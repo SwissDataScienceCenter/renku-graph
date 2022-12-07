@@ -25,7 +25,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
-import io.renku.metrics.LabeledHistogram
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -54,13 +54,12 @@ private class EventFinder[F[_]: MonadThrow: Logger](
 
 private object EventFinder {
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.EventFinder[F, ZombieEvent]] = for {
-    longProcessingEventFinder <- LongProcessingEventFinder(queriesExecTimes)
-    lostSubscriberEventFinder <- LostSubscriberEventFinder(queriesExecTimes)
-    zombieNodesCleaner        <- ZombieNodesCleaner(queriesExecTimes)
-    lostZombieEventFinder     <- LostZombieEventFinder(queriesExecTimes)
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: QueriesExecutionTimes]
+      : F[producers.EventFinder[F, ZombieEvent]] = for {
+    longProcessingEventFinder <- LongProcessingEventFinder[F]
+    lostSubscriberEventFinder <- LostSubscriberEventFinder[F]
+    zombieNodesCleaner        <- ZombieNodesCleaner[F]
+    lostZombieEventFinder     <- LostZombieEventFinder[F]
   } yield new EventFinder[F](longProcessingEventFinder,
                              lostSubscriberEventFinder,
                              zombieNodesCleaner,

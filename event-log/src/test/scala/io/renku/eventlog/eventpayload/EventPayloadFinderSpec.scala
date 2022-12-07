@@ -18,14 +18,15 @@
 
 package io.renku.eventlog.eventpayload
 
-import io.renku.db.SqlStatement
-import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
+import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
-import io.renku.testtools.IOSpec
+import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.{EventStatus, ZippedEventPayload}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
+import io.renku.metrics.TestMetricsRegistry
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.ByteVector
@@ -33,6 +34,7 @@ import scodec.bits.ByteVector
 class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "findEventPayload" should {
+
     "return the payload if present" in {
       val eventId     = EventsGenerators.compoundEventIds.generateOne
       val projectPath = GraphModelGenerators.projectPaths.generateOne
@@ -47,7 +49,7 @@ class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
         maybeEventPayload = Some(ZippedEventPayload(payload.toArray))
       )
 
-      val finder = EventPayloadFinder(TestLabeledHistogram[SqlStatement.Name]("query_id"))
+      val finder = EventPayloadFinder[IO]
       val result = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
       result shouldBe Some(PayloadData(payload))
     }
@@ -55,7 +57,7 @@ class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
     "return none if event is not present" in {
       val eventId     = EventsGenerators.compoundEventIds.generateOne
       val projectPath = GraphModelGenerators.projectPaths.generateOne
-      val finder      = EventPayloadFinder(TestLabeledHistogram[SqlStatement.Name]("query_id"))
+      val finder      = EventPayloadFinder[IO]
       val result      = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
       result shouldBe None
     }
@@ -72,9 +74,12 @@ class EventPayloadFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
         projectPath = projectPath
       )
 
-      val finder = EventPayloadFinder(TestLabeledHistogram[SqlStatement.Name]("query_id"))
+      val finder = EventPayloadFinder[IO]
       val result = finder.findEventPayload(eventId.id, projectPath).unsafeRunSync()
       result shouldBe None
     }
   }
+
+  private implicit lazy val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+  private implicit lazy val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
 }

@@ -26,19 +26,19 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.Criteria
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.model.{PerPage, Total}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import io.renku.metrics.LabeledHistogram
 
 private trait EventsFinder[F[_]] {
   def findEvents(request: EventsEndpoint.Criteria): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventsFinder[F]
     with Paging[EventInfo] {
 
@@ -280,6 +280,6 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 }
 
 private object EventsFinder {
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new EventsFinderImpl(queriesExecTimes))
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: QueriesExecutionTimes]: F[EventsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new EventsFinderImpl[F])
 }

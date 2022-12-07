@@ -24,11 +24,12 @@ import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.version
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.creation.CreateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpRoutes, Response}
 import org.typelevel.log4cats.Logger
@@ -76,12 +77,11 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[MicroserviceRoutes[F]] = for {
-    fetchTokenEndpoint  <- FetchTokenEndpoint(queriesExecTimes)
-    createTokenEndpoint <- CreateTokenEndpoint(queriesExecTimes)
-    deleteTokenEndpoint <- DeleteTokenEndpoint(queriesExecTimes)
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: SessionResource: QueriesExecutionTimes]
+      : F[MicroserviceRoutes[F]] = for {
+    fetchTokenEndpoint  <- FetchTokenEndpoint[F]
+    createTokenEndpoint <- CreateTokenEndpoint[F]
+    deleteTokenEndpoint <- DeleteTokenEndpoint[F]
     versionRoutes       <- version.Routes[F]
     dbReady             <- Ref.of(false)
   } yield new MicroserviceRoutesImpl(fetchTokenEndpoint,

@@ -24,10 +24,10 @@ import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
 import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -68,9 +68,7 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 }
 
 object EventDetailsEndpoint {
-  def apply[F[_]: Concurrent: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[EventDetailsEndpoint[F]] = for {
-    eventDetailFinder <- EventDetailsFinder(queriesExecTimes)
+  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[EventDetailsEndpoint[F]] = for {
+    eventDetailFinder <- EventDetailsFinder[F]
   } yield new EventDetailsEndpointImpl[F](eventDetailFinder)
 }

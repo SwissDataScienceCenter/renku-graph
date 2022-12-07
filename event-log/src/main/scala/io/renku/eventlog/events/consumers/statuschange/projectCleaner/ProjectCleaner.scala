@@ -26,10 +26,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectPathEncoder}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
@@ -42,15 +42,14 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: AccessTokenFinder: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
+  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes]: F[ProjectCleaner[F]] = for {
     projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
-  } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover, queriesExecTimes)
+  } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover)
 }
 
-private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
-    projectWebhookAndTokenRemover: ProjectWebhookAndTokenRemover[F],
-    queriesExecTimes:              LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecutionTimes](
+    projectWebhookAndTokenRemover: ProjectWebhookAndTokenRemover[F]
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectCleaner[F] {
   private val applicative = Applicative[F]
   import applicative._

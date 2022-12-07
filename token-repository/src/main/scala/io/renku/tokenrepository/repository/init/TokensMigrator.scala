@@ -21,46 +21,37 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import creation._
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import creation._
 import deletion.TokenRemover
 import io.renku.db.DbClient
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 import skunk.~
 
 import scala.concurrent.duration._
 
 private object TokensMigrator {
-  def apply[F[_]: Async: GitLabClient: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DBMigration[F]] = for {
+  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes]: F[DBMigration[F]] = for {
     accessTokenCrypto    <- AccessTokenCrypto[F]()
     tokenValidator       <- TokenValidator[F]
-    tokenRemover         <- TokenRemover[F](queriesExecTimes).pure[F]
+    tokenRemover         <- TokenRemover[F].pure[F]
     tokensCreator        <- NewTokensCreator[F]()
-    associationPersister <- TokensPersister[F](queriesExecTimes).pure[F]
-  } yield new TokensMigrator[F](accessTokenCrypto,
-                                tokenValidator,
-                                tokenRemover,
-                                tokensCreator,
-                                associationPersister,
-                                queriesExecTimes
-  )
+    associationPersister <- TokensPersister[F].pure[F]
+  } yield new TokensMigrator[F](accessTokenCrypto, tokenValidator, tokenRemover, tokensCreator, associationPersister)
 }
 
-private class TokensMigrator[F[_]: Async: SessionResource: Logger](
+private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes](
     tokenCrypto:          AccessTokenCrypto[F],
     tokenValidator:       TokenValidator[F],
     tokenRemover:         TokenRemover[F],
     tokensCreator:        NewTokensCreator[F],
     associationPersister: TokensPersister[F],
-    queriesExecTimes:     LabeledHistogram[F],
     retryInterval:        Duration = 5 seconds
-) extends DbClient[F](Some(queriesExecTimes))
+) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with DBMigration[F]
     with TokenRepositoryTypeSerializers {
 

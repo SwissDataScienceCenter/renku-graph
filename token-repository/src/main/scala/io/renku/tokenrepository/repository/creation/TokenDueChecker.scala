@@ -20,12 +20,12 @@ package io.renku.tokenrepository.repository
 package creation
 
 import ProjectsTokensDB.SessionResource
-import creation.TokenDates.ExpiryDate
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import creation.TokenDates.ExpiryDate
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 
 import java.time.LocalDate.now
 import java.time.Period
@@ -35,14 +35,13 @@ private trait TokenDueChecker[F[_]] {
 }
 
 private object TokenDueChecker {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[TokenDueChecker[F]] =
-    ProjectTokenDuePeriod[F]().map(new TokenDueCheckerImpl[F](_, queriesExecTimes))
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[TokenDueChecker[F]] =
+    ProjectTokenDuePeriod[F]().map(new TokenDueCheckerImpl[F](_))
 }
 
-private class TokenDueCheckerImpl[F[_]: MonadCancelThrow: SessionResource](
-    tokenDuePeriod:   Period,
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient[F](Some(queriesExecTimes))
+private class TokenDueCheckerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    tokenDuePeriod: Period
+) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with TokenDueChecker[F]
     with TokenRepositoryTypeSerializers {
 

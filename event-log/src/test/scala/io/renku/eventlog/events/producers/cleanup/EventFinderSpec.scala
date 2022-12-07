@@ -20,18 +20,18 @@ package io.renku.eventlog.events.producers.cleanup
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
+import io.renku.eventlog.metrics.TestEventStatusGauges._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.Path
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -68,13 +68,15 @@ private class EventFinderSpec
         )
         val project1Event2 = generateEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 1))
 
-        (awaitingDeletionGauge.update _).expects(project1.path -> -1d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project1.path -> 1d).returning(().pure[IO])
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        (awaitingDeletionGauge.update _).expects(project2.path -> 0d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project2.path -> 0d).returning(().pure[IO])
+        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 1d
+
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
+
+        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -92,15 +94,15 @@ private class EventFinderSpec
         val project2      = consumerProjects.generateOne
         val project2Event = generateEvent(project2, AwaitingDeletion, ExecutionDate(now))
 
-        (awaitingDeletionGauge.update _).expects(project1.path -> 0d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project1.path -> 0d).returning(().pure[IO])
-
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        (awaitingDeletionGauge.update _).expects(project2.path -> -1d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project2.path -> 1d).returning(().pure[IO])
+        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe 0d
+        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 0d
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
+
+        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -124,15 +126,15 @@ private class EventFinderSpec
         val project2      = consumerProjects.generateOne
         val project2Event = generateEvent(project2, AwaitingDeletion, ExecutionDate(now))
 
-        (awaitingDeletionGauge.update _).expects(project1.path -> -2d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project1.path -> 2d).returning(().pure[IO])
-
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        (awaitingDeletionGauge.update _).expects(project2.path -> -1d).returning(().pure[IO])
-        (deletingGauge.update _).expects(project2.path -> 1d).returning(().pure[IO])
+        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe -2d
+        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 2d
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
+
+        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -146,13 +148,13 @@ private class EventFinderSpec
   private trait TestCase {
     val now = Instant.now()
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val awaitingDeletionGauge = mock[LabeledGauge[IO, Path]]
-    val deletingGauge         = mock[LabeledGauge[IO, Path]]
-    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val currentTime           = mockFunction[Instant]
+    private implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    implicit val gauges:                   EventStatusGauges[IO]     = TestEventStatusGauges[IO]
+    val currentTime = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
-    val finder = new EventFinderImpl[IO](awaitingDeletionGauge, deletingGauge, queriesExecTimes, currentTime)
+    val finder = new EventFinderImpl[IO](currentTime)
   }
 
   private def generateEvent(project:       Project,

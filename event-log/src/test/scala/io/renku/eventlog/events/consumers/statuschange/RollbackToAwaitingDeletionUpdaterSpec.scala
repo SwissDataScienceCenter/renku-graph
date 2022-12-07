@@ -19,17 +19,17 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events._
 import EventStatus._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.Project
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -71,9 +71,10 @@ class RollbackToAwaitingDeletionUpdaterSpec
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new RollbackToAwaitingDeletionUpdater[IO](queriesExecTimes, currentTime)
+    val currentTime = mockFunction[Instant]
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val dbUpdater = new RollbackToAwaitingDeletionUpdater[IO](currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

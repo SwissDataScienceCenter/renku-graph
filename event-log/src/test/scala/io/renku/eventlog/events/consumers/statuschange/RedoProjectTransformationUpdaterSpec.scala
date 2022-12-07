@@ -19,21 +19,21 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators.eventMessages
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -104,9 +104,10 @@ class RedoProjectTransformationUpdaterSpec
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val updater          = new RedoProjectTransformationUpdaterImpl[IO](queriesExecTimes)
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val updater = new RedoProjectTransformationUpdaterImpl[IO]
   }
 
   private type EventCreationResult = (CompoundEventId, Project, EventDate)

@@ -20,19 +20,19 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events._
 import EventStatus._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import StatusChangeEvent.{AllowedCombination, ToFailure}
 import cats.data.Kleisli
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -251,8 +251,9 @@ class ToFailureUpdaterSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val currentTime         = mockFunction[Instant]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater           = new ToFailureUpdater[IO](deliveryInfoRemover, queriesExecTimes, currentTime)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val dbUpdater = new ToFailureUpdater[IO](deliveryInfoRemover, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

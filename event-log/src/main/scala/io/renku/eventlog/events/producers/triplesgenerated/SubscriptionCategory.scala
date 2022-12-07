@@ -26,25 +26,23 @@ import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.CategoryName
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
   val categoryName: CategoryName = CategoryName("TRIPLES_GENERATED")
 
-  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-      underTransformationGauge:    LabeledGauge[F, projects.Path],
-      queriesExecTimes:            LabeledHistogram[F]
-  ): F[producers.SubscriptionCategory[F]] = for {
+  def apply[F[
+      _
+  ]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+      : F[producers.SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventFetcher     <- EventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+    eventFetcher     <- EventFinder[F]
     dispatchRecovery <- DispatchRecovery[F]
     eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](
-                       eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id),
-                       queriesExecTimes
+                       eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id)
                      )
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,

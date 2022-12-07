@@ -23,18 +23,19 @@ import ProjectPrioritisation.Priority.MaxPriority
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.metrics.TestEventStatusGauges._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
-import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -74,9 +75,6 @@ private class EventFinderSpec
 
         findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 0)),
           totalOccupancy = 0,
@@ -87,16 +85,14 @@ private class EventFinderSpec
           AwaitingGenerationEvent(event2Id, projectPath, event2Body)
         )
 
+        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
+        gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 1
+
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
         givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
-
-        queriesExecTimes.verifyExecutionTimeMeasured("awaiting_generation - find projects",
-                                                     "awaiting_generation - find latest",
-                                                     "awaiting_generation - update status"
-        )
       }
 
     s"find the most recent event in status $New or $GenerationRecoverableFailure " +
@@ -122,9 +118,6 @@ private class EventFinderSpec
         findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
         // 1st event with the same event date
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 0)),
           totalOccupancy = 0,
@@ -136,13 +129,16 @@ private class EventFinderSpec
             be(AwaitingGenerationEvent(event2Id, projectPath, event2Body).some)
         }
 
+        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
+        gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 1
+
         findEvents(EventStatus.GeneratingTriples).noBatchDate should {
           be(List((event1Id, executionDate))) or be(List((event2Id, executionDate)))
         }
 
         // 2nd event with the same event date
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
+        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -2
+        gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 2
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 1)),
@@ -188,9 +184,6 @@ private class EventFinderSpec
 
           findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
-          expectWaitingEventsGaugeDecrement(projectPath)
-          expectUnderProcessingGaugeIncrement(projectPath)
-
           givenPrioritisation(
             takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 0)),
             totalOccupancy = 0,
@@ -200,6 +193,9 @@ private class EventFinderSpec
           finder.popEvent().unsafeRunSync() shouldBe Some(
             AwaitingGenerationEvent(event1Id, projectPath, event1Body)
           )
+
+          gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
+          gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 1
         }
     }
 
@@ -284,8 +280,6 @@ private class EventFinderSpec
 
       findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
-      expectGaugeUpdated(times = events.size)
-
       events.sortBy(_._3).reverse.zipWithIndex foreach { case ((eventId, _, eventDate, projectPath), index) =>
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
@@ -298,18 +292,18 @@ private class EventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
+      events foreach { case (_, _, _, path) =>
+        gauges.awaitingGeneration.getValue(path).unsafeRunSync() shouldBe -1
+        gauges.underGeneration.getValue(path).unsafeRunSync()    shouldBe 1
+      }
+
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
     "return the latest events from each projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFind = new EventFinderImpl(waitingEventsGauge,
-                                             underProcessingGauge,
-                                             queriesExecTimes,
-                                             currentTime,
-                                             projectsFetchingLimit = 5,
-                                             projectPrioritisation = projectPrioritisation
-      )
+      val eventLogFind =
+        new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 5, projectPrioritisation = projectPrioritisation)
 
       val events = readyStatuses
         .generateNonEmptyList(min = 3, max = 6)
@@ -323,8 +317,6 @@ private class EventFinderSpec
 
       val eventsPerProject = events.groupBy(_._4).toList.sortBy(_._2.maxBy(_._3)._3).reverse
 
-      expectGaugeUpdated(times = eventsPerProject.size)
-
       eventsPerProject.zipWithIndex foreach { case ((projectPath, events), index) =>
         val (eventIdOfTheNewestEvent, _, _, _) = events.sortBy(_._3).reverse.head
         (projectPrioritisation.prioritise _)
@@ -334,6 +326,11 @@ private class EventFinderSpec
 
       eventsPerProject foreach { _ =>
         eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      eventsPerProject foreach { case (path, events) =>
+        gauges.awaitingGeneration.getValue(path).unsafeRunSync() shouldBe -events.size
+        gauges.underGeneration.getValue(path).unsafeRunSync()    shouldBe events.size
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs eventsPerProject.map {
@@ -352,25 +349,10 @@ private class EventFinderSpec
     val currentTime   = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
-    val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
+    implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
     val projectPrioritisation = mock[ProjectPrioritisation[IO]]
-    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
-
-    def expectWaitingEventsGaugeDecrement(projectPath: Path) =
-      (waitingEventsGauge.decrement _)
-        .expects(projectPath)
-        .returning(IO.unit)
-
-    def expectUnderProcessingGaugeIncrement(projectPath: Path) =
-      (underProcessingGauge.increment _)
-        .expects(projectPath)
-        .returning(IO.unit)
-
-    def expectGaugeUpdated(times: Int = 1) = {
-      (waitingEventsGauge.decrement _).expects(*).returning(IO.unit).repeat(times)
-      (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(times)
-    }
+    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
 
     def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
@@ -379,14 +361,7 @@ private class EventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-
-    val finder = new EventFinderImpl(waitingEventsGauge,
-                                     underProcessingGauge,
-                                     queriesExecTimes,
-                                     currentTime,
-                                     projectsFetchingLimit = 1,
-                                     projectPrioritisation = projectPrioritisation
-    )
+    val finder = new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 1, projectPrioritisation)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply

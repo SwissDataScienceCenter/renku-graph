@@ -22,36 +22,20 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.Microservice
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: SessionResource: Logger](
-      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
-      underGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-      underTransformationGauge:    LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
-      underDeletionGauge:          LabeledGauge[F, projects.Path],
-      queriesExecTimes:            LabeledHistogram[F]
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]
+      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(
-                 queriesExecTimes,
-                 awaitingGenerationGauge,
-                 underGenerationGauge,
-                 awaitingTransformationGauge,
-                 underTransformationGauge,
-                 awaitingDeletionGauge,
-                 underDeletionGauge
-               )
+    handler <- EventHandler[F]
   } yield handler -> subscriptionMechanism
 }

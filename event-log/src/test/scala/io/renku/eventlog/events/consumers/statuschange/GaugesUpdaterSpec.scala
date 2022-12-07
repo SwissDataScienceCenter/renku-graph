@@ -18,22 +18,22 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.syntax.all._
+import cats.effect.IO
+import io.renku.eventlog.metrics.TestEventStatusGauges._
+import io.renku.eventlog.metrics.{EventStatusGauges, TestEventStatusGauges}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonNegativeInts
+import io.renku.generators.Generators.{nonNegativeDoubles, nonNegativeInts}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledGauge
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory with IOSpec {
 
   "updateGauges" should {
 
@@ -43,74 +43,73 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
       val updateResults =
         DBUpdateResults.ForProjects(projectsPath.map(_ -> countsForAllStatuses.generateOne).toList.toSet)
 
+      gaugesUpdater.updateGauges(updateResults).unsafeRunSync() shouldBe ()
+
       projectsPath.toList.foreach { projectPath =>
         val awaitingGenerationChange = List(
           updateResults.getCount(projectPath, New),
           updateResults.getCount(projectPath, GenerationRecoverableFailure)
         ).sum.toDouble
-        (awaitingGenerationGauge.update _).expects(projectPath -> awaitingGenerationChange).returning(().pure[Try])
+        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe awaitingGenerationChange
 
         val awaitingTransformationChange = List(
           updateResults.getCount(projectPath, TriplesGenerated),
           updateResults.getCount(projectPath, TransformationRecoverableFailure)
         ).sum.toDouble
-        (awaitingTransformationGauge.update _)
-          .expects(projectPath -> awaitingTransformationChange)
-          .returning(().pure[Try])
+        gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe awaitingTransformationChange
 
         val underGenerationGaugeChange = List(updateResults.getCount(projectPath, GeneratingTriples)).sum.toDouble
-        (underTriplesGenerationGauge.update _)
-          .expects(projectPath -> underGenerationGaugeChange)
-          .returning(().pure[Try])
+        gauges.underGeneration.getValue(projectPath).unsafeRunSync() shouldBe underGenerationGaugeChange
 
         val underTransformationGaugeChange = List(updateResults.getCount(projectPath, TransformingTriples)).sum.toDouble
-        (underTransformationGauge.update _)
-          .expects(projectPath -> underTransformationGaugeChange)
-          .returning(().pure[Try])
+        gauges.underTransformation.getValue(projectPath).unsafeRunSync() shouldBe underTransformationGaugeChange
+
         val awaitingDeletionGaugeChange = List(updateResults.getCount(projectPath, AwaitingDeletion)).sum.toDouble
-        (awaitingDeletionGauge.update _)
-          .expects(projectPath -> awaitingDeletionGaugeChange)
-          .returning(().pure[Try])
+        gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe awaitingDeletionGaugeChange
 
-        val deletingGaugeChange = List(updateResults.getCount(projectPath, Deleting)).sum.toDouble
-        (deletingGauge.update _)
-          .expects(projectPath -> deletingGaugeChange)
-          .returning(().pure[Try])
+        val underDeletingGaugeChange = List(updateResults.getCount(projectPath, Deleting)).sum.toDouble
+        gauges.underDeletion.getValue(projectPath).unsafeRunSync() shouldBe underDeletingGaugeChange
       }
-
-      gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
     }
 
     s"reset all the gauges in case of ${DBUpdateResults.ForAllProjects} update" in new TestCase {
 
       val updateResults = DBUpdateResults.ForAllProjects
 
-      (awaitingGenerationGauge.reset _).expects().returning(().pure[Try])
-      (awaitingTransformationGauge.reset _).expects().returning(().pure[Try])
-      (underTriplesGenerationGauge.reset _).expects().returning(().pure[Try])
-      (underTransformationGauge.reset _).expects().returning(().pure[Try])
-      (awaitingDeletionGauge.reset _).expects().returning(().pure[Try])
-      (deletingGauge.reset _).expects().returning(().pure[Try])
+      gauges.awaitingGeneration
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
+      gauges.underGeneration
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
+      gauges.awaitingTransformation
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
+      gauges.underTransformation
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
+      gauges.awaitingDeletion
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
+      gauges.underDeletion
+        .set(projectPaths.generateOne -> nonNegativeDoubles().generateOne.value)
+        .unsafeRunSync()
 
-      gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
+      gaugesUpdater.updateGauges(updateResults).unsafeRunSync() shouldBe ()
+
+      gauges.awaitingGeneration.getAllValues.unsafeRunSync()     shouldBe Map.empty
+      gauges.underGeneration.getAllValues.unsafeRunSync()        shouldBe Map.empty
+      gauges.awaitingTransformation.getAllValues.unsafeRunSync() shouldBe Map.empty
+      gauges.underTransformation.getAllValues.unsafeRunSync()    shouldBe Map.empty
+      gauges.awaitingDeletion.getAllValues.unsafeRunSync()       shouldBe Map.empty
+      gauges.underDeletion.getAllValues.unsafeRunSync()          shouldBe Map.empty
     }
   }
 
   private trait TestCase {
 
-    val awaitingGenerationGauge     = mock[LabeledGauge[Try, projects.Path]]
-    val awaitingTransformationGauge = mock[LabeledGauge[Try, projects.Path]]
-    val underTransformationGauge    = mock[LabeledGauge[Try, projects.Path]]
-    val underTriplesGenerationGauge = mock[LabeledGauge[Try, projects.Path]]
-    val awaitingDeletionGauge       = mock[LabeledGauge[Try, projects.Path]]
-    val deletingGauge               = mock[LabeledGauge[Try, projects.Path]]
-    val gaugesUpdater = new GaugesUpdaterImpl[Try](awaitingGenerationGauge,
-                                                   awaitingTransformationGauge,
-                                                   underTransformationGauge,
-                                                   underTriplesGenerationGauge,
-                                                   awaitingDeletionGauge,
-                                                   deletingGauge
-    )
+    implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
+    val gaugesUpdater = new GaugesUpdaterImpl[IO]
   }
 
   private def countsForAllStatuses: Gen[Map[EventStatus, Int]] = for {

@@ -24,21 +24,27 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 
-import scala.jdk.CollectionConverters._
-
 sealed trait Histogram[F[_]] extends MetricsCollector
 
 trait SingleValueHistogram[F[_]] extends Histogram[F] {
   def startTimer(): F[Histogram.Timer[F]]
 }
 
-class SingleValueHistogramImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibHistogram)
-    extends SingleValueHistogram[F]
+class SingleValueHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
+                                                 val help: String Refined NonEmpty,
+                                                 buckets:  Seq[Double]
+) extends SingleValueHistogram[F]
     with PrometheusCollector {
 
   type Collector = LibHistogram
-  override lazy val name: String = wrappedCollector.describe().asScala.head.name
-  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  private[metrics] override lazy val wrappedCollector: LibHistogram =
+    LibHistogram
+      .build()
+      .name(name.value)
+      .help(help.value)
+      .buckets(buckets: _*)
+      .create()
 
   override def startTimer(): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     new Histogram.TimerImpl(wrappedCollector.startTimer())
@@ -49,13 +55,23 @@ trait LabeledHistogram[F[_]] extends Histogram[F] {
   def startTimer(labelValue: String): F[Histogram.Timer[F]]
 }
 
-class LabeledHistogramImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibHistogram)
-    extends LabeledHistogram[F]
+class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
+                                             val help:  String Refined NonEmpty,
+                                             labelName: String Refined NonEmpty,
+                                             buckets:   Seq[Double]
+) extends LabeledHistogram[F]
     with PrometheusCollector {
 
   type Collector = LibHistogram
-  override lazy val name: String = wrappedCollector.describe().asScala.head.name
-  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  private[metrics] override lazy val wrappedCollector: LibHistogram =
+    LibHistogram
+      .build()
+      .name(name.value)
+      .help(help.value)
+      .labelNames(labelName.value)
+      .buckets(buckets: _*)
+      .create()
 
   override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     new Histogram.TimerImpl(wrappedCollector.labels(labelValue).startTimer())
@@ -78,37 +94,18 @@ object Histogram {
       name:    String Refined NonEmpty,
       help:    String Refined NonEmpty,
       buckets: Seq[Double]
-  ): F[SingleValueHistogram[F]] = {
-
-    val histogram = new SingleValueHistogramImpl[F](
-      LibHistogram
-        .build()
-        .name(name.value)
-        .help(help.value)
-        .buckets(buckets: _*)
-        .create()
-    )
-
-    MetricsRegistry[F].register(histogram).widen
-  }
+  ): F[SingleValueHistogram[F]] =
+    MetricsRegistry[F]
+      .register(new SingleValueHistogramImpl[F](name, help, buckets))
+      .widen
 
   def apply[F[_]: MonadThrow: MetricsRegistry](
       name:      String Refined NonEmpty,
       help:      String Refined NonEmpty,
       labelName: String Refined NonEmpty,
       buckets:   Seq[Double]
-  ): F[LabeledHistogram[F]] = {
-
-    val histogram = new LabeledHistogramImpl[F](
-      LibHistogram
-        .build()
-        .name(name.value)
-        .help(help.value)
-        .labelNames(labelName.value)
-        .buckets(buckets: _*)
-        .create()
-    )
-
-    MetricsRegistry[F].register(histogram).widen
-  }
+  ): F[LabeledHistogram[F]] =
+    MetricsRegistry[F]
+      .register(new LabeledHistogramImpl[F](name, help, labelName, buckets))
+      .widen
 }

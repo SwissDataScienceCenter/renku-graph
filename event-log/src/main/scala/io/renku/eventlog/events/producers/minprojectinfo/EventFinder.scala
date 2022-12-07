@@ -25,18 +25,18 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                       now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, MinProjectInfoEvent]
     with SubscriptionTypeSerializers {
 
@@ -102,9 +102,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesEx
 }
 
 private object EventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[EventFinder[F, MinProjectInfoEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl(queriesExecTimes)
-  }
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MinProjectInfoEvent]] =
+    MonadThrow[F].catchNonFatal {
+      new EventFinderImpl[F]()
+    }
 }

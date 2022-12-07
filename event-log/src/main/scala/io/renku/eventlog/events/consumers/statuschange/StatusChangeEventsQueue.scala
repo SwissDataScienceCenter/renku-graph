@@ -26,7 +26,7 @@ import cats.{MonadThrow, Show}
 import io.circe.{Decoder, Encoder}
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.metrics.LabeledHistogram
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.{Session, ~}
@@ -57,15 +57,14 @@ object StatusChangeEventsQueue {
     implicit def show[E]: Show[EventType[E]] = Show.show(_.value)
   }
 
-  def apply[F[_]: Async: Logger: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[StatusChangeEventsQueue[F]] = MonadThrow[F].catchNonFatal {
-    new StatusChangeEventsQueueImpl[F](queriesExecTimes)
-  }
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[StatusChangeEventsQueue[F]] =
+    MonadThrow[F].catchNonFatal {
+      new StatusChangeEventsQueueImpl[F]
+    }
 }
 
-private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with StatusChangeEventsQueue[F] {
 
   import eu.timepit.refined.auto._

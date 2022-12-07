@@ -25,12 +25,12 @@ import io.circe.{Encoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
 import io.renku.eventlog.events.EventsEndpoint.JsonEncoders
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest
-import io.renku.metrics.LabeledHistogram
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -64,10 +64,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
 object EventsEndpoint {
 
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[EventsEndpoint[F]] = for {
-    eventsFinder <- EventsFinder(queriesExecTimes)
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: QueriesExecutionTimes]: F[EventsEndpoint[F]] = for {
+    eventsFinder <- EventsFinder[F]
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
 

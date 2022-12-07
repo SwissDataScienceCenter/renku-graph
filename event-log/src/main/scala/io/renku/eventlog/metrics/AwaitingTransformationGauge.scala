@@ -27,17 +27,23 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.metrics._
 
+trait AwaitingTransformationGauge[F[_]] extends LabeledGauge[F, projects.Path]
+
 object AwaitingTransformationGauge {
   val NumberOfProjects: Int Refined Positive = 20
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
-    Gauge[F, projects.Path](
-      name = "events_awaiting_transformation_count",
-      help = "Number of Events waiting to have their triples transformed by project path.",
-      labelName = "project",
-      resetDataFetch = () =>
-        statsFinder
-          .countEvents(Set(TriplesGenerated), maybeLimit = Some(NumberOfProjects))
-          .map(_.view.mapValues(_.toDouble).toMap)
-    )
+  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[AwaitingTransformationGauge[F]] =
+    MetricsRegistry[F].register {
+      new LabeledGaugeImpl[F, projects.Path](
+        name = "events_awaiting_transformation_count",
+        help = "Number of Events waiting to have their triples transformed by project path.",
+        labelName = "project",
+        resetDataFetch = () =>
+          statsFinder
+            .countEvents(Set(TriplesGenerated), maybeLimit = Some(NumberOfProjects))
+            .map(_.view.mapValues(_.toDouble).toMap)
+      ) with AwaitingTransformationGauge[F]
+    }.widen
+
+  def apply[F[_]](implicit ev: AwaitingTransformationGauge[F]): AwaitingTransformationGauge[F] = ev
 }

@@ -22,9 +22,9 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.Id
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
@@ -34,12 +34,12 @@ private[repository] trait TokenRemover[F[_]] {
 }
 
 private[repository] object TokenRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F]): TokenRemover[F] =
-    new TokenRemoverImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]: TokenRemover[F] =
+    new TokenRemoverImpl[F]
 }
 
-private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with TokenRemover[F]
     with TokenRepositoryTypeSerializers {
 

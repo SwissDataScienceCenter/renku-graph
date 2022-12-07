@@ -18,15 +18,16 @@
 
 package io.renku.eventlog.events.producers.projectsync
 
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators._
+import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.LastSyncedDate
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -115,7 +116,8 @@ class EventFinderSpec
     val currentTime = Instant.now()
     val now         = mockFunction[Instant]
     now.expects().returning(currentTime).anyNumberOfTimes()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder           = new EventFinderImpl(queriesExecTimes, now)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val finder = new EventFinderImpl[IO](now)
   }
 }

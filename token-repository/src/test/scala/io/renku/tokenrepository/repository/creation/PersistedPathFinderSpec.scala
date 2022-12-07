@@ -18,13 +18,14 @@
 
 package io.renku.tokenrepository.repository.creation
 
-import io.renku.db.SqlStatement
+import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -57,7 +58,8 @@ class PersistedPathFinderSpec
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder                   = new PersistedPathFinderImpl(queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val finder = new PersistedPathFinderImpl[IO]
   }
 }

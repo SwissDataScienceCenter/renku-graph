@@ -19,17 +19,17 @@
 package io.renku.eventlog.eventpayload
 
 import cats.effect.MonadCancelThrow
+import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.projects.{Path => ProjectPath}
-import io.renku.metrics.LabeledHistogram
 import scodec.bits.ByteVector
 import skunk._
 import skunk.implicits._
-import eu.timepit.refined.auto._
 
 trait EventPayloadFinder[F[_]] {
 
@@ -43,8 +43,8 @@ object EventPayloadFinder {
     def length: Long = data.length
   }
 
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): EventPayloadFinder[F] =
-    new DbClient[F](Some(queriesExecTimes)) with EventPayloadFinder[F] with TypeSerializers {
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: EventPayloadFinder[F] =
+    new DbClient[F](Some(QueriesExecutionTimes[F])) with EventPayloadFinder[F] with TypeSerializers {
 
       override def findEventPayload(eventId: EventId, projectPath: ProjectPath): F[Option[PayloadData]] =
         SessionResource[F].useK(measureExecutionTime(findStatement(eventId, projectPath)))

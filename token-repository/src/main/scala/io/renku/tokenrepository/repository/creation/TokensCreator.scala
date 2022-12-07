@@ -33,7 +33,7 @@ import fetching.PersistedTokensFinder
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -165,13 +165,11 @@ private object TokensCreator {
 
   private val maxRetries: Int Refined NonNegative = 3
 
-  def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[TokensCreator[F]] = for {
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[TokensCreator[F]] = for {
     pathFinder                <- ProjectPathFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
-    tokenDueChecker           <- TokenDueChecker[F](queriesExecTimes)
+    tokenDueChecker           <- TokenDueChecker[F]
     projectAccessTokenCreator <- NewTokensCreator[F]()
     revokeCandidatesFinder    <- RevokeCandidatesFinder[F]
   } yield new TokensCreatorImpl[F](
@@ -180,10 +178,10 @@ private object TokensCreator {
     tokenValidator,
     tokenDueChecker,
     projectAccessTokenCreator,
-    TokensPersister(queriesExecTimes),
-    PersistedPathFinder(queriesExecTimes),
-    TokenRemover(queriesExecTimes),
-    PersistedTokensFinder(queriesExecTimes),
+    TokensPersister[F],
+    PersistedPathFinder[F],
+    TokenRemover[F],
+    PersistedTokensFinder[F],
     revokeCandidatesFinder,
     TokensRevoker[F],
     maxRetries

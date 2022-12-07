@@ -25,10 +25,10 @@ import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.client.ServiceHealthChecker
-import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -39,11 +39,10 @@ private trait ZombieNodesCleaner[F[_]] {
   def removeZombieNodes(): F[Unit]
 }
 
-private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
-    queriesExecTimes:     LabeledHistogram[F],
+private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource: QueriesExecutionTimes](
     microserviceBaseUrl:  MicroserviceBaseUrl,
     serviceHealthChecker: ServiceHealthChecker[F]
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ZombieNodesCleaner[F]
     with TypeSerializers {
 
@@ -148,11 +147,9 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
 }
 
 private object ZombieNodesCleaner {
-  def apply[F[_]: Async: Parallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[ZombieNodesCleaner[F]] = for {
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: QueriesExecutionTimes]: F[ZombieNodesCleaner[F]] = for {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)
     serviceBaseUrl       <- serviceUrlFinder.findBaseUrl()
     serviceHealthChecker <- ServiceHealthChecker[F]
-  } yield new ZombieNodesCleanerImpl(queriesExecTimes, serviceBaseUrl, serviceHealthChecker)
+  } yield new ZombieNodesCleanerImpl(serviceBaseUrl, serviceHealthChecker)
 }

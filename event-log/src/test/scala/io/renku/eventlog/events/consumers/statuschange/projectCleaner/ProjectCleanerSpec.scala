@@ -21,20 +21,20 @@ package projectCleaner
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -93,9 +93,10 @@ class ProjectCleanerSpec
     insertCleanUpEvent(project)
     upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val projectHookRemover = mock[ProjectWebhookAndTokenRemover[IO]]
-    val projectCleaner     = new ProjectCleanerImpl[IO](projectHookRemover, queriesExecTimes)
+    val projectCleaner     = new ProjectCleanerImpl[IO](projectHookRemover)
   }
 }

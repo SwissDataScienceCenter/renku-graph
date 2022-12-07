@@ -33,7 +33,6 @@ import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventDate, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.Path
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -49,10 +48,9 @@ trait StatsFinder[F[_]] {
   def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Path, Long]]
 }
 
-class StatsFinderImpl[F[_]: Async: SessionResource](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with StatsFinder[F]
     with SubscriptionTypeSerializers {
 
@@ -258,6 +256,6 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
 }
 
 object StatsFinder {
-  def apply[F[_]: MonadThrow: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[StatsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new StatsFinderImpl(queriesExecTimes))
+  def apply[F[_]: MonadThrow: Async: SessionResource: QueriesExecutionTimes]: F[StatsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new StatsFinderImpl[F]())
 }
