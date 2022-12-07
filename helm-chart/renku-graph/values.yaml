@@ -96,8 +96,8 @@ tokenRepository:
   gitlab:
     rateLimit: 50/sec
   projectTokenTTL: '365 days'
-  # name of the Project Access Tokens to be created on behalf of the user
-  projectTokenName: 'renku'
+  # name of the Project Access Tokens to be created on behalf of the user in GitLab; defaults to .Release.Name
+  projectTokenName:
   projectTokenDuePeriod: '184 days'
   connectionPool: 2
   tokenEncryption:
