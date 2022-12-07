@@ -21,12 +21,11 @@ package io.renku.tokenrepository.repository.deletion
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
-import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -56,10 +55,8 @@ class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
 }
 
 object DeleteTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DeleteTokenEndpoint[F]] = MonadThrow[F].catchNonFatal {
-    new DeleteTokenEndpointImpl[F](new TokenRemoverImpl[F](sessionResource, queriesExecTimes))
-  }
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[DeleteTokenEndpoint[F]] =
+    MonadThrow[F].catchNonFatal {
+      new DeleteTokenEndpointImpl[F](TokenRemover[F])
+    }
 }

@@ -20,7 +20,6 @@ package io.renku.eventlog.metrics
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptySet, nonNegativeLongs}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
@@ -28,7 +27,6 @@ import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
-import io.renku.metrics.MetricsTools._
 import io.renku.metrics._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -44,13 +42,13 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
 
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
-        .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
+        .expects(*)
         .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val gauge = UnderTriplesGenerationGauge(statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
-      gauge.name                                          shouldBe "events_under_triples_generation_count"
+      gauge.name.value                                    shouldBe "events_under_triples_generation_count"
     }
 
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
@@ -65,16 +63,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
         .expects(Set(GeneratingTriples: EventStatus), None)
         .returning(processingEvents.pure[IO])
 
-      val gauge = UnderTriplesGenerationGauge(statsFinder).unsafeRunSync()
-
-      gauge.reset().unsafeRunSync()
-
-      gauge
-        .asInstanceOf[LabeledGaugeImpl[IO, projects.Path]]
-        .wrappedCollector
-        .collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
-        ("project", project.value, count.toDouble)
-      }
+      UnderTriplesGenerationGauge(statsFinder).unsafeRunSync().reset().unsafeRunSync()
     }
   }
 
@@ -84,9 +73,6 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
   }
 
   private lazy val processingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {
-    for {
-      path  <- projectPaths
-      count <- nonNegativeLongs()
-    } yield path -> count.value
+    (projectPaths -> nonNegativeLongs().map(_.value)).mapN(_ -> _)
   }.map(_.toMap)
 }

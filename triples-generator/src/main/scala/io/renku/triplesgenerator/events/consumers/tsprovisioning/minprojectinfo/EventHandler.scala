@@ -30,8 +30,8 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
@@ -55,7 +55,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
     project <- fromEither(request.event.getProject)
     result <-
       Spawn[F]
-        .start(process(MinProjectInfoEvent(project)).recoverWith(errorLogging(project)) >> processing.complete(()))
+        .start((process(MinProjectInfoEvent(project)) recoverWith logError(project)) >> processing.complete(()))
         .toRightT
         .map(_ => Accepted)
         .semiflatTap(Logger[F].log(project))

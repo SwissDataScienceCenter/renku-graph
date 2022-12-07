@@ -19,37 +19,29 @@
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{datasetEntities, renkuProjectEntities, visibilityPublic}
-import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class CrossEntitiesSearchSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData {
+class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/entities") {
 
     val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
 
     val commonPhrase = nonBlankStrings(minLength = 5).generateOne
     val testEntitiesProject =
@@ -64,7 +56,7 @@ class CrossEntitiesSearchSpec
         )
         .withActivities(
           activityEntities(
-            planEntities().modify(replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name]))
+            stepPlanEntities().map(_.replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name]))
           )
         )
         .withDatasets(
@@ -78,8 +70,10 @@ class CrossEntitiesSearchSpec
 
       Given("there's relevant data in the Triples Store")
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      gitLabStub.setupProject(project, commitId)
+      gitLabStub.addAuthenticated(user)
+      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId, user.accessToken)
 
       When("the user calls the GET knowledge-graph/entities")
       val response = knowledgeGraphClient GET s"knowledge-graph/entities?query=${urlEncode(commonPhrase.value)}"

@@ -20,20 +20,16 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Decoder
-import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.events.EventsEndpoint._
-import io.renku.eventlog.events.Generators.eventInfos
-import io.renku.eventlog.{EventDate, EventMessage, ExecutionDate}
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import io.renku.graph.model.projects
+import io.renku.graph.model.events._
+import io.renku.graph.model.EventContentGenerators
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.model.Total
@@ -42,7 +38,6 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.MediaType._
 import org.http4s.Method.GET
 import org.http4s.Status.{InternalServerError, Ok}
@@ -73,12 +68,12 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe Nil
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[EventLogUrl](pagingResponse)
     }
 
     s"$Ok with array of events if there are events found" in new TestCase {
 
-      val pagingResponse = pagingResponses(eventInfos()).generateOne
+      val pagingResponse = pagingResponses(EventContentGenerators.eventInfos()).generateOne
 
       (eventsFinder.findEvents _)
         .expects(criteria)
@@ -89,7 +84,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe pagingResponse.results
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[EventLogUrl](pagingResponse)
     }
 
     s"$InternalServerError when an error happens while fetching the events" in new TestCase {
@@ -113,7 +108,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
     import EventsEndpoint.Criteria._
 
     val filtersOnDates: Gen[FiltersOnDate] =
-      eventDates.toGeneratorOfList(minElements = 1, maxElements = 2).map {
+      eventDates.toGeneratorOfList(min = 1, max = 2).map {
         case head :: Nil => if (Random.nextBoolean()) Filters.EventsSince(head) else Filters.EventsUntil(head)
         case since :: until :: Nil =>
           Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until))
@@ -151,23 +146,6 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val endpoint = new EventsEndpointImpl[IO](eventsFinder, eventLogUrl)
   }
-
-  private implicit val eventInfoDecoder: Decoder[EventInfo] = cursor =>
-    for {
-      id              <- cursor.downField("id").as[EventId]
-      projectPath     <- cursor.downField("projectPath").as[projects.Path]
-      status          <- cursor.downField("status").as[EventStatus]
-      eventDate       <- cursor.downField("date").as[EventDate]
-      executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
-      maybeMessage    <- cursor.downField("message").as[Option[EventMessage]]
-      processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
-    } yield EventInfo(id, projectPath, status, eventDate, executionDate, maybeMessage, processingTimes)
-
-  private implicit val statusProcessingTimeDecoder: Decoder[StatusProcessingTime] = cursor =>
-    for {
-      status         <- cursor.downField("status").as[EventStatus]
-      processingTime <- cursor.downField("processingTime").as[EventProcessingTime]
-    } yield StatusProcessingTime(status, processingTime)
 
   private implicit val entityDecoder: EntityDecoder[IO, List[EventInfo]] = org.http4s.circe.jsonOf[IO, List[EventInfo]]
 }

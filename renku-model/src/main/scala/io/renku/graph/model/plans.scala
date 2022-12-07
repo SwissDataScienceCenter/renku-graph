@@ -19,7 +19,9 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.{EntityId, EntityIdEncoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
@@ -28,11 +30,11 @@ import java.time.Instant
 object plans {
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
-
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId] {
+      with EntityIdJsonLDOps[ResourceId]
+      with AnyResourceRenderer[ResourceId] {
 
     def apply(identifier: Identifier)(implicit renkuUrl: RenkuUrl): ResourceId =
       ResourceId((renkuUrl / "plans" / identifier).value)
@@ -48,7 +50,10 @@ object plans {
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier] {
+    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Identifier] =
+      EntityIdEncoder.instance(id => ResourceId(id).asEntityId)
+  }
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
@@ -89,4 +94,13 @@ object plans {
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
+  final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
+  implicit object DerivedFrom
+      extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_))
+      with constraints.Url[DerivedFrom]
+      with AnyResourceRenderer[DerivedFrom]
+      with EntityIdJsonLDOps[DerivedFrom] {
+
+    def apply(entityId: EntityId): DerivedFrom = DerivedFrom(entityId.toString)
+  }
 }

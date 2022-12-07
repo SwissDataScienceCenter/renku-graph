@@ -23,9 +23,9 @@ import cats.effect.MonadCancelThrow
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.implicits._
 
@@ -33,8 +33,8 @@ private trait EventDetailsFinder[F[_]] {
   def findDetails(eventId: CompoundEventId): F[Option[EventDetails]]
 }
 
-private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventDetailsFinder[F]
     with TypeSerializers {
 
@@ -57,8 +57,8 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource](qu
 }
 
 private object EventDetailsFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventDetailsFinder[F]] =
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
     MonadThrow[F].catchNonFatal {
-      new EventDetailsFinderImpl(queriesExecTimes)
+      new EventDetailsFinderImpl[F]
     }
 }

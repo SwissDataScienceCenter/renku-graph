@@ -23,13 +23,12 @@ import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -77,10 +76,6 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
 }
 
 object FetchTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[FetchTokenEndpoint[F]] = for {
-    tokenFinder <- TokenFinder(sessionResource, queriesExecTimes)
-  } yield new FetchTokenEndpointImpl[F](tokenFinder)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
+    TokenFinder[F].map(new FetchTokenEndpointImpl[F](_))
 }

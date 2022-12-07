@@ -21,27 +21,19 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk.implicits._
 import skunk.{Command, Session}
 
-private trait DuplicateProjectsRemover[F[_]] {
-  def run(): F[Unit]
-}
-
 private object DuplicateProjectsRemover {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, ProjectsTokensDB]
-  ): DuplicateProjectsRemover[F] = new DuplicateProjectsRemoverImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: DBMigration[F] =
+    new DuplicateProjectsRemover[F]
 }
 
-private class DuplicateProjectsRemoverImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, ProjectsTokensDB]
-) extends DuplicateProjectsRemover[F] {
+private class DuplicateProjectsRemover[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     for {
       _ <- deduplicateProjects()
       _ <- Kleisli.liftF(Logger[F] info "Projects de-duplicated")

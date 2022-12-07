@@ -20,14 +20,13 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.IO
 import cats.implicits.toShow
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -35,7 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class StatsFinderSpec
     extends AnyWordSpec
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ScalaCheckPropertyChecks
     with should.Matchers
     with IOSpec {
@@ -58,8 +57,8 @@ class StatsFinderSpec
       val projectsWithDatasets =
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
       val projectsWithActivities = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
-        .generateNonEmptyList(minElements = 10, maxElements = 50)
+        .withActivities(activityEntities(stepPlanEntities()))
+        .generateNonEmptyList(min = 10, max = 50)
         .toList
       val persons = projectsWithActivities.flatMap(_.activities.map(_.author))
 
@@ -72,7 +71,7 @@ class StatsFinderSpec
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.count(_.maybeGitLabId.isDefined))
 
-      upload(to = renkuDataset, projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
+      upload(to = projectsDataset, projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
     }
@@ -81,7 +80,7 @@ class StatsFinderSpec
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val stats = new StatsFinderImpl[IO](renkuDSConnectionInfo)
+    val stats = new StatsFinderImpl[IO](projectsDSConnectionInfo)
   }
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {

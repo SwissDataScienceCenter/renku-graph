@@ -21,9 +21,9 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities.CommandParameterBase.CommandInput
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,10 +32,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Usage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
-        val activity = executionPlanners(planEntities(CommandInput.fromLocation(location)),
+        val activity = executionPlanners(stepPlanEntities(CommandInput.fromLocation(location)),
                                          projectCreatedDates().generateOne
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)

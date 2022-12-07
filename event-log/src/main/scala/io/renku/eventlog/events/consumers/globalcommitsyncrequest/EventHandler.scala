@@ -24,10 +24,10 @@ import cats.effect.Concurrent
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: Concurrent: Logger](
@@ -43,11 +43,11 @@ private class EventHandler[F[_]: Concurrent: Logger](
     EventHandlingProcess[F](startForceCommitSync(request))
 
   private def startForceCommitSync(request: EventRequestContent) = for {
-    event <-
+    event @ (projectId, projectPath) <-
       fromEither[F](
         request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
-    result <- moveGlobalCommitSync(event._1, event._2).toRightT
+    result <- moveGlobalCommitSync(projectId, projectPath).toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))
                 .leftSemiflatTap(Logger[F].log(event))
@@ -66,8 +66,6 @@ private class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] =
-    for {
-      commitSyncForcer <- GlobalCommitSyncForcer(queriesExecTimes)
-    } yield new EventHandler[F](categoryName, commitSyncForcer)
+  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[EventHandler[F]] =
+    GlobalCommitSyncForcer[F]().map(new EventHandler[F](categoryName, _))
 }

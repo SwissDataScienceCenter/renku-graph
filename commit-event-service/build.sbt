@@ -18,4 +18,4 @@
 
 name := "commit-event-service"
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.5"

@@ -20,15 +20,13 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.Generators._
 import io.renku.eventlog.init.model.Event
-import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.{BatchDate, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
@@ -43,9 +41,11 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
+  private[this] implicit val logger: TestLogger[IO] = TestLogger[IO]()
+
   protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = List(
-    eventLogTableCreator,
-    projectPathAdder
+    EventLogTableCreator[IO],
+    ProjectPathAdder[IO]
   )
 
   "run" should {

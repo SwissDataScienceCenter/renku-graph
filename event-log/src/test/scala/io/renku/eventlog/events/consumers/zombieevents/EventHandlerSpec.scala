@@ -19,11 +19,13 @@
 package io.renku.eventlog.events.consumers
 package zombieevents
 
-import cats.effect.{Deferred, IO}
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.metrics.TestEventStatusGauges._
+import io.renku.eventlog.metrics.{EventStatusGauges, TestEventStatusGauges}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
@@ -65,21 +67,6 @@ class EventHandlerSpec
               .expects(event)
               .returning(result.pure[IO])
 
-            val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
-            val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
-            if (result == Updated) {
-              val (incGauge, decGauge) = gaugesFor(status)
-              (incGauge.increment _)
-                .expects(event.projectPath)
-                .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
-              (decGauge.decrement _)
-                .expects(event.projectPath)
-                .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
-            } else {
-              waitForGaugeIncrement.complete(()).unsafeRunSync()
-              waitForGaugeDecrement.complete(()).unsafeRunSync()
-            }
-
             handler
               .createHandlingProcess(requestContent(event.asJson))
               .unsafeRunSync()
@@ -87,7 +74,15 @@ class EventHandlerSpec
               .value
               .unsafeRunSync() shouldBe Right(Accepted)
 
-            (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
+            result match {
+              case Updated =>
+                val (incGauge, decGauge) = gaugesFor(status)
+                eventually {
+                  incGauge.getValue(projectPath).unsafeRunSync() shouldBe 1d
+                  decGauge.getValue(projectPath).unsafeRunSync() shouldBe -1d
+                }
+              case NotUpdated => ()
+            }
 
             logger.loggedOnly(
               Info(
@@ -169,28 +164,15 @@ class EventHandlerSpec
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val zombieStatusCleaner         = mock[ZombieStatusCleaner[IO]]
-    val awaitingGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
-    val underGenerationGauge        = mock[LabeledGauge[IO, projects.Path]]
-    val awaitingTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val underTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
-    val awaitingDeletionGauge       = mock[LabeledGauge[IO, projects.Path]]
-    val underDeletionGauge          = mock[LabeledGauge[IO, projects.Path]]
-    val handler = new EventHandler[IO](categoryName,
-                                       zombieStatusCleaner,
-                                       awaitingGenerationGauge,
-                                       underGenerationGauge,
-                                       awaitingTransformationGauge,
-                                       underTransformationGauge,
-                                       awaitingDeletionGauge,
-                                       underDeletionGauge
-    )
+    implicit val logger: TestLogger[IO]        = TestLogger[IO]()
+    implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
+    val zombieStatusCleaner = mock[ZombieStatusCleaner[IO]]
+    val handler             = new EventHandler[IO](categoryName, zombieStatusCleaner)
 
     val gaugesFor: ProcessingStatus => (LabeledGauge[IO, projects.Path], LabeledGauge[IO, projects.Path]) = {
-      case GeneratingTriples   => awaitingGenerationGauge     -> underGenerationGauge
-      case TransformingTriples => awaitingTransformationGauge -> underTransformationGauge
-      case Deleting            => awaitingDeletionGauge       -> underDeletionGauge
+      case GeneratingTriples   => gauges.awaitingGeneration     -> gauges.underGeneration
+      case TransformingTriples => gauges.awaitingTransformation -> gauges.underTransformation
+      case Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
     }
   }
 

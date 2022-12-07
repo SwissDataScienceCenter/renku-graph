@@ -19,17 +19,16 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.CompoundEventId
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -70,7 +69,8 @@ class DeliveryInfoRemoverSpec extends AnyWordSpec with IOSpec with should.Matche
     val subscriberUrl = subscriberUrls.generateOne
     val sourceUrl     = microserviceBaseUrls.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val deliveryRemover  = new DeliveryInfoRemoverImpl[IO](queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val deliveryRemover = new DeliveryInfoRemoverImpl[IO]
   }
 }

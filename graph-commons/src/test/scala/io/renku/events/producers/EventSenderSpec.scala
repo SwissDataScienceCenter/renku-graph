@@ -30,8 +30,8 @@ import io.renku.events.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.config.EventLogUrl
+import io.renku.graph.metrics.SentEventsGauge
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.LabeledGauge
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
@@ -160,7 +160,7 @@ class EventSenderSpec
     val categoryName = categoryNames.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val sentEventsGauge = mock[LabeledGauge[IO, CategoryName]]
+    val sentEventsGauge = mock[SentEventsGauge[IO]]
     val eventLogUrl:  EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
     val onErrorSleep: FiniteDuration = 500 millis
     val eventSender = new EventSenderImpl[IO](eventLogUrl,

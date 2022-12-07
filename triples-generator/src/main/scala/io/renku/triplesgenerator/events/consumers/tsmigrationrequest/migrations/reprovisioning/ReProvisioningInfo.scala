@@ -18,13 +18,13 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
+import ReProvisioningInfo.Status.Running
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld._
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import ReProvisioningInfo.Status.Running
 
 private final case class ReProvisioningInfo(status:        ReProvisioningInfo.Status.Running,
                                             controllerUrl: MicroserviceBaseUrl

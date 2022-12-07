@@ -24,14 +24,12 @@ import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
@@ -98,10 +96,6 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: Logger: SessionResource](
-      waitingEventsGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:   LabeledHistogram[F]
-  ): F[EventHandler[F]] = for {
-    eventPersister <- EventPersister(waitingEventsGauge, queriesExecTimes)
-  } yield new EventHandler[F](categoryName, eventPersister)
+  def apply[F[_]: Concurrent: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]: F[EventHandler[F]] =
+    EventPersister[F].map(new EventHandler[F](categoryName, _))
 }

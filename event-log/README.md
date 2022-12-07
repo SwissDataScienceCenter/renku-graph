@@ -4,17 +4,18 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                                    | Description                                                    |
-|--------|-----------------------------------------|----------------------------------------------------------------|
-| GET    | ```/events```                           | Returns info about events                                      |
-| GET    | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
-| POST   | ```/events```                           | Sends an event for processing                                  |
-| GET    | ```/metrics```                          | Returns Prometheus metrics of the service                      |
-| GET    | ```/migration-status```                 | Returns whether or not DB is currently migrating               |
-| GET    | ```/ping```                             | Verifies service health                                        |
-| GET    | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
-| POST   | ```/subscriptions```                    | Adds a subscription for events                                 |
-| GET    | ```/version```                          | Returns info about service version |
+| Method | Path                                        | Description                                                                |
+|--------|---------------------------------------------|----------------------------------------------------------------------------|
+| GET    | ```/events```                               | Returns info about events                                                  |
+| GET    | ```/events/:event-id/:project-path```         | Returns info about event with the given `id` and `project-path`              |
+| GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
+| POST   | ```/events```                               | Sends an event for processing                                              |
+| GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
+| GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
+| GET    | ```/ping```                                 | Verifies service health                                                    |
+| GET    | ```/processing-status?project-id=:id```     | Finds processing status of events belonging to a project                   |
+| POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
+| GET    | ```/version```                              | Returns info about service version                                         |
 
 All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
 
@@ -97,6 +98,21 @@ Response body example:
   "body": "JSON payload"
 }
 ```
+
+### GET /events/:event-id/:project-path/payload`
+
+Finds event's payload.
+
+**Response**
+
+| Status                          | Description                                                                |
+|---------------------------------|----------------------------------------------------------------------------|
+| OK (200)                        | If payload for the given event exists                                      |
+| NOT_FOUND (404)                 | If either no event or no payload for the given `event-id` and `project-id` |
+| INTERNAL SERVER ERROR (500)     | When there are problems                                                    |
+| SERVICE UNAVAILABLE ERROR (503) | When a migration is running                                                |
+
+Response contains a `application/gzip` binary format. In addition to `content-type`, `content-length` and `content-disposition` headers are given. 
 
 ### POST /events
 
@@ -210,6 +226,22 @@ the new status.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_GENERATED"
+}
+```
+
+#### Changing status of the given project's latest event in `TRIPLES_STORE` to `TRIPLES_GENERATED` or triggering `ADD_MIN_PROJECT_INFO` event in case there's no event in `TRIPLES_STORE`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "project": {
     "path": "namespace/project-name"
   },
   "newStatus": "TRIPLES_GENERATED"
@@ -870,8 +902,8 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_path      VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMPTZ    NOT NULL |
 
-| event_payload                    |
-|----------------------------------|
+| event_payload                     |
+|-----------------------------------|
 | event_id   VARCHAR PK FK NOT NULL |
 | project_id INT4    PK FK NOT NULL |
 | payload    BYTEA         NOT NULL |

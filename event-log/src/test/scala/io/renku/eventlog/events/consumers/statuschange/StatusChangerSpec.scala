@@ -23,14 +23,15 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.Generators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, nonNegativeInts, positiveInts}
+import io.renku.generators.Generators.{exceptions, fixed, nonNegativeInts, positiveInts}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
@@ -43,7 +44,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
 import skunk.{Session, ~}
-import io.renku.events.consumers.Project
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -169,23 +169,24 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AllEventsToNew                           => Gen.const(DBUpdateResults.ForAllProjects)
-    case ProjectEventsToNew(project)              => genUpdateResult(project.path)
+    case AllEventsToNew                           => fixed(DBUpdateResults.ForAllProjects)
+    case ProjectEventsToNew(_)                    => fixed(DBUpdateResults.ForProjects.empty)
+    case RedoProjectTransformation(_)             => fixed(DBUpdateResults.ForProjects.empty)
     case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
     case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
-      Gen.const(
+      fixed(
         DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
       )
     case RollbackToNew(_, projectPath) =>
-      Gen.const(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
+      fixed(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
     case RollbackToTriplesGenerated(_, projectPath) =>
-      Gen.const(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
+      fixed(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
     case ToAwaitingDeletion(_, projectPath) =>
-      Gen.const(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
+      fixed(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
     case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
       val updatedRows = positiveInts(max = 40).generateOne
-      Gen.const(
+      fixed(
         DBUpdateResults.ForProjects(projectPath, Map(Deleting -> -updatedRows, AwaitingDeletion -> updatedRows))
       )
   }

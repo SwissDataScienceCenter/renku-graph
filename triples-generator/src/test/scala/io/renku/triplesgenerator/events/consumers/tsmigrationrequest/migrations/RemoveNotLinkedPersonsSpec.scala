@@ -26,9 +26,9 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,7 +39,7 @@ class RemoveNotLinkedPersonsSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with MockFactory {
 
   "run" should {
@@ -53,18 +53,18 @@ class RemoveNotLinkedPersonsSpec
 
       assume(project.maybeCreator.isDefined)
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val person = personEntities.generateOne.to[entities.Person]
-      upload(to = renkuDataset, person)
+      upload(to = projectsDataset, person)
 
       assume((project.maybeCreator.map(_.resourceId).toSet + person.resourceId).size > 1)
 
-      findAllPersons() shouldBe project.maybeCreator.map(_.resourceId).toSet + person.resourceId
+      findAllPersons shouldBe project.maybeCreator.map(_.resourceId).toSet + person.resourceId
 
-      runUpdate(on = renkuDataset, RemoveNotLinkedPersons.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = projectsDataset, RemoveNotLinkedPersons.query).unsafeRunSync() shouldBe ()
 
-      findAllPersons() shouldBe project.maybeCreator.map(_.resourceId).toSet
+      findAllPersons shouldBe project.maybeCreator.map(_.resourceId).toSet
     }
   }
 
@@ -77,17 +77,18 @@ class RemoveNotLinkedPersonsSpec
     }
   }
 
-  private def findAllPersons(): Set[persons.ResourceId] =
-    runSelect(
-      on = renkuDataset,
-      SparqlQuery.of(
-        "fetch personId",
-        Prefixes of schema -> "schema",
-        s"""|SELECT ?personId
-            |WHERE { ?personId a schema:Person }
-            |""".stripMargin
-      )
-    ).unsafeRunSync()
-      .map(row => persons.ResourceId(row("personId")))
-      .toSet
+  private def findAllPersons: Set[persons.ResourceId] = runSelect(
+    on = projectsDataset,
+    SparqlQuery.of(
+      "fetch personId",
+      Prefixes of schema -> "schema",
+      s"""|SELECT ?personId
+          |FROM <${GraphClass.Persons.id}> { 
+          |  ?personId a schema:Person 
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row => persons.ResourceId(row("personId")))
+    .toSet
 }

@@ -21,10 +21,11 @@ package io.renku.graph.model.entities
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
-import io.renku.graph.model.{GitLabApiUrl, InvalidationTime, RenkuUrl}
+import io.renku.jsonld.JsonLDEncoder
 
 import java.time.Instant
 
@@ -37,11 +38,22 @@ final case class Dataset[+P <: Provenance](identification:    Identification,
 
 object Dataset {
 
-  import io.renku.graph.model.Schemas._
+  implicit def functions[P <: Provenance](implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl
+  ): EntityFunctions[Dataset[P]] = new EntityFunctions[Dataset[P]] {
+
+    override val findAllPersons: Dataset[P] => Set[Person] = _.provenance.creators.toList.toSet
+
+    override val encoder: GraphClass => JsonLDEncoder[Dataset[P]] = Dataset.encoder(renkuUrl, gitLabApiUrl, _)
+  }
+
+  import io.renku.graph.model.Schemas.{prov, renku, schema}
   import io.renku.jsonld.JsonLDDecoder._
   import io.renku.jsonld.JsonLDEncoder._
-  import io.renku.jsonld._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
+  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Property}
 
   def from[P <: Provenance](identification:    Identification,
                             provenance:        P,
@@ -217,8 +229,9 @@ object Dataset {
     }
 
     private[Dataset] implicit def encoder(implicit
-        renkuUrl:     RenkuUrl,
-        gitLabApiUrl: GitLabApiUrl
+        renkuUrl: RenkuUrl,
+        glApiUrl: GitLabApiUrl,
+        graph:    GraphClass
     ): Provenance => Map[Property, JsonLD] = {
       case provenance @ Internal(_, _, date, creators) =>
         Map(
@@ -450,13 +463,20 @@ object Dataset {
           position   <- cursor.downField(schema / "position").as[ImagePosition]
         } yield Image(resourceId, uri, position)
     }
+
+    val ontology: Type = Type.Def(
+      Class(schema / "ImageObject"),
+      DataProperty(schema / "contentUrl", xsd / "string"),
+      DataProperty(schema / "position", xsd / "int")
+    )
   }
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
 
   implicit def encoder[P <: Provenance](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
   ): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
       def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)
@@ -508,6 +528,35 @@ object Dataset {
             .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
       } yield dataset
     }
+
+  val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
+  lazy val ontology: Type =
+    Type.Def(
+      ontologyClass,
+      ObjectProperties(
+        ObjectProperty(schema / "sameAs", SameAs.ontology),
+        ObjectProperty(prov / "wasDerivedFrom", DerivedFrom.ontology),
+        ObjectProperty(schema / "creator", Person.ontology),
+        ObjectProperty(renku / "topmostSameAs", ontologyClass),
+        ObjectProperty(renku / "topmostDerivedFrom", ontologyClass),
+        ObjectProperty(schema / "image", Image.ontology),
+        ObjectProperty(schema / "hasPart", DatasetPart.ontology)
+      ),
+      DataProperties(
+        DataProperty(schema / "identifier", xsd / "string"),
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(renku / "slug", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty(schema / "datePublished", xsd / "date"),
+        DataProperty(renku / "originalIdentifier", xsd / "string"),
+        DataProperty(prov / "invalidatedAtTime", xsd / "dateTime"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "keywords", xsd / "string"),
+        DataProperty(schema / "license", xsd / "string"),
+        DataProperty(schema / "version", xsd / "string")
+      ),
+      ReverseProperties(PublicationEvent.ontology)
+    )
 }
 
 trait DatasetOps[+P <: Provenance] {

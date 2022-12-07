@@ -18,19 +18,20 @@
 
 package io.renku.eventlog.events.producers.commitsync
 
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import cats.effect.IO
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
-import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -214,7 +215,9 @@ class EventFinderSpec
   }
 
   private trait TestCase {
-    val finder = new EventFinderImpl(TestLabeledHistogram[SqlStatement.Name]("query_id"))
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val finder = new EventFinderImpl[IO]
   }
 
   private def addEvent(eventId:     CompoundEventId,

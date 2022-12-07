@@ -10,7 +10,8 @@ COPY . .
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apt-get update && apt-get install -y bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.0/sbt-1.7.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.8.0/sbt-1.8.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    sbt writeVersionToVersionSbt && \
     sbt writeVersionToVersionConf && \
     sbt "project token-repository" stage && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives

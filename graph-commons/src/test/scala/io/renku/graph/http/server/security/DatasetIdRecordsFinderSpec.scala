@@ -25,8 +25,8 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -34,7 +34,7 @@ class DatasetIdRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with should.Matchers {
 
   "apply" should {
@@ -43,7 +43,7 @@ class DatasetIdRecordsFinderSpec
       val (dataset, project) =
         renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
@@ -57,7 +57,7 @@ class DatasetIdRecordsFinderSpec
           .addDataset(datasetEntities(provenanceNonModified))
           .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
@@ -72,7 +72,7 @@ class DatasetIdRecordsFinderSpec
           .forkOnce()
           .generateOne
 
-      upload(to = renkuDataset, parentProject, project)
+      upload(to = projectsDataset, parentProject, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() should contain theSameElementsAs List(
         (parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
@@ -90,6 +90,6 @@ class DatasetIdRecordsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](renkuDSConnectionInfo)
+    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

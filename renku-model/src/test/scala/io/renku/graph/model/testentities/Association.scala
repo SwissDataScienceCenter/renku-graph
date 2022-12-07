@@ -19,26 +19,26 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
-import io.renku.graph.model.{RenkuUrl, associations, entities}
+import io.renku.graph.model._
 import io.renku.jsonld._
 
 sealed trait Association {
   type AgentType
   val activity: Activity
   val agent:    AgentType
-  val plan:     Plan
+  val plan:     StepPlan
 }
 
 object Association {
 
-  final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: Plan) extends Association {
+  final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: StepPlan) extends Association {
     type AgentType = Agent
   }
-  final case class WithPersonAgent(activity: Activity, agent: Person, plan: Plan) extends Association {
+  final case class WithPersonAgent(activity: Activity, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
   }
 
-  def factory(agent: Agent, plan: Plan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
+  def factory(agent: Agent, plan: StepPlan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
 
   import io.renku.jsonld.syntax._
 
@@ -46,18 +46,18 @@ object Association {
     case a @ Association.WithRenkuAgent(_, agent, plan) =>
       entities.Association.WithRenkuAgent(associations.ResourceId(a.asEntityId.show),
                                           agent.to[entities.Agent],
-                                          plan.to[entities.Plan]
+                                          plan.to[entities.StepPlan].resourceId
       )
     case a @ Association.WithPersonAgent(_, agent, plan) =>
       entities.Association.WithPersonAgent(associations.ResourceId(a.asEntityId.show),
                                            agent.to[entities.Person],
-                                           plan.to[entities.Plan]
+                                           plan.to[entities.StepPlan].resourceId
       )
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Association] =
-    JsonLDEncoder.instance(association => association.to[entities.Association].asJsonLD)
+  implicit def encoder(implicit renkuUrl: RenkuUrl, graph: GraphClass): JsonLDEncoder[Association] =
+    JsonLDEncoder.instance(_.to[entities.Association].asJsonLD)
 
   implicit def entityIdEncoder[A <: Association](implicit renkuUrl: RenkuUrl): EntityIdEncoder[A] =
-    EntityIdEncoder.instance(entity => entity.activity.asEntityId.asUrlEntityId / "association")
+    EntityIdEncoder.instance(_.activity.asEntityId.asUrlEntityId / "association")
 }

@@ -18,9 +18,9 @@
 
 package io.renku.tokenrepository.repository
 
+import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
-import eu.timepit.refined.auto._
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -28,6 +28,7 @@ import io.renku.generators.Generators._
 import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.nio.charset.StandardCharsets.UTF_8
@@ -36,28 +37,18 @@ import java.util.Base64
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers {
+class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
 
   "encrypt/decrypt" should {
 
-    "encrypt and decrypt the given PersonalAccessToken" in new TestCase {
-      val token: AccessToken = personalAccessTokens.generateOne
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"encrypt and decrypt the given $tokenType" in new TestCase {
 
-      val Success(crypted) = hookTokenCrypto.encrypt(token)
-      crypted.value should not be token
+        val Success(crypted) = hookTokenCrypto encrypt accessToken
+        crypted.value should not be accessToken
 
-      val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
-      decrypted shouldBe token
-    }
-
-    "encrypt and decrypt the given OauthAccessToken" in new TestCase {
-      val token: AccessToken = oauthAccessTokens.generateOne
-
-      val Success(crypted) = hookTokenCrypto.encrypt(token)
-      crypted.value should not be token
-
-      val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
-      decrypted shouldBe token
+        (hookTokenCrypto decrypt crypted) shouldBe accessToken.pure[Try]
+      }
     }
 
     "fail if cannot be decrypted" in new TestCase {
@@ -113,4 +104,11 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers {
         .getOrElse(throw new IllegalArgumentException("Wrong secret"))
     )
   }
+
+  private lazy val tokenScenarios = Table(
+    "Token type"              -> "token",
+    "Project Access Token"    -> projectAccessTokens.generateOne,
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne
+  )
 }

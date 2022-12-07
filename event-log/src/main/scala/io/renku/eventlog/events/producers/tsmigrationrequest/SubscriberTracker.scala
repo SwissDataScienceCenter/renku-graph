@@ -27,19 +27,19 @@ import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Done
-import io.renku.eventlog.events.producers
 import io.renku.eventlog._
+import io.renku.eventlog.events.producers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Session, SqlState, ~}
 
 import java.time.Instant
 
-private class SubscriberTracker[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                         now: () => Instant = () => Instant.now()
-) extends DbClient(Some(queriesExecTimes))
+private class SubscriberTracker[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now()
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with events.producers.SubscriberTracker[F, MigratorSubscriptionInfo]
     with TSMigtationTypeSerializers {
 
@@ -108,9 +108,8 @@ private object SubscriberTracker {
 
   type Type[F[_]] = producers.SubscriberTracker[F, MigratorSubscriptionInfo]
 
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[SubscriberTracker[F]] = MonadCancelThrow[F].catchNonFatal {
-    new SubscriberTracker(queriesExecTimes)
-  }
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[SubscriberTracker[F]] =
+    MonadCancelThrow[F].catchNonFatal {
+      new SubscriberTracker[F]()
+    }
 }

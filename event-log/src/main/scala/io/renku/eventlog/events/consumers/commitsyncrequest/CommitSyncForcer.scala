@@ -25,11 +25,12 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, commitsync}
-import io.renku.eventlog.{EventDate, TypeSerializers}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
+import io.renku.graph.model.events.EventDate
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
@@ -40,8 +41,8 @@ private trait CommitSyncForcer[F[_]] {
   def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
 }
 
-private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient(Some(queriesExecTimes))
+private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with CommitSyncForcer[F]
     with TypeSerializers
     with SubscriptionTypeSerializers {
@@ -83,6 +84,6 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](quer
 }
 
 private object CommitSyncForcer {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[CommitSyncForcer[F]] =
-    MonadThrow[F].catchNonFatal(new CommitSyncForcerImpl(queriesExecTimes))
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[CommitSyncForcer[F]] =
+    MonadThrow[F].catchNonFatal(new CommitSyncForcerImpl[F])
 }

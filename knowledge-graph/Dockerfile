@@ -10,7 +10,8 @@ COPY . .
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apt-get update && apt-get install -y bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.0/sbt-1.7.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.8.0/sbt-1.8.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    sbt writeVersionToVersionSbt && \
     sbt writeVersionToVersionConf && \
     sbt "project knowledge-graph" stage && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
@@ -30,9 +31,9 @@ RUN apt-get update && apt-get install -y tzdata curl bash tini && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
 
 ENV GID=1000
-RUN addgroup --gid "$GID" ceuser && \
-    adduser --disabled-password --gid "$GID" --uid 1000 kguser && \
-    chmod 555 -R /opt/knowledge-graph
+RUN adduser --disabled-password -g "$GID" -D -u 1000 kguser && \
+    chown -R kguser /opt/knowledge-graph && \
+    chmod 755 -R /opt/knowledge-graph
 
 USER kguser
 

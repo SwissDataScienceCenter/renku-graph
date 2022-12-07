@@ -25,9 +25,10 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entityModel.{Location, LocationLike}
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld._
-import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 
@@ -37,7 +38,7 @@ object commandParameters {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
@@ -109,7 +110,7 @@ object commandParameters {
     implicit object ResourceId
         extends TinyTypeFactory[ResourceId](new ResourceId(_))
         with Url[ResourceId]
-        with EntityIdJsonLdOps[ResourceId]
+        with EntityIdJsonLDOps[ResourceId]
 
     sealed trait In                                       extends IOStream
     sealed trait Out                                      extends IOStream
@@ -133,16 +134,15 @@ object commandParameters {
         )
       }
 
-    implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] =
-      JsonLDDecoder.entity(entityTypes) { cursor =>
-        for {
-          resourceId <- cursor.downEntityId.as[ResourceId]
-          _ <- cursor.downField(renku / "streamType").as[String] >>= {
-                 case StdIn.name.value => ().asRight
-                 case name             => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
-               }
-        } yield StdIn(resourceId): IOStream.In
-      }
+    implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      for {
+        resourceId <- cursor.downEntityId.as[ResourceId]
+        _ <- cursor.downField(renku / "streamType").as[String] >>= {
+               case StdIn.name.value => ().asRight
+               case name             => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
+             }
+      } yield StdIn(resourceId): IOStream.In
+    }
 
     implicit lazy val stdOutDecoder: JsonLDDecoder[IOStream.Out] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
@@ -155,5 +155,10 @@ object commandParameters {
                     }
         } yield stdOut
       }
+
+    lazy val ontology: Type = Type.Def(
+      Class(renku / "IOStream"),
+      DataProperty(renku / "streamType", DataPropertyRange(StdIn.name, StdOut.name, StdErr.name))
+    )
   }
 }

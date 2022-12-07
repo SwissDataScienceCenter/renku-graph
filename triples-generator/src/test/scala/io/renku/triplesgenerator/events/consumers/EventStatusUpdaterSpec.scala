@@ -23,10 +23,10 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
@@ -37,18 +37,12 @@ import io.renku.http.client.RestClient._
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventStatusUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with TinyTypeEncoders {
+class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "toTriplesGenerated" should {
 

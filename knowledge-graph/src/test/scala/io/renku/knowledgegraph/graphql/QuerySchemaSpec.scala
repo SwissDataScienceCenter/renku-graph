@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.graphql
+package io.renku.knowledgegraph
+package graphql
 
 import cats.effect.IO
 import io.circe.Json
@@ -25,17 +26,17 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage
-import io.renku.knowledgegraph.lineage.LineageFinder
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.lineage.model._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import projects.files.lineage
+import projects.files.lineage.LineageFinder
+import projects.files.lineage.LineageGenerators._
+import projects.files.lineage.model.Node.Location
+import projects.files.lineage.model._
 import sangria.ast.Document
 import sangria.execution.Executor
 import sangria.macros._
@@ -111,31 +112,25 @@ class QuerySchemaSpec
       nodes = Set(sourceNode, targetNode)
     )
 
-    def json(lineage: Lineage) =
-      json"""
-      {
-        "data": {
-          "lineage": {
-            "nodes": ${Json.arr(lineage.nodes.map(toJson).toList: _*)},
-            "edges": ${Json.arr(lineage.edges.map(toJson).toList: _*)}
-          }
+    def json(lineage: Lineage) = json"""{
+      "data": {
+        "lineage": {
+          "nodes": ${Json.arr(lineage.nodes.map(toJson).toList: _*)},
+          "edges": ${Json.arr(lineage.edges.map(toJson).toList: _*)}
         }
-      }"""
+      }
+    }"""
 
-    private def toJson(node: Node) =
-      json"""
-      {
-        "id": ${node.location.value},
-        "location": ${node.location.value},
-        "label": ${node.label.value},
-        "type": ${node.singleWordType.fold(throw _, identity).name}
-      }"""
+    private def toJson(node: Node) = json"""{
+      "id": ${node.location.value},
+      "location": ${node.location.value},
+      "label": ${node.label.value},
+      "type": ${node.typ.value}
+    }"""
 
-    private def toJson(edge: Edge) =
-      json"""
-      {
-        "source" : ${edge.source.value},
-        "target" : ${edge.target.value}
-      }"""
+    private def toJson(edge: Edge) = json"""{
+      "source" : ${edge.source.value},
+      "target" : ${edge.target.value}
+    }"""
   }
 }

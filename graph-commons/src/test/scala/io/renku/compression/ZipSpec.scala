@@ -19,7 +19,6 @@
 package io.renku.compression
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.testtools.IOSpec
@@ -57,7 +56,7 @@ class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
     "fail with a meaningful error if unzipping fails" in {
       val actual = intercept[Exception] {
         Zip
-          .unzip[IO](bytes = Arbitrary.arbByte.arbitrary.generateList(minElements = 10, maxElements = 100).toArray)
+          .unzip[IO](bytes = Arbitrary.arbByte.arbitrary.generateList(min = 10, max = 100).toArray)
           .unsafeRunSync()
       }
       actual.getMessage shouldBe "Unzipping content failed"

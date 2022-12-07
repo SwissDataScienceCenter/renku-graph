@@ -22,7 +22,7 @@ package finder
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.graph.model._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
@@ -47,6 +47,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?idsPathsVisibilities ?sameAs
         |    ?maybeDateCreated ?maybeDatePublished ?date
@@ -65,55 +66,84 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
         |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
-        |            {
+        |            ${filters.onQuery(
+    s"""|            {
         |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
         |                {
         |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
         |                } {
-        |                  ?id a schema:Dataset
+        |                  GRAPH ?projectId {
+        |                    ?id a schema:Dataset
+        |                  }
         |                  BIND (?id AS ?dsId)
         |                } UNION {
-        |                  ?dsId schema:creator ?id;
-        |                        a schema:Dataset.
+        |                  GRAPH ?projectId {
+        |                    ?dsId schema:creator ?id;
+        |                          a schema:Dataset
+        |                  }
         |                }
         |              }
         |              GROUP BY ?dsId
         |            }
-        |            ?dsId renku:topmostSameAs ?sameAs;
-        |                  ^renku:hasDataset ?projectId.
-        |            OPTIONAL {
-        |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
-        |                       ^renku:hasDataset ?childProjectId.
+        |""")}
+        |            GRAPH ?projectId {
+        |              ?dsId a schema:Dataset;
+        |                    renku:topmostSameAs ?sameAs;
+        |                    ^renku:hasDataset ?projectId.
         |            }
         |            OPTIONAL {
-        |              ?dsId prov:invalidatedAtTime ?invalidationTime;
-        |                    ^renku:hasDataset ?projectIdWhereInvalidated
+        |              GRAPH ?childProjectId {
+        |                ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+        |                           ^renku:hasDataset ?childProjectId
+        |              }
+        |            }
+        |            OPTIONAL {
+        |              GRAPH ?projectIdWhereInvalidated {
+        |                ?dsId prov:invalidatedAtTime ?invalidationTime;
+        |                      ^renku:hasDataset ?projectIdWhereInvalidated
+        |              }
         |            }
         |          }
         |          GROUP BY ?sameAs ?dsId ?projectId ?matchingScore
         |        }
+        |
         |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
-        |        ?projectId renku:projectVisibility ?visibility;
-        |                   renku:projectPath ?projectPath.
-        |        ?dsId schema:identifier ?identifier;
-        |              renku:slug ?name.
-        |        BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
-        |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |        ${filters.maybeOnVisibility("?visibility")}
-        |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
-        |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
-        |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
-        |        BIND (IF (BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
-        |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
-        |        OPTIONAL { ?dsId schema:keywords ?keyword }
-        |        OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |        OPTIONAL {
-        |          ?dsId schema:image ?imageId .
-        |          ?imageId schema:position ?imagePosition ;
-        |                   schema:contentUrl ?imageUrl .
-        |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |
+        |        GRAPH ?projectId {
+        |          ?projectId renku:projectVisibility ?visibility;
+        |                     renku:projectNamespace ?namespace;
+        |                     renku:projectPath ?projectPath.
+        |          ?dsId schema:identifier ?identifier;
+        |                renku:slug ?name.
+        |          BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
+        |          ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |          ${filters.maybeOnVisibility("?visibility")}
+        |          ${filters.maybeOnNamespace("?namespace")}
+        |          OPTIONAL { 
+        |            ?dsId schema:creator ?creatorId.
+        |            GRAPH <${GraphClass.Persons.id}> {
+        |              ?creatorId schema:name ?creatorName
+        |            }
+        |          }
+        |          OPTIONAL {
+        |            ?dsId schema:dateCreated ?maybeDateCreated.
+        |            BIND (?maybeDateCreated AS ?date)
+        |          }
+        |          OPTIONAL {
+        |            ?dsId schema:datePublished ?maybeDatePublished
+        |            BIND (?maybeDatePublished AS ?date)
+        |          }
+        |          ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
+        |          OPTIONAL { ?dsId schema:keywords ?keyword }
+        |          OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |          OPTIONAL {
+        |            ?dsId schema:image ?imageId .
+        |            ?imageId schema:position ?imagePosition ;
+        |                     schema:contentUrl ?imageUrl .
+        |            BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |          }
         |        }
         |      }
         |      GROUP BY ?sameAs ?name ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
@@ -122,9 +152,10 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |    BIND ('dataset' AS ?entityType)
         |  }
         |}""".stripMargin
+    // format: on
   }
 
-  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -168,36 +199,22 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         }
 
     for {
-      matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      name          <- cursor.downField("name").downField("value").as[datasets.Name]
-      sameAs        <- cursor.downField("sameAs").downField("value").as[datasets.SameAs]
-      idPathAndVisibility <- cursor
-                               .downField("idsPathsVisibilities")
-                               .downField("value")
-                               .as[Option[String]]
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[datasets.Name]("name")
+      sameAs        <- extract[datasets.SameAs]("sameAs")
+      idPathAndVisibility <- extract[Option[String]]("idsPathsVisibilities")
                                .flatMap(toListOfIdsPathsAndVisibilities)
                                .map(selectBroaderVisibilityTuple(or = sameAs))
-      maybeDateCreated <- cursor.downField("maybeDateCreated").downField("value").as[Option[datasets.DateCreated]]
-      maybeDatePublished <-
-        cursor.downField("maybeDatePublished").downField("value").as[Option[datasets.DatePublished]]
+      maybeDateCreated   <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
+      maybeDatePublished <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
       date <-
         Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
-      creators <- cursor
-                    .downField("creatorsNames")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[persons.Name, persons.Name.type](persons.Name))
-      keywords <- cursor
-                    .downField("keywords")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword))
-      maybeDesc <- cursor.downField("maybeDescription").downField("value").as[Option[datasets.Description]]
-      images <- cursor
-                  .downField("images")
-                  .downField("value")
-                  .as[Option[String]]
-                  .flatMap(toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri))
+      creators <- extract[Option[String]]("creatorsNames") >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      keywords <-
+        extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+      maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
+      images <- extract[Option[String]]("images") >>=
+                  toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri)
     } yield Entity.Dataset(matchingScore,
                            idPathAndVisibility._1,
                            name,

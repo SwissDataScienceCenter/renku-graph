@@ -20,7 +20,7 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.renku.graph.model.entityModel.Location.FileOrFolder.from
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
@@ -33,7 +33,7 @@ object entityModel {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
 
   sealed trait LocationLike extends Any with RelativePathTinyType {
     override def equals(obj: Any): Boolean =

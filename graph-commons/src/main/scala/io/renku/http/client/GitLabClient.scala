@@ -31,7 +31,7 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
-import org.http4s.Method.{DELETE, GET, POST}
+import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
 import org.http4s.{EntityEncoder, Method, Uri}
 import org.typelevel.log4cats.Logger
@@ -41,6 +41,10 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 trait GitLabClient[F[_]] {
 
   def get[ResultType](path:    Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:             ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
+
+  def head[ResultType](path:   Uri, endpointName: String Refined NonEmpty)(
       mapResponse:             ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
@@ -61,25 +65,34 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     maybeTimeRecorder = Some(apiCallRecorder.instance),
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(
+      gitLabThrottler,
+      maybeTimeRecorder = Some(apiCallRecorder.instance),
+      retryInterval = retryInterval,
+      maxRetries = maxRetries,
+      requestTimeoutOverride = requestTimeoutOverride
     )
     with GitLabClient[F] {
 
-  def get[ResultType](path:    Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMapping[ResultType]
-  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
+  override def get[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:                   ResponseMapping[ResultType]
+  )(implicit maybeAccessToken:       Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(GET, uri, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
 
-  def post[ResultType](path:   Uri, endpointName: String Refined NonEmpty, payload: Json)(
-      mapResponse:             ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
+  override def head[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:                    ResponseMapping[ResultType]
+  )(implicit maybeAccessToken:        Option[AccessToken]): F[ResultType] = for {
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
+    request <- secureNamedRequest(HEAD, uri, endpointName)
+    result  <- super.send(request)(mapResponse)
+  } yield result
+
+  override def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      mapResponse:                    ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken:        Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(uri, endpointName, payload)
     result  <- super.send(request)(mapResponse)

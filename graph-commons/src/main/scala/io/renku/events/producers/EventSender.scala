@@ -18,9 +18,9 @@
 
 package io.renku.events.producers
 
-import cats.{Applicative, Eval}
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import cats.{Applicative, Eval}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
@@ -31,7 +31,7 @@ import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.metrics.{LabeledGauge, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.http4s.Method.POST
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.http4s._
@@ -50,7 +50,7 @@ trait EventSender[F[_]] {
 
 class EventSenderImpl[F[_]: Async: Logger](
     eventLogUrl:            EventLogUrl,
-    sentEventsGauge:        LabeledGauge[F, CategoryName],
+    sentEventsGauge:        SentEventsGauge[F],
     onErrorSleep:           FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
@@ -97,9 +97,8 @@ class EventSenderImpl[F[_]: Async: Logger](
     send(request)(responseMapping)
       .recoverWith(retryOnServerError(Eval.always(sendWithRetry(request, context)), context))
 
-  private def retryOnServerError(
-      retry:   Eval[F[Status]],
-      context: EventContext
+  private def retryOnServerError(retry:   Eval[F[Status]],
+                                 context: EventContext
   ): PartialFunction[Throwable, F[Status]] = {
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
       waitAndRetry(retry, exception, context.errorMessage)

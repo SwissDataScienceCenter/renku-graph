@@ -27,45 +27,40 @@ import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
+import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.CategoryName
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
   val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      awaitingGenerationGauge: LabeledGauge[F, projects.Path],
-      underGenerationGauge:    LabeledGauge[F, projects.Path],
-      queriesExecTimes:        LabeledHistogram[F]
-  ): F[producers.SubscriptionCategory[F]] = UrlAndIdSubscribers[F](categoryName)
-    .flatMap { implicit subscribers =>
-      for {
-        eventFetcher     <- EventFinder(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
-        dispatchRecovery <- DispatchRecovery[F]
-        eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
-                           eventDeliveryIdExtractor =
-                             (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id),
-                           queriesExecTimes
+  def apply[F[
+      _
+  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+      : F[producers.SubscriptionCategory[F]] = for {
+    implicit0(subscribers: UrlAndIdSubscribers[F]) <- UrlAndIdSubscribers[F](categoryName)
+    eventFetcher                                   <- EventFinder[F]
+    dispatchRecovery                               <- DispatchRecovery[F]
+    eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
+                       eventDeliveryIdExtractor = (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id)
+                     )
+    eventsDistributor <- EventsDistributor(categoryName,
+                                           subscribers,
+                                           eventFetcher,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent, encodePayload),
+                                           dispatchRecovery
                          )
-        eventsDistributor <- EventsDistributor(categoryName,
-                                               subscribers,
-                                               eventFetcher,
-                                               eventDelivery,
-                                               EventEncoder(encodeEvent, encodePayload),
-                                               dispatchRecovery
-                             )
-        deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](
-                          categoryName,
-                          SubscriptionPayload.apply
-                        )
-      } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
-                                                                   subscribers,
-                                                                   eventsDistributor,
-                                                                   deserializer
-      )
-    }
-    .widen[producers.SubscriptionCategory[F]]
+    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](
+                      categoryName,
+                      SubscriptionPayload.apply
+                    )
+  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
+                                                               subscribers,
+                                                               eventsDistributor,
+                                                               deserializer
+  )
 }

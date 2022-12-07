@@ -18,19 +18,17 @@
 
 package io.renku.webhookservice.hookcreation
 
-import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
-import io.renku.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
+import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import io.renku.webhookservice.hookcreation.project.ProjectInfoFinder
+import io.renku.webhookservice.hookcreation.project.{ProjectInfo, ProjectInfoFinder}
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
-import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
 import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, ProjectHookUrl}
 import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import io.renku.webhookservice.{CommitSyncRequestSender, hookvalidation}
@@ -61,34 +59,33 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
   import projectInfoFinder._
 
   override def createHook(projectId: Id, accessToken: AccessToken): F[CreationResult] = {
-    for {
-      hookValidation      <- right(validateHook(projectId, Some(accessToken)))
-      _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
-      projectInfo         <- right(findProjectInfo(projectId)(Some(accessToken)))
-      serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
-      _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
-      _                   <- right(associate(projectId, accessToken))
-      _ <- right(Spawn[F].start(sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject), "HookCreation")))
-    } yield ()
-  }.fold[CreationResult](_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
+    def sendCommitSyncReq(projectInfo: ProjectInfo) =
+      sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject), "HookCreation")
 
-  private def leftIfProjectHookExists(
-      hookValidation: HookValidationResult,
-      projectId:      Id,
-      projectHookUrl: ProjectHookUrl
-  ): EitherT[F, HookAlreadyCreated, Unit] = EitherT.cond[F](
-    test = hookValidation == HookMissing,
-    left = HookAlreadyCreated(projectId, projectHookUrl),
-    right = ()
-  )
+    def createIfMissing(hvr: HookValidationResult, projectInfo: ProjectInfo): F[CreationResult] =
+      hvr match {
+        case HookValidationResult.HookMissing =>
+          for {
+            serializedHookToken <- encrypt(HookToken(projectInfo.id))
+            _                   <- create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
+            _                   <- associate(projectId, accessToken)
+          } yield HookCreated
+        case HookValidationResult.HookExists =>
+          (HookExisted: CreationResult).pure[F]
+      }
+
+    (for {
+      hookValidation <- validateHook(projectId, Some(accessToken))
+      projectInfo    <- findProjectInfo(projectId)(Some(accessToken))
+      result         <- createIfMissing(hookValidation, projectInfo)
+      _              <- Spawn[F].start(sendCommitSyncReq(projectInfo))
+    } yield result).recoverWith(loggingError(projectId))
+  }
 
   private def loggingError(projectId: Id): PartialFunction[Throwable, F[CreationResult]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
     exception.raiseError[F, CreationResult]
   }
-
-  private def right[T](value: F[T]): EitherT[F, HookAlreadyCreated, T] =
-    EitherT.right[HookAlreadyCreated](value)
 }
 
 private object HookCreator {

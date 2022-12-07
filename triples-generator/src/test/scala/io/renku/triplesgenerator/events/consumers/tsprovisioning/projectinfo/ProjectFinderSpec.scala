@@ -41,7 +41,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.json.JsonOps._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
@@ -59,7 +58,6 @@ class ProjectFinderSpec
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
-    with TinyTypeEncoders
     with GitLabClientTools[IO] {
 
   "findProject" should {
@@ -201,7 +199,7 @@ class ProjectFinderSpec
       "name":                ${project.name},
       "created_at":          ${project.dateCreated},
       "visibility":          ${project.visibility},
-      "tag_list":            ${project.keywords.map(_.value) + blankStrings().generateOne}
+      "topics":              ${project.keywords.map(_.value) + blankStrings().generateOne}
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))

@@ -18,14 +18,17 @@
 
 package io.renku.metrics
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
+
 trait MetricsCollector {
-  val name: String
-  val help: String
+  val name: String Refined NonEmpty
+  val help: String Refined NonEmpty
 }
 
 trait PrometheusCollector {
   self: MetricsCollector =>
 
   type Collector <: io.prometheus.client.Collector
-  val wrappedCollector: Collector
+  private[metrics] val wrappedCollector: Collector
 }

@@ -22,8 +22,9 @@ package finder
 import io.circe.Decoder
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
+import io.renku.triplesstore.ResultsDecoder
 
-trait EntityQuery[+E <: model.Entity] extends Product with Serializable {
+private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with Product with Serializable {
   val entityType:      EntityType
   val selectVariables: Set[String]
   def query(criteria: Criteria): Option[String]

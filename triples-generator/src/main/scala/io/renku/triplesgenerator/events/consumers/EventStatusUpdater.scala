@@ -20,13 +20,12 @@ package io.renku.triplesgenerator.events.consumers
 
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
-import io.circe.Encoder
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
@@ -34,8 +33,6 @@ import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
 import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.constraints.DurationNotNegative
-import io.renku.tinytypes.json.TinyTypeEncoders
-import io.renku.tinytypes.json.TinyTypeEncoders.durationEncoder
 import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
 import org.typelevel.log4cats.Logger
@@ -75,8 +72,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
     eventSender:  EventSender[F],
     categoryName: CategoryName,
     zipper:       Zip
-) extends EventStatusUpdater[F]
-    with TinyTypeEncoders {
+) extends EventStatusUpdater[F] {
 
   import io.circe.literal._
   import zipper._
@@ -90,15 +86,15 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
     _ <- eventSender.sendEvent(
            eventContent = events.EventRequestContent.WithPayload(
              event = json"""{
-                              "categoryName": "EVENTS_STATUS_CHANGE",
-                              "id": ${eventId.id},
-                              "project": {
-                                "id":   ${eventId.projectId},
-                                "path": $projectPath
-                              },
-                              "newStatus": $TriplesGenerated,
-                              "processingTime": $processingTime
-                            }""",
+                       "categoryName": "EVENTS_STATUS_CHANGE",
+                       "id": ${eventId.id},
+                       "project": {
+                         "id":   ${eventId.projectId},
+                         "path": $projectPath
+                       },
+                       "newStatus": $TriplesGenerated,
+                       "processingTime": $processingTime
+                     }""",
              payload = zippedContent
            ),
            EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
@@ -205,9 +201,5 @@ private object EventStatusUpdater {
   final class ExecutionDelay private (val value: Duration) extends AnyVal with DurationTinyType
   object ExecutionDelay
       extends TinyTypeFactory[ExecutionDelay](new ExecutionDelay(_))
-      with DurationNotNegative[ExecutionDelay] {
-
-    implicit val encoder: Encoder[ExecutionDelay] = durationEncoder
-
-  }
+      with DurationNotNegative[ExecutionDelay]
 }

@@ -26,10 +26,10 @@ import Schemas.renku
 import eu.timepit.refined.auto._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

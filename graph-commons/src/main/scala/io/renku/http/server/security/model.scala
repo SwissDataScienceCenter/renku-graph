@@ -19,11 +19,11 @@
 package io.renku.http.server.security
 
 import io.renku.graph.model.persons
-import io.renku.http.client.AccessToken
+import io.renku.http.client.UserAccessToken
 import org.http4s.Response
 
 object model {
-  final case class AuthUser(id: persons.GitLabId, accessToken: AccessToken)
+  final case class AuthUser(id: persons.GitLabId, accessToken: UserAccessToken)
 }
 
 sealed trait EndpointSecurityException extends Exception with Product with Serializable {

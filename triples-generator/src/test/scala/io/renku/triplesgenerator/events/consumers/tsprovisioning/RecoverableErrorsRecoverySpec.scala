@@ -22,8 +22,8 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
+import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -61,7 +61,9 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
     ) { case (problemName, exception, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName" in {
         val Success(Left(failure: ProcessingRecoverableError)) =
-          exception.raiseError[Try, Unit] recoverWith maybeRecoverableError[Try, Unit]
+          exception
+            .raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+            .recoverWith(maybeRecoverableError[Try, Unit])
 
         failureTypeAssertion(failure)
       }
@@ -70,7 +72,9 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
     s"fail with MalformedRepository for ${Status.InternalServerError}" in {
       val exception = UnexpectedResponseException(Status.InternalServerError, nonEmptyStrings().generateOne)
 
-      val Failure(failure) = exception.raiseError[Try, Unit] recoverWith maybeRecoverableError[Try, Unit]
+      val Failure(failure) = exception
+        .raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+        .recoverWith(maybeRecoverableError[Try, Unit])
 
       failure            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       failure.getMessage shouldBe exception.message

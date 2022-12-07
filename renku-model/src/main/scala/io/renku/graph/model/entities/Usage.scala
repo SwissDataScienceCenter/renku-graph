@@ -21,7 +21,8 @@ package io.renku.graph.model.entities
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.usages.ResourceId
 import io.renku.jsonld._
-import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 
 final case class Usage(resourceId: ResourceId, entity: Entity)
 
@@ -44,4 +45,9 @@ object Usage {
       entity     <- cursor.downField(prov / "entity").as[Entity]
     } yield Usage(resourceId, entity)
   }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "Usage"),
+    ObjectProperty(prov / "entity", Entity.ontology)
+  )
 }

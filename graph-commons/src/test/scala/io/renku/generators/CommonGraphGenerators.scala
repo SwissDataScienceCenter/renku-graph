@@ -21,10 +21,10 @@ package io.renku.generators
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.config._
 import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
-import io.renku.config._
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
@@ -32,7 +32,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectPaths}
 import io.renku.graph.model.Schemas
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClientError._
 import io.renku.http.client._
 import io.renku.http.rest.Links.{Href, Link, Rel}
@@ -69,18 +69,22 @@ object CommonGraphGenerators {
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
   } yield PersonalAccessToken(chars.mkString(""))
 
-  implicit val oauthAccessTokens: Gen[OAuthAccessToken] = for {
+  implicit val userOAuthAccessTokens: Gen[UserOAuthAccessToken] = for {
     length <- Gen.choose(5, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield OAuthAccessToken(chars.mkString(""))
+  } yield UserOAuthAccessToken(chars.mkString(""))
+
+  implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
+    chars <- Gen.listOfN(20, Gen.oneOf(('A' to 'Z').map(_.toString) ++ ('a' to 'z').map(_.toString)))
+  } yield ProjectAccessToken(s"$ProjectAccessTokenDefaultPrefix${chars.mkString("")}")
 
   implicit val securityExceptions: Gen[EndpointSecurityException] =
     Gen.oneOf(AuthenticationFailure, AuthorizationFailure)
 
-  implicit val accessTokens: Gen[AccessToken] = for {
-    boolean     <- Gen.oneOf(true, false)
-    accessToken <- if (boolean) personalAccessTokens else oauthAccessTokens
-  } yield accessToken
+  implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens)
+
+  implicit val accessTokens: Gen[AccessToken] =
+    Gen.oneOf(projectAccessTokens, userOAuthAccessTokens, personalAccessTokens)
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
@@ -105,6 +109,17 @@ object CommonGraphGenerators {
     credentials <- basicAuthCredentials
   } yield AdminConnectionConfig(url, credentials)
 
+  final case class TestDatasetConnectionConfig(fusekiUrl:       FusekiUrl,
+                                               datasetName:     DatasetName,
+                                               authCredentials: BasicAuthCredentials
+  ) extends DatasetConnectionConfig
+
+  implicit val storeConnectionConfigs: Gen[TestDatasetConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    name        <- nonEmptyStrings().toGeneratorOf(DatasetName)
+    credentials <- basicAuthCredentials
+  } yield new TestDatasetConnectionConfig(url, name, credentials)
+
   implicit val datasetConnectionConfigs: Gen[DatasetConnectionConfig] = for {
     url         <- httpUrls() map FusekiUrl.apply
     dataset     <- nonEmptyStrings().toGeneratorOf(DatasetName)
@@ -114,11 +129,6 @@ object CommonGraphGenerators {
     override val datasetName     = dataset
     override val authCredentials = credentials
   }
-
-  implicit val renkuConnectionConfigs: Gen[RenkuConnectionConfig] = for {
-    fusekiUrl       <- httpUrls() map FusekiUrl.apply
-    authCredentials <- basicAuthCredentials
-  } yield RenkuConnectionConfig(fusekiUrl, authCredentials)
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -164,24 +174,25 @@ object CommonGraphGenerators {
     serviceVersion <- serviceVersions
   } yield SentryConfig(dsn, environment, serviceName, serviceVersion)
 
-  implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
+  implicit val rels:        Gen[Rel]          = nonEmptyStrings() map Rel.apply
+  implicit val linkMethods: Gen[Links.Method] = Gen.oneOf(Links.Method.all)
   implicit val hrefs: Gen[Href] = for {
     baseUrl <- httpUrls()
     path    <- relativePaths()
   } yield Href(s"$baseUrl/$path")
   implicit val linkObjects: Gen[Link] = for {
-    rel  <- rels
-    href <- hrefs
-  } yield Link(rel, href)
+    rel    <- rels
+    href   <- hrefs
+    method <- linkMethods
+  } yield Link(rel, href, method)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
 
   implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
 
-  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
-    for {
-      property  <- Gen.oneOf(sortBy.properties.toList)
-      direction <- sortingDirections
-    } yield sortBy.By(property, direction)
+  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] = for {
+    property  <- Gen.oneOf(sortBy.properties.toList)
+    direction <- sortingDirections
+  } yield sortBy.By(property, direction)
 
   object TestSort extends SortBy {
     type PropertyType = TestProperty
@@ -206,7 +217,7 @@ object CommonGraphGenerators {
   def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] = for {
     page    <- pages
     perPage <- perPages
-    results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
+    results <- listOf(resultsGen, max = perPage.value)
     total = Total((page.value - 1) * perPage.value + results.size)
   } yield PagingResponse
     .from[Try, Result](results, PagingRequest(page, perPage), total)
@@ -282,12 +293,12 @@ object CommonGraphGenerators {
 
   implicit val authUsers: Gen[AuthUser] = for {
     gitLabId    <- personGitLabIds
-    accessToken <- accessTokens
+    accessToken <- userAccessTokens
   } yield AuthUser(gitLabId, accessToken)
 
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {
     maybeAuthUser   <- authUsers.toGeneratorOfOptions
     key             <- keysGen
-    allowedProjects <- projectPaths.toGeneratorOfSet(minElements = 0)
+    allowedProjects <- projectPaths.toGeneratorOfSet(min = 0)
   } yield AuthContext(maybeAuthUser, key, allowedProjects)
 }

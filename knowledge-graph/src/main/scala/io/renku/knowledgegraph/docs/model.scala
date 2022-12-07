@@ -20,11 +20,14 @@ package io.renku.knowledgegraph.docs
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.Json
+import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD
+import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample}
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
 object model {
+
   trait OpenApiDocument {
     def openApiVersion: String
     def info:           Info
@@ -44,9 +47,11 @@ object model {
                                         servers:        List[Server],
                                         paths:          Map[String, Path]
   ) {
+
     def addPath(path: Path): CompleteDoc =
       CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None, Nil)
-    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, servers :+ server, paths)
+
+    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, server :: servers, paths)
   }
 
   private case class CompleteDoc(openApiVersion: String,
@@ -56,79 +61,64 @@ object model {
                                  components:     Option[Components],
                                  security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
-    def addPath(path: Path): OpenApiDocument = copy(paths = paths + (path.template -> path))
 
-    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
+    def addPath(path: Path): CompleteDoc = copy(paths = paths + (path.template -> path))
 
-    def addNoAuthSecurity: CompleteDoc =
-      copy(security = security :+ SecurityRequirementNoAuth)
+    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, server :: servers, paths)
 
-    def addSecurity(securityScheme: SecurityScheme) = {
-      val newComponents = {
-        val c = this.components.getOrElse(Components.empty)
-        c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
-      }
-      copy(security = security :+ SecurityRequirementAuth(securityScheme.name, Nil), components = newComponents.some)
-    }
+    def addNoAuthSecurity(): CompleteDoc =
+      copy(security = SecurityRequirementNoAuth :: security)
 
-    def addResponsesToAll(responses: Map[Status, Response]): CompleteDoc =
-      copy(paths = paths.map { case (template, path) =>
-        (template,
-         PathImpl(path.summary,
-                  path.description,
-                  path.operations.map(op => op.copy(responses = op.responses ++ responses)),
-                  path.parameters,
-                  path.template
-         )
-        )
-      })
+    def addSecurity(securityScheme: SecurityScheme) = copy(
+      security = SecurityRequirementAuth(securityScheme.id, Nil) :: security,
+      components = {
+        val c = components.getOrElse(Components.empty)
+        c.copy(securitySchemes = c.securitySchemes + (securityScheme.id -> securityScheme))
+      }.some
+    )
   }
 
   case class Info(title: String, description: Option[String], version: String)
 
-  case class Server(url: String, description: String, variables: Map[String, Variable])
+  case class Server(url: String, description: String, variables: Map[String, Variable] = Map.empty)
 
   case class Variable(default: String)
+
   object Uri {
-    def /(nextPart: Parameter) = Uri(List(ParameterPart(nextPart)))
-    def /(nextPart: String)    = Uri(List(StringPart(nextPart)))
+
+    def /(nextPart: Parameter): Uri = Uri(List(ParameterPart(nextPart)))
+    def /(nextPart: String):    Uri = Uri(List(StringPart(nextPart)))
+
     def getTemplate(parts: List[UriPart]): String =
       parts
-        .map {
-          case ParameterPart(parameter) => s"{${parameter.name}}"
-          case StringPart(value)        => value
+        .collect {
+          case ParameterPart(parameter: Parameter.Path) => s"{${parameter.name}}"
+          case StringPart(value)                        => value
         }
         .mkString("/")
-        .prepended("/")
+        .prepended('/')
         .mkString("")
 
   }
+
   private[model] case class Uri(parts: List[UriPart]) {
     def show: Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart: Parameter) = copy(parts :+ ParameterPart(nextPart))
-    def /(nextPart: String)    = copy(parts :+ StringPart(nextPart))
-  }
-
-  trait WithOperation {
-    def operation: Operation
-  }
-
-  private[model] case class UriOp(operation: Operation, parts: List[UriPart]) {
-    def show: Show[UriOp] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart: Parameter) = copy(parts = parts :+ ParameterPart(nextPart))
-    def /(nextPart: String)    = copy(parts = parts :+ StringPart(nextPart))
+    def /(nextPart:  Parameter.Path):  Uri = copy(parts :+ ParameterPart(nextPart))
+    def /(nextPart:  String):          Uri = copy(parts :+ StringPart(nextPart))
+    def :?(nextPart: Parameter.Query): Uri = copy(parts :+ ParameterPart(nextPart))
+    def &(nextPart:  Parameter.Query): Uri = copy(parts :+ ParameterPart(nextPart))
   }
 
   trait UriPart {
-    def show: Show[UriPart]
+    val show: Show[UriPart]
   }
 
   case class StringPart(value: String) extends UriPart {
-    def show: Show[UriPart] = Show.show(_ => value)
+    override val show: Show[UriPart] = Show.show(_ => value)
   }
 
   case class ParameterPart(parameter: Parameter) extends UriPart {
-    def show: Show[UriPart] = Show.show(_ => s"{${parameter.name}}")
+    override val show: Show[UriPart] = Show.show(_ => s"{${parameter.name}}")
   }
 
   trait Path {
@@ -140,38 +130,11 @@ object model {
   }
 
   object Path {
+
     def apply(summary: String, description: Option[String] = None, opMapping: OpMapping): Path =
       PathImpl(summary, description, List(opMapping.operation), opMapping.operation.parameters, opMapping.template)
 
-    def apply(summary: String, description: String): PathWithDescriptors =
-      PathWithDescriptors(summary, description.some)
-
     case class OpMapping(template: String, operation: Operation)
-  }
-
-  private[model] case class PathWithDescriptors(summary: String, description: Option[String]) {
-
-    def addSingleOperation(uriOp: UriOp): PathImpl =
-      PathImpl(summary, description, List(uriOp.operation), getParameters(uriOp.parts), Uri.getTemplate(uriOp.parts))
-
-    def addUri(uri: Uri): PathWithUri =
-      PathWithUri(summary, description, getParameters(uri.parts), Uri.getTemplate(uri.parts))
-
-    private def getParameters(parts: List[UriPart]) =
-      parts.flatMap {
-        case ParameterPart(parameter) => Some(parameter)
-        case _                        => None
-      }
-
-  }
-
-  private case class PathWithUri(summary:     String,
-                                 description: Option[String],
-                                 parameters:  List[Parameter],
-                                 template:    String
-  ) {
-    def addGet(operation: Operation.Get): PathImpl =
-      PathImpl(summary, description, List(operation), parameters, template)
   }
 
   private case class PathImpl(summary:     String,
@@ -179,10 +142,7 @@ object model {
                               operations:  List[Operation],
                               parameters:  List[Parameter],
                               template:    String
-  ) extends Path {
-    def addGet(operation: Operation.Get): PathImpl =
-      PathImpl(summary, description, operations :+ operation, parameters, template)
-  }
+  ) extends Path
 
   sealed trait Operation extends Product with Serializable {
     def summary:     Option[String]
@@ -190,25 +150,17 @@ object model {
     def requestBody: Option[RequestBody]
     def responses:   Map[Status, Response]
     def security:    List[SecurityRequirement]
-    def copy(summary:     Option[String] = summary, // TODO: make this generic
-             parameters:  List[Parameter] = parameters,
-             requestBody: Option[RequestBody] = requestBody,
-             responses:   Map[Status, Response] = responses,
-             security:    List[SecurityRequirement] = security
-    ) = this match {
-      case _: Operation.Get => Operation.Get(summary, parameters, requestBody, responses, security)
-    }
   }
 
   object Operation {
-    def GET(uri: Uri, status: Status, response: Response): OpMapping = {
-      val template = Uri.getTemplate(uri.parts)
+
+    def GET(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      OpMapping(template, Get("".some, parameters, None, Map(status -> response), Nil))
+      OpMapping(Uri.getTemplate(uri.parts), Get("".some, parameters, None, statusAndResponse.toMap, Nil))
     }
 
     case class Get(summary:     Option[String],
@@ -219,95 +171,139 @@ object model {
     ) extends Operation
   }
 
-  case class Parameter(name: String, in: In, description: Option[String], required: Boolean, schema: Schema)
-
+  sealed trait Parameter {
+    type InType <: In
+    val name:        String
+    val in:          InType
+    val description: Option[String]
+    val required:    Boolean
+    val schema:      Schema
+  }
   object Parameter {
-    def in(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true) =
-      Parameter(name, In.Path, description, required, schema)
+
+    final case class Path(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Path.type
+      override val in: InType = In.Path
+    }
+    final case class Query(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Query.type
+      override val in: InType = In.Query
+    }
+    final case class Header(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Header.type
+      override val in: InType = In.Header
+    }
+    final case class Cookie(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Cookie.type
+      override val in: InType = In.Cookie
+    }
   }
 
-  sealed trait In extends Product with Serializable {
-    def value: String
-  }
-
+  sealed trait In extends Product with Serializable { val value: String }
   object In {
 
+    final case object Path extends In {
+      override val value: String = "path"
+    }
+
     final case object Query extends In {
-      def value: String = "query"
+      override val value: String = "query"
     }
 
     final case object Header extends In {
-      def value: String = "header"
-    }
-
-    final case object Path extends In {
-      def value: String = "path"
+      override val value: String = "header"
     }
 
     final case object Cookie extends In {
-      def value: String = "cookie"
+      override val value: String = "cookie"
     }
-
   }
 
   final case class RequestBody(description: String, content: Map[String, MediaType])
+
   final case class MediaType(name: String, examples: Map[String, Example])
   object MediaType {
+
     def apply(name: String, exampleName: String, example: Example): MediaType =
       MediaType(name, Map(exampleName -> example))
+
+    lazy val `text/html`: MediaType = MediaType("text/html", Map.empty)
+
+    def `application/json`(exampleName: String, example: Json): MediaType =
+      MediaType("application/json", Map(exampleName -> JsonExample(example)))
+
+    def `application/ld+json`(exampleName: String, example: JsonLD): MediaType =
+      MediaType("application/ld+json", Map(exampleName -> JsonLDExample(example)))
+
+    def `application/json`[P](exampleName: String, example: P)(implicit encoder: Encoder[P]): MediaType =
+      MediaType("application/json", Map(exampleName -> JsonExample(encoder(example))))
   }
+
   final case class Response(
       description: String,
-      content:     Map[String, MediaType],
+      content:     Map[String, MediaType] = Map.empty,
       headers:     Map[String, Header] = Map.empty,
       links:       Map[String, Link] = Map.empty
   )
 
-  case class Status(code: Int, name: String)
+  object Contents {
+    def apply(mediaTypes: MediaType*): Map[String, MediaType] =
+      mediaTypes.map(media => media.name -> media).toMap
+  }
+
+  class Status(val code: Int, val name: String)
+  object Status {
+
+    def apply(code: Int, name: String): Status = new Status(code, name)
+
+    case object Ok extends Status(200, "Ok")
+
+    case object BadRequest   extends Status(400, "Bad Request")
+    case object Unauthorized extends Status(401, "Unauthorized")
+    case object NotFound     extends Status(404, "Not Found")
+
+    case object InternalServerError extends Status(500, "Internal Server Error")
+  }
 
   trait SecurityRequirement
   final case class SecurityRequirementAuth(schemeName: String, scopeNames: List[String]) extends SecurityRequirement
   final object SecurityRequirementNoAuth                                                 extends SecurityRequirement
 
-  final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
-
+  sealed trait SecurityScheme {
+    val id:          String
+    val `type`:      TokenType
+    val description: Option[String]
+  }
   object SecurityScheme {
-
-    sealed trait SchemeType {
-      def value: String
+    final case class ApiKey(id: String, name: String, description: Option[String] = None, in: In = In.Header)
+        extends SecurityScheme {
+      override val `type`: TokenType = TokenType.ApiKey
     }
-
-    object SchemeType {
-      final case object BearerToken extends SchemeType {
-        def value: String = "Bearer"
-      }
-      final case object BasicToken extends SchemeType {
-        def value: String = "Basic"
-      }
-      final case object OAuth2Token extends SchemeType {
-        def value: String = "OAuth"
-      }
+    final case class OpenIdConnect(id:               String,
+                                   name:             String,
+                                   openIdConnectUrl: String,
+                                   description:      Option[String] = None,
+                                   in:               In = In.Header
+    ) extends SecurityScheme {
+      override val `type`: TokenType = TokenType.OpenIdConnect
     }
   }
+
   final case class Header(description: Option[String], schema: Schema)
+
   final case class Link()
 
-  sealed trait TokenType extends Product with Serializable {
-    def value: String
-  }
-
+  sealed trait TokenType extends Product with Serializable { val value: String }
   object TokenType {
     case object ApiKey extends TokenType {
-      override def value: String = "apiKey"
-    }
-    case object OAuth2 extends TokenType {
-      override def value: String = "oauth2"
+      override val value: String = "apiKey"
     }
     case object OpenIdConnect extends TokenType {
-      override def value: String = "openIdConnect"
-    }
-    case object Http extends TokenType {
-      override def value: String = "http"
+      override val value: String = "openIdConnect"
     }
   }
 
@@ -325,12 +321,14 @@ object model {
 
   object OAuthFlows {
     import OAuthFlowType._
+
     def apply(flow: OAuthFlow): OAuthFlows = flow.`type` match {
       case Implicit          => OAuthFlowsImpl(Some(flow), None, None, None)
       case Password          => OAuthFlowsImpl(None, Some(flow), None, None)
       case ClientCredentials => OAuthFlowsImpl(None, None, Some(flow), None)
       case AuthorizationCode => OAuthFlowsImpl(None, None, None, Some(flow))
     }
+
     final case class OAuthFlow(
         `type`:           OAuthFlowType,
         authorizationUrl: String,
@@ -339,39 +337,36 @@ object model {
         refreshUrl:       Option[String] = None
     )
 
-    sealed trait OAuthFlowType {
-      def value: String
-    }
+    sealed trait OAuthFlowType { val value: String }
 
     object OAuthFlowType {
       final case object Implicit extends OAuthFlowType {
-        override def value: String = "implicit"
+        override val value: String = "implicit"
       }
 
       final case object Password extends OAuthFlowType {
-        override def value: String = "password"
+        override val value: String = "password"
       }
 
       final case object ClientCredentials extends OAuthFlowType {
-        override def value: String = "clientCredentials"
+        override val value: String = "clientCredentials"
       }
 
       final case object AuthorizationCode extends OAuthFlowType {
-        override def value: String = "authorizationCode"
+        override val value: String = "authorizationCode"
       }
     }
-
   }
 
-  sealed trait Schema {
-    def `type`: String
-  }
+  sealed trait Schema { val `type`: String }
   object Schema {
+
     final case object String extends Schema {
-      val `type`: String = "string"
+      override val `type`: String = "string"
     }
+
     final case object Integer extends Schema {
-      val `type`: String = "integer"
+      override val `type`: String = "integer"
     }
   }
 
@@ -389,13 +384,17 @@ object model {
     def summary: Option[String]
     type T
   }
+
   object Example {
+
     case class JsonExample(value: Json, summary: Option[String] = None) extends Example {
       type T = Json
+    }
+    case class JsonLDExample(value: JsonLD, summary: Option[String] = None) extends Example {
+      type T = JsonLD
     }
     case class StringExample(value: String, summary: Option[String] = None) extends Example {
       type T = String
     }
   }
-
 }

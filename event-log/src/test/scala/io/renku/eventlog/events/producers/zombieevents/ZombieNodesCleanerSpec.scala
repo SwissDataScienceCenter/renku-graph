@@ -21,14 +21,13 @@ package io.renku.eventlog.events.producers.zombieevents
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.ServiceHealthChecker
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -111,7 +110,7 @@ class ZombieNodesCleanerSpec
           .atLeastOnce()
         upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, microserviceBaseUrl)
 
-        val otherSources = microserviceBaseUrls.generateNonEmptyList(minElements = 3)
+        val otherSources = microserviceBaseUrls.generateNonEmptyList(min = 3)
         otherSources map (upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, _))
 
         val someInactiveSource = otherSources.head
@@ -163,10 +162,11 @@ class ZombieNodesCleanerSpec
   }
 
   private trait TestCase {
-    val queriesExecTimes     = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val microserviceBaseUrl  = microserviceBaseUrls.generateOne
     val serviceHealthChecker = mock[ServiceHealthChecker[IO]]
-    val cleaner              = new ZombieNodesCleanerImpl(queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
+    val cleaner              = new ZombieNodesCleanerImpl(microserviceBaseUrl, serviceHealthChecker)
   }
 
   private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {

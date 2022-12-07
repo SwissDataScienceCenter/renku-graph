@@ -20,7 +20,6 @@ package io.renku.metrics
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.metrics.MetricsTools._
@@ -41,16 +40,15 @@ class SingleValueGaugeSpec extends AnyWordSpec with MockFactory with should.Matc
 
       gauge.set(value) shouldBe MonadThrow[Try].unit
 
-      underlying.get() shouldBe value
+      gauge.wrappedCollector.get() shouldBe value
     }
   }
 
   private trait TestCase {
     private val name = nonBlankStrings().generateOne
     private val help = sentences().generateOne
-    val underlying   = LibGauge.build(name.value, help.value).create()
 
-    val gauge = new SingleValueGaugeImpl[Try](underlying)
+    val gauge = new SingleValueGaugeImpl[Try](name, help)
   }
 }
 
@@ -67,7 +65,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue1.value, value1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
 
       // iteration 2
       val labelValue2 = projectPaths.generateOne
@@ -75,8 +73,8 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       gauge.set(labelValue2 -> value2) shouldBe MonadThrow[Try].unit
 
       underlying.collectAllSamples should contain.only(
-        (label, labelValue1.value, value1),
-        (label, labelValue2.value, value2)
+        (label.value, labelValue1.value, value1),
+        (label.value, labelValue2.value, value2)
       )
     }
   }
@@ -89,7 +87,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val update     = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> update) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, update))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, update))
     }
 
     "update the value associated with the label - case with a positive value" in new TestCase {
@@ -98,13 +96,13 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val initialValue = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, initialValue))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, initialValue))
 
       val update = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> update) shouldBe MonadThrow[Try].unit
 
       underlying.collectAllSamples should contain.only(
-        (label, labelValue.value, initialValue + update)
+        (label.value, labelValue.value, initialValue + update)
       )
     }
 
@@ -114,13 +112,13 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val initialValue = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, initialValue))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, initialValue))
 
       val update = initialValue * negativeInts(-5).generateOne
       gauge.update(labelValue -> -update) shouldBe MonadThrow[Try].unit
 
       underlying.collectAllSamples should contain.only(
-        (label, labelValue.value, initialValue - update)
+        (label.value, labelValue.value, initialValue - update)
       )
     }
   }
@@ -134,7 +132,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue1.value, value1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
 
       // re-provisioning
       val waitingEvents = waitingEventsGen.generateNonEmptyList().toList.flatten.toMap
@@ -143,7 +141,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       gauge.reset() shouldBe MonadThrow[Try].unit
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
-        (label, labelValue.value, value)
+        (label.value, labelValue.value, value)
       }
     }
   }
@@ -157,7 +155,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue1.value, value1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
 
       gauge.clear() shouldBe MonadThrow[Try].unit
 
@@ -174,12 +172,12 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> value) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, value))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value))
 
       // incrementing
       gauge.increment(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, value + 1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value + 1))
     }
 
     "add label value if one is not present yet" in new TestCase {
@@ -188,7 +186,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       gauge.increment(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, 1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, 1))
     }
   }
 
@@ -201,12 +199,12 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> value) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, value))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value))
 
       // incrementing
       gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, value - 1))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value - 1))
     }
 
     "add label value with value 0 if one is not present yet" in new TestCase {
@@ -215,18 +213,18 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label, labelValue.value, 0))
+      underlying.collectAllSamples should contain only ((label.value, labelValue.value, 0))
     }
   }
 
   private trait TestCase {
-    val label        = nonBlankStrings().generateOne.value
+    val label        = nonBlankStrings().generateOne
     private val name = nonBlankStrings().generateOne
-    private val help = sentences().generateOne
-    val underlying   = LibGauge.build(name.value, help.value).labelNames(label).create()
+    private val help = nonBlankStrings().generateOne
 
     val resetDataFetch = mockFunction[Try[Map[Path, Double]]]
-    val gauge          = new LabeledGaugeImpl[Try, Path](underlying, resetDataFetch)
+    val gauge          = new LabeledGaugeImpl[Try, Path](name, help, label, resetDataFetch)
+    val underlying     = gauge.wrappedCollector
   }
 
   private lazy val waitingEventsGen: Gen[Map[Path, Double]] = nonEmptySet {
@@ -252,8 +250,8 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
         val Success(gauge) = Gauge[Try](name, help)
 
         gauge.isInstanceOf[SingleValueGauge[Try]] shouldBe true
-        gauge.name                                shouldBe name.value
-        gauge.help                                shouldBe help.value
+        gauge.name                                shouldBe name
+        gauge.help                                shouldBe help
       }
   }
 
@@ -272,8 +270,8 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
         val Success(gauge) = Gauge[Try, String](name, help, labelName)
 
         gauge.isInstanceOf[LabeledGauge[Try, String]] shouldBe true
-        gauge.name                                    shouldBe name.value
-        gauge.help                                    shouldBe help.value
+        gauge.name                                    shouldBe name
+        gauge.help                                    shouldBe help
       }
   }
 

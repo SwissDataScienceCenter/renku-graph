@@ -29,5 +29,4 @@ private object EventProcessingGenerators {
     commitId <- commitIds
     project  <- consumerProjects
   } yield CommitEvent(EventId(commitId.value), project, commitId)
-
 }

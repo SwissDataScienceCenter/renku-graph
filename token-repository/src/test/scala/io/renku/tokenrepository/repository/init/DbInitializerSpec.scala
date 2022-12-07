@@ -37,8 +37,6 @@ class DbInitializerSpec
     with should.Matchers
     with MockedRunnableCollaborators {
 
-  import DbInitializer.Runnable
-
   "run" should {
 
     "run all the migrations" in new TestCase {
@@ -70,11 +68,8 @@ class DbInitializerSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val migrator1 = mock[ProjectsTokensTableCreator[IO]]
-    val migrator2 = mock[ProjectPathAdder[IO]]
-    val initializer = new DbInitializerImpl(
-      List[Runnable[IO, Unit]](migrator1, migrator2),
-      retrySleepDuration = 500 millis
-    )
+    val migrator1   = mock[DBMigration[IO]]
+    val migrator2   = mock[DBMigration[IO]]
+    val initializer = new DbInitializerImpl(List(migrator1, migrator2), retrySleepDuration = 500 millis)
   }
 }

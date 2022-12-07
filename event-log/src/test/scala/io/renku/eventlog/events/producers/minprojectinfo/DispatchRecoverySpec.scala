@@ -21,17 +21,17 @@ package minprojectinfo
 
 import Generators.sendingResults
 import cats.effect.IO
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -97,8 +97,9 @@ class DispatchRecoverySpec
   private trait TestCase {
     val event = MinProjectInfoEvent(projectIds.generateOne, projectPaths.generateOne)
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val recovery         = new DispatchRecoveryImpl[IO](queriesExecTimes)
+    private implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val recovery = new DispatchRecoveryImpl[IO]
   }
 }

@@ -34,6 +34,7 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{Request, Response}
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -41,7 +42,7 @@ trait EventEndpoint[F[_]] {
   def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[F[_]: Async](eventConsumersRegistry: EventConsumersRegistry[F])
+class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsumersRegistry[F])
     extends Http4sDsl[F]
     with EventEndpoint[F] {
 
@@ -55,7 +56,7 @@ class EventEndpointImpl[F[_]: Async](eventConsumersRegistry: EventConsumersRegis
       multipart      <- toMultipart(request)
       eventJson      <- toEvent(multipart)
       requestContent <- getRequestContent(multipart, eventJson)
-      result         <- right[Response[F]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
+      result         <- right[Response[F]]((eventConsumersRegistry handle requestContent) >>= toHttpResult)
     } yield result
   }.merge recoverWith { case NonFatal(error) => toHttpResult(SchedulingError(error)) }
 
@@ -117,17 +118,20 @@ class EventEndpointImpl[F[_]: Async](eventConsumersRegistry: EventConsumersRegis
   }
 
   private lazy val toHttpResult: EventSchedulingResult => F[Response[F]] = {
-    case EventSchedulingResult.Accepted                   => Accepted(InfoMessage("Event accepted"))
-    case EventSchedulingResult.Busy                       => TooManyRequests(InfoMessage("Too many events to handle"))
-    case EventSchedulingResult.UnsupportedEventType       => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest                 => BadRequest(ErrorMessage("Malformed event"))
-    case EventSchedulingResult.ServiceUnavailable(reason) => ServiceUnavailable(InfoMessage(reason))
-    case EventSchedulingResult.SchedulingError(_) => InternalServerError(ErrorMessage("Failed to schedule event"))
+    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
+    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.ServiceUnavailable(reason) =>
+      Logger[F].error(s"Service needed for event processing unavailable: $reason") >>
+        ServiceUnavailable(InfoMessage(reason))
+    case EventSchedulingResult.SchedulingError(ex) =>
+      Logger[F].error(ex)("Event scheduling error") >> InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 }
 
 object EventEndpoint {
 
-  def apply[F[_]: Async](consumersRegistry: EventConsumersRegistry[F]): F[EventEndpoint[F]] =
+  def apply[F[_]: Async: Logger](consumersRegistry: EventConsumersRegistry[F]): F[EventEndpoint[F]] =
     MonadThrow[F].catchNonFatal(new EventEndpointImpl[F](consumersRegistry))
 }

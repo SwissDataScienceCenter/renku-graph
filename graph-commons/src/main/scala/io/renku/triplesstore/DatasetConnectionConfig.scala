@@ -52,23 +52,23 @@ trait DatasetConnectionConfig extends FusekiConnectionConfig {
   val authCredentials: BasicAuthCredentials
 }
 
-final case class RenkuConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
+final case class ProjectsConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
     extends DatasetConnectionConfig {
-  val datasetName: DatasetName = RenkuConnectionConfig.RenkuDS
+  val datasetName: DatasetName = ProjectsConnectionConfig.ProjectsDS
 }
 
-object RenkuConnectionConfig {
+object ProjectsConnectionConfig {
 
-  val RenkuDS: DatasetName = DatasetName("renku")
+  val ProjectsDS: DatasetName = DatasetName("projects")
 
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[RenkuConnectionConfig] = for {
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ProjectsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
-  } yield RenkuConnectionConfig(url, BasicAuthCredentials(username, password))
+  } yield ProjectsConnectionConfig(url, BasicAuthCredentials(username, password))
 }
 
 final case class MigrationsConnectionConfig(

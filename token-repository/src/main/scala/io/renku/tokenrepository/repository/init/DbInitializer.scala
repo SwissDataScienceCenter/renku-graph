@@ -18,23 +18,21 @@
 
 package io.renku.tokenrepository.repository.init
 
-import DbInitializer.Runnable
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.http.client.GitLabClient
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
+class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
                                              retrySleepDuration: FiniteDuration = 20 seconds
 ) extends DbInitializer[F] {
 
@@ -56,14 +54,16 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
 
 object DbInitializer {
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DbInitializer[F]] = for {
-    tableCreator             <- ProjectsTokensTableCreator[F](sessionResource).pure[F]
-    pathAdder                <- ProjectPathAdder[F](sessionResource, queriesExecTimes)
-    duplicateProjectsRemover <- DuplicateProjectsRemover[F](sessionResource).pure[F]
-  } yield new DbInitializerImpl[F](List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover))
+  def migrations[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[List[DBMigration[F]]] =
+    List(
+      ProjectsTokensTableCreator[F].pure[F],
+      ProjectPathAdder[F].pure[F],
+      DuplicateProjectsRemover[F].pure[F],
+      ExpiryAndCreatedDatesAdder[F].pure[F],
+      TokensMigrator[F],
+      ExpiryAndCreatedDatesNotNull[F].pure[F]
+    ).sequence
 
-  private[init] type Runnable[F[_], R] = { def run(): F[R] }
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[DbInitializer[F]] =
+    migrations[F].map(new DbInitializerImpl[F](_))
 }

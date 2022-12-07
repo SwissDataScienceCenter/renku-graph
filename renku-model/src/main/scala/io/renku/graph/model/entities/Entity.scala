@@ -23,6 +23,7 @@ import io.renku.graph.model.Schemas.{prov, renku}
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.generations
 import io.renku.jsonld.JsonLDDecoder.Result
+import io.renku.jsonld.ontology._
 import io.renku.jsonld.{Cursor, EntityTypes, JsonLDDecoder}
 
 sealed trait Entity {
@@ -121,4 +122,10 @@ object Entity {
         case types                                     => s"Entity with unknown $types types".asLeft
       }
     }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "Entity"),
+    ObjectProperties(ObjectProperty(prov / "qualifiedGeneration", Generation.ontology)),
+    DataProperties(DataProperty(prov / "atLocation", xsd / "string"), DataProperty(renku / "checksum", xsd / "string"))
+  )
 }

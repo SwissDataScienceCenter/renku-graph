@@ -18,10 +18,10 @@
 
 package io.renku.db
 
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, TestSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 
 trait DbSpec extends BeforeAndAfterAll with BeforeAndAfter {
-  self: TestSuite =>
+  self: Suite =>
 
   protected def initDb():           Unit
   protected def prepareDbForTest(): Unit

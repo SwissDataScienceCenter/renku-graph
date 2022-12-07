@@ -24,8 +24,8 @@ import cats.kernel.Semigroup
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.graph.model.entities.Project
-import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesstore.SparqlQuery
 
 private[tsprovisioning] final case class TransformationStep[F[_]](
     name:           String Refined NonEmpty,
@@ -42,8 +42,8 @@ private[tsprovisioning] object TransformationStep {
   final case class Queries(preDataUploadQueries: List[SparqlQuery], postDataUploadQueries: List[SparqlQuery])
 
   object Queries {
-    val empty:                                           Queries = Queries(Nil, Nil)
-    def preDataQueriesOnly(queries: List[SparqlQuery]):  Queries = Queries(queries, Nil)
+    val empty: Queries = Queries(Nil, Nil)
+    def preDataQueriesOnly(queries:  List[SparqlQuery]): Queries = Queries(queries, Nil)
     def postDataQueriesOnly(queries: List[SparqlQuery]): Queries = Queries(Nil, queries)
 
     implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) =>

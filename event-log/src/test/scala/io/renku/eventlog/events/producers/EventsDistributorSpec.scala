@@ -431,7 +431,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
                                     event:      TestCategoryEvent,
                                     returning: PartialFunction[Throwable, IO[Unit]] =
                                       new PartialFunction[Throwable, IO[Unit]] {
-                                        override def isDefinedAt(x: Throwable)   = true
+                                        override def isDefinedAt(x:   Throwable) = true
                                         override def apply(throwable: Throwable) = dispatchRecoveryStrategy(throwable)
                                       }
     ) = (dispatchRecovery.recover _)

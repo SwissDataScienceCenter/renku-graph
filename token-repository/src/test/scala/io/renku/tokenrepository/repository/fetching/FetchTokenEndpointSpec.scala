@@ -47,7 +47,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
     "respond with OK with the oauth token if one is found in the repository" in new TestCase {
       import endpoint._
 
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
       val projectId = projectIds.generateOne
 
       (tokensFinder
@@ -87,7 +87,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
     "respond with OK with the token if one is found in the repository for the given project path" in new TestCase {
       import endpoint._
 
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
       val projectPath = projectPaths.generateOne
 
       (tokensFinder

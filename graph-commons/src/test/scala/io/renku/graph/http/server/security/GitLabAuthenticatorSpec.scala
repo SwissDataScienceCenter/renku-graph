@@ -20,12 +20,10 @@ package io.renku.graph.http.server.security
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -34,12 +32,11 @@ import io.renku.http.server.security.EndpointSecurityException.AuthenticationFai
 import io.renku.http.server.security._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Status._
 import org.http4s.circe.jsonEncoder
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Header, Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -50,7 +47,6 @@ class GitLabAuthenticatorSpec
     with IOSpec
     with should.Matchers
     with MockFactory
-    with ExternalServiceStubbing
     with GitLabClientTools[IO] {
 
   "authenticate" should {
@@ -109,7 +105,7 @@ class GitLabAuthenticatorSpec
   }
 
   private trait TestCase {
-    val accessToken = accessTokens.generateOne
+    val accessToken = userAccessTokens.generateOne
     val uri         = uri"user"
     val endpointName: NonEmptyString = "user"
 
@@ -122,13 +118,5 @@ class GitLabAuthenticatorSpec
         _.authenticate(accessToken).unsafeRunSync(),
         Gen.const(Right(AuthUser(personGitLabIds.generateOne, accessToken)))
       )
-  }
-
-  private def `/api/v4/user`(header: Header.Raw) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get("/api/v4/user")
-        .withHeader(header.name.toString, equalTo(header.value))
-        .willReturn(response)
-    }
   }
 }

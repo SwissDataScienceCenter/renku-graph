@@ -23,7 +23,6 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.circe.Decoder.decodeList
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
@@ -50,7 +49,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
     subscriptionsRegistry: Ref[F, List[SubscriptionMechanism[F]]],
     lastCacheCheckTimeRef: Ref[F, Long]
 )(implicit renkuUrl:       RenkuUrl)
-    extends TSClientImpl(storeConfig)
+    extends TSClient(storeConfig)
     with ReProvisioningStatus[F] {
 
   import io.renku.jsonld.syntax._
@@ -142,27 +141,15 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
     )
   }(statusDecoder)
 
-  private lazy val statusDecoder: Decoder[Option[ReProvisioningInfo.Status]] = {
+  private lazy val statusDecoder: Decoder[Option[ReProvisioningInfo.Status]] =
+    ResultsDecoder[List, ReProvisioningInfo.Status] { implicit cur =>
+      extract[ReProvisioningInfo.Status]("status")
+    }.map(_.headOption)
 
-    val ofStatuses: Decoder[ReProvisioningInfo.Status] =
-      _.downField("status").downField("value").as[ReProvisioningInfo.Status]
-
-    _.downField("results")
-      .downField("bindings")
-      .as(decodeList(ofStatuses))
-      .map(_.headOption)
-  }
-
-  private lazy val controllerUrlDecoder: Decoder[Option[MicroserviceBaseUrl]] = {
-
-    val ofControllers: Decoder[MicroserviceBaseUrl] =
-      _.downField("url").downField("value").as[MicroserviceBaseUrl]
-
-    _.downField("results")
-      .downField("bindings")
-      .as(decodeList(ofControllers))
-      .map(_.headOption)
-  }
+  private lazy val controllerUrlDecoder: Decoder[Option[MicroserviceBaseUrl]] =
+    ResultsDecoder[List, MicroserviceBaseUrl] { implicit cur =>
+      extract[MicroserviceBaseUrl]("url")
+    }.map(_.headOption)
 }
 
 object ReProvisioningStatus {
@@ -173,17 +160,14 @@ object ReProvisioningStatus {
   def apply[F[_]](implicit ev: ReProvisioningStatus[F]): ReProvisioningStatus[F] = ev
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](): F[ReProvisioningStatus[F]] = for {
-    storeConfig           <- MigrationsConnectionConfig[F]()
-    renkuUrl              <- RenkuUrlLoader[F]()
-    subscriptionsRegistry <- Ref.of(List.empty[SubscriptionMechanism[F]])
-    lastCacheCheckTimeRef <- Ref.of[F, Long](0)
-  } yield {
-    implicit val baseUrl: RenkuUrl = renkuUrl
-    new ReProvisioningStatusImpl(storeConfig,
-                                 StatusRefreshInterval,
-                                 CacheRefreshInterval,
-                                 subscriptionsRegistry,
-                                 lastCacheCheckTimeRef
-    )
-  }
+    storeConfig                   <- MigrationsConnectionConfig[F]()
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+    subscriptionsRegistry         <- Ref.of(List.empty[SubscriptionMechanism[F]])
+    lastCacheCheckTimeRef         <- Ref.of[F, Long](0)
+  } yield new ReProvisioningStatusImpl(storeConfig,
+                                       StatusRefreshInterval,
+                                       CacheRefreshInterval,
+                                       subscriptionsRegistry,
+                                       lastCacheCheckTimeRef
+  )
 }

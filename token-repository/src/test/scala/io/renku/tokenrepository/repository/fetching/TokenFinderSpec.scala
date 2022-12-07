@@ -21,6 +21,7 @@ package io.renku.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -34,7 +35,6 @@ import io.renku.tokenrepository.repository.RepositoryGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import eu.timepit.refined.types.numeric
 
 class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
@@ -46,7 +46,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: Id))
+        .findStoredToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 
@@ -64,7 +64,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
       val projectId = projectIds.generateOne
 
       (tokenInRepoFinder
-        .findToken(_: Id))
+        .findStoredToken(_: Id))
         .expects(projectId)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
@@ -77,7 +77,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findToken(_: Id))
+        .findStoredToken(_: Id))
         .expects(projectId)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
 
@@ -98,7 +98,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
         val encryptedToken = encryptedAccessTokens.generateOne
         (tokenInRepoFinder
-          .findToken(_: Id))
+          .findStoredToken(_: Id))
           .expects(projectId)
           .returning(OptionT.some(encryptedToken))
 
@@ -109,7 +109,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
           .returning(exception.raiseError[IO, AccessToken])
 
         (tokenInRepoFinder
-          .findToken(_: Id))
+          .findStoredToken(_: Id))
           .expects(projectId)
           .returning(OptionT.some(encryptedToken))
 
@@ -131,7 +131,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: Id))
+        .findStoredToken(_: Id))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 
@@ -142,11 +142,11 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       intercept[Exception] {
         tokenFinder.findToken(projectId).value.unsafeRunSync()
-      }.getMessage() shouldBe exception.getMessage
+      }.getMessage shouldBe exception.getMessage
     }
   }
 
-  "findToken(ProjectPath)" should {
+  "findStoredToken(ProjectPath)" should {
 
     "return Access Token if the token found for the projectPath in the db was successfully decrypted" in new TestCase {
 
@@ -154,7 +154,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: Path))
+        .findStoredToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.some(encryptedToken))
 
@@ -172,7 +172,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
       val projectPath = projectPaths.generateOne
 
       (tokenInRepoFinder
-        .findToken(_: Path))
+        .findStoredToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
@@ -185,7 +185,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findToken(_: Path))
+        .findStoredToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
       intercept[Exception] {
@@ -205,7 +205,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
         val encryptedToken = encryptedAccessTokens.generateOne
         (tokenInRepoFinder
-          .findToken(_: Path))
+          .findStoredToken(_: Path))
           .expects(projectPath)
           .returning(OptionT.some(encryptedToken))
         val exception = exceptions.generateOne
@@ -215,7 +215,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
           .returning(exception.raiseError[IO, AccessToken])
 
         (tokenInRepoFinder
-          .findToken(_: Path))
+          .findStoredToken(_: Path))
           .expects(projectPath)
           .returning(OptionT.some(encryptedToken))
 
@@ -237,7 +237,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findToken(_: Path))
+        .findStoredToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.some(encryptedToken))
 
@@ -248,7 +248,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       intercept[Exception] {
         tokenFinder.findToken(projectPath).value.unsafeRunSync()
-      }.getMessage() shouldBe exception.getMessage
+      }.getMessage shouldBe exception.getMessage
     }
   }
 

@@ -18,12 +18,12 @@
 
 package io.renku.graph.http.server.security
 
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.http.server.security.Authorizer.AuthContext
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.graph.model.GraphModelGenerators.projectPaths
 
 class AuthContextSpec extends AnyWordSpec with should.Matchers {
 

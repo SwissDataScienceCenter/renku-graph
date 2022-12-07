@@ -21,18 +21,15 @@ package io.renku.eventlog.events.consumers.creation
 import cats.effect.Concurrent
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Concurrent: Logger: SessionResource](
-      waitingEventsGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:   LabeledHistogram[F]
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    handler <- EventHandler(waitingEventsGauge, queriesExecTimes)
+  def apply[F[_]: Concurrent: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler[F]
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

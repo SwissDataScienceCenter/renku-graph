@@ -61,7 +61,7 @@ class AccessTokenFinderSpec
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
 
       val projectId = projectIds.generateOne
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/$projectId/tokens")
@@ -135,7 +135,7 @@ class AccessTokenFinderSpec
     "return Some OAuth Access Token if remote responds with OK and valid body" in new TestCase {
 
       val projectPath = projectPaths.generateOne
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
       stubFor {
         get(s"/projects/${urlEncode(projectPath.toString)}/tokens")

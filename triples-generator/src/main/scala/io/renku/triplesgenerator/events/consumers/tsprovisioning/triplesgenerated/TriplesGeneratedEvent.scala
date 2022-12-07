@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning.triplesgenerated
 
 import cats.Show
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.jsonld.JsonLD
-import io.renku.triplesgenerator.events.consumers.models.CategoryEvent
 
 private final case class TriplesGeneratedEvent(eventId: EventId, project: Project, payload: JsonLD)
     extends Product

@@ -23,23 +23,22 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
-import io.renku.eventlog.events.EventsEndpoint.{Criteria, EventInfo, StatusProcessingTime}
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.eventlog.events.EventsEndpoint.Criteria
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.model.{PerPage, Total}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import io.renku.metrics.LabeledHistogram
 
 private trait EventsFinder[F[_]] {
   def findEvents(request: EventsEndpoint.Criteria): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventsFinder[F]
     with Paging[EventInfo] {
 
@@ -65,7 +64,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       }
 
       private val selectEventInfo: Fragment[Void] = sql"""
-        SELECT evt.event_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
+        SELECT evt.event_id, prj.project_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
         FROM event evt
       """
 
@@ -79,17 +78,17 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 
       private val whereEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
         case Some(Criteria.Filters.EventsSince(since)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             WHERE evt.event_date >= $eventDateEncoder
           """
           fragment(since)
         case Some(Criteria.Filters.EventsUntil(until)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             WHERE evt.event_date <= $eventDateEncoder
           """
           fragment(until)
         case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
-          val fragment: Fragment[(eventlog.EventDate ~ eventlog.EventDate)] = sql"""
+          val fragment: Fragment[(EventDate ~ EventDate)] = sql"""
             WHERE evt.event_date >= $eventDateEncoder
               AND evt.event_date <= $eventDateEncoder
           """
@@ -99,17 +98,17 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 
       private val andEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
         case Some(Criteria.Filters.EventsSince(since)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             AND evt.event_date >= $eventDateEncoder
           """
           fragment(since)
         case Some(Criteria.Filters.EventsUntil(until)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             AND evt.event_date <= $eventDateEncoder
           """
           fragment(until)
         case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
-          val fragment: Fragment[eventlog.EventDate ~ eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate ~ EventDate] = sql"""
             AND evt.event_date >= $eventDateEncoder
             AND evt.event_date <= $eventDateEncoder
           """
@@ -126,7 +125,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       """
 
       private val groupBy: Fragment[Void] = sql"""
-        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_path
+        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_id, prj.project_path
       """
 
       private val orderBy: Criteria.Sorting.By => Fragment[Void] = {
@@ -185,19 +184,19 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
           .select[query.A, (EventInfo, Long)](
             query.fragment
               .query(
-                eventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder ~ eventDateDecoder ~
+                eventIdDecoder ~ projectIdsDecoder ~ eventStatusDecoder ~ eventDateDecoder ~
                   executionDateDecoder ~ eventMessageDecoder.opt ~ int8
               )
               .map {
-                case (eventId:    EventId) ~
-                    (projectPath: projects.Path) ~
+                case (eventId:   EventId) ~
+                    (projectIds: EventInfo.ProjectIds) ~
                     (status: EventStatus) ~
                     (eventDate: EventDate) ~
                     (executionDate: ExecutionDate) ~
                     (maybeMessage: Option[EventMessage]) ~
                     (processingTimesCount: Long) =>
                   EventInfo(eventId,
-                            projectPath,
+                            projectIds,
                             status,
                             eventDate,
                             executionDate,
@@ -229,7 +228,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
               )
           """.query(statusProcessingTimesDecoder)
           )
-          .arguments(eventInfo.eventId, eventInfo.projectPath)
+          .arguments(eventInfo.eventId, eventInfo.project.path)
           .build(_.toList)
       }
 
@@ -281,6 +280,6 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 }
 
 private object EventsFinder {
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new EventsFinderImpl(queriesExecTimes))
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: QueriesExecutionTimes]: F[EventsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new EventsFinderImpl[F])
 }

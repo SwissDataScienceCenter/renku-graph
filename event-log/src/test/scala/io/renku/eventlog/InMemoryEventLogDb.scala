@@ -20,38 +20,17 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
-import com.dimafeng.testcontainers._
-import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.testtools.IOSpec
-import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
+/** Utilities for event log  database. You can swap [[ContainerEventLogDb]] with [[ExternalEventLogDb]] for more
+ *  convenient debugging. 
+ */
+trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
   self: Suite with IOSpec =>
-
-  private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
-
-  override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
-  )
-
-  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
-    Session.single(
-      host = container.host,
-      port = container.container.getMappedPort(dbConfig.port.value),
-      user = dbConfig.user.value,
-      database = dbConfig.name.value,
-      password = Some(dbConfig.pass.value)
-    )
-  )
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
     sessionResource.useK(query).unsafeRunSync()

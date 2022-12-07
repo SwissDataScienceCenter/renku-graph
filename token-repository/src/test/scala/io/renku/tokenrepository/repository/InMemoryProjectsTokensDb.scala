@@ -20,30 +20,24 @@ package io.renku.tokenrepository.repository
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import com.dimafeng.testcontainers._
-import io.renku.db.SessionResource
+import io.renku.db.PostgresContainer
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-trait InMemoryProjectsTokensDb extends ForAllTestContainer {
+trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryTypeSerializers {
   self: Suite with IOSpec =>
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
-    databaseName = "projects_tokens",
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
-  )
+  override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
-  lazy val sessionResource: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
+  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, ProjectsTokensDB](
     Session.single(
       host = container.host,
       database = dbConfig.name.value,
@@ -54,21 +48,68 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   )
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
-    sessionResource.useK(query).unsafeRunSync()
+    SessionResource[IO].useK(query).unsafeRunSync()
 
-  protected def tableExists(): Boolean =
-    sessionResource
-      .useK {
-        val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
-        Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
-      }
-      .unsafeRunSync()
-      .isDefined
+  protected def tableExists(tableName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+      session.prepare(query).use(_.unique(tableName)).recover { case _ => false }
+    }
+  }
 
   protected def dropTable(table: String): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Void] = sql"DROP TABLE IF EXISTS #$table".command
       session.execute(query).void
+    }
+  }
+
+  protected def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT *
+                FROM information_schema.columns
+                WHERE table_name = $varchar AND column_name = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .recover { case _ => false }
+    }
+  }
+
+  protected def verifyColumnNullable(table: String, column: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] = sql"""
+        SELECT DISTINCT is_nullable
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE table_name = $varchar AND column_name = $varchar"""
+        .query(varchar(3))
+        .map {
+          case "YES" => true
+          case "NO"  => false
+          case other => throw new Exception(s"is_nullable for $table.$column has value $other")
+        }
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+    }
+  }
+
+  def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+               SELECT *
+               FROM pg_indexes
+               WHERE tablename = $varchar AND indexname = $varchar
+             )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ indexName))
+        .recover { case _ => false }
     }
   }
 

@@ -30,20 +30,19 @@ private[migrations] trait UpdateQueryRunner[F[_]] {
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl[F](renkuConnectionConfig,
-                          idleTimeoutOverride = (16 minutes).some,
-                          requestTimeoutOverride = (15 minutes).some
-    )
+    storeConfig: ProjectsConnectionConfig
+) extends TSClient[F](storeConfig, idleTimeoutOverride = (16 minutes).some, requestTimeoutOverride = (15 minutes).some)
     with UpdateQueryRunner[F] {
 
   def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
 }
 
 private[migrations] object UpdateQueryRunner {
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
-    RenkuConnectionConfig[F]().map(new UpdateQueryRunnerImpl(_))
+    ProjectsConnectionConfig[F]().map(new UpdateQueryRunnerImpl(_))
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig
-  ): UpdateQueryRunner[F] = new UpdateQueryRunnerImpl(renkuConnectionConfig)
+      storeConfig: ProjectsConnectionConfig
+  ): UpdateQueryRunner[F] = new UpdateQueryRunnerImpl(storeConfig)
 }

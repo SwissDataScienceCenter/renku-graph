@@ -25,28 +25,26 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
+import io.renku.graph.model.testentities.RenkuProject
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
-import io.renku.graph.model.{SchemaVersion, testentities}
+import io.renku.graph.model.{GraphClass, SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.scalactic.source.Position
+import org.scalatest.Assertion
 import org.scalatest.enablers.Retrying
-import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.time.{Minutes, Seconds, Span}
-import org.scalatest.{Assertion, GivenWhenThen}
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
-class ProjectReProvisioningSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData {
+class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("Project re-provisioning") {
 
@@ -59,10 +57,11 @@ class ProjectReProvisioningSpec
       val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
-      `GET <gitlabApi>/user returning OK`(user)
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       eventually {
         knowledgeGraphClient
@@ -108,10 +107,10 @@ class ProjectReProvisioningSpec
 
   private object TestData {
 
-    val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
+    val user:        AuthUser    = authUsers.generateOne
+    val accessToken: AccessToken = user.accessToken
 
-    val testEntitiesProject = renkuProjectEntities(visibilityPublic).generateOne
+    val testEntitiesProject: RenkuProject = renkuProjectEntities(visibilityPublic).generateOne
       .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }
 

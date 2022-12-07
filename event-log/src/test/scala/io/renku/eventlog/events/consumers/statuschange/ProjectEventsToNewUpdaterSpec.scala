@@ -21,13 +21,11 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventMessages
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projectCleaner.ProjectCleaner
 import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
@@ -36,12 +34,13 @@ import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -68,7 +67,7 @@ class ProjectEventsToNewUpdaterSpec
         val project = consumerProjects.generateOne
         val eventsStatuses = Gen
           .oneOf(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))
-          .generateList(minElements = 2)
+          .generateList(min = 2)
 
         val eventsAndDates = eventsStatuses.map { status =>
           val eventDate = timestampsNotInTheFuture.generateAs(EventDate)
@@ -231,11 +230,12 @@ class ProjectEventsToNewUpdaterSpec
     val subscriberUrl = subscriberUrls.generateOne
     upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val projectCleaner   = mock[ProjectCleaner[IO]]
-    val dbUpdater        = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, queriesExecTimes, currentTime)
-    val now              = Instant.now()
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val projectCleaner = mock[ProjectCleaner[IO]]
+    val dbUpdater      = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, currentTime)
+    val now            = Instant.now()
 
     currentTime.expects().returning(now)
   }

@@ -28,24 +28,23 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{CommitId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class EventFinderImpl[F[_]: Async: SessionResource](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-    queriesExecTimes:      LabeledHistogram[F],
     syncFrequency:         Duration,
     now:                   () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, GlobalCommitSyncEvent]
     with SubscriptionTypeSerializers {
 
@@ -138,12 +137,11 @@ private object EventFinder {
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: Async: SessionResource](
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes](
       lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-      queriesExecTimes:      LabeledHistogram[F],
       config:                Config = ConfigFactory.load()
   ): F[EventFinder[F, GlobalCommitSyncEvent]] = for {
     configFrequency <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
     syncFrequency   <- Duration.ofDays(configFrequency.toDays).pure[F]
-  } yield new EventFinderImpl(lastSyncedDateUpdater, queriesExecTimes, syncFrequency)
+  } yield new EventFinderImpl(lastSyncedDateUpdater, syncFrequency)
 }

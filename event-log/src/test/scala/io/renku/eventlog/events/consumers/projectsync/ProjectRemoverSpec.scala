@@ -19,17 +19,17 @@
 package io.renku.eventlog.events.consumers.projectsync
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{CompoundEventId, LastSyncedDate}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -83,7 +83,8 @@ class ProjectRemoverSpec
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val remover          = new ProjectRemoverImpl[IO](queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val remover = new ProjectRemoverImpl[IO]
   }
 }

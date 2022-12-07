@@ -28,9 +28,9 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
@@ -41,7 +41,9 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     subscriptionMechanism:      SubscriptionMechanism[F],
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+
   import eventBodyDeserializer.toCleanUpEvent
+  import eventProcessor._
   import tsReadinessChecker._
 
   override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
@@ -54,7 +56,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     event <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
     result <-
       Spawn[F]
-        .start(eventProcessor.process(event.project).recoverWith(errorLogging(event.project)) >> deferred.complete(()))
+        .start((process(event.project) recoverWith logError(event.project)) >> deferred.complete(()))
         .toRightT
         .map(_ => Accepted)
         .semiflatTap(Logger[F].log(event))

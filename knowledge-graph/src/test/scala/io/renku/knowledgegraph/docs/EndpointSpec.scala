@@ -19,25 +19,47 @@
 package io.renku.knowledgegraph.docs
 
 import cats.effect.IO
-import io.renku.config.ServiceVersion
+import io.circe.Json
+import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.http.server.EndpointTester._
+import io.renku.knowledgegraph.docs.OpenApiTester._
+import io.renku.knowledgegraph.docs.model.Operation.GET
+import io.renku.knowledgegraph.docs.model.{Path, Uri}
 import io.renku.testtools.IOSpec
-import io.swagger.parser.OpenAPIParser
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
+class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
 
   "GET /spec.json" should {
 
     "return the OpenAPI specification" in new TestCase {
-
-      val contents = endpoint.`get /docs`.unsafeRunSync().as[String].unsafeRunSync()
-
-      Option(new OpenAPIParser().readContents(contents, null, null).getOpenAPI).isEmpty shouldBe false
+      validateDocument {
+        endpoint.`get /spec.json`.unsafeRunSync().as[Json].unsafeRunSync()
+      }
     }
   }
 
   private trait TestCase {
-    val endpoint = new EndpointImpl[IO](ServiceVersion("0.0.0"))
+
+    private val endpointDocs1 = mock[EndpointDocs]
+    (() => endpointDocs1.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
+
+    val otherEndpointDocs = 1 to ints(min = 1, max = 10).generateOne map { _ =>
+      val docs = mock[EndpointDocs]
+
+      (() => docs.path)
+        .expects()
+        .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
+
+      docs
+    }
+
+    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1, otherEndpointDocs: _*)
   }
 }

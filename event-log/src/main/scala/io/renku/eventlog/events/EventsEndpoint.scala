@@ -23,15 +23,14 @@ import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
-import io.renku.eventlog.events.EventsEndpoint.EventInfo
+import io.renku.eventlog.events.EventsEndpoint.JsonEncoders
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest
-import io.renku.metrics.LabeledHistogram
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -51,7 +50,7 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
       .findEvents(criteria)
-      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.infoEncoder))
+      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, JsonEncoders.eventInfoEncoder))
       .recoverWith(httpResponse(request))
 
   private def resourceUrl(request: Request[F]) = EventLogUrl(show"$eventLogUrl${request.uri}")
@@ -65,10 +64,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
 object EventsEndpoint {
 
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[EventsEndpoint[F]] = for {
-    eventsFinder <- EventsFinder(queriesExecTimes)
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: QueriesExecutionTimes]: F[EventsEndpoint[F]] = for {
+    eventsFinder <- EventsFinder[F]
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
 
@@ -126,38 +123,30 @@ object EventsEndpoint {
     case Filters.EventsSinceAndUntil(since, until) => show"since: ${since.eventDate}; until: ${until.eventDate}"
   }
 
-  final case class EventInfo(eventId:         EventId,
-                             projectPath:     projects.Path,
-                             status:          EventStatus,
-                             eventDate:       EventDate,
-                             executionDate:   ExecutionDate,
-                             maybeMessage:    Option[EventMessage],
-                             processingTimes: List[StatusProcessingTime]
-  )
+  object JsonEncoders {
+    import io.circe.literal._
+    import io.circe.syntax._
 
-  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
-
-  object EventInfo {
-
-    implicit lazy val infoEncoder: Encoder[EventInfo] = eventInfo => {
-      import io.circe.literal._
-      import io.circe.syntax._
-
-      implicit val processingTimeEncoder: Encoder[StatusProcessingTime] = processingTime => json"""{
-        "status":         ${processingTime.status.value},
-        "processingTime": ${processingTime.processingTime.value}
-      }"""
-
+    implicit val statusProcessingTimeEncoder: Encoder[StatusProcessingTime] = { processingTime =>
       json"""{
-        "id":              ${eventInfo.eventId.value},
-        "projectPath":     ${eventInfo.projectPath.value},
-        "status":          ${eventInfo.status.value},
-        "processingTimes": ${eventInfo.processingTimes.map(_.asJson)},
-        "date" :           ${eventInfo.eventDate.value.asJson},
-        "executionDate":   ${eventInfo.executionDate.value.asJson}
-      }""" deepMerge {
-        eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
-      }
+        "status":         ${processingTime.status},
+        "processingTime": ${processingTime.processingTime}
+      }"""
     }
+
+    implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
+      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+
+    implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
+      json"""{
+          "id":              ${eventInfo.eventId},
+          "project":     ${eventInfo.project},
+          "status":          ${eventInfo.status},
+          "processingTimes": ${eventInfo.processingTimes},
+          "date" :           ${eventInfo.eventDate},
+          "executionDate":   ${eventInfo.executionDate}
+        }""".deepMerge(
+        eventInfo.maybeMessage.map(m => Json.obj("message" -> m.asJson)).getOrElse(Json.obj())
+      )
   }
 }

@@ -49,8 +49,8 @@ object model {
     ): F[ProjectHookUrl] =
       SelfUrl[F](config).map(from)
 
-    def from(selfUrl: SelfUrl):        ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
-    def fromGitlab(gitlabUrl: String): ProjectHookUrl = new ProjectHookUrl(gitlabUrl)
+    def from(selfUrl:         SelfUrl): ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
+    def fromGitlab(gitlabUrl: String):  ProjectHookUrl = new ProjectHookUrl(gitlabUrl)
   }
 
   final class SelfUrl private (val value: String) extends AnyVal with UrlTinyType

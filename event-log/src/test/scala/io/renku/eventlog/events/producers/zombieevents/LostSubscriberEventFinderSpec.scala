@@ -18,18 +18,19 @@
 
 package io.renku.eventlog.events.producers.zombieevents
 
+import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -73,8 +74,9 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
     val sourceUrl    = microserviceBaseUrls.generateOne
     val projectPath  = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder           = new LostSubscriberEventFinder(queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val finder = new LostSubscriberEventFinder[IO]
 
     def addEvent(eventId: CompoundEventId, status: EventStatus): Unit = storeEvent(
       eventId,

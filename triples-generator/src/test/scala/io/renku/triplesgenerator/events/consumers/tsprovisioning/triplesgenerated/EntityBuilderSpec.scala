@@ -21,9 +21,8 @@ package tsprovisioning
 package triplesgenerated
 
 import CategoryGenerators._
-import cats.data.EitherT
+import cats.data.{EitherT, Kleisli}
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -32,7 +31,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.http.client.AccessToken
@@ -47,6 +46,8 @@ import scala.language.reflectiveCalls
 import scala.util.{Failure, Success, Try}
 
 class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   "buildEntity" should {
 
@@ -227,7 +228,12 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
               .to[entities.RenkuProject.WithoutParent]
               .copy(activities =
                 activityEntities
-                  .withDateBefore(project.dateCreated)
+                  .map(
+                    _.replaceStartTime(
+                      timestamps(max = project.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime)
+                    )
+                  )
+                  .run(project.dateCreated)
                   .generateFixedSizeList(1)
                   .map(_.to[entities.Activity])
               )
@@ -285,12 +291,12 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
   }
 
-  private def activityEntities: ActivityGenFactory = project => {
+  private def activityEntities: ActivityGenFactory = Kleisli { project =>
     val paramValue = parameterDefaultValues.generateOne
     val input      = entityLocations.generateOne
     val output     = entityLocations.generateOne
     executionPlanners(
-      planEntities(
+      stepPlanEntities(
         CommandParameter.from(paramValue),
         CommandInput.fromLocation(input),
         CommandOutput.fromLocation(output)

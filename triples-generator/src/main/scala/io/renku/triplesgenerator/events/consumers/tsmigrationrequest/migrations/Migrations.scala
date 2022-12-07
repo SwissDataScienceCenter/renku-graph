@@ -33,37 +33,17 @@ private[tsmigrationrequest] object Migrations {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[List[Migration[F]]] = for {
-    datasetsCreator                   <- DatasetsCreator[F]
-    reProvisioning                    <- ReProvisioning[F](config)
-    malformedActivityIds              <- MalformedActivityIds[F]
-    multiplePersonNames               <- MultiplePersonNames[F]
-    malformedDSImageIds               <- MalformedDSImageIds[F]
-    multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
-    multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
-    multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
-    multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
-    multipleDSDateCreated             <- MultipleDSDateCreated[F]
-    multipleDSSameAs                  <- MultipleDSSameAs[F]
-    removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
-    multipleDSDescriptions            <- MultipleDSDescriptions[F]
-    multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
-    multipleProjectAgents             <- MultipleProjectAgents[F]
+    datasetsCreator               <- DatasetsCreator[F]
+    datasetsRemover               <- DatasetsRemover[F]
+    reProvisioning                <- ReProvisioning[F](config)
+    removeNotLinkedPersons        <- RemoveNotLinkedPersons[F]
+    fixPlansYoungerThanActivities <- FixPlansYoungerThanActivities[F]
     migrations <- validateNames(
                     datasetsCreator,
+                    datasetsRemover,
                     reProvisioning,
-                    malformedActivityIds,
-                    multiplePersonNames,
-                    malformedDSImageIds,
-                    multipleDSTopmostSameAs,
-                    multipleAllWrongTopmostSameAs,
-                    multipleTopmostSameAsOnInternalDS,
-                    multipleOriginalIdentifiers,
-                    multipleDSDateCreated,
-                    multipleDSSameAs,
                     removeNotLinkedPersons,
-                    multipleDSDescriptions,
-                    multipleTopmostDerivedFroms,
-                    multipleProjectAgents
+                    fixPlansYoungerThanActivities
                   )
   } yield migrations
 

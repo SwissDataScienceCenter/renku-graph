@@ -26,12 +26,14 @@ import cats.syntax.all._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -40,7 +42,7 @@ import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
 import io.renku.http.server.version
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import org.http4s._
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -55,6 +57,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
+    eventPayloadEndpoint:     EventPayloadEndpoint[F],
     routesMetrics:            RoutesMetrics[F],
     isMigrating:              Ref[F, Boolean],
     versionRoutes:            version.Routes[F]
@@ -77,7 +80,8 @@ private class MicroserviceRoutes[F[_]: Sync](
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
-    case           GET  -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
     case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
@@ -216,25 +220,27 @@ private class MicroserviceRoutes[F[_]: Sync](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry](
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
       consumersRegistry:      EventConsumersRegistry[F],
-      queriesExecTimes:       LabeledHistogram[F],
       eventProducersRegistry: EventProducersRegistry[F],
       isMigrating:            Ref[F, Boolean]
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint            <- EventEndpoint[F](consumersRegistry)
-    eventsEndpoint           <- EventsEndpoint(queriesExecTimes)
-    processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
+    eventsEndpoint           <- EventsEndpoint[F]
+    processingStatusEndpoint <- ProcessingStatusEndpoint[F]
     subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
-    eventDetailsEndpoint     <- EventDetailsEndpoint(queriesExecTimes)
-    versionRoutes            <- version.Routes[F]
-  } yield new MicroserviceRoutes(eventEndpoint,
-                                 eventsEndpoint,
-                                 processingStatusEndpoint,
-                                 subscriptionsEndpoint,
-                                 eventDetailsEndpoint,
-                                 new RoutesMetrics[F],
-                                 isMigrating,
-                                 versionRoutes
+    eventDetailsEndpoint     <- EventDetailsEndpoint[F]
+    eventPayloadEndpoint = EventPayloadEndpoint[F]
+    versionRoutes <- version.Routes[F]
+  } yield new MicroserviceRoutes(
+    eventEndpoint,
+    eventsEndpoint,
+    processingStatusEndpoint,
+    subscriptionsEndpoint,
+    eventDetailsEndpoint,
+    eventPayloadEndpoint,
+    new RoutesMetrics[F],
+    isMigrating,
+    versionRoutes
   )
 }

@@ -18,14 +18,14 @@
 
 package io.renku.triplesstore
 
-import cats.MonadThrow
+import cats.{MonadThrow, Show}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.Schema
-import io.renku.triplesstore.SparqlQuery.Prefix
 import io.renku.tinytypes.StringTinyType
+import io.renku.triplesstore.SparqlQuery.Prefix
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
                              prefixes:           Set[Prefix],
@@ -79,6 +79,8 @@ object SparqlQuery {
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank[Prefix] {
     def apply(name: String Refined NonEmpty, schema: Schema): Prefix = Prefix(schema asPrefix name.value)
   }
+
+  implicit val show: Show[SparqlQuery] = Show.show(q => s"${q.name}:\n$q")
 
   object Prefixes {
 

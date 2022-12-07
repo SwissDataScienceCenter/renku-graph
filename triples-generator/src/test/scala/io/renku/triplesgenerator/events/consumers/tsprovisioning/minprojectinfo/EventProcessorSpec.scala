@@ -23,7 +23,7 @@ package minprojectinfo
 import CategoryGenerators._
 import ProcessingRecoverableError._
 import cats.data.EitherT
-import cats.data.EitherT.{leftT, rightT}
+import cats.data.EitherT.{leftT, right, rightT}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -50,7 +50,7 @@ import transformation.TransformationStepsCreator
 import triplesuploading.TriplesUploadResult._
 import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
@@ -93,9 +93,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .returning(maybeAccessToken.pure[Try])
 
       val exception = exceptions.generateOne
-      givenEntityBuilding(event,
-                          returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
-      )
+      givenEntityBuilding(event, returning = right[ProcessingRecoverableError](exception.raiseError[Try, Project]))
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -103,7 +101,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       logSummary(event, isSuccessful = false)
     }
 
-    s"do not log an error if entity building fails with SilentRecoverableError" in new TestCase {
+    "do not log an error if entity building fails with SilentRecoverableError" in new TestCase {
 
       givenFetchingAccessToken(forProjectPath = event.project.path)
         .returning(maybeAccessToken.pure[Try])
@@ -122,9 +120,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .returning(maybeAccessToken.pure[Try])
 
       val exception = nonRecoverableMalformedRepoErrors.generateOne
-      givenEntityBuilding(event,
-                          returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
-      )
+      givenEntityBuilding(event, returning = right[ProcessingRecoverableError](exception.raiseError[Try, Project]))
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -140,16 +136,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
       val processingRecoverableError = logWorthyRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(failure.pure[Try].widen[TriplesUploadResult])
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -165,16 +154,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
       val processingRecoverableError = silentRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(failure.pure[Try].widen[TriplesUploadResult])
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -189,16 +171,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
       val failure =
         TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(failure.pure[Try].widen[TriplesUploadResult])
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -214,16 +189,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
       val exception = exceptions.generateOne
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(exception.raiseError[Try, TriplesUploadResult])
+      successfulStepsCreation(project, exception.raiseError[Try, TriplesUploadResult])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -239,39 +206,25 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
-      val uploadingError =
+      val failure =
         nonEmptyStrings().map(message => RecoverableFailure(LogWorthyRecoverableError(message))).generateOne
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(uploadingError.pure[Try])
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
-      logError(event, uploadingError.error, uploadingError.message)
+      logError(event, failure.error, failure.message)
       logSummary(event, isSuccessful = false)
     }
 
     "log an error if uploading triples to the store fails with a NonRecoverableFailure" in new TestCase {
-      val failure = NonRecoverableFailure("error")
       givenFetchingAccessToken(forProjectPath = event.project.path)
         .returning(maybeAccessToken.pure[Try])
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
-
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(failure.pure[Try])
+      val failure = NonRecoverableFailure("error")
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -300,27 +253,35 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
     implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val stepsCreator          = mock[TransformationStepsCreator[Try]]
-    val triplesUploader       = mock[TransformationStepsRunner[Try]]
+    val stepsRunner           = mock[TransformationStepsRunner[Try]]
     val entityBuilder         = mock[EntityBuilder[Try]]
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val eventProcessor =
-      new EventProcessorImpl[Try](stepsCreator, triplesUploader, entityBuilder, executionTimeRecorder)
+    val eventProcessor = new EventProcessorImpl[Try](stepsCreator, stepsRunner, entityBuilder, executionTimeRecorder)
 
     def givenFetchingAccessToken(forProjectPath: Path) =
       (accessTokenFinder
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def successfulTriplesTransformationAndUpload(project: Project) = {
+    def successfulTriplesTransformationAndUpload(project: Project) =
+      successfulStepsCreation(project, runningToReturn = DeliverySuccess.pure[Try])
+
+    def successfulStepsCreation(project: Project, runningToReturn: Try[TriplesUploadResult]) = {
       val steps = transformationSteps[Try].generateList()
       (() => stepsCreator.createSteps)
         .expects()
         .returning(steps)
 
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(Success(DeliverySuccess))
+      givenStepsRunnerFor(steps, project, returning = runningToReturn)
     }
+
+    def givenStepsRunnerFor(steps:     List[TransformationStep[Try]],
+                            project:   Project,
+                            returning: Try[TriplesUploadResult]
+    ) = (stepsRunner
+      .run(_: List[TransformationStep[Try]], _: Project))
+      .expects(steps, project)
+      .returning(returning)
 
     def givenEntityBuilding(event: MinProjectInfoEvent, returning: EitherT[Try, ProcessingRecoverableError, Project]) =
       (entityBuilder

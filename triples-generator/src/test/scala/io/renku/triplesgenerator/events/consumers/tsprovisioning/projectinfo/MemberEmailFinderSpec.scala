@@ -22,7 +22,6 @@ package projectinfo
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.ints
@@ -36,7 +35,6 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
@@ -53,8 +51,7 @@ class MemberEmailFinderSpec
     with ExternalServiceStubbing
     with should.Matchers
     with ScalaCheckPropertyChecks
-    with MockFactory
-    with TinyTypeEncoders {
+    with MockFactory {
 
   "findEmail" should {
 
@@ -159,7 +156,7 @@ class MemberEmailFinderSpec
 
         def setExpectationForFirstPage = {
           val firstPage        = 1
-          val firstPageEvents  = pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList
+          val firstPageEvents  = pushEvents.generateNonEmptyList(min = 20, max = 20).toList
           val firstPageResults = wrapResult(firstPageEvents, PagingInfo(2.some, maybeTotalPages))
           (projectEventsFinder
             .find(_: Project, _: Int)(_: Option[AccessToken]))
@@ -169,7 +166,7 @@ class MemberEmailFinderSpec
 
         def setExpectationForMiddlePages =
           step to (totalPages - 1, step) foreach { page => // gets every every value from 100, 200, 300 up to 2990
-            val nextPageEvents  = pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList
+            val nextPageEvents  = pushEvents.generateNonEmptyList(min = 20, max = 20).toList
             val nextPageResults = wrapResult(nextPageEvents, PagingInfo((page + 1).some, maybeTotalPages))
             (projectEventsFinder
               .find(_: Project, _: Int)(_: Option[AccessToken]))
@@ -180,7 +177,7 @@ class MemberEmailFinderSpec
         val event = pushEvents.generateOne.forMember(member).forProject(project)
 
         def setExpectationForLastPage = {
-          val nextPageEvents  = event :: pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList
+          val nextPageEvents  = event :: pushEvents.generateNonEmptyList(min = 20, max = 20).toList
           val nextPageResults = wrapResult(nextPageEvents, PagingInfo(None, maybeTotalPages))
           (projectEventsFinder
             .find(_: Project, _: Int)(_: Option[AccessToken]))

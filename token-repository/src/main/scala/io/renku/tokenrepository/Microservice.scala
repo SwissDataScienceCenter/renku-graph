@@ -22,6 +22,7 @@ import cats.effect._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
@@ -41,40 +42,48 @@ object Microservice extends IOMicroservice {
     exitCode            <- runMicroservice(sessionPoolResource)
   } yield exitCode
 
-  private def runMicroservice(
-      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
-  ) = sessionPoolResource.use { implicit sessionResource =>
-    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
+  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]) =
+    sessionPoolResource.use { implicit sessionResource =>
       for {
-        certificateLoader  <- CertificateLoader[IO]
-        sentryInitializer  <- SentryInitializer[IO]
-        queriesExecTimes   <- QueriesExecutionTimes[IO]
-        dbInitializer      <- DbInitializer(sessionResource, queriesExecTimes)
-        microserviceRoutes <- MicroserviceRoutes[IO](sessionResource, queriesExecTimes).map(_.routes)
-        exitcode <- microserviceRoutes.use { routes =>
+        implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
+        implicit0(qet: QueriesExecutionTimes[IO]) <- QueriesExecutionTimes[IO]()
+        implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+        certificateLoader                         <- CertificateLoader[IO]
+        sentryInitializer                         <- SentryInitializer[IO]
+        dbInitializer                             <- DbInitializer[IO]
+        microserviceRoutes                        <- MicroserviceRoutes[IO]
+        exitCode <- microserviceRoutes.routes.use { routes =>
                       new MicroserviceRunner(
                         certificateLoader,
                         sentryInitializer,
                         dbInitializer,
-                        HttpServer[IO](serverPort = 9003, routes)
+                        HttpServer[IO](serverPort = 9003, routes),
+                        microserviceRoutes
                       ).run()
                     }
-      } yield exitcode
+      } yield exitCode
     }
-  }
 }
 
 private class MicroserviceRunner(
-    certificateLoader: CertificateLoader[IO],
-    sentryInitializer: SentryInitializer[IO],
-    dbInitializer:     DbInitializer[IO],
-    httpServer:        HttpServer[IO]
+    certificateLoader:  CertificateLoader[IO],
+    sentryInitializer:  SentryInitializer[IO],
+    dbInitializer:      DbInitializer[IO],
+    httpServer:         HttpServer[IO],
+    microserviceRoutes: MicroserviceRoutes[IO]
 ) {
 
-  def run(): IO[ExitCode] = for {
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    _      <- dbInitializer.run()
-    result <- httpServer.run()
-  } yield result
+  def run()(implicit logger: Logger[IO]): IO[ExitCode] = for {
+    _        <- certificateLoader.run()
+    _        <- sentryInitializer.run()
+    _        <- kickOffDBInit()
+    exitCode <- httpServer.run()
+    _        <- Logger[IO].info("Service started")
+  } yield exitCode
+
+  private def kickOffDBInit()(implicit logger: Logger[IO]) = Spawn[IO].start(
+    (dbInitializer.run() >> microserviceRoutes.notifyDBReady()).recoverWith { case ex =>
+      Logger[IO].error(ex)("DB initialization failed")
+    }.void
+  )
 }

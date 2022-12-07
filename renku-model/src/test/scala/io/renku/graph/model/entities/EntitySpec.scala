@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, projectCreatedDates}
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, generations}
+import io.renku.graph.model.{GraphClass, entities, generations}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
@@ -34,6 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD InputEntity entity into the Entity object " in {
       forAll(inputEntities) { entity =>
@@ -46,7 +47,7 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "turn JsonLD Output entity into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
 
         val Right(decodedEntities) = JsonLD
           .arr(activity.asJsonLD, datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne.asJsonLD)
@@ -63,7 +64,7 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "turn JsonLD Output entity into the OutputEntity object for the given generation Id " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
           .to[entities.Activity]
 
         val Right(decodedEntities) = JsonLD
@@ -81,7 +82,7 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "turn JsonLD Output entity with multiple Generations into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
           .to[entities.Activity]
 
         val updateGenerations = activity.generations.map { generation =>

@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
@@ -41,7 +41,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     lazy val resourceId: persons.ResourceId = person.to[entities.Person].resourceId
 
-    def to[T](implicit convert: Person => T):              T         = convert(person)
+    def to[T](implicit convert:      Person => T):         T         = convert(person)
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
@@ -52,6 +52,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
   abstract class AbstractProjectOps[P <: Project](project: P)(implicit
       renkuUrl:                                            RenkuUrl
   ) {
+    lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     def to[T](implicit convert: P => T): T = convert(project)
   }
@@ -76,19 +77,19 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def to[T](implicit convert: P => T): T = convert(project)
 
-    def forkOnce(): (RenkuProject, RenkuProject.WithParent) = {
+    def forkOnce(): (P, RenkuProject.WithParent) = {
       val (parent, childGen) = fork(times = 1)
       parent -> childGen.head
     }
 
-    def fork(
-        times: Int Refined Positive
-    ): (RenkuProject, NonEmptyList[RenkuProject.WithParent]) = {
+    def fork(times: Int Refined Positive): (P, NonEmptyList[RenkuProject.WithParent]) = {
       val parent = project match {
         case proj: RenkuProject.WithParent =>
-          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value))).asInstanceOf[P]
         case proj: RenkuProject.WithoutParent =>
-          proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+          proj
+            .copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+            .asInstanceOf[P]
       }
       parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
         newChildGen(parent).generateOne :: childrenGens
@@ -129,6 +130,48 @@ trait ModelOps extends Dataset.ProvenanceOps {
         )
       )
       importedDS -> (project addDatasets importedDS)
+    }
+
+    def importDataset(
+        publicationEvent: PublicationEvent
+    ): (Dataset[Provenance.ImportedInternal], RenkuProject) = {
+      val newIdentifier = datasetIdentifiers.generateOne
+
+      val importedDS = publicationEvent.dataset.provenance match {
+        case provenance: Provenance.Internal =>
+          val provFactory =
+            implicitly[ProvenanceImportFactory[Provenance.Internal, Provenance.ImportedInternalAncestorInternal]]
+          publicationEvent.dataset.copy(
+            identification = publicationEvent.dataset.identification.copy(identifier = newIdentifier),
+            provenance = provFactory(
+              Dataset.entityId(newIdentifier),
+              SameAs(publicationEvent.dataset.entityId),
+              provenance,
+              OriginalIdentifier(newIdentifier)
+            )
+          )
+        case provenance: Provenance.Modified =>
+          val provFactory =
+            implicitly[ProvenanceImportFactory[Provenance.Modified, Provenance.ImportedInternalAncestorInternal]]
+          publicationEvent.dataset.copy(
+            identification = publicationEvent.dataset.identification.copy(identifier = newIdentifier),
+            provenance = provFactory(
+              Dataset.entityId(newIdentifier),
+              SameAs(publicationEvent.dataset.entityId),
+              provenance,
+              OriginalIdentifier(newIdentifier)
+            )
+          )
+        case other => throw new IllegalArgumentException(s"Cannot import from DS with $other")
+      }
+
+      val importedDSWithTag = importedDS.copy(
+        publicationEventFactories = List(publicationEvent.toFactory),
+        additionalInfo =
+          importedDS.additionalInfo.copy(maybeVersion = datasets.Version(publicationEvent.name.show).some)
+      )
+
+      importedDSWithTag -> (project addDatasets importedDSWithTag)
     }
   }
 
@@ -268,7 +311,9 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def createModification(
         modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
+      ((projectDate: projects.DateCreated) => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
+
+    def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
@@ -298,6 +343,15 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def makeDescContaining(phrase: String): Dataset[P] =
       replaceDSDesc(to = sentenceContaining(Refined.unsafeApply(phrase)).map(Description.apply).generateSome)(dataset)
+
+    def replacePublicationEvents(eventFactories: List[Dataset[Provenance] => PublicationEvent])(implicit
+        ev:                                      P <:< Provenance.NonImported
+    ): Dataset[P] = dataset.copy(publicationEventFactories = eventFactories)
+  }
+
+  def replaceTopmostSameAs[P <: Dataset.Provenance.ImportedInternal](newValue: TopmostSameAs): P => P = {
+    case p: Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(topmostSameAs = newValue).asInstanceOf[P]
+    case p: Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(topmostSameAs = newValue).asInstanceOf[P]
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =
@@ -429,25 +483,6 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
   }
 
-  implicit class PlanOps(plan: Plan) {
-
-    def to[T](implicit convert: Plan => T): T = convert(plan)
-
-    def invalidate(time: InvalidationTime): Plan with HavingInvalidationTime =
-      new Plan(plan.id,
-               plan.name,
-               plan.maybeDescription,
-               plan.maybeCommand,
-               plan.dateCreated,
-               plan.maybeProgrammingLanguage,
-               plan.keywords,
-               plan.commandParameterFactories,
-               plan.successCodes
-      ) with HavingInvalidationTime {
-        override val invalidationTime: InvalidationTime = time
-      }
-  }
-
   implicit class CommandParameterBaseOps[P <: CommandParameterBase](parameter: P) {
     def to[T](implicit convert: P => T): T = convert(parameter)
   }
@@ -481,7 +516,15 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class PublicationEventOps(publicationEvent: PublicationEvent) {
+
     def to[T](implicit convert: PublicationEvent => T): T = convert(publicationEvent)
+
+    lazy val toFactory: Dataset[Provenance] => PublicationEvent = PublicationEvent(
+      _,
+      publicationEvent.maybeDescription,
+      publicationEvent.name,
+      timestampsNotInTheFuture(publicationEvent.startDate.value).generateAs(publicationEvents.StartDate)
+    )
   }
 
   implicit class ProvenanceOps[P <: Dataset.Provenance](provenance: P) {

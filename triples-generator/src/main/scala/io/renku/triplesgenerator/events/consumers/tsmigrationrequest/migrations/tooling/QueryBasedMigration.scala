@@ -28,8 +28,8 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
@@ -45,7 +45,7 @@ private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
   import recoveryStrategy._
 
   protected[tooling] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    (findProjects().map(toEvents) >>= sendEvents)
+    ((findProjects map toEvents) >>= sendEvents)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(maybeRecoverableError[F, Unit])
   }

@@ -21,7 +21,6 @@ package generators
 
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
@@ -39,6 +38,7 @@ trait RenkuProjectEntitiesGenerators {
   self: EntitiesGenerators =>
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
+  lazy val visibilityPrivate:   Gen[Visibility] = fixed(Visibility.Private)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val anyVisibility:       Gen[Visibility] = projectVisibilities
 
@@ -55,7 +55,7 @@ trait RenkuProjectEntitiesGenerators {
   lazy val renkuProjectEntitiesWithDatasetsAndActivities: Gen[RenkuProject] =
     renkuProjectEntities(anyVisibility)
       .withActivities(
-        List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(planEntities())): _*
+        List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(stepPlanEntities())): _*
       )
       .withDatasets(
         List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*
@@ -76,8 +76,8 @@ trait RenkuProjectEntitiesGenerators {
     maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
-    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
-    members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
+    keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
+    members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
     version          <- projectSchemaVersions
     activities       <- activityFactories.map(_.apply(dateCreated)).sequence
     datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
@@ -113,8 +113,8 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     maybeCreator     <- projectMembers.toGeneratorOfOptions
-    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
-    members          <- projectMembers.toGeneratorOfList(minElements = 1).map(_.toSet)
+    keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
+    members          <- projectMembers.toGeneratorOfList(min = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentPath  <- projectPaths.toGeneratorOfOptions
   } yield GitLabProjectInfo(id,
@@ -146,9 +146,7 @@ trait RenkuProjectEntitiesGenerators {
     def modify(f: ProjectMember => ProjectMember): Gen[ProjectMember] = membersGen.map(f)
   }
 
-  implicit class RenkuProjectGenFactoryOps[FC <: ForksCount](projectGen: Gen[RenkuProject])(implicit
-      renkuUrl:                                                          RenkuUrl
-  ) {
+  implicit class RenkuProjectGenFactoryOps(projectGen: Gen[RenkuProject])(implicit renkuUrl: RenkuUrl) {
 
     def withDatasets[P <: Dataset.Provenance](factories: DatasetGenFactory[P]*): Gen[RenkuProject] = for {
       project  <- projectGen
@@ -200,6 +198,11 @@ trait RenkuProjectEntitiesGenerators {
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): Gen[(Dataset[POUT], RenkuProject)] =
       projectGen.map(_.importDataset(dataset))
 
+    def importDataset(
+        publicationEvent: PublicationEvent
+    ): Gen[(Dataset[Dataset.Provenance.ImportedInternal], RenkuProject)] =
+      projectGen.map(_.importDataset(publicationEvent))
+
     def modify(f: RenkuProject => RenkuProject): Gen[RenkuProject] = projectGen.map {
       case project: RenkuProject.WithoutParent => f(project)
       case project: RenkuProject.WithParent    => f(project)
@@ -217,26 +220,23 @@ trait RenkuProjectEntitiesGenerators {
     def addDataset[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[((T, Dataset[P]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      ds <- factory(project.dateCreated)
+      (entities, project) <- tupleGen
+      ds                  <- factory(project.dateCreated)
     } yield (entities -> ds) -> (project addDatasets ds)
 
     def addDatasetAndModification[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[(((T, Dataset[P]), Dataset[Dataset.Provenance.Modified]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      originalDs <- factory(project.dateCreated)
-      modifiedDs <- originalDs.createModification()(project.dateCreated)
+      (entities, project) <- tupleGen
+      originalDs          <- factory(project.dateCreated)
+      modifiedDs          <- originalDs.createModification()(project.dateCreated)
     } yield ((entities -> originalDs) -> modifiedDs) -> project.addDatasets(originalDs, modifiedDs)
 
     def addDatasetAndInvalidation[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[(((T, Dataset[P]), Dataset[Dataset.Provenance.Modified]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      originalDs <- factory(project.dateCreated)
+      (entities, project) <- tupleGen
+      originalDs          <- factory(project.dateCreated)
       invalidated = originalDs.invalidateNow
     } yield ((entities -> originalDs) -> invalidated) -> project.addDatasets(originalDs, invalidated)
 

@@ -18,12 +18,10 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import io.renku.jsonld.EntityId
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -35,14 +33,10 @@ private trait TriplesRemover[F[_]] {
 }
 
 private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    removalBatchSize:      Long Refined Positive,
-    renkuConnectionConfig: RenkuConnectionConfig,
-    idleTimeout:           Duration = 11 minutes,
-    requestTimeout:        Duration = 10 minutes
-) extends TSClientImpl(renkuConnectionConfig,
-                       idleTimeoutOverride = idleTimeout.some,
-                       requestTimeoutOverride = requestTimeout.some
-    )
+    storeConfig:    ProjectsConnectionConfig,
+    idleTimeout:    Duration = 11 minutes,
+    requestTimeout: Duration = 10 minutes
+) extends TSClient(storeConfig, idleTimeoutOverride = idleTimeout.some, requestTimeoutOverride = requestTimeout.some)
     with TriplesRemover[F] {
 
   import eu.timepit.refined.auto._
@@ -50,46 +44,34 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.Schemas._
 
   override def removeAllTriples(): F[Unit] =
-    queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) >>= {
-      case true  => MonadThrow[F].unit
-      case false => updateWithNoResult(removeTriplesBatch) >> removeAllTriples()
+    queryExpecting[Option[EntityId]](findGraph) >>= {
+      case Some(graphId) => updateWithNoResult(remove(graphId)) >> removeAllTriples()
+      case None          => ().pure[F]
     }
 
-  private val checkIfEmpty = SparqlQuery.of(
+  private val findGraph = SparqlQuery.of(
     name = "triples remove - count",
-    Prefixes.of(renku -> "renku"),
-    s"""|SELECT ?subject
-        |WHERE { ?subject ?p ?o }
+    Prefixes of renku -> "renku",
+    s"""|SELECT DISTINCT ?graph
+        |WHERE { GRAPH ?graph { ?s ?p ?o } }
         |LIMIT 1
         |""".stripMargin
   )
 
-  private val removeTriplesBatch = SparqlQuery.of(
+  private def remove(graphId: EntityId) = SparqlQuery.of(
     name = "triples remove - delete",
-    Prefixes.of(renku -> "renku"),
-    s"""|DELETE { ?s ?p ?o }
-        |WHERE { 
-        |  SELECT ?s ?p ?o
-        |  WHERE { ?s ?p ?o }
-        |  LIMIT ${removalBatchSize.value}
-        |}
-        |""".stripMargin
+    Prefixes of renku -> "renku",
+    s"DROP GRAPH <$graphId>"
   )
 
-  private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = ResultsDecoder[List, String] { implicit cur =>
-    extract[String]("subject")
-  }.map(_.isEmpty)
+  private implicit val graphIdDecoder: Decoder[Option[EntityId]] = ResultsDecoder[List, EntityId] { implicit cur =>
+    extract[String]("graph").map(EntityId.of(_))
+  }.map(_.headOption)
 }
 
 private object TriplesRemoverImpl {
 
-  import eu.timepit.refined.pureconfig._
-  import io.renku.config.ConfigLoader._
-
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig,
-      config:                Config = ConfigFactory.load()
-  ): F[TriplesRemover[F]] = for {
-    removalBatchSize <- find[F, Long Refined Positive]("re-provisioning-removal-batch-size", config)
-  } yield new TriplesRemoverImpl(removalBatchSize, renkuConnectionConfig)
+      config: Config = ConfigFactory.load()
+  ): F[TriplesRemover[F]] = ProjectsConnectionConfig[F](config).map(new TriplesRemoverImpl(_))
 }

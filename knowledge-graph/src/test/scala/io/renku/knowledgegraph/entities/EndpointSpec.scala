@@ -40,6 +40,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
 import io.renku.knowledgegraph.entities.finder.EntitiesFinder
+import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 import io.renku.knowledgegraph.entities.model.MatchingScore
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
@@ -66,7 +67,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
-        response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+        response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
         implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
         response.as[List[model.Entity]].unsafeRunSync() shouldBe results.results
       }
@@ -80,7 +81,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
       implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
       response.as[List[model.Entity]].unsafeRunSync() shouldBe Nil
     }
@@ -164,21 +165,41 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       }
     }
 
+    implicit val namespacesListDecoder: Decoder[(Rel, projects.Namespace)] = Decoder.instance { cursor =>
+      (cursor.downField("rel").as[Rel] -> cursor.downField("namespace").as[projects.Namespace]).mapN(_ -> _)
+    }
+
+    implicit val workflowTypeDecoder: Decoder[WorkflowType] =
+      Decoder.decodeString.emap(WorkflowType.fromName)
+
+    def expectedNamespaces(path: projects.Path) = path.toNamespaces
+      .foldLeft(List.empty[(Rel, List[projects.Namespace])]) {
+        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
+        case (all @ (_, prevNamespaces) :: _, namespace) =>
+          all ::: (Rel(namespace.show), prevNamespaces ::: namespace :: Nil) :: Nil
+      }
+      .map { case (rel, namespaces) => rel -> projects.Namespace(namespaces.map(_.show).mkString("/")) }
+
     cursor.downField("type").as[Endpoint.Criteria.Filters.EntityType] >>= {
       case Endpoint.Criteria.Filters.EntityType.Project =>
         for {
           score        <- cursor.downField("matchingScore").as[MatchingScore]
           name         <- cursor.downField("name").as[projects.Name]
           path         <- cursor.downField("path").as[projects.Path]
-          namespace    <- cursor.downField("namespace").as[String]
+          namespace    <- cursor.downField("namespace").as[projects.Namespace]
+          namespaces   <- cursor.downField("namespaces").as[List[(Rel, projects.Namespace)]]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]
           maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
           keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
           maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
-          _ <- Either.cond(path.value startsWith namespace,
+          _ <- Either.cond(path.show startsWith namespace.show,
                            (),
-                           DecodingFailure(s"'$path' does not start with '$namespace'", Nil)
+                           DecodingFailure(show"'$path' does not start with '$namespace'", Nil)
+               )
+          _ <- Either.cond(namespaces == expectedNamespaces(path),
+                           (),
+                           DecodingFailure(show"'$namespaces' do not match '${expectedNamespaces(path)}'", Nil)
                )
           _ <- cursor._links
                  .flatMap(_.get(Links.Rel("details")).toRight(DecodingFailure("No project details link", Nil)))
@@ -233,13 +254,14 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
         )
       case Endpoint.Criteria.Filters.EntityType.Workflow =>
         for {
-          score      <- cursor.downField("matchingScore").as[MatchingScore]
-          name       <- cursor.downField("name").as[plans.Name]
-          visibility <- cursor.downField("visibility").as[projects.Visibility]
-          date       <- cursor.downField("date").as[plans.DateCreated]
-          keywords   <- cursor.downField("keywords").as[List[plans.Keyword]]
-          maybeDesc  <- cursor.downField("description").as[Option[plans.Description]]
-        } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc)
+          score        <- cursor.downField("matchingScore").as[MatchingScore]
+          name         <- cursor.downField("name").as[plans.Name]
+          visibility   <- cursor.downField("visibility").as[projects.Visibility]
+          date         <- cursor.downField("date").as[plans.DateCreated]
+          keywords     <- cursor.downField("keywords").as[List[plans.Keyword]]
+          maybeDesc    <- cursor.downField("description").as[Option[plans.Description]]
+          workflowType <- cursor.downField("workflowType").as[WorkflowType]
+        } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc, workflowType)
       case Endpoint.Criteria.Filters.EntityType.Person =>
         for {
           score <- cursor.downField("matchingScore").as[MatchingScore]

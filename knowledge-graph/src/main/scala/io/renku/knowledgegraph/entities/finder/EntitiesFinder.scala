@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -36,13 +36,13 @@ private[entities] trait EntitiesFinder[F[_]] {
 
 private[entities] object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    RenkuConnectionConfig[F]().map(new EntitiesFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    entityQueries:         List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-) extends TSClientImpl[F](renkuConnectionConfig)
+    storeConfig:   ProjectsConnectionConfig,
+    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+) extends TSClient[F](storeConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
 
@@ -59,7 +59,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
 
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "cross-entity search",
-    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
     s"""|SELECT ${entityQueries.map(_.selectVariables).combineAll.mkString(" ")}
         |WHERE {
         |  ${entityQueries.flatMap(_.query(criteria)).mkString(" UNION ")}
@@ -74,16 +74,15 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     case Criteria.Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
   }
 
-  private implicit lazy val recordDecoder: Decoder[Entity] = {
+  private implicit lazy val recordDecoder: Decoder[Entity] = { implicit cursor =>
     import io.circe.DecodingFailure
 
-    cursor =>
-      cursor.downField("entityType").downField("value").as[EntityType] >>= { entityType =>
-        entityQueries.flatMap(_.getDecoder(entityType)) match {
-          case Nil            => DecodingFailure(s"No decoder for $entityType", Nil).asLeft
-          case decoder :: Nil => cursor.as(decoder)
-          case _              => DecodingFailure(s"Multiple decoders for $entityType", Nil).asLeft
-        }
+    extract[EntityType]("entityType") >>= { entityType =>
+      entityQueries.flatMap(_.getDecoder(entityType)) match {
+        case Nil            => DecodingFailure(s"No decoder for $entityType", Nil).asLeft
+        case decoder :: Nil => cursor.as(decoder)
+        case _              => DecodingFailure(s"Multiple decoders for $entityType", Nil).asLeft
       }
+    }
   }
 }

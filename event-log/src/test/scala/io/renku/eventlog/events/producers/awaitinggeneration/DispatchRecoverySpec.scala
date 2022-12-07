@@ -22,23 +22,22 @@ package awaitinggeneration
 import Generators.sendingResults
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.EventMessage
 import io.renku.events.consumers.subscriptions._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.events.EventMessage
 import io.renku.graph.model.events.EventStatus._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory with TinyTypeEncoders {
+class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "returnToQueue" should {
 

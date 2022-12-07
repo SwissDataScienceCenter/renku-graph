@@ -23,9 +23,9 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.Session
 import skunk.data.Completion
 
@@ -34,16 +34,13 @@ private trait DeliveryInfoRemover[F[_]] {
 }
 
 private object DeliveryInfoRemover {
-  def apply[F[_]: MonadCancelThrow](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
-    new DeliveryInfoRemoverImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: QueriesExecutionTimes]: F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
+    new DeliveryInfoRemoverImpl[F]
   }
 }
 
-private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with DeliveryInfoRemover[F]
     with TypeSerializers {
 

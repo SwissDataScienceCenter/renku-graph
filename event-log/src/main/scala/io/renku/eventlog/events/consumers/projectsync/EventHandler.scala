@@ -22,13 +22,14 @@ import cats.data.EitherT.fromEither
 import cats.effect._
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: CategoryName,
@@ -48,7 +49,7 @@ private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: 
   private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     event <- fromEither(request.event.getProject).map(p => ProjectSyncEvent(p.id, p.path))
     result <- Spawn[F]
-                .start(syncProjectInfo(event).recoverWith(errorLogging(event)) >> processing.complete(()))
+                .start((syncProjectInfo(event) recoverWith logError(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))
@@ -63,12 +64,13 @@ private object EventHandler {
   import eu.timepit.refined.pureconfig._
   import io.renku.config.ConfigLoader.find
 
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry](
+  def apply[F[
+      _
+  ]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
       subscriptionMechanism: SubscriptionMechanism[F],
-      queriesExecTimes:      LabeledHistogram[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
-    projectInfoSynchronizer    <- ProjectInfoSynchronizer[F](queriesExecTimes)
+    projectInfoSynchronizer    <- ProjectInfoSynchronizer[F]
     maxConcurrentProcesses     <- find[F, Int Refined Positive]("project-sync-max-concurrent-processes", config)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter[F](processesCount = maxConcurrentProcesses)
   } yield new EventHandler[F](categoryName, projectInfoSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)

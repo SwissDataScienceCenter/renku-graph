@@ -24,8 +24,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}
 
-import scala.jdk.CollectionConverters._
-
 trait Gauge[F[_]] extends MetricsCollector
 
 trait SingleValueGauge[F[_]] extends Gauge[F] {
@@ -41,26 +39,38 @@ trait LabeledGauge[F[_], LabelValue] extends Gauge[F] {
   def clear(): F[Unit]
 }
 
-class SingleValueGaugeImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibGauge)
+class SingleValueGaugeImpl[F[_]: MonadThrow](val name: String Refined NonEmpty, val help: String Refined NonEmpty)
     extends SingleValueGauge[F]
     with PrometheusCollector {
 
   type Collector = LibGauge
-  override lazy val name: String = wrappedCollector.describe().asScala.head.name
-  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  private[metrics] lazy val wrappedCollector: Collector =
+    LibGauge
+      .build()
+      .name(name.value)
+      .help(help.value)
+      .create()
 
   override def set(value: Double): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector set value)
 }
 
-class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
-    val wrappedCollector: LibGauge,
-    resetDataFetch:       () => F[Map[LabelValue, Double]]
+class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue](val name: String Refined NonEmpty,
+                                                     val help:       String Refined NonEmpty,
+                                                     labelName:      String Refined NonEmpty,
+                                                     resetDataFetch: () => F[Map[LabelValue, Double]]
 ) extends LabeledGauge[F, LabelValue]
     with PrometheusCollector {
 
   type Collector = LibGauge
-  override lazy val name: String = wrappedCollector.describe().asScala.head.name
-  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  private[metrics] lazy val wrappedCollector: Collector =
+    LibGauge
+      .build()
+      .name(name.value)
+      .help(help.value)
+      .labelNames(labelName.value)
+      .create()
 
   override def set(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
     val (labelValue, value) = labelValueAndValue
@@ -97,18 +107,8 @@ object Gauge {
   def apply[F[_]: MonadThrow: MetricsRegistry](
       name: String Refined NonEmpty,
       help: String Refined NonEmpty
-  ): F[SingleValueGauge[F]] = {
-
-    val gauge = new SingleValueGaugeImpl[F](
-      LibGauge
-        .build()
-        .name(name.value)
-        .help(help.value)
-        .create()
-    )
-
-    MetricsRegistry[F].register(gauge).widen
-  }
+  ): F[SingleValueGauge[F]] =
+    MetricsRegistry[F].register(new SingleValueGaugeImpl[F](name, help)).widen
 
   def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
       name:      String Refined NonEmpty,
@@ -122,18 +122,8 @@ object Gauge {
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => F[Map[LabelValue, Double]]
-  ): F[LabeledGauge[F, LabelValue]] = {
-
-    val gauge = new LabeledGaugeImpl[F, LabelValue](
-      LibGauge
-        .build()
-        .name(name.value)
-        .help(help.value)
-        .labelNames(labelName.value)
-        .create(),
-      resetDataFetch
-    )
-
-    MetricsRegistry[F].register(gauge).widen
-  }
+  ): F[LabeledGauge[F, LabelValue]] =
+    MetricsRegistry[F]
+      .register(new LabeledGaugeImpl[F, LabelValue](name, help, labelName, resetDataFetch))
+      .widen
 }

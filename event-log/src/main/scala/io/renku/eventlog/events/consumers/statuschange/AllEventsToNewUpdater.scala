@@ -29,24 +29,22 @@ import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
-import io.renku.tinytypes.json.TinyTypeEncoders
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
 
-private class AllEventsToNewUpdater[F[_]: Async](
-    eventSender:      EventSender[F],
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
+    eventSender: EventSender[F]
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, AllEventsToNew]
-    with TypeSerializers
-    with TinyTypeEncoders {
+    with TypeSerializers {
 
   private val applicative: Applicative[F] = Applicative[F]
 
@@ -102,7 +100,6 @@ private class AllEventsToNewUpdater[F[_]: Async](
 }
 
 private object AllEventsToNewUpdater {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[AllEventsToNewUpdater[F]] = EventSender[F] map (new AllEventsToNewUpdater(_, queriesExecTimes))
+  def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]: F[AllEventsToNewUpdater[F]] =
+    EventSender[F] map (new AllEventsToNewUpdater(_))
 }

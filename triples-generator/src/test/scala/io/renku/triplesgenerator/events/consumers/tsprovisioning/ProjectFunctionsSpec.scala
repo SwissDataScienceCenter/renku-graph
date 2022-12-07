@@ -24,7 +24,8 @@ import io.renku.graph.model._
 import GraphModelGenerators.datasetTopmostDerivedFroms
 import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.TopmostDerivedFrom
-import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
+import io.renku.graph.model.entities.{ActivityLens, PlanLens}
+import io.renku.graph.model.testentities._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,34 +35,6 @@ import scala.util.{Failure, Try}
 class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   import ProjectFunctions._
-
-  "findAllPersons" should {
-    "collect renku project members, project creator, activities' authors, associations' agents and datasets' creators" in {
-      forAll(
-        anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()),
-                          activityEntities(planEntities()).modify(toAssociationPersonAgent)
-          )
-          .withDatasets(datasetEntities(provenanceNonModified))
-          .map(_.to[entities.Project])
-      ) { project =>
-        findAllPersons(project) shouldBe project.members ++
-          project.maybeCreator ++
-          project.datasets.flatMap(_.provenance.creators.toList) ++
-          project.activities.map(_.author) ++
-          project.activities.flatMap(_.association.agent match {
-            case p: entities.Person => List(p)
-            case _ => List.empty[entities.Person]
-          })
-      }
-    }
-
-    "collect non-renku project members and creator" in {
-      forAll(anyNonRenkuProjectEntities.map(_.to[entities.Project])) { project =>
-        findAllPersons(project) shouldBe project.members ++ project.maybeCreator
-      }
-    }
-  }
 
   "update - person" should {
     val oldPerson = personEntities().generateOne
@@ -101,8 +74,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(planEntities()).modify(_.copy(author = oldPerson)),
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities()).map(_.copy(author = oldPerson)),
+          activityEntities(stepPlanEntities())
         )
         .generateOne
         .to[entities.Project]
@@ -120,8 +93,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(planEntities()).modify(toAssociationPersonAgent(oldPerson)),
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities()).map(toAssociationPersonAgent(oldPerson)),
+          activityEntities(stepPlanEntities())
         )
         .generateOne
         .to[entities.Project]
@@ -129,12 +102,30 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val entitiesOldPerson = oldPerson.to[entities.Person]
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
-      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map { activity =>
-        activity.association match {
-          case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newPerson))
-          case _ => activity
-        }
+      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map {
+        ActivityLens.activityAssociationAgent.modify(_.as(newPerson))
       }
+    }
+
+    "replace the old person with the new person in all plan creators" in {
+      val project = anyRenkuProjectEntities
+        .withActivities(
+          activityEntities(stepPlanEntities())
+            .map(setPlanCreator(oldPerson))
+            .map(toAssociationRenkuAgent(agentEntities.generateOne)),
+          activityEntities(stepPlanEntities())
+            .map(setPlanCreator(oldPerson))
+            .map(toAssociationRenkuAgent(agentEntities.generateOne))
+        )
+        .generateOne
+        .to[entities.Project]
+
+      val entitiesOldPerson = oldPerson.to[entities.Person]
+      val newPerson         = personEntities().generateOne.to[entities.Person]
+
+      val updated = update(entitiesOldPerson, newPerson)(project)
+
+      updated.plans shouldBe project.plans.map(PlanLens.planCreators.set(List(newPerson)))
     }
 
     "replace the old person with the new on all datasets" in {

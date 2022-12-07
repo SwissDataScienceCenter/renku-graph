@@ -22,17 +22,18 @@ package triplesgenerated
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.TestEventStatusGauges._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
-import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -75,9 +76,6 @@ private class EventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        expectAwaitingTransformationGaugeDecrement(projectPath)
-        expectUnderTransformationGaugeIncrement(projectPath)
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -94,12 +92,10 @@ private class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
+        gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -1d
+        gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
-        queriesExecTimes.verifyExecutionTimeMeasured("triples_generated - find projects",
-                                                     "triples_generated - find oldest",
-                                                     "triples_generated - update status"
-        )
+        findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
       }
 
     "return an event if there are multiple latest events with the same date" in new TestCase {
@@ -125,9 +121,6 @@ private class EventFinderSpec
       findEvents(TransformingTriples) shouldBe List.empty
 
       // 1st event with the same event date
-      expectAwaitingTransformationGaugeDecrement(projectPath)
-      expectUnderTransformationGaugeIncrement(projectPath)
-
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -148,10 +141,10 @@ private class EventFinderSpec
         be(List((event1Id, executionDate))) or be(List((event2Id, executionDate)))
       }
 
-      // 2nd event with the same event date
-      expectAwaitingTransformationGaugeDecrement(projectPath)
-      expectUnderTransformationGaugeIncrement(projectPath)
+      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
+      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
+      // 2nd event with the same event date
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -172,6 +165,9 @@ private class EventFinderSpec
       findEvents(TransformingTriples).noBatchDate should contain theSameElementsAs List(event1Id -> executionDate,
                                                                                         event2Id -> executionDate
       )
+
+      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -2d
+      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 2d
 
       // no more events left
       givenPrioritisation(takes = Nil, returns = Nil)
@@ -196,9 +192,6 @@ private class EventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        expectAwaitingTransformationGaugeDecrement(projectPath)
-        expectUnderTransformationGaugeIncrement(projectPath)
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -206,9 +199,13 @@ private class EventFinderSpec
 
         val Some(TriplesGeneratedEvent(actualEvent1Id, actualEvent1Path, actualEvent1Payload)) =
           finder.popEvent().unsafeRunSync()
+
         actualEvent1Id          shouldBe event1Id
         actualEvent1Path        shouldBe projectPath
         actualEvent1Payload.value should contain theSameElementsAs eventPayload1.value
+
+        gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -219,9 +216,6 @@ private class EventFinderSpec
           projectPath = projectPath
         )
 
-        expectAwaitingTransformationGaugeDecrement(projectPath)
-        expectUnderTransformationGaugeIncrement(projectPath)
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, newerLatestEventDate, 1)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -229,16 +223,15 @@ private class EventFinderSpec
 
         val Some(TriplesGeneratedEvent(actualEvent2Id, actualEvent2Path, actualEvent2Payload)) =
           finder.popEvent().unsafeRunSync()
+
         actualEvent2Id          shouldBe event2Id
         actualEvent2Path        shouldBe projectPath
         actualEvent2Payload.value should contain theSameElementsAs eventPayload2.value
 
-        findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
+        gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -2d
+        gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 2d
 
-        queriesExecTimes.verifyExecutionTimeMeasured("triples_generated - find projects",
-                                                     "triples_generated - find oldest",
-                                                     "triples_generated - update status"
-        )
+        findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
       }
 
     s"skip events in $TriplesGenerated status which do not have payload - within a project" in new TestCase {
@@ -264,9 +257,6 @@ private class EventFinderSpec
         projectPath = projectPath
       )
 
-      expectAwaitingTransformationGaugeDecrement(projectPath)
-      expectUnderTransformationGaugeIncrement(projectPath)
-
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, event1Date, 0)),
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
@@ -274,9 +264,13 @@ private class EventFinderSpec
 
       val Some(TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload)) =
         finder.popEvent().unsafeRunSync()
+
       actualEventId          shouldBe event2Id
       actualEventPath        shouldBe projectPath
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
+
+      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
+      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
       findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
     }
@@ -307,9 +301,6 @@ private class EventFinderSpec
         projectPath = event2ProjectPath
       )
 
-      expectAwaitingTransformationGaugeDecrement(event2ProjectPath)
-      expectUnderTransformationGaugeIncrement(event2ProjectPath)
-
       givenPrioritisation(
         takes = List(ProjectInfo(event2ProjectId, event2ProjectPath, event2Date, 0)),
         returns = List(ProjectIds(event2ProjectId, event2ProjectPath) -> MaxPriority)
@@ -322,6 +313,9 @@ private class EventFinderSpec
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
 
       findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
+
+      gauges.awaitingDeletion.getValue(event2ProjectPath).unsafeRunSync() shouldBe -1d
+      gauges.underDeletion.getValue(event2ProjectPath).unsafeRunSync()    shouldBe 1d
     }
 
     "return no event when execution date is in the future " +
@@ -363,13 +357,11 @@ private class EventFinderSpec
     "return events from all the projects" in new TestCase {
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 2)
+        .generateNonEmptyList(min = 2)
         .map(status => createEvent(status))
         .toList
 
       findEvents(TransformingTriples) shouldBe List.empty
-
-      expectGaugeUpdated(times = events.size)
 
       events foreach { case (eventId, _, eventDate, projectPath, _) =>
         givenPrioritisation(
@@ -382,21 +374,20 @@ private class EventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
+      events foreach { case (_, _, _, path, _) =>
+        gauges.awaitingDeletion.getValue(path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(path).unsafeRunSync()    shouldBe 1d
+      }
+
       findEvents(status = TransformingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFind = new EventFinderImpl(awaitingTransformationGauge,
-                                             underTransformationGauge,
-                                             queriesExecTimes,
-                                             currentTime,
-                                             projectsFetchingLimit = 5,
-                                             projectPrioritisation = projectPrioritisation
-      )
+      val eventLogFind = new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 5, projectPrioritisation)
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 3, maxElements = 6)
+        .generateNonEmptyList(min = 3, max = 6)
         .toList
         .flatMap { status =>
           val projectId   = projectIds.generateOne
@@ -409,8 +400,6 @@ private class EventFinderSpec
 
       val eventsGroupedByProjects = events.groupBy(_._1.projectId)
 
-      expectGaugeUpdated(times = eventsGroupedByProjects.size)
-
       eventsGroupedByProjects foreach {
         case (projectId, (_, _, _, projectPath, _) :: _) =>
           (projectPrioritisation.prioritise _)
@@ -421,6 +410,12 @@ private class EventFinderSpec
 
       eventsGroupedByProjects foreach { _ =>
         eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      eventsGroupedByProjects foreach { case (_, list) =>
+        val path = list.head._4
+        gauges.awaitingDeletion.getValue(path).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(path).unsafeRunSync()    shouldBe 1d
       }
 
       findEvents(TransformingTriples).eventIdsOnly should contain theSameElementsAs eventsGroupedByProjects.map {
@@ -439,25 +434,10 @@ private class EventFinderSpec
     val currentTime   = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    val awaitingTransformationGauge = mock[LabeledGauge[IO, Path]]
-    val underTransformationGauge    = mock[LabeledGauge[IO, Path]]
-    val projectPrioritisation       = mock[ProjectPrioritisation]
-    val queriesExecTimes            = TestLabeledHistogram[SqlStatement.Name]("query_id")
-
-    def expectAwaitingTransformationGaugeDecrement(projectPath: Path) =
-      (awaitingTransformationGauge.decrement _)
-        .expects(projectPath)
-        .returning(IO.unit)
-
-    def expectUnderTransformationGaugeIncrement(projectPath: Path) =
-      (underTransformationGauge.increment _)
-        .expects(projectPath)
-        .returning(IO.unit)
-
-    def expectGaugeUpdated(times: Int = 1) = {
-      (awaitingTransformationGauge.decrement _).expects(*).returning(IO.unit).repeat(times)
-      (underTransformationGauge.increment _).expects(*).returning(IO.unit).repeat(times)
-    }
+    val projectPrioritisation = mock[ProjectPrioritisation]
+    implicit val gauges:                  EventStatusGauges[IO]     = TestEventStatusGauges[IO]
+    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
 
     def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
@@ -466,13 +446,7 @@ private class EventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-    val finder = new EventFinderImpl(awaitingTransformationGauge,
-                                     underTransformationGauge,
-                                     queriesExecTimes,
-                                     currentTime,
-                                     projectsFetchingLimit = 1,
-                                     projectPrioritisation = projectPrioritisation
-    )
+    val finder = new EventFinderImpl[IO](currentTime, projectsFetchingLimit = 1, projectPrioritisation)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply

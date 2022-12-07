@@ -22,8 +22,8 @@ package triplesgenerated
 import ProjectPrioritisation.{Priority, ProjectInfo}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.eventlog.EventDate
 import io.renku.eventlog.events.producers.ProjectIds
+import io.renku.graph.model.events.EventDate
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 

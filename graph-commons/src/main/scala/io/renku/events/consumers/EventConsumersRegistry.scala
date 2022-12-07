@@ -20,9 +20,9 @@ package io.renku.events.consumers
 
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventSchedulingResult.UnsupportedEventType
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, EventRequestContent}
 
 trait EventConsumersRegistry[F[_]] {
   def handle(requestContent: EventRequestContent): F[EventSchedulingResult]

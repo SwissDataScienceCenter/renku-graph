@@ -18,10 +18,10 @@
 
 package io.renku.http.rest
 
+import cats.Show
 import cats.syntax.all._
 import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder}
-import cats.Show
 
 trait SortBy {
 

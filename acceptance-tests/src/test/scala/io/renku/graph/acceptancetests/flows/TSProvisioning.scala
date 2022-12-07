@@ -18,16 +18,20 @@
 
 package io.renku.graph.acceptancetests.flows
 
+import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime
+import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
+import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -35,12 +39,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
 import java.lang.Thread.sleep
-import scala.concurrent.duration._
-import cats.data.NonEmptyList
-import io.renku.events.CategoryName
-import io.renku.graph.acceptancetests.db.EventLog
-
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 
 trait TSProvisioning
     extends ModelImplicits
@@ -48,20 +48,22 @@ trait TSProvisioning
     with Eventually
     with AcceptanceTestPatience
     with should.Matchers {
-  self: GraphServices =>
+  self: ApplicationServices with IOSpec =>
 
   def `data in the Triples Store`(
-      project:            data.Project,
-      commitId:           CommitId = commitIds.generateOne
-  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion =
-    `data in the Triples Store`(project, NonEmptyList(commitId, Nil))
+      project:          data.Project,
+      commitId:         CommitId = commitIds.generateOne,
+      accessToken:      AccessToken
+  )(implicit ioRuntime: IORuntime): Assertion =
+    `data in the Triples Store`(project, NonEmptyList(commitId, Nil), accessToken)
 
   def `data in the Triples Store`(
-      project:            data.Project,
-      commitIds:          NonEmptyList[CommitId]
-  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
+      project:          data.Project,
+      commitIds:        NonEmptyList[CommitId],
+      accessToken:      AccessToken
+  )(implicit ioRuntime: IORuntime): Assertion = {
 
-    givenAccessTokenPresentFor(project)
+    givenAccessTokenPresentFor(project, accessToken)
 
     commitIds.toList.foreach { commitId =>
       webhookServiceClient

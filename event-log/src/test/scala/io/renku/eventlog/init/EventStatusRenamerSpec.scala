@@ -22,14 +22,13 @@ import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.model.Event
 import io.renku.eventlog.{events => _, _}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
@@ -57,13 +56,13 @@ class EventStatusRenamerSpec
     "rename all the events from PROCESSING to GENERATING_TRIPLES, " +
       "RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
       "NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
-        val processingEvents = events.generateNonEmptyList(minElements = 2)
+        val processingEvents = events.generateNonEmptyList(min = 2)
         processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
-        val recoverableEvents = events.generateNonEmptyList(minElements = 2)
+        val recoverableEvents = events.generateNonEmptyList(min = 2)
         recoverableEvents.map(event => store(event, withStatus = "RECOVERABLE_FAILURE"))
 
-        val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
+        val nonRecoverableEvents = events.generateNonEmptyList(min = 2)
         nonRecoverableEvents.map(event => store(event, withStatus = "NON_RECOVERABLE_FAILURE"))
 
         val otherEvents = events.generateNonEmptyList()

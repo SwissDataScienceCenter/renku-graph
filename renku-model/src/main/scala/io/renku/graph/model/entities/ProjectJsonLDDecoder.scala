@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import ProjectLens._
 import cats.data.Validated
 import cats.syntax.all._
 import io.circe.DecodingFailure
@@ -27,12 +28,13 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
 import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
+import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
 object ProjectJsonLDDecoder {
 
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
-    JsonLDDecoder.entity(entityTypes) { implicit cursor =>
+    JsonLDDecoder.entity(entityTypes) { cursor =>
       val maybeDescriptionR = cursor
         .downField(schema / "description")
         .as[Option[Description]]
@@ -42,16 +44,23 @@ object ProjectJsonLDDecoder {
         case kwrds                  => kwrds
       }
 
+      class DecodingDependencyLinks(allPlans: List[Plan]) extends DependencyLinks {
+        override def findStepPlan(planId: plans.ResourceId): Option[StepPlan] =
+          collectStepPlans(allPlans).find(_.resourceId == planId)
+      }
+
       for {
-        maybeAgent       <- cursor.downField(schema / "agent").as[Option[CliVersion]]
-        maybeVersion     <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
-        maybeDateCreated <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
-        maybeDescription <- maybeDescriptionR
-        keywords         <- keywordsR
-        allPersons       <- findAllPersons(gitLabInfo)
-        activities       <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
-        datasets         <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
-        resourceId       <- ResourceId(gitLabInfo.path).asRight
+        maybeAgent                     <- cursor.downField(schema / "agent").as[Option[CliVersion]]
+        maybeVersion                   <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
+        maybeDateCreated               <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
+        maybeDescription               <- maybeDescriptionR
+        keywords                       <- keywordsR
+        allPersons                     <- findAllPersons(cursor, gitLabInfo)
+        plans                          <- cursor.downField(renku / "hasPlan").as[List[Plan]]
+        implicit0(dl: DependencyLinks) <- new DecodingDependencyLinks(plans).asRight
+        activities <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
+        datasets   <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
+        resourceId <- ResourceId(gitLabInfo.path).asRight
         project <- newProject(
                      gitLabInfo,
                      resourceId,
@@ -62,12 +71,13 @@ object ProjectJsonLDDecoder {
                      maybeVersion,
                      allPersons,
                      activities,
-                     datasets
+                     datasets,
+                     plans
                    )
       } yield project
     }
 
-  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
+  private def findAllPersons(cursor: Cursor, gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl) =
     cursor.focusTop
       .as[List[Person]]
       .map(_.toSet)
@@ -84,7 +94,8 @@ object ProjectJsonLDDecoder {
                          maybeVersion:     Option[SchemaVersion],
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
-                         datasets:         List[Dataset[Dataset.Provenance]]
+                         datasets:         List[Dataset[Dataset.Provenance]],
+                         plans:            List[Plan]
   )(implicit renkuUrl:                     RenkuUrl): Either[DecodingFailure, Project] = {
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
@@ -103,6 +114,7 @@ object ProjectJsonLDDecoder {
             version,
             activities,
             datasets,
+            plans,
             parentResourceId = ResourceId(parentPath)
           )
           .widen[Project]
@@ -121,7 +133,8 @@ object ProjectJsonLDDecoder {
             members(allJsonLdPersons)(gitLabInfo),
             version,
             activities,
-            datasets
+            datasets,
+            plans
           )
           .widen[Project]
       case (None, None, Some(parentPath)) =>

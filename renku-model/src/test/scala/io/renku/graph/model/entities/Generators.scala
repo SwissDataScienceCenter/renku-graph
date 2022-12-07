@@ -22,10 +22,13 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters._
-import io.renku.graph.model.testentities.CommandParameterBase.CommandInput._
-import io.renku.graph.model.testentities.CommandParameterBase.CommandOutput._
-import io.renku.graph.model.testentities.CommandParameterBase._
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput._
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput._
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
+import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, ProjectBasedGenFactory, ProjectBasedGenFactoryOps, StepPlanGenFactory}
+import io.renku.graph.model.testentities.generators.genMonad
 import org.scalacheck.Gen
 
 private object Generators {
@@ -36,7 +39,7 @@ private object Generators {
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (position: Position) =>
-    (plan: Plan) => ExplicitCommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan)
+    (plan: Plan) => ExplicitCommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan.id)
 
   implicit lazy val implicitCommandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
     name             <- commandParameterNames
@@ -44,7 +47,7 @@ private object Generators {
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandParameter(name, maybeDescription, maybePrefix, defaultValue, plan)
+    (plan: Plan) => ImplicitCommandParameter(name, maybeDescription, maybePrefix, defaultValue, plan.id)
 
   implicit lazy val locationCommandInputObjects: Gen[Position => Plan => LocationCommandInput] = for {
     name                <- commandParameterNames
@@ -54,7 +57,7 @@ private object Generators {
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      LocationCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+      LocationCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   implicit lazy val mappedCommandInputObjects: Gen[Position => Plan => MappedCommandInput] = for {
     name                <- commandParameterNames
@@ -64,7 +67,7 @@ private object Generators {
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+      MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   lazy val implicitCommandInputObjects: Gen[Position => Plan => ImplicitCommandInput] = for {
     name                <- commandParameterNames
@@ -72,7 +75,7 @@ private object Generators {
     defaultValue        <- entityLocations.map(InputDefaultValue(_))
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandInput(name, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+    (plan: Plan) => ImplicitCommandInput(name, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   implicit lazy val locationCommandOutputObjects: Gen[Position => Plan => LocationCommandOutput] = for {
     name                <- commandParameterNames
@@ -90,7 +93,7 @@ private object Generators {
                             defaultValue,
                             folderCreation,
                             maybeEncodingFormat,
-                            plan
+                            plan.id
       )
 
   implicit lazy val mappedCommandOutputObjects: Gen[Position => Plan => MappedCommandOutput] = for {
@@ -111,7 +114,7 @@ private object Generators {
                           folderCreation,
                           maybeEncodingFormat,
                           mappedTo,
-                          plan
+                          plan.id
       )
 
   implicit lazy val implicitCommandOutputObjects: Gen[Position => Plan => ImplicitCommandOutput] = for {
@@ -121,11 +124,40 @@ private object Generators {
     folderCreation      <- commandParameterFolderCreation
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan)
+    (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan.id)
 
   implicit val ioStreamOuts: Gen[IOStream.Out] = Gen.oneOf(
     IOStream.StdOut(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show)),
     IOStream.StdErr(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show))
   )
 
+  implicit lazy val commandParametersLists: Gen[List[CommandParameterFactory]] = for {
+    explicitParameters <- explicitCommandParameterObjects.toGeneratorOfList()
+    locationInputs     <- locationCommandInputObjects.toGeneratorOfList()
+    mappedInputs       <- mappedCommandInputObjects.toGeneratorOfList()
+    implicitInputs     <- implicitCommandInputObjects.toGeneratorOfList()
+    locationOutputs    <- locationCommandOutputObjects.toGeneratorOfList()
+    mappedOutputs      <- mappedCommandOutputObjects.toGeneratorOfList()
+    implicitOutputs    <- implicitCommandOutputObjects.toGeneratorOfList()
+  } yield explicitParameters ::: locationInputs ::: mappedInputs ::: implicitInputs ::: locationOutputs ::: mappedOutputs ::: implicitOutputs
+
+  def compositePlanGenFactory(minChildren: Int = 3, maxChildren: Int = 6): CompositePlanGenFactory =
+    for {
+      params <- ProjectBasedGenFactory.liftF(commandParametersLists)
+      plan   <- compositePlanEntities(planEntitiesList(minChildren, maxChildren, params))
+    } yield plan
+
+  def stepPlanGenFactory: StepPlanGenFactory =
+    for {
+      params     <- ProjectBasedGenFactory.liftF(commandParametersLists)
+      explParams <- ProjectBasedGenFactory.liftF(explicitCommandParameterObjects)
+      plan       <- stepPlanEntities((explParams :: params): _*)
+    } yield plan
+
+  def compositePlanGen(minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
+    compositePlanGenFactory(minChildren, maxChildren).generateOne
+
+  def compositePlanNonEmptyMappings: CompositePlanGenFactory =
+    compositePlanEntities(stepPlanGenFactory.mapF(_.toGeneratorOfList(min = 3)))
+      .mapF(_.suchThat(_.mappings.nonEmpty))
 }

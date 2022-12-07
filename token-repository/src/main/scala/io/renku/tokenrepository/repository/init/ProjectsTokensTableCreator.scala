@@ -21,28 +21,20 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk.codec.all.bool
 
-private trait ProjectsTokensTableCreator[F[_]] {
-  def run(): F[Unit]
-}
-
 private object ProjectsTokensTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, ProjectsTokensDB]
-  ): ProjectsTokensTableCreator[F] = new ProjectsTokensTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: DBMigration[F] =
+    new ProjectsTokensTableCreator[F]
 }
 
-private class ProjectsTokensTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, ProjectsTokensDB]
-) extends ProjectsTokensTableCreator[F] {
+private class ProjectsTokensTableCreator[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
   import skunk._
   import skunk.implicits._
 
-  def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case false => createTable.flatMapF(_ => Logger[F].info("'projects_tokens' table created"))
       case true  => Kleisli.liftF(Logger[F].info("'projects_tokens' table existed"))

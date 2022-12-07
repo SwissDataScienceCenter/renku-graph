@@ -57,21 +57,15 @@ object Generators {
   }.map(_.reverse.mkString)
 
   def nonEmptyStrings(minLength: Int = 1, maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
-    nonBlankStrings(minLength = Refined.unsafeApply(minLength),
-                    maxLength = Refined.unsafeApply(maxLength),
-                    charsGenerator = charsGenerator
-    ) map (_.value)
+    nonBlankStrings(minLength, maxLength, charsGenerator) map (_.value)
 
-  def nonBlankStrings(minLength:      Int Refined Positive = 1,
-                      maxLength:      Int Refined Positive = 10,
-                      charsGenerator: Gen[Char] = alphaChar
-  ): Gen[NonBlank] = {
-    require(minLength.value <= maxLength.value)
+  def nonBlankStrings(minLength: Int = 1, maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[NonBlank] = {
+    require(minLength <= maxLength)
 
     val lengths =
-      if (maxLength.value == 1) const(maxLength.value)
-      else if (minLength.value == maxLength.value) const(maxLength.value)
-      else frequency(1 -> choose(minLength.value, maxLength.value), 9 -> choose(minLength.value + 1, maxLength.value))
+      if (maxLength == 1) const(maxLength)
+      else if (minLength == maxLength) const(maxLength)
+      else frequency(1 -> choose(minLength, maxLength), 9 -> choose(minLength + 1, maxLength))
 
     for {
       length <- lengths
@@ -79,73 +73,69 @@ object Generators {
     } yield Refined.unsafeApply(chars.mkString(""))
   }
 
-  def stringsOfLength(length: Int Refined Positive = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
+  def stringsOfLength(length: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
     listOfN(length, charsGenerator).map(_.mkString(""))
 
-  def paragraphs(minElements: Int Refined Positive = 5, maxElements: Int Refined Positive = 10): Gen[NonBlank] =
+  def paragraphs(minElements: Int = 5, maxElements: Int = 10): Gen[NonBlank] =
     nonEmptyStringsList(minElements, maxElements) map (_.mkString(" ")) map Refined.unsafeApply
 
-  def sentences(minWords:       Int Refined Positive = 1,
-                maxWords:       Int Refined Positive = 10,
-                charsGenerator: Gen[Char] = alphaChar
-  ): Gen[NonBlank] =
+  def sentences(minWords: Int = 1, maxWords: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[NonBlank] = {
+    require(minWords <= maxWords, s"minWords = $minWords has to be > maxWords = $maxWords")
+
     nonEmptyStringsList(minWords, maxWords, charsGenerator) map (_.mkString(" ")) map Refined.unsafeApply
+  }
 
   def sentenceContaining(phrase: NonBlank): Gen[String] = for {
     prefix <- nonEmptyStrings()
     suffix <- nonEmptyStrings()
   } yield s"$prefix $phrase $suffix"
 
-  def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
-    for {
-      length <- choose(0, maxLength.value)
-      chars  <- listOfN(length, const(" "))
-    } yield chars.mkString("")
+  def blankStrings(maxLength: Int = 10): Gen[String] = for {
+    length <- choose(0, maxLength)
+    chars  <- listOfN(length, const(" "))
+  } yield chars.mkString("")
 
-  def nonEmptyStringsList(minElements:    Int Refined Positive = 1,
-                          maxElements:    Int Refined Positive = 5,
-                          charsGenerator: Gen[Char] = alphaChar
-  ): Gen[List[String]] = for {
-    size  <- choose(minElements.value, maxElements.value)
-    lines <- Gen.listOfN(size, nonEmptyStrings(charsGenerator = charsGenerator))
-  } yield lines
+  def nonEmptyStringsList(min: Int = 1, max: Int = 5, charsGenerator: Gen[Char] = alphaChar): Gen[List[String]] = {
+    require(min <= max, s"min = $min has to be > max = $max")
 
-  def nonEmptyList[T](generator:   Gen[T],
-                      minElements: Int Refined Positive = 1,
-                      maxElements: Int Refined Positive = 5
-  ): Gen[NonEmptyList[T]] =
     for {
-      size <- choose(minElements.value, maxElements.value)
+      size  <- choose(min, max)
+      lines <- Gen.listOfN(size, nonEmptyStrings(charsGenerator = charsGenerator))
+    } yield lines
+  }
+
+  def nonEmptyList[T](generator: Gen[T], min: Int = 1, max: Int = 5): Gen[NonEmptyList[T]] = {
+    require(min <= max, s"min = $min has to be > max = $max")
+
+    for {
+      size <- choose(min, max)
       list <- Gen.listOfN(size, generator)
     } yield NonEmptyList.fromListUnsafe(list)
+  }
 
-  def nonEmptySet[T](
-      generator:   Gen[T],
-      minElements: Int Refined Positive = 1,
-      maxElements: Int Refined Positive = 5
-  ): Gen[Set[T]] =
+  def nonEmptySet[T](generator: Gen[T], min: Int = 1, max: Int = 5): Gen[Set[T]] = {
+    require(min <= max, s"min = $min has to be > max = $max")
+
     for {
-      size <- choose(minElements.value, maxElements.value)
+      size <- choose(min, max)
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
+  }
 
-  def listOf[T](generator:   Gen[T],
-                minElements: Int Refined NonNegative = 0,
-                maxElements: Int Refined Positive = 5
-  ): Gen[List[T]] =
+  def listOf[T](generator: Gen[T], min: Int = 0, max: Int = 5): Gen[List[T]] = {
+    require(min <= max, s"min = $min has to be > max = $max")
+
     for {
-      size <- choose(minElements.value, maxElements.value)
+      size <- choose(min, max)
       list <- Gen.listOfN(size, generator)
     } yield list
+  }
 
-  def setOf[T](generator:   Gen[T],
-               minElements: Int Refined NonNegative = 0,
-               maxElements: Int Refined Positive = 5
-  ): Gen[Set[T]] = {
-    require(minElements.value <= maxElements.value)
+  def setOf[T](generator: Gen[T], min: Int = 0, max: Int = 5): Gen[Set[T]] = {
+    require(min <= max, s"min = $min has to be > max = $max")
 
     for {
-      size <- choose(minElements.value, maxElements.value)
+      size <- choose(min, max)
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
   }
@@ -177,6 +167,9 @@ object Generators {
   def durations(min: FiniteDuration = 0 millis, max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(min.toMillis, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
 
+  def periods(min: LocalDate = LocalDate.EPOCH, max: LocalDate = LocalDate.now().plus(2000, JAVA_DAYS)): Gen[Period] =
+    Period.between(min, max)
+
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
                     partsGenerator: Gen[String] = nonBlankStrings(
@@ -185,7 +178,7 @@ object Generators {
                     ).map(_.value)
   ): Gen[String] = {
     require(minSegments <= maxSegments,
-            s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense"
+            s"Generate relative paths with minSegments = $minSegments and maxSegments = $maxSegments makes no sense"
     )
 
     for {
@@ -194,18 +187,17 @@ object Generators {
     } yield parts.mkString("/")
   }
 
-  val httpPorts: Gen[Int Refined Positive] = choose(2000, 10000) map Refined.unsafeApply
+  val httpPorts: Gen[Int] = choose(2000, 10000)
 
   def httpUrls(hostGenerator: Gen[String] = nonEmptyStrings(),
                pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
-  ): Gen[String] =
-    for {
-      protocol <- Gen.oneOf("http", "https")
-      port     <- httpPorts
-      host     <- hostGenerator
-      path     <- pathGenerator
-      pathValidated = if (path.isEmpty) "" else s"/$path"
-    } yield s"$protocol://$host:$port$pathValidated"
+  ): Gen[String] = for {
+    protocol <- Gen.oneOf("http", "https")
+    port     <- httpPorts
+    host     <- hostGenerator
+    path     <- pathGenerator
+    pathValidated = if (path.isEmpty) "" else s"/$path"
+  } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Gen.oneOf("http", "https")
@@ -239,7 +231,7 @@ object Generators {
         s"relativeTimestamps with lessThanAgo = $lessThanAgo and moreThanAgo = $moreThanAgo"
       )
 
-    timestamps(min = now.minus(lessThanAgo), max = now.minus(moreThanAgo))
+    timestamps(min = now minus lessThanAgo, max = now minus moreThanAgo)
   }
 
   val timestampsNotInTheFuture: Gen[Instant] =
@@ -305,10 +297,10 @@ object Generators {
 
     val tuples = for {
       key <- nonEmptyStrings(maxLength = 5)
-      value <- oneOf(nonEmptyStrings(maxLength = 5),
-                     Arbitrary.arbNumber.arbitrary,
-                     Arbitrary.arbBool.arbitrary,
-                     Gen.nonEmptyListOf(nonEmptyStrings())
+      value <- oneOf[Any](nonEmptyStrings(maxLength = 5),
+                          Arbitrary.arbNumber.arbitrary,
+                          Arbitrary.arbBool.arbitrary,
+                          Gen.nonEmptyListOf(nonEmptyStrings())
                )
     } yield key -> value
 
@@ -344,22 +336,20 @@ object Generators {
       def generateAs[TT](implicit ttFactory: T => TT): TT =
         generateExample(generator map ttFactory)
 
-      def generateFixedSizeList(ofSize: Int Refined Positive): List[T] =
-        generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
+      def generateFixedSizeList(ofSize: Int): List[T] =
+        generateNonEmptyList(min = ofSize, max = ofSize).toList
 
-      def generateList(minElements: Int Refined NonNegative = 0, maxElements: Int Refined Positive = 5): List[T] =
-        generateExample(listOf(generator, minElements, maxElements))
+      def generateList(min: Int = 0, max: Int = 5): List[T] =
+        generateExample(listOf(generator, min, max))
 
-      def generateFixedSizeSet(ofSize: Int Refined Positive = 5): Set[T] =
-        generateExample(setOf(generator, minElements = ofSize, maxElements = ofSize))
+      def generateFixedSizeSet(ofSize: Int = 5): Set[T] =
+        generateExample(setOf(generator, min = ofSize, max = ofSize))
 
-      def generateSet(minElements: Int Refined NonNegative = 0, maxElements: Int Refined Positive = 5): Set[T] =
-        generateExample(setOf(generator, minElements, maxElements))
+      def generateSet(min: Int = 0, max: Int = 5): Set[T] =
+        generateExample(setOf(generator, min, max))
 
-      def generateNonEmptyList(minElements: Int Refined Positive = 1,
-                               maxElements: Int Refined Positive = 5
-      ): NonEmptyList[T] =
-        generateExample(nonEmptyList(generator, minElements, maxElements))
+      def generateNonEmptyList(min: Int = 1, max: Int = 5): NonEmptyList[T] =
+        generateExample(nonEmptyList(generator, min, max))
 
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
 
@@ -386,19 +376,24 @@ object Generators {
                                     maxElements: Int Refined Positive = 5
       ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
 
-      def toGeneratorOfList(minElements: Int Refined NonNegative = 0,
-                            maxElements: Int Refined Positive = 5
-      ): Gen[List[T]] = listOf(generator, minElements, maxElements)
+      def toGeneratorOfList(min: Int = 0, max: Int = 5): Gen[List[T]] = listOf(generator, min, max)
 
-      def toGeneratorOfSet(minElements: Int Refined NonNegative = 1,
-                           maxElements: Int Refined Positive = 5
-      ): Gen[Set[T]] =
-        setOf(generator, minElements, maxElements)
+      def toGeneratorOfSet(min: Int = 1, max: Int = 5): Gen[Set[T]] =
+        setOf(generator, min, max)
 
       def toGeneratorOf[TT](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
 
-      private def generateExample[O](generator: Gen[O]): O =
-        generator.sample getOrElse generateExample(generator)
+      private def generateExample[O](generator: Gen[O]): O = {
+        @annotation.tailrec
+        def loop(tries: Int): O =
+          generator.sample match {
+            case Some(o)               => o
+            case None if tries >= 5000 => sys.error(s"Failed to generate example value after $tries tries")
+            case None                  => loop(tries + 1)
+          }
+
+        loop(0)
+      }
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)
@@ -411,7 +406,7 @@ object Generators {
     }
 
     implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-      override def pure[A](x: A) = Gen.const(x)
+      override def pure[A](x:   A) = Gen.const(x)
       override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
     }
 

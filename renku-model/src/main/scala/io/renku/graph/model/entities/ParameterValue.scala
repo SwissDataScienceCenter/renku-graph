@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters
-import io.renku.graph.model.entities.CommandParameterBase._
+import io.renku.graph.model.entities.StepPlanCommandParameter._
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.parameterValues.{ResourceId, _}
 import io.renku.jsonld.JsonLDDecoder
@@ -60,6 +60,7 @@ object ParameterValue {
   }
 
   import io.renku.jsonld.JsonLDEncoder._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -90,48 +91,69 @@ object ParameterValue {
         )
     }
 
-  def decoder(plan: Plan): JsonLDDecoder[ParameterValue] = JsonLDDecoder.entity(parameterValueTypes) { cursor =>
-    def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) = plan
-      .findParameter(valueReferenceId)
-      .map(parameter =>
-        cursor
-          .downField(schema / "value")
-          .as[ValueOverride]
-          .map(value => CommandParameterValue(resourceId, value, parameter))
+  def decoder(association: Association)(implicit dependencyLinks: DependencyLinks): JsonLDDecoder[ParameterValue] =
+    JsonLDDecoder.entity(parameterValueTypes) { cursor =>
+      def findPlan = dependencyLinks.findStepPlan(association.planId)
+
+      def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+        findPlan
+          .flatMap(_.findParameter(valueReferenceId))
+          .map(parameter =>
+            cursor
+              .downField(schema / "value")
+              .as[ValueOverride]
+              .map(value => CommandParameterValue(resourceId, value, parameter))
+          )
+
+      def maybeCommandInput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+        findPlan
+          .flatMap(_.findInput(valueReferenceId))
+          .map(input =>
+            cursor
+              .downField(schema / "value")
+              .as[Location.FileOrFolder]
+              .map(value => CommandInputValue(resourceId, value, input))
+          )
+
+      def maybeCommandOutput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+        findPlan
+          .flatMap(_.findOutput(valueReferenceId))
+          .map(output =>
+            cursor
+              .downField(schema / "value")
+              .as[Location.FileOrFolder]
+              .map(value => CommandOutputValue(resourceId, value, output))
+          )
+
+      for {
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
+        parameterValue <-
+          List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
+            .flatMap(_.apply(resourceId, valueReferenceId)) match {
+            case Nil =>
+              DecodingFailure(s"ParameterValue points to a non-existing command parameter $valueReferenceId",
+                              Nil
+              ).asLeft
+            case value :: Nil => value
+            case _ =>
+              DecodingFailure(s"ParameterValue points to multiple command parameters with $valueReferenceId",
+                              Nil
+              ).asLeft
+          }
+      } yield parameterValue
+    }
+
+  lazy val ontology: Type = Type.Def(
+    Class(renku / "ParameterValue"),
+    ObjectProperties(
+      ObjectProperty(
+        schema / "valueReference",
+        StepPlanCommandParameter.CommandParameter.ontology,
+        StepPlanCommandParameter.CommandInput.ontology,
+        StepPlanCommandParameter.CommandOutput.ontology
       )
-
-    def maybeCommandInput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
-      plan
-        .findInput(valueReferenceId)
-        .map(input =>
-          cursor
-            .downField(schema / "value")
-            .as[Location.FileOrFolder]
-            .map(value => CommandInputValue(resourceId, value, input))
-        )
-
-    def maybeCommandOutput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
-      plan
-        .findOutput(valueReferenceId)
-        .map(output =>
-          cursor
-            .downField(schema / "value")
-            .as[Location.FileOrFolder]
-            .map(value => CommandOutputValue(resourceId, value, output))
-        )
-
-    for {
-      resourceId       <- cursor.downEntityId.as[ResourceId]
-      valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
-      parameterValue <-
-        List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
-          .flatMap(_.apply(resourceId, valueReferenceId)) match {
-          case Nil =>
-            DecodingFailure(s"ParameterValue points to a non-existing command parameter $valueReferenceId", Nil).asLeft
-          case value :: Nil => value
-          case _ =>
-            DecodingFailure(s"ParameterValue points to multiple command parameters with $valueReferenceId", Nil).asLeft
-        }
-    } yield parameterValue
-  }
+    ),
+    DataProperties(DataProperty(schema / "value", xsd / "string"))
+  )
 }

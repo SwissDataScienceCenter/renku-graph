@@ -22,77 +22,84 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
-import io.renku.knowledgegraph.docs.Implicits.StatusOps
+import io.renku.knowledgegraph._
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.lineage
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 
 trait Endpoint[F[_]] {
-  def `get /docs`: F[http4s.Response[F]]
+  def `get /spec.json`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
+                                        endpoint:  EndpointDocs,
+                                        endpoints: EndpointDocs*
+) extends Http4sDsl[F]
+    with Endpoint[F] {
   import Encoders._
 
-  override def `get /docs`: F[http4s.Response[F]] = Ok(doc.asJson)
+  override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
 
-  lazy val doc: OpenApiDocument =
-    OpenApiDocument(
+  lazy val doc: OpenApiDocument = {
+    val document = OpenApiDocument(
       openApiVersion = "3.0.3",
       Info("Knowledge Graph API",
            "Get info about datasets, users, activities, and other entities".some,
            serviceVersion.value
       )
-    ).addPath(lineage.EndpointDoc.path)
-      .addServer(server)
+    ).addServer(server)
+
+    endpoints
+      .foldLeft(document addPath endpoint.path) { (d, endpoint) =>
+        d.addPath(endpoint.path)
+      }
       .addSecurity(privateToken)
-      .addSecurity(oAuth)
-      .addNoAuthSecurity
-      .addResponsesToAll(authErrorResponses)
-
-  private lazy val server: Server =
-    Server(
-      url = "/knowledge-graph",
-      description = "Renku Knowledge Graph API",
-      variables = Map.empty
-    )
-
-  private lazy val privateToken = SecurityScheme(
-    "PRIVATE-TOKEN",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
-  )
-
-  private lazy val oAuth = SecurityScheme(
-    "oauth_auth",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
-  )
-
-  val authErrorResponses = Map(
-    http4s.Status.Unauthorized.asDocStatus -> Response("If given auth header cannot be authenticated",
-                                                       Map.empty,
-                                                       Map.empty,
-                                                       Map.empty
-    ),
-    http4s.Status.NotFound.asDocStatus -> Response(
-      "If there is no project with the given namespace/name or user is not authorised to access this project",
-      Map.empty,
-      Map.empty,
-      Map.empty
-    ),
-    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise", Map.empty, Map.empty, Map.empty)
-  )
-
-}
-object Endpoint {
-
-  def apply[F[_]: Async]: F[Endpoint[F]] = {
-    val serviceVersion: F[ServiceVersion] = ServiceVersion.readFromConfig[F]()
-    serviceVersion.map(new EndpointImpl[F](_)).widen[Endpoint[F]]
+      .addSecurity(openIdConnect)
+      .addNoAuthSecurity()
   }
+
+  private lazy val server = Server(
+    url = "/knowledge-graph",
+    description = "Renku Knowledge Graph API"
+  )
+
+  private lazy val privateToken = SecurityScheme.ApiKey(
+    id = "private-token",
+    name = "PRIVATE-TOKEN",
+    description = "User's Personal Access Token in GitLab".some
+  )
+
+  private lazy val openIdConnect = SecurityScheme.OpenIdConnect(
+    id = "oauth_auth",
+    name = "oauth_auth",
+    openIdConnectUrl = "/auth/realms/Renku/.well-known/openid-configuration"
+  )
+}
+
+object Endpoint {
+  def apply[F[_]: Async]: F[Endpoint[F]] = for {
+    datasetsEndpoint           <- datasets.EndpointDocs[F]
+    datasetDetailsEndpoint     <- datasets.details.EndpointDocs[F]
+    entitiesEndpoint           <- entities.EndpointDocs[F]
+    ontologyEndpoint           <- ontology.EndpointDocs[F]
+    projectDetailsEndpoint     <- projects.details.EndpointDocs[F]
+    projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
+    projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
+    userProjectsEndpoint       <- users.projects.EndpointDocs[F]
+    docsEndpointEndpoint       <- EndpointDocs[F]
+    serviceVersion             <- ServiceVersion.readFromConfig[F]()
+  } yield new EndpointImpl[F](
+    serviceVersion,
+    datasetsEndpoint,
+    datasetDetailsEndpoint,
+    entitiesEndpoint,
+    ontologyEndpoint,
+    projectDetailsEndpoint,
+    projects.files.lineage.EndpointDocs,
+    projectDatasetsEndpoint,
+    projectDatasetTagsEndpoint,
+    docsEndpointEndpoint,
+    userProjectsEndpoint
+  )
 }

@@ -18,15 +18,24 @@
 
 package io.renku.knowledgegraph.entities
 
-import io.circe.{Decoder, Encoder}
-import io.renku.graph.model.{datasets, persons, plans, projects}
+import Endpoint.Criteria
+import cats.data.NonEmptyList
+import cats.syntax.all._
+import io.circe.literal._
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, Json}
+import io.renku.config.renku
+import io.renku.graph.model._
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.json.JsonOps._
+import io.renku.knowledgegraph
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
-import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
+import io.renku.tinytypes.json.TinyTypeDecoders
 
 import java.time.Instant
 
-object model {
+private object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType
@@ -54,6 +63,45 @@ object model {
       override type Date = projects.DateCreated
     }
 
+    object Project {
+      private[entities] implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Entity.Project] =
+        Encoder.instance { project =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Project.value},
+            "matchingScore": ${project.matchingScore},
+            "name":          ${project.name},
+            "path":          ${project.path},
+            "namespace":     ${project.path.toNamespaces.mkString("/")},
+            "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
+            "visibility":    ${project.visibility},
+            "date":          ${project.date},
+            "keywords":      ${project.keywords}
+          }"""
+            .addIfDefined("creator" -> project.maybeCreator)
+            .addIfDefined("description" -> project.maybeDescription)
+            .deepMerge(
+              _links(
+                Link(Rel("details") -> knowledgegraph.projects.details.Endpoint.href(renkuApiUrl, project.path))
+              )
+            )
+        }
+
+      private type NamespaceInfo = (Rel, List[projects.Namespace])
+
+      private lazy val toDetailedInfo: List[projects.Namespace] => Json = _.foldLeft(List.empty[NamespaceInfo]) {
+        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
+        case (all @ (_, lastNamespaces) :: _, namespace) =>
+          all ::: (Rel(namespace.show) -> (lastNamespaces ::: namespace :: Nil)) :: Nil
+      }.asJson
+
+      private implicit lazy val namespaceEncoder: Encoder[NamespaceInfo] = Encoder.instance { case (rel, namespaces) =>
+        json"""{
+          "rel":       $rel,
+          "namespace": ${namespaces.map(_.show).mkString("/")}
+        }"""
+      }
+    }
+
     final case class Dataset(
         matchingScore:       MatchingScore,
         identifier:          datasets.Identifier,
@@ -70,16 +118,93 @@ object model {
       override type Date = datasets.Date
     }
 
+    object Dataset {
+      private[entities] implicit def encoder(implicit
+          gitLabUrl:   GitLabUrl,
+          renkuApiUrl: renku.ApiUrl
+      ): Encoder[model.Entity.Dataset] = {
+
+        implicit lazy val imagesEncoder: Encoder[(List[datasets.ImageUri], projects.Path)] =
+          Encoder.instance[(List[datasets.ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+            Json.arr(imageUris.map {
+              case uri: datasets.ImageUri.Relative =>
+                json"""{
+                  "location": $uri
+                }""" deepMerge _links(
+                  Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+                )
+              case uri: datasets.ImageUri.Absolute =>
+                json"""{
+                  "location": $uri
+                }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
+            }: _*)
+          }
+
+        Encoder.instance { ds =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Dataset.value},
+            "matchingScore": ${ds.matchingScore},
+            "name":          ${ds.name},
+            "visibility":    ${ds.visibility},
+            "date":          ${ds.date},
+            "creators":      ${ds.creators},
+            "keywords":      ${ds.keywords},
+            "images":        ${(ds.images -> ds.exemplarProjectPath).asJson}
+          }"""
+            .addIfDefined("description" -> ds.maybeDescription)
+            .deepMerge(
+              _links(
+                Link(Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, ds.identifier))
+              )
+            )
+        }
+      }
+    }
+
     final case class Workflow(
         matchingScore:    MatchingScore,
         name:             plans.Name,
         visibility:       projects.Visibility,
         date:             plans.DateCreated,
         keywords:         List[plans.Keyword],
-        maybeDescription: Option[plans.Description]
+        maybeDescription: Option[plans.Description],
+        workflowType:     Workflow.WorkflowType
     ) extends Entity {
       override type Name = plans.Name
       override type Date = plans.DateCreated
+    }
+
+    object Workflow {
+      sealed trait WorkflowType { self: Product =>
+        final def name: String = self.productPrefix.toLowerCase
+      }
+      object WorkflowType {
+        case object Composite extends WorkflowType
+        case object Step      extends WorkflowType
+
+        val all: NonEmptyList[WorkflowType] =
+          NonEmptyList.of(Composite, Step)
+
+        def fromName(str: String): Either[String, WorkflowType] =
+          all.find(_.name.equalsIgnoreCase(str)).toRight(s"Invalid workflowType name: $str")
+
+        implicit val encoder: Encoder[WorkflowType] =
+          Encoder.encodeString.contramap(_.name)
+      }
+
+      private[entities] implicit lazy val encoder: Encoder[model.Entity.Workflow] =
+        Encoder.instance { workflow =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Workflow.value},
+            "matchingScore": ${workflow.matchingScore},
+            "name":          ${workflow.name},
+            "visibility":    ${workflow.visibility},
+            "date":          ${workflow.date},
+            "keywords":      ${workflow.keywords},
+            "workflowType": ${workflow.workflowType}
+          }"""
+            .addIfDefined("description" -> workflow.maybeDescription)
+        }
     }
 
     final case class Person(
@@ -96,13 +221,21 @@ object model {
         override val value: Instant = Instant.EPOCH
       }
       type DateCreationFiller = DateCreationFiller.type
+
+      private[entities] implicit lazy val encoder: Encoder[model.Entity.Person] =
+        Encoder.instance { person =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Person.value},
+            "matchingScore": ${person.matchingScore},
+            "name":          ${person.name}
+          }"""
+        }
     }
   }
 
   final class MatchingScore private (val value: Float) extends AnyVal with FloatTinyType
   object MatchingScore extends TinyTypeFactory[MatchingScore](new MatchingScore(_)) with FiniteFloat[MatchingScore] {
     val min:                  MatchingScore          = MatchingScore(1.0f)
-    implicit val jsonEncoder: Encoder[MatchingScore] = TinyTypeEncoders.floatEncoder
     implicit val jsonDecoder: Decoder[MatchingScore] = TinyTypeDecoders.floatDecoder(MatchingScore)
   }
 }

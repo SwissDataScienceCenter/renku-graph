@@ -28,24 +28,23 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.{New, NonRecoverableFailure, Sent}
 import io.renku.eventlog._
 import io.renku.eventlog.events.producers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 import scala.util.control.NonFatal
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DispatchRecovery[F, MigrationRequestEvent]] = MonadThrow[F].catchNonFatal {
-    new DispatchRecoveryImpl[F](queriesExecTimes)
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]
+      : F[DispatchRecovery[F, MigrationRequestEvent]] = MonadThrow[F].catchNonFatal {
+    new DispatchRecoveryImpl[F]()
   }
 }
 
-private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F],
-                                                                         now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.DispatchRecovery[F, MigrationRequestEvent]
     with TSMigtationTypeSerializers {
   import cats.syntax.all._

@@ -26,12 +26,12 @@ import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -39,10 +39,9 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder[F[_]: Async: SessionResource](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
@@ -147,9 +146,8 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
 }
 
 private object LongProcessingEventFinder {
-  def apply[F[_]: Async: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
-    new LongProcessingEventFinder(queriesExecTimes)
-  }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
+    MonadThrow[F].catchNonFatal {
+      new LongProcessingEventFinder()
+    }
 }

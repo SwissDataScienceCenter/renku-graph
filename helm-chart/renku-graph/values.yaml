@@ -25,12 +25,13 @@ global:
       # Password for the `tokenstorage` user
       # Generate one using: `openssl rand -hex 16`
       value:
+  ## to enable debug mode
+  debug: false
 
 jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent
-    tag: '0.0.15'
   users:
     admin:
       ## Admin user password
@@ -58,6 +59,8 @@ jena:
         name: shiro-ini
         defaultMode: 0555
   additionalInitContainerScript: "find /fuseki -name tdb.lock -type f -delete && find /fuseki/configuration -name *.ttl -type f -empty -delete && echo clean-up done"
+  test:
+    enabled: false
 
 webhookService:
   image:
@@ -92,6 +95,10 @@ tokenRepository:
   jvmXmx: 128M
   gitlab:
     rateLimit: 50/sec
+  projectTokenTTL: '365 days'
+  # name of the Project Access Tokens to be created on behalf of the user in GitLab; defaults to .Release.Name
+  projectTokenName:
+  projectTokenDuePeriod: '184 days'
   connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
@@ -112,7 +119,6 @@ triplesGenerator:
       memory: 2048Mi
       cpu: "1"
   jvmXmx: 1g
-  reProvisioningRemovalBatchSize: 1000
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes

@@ -20,7 +20,6 @@ package io.renku.eventlog.metrics
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.eventlog.metrics.AwaitingGenerationGauge.NumberOfProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptySet, nonNegativeLongs}
@@ -28,7 +27,6 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
-import io.renku.metrics.MetricsTools._
 import io.renku.metrics._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -44,13 +42,13 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
 
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
-        .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
+        .expects(*)
         .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val gauge = AwaitingGenerationGauge(statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
-      gauge.name                                          shouldBe "events_awaiting_generation_count"
+      gauge.name.value                                    shouldBe "events_awaiting_generation_count"
     }
 
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
@@ -60,21 +58,11 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
         .expects(*)
         .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
-      val waitingEvents = waitingEventsGen.generateOne
       (statsFinder.countEvents _)
         .expects(Set(New, GenerationRecoverableFailure), Some(NumberOfProjects))
-        .returning(waitingEvents.pure[IO])
+        .returning(waitingEventsGen.generateOne.pure[IO])
 
-      val gauge = AwaitingGenerationGauge(statsFinder).unsafeRunSync()
-
-      gauge.reset().unsafeRunSync()
-
-      gauge
-        .asInstanceOf[LabeledGaugeImpl[IO, projects.Path]]
-        .wrappedCollector
-        .collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
-        ("project", project.value, count.toDouble)
-      }
+      AwaitingGenerationGauge(statsFinder).unsafeRunSync().reset().unsafeRunSync()
     }
   }
 
@@ -84,9 +72,6 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
   }
 
   private lazy val waitingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {
-    for {
-      path  <- projectPaths
-      count <- nonNegativeLongs()
-    } yield path -> count.value
+    (projectPaths -> nonNegativeLongs().map(_.value)).mapN(_ -> _)
   }.map(_.toMap)
 }

@@ -23,10 +23,8 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 final class CategoryName private (val value: String) extends AnyVal with StringTinyType
 object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank[CategoryName] {
-  import io.circe.{Decoder, Encoder}
+  import io.circe.Decoder
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
-  import io.renku.tinytypes.json.TinyTypeEncoders.stringEncoder
 
   implicit val decoder: Decoder[CategoryName] = stringDecoder(CategoryName)
-  implicit val encoder: Encoder[CategoryName] = stringEncoder[CategoryName]
 }

@@ -19,8 +19,10 @@
 package io.renku.http.rest
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.circe._
 import io.circe.literal._
+import io.circe.syntax._
 import io.renku.http.rest.Links.{Link, Rel}
 import io.renku.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
@@ -35,8 +37,10 @@ trait LinkOps {
 
 object Links {
 
-  def apply(link: (Rel, Href)):                   Links = Links(NonEmptyList.of(Link(link)))
-  def of(link: Link, other: Link*):               Links = Links(NonEmptyList.of(link, other: _*))
+  def apply(link: (Rel, Href)): Links = Links(NonEmptyList.of(Link(link)))
+
+  def of(link: Link, other: Link*): Links = Links(NonEmptyList.of(link, other: _*))
+
   def of(link: (Rel, Href), other: (Rel, Href)*): Links = Links(NonEmptyList.of(link, other: _*).map(Link.apply))
 
   def self(href: Href): Links = Links(NonEmptyList.of(Link.self(href)))
@@ -47,25 +51,55 @@ object Links {
   }
 
   final class Href private (val value: String) extends AnyVal with UrlTinyType
+
   implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url[Href] with UrlOps[Href] {
     def apply(value: UrlTinyType): Href = Href(value.value)
   }
 
-  final case class Link(rel: Rel, href: Href)
+  sealed trait Method extends StringTinyType with Product with Serializable
+
+  object Method extends TinyTypeFactory[Method](MethodInstantiator) {
+    final case object GET extends Method {
+      override val value: String = "GET"
+    }
+
+    final case object POST extends Method {
+      override val value: String = "POST"
+    }
+
+    lazy val all: Set[Method] = Set(GET, POST)
+
+    implicit val jsonDecoder: Decoder[Method] = Decoder.decodeString.emap { value =>
+      Either.fromOption(
+        Method.all.find(_.value == value),
+        ifNone = s"'$value' unknown Link Method"
+      )
+    }
+  }
+
+  private object MethodInstantiator extends (String => Method) {
+    override def apply(value: String): Method = Method.all.find(_.value.toLowerCase == value.toLowerCase).getOrElse {
+      throw new IllegalArgumentException(s"'$value' unknown Method")
+    }
+  }
+
+  final case class Link(rel: Rel, href: Href, method: Method = Method.GET)
 
   object Link {
-    def self(href: Href):          Link = Link(Rel.Self, href)
+    def self(href:   Href):        Link = Link(Rel.Self, href)
     def apply(tuple: (Rel, Href)): Link = Link(tuple._1, tuple._2)
   }
 
   implicit val linksEncoder: Encoder[Links] = Encoder.instance[Links] { links =>
     import io.circe.Json
-    import io.circe.literal._
 
-    def toJson(link: Link) = json"""{
-      "rel": ${link.rel.value},
-      "href": ${link.href.value}
-    }"""
+    def toJson(link: Link) = Json.obj(
+      List(
+        Some("rel"                                            -> link.rel.asJson),
+        Some("href"                                           -> link.href.asJson),
+        Option.when(link.method != Links.Method.GET)("method" -> link.method.asJson)
+      ).flatten: _*
+    )
 
     Json.arr(links.links.toList.map(toJson): _*)
   }
@@ -76,9 +110,10 @@ object Links {
 
     val link: Decoder[Link] = (cursor: HCursor) =>
       for {
-        rel  <- cursor.downField("rel").as[Rel]
-        href <- cursor.downField("href").as[Href]
-      } yield Link(rel, href)
+        rel    <- cursor.downField("rel").as[Rel]
+        href   <- cursor.downField("href").as[Href]
+        method <- cursor.downField("method").as[Option[Method]].map(_.getOrElse(Method.GET))
+      } yield Link(rel, href, method)
 
     decodeList(link).emap {
       case Nil          => Left("No links found")

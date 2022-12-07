@@ -55,7 +55,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       "'services.sentry.url', 'services.sentry.environment', 'service-name' and 'version' are set" in {
         forAll { sentryConfig: SentryConfig =>
           val config = ConfigFactory.parseMap(
-            Map(
+            Map[String, AnyRef](
               "service-name" -> sentryConfig.serviceName.value,
               "services" -> Map(
                 "sentry" -> Map(
@@ -78,7 +78,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.dsn' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, AnyRef](
           "service-name" -> sentryConfig.serviceName.value,
           "services" -> Map(
             "sentry" -> Map(
@@ -101,7 +101,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "fail if 'services.sentry.enabled' is 'true' but 'service-name' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, AnyRef](
           "service-name" -> "",
           "services" -> Map(
             "sentry" -> Map(
@@ -124,7 +124,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.environment' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, AnyRef](
           "service-name" -> sentryConfig.serviceName.value,
           "services" -> Map(
             "sentry" -> Map(
@@ -147,7 +147,7 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "fail if 'services.sentry.enabled' is 'true' but 'version' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, AnyRef](
           "service-name" -> sentryConfig.serviceName.value,
           "services" -> Map(
             "sentry" -> Map(

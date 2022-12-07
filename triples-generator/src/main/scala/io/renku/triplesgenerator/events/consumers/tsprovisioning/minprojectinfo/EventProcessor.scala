@@ -50,7 +50,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 ) extends EventProcessor[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
-  import UploadingResult._
+  import EventUploadingResult._
   import accessTokenFinder._
   import entityBuilder._
   import executionTimeRecorder._
@@ -69,51 +69,46 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def transformAndUpload(
       event:                   MinProjectInfoEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
+  )(implicit maybeAccessToken: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[UploadingResult](run(createSteps, project) >>= (toUploadingResult(event, _)))
+      result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
-  private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[UploadingResult]] = {
+  private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.getMessage}")
         .map(_ => RecoverableError(event, error))
     case error: SilentRecoverableError =>
-      RecoverableError(event, error).pure[F].widen[UploadingResult]
+      RecoverableError(event, error).pure[F].widen[EventUploadingResult]
   }
 
-  private def toUploadingResult(event:               MinProjectInfoEvent,
-                                triplesUploadResult: TriplesUploadResult
-  ): F[UploadingResult] = triplesUploadResult match {
-    case DeliverySuccess => (Uploaded(event): UploadingResult).pure[F]
-    case RecoverableFailure(error) =>
-      error match {
-        case error @ LogWorthyRecoverableError(message, _) =>
-          Logger[F]
-            .error(error)(s"${logMessageCommon(event)} $message")
-            .map(_ => RecoverableError(event, error))
-        case error @ SilentRecoverableError(_, _) =>
-          RecoverableError(event, error).pure[F].widen[UploadingResult]
-      }
+  private def toUploadingResult(event: MinProjectInfoEvent): TriplesUploadResult => F[EventUploadingResult] = {
+    case DeliverySuccess => Uploaded(event).pure[F].widen
+    case RecoverableFailure(error @ LogWorthyRecoverableError(message, _)) =>
+      Logger[F]
+        .error(error)(s"${logMessageCommon(event)} $message")
+        .map(_ => RecoverableError(event, error))
+    case RecoverableFailure(error @ SilentRecoverableError(_, _)) =>
+      RecoverableError(event, error).pure[F].widen[EventUploadingResult]
     case error: NonRecoverableFailure =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.message}")
         .map(_ => NonRecoverableError(event, error: Throwable))
   }
 
-  private def nonRecoverableFailure(event: MinProjectInfoEvent): PartialFunction[Throwable, F[UploadingResult]] = {
+  private def nonRecoverableFailure(event: MinProjectInfoEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case exception: ProcessingNonRecoverableError.MalformedRepository =>
-      NonRecoverableError(event, exception).pure[F].widen[UploadingResult]
+      NonRecoverableError(event, exception).pure[F].widen[EventUploadingResult]
     case NonFatal(exception) =>
       Logger[F]
         .error(exception)(s"${logMessageCommon(event)} ${exception.getMessage}")
         .map(_ => NonRecoverableError(event, exception))
   }
 
-  private def logSummary(event: MinProjectInfoEvent): ((ElapsedTime, UploadingResult)) => F[Unit] = {
+  private def logSummary(event: MinProjectInfoEvent): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
     case (elapsedTime, uploadingResult) =>
       val message = uploadingResult match {
         case Uploaded(_) => "success"
@@ -124,20 +119,24 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def logMessageCommon(event: MinProjectInfoEvent): String = show"$categoryName: $event"
 
-  private sealed trait UploadingResult extends Product with Serializable {
+  private sealed trait EventUploadingResult extends UploadingResult {
     val event: MinProjectInfoEvent
   }
 
-  private sealed trait UploadingError extends UploadingResult {
+  private sealed trait UploadingError extends EventUploadingResult {
     val cause: Throwable
   }
 
-  private object UploadingResult {
-    case class Uploaded(event: MinProjectInfoEvent) extends UploadingResult
+  private object EventUploadingResult {
+    case class Uploaded(event: MinProjectInfoEvent) extends EventUploadingResult with UploadingResult.Uploaded
 
-    case class RecoverableError(event: MinProjectInfoEvent, cause: ProcessingRecoverableError) extends UploadingError
+    case class RecoverableError(event: MinProjectInfoEvent, cause: ProcessingRecoverableError)
+        extends UploadingError
+        with UploadingResult.RecoverableError
 
-    case class NonRecoverableError(event: MinProjectInfoEvent, cause: Throwable) extends UploadingError
+    case class NonRecoverableError(event: MinProjectInfoEvent, cause: Throwable)
+        extends UploadingError
+        with UploadingResult.NonRecoverableError
   }
 }
 

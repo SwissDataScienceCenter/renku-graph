@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.eventdetails
 
+import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -55,7 +55,8 @@ class EventDetailsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
     val eventId   = compoundEventIds.generateOne
     val eventBody = eventBodies.generateOne
 
-    val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val eventDetailsFinder = new EventDetailsFinderImpl(queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val eventDetailsFinder = new EventDetailsFinderImpl[IO]
   }
 }

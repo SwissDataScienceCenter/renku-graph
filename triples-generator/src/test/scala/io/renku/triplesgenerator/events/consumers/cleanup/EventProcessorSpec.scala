@@ -39,17 +39,19 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "remove the triples linked to the project and notify the EL when the process is done" in new TestCase {
 
-      (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
     }
 
     "do not fail but log an error if the removal of the triples fails" in new TestCase {
-      val exception = exceptions.generateOne
-      (triplesRemover.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      val exception = exceptions.generateOne
+      (tsCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
+
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
@@ -57,11 +59,13 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     }
 
     "do not fail but log an error if the notification of the EL fails" in new TestCase {
+
+      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+
       val exception = exceptions.generateOne
-      (triplesRemover.removeTriples _).expects(path).returns(().pure[IO])
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
@@ -76,8 +80,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val project: Project       = Project(projectIds.generateOne, path)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val triplesRemover     = mock[ProjectTriplesRemover[IO]]
+    val tsCleaner          = mock[namedgraphs.TSCleaner[IO]]
     val eventStatusUpdater = mock[EventStatusUpdater[IO]]
-    val eventProcessor     = new EventProcessorImpl[IO](triplesRemover, eventStatusUpdater)
+    val eventProcessor     = new EventProcessorImpl[IO](tsCleaner, eventStatusUpdater)
   }
 }

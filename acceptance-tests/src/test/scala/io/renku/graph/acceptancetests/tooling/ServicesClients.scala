@@ -20,7 +20,7 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.Monad
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Temporal}
+import cats.effect.{Async, IO, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -35,7 +35,7 @@ import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{Header, Headers, Method, Status, Uri}
+import org.http4s.{Header, Headers, Method, Request, Response, Status, Uri}
 import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should
 import org.typelevel.ci._
@@ -112,6 +112,21 @@ object KnowledgeGraphClient {
         }"""
       }
     }
+
+    def `GET /knowledge-graph/ontology`(implicit ioRuntime: IORuntime): (Status, Headers, String) = {
+      import io.renku.http.server.EndpointTester.stringEntityDecoder
+      val responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[(Status, Headers, String)]] = {
+        case (status, _, response) =>
+          response
+            .as[String](implicitly[Async[IO]], stringEntityDecoder)
+            .map(pageBody => (status, response.headers, pageBody))
+      }
+
+      for {
+        uri      <- validateUri(s"$baseUrl/knowledge-graph/ontology/index-en.html")
+        response <- send(request(Method.GET, uri))(responseMapping)
+      } yield response
+    }.unsafeRunSync()
   }
 }
 
@@ -164,15 +179,27 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   import cats.syntax.all._
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Method, Request, Response, Status}
+
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   val baseUrl: String Refined Url
 
-  def POST(url: String, maybeAccessToken: Option[AccessToken])(implicit ioRuntime: IORuntime): ClientResponse = {
+  def POST(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.POST, uri, maybeAccessToken))(mapResponse)
+      response <- send(request(Method.POST, uri, accessToken))(mapResponse)
     } yield response
+  }.unsafeRunSync()
+
+  def POST(url:  String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
+      ioRuntime: IORuntime
+  ): Status = {
+    validateUri(s"$baseUrl/$url") >>=
+      (url =>
+        send(request(Method.POST, url, maybeAccessToken).withEntity(payload)) { case (status, _, _) =>
+          status.pure[IO]
+        }
+      )
   }.unsafeRunSync()
 
   def PUT(url:   String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
@@ -196,7 +223,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.GET, uri, maybeAccessToken = Some(accessToken)))(mapResponse)
+      response <- send(request(Method.GET, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
@@ -214,9 +241,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
     } yield
       if (status == Ok) ServiceUp
       else ServiceDown
-  } recover { case NonFatal(_) =>
-    ServiceDown
-  }
+  } recover { case NonFatal(_) => ServiceDown }
 
   protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ClientResponse]] = {
     case (status, _, response) => response.as[Json].map(json => ClientResponse(status, json, response.headers))

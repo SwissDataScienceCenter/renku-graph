@@ -20,4 +20,5 @@ organization := "io.renku"
 name := "renku-model"
 
 //libraryDependencies += "dev.optics" %% "monocle-core" % 3.x.x // to be used when circe-optics starts to use is
-libraryDependencies += "com.github.julien-truffaut" %% "monocle-core" % "2.1.0"
+libraryDependencies += "com.github.julien-truffaut" %% "monocle-core"           % "2.1.0"
+libraryDependencies += "com.softwaremill.diffx"     %% "diffx-scalatest-should" % "0.8.2" % Test

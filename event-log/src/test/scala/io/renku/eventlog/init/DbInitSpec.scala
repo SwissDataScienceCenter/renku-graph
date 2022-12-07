@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDb
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfter, Suite}
 import skunk._
@@ -31,6 +32,7 @@ import skunk.implicits._
 trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
   self: Suite with IOSpec =>
 
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   protected[init] val migrationsToRun: List[DbMigrator[IO]]
 
   before {
@@ -49,7 +51,7 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
   }
 
   protected def createEventTable(): Unit =
-    List(eventLogTableCreator, batchDateAdder, eventLogTableRenamer)
+    List(EventLogTableCreator[IO], BatchDateAdder[IO], EventLogTableRenamer[IO])
       .map(_.run())
       .sequence
       .void

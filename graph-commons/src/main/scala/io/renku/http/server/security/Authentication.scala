@@ -21,8 +21,8 @@ package io.renku.http.server.security
 import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.UserAccessToken
+import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model._
 import org.http4s.AuthScheme.Bearer
@@ -60,13 +60,13 @@ private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[
 
     import Header.Select._
 
-    lazy val getBearerToken: Option[AccessToken] =
+    lazy val getBearerToken: Option[UserAccessToken] =
       request.headers.get(singleHeaders(Authorization.headerInstance)) >>= {
-        case Authorization(Token(Bearer, token)) => OAuthAccessToken(token).some
+        case Authorization(Token(Bearer, token)) => UserOAuthAccessToken(token).some
         case _                                   => None
       }
 
-    lazy val getPrivateAccessToken: Option[AccessToken] =
+    lazy val getPrivateAccessToken: Option[UserAccessToken] =
       request.headers.get(ci"PRIVATE-TOKEN").map(_.toList) >>= {
         case Header.Raw(_, token) :: _ => PersonalAccessToken(token).some
         case _                         => None

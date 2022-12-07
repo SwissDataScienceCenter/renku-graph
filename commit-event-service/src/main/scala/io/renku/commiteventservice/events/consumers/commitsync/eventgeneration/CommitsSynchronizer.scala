@@ -65,12 +65,11 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   import latestCommitFinder._
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
-    findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
-      for {
-        maybeLatestCommit <- findLatestCommit(event.project.id)
-        _                 <- checkForSkippedEvent(maybeLatestCommit, event)
-      } yield ()
-    }
+    for {
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.id)
+      maybeLatestCommit                   <- findLatestCommit(event.project.id)
+      _                                   <- checkForSkippedEvent(maybeLatestCommit, event)
+    } yield ()
   } recoverWith loggingError(event, "Synchronization failed")
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit

@@ -24,11 +24,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,7 +36,7 @@ class ProjectsFinderSpec
     with IOSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with ProjectsDataset {
 
   "findProjects" should {
 
@@ -45,9 +44,9 @@ class ProjectsFinderSpec
 
       val projects = anyProjectEntities.generateNonEmptyList().toList
 
-      projects.foreach(p => upload(to = renkuDataset, p.asJsonLD))
+      projects foreach (upload(to = projectsDataset, _))
 
-      projectsFinder.findProjects().unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
+      projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
     }
   }
 
@@ -55,11 +54,11 @@ class ProjectsFinderSpec
     val query = SparqlQuery.of(
       "find path",
       Prefixes of (schema -> "schema", renku -> "renku"),
-      """|SELECT ?path
-         |WHERE { ?id a schema:Project; renku:projectPath ?path }""".stripMargin
+      """|SELECT DISTINCT ?path
+         |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?path } }""".stripMargin
     )
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectsFinder = new ProjectsFinderImpl[IO](query, renkuDSConnectionInfo)
+    val projectsFinder = new ProjectsFinderImpl[IO](query, projectsDSConnectionInfo)
   }
 }

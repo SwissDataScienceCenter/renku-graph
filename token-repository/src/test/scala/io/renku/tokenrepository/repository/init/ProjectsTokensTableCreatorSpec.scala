@@ -21,23 +21,29 @@ package io.renku.tokenrepository.repository.init
 import cats.effect._
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class ProjectsTokensTableCreatorSpec
+    extends AnyWordSpec
+    with IOSpec
+    with DbInitSpec
+    with should.Matchers
+    with MockFactory {
 
-  protected override val migrationsToRun: List[Migration] = List.empty
+  protected override val migrationsToRun: List[DBMigration[IO]] = List.empty
 
   "run" should {
 
     "create the projects_tokens table if id does not exist" in new TestCase {
-      tableExists() shouldBe false
+      tableExists("projects_tokens") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'projects_tokens' table created"))
 
-      tableExists() shouldBe true
+      tableExists("projects_tokens") shouldBe true
 
       tableCreator.run().unsafeRunSync() shouldBe ()
 
@@ -46,6 +52,6 @@ class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val tableCreator = new ProjectsTokensTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new ProjectsTokensTableCreator[IO]
   }
 }

@@ -18,30 +18,30 @@
 
 package io.renku.eventlog.events.consumers.projectsync
 
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.Microservice
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: MetricsRegistry: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  ]: Async: Parallel: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler[F](subscriptionMechanism, queriesExecTimes)
+    handler <- EventHandler[F](subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

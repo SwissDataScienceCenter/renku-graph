@@ -53,15 +53,72 @@ Hence, we are trying to find and then follow good patterns in naming, code organ
 * great attention should be paid to the scopes on all levels and as a rule it's preferable that the visibility is kept as low as possible;
 * variables should rather be defined the closest possible the usage; we don't follow the old way of top-variables-definition-block as it's hard to see the aim of a variable;
 * ADTs (Abstract Data Types) are used everywhere to make compiler preventing accidental mixing up different domain values; only in very exceptional cases that can be lifted;
+* technical names are rather discouraged in naming as domain and business language; an obvious exception here is more abstract utility defs/classes/objects etc.;
+* packages' names if possible should also carry business info rather than technicalities;
+* it's preferred to use simple names of classes/objects/traits and introduce namespacing through packages over putting context info into compilation unit names; e.g. it's fine to repeat _'Endpoint'_ as a class name of all the endpoints as each endpoint should live in its own package;
 * `implicit`s and Context Bound should/may be used extensively but wisely;
 * `show` String Interpolator should be the first choice over the `s` and `toString`; 
 * obviously the rules above can be always lifted if favour of readability;
 * code should be formatted with the rules defined in the `.scalafmt.conf` file;
 * once code readability issue is found, it should be either fix straight away or an issue should be created.
+* jsonLD should be used instead of jsonLd or jsonld
 
 #### Releasing
 
-The standard release process is done manually.
+The standard release process is done manually. There are multiple
+repositories taking part in the process. The
+[renku](https://github.com/SwissDataScienceCenter/renku) project
+contains helm charts for deploying to kubernetes and the acceptance
+tests. The
+[terraform-renku](https://github.com/SwissDataScienceCenter/terraform-renku)
+project contains deployment descriptions for all environments.
+
+**renku-graph project:**
+- create a branch off the `origin/release` branch, name it
+  `prep-<version>`
+- either cherry-pick from development to here or do a `git rebase
+  origin/development`
+- make a PR for this branch to be merged into origin/release
+  ([example](https://github.com/SwissDataScienceCenter/renku-graph/pull/1095))
+- list some points in the description for what has been changed
+- merge the PR and create a release on github
+  - release description: list the points again but organized in
+    Features, Bugfixes etc
+    ([example](https://github.com/SwissDataScienceCenter/renku-graph/releases/tag/2.19.0))
+  - the release notes are public, so don't list refactorings.
+  - this will trigger actions that:
+    - Runs acceptance tests
+    - creates a PR on the
+      [renku](https://github.com/SwissDataScienceCenter/renku) project
+      to change the version in the `requirements.yml`
+      ([example](https://github.com/SwissDataScienceCenter/renku/pull/2704))
+
+**renku project:**
+- amend the PR created by the bot with the following:
+  - create a new entry in `CHANGELOG.rst` 
+  - change the version in
+  [`helm-chart/renku/CHart.yaml`](https://github.com/SwissDataScienceCenter/renku/blob/master/helm-chart/renku/Chart.yaml)
+  - if there already exists a release PR from another project, apply
+    the changes directly to the existing PR (including changelog
+    entries) and close the obsolete PR from `renku-graph` afterwards.
+- merge the PR when satisfiled
+- create a new release in the renku project.
+  ([example](https://github.com/SwissDataScienceCenter/renku/releases/tag/0.17.2))
+- then it will publish new renku helm chart and create all relevant
+  PRs in the
+  [terraform-renku](https://github.com/SwissDataScienceCenter/terraform-renku)
+  repo which will contain changes to the deployment
+  - Examples:
+    - https://github.com/SwissDataScienceCenter/terraform-renku/pull/858
+    - https://github.com/SwissDataScienceCenter/terraform-renku/pull/857
+
+**terraform-renku:**
+- these PRs are merged by the YAT team which will release to prod
+
+**Cleanup (renku-graph):**
+- merge the `release` branch back into `development`
+- push directly to the `development` branch
+
 
 #### Hotfixes
 
@@ -75,48 +132,65 @@ This section describes the flow of events starting from a commit on GitLab until
 store. The solid lines represent an event being sent and the dotted lines represent non-event-like data (request or
 response).
 
-#### Project creation flow and new commit flow
+#### Opting in a Project into KG
 
-When a project is created on GitLab or a new commit is pushed to GitLab the following flow is triggered:
-A `MinimalCommitSyncEvent` is created if a new project is created and a `FullCommitSyncEvent` is created when a new
-commit is pushed.
+The assumption is that the Project already exists in GitLab.
+
+```mermaid
+sequenceDiagram
+    participant UI
+    participant WebhookService
+    participant GitLab
+    participant TokenRepository
+    participant EventLog
+    
+    UI ->> WebhookService: POST /projects/:id/webhooks
+    activate WebhookService
+    WebhookService ->> GitLab: Create a KG webhook     
+    WebhookService ->> TokenRepository: PUT /projects/:id/tokens
+    WebhookService ->> EventLog: sends COMMIT_SYNC_REQUEST
+    WebhookService ->> UI: 200/201
+    deactivate WebhookService
+```
+
+#### A new commit flow
+
+The assumption is that there's Renku Webhook for a Project created and GitLab sends a Push Event for the project.
 
 ```mermaid
 sequenceDiagram
     participant GitLab
     participant WebhookService
     participant EventLog
-    participant CommmitEventService
-    participant TriplesGenerator
-    participant TriplesStore
-    GitLab ->>WebhookService: WebhookEvent
-    WebhookService ->>EventLog: CommitSyncRequest 
-    loop Continuously pulling
-    EventLog -->>EventLog: find latest event 
-    end
-    EventLog ->>CommmitEventService: MinimalCommitSyncEvent or FullCommitSyncEvent
-    Note over CommmitEventService, GitLab: this process will be repeated for each commit that is not yet in EventLog or if a commit in EventLog should be removed
-    loop Until the commit from gitlab is already in the EventLog
-    CommmitEventService -->>GitLab: get commit
-    GitLab ->>CommmitEventService: CommitInfo
-    CommmitEventService ->>EventLog: NewCommitEvent or AwaitingDeletion
-    end
-    loop Continuously pulling
-    EventLog -->>EventLog: find AwaitingGenerationEvent
-    end
-    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
-    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
-    loop Continuously pulling
-    EventLog -->>EventLog: find TriplesGeneratedEvent
-    end
-    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
-    TriplesGenerator -->>TriplesStore: JsonLD
-    TriplesGenerator ->>EventLog: TriplesStoreEvent
+    
+    GitLab ->> WebhookService: POST /webhooks/events
+    WebhookService ->> EventLog: sends COMMIT_SYNC_REQUEST 
+```
+
+#### Commit Sync flow
+
+This flow traverses the commit history for a Project in GitLab until it finds a commit EventLog knows about.
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant CommitEventService
+    participant CommitEventService
+    participant GitLab
+
+    EventLog ->> CommitEventService: sends COMMIT_SYNC 
+    activate CommitEventService
+    CommitEventService ->> TokenRepository: fetches access token
+    CommitEventService ->> GitLab: finds commits which are not in EventLog
+    CommitEventService ->> EventLog: sends CREATION for all commits that are not in EventLog
+    CommitEventService ->> EventLog: sends EVENTS_STATUS_CHANGE (to: AWAITING_DELETION) for all commits that are in EventLog but not in GitLab
+    CommitEventService ->> EventLog: sends GLOBAL_COMMIT_SYNC_REQUEST if at least one AWAITING_DELETION or CREATION was found 
+    deactivate CommitEventService
 ```
 
 #### Global Commit Sync flow:
 
-This flow traverses the whole commit history of a project and find out:
+This flow traverses the whole commit history of a Project and find out:
 
 1. if there are commits on GitLab that need to be created on the `Eventlog`
 2. if there are commits that are not on GitLab that should be removed from the `EventLog`
@@ -128,32 +202,168 @@ the `EventLog`.
 
 ```mermaid
 sequenceDiagram
-    participant GitLab
     participant EventLog
     participant CommmitEventService
-    participant TriplesGenerator
-    participant TriplesStore
-    Note over CommmitEventService, EventLog: The scheduling time depends on the usage of the project
-    loop Every hour or week
-    EventLog ->>CommmitEventService: GlobalCommitSyncEvent
-    CommmitEventService -->>EventLog: get all commits
-    EventLog -->>CommmitEventService: return all commits
-    CommmitEventService -->>GitLab: get all commits
-    GitLab -->>CommmitEventService: return all commits
-    CommmitEventService ->>EventLog: AwaitingDeletionEvent or NewCommitEvent
+    participant CommitEventService
+    participant GitLab
+
+    EventLog ->> CommmitEventService: GLOBAL_COMMIT_SYNC
+    activate CommitEventService
+    CommitEventService ->> GitLab: finds out the last commit ID and the total number of commits
+    loop if the last commit ID or the total number of commits do not match with EventLog state find all the differences
+    CommitEventService ->> TokenRepository: fetches access token
+    CommitEventService ->> GitLab: get all commits
+    CommitEventService ->> EventLog: get all commits
+    CommitEventService ->> EventLog: sends CREATION for all commits that are not in EventLog
+    CommitEventService ->> EventLog: sends EVENTS_STATUS_CHANGE (to: AWAITING_DELETION) for all commits that are in EventLog but not in GitLab
     end
-    loop Continuously pulling
-    EventLog -->>EventLog: find AwaitingGenerationEvent
-    end
-    EventLog ->>TriplesGenerator: AwaitingGenerationEvent
-    TriplesGenerator ->>EventLog: TriplesGeneratedEvent
-    loop Continuously pulling
-    EventLog -->>EventLog: find TriplesGeneratedEvent
-    end
-    EventLog ->>TriplesGenerator: TriplesGeneratedEvent
-    TriplesGenerator -->>TriplesStore: JsonLD
-    TriplesGenerator ->>EventLog: TriplesStoreEvent
+    deactivate CommitEventService
 ```
+
+#### Project provisioning flow
+
+The assumption is the latest Commit Event for a Project in EventLog is in status 'NEW'
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant TriplesGenerator
+    participant TokenRepository
+    participant GitLab
+    participant CLI
+    participant TriplesStore
+
+    EventLog ->> TriplesGenerator: sends AWAITING_GENERATION
+    activate TriplesGenerator
+    TriplesGenerator ->> TokenRepository: fetches access token
+    TriplesGenerator ->> GitLab: clones the project
+    TriplesGenerator ->> CLI: renku migrate
+    TriplesGenerator ->> CLI: renku graph export
+    TriplesGenerator ->> EventLog: sends EVENTS_STATUS_CHANGE (to: TRIPLES_GENERATED) with the graph as payload
+    deactivate TriplesGenerator
+    
+    EventLog ->> TriplesGenerator: sends TRIPLES_GENERATED
+    activate TriplesGenerator
+    TriplesGenerator ->> TokenRepository: fetches access token
+    TriplesGenerator ->> GitLab: calls several APIs in the Transformation process
+    TriplesGenerator ->> TriplesStore: execute update queries and uploads project metadata
+    TriplesGenerator ->> EventLog: sends EVENTS_STATUS_CHANGE (to: TRIPLES_STORE)
+    deactivate TriplesGenerator    
+```
+
+#### Commit deletion flow
+
+The assumption is that there was a `git reset hard` or `git rebase` done on the Project
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant TriplesGenerator
+    participant TokenRepository
+    participant GitLab
+    participant TriplesStore
+
+    EventLog ->> TriplesGenerator: sends CLEAN_UP_REQUEST
+    activate TriplesGenerator
+    TriplesGenerator ->> TokenRepository: fetches access token
+    TriplesGenerator ->> TriplesStore: remove the data of a Project
+    TriplesGenerator ->> EventLog: sends EVENTS_STATUS_CHANGE (to: NEW) of all the event of a single Project
+    deactivate TriplesGenerator
+    
+    activate EventLog
+    EventLog ->> EventLog: remove all events in status AWAITING_DELETION and DELETING
+    loop if there are no events left for the Project
+    EventLog ->> EventLog: remove the Project 
+    EventLog ->> TokenRepository: remove the Project token
+    EventLog ->> GitLab: remove the Project WebHook
+    end
+    EventLog ->> EventLog: change status of all Project events to NEW
+    EventLog ->> TriplesGenerator: sends AWAITING_GENERATION
+    deactivate EventLog    
+```
+
+#### The ADD_MIN_PROJECT_INFO event
+
+The assumption is that there's no Commit Event in TRIPLES_STORE status for a Project
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant TriplesGenerator
+    participant TokenRepository
+    participant GitLab
+    participant TriplesStore
+
+    EventLog ->> TriplesGenerator: sends ADD_MIN_PROJECT_INFO
+    activate TriplesGenerator
+    TriplesGenerator ->> TokenRepository: fetches access token
+    TriplesGenerator ->> GitLab: calls several APIs in the Transformation process
+    TriplesGenerator ->> TriplesStore: execute update queries and uploads project metadata
+    TriplesGenerator ->> EventLog: sends EVENTS_STATUS_CHANGE (to: TRIPLES_STORE)
+    deactivate TriplesGenerator    
+```
+
+#### The MEMBER_SYNC event
+
+This event is sent periodically to sync authorization data between GitLab and Triples Store
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant TriplesGenerator
+    participant TokenRepository
+    participant GitLab
+    participant TriplesStore
+
+    EventLog ->> TriplesGenerator: sends MEMBER_SYNC
+    activate TriplesGenerator
+    TriplesGenerator ->> TokenRepository: fetches access token
+    TriplesGenerator ->> GitLab: calls the Project users and Project members APIs
+    TriplesGenerator ->> TriplesStore: project members
+    deactivate TriplesGenerator    
+```
+
+#### The PROJECT_SYNC event
+
+This event is sent periodically to sync Project data between GitLab, EventLog and Triples Store
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant CommitEventService
+    participant TriplesGenerator
+    participant TokenRepository
+    participant GitLab
+
+    EventLog ->> EventLog: sends PROJECT_SYNC
+    activate EventLog
+    EventLog ->> TokenRepository: fetches access token
+    EventLog ->> GitLab: calls the Project Details
+    loop if there project path is NOT the same in EventLog and GitLab
+    EventLog ->> CommitEventService: sends COMMIT_SYNC for the new path
+    EventLog ->> TriplesGenerator: sends CLEAN_UP_REQUEST for the old path
+    end
+    deactivate EventLog    
+```
+
+#### The ZOMBIE_CHASING event
+
+This event category detects Commit Events that got stale. 
+
+```mermaid
+sequenceDiagram
+    participant EventLog
+    participant TriplesGenerator
+
+    loop finds out events that are marked as under processing but the process was interrupted
+    activate EventLog    
+    EventLog ->> TriplesGenerator: verifies if instance with given URL and identifier exist
+    EventLog ->> EventLog: sends ZOMBIE_CHASING
+    deactivate EventLog   
+    EventLog ->> EventLog: sends EVENTS_STATUS_CHANGE (to: NEW | TRIPLES_GENERATED)
+    end 
+```
+
 ##### The removal (re-provisioning) of a project
 
 Once an event is marked as AwaitingDeletion it is automatically picked up by our process and a CleanUp event is created. 

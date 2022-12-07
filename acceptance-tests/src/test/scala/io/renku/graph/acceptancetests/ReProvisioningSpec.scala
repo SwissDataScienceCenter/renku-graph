@@ -26,22 +26,22 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceClient}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{SchemaVersion, testentities}
+import io.renku.graph.model.{GraphClass, SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
-import org.scalatest.GivenWhenThen
 import org.scalatest.enablers.Retrying
-import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.time.{Minutes, Seconds, Span}
 
 import java.nio.file.{Files, Paths}
 
-class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning with TSData {
+class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("ReProvisioning") {
 
@@ -55,10 +55,11 @@ class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
       val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
-      `GET <gitlabApi>/user returning OK`(user)
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
@@ -96,12 +97,12 @@ class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
   private object TestData {
 
     val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
+    val accessToken: AccessToken = user.accessToken
     val initialProjectSchemaVersion = SchemaVersion("8")
 
     val testEntitiesProject = renkuProjectEntities(visibilityPublic)
       .map(_.copy(version = initialProjectSchemaVersion))
-      .withActivities(activityEntities(planEntities()))
+      .withActivities(activityEntities(stepPlanEntities()))
       .generateOne
       .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }

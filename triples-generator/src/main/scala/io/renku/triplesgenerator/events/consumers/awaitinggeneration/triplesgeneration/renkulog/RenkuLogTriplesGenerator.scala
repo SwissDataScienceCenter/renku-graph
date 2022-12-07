@@ -124,7 +124,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
         )
         .flatten
         .fold(_.raiseError[F, Either[ProcessingRecoverableError, JsonLD]],
-              _.asRight[ProcessingRecoverableError].pure[F]
+              _.asRight[ProcessingRecoverableError].pure[F].widen
         )
     }
 

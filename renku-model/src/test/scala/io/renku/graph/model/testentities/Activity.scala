@@ -39,7 +39,7 @@ final case class Activity(id:                  Id,
 ) {
 
   val association: Association          = associationFactory(this)
-  val plan:        Plan                 = association.plan
+  val plan:        StepPlan             = association.plan
   val usages:      List[Usage]          = usageFactories.map(_.apply(this))
   val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
   val generations: List[Generation]     = generationFactories.map(_.apply(this))
@@ -58,6 +58,10 @@ final case class Activity(id:                  Id,
 
   def findGenerationChecksum(location: Location): Option[Checksum] =
     findGenerationEntity(location).map(_.checksum)
+
+  def replaceStartTime(startTime: StartTime) = copy(startTime = startTime)
+
+  def modify(f: Activity => Activity) = f(this)
 }
 
 object Activity {
@@ -99,8 +103,11 @@ object Activity {
       activity.parameters.map(_.to[entities.ParameterValue])
     )
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance(activity => activity.to[entities.Activity].asJsonLD)
+  implicit def encoder(implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
+  ): JsonLDEncoder[Activity] = JsonLDEncoder.instance(_.to[entities.Activity].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance(entity => EntityId of renkuUrl / "activities" / entity.id)

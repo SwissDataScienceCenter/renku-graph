@@ -47,6 +47,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer.toCommitEvent
+  import eventProcessor._
   import tsReadinessChecker.verifyTSReady
 
   override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
@@ -55,14 +56,14 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessingEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
+  private def startProcessingEvent(requestContent: EventRequestContent, processing: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
                    case _                                                   => EitherT.leftT(BadRequest)
                  }
     event <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
     result <- Concurrent[F]
-                .start(eventProcessor.process(event).recoverWith(errorLogging(event)) >> deferred.complete(()))
+                .start((process(event) recoverWith logError(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))

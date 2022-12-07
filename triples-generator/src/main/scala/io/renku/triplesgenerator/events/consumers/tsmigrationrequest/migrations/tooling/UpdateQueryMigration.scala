@@ -23,8 +23,8 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class UpdateQueryMigration[F[_]: MonadThrow](
@@ -48,7 +48,6 @@ private[migrations] object UpdateQueryMigration {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       name:        Migration.Name,
       updateQuery: SparqlQuery
-  ): F[UpdateQueryMigration[F]] = for {
-    queryRunner <- UpdateQueryRunner[F]
-  } yield new UpdateQueryMigration[F](name, updateQuery, queryRunner)
+  ): F[UpdateQueryMigration[F]] =
+    UpdateQueryRunner[F].map(new UpdateQueryMigration[F](name, updateQuery, _))
 }

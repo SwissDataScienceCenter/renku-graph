@@ -23,18 +23,18 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers._
 import eventdelivery._
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 import projectsync.EventEncoder.encodeEvent
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[SubscriptionCategory[F]] = for {
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventFinder      <- EventFinder(queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
+    eventFinder      <- EventFinder[F]
+    dispatchRecovery <- DispatchRecovery[F]
     eventDelivery    <- EventDelivery.noOp[F, ProjectSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,

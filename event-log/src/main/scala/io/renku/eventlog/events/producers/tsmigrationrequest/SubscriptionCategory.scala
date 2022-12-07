@@ -24,29 +24,27 @@ import cats.syntax.all._
 import eventdelivery.EventDelivery
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.SubscriptionCategory[F]] =
-    SubscriberTracker[F](queriesExecTimes) flatMap { implicit subscriberTracker =>
-      for {
-        subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
-        eventFinder      <- EventFinder[F](queriesExecTimes)
-        dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
-        eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
-        distributor <- EventsDistributor[F, MigrationRequestEvent](
-                         categoryName,
-                         subscribers,
-                         eventFinder,
-                         eventDelivery,
-                         EventEncoder(MigrationRequestEvent.encodeEvent),
-                         dispatchRecovery
-                       )
-        deserializer <- SubscriptionPayloadDeserializer[F]
-      } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
-    }
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[producers.SubscriptionCategory[F]] = for {
+    implicit0(st: SubscriberTracker[F]) <- SubscriberTracker[F]
+    subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
+    eventFinder      <- EventFinder[F]
+    dispatchRecovery <- DispatchRecovery[F]
+    eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
+    distributor <- EventsDistributor[F, MigrationRequestEvent](
+                     categoryName,
+                     subscribers,
+                     eventFinder,
+                     eventDelivery,
+                     EventEncoder(MigrationRequestEvent.encodeEvent),
+                     dispatchRecovery
+                   )
+    deserializer <- SubscriptionPayloadDeserializer[F]
+  } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
 }

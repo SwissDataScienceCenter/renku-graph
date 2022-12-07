@@ -24,22 +24,20 @@ import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToAwaitingDeletion
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.events.{EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
 
-private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, ToAwaitingDeletion] {
 
   override def updateDB(event: ToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {

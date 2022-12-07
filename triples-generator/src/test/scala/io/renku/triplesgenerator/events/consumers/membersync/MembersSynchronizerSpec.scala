@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.membersync
 
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{accessTokens, sparqlQueries}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -41,65 +41,31 @@ import scala.util.Try
 class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "synchronizeMembers" should {
-    "pulls members from Gitlab & KG" +
-      "AND applies diff in triplestore" in new TestCase {
 
-        val gitLabMemberMissingInKG = gitLabProjectMembers.generateOne
-        val gitLabMemberAlsoInKG    = gitLabProjectMembers.generateOne
-        val kgMemberAlsoInGitLab    = kgProjectMembers.generateOne.copy(gitLabId = gitLabMemberAlsoInKG.gitLabId)
-        val kgMemberMissingInGitLab = kgProjectMembers.generateOne
+    "pulls members from GitLab and sync the members in the TS" in new TestCase {
 
-        val membersInGitLab = Set(gitLabMemberMissingInKG, gitLabMemberAlsoInKG)
-        val membersInKG     = Set(kgMemberAlsoInGitLab, kgMemberMissingInGitLab)
+      val membersInGitLab = gitLabProjectMembers.generateSet()
 
-        val maybeAccessToken = accessTokens.generateOption
-        (accessTokenFinder
-          .findAccessToken(_: Path)(_: Path => String))
-          .expects(projectPath, projectPathToPath)
-          .returning(maybeAccessToken.pure[Try])
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
 
-        (gitLabProjectMembersFinder
-          .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
-          .returning(membersInGitLab.pure[Try])
+      (gitLabProjectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(membersInGitLab.pure[Try])
 
-        (kGProjectMembersFinder
-          .findProjectMembers(_: projects.Path))
-          .expects(projectPath)
-          .returning(membersInKG.pure[Try])
+      val syncSummary = syncSummaries.generateOne
+      (kgSynchronizer.syncMembers _)
+        .expects(projectPath, membersInGitLab)
+        .returning(syncSummary.pure[Try])
 
-        val missingMembersWithIds = Set(gitLabMemberMissingInKG -> personResourceIds.generateOption)
-        (kGPersonFinder
-          .findPersonIds(_: Set[GitLabProjectMember]))
-          .expects(Set(gitLabMemberMissingInKG))
-          .returning(missingMembersWithIds.pure[Try])
+      synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
-        val insertionQueries = sparqlQueries.generateNonEmptyList().toList
-        (updatesCreator.insertion _)
-          .expects(projectPath, missingMembersWithIds)
-          .returning(insertionQueries)
-
-        val removalQueries  = sparqlQueries.generateNonEmptyList().toList
-        val membersToRemove = Set(kgMemberMissingInGitLab)
-        (updatesCreator.removal _)
-          .expects(projectPath, membersToRemove)
-          .returning(removalQueries)
-
-        (removalQueries ::: insertionQueries).foreach { query =>
-          (querySender.send _)
-            .expects(query)
-            .returning(().pure[Try])
-        }
-
-        synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
-
-        logger.loggedOnly(
-          Info(
-            s"$categoryName: Members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
-              s"${missingMembersWithIds.size} member(s) added, ${membersToRemove.size} member(s) removed"
-          )
-        )
-      }
+      logger.loggedOnly(infoMessage(syncSummary))
+    }
 
     "recover with log statement if collaborator fails" in new TestCase {
 
@@ -130,19 +96,14 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
     implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
-    val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
-    val kGPersonFinder             = mock[KGPersonFinder[Try]]
-    val updatesCreator             = mock[UpdatesCreator]
-    val querySender                = mock[QuerySender[Try]]
+    val kgSynchronizer             = mock[KGSynchronizer[Try]]
     val executionTimeRecorder      = TestExecutionTimeRecorder[Try](maybeHistogram = None)
+    val synchronizer =
+      new MembersSynchronizerImpl[Try](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
 
-    val synchronizer = new MembersSynchronizerImpl[Try](
-      gitLabProjectMembersFinder,
-      kGProjectMembersFinder,
-      kGPersonFinder,
-      updatesCreator,
-      querySender,
-      executionTimeRecorder
+    def infoMessage(syncSummary: SyncSummary) = Info(
+      s"$categoryName: members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
+        s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
     )
   }
 }

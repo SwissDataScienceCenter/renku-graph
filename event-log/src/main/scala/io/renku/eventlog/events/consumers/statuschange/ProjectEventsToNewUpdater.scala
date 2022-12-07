@@ -29,13 +29,12 @@ import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projectCleaner.ProjectCleaner
 import io.renku.eventlog.events.producers.minprojectinfo
-import io.renku.eventlog.{EventDate, ExecutionDate}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
+import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
@@ -47,18 +46,16 @@ import scala.util.control.NonFatal
 private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 private object ProjectEventsToNewUpdater {
-  def apply[F[_]: Async: AccessTokenFinder: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
-    new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
-  )
+  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes]: F[DBUpdater[F, ProjectEventsToNew]] =
+    ProjectCleaner[F].map(
+      new ProjectEventsToNewUpdaterImpl(_)
+    )
 }
 
-private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
-    projectCleaner:   ProjectCleaner[F],
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutionTimes](
+    projectCleaner: ProjectCleaner[F],
+    now:            () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectEventsToNewUpdater[F] {
 
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = {

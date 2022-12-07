@@ -20,5 +20,5 @@ name := "triples-generator"
 
 Test / fork := true
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.5"
 libraryDependencies += "com.lihaoyi"   %% "ammonite-ops"    % "2.4.1"

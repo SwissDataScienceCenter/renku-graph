@@ -3,28 +3,33 @@
 This is a microservice which provides API for the Graph DB.
 
 ## API
-The following routes may be slightly different when accessed via the main renku api, which uses the gateway service (e.g. /api/kg/datasets)
 
-| Method | Path                                                                     | Description                                                          |
-|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
-| GET    | ```/api/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
-| GET    | ```/api/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
-| GET    | ```/api/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
-| GET    | ```/api/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
-| POST   | ```/api/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
-| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
-| GET    | ```/ping```                                                              | To check if service is healthy                                       |
-| GET    | ```/version```                                                           | Returns info about service version                                   |
+The following routes may be slightly different when accessed via the main Renku API, which uses the gateway service (e.g. /api/kg/datasets)
 
-#### GET /api/knowledge-graph/datasets
+| Method | Path                                                                     | Description                                                                          |
+|--------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                                   |
+| GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
+| GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
+| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                                      |
+| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                                               |
+| GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
+| GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
+| GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                                          |
+| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                                            |
+| GET    | ```/ping```                                                              | To check if service is healthy                                                       |
+| GET    | ```/version```                                                           | Returns info about service version                                                   |
+
+#### GET /knowledge-graph/datasets
 
 Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
 
-NOTES:
+**NOTES:**
 
 * the `query` query parameter has to be url-encoded and it cannot be blank.
 * the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`,
@@ -33,13 +38,13 @@ NOTES:
 * the `per_page` query parameter is optional and defaults to `20`.
 
 **Response**
-****
 
-| Status                     | Description                                                                                    |
-|----------------------------|------------------------------------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
-| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                      |
+| Status                       | Description                                                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                              |
+| BAD_REQUEST (400)            | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                   |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                      |
 
 Response headers:
 
@@ -56,18 +61,18 @@ Response headers:
 Link response header example:
 
 Assuming the total is `30` and the
-URL `https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
+URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
 
 ```
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
 
-```
+```json
 [
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
@@ -133,23 +138,24 @@ Response body example:
       ],
       "_links":[  
          {  
-            "rel":"details",
-            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+            "rel":  "details",
+            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
          }
       ]
    }
 ]
 ```
 
-#### GET /api/knowledge-graph/entities
+#### GET /knowledge-graph/entities
 
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
-Filtering:
+**Filtering:**
 * `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
 * `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
+* `namespace`  - to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. `group/subgroup` 
 * `since`      - to filter by entity's creation date to >= the given date
 * `until`      - to filter by entity's creation date to <= the given date
 
@@ -162,7 +168,7 @@ When the `query` parameter is given, the match is done on the following fields:
 * keyword
 * description
 
-Sorting:
+**Sorting:**
 * `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
 * `date` - to sort by entity creation date
@@ -175,11 +181,12 @@ Sorting:
 
 **Response**
 
-| Status                     | Description                                    |
-|----------------------------|------------------------------------------------|
-| OK (200)                   | If results are found; `[]` if nothing is found |
-| BAD_REQUEST (400)          | If illegal values for query parameters are given |
-| INTERNAL SERVER ERROR (500)| Otherwise                                      |
+| Status                       | Description                                      |
+|------------------------------|--------------------------------------------------|
+| OK (200)                     | If results are found; `[]` if nothing is found   |
+| BAD_REQUEST (400)            | If illegal values for query parameters are given |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated     |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                        |
 
 Response headers:
 
@@ -193,13 +200,13 @@ Response headers:
 | `Prev-Page`   | The index of the previous page (optional)                                             |
 | `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
-Assuming the total is `30` and the URL is `https://renku/api/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
+Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
 
 ```
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
@@ -207,41 +214,42 @@ Response body example:
 ```json
 [
   {
-    "type": "project",
+    "type":          "project",
     "matchingScore": 1.0055376,
-    "name": "name",
-    "path": "group/subgroup/name",
-    "namespace": "group/subgroup",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z",
-    "creator": "Jan Kowalski",
-    "keywords": [
-      "keyword1",
-      "keyword2"
+    "name":          "name",
+    "path":          "group/subgroup/name",
+    "namespace":     "group/subgroup",
+    "namespaces": [
+      {
+        rel:       "group",
+        namespace: "group"
+      },
+      {
+        rel:       "subgroup",
+        namespace: "group/subgroup"
+      }
     ],
-    "description": "desc",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z",
+    "creator":       "Jan Kowalski",
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
     "_links": [
       {
-        "rel": "details",
+        "rel":  "details",
         "href": "http://t:5511/projects/group/subgroup/name"
       }
     ]
   },
   {
-    "type": "dataset",
+    "type":          "dataset",
     "matchingScore": 3.364836,
-    "name": "name",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
-    "creators": [
-      "Jan Kowalski",
-      "Zoe"
-    ],
-    "keywords": [
-      "keyword1",
-      "keyword2"
-    ],
-    "description": "desc",
+    "name":          "name",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "creators":      [ "Jan Kowalski", "Zoe" ],
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
     "images": [
       {
         "location": "image.png",
@@ -255,130 +263,140 @@ Response body example:
     ],
     "_links": [
       {
-        "rel": "details",
+        "rel":  "details",
         "href": "http://t:5511/datasets/122334344"
       }
     ]
   },
   {
-    "type": "workflow",
+    "type":          "workflow",
     "matchingScore": 5.364836,
-    "name": "name",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z",
-    "keywords": [
-      "keyword1",
-      "keyword2"
-    ],
-    "description": "desc",
-    "_links": []
+    "name":          "name",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z",
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
+    "_links":        []
   },
   {
-    "type": "person",
+    "type":          "person",
     "matchingScore": 4.364836,
-    "name": "name",
-    "_links": []
+    "name":          "name",
+    "_links":        []
   }
 ]
 ```
 
-#### GET /api/knowledge-graph/datasets/:id
+#### GET /knowledge-graph/datasets/:id
 
 Finds details of the dataset with the given `id`.
 
 **Response**
 
-| Status                     | Description                                                                                       |
-|----------------------------|---------------------------------------------------------------------------------------------------|
-| OK (200)                   | If dataset details are found                                                                      |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                      |
-| NOT_FOUND (404)            | If dataset is not found or user is not authorised to access project where this dataset belongs to |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                         |
+| Status                       | Description                                                                                       |
+|------------------------------|---------------------------------------------------------------------------------------------------|
+| OK (200)                     | If dataset details are found                                                                      |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                      |
+| NOT_FOUND (404)              | If dataset is not found or user is not authorised to access project where this dataset belongs to |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                         |
 
 Response body example:
 
-```
+```json
 {
-  "_links" : [
+  "_links": [
     {
-      "rel" : "self",
-      "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+      "rel":  "self",
+      "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
     },
     {
-      "rel" : "initial-version",
-      "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+      "rel":  "initial-version",
+      "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "rel":  "tags",
+      "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
     }
   ],
-  "identifier" : "22222222-2222-2222-2222-222222222222",
-  "versions" : {
+  "identifier": "22222222-2222-2222-2222-222222222222",
+  "versions": {
     "initial": "11111111-1111-1111-1111-111111111111"
   },
-  "title" : "dataset title",
-  "name" : "dataset alternate name",
-  "url" : "http://host/url1",                     // optional property
-  "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
-  "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
-  "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-  "published" : {
-    "datePublished" : "2012-10-14",               // optional property
-    "creator" : [
+  "tags": {                                      // optional
+    "initial": {
+      "name":        "1.0.1",
+      "description": "some tag"                  //optional
+    }
+  },
+  "title":       "dataset title",
+  "name":        "dataset-name",
+  "url":         "http://host/url1",             // optional property
+  "sameAs":      "http://host/url2",             // optional property when no "derivedFrom" exists
+  "derivedFrom": "http://host/url1",             // optional property when no "sameAs" exists
+  "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+  "published": {
+    "datePublished": "2012-10-14",               // optional property
+    "creator": [
       {
-        "name" : "e wmtnxmcguz"
-        "affiliation" : "SDSC"                    // optional property
+        "name":        "e wmtnxmcguz",
+        "affiliation": "SDSC"                    // optional property
       },
       {
-        "name" : "iilmadw vcxabmh",
-        "email" : "ticUnrW@cBmrdomoa"             // optional property
+        "name":  "iilmadw vcxabmh",
+        "email": "ticUnrW@cBmrdomoa"             // optional property
       }
     ]
   },
-  "created" : "2012-10-15T03:02:25.639Z",         // optional property
-  "hasPart" : [
+  "created": "2012-10-15T03:02:25.639Z",         // optional property
+  "hasPart": [
     {
-      "atLocation" : "data/dataset-name/file1"
+      "atLocation": "data/dataset-name/file1"
     },
     {
-      "atLocation" : "data/dataset-name/file2"
+      "atLocation": "data/dataset-name/file2"
     }
   ],
   "project":  {
-    "_links" : [
+    "_links": [
       {
-        "rel" : "project-details",
-        "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        "rel":  "project-details",
+        "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
       }
     ],
-    "path" : "namespace1/project1-name",
-    "name" : "project1 name"
+    "path": "namespace1/project1-name",
+    "name": "project1 name",
+    "visibility": "public"
   },
-  "usedIn" : [
+  "usedIn": [
     {
-      "_links" : [
+      "_links": [
         {
-          "rel" : "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
         }
       ],
-      "path" : "namespace1/project1-name",
-      "name" : "project1 name"
+      "path": "namespace1/project1-name",
+      "name": "project1 name",
+      "visibility": "public"
     },
     {
-      "_links" : [
+      "_links": [
         {
-          "rel" : "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace2/project2-name"
         }
       ],
-      "path" : "namespace2/project2-name",
-      "name" : "project2 name"
+      "path": "namespace2/project2-name",
+      "name": "project2 name",
+      "visibility": "public"
     }
   ],
   "keywords": [ "rldzpwo", "gfioui" ],
   "images": [
     {
       "location": "image.png",
-      "_links":[  
-         {  
+      "_links":[
+         {
             "rel":  "view",
             "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
          }
@@ -386,8 +404,8 @@ Response body example:
     },
     {
       "location": "http://host/external-image.png",
-      "_links":[  
-         {  
+      "_links":[
+         {
             "rel":  "view",
             "href": "http://host/external-image.png"
          }
@@ -397,34 +415,34 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/graphql
+#### GET /knowledge-graph/graphql
 
 Returns Knowledge Graph GraphQL endpoint schema.
 
 **Response**
 
-| Status                     | Description                    |
-|----------------------------|--------------------------------|
-| OK (200)                   | Schema of the GraphQL endpoint |
-| INTERNAL SERVER ERROR (500)| Otherwise                      |
+| Status                       | Description                    |
+|------------------------------|--------------------------------|
+| OK (200)                     | Schema of the GraphQL endpoint |
+| INTERNAL SERVER ERROR (500)  | Otherwise                      |
 
 **A curl command example**
 
 ```
-curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/api/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
+curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
 ```
 
-#### POST /api/knowledge-graph/graphql
+#### POST /knowledge-graph/graphql
 
 Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 **Response**
 
-| Status                     | Description                                  |
-|----------------------------|----------------------------------------------|
-| OK (200)                   | Body containing queried data                 |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated |
-| INTERNAL SERVER ERROR (500)| Otherwise                                    |
+| Status                       | Description                                  |
+|------------------------------|----------------------------------------------|
+| OK (200)                     | Body containing queried data                 |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                    |
 
 **Available queries**
 
@@ -432,7 +450,7 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 Query example:
 
-```
+```json
 {
   "query": "{ 
     lineage(projectPath: \"namespace/project\", filePath: \"zhbikes.parquet\") {
@@ -446,7 +464,7 @@ Query example:
 
 Response body example:
 
-```
+```json
 {
   "data": {
     "lineage": {
@@ -462,22 +480,22 @@ Response body example:
       ],
       "nodes": [
         {
-          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "id":       "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
           "location": "data/zhbikes",
-          "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
-          "type": "Directory"
+          "label":    "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
+          "type":     "Directory"
         },
         {
-          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "id":       "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
           "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
-          "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
-          "type": "ProcessRun"
+          "label":    "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
+          "type":     "ProcessRun"
         },
         {
-          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+          "id":       "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
           "location": "data/preprocessed/zhbikes.parquet",
-          "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "type": "File"
+          "label":    "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "type":     "File"
         }
       ]
     }
@@ -485,7 +503,68 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name
+#### GET /knowledge-graph/ontology
+
+Returns ontology used in the Knowledge Graph as HTML page or JSON-LD.
+
+The resource supports `text/html` and `application/ld+json` `Accept` headers.
+
+**Response**
+
+| Status                       | Description                           |
+|------------------------------|---------------------------------------|
+| OK (200)                     | If generating ontology was successful |
+| INTERNAL SERVER ERROR (500)  | Otherwise                             |
+
+Response body example for `Accept: application/ld+json`:
+
+```json
+[
+  {
+    "@id":   "https://swissdatasciencecenter.github.io/renku-ontology",
+    "@type": "http://www.w3.org/2002/07/owl#Ontology",
+    "http://www.w3.org/2002/07/owl#imports": [
+      {
+        "@id": "http://www.w3.org/ns/oa#"
+      }
+    ]
+  },
+  {
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf",
+    "@type": "http://www.w3.org/2002/07/owl#Class"
+  },
+  {
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/name",
+    "@type": "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain": [
+      {
+        "@id": "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+      }
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#range": [
+      {
+        "@id": "http://www.w3.org/2001/XMLSchema#string"
+      }
+    ]
+  },
+  {
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/number",
+    "@type": "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain": [
+      {
+        "@id": "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+      }
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#range": [
+      {
+        "@id": "http://www.w3.org/2001/XMLSchema#number"
+      }
+    ]
+  }
+]
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`. The endpoint requires an authorization token to be passed
 in the request for non-public projects. Supported headers are:
@@ -494,18 +573,20 @@ in the request for non-public projects. Supported headers are:
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
 - There's no need for a security headers for public projects
 
+The resource supports `application/json` and `application/ld+json` `Accept` headers.
+
 **Response**
 
-| Status                     | Description                                                                                            |
-|----------------------------|--------------------------------------------------------------------------------------------------------|
-| OK (200)                   | If project with the given `namespace/name` can be found                                                |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                           |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access the project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                              |
+| Status                       | Description                                                                                            |
+|------------------------------|--------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If project with the given `namespace/name` can be found                                                |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                           |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access the project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                              |
 
-Response body example:
+Response body example for `Accept: application/json`:
 
-```
+```json
 {
   "identifier":  123,
   "path":        "namespace/project-name", 
@@ -515,8 +596,9 @@ Response body example:
   "created": {
     "dateCreated": "2001-09-05T10:48:29.457Z",
     "creator": { // optional
-      "name":  "author name",
-      "email": "author@mail.org" // optional
+      "name":        "author name",
+      "email":       "author@mail.org", // optional
+      "affiliation": "SDSC" // optional
     }
   },
   "updatedAt":  "2001-10-06T10:48:29.457Z",
@@ -534,8 +616,9 @@ Response body example:
       "created": {
         "dateCreated": "2001-09-04T10:48:29.457Z",
         "creator": { // optional
-          "name":  "parent author name", 
-          "email": "parent.author@mail.org" // optional
+          "name":        "parent author name", 
+          "email":       "parent.author@mail.org", // optional
+          "affiliation": "SDSC" // optional
         }
       }
     }
@@ -560,63 +643,132 @@ Response body example:
   "version": "9",  // optional
   "_links":[  
     {  
-      "rel":"self",
+      "rel": "self",
       "href":"http://t:5511/projects/namespace/project-name"
     },
     {  
-      "rel":"datasets",
+      "rel": "datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
     }
   ]
 }
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name/datasets
+Response body example for `Accept: application/ld+json`:
+
+```json
+{
+  "@id": "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
+  "@type": [
+    "http://www.w3.org/ns/prov#Location",
+    "http://schema.org/Project"
+  ],
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectPath": {
+    "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  },
+  "http://schema.org/description": {
+    "@value": "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
+  },
+  "http://schema.org/dateModified": {
+    "@type":  "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value": "1990-07-16T21:51:12.949Z"
+  },
+  "http://schema.org/identifier": {
+    "@value": 402288
+  },
+  "http://schema.org/creator": {
+    "@id": "http://wwywiir:3577/yobqsDoboi/persons/69212174",
+    "@type": [
+      "http://www.w3.org/ns/prov#Person",
+      "http://schema.org/Person"
+    ],
+    "http://schema.org/email": {
+      "@value": "kpgj2u65iv@nezifs"
+    },
+    "http://schema.org/name": {
+      "@value": "flawal dolBA`ql"
+    }
+  },
+  "http://schema.org/schemaVersion": {
+    "@value": "42.31.9"
+  },
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectVisibility": {
+    "@value": "internal"
+  },
+  "http://schema.org/name": {
+    "@value": "__-6h3a"
+  },
+  "http://schema.org/dateCreated": {
+    "@type":  "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value": "2007-01-27T17:58:52.739Z"
+  },
+  "http://schema.org/keywords": [
+    {
+      "@value": "bNalprNSye"
+    },
+    {
+      "@value": "jffkdfe"
+    },
+    {
+      "@value": "qscrvP"
+    },
+    {
+      "@value": "ywnzgRbu"
+    }
+  ]
+}
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name/datasets
 
 Finds list of datasets of the project with the given `namespace/name`.
 
 **Response**
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| Status                       | Description                                                                                             |
+|------------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
 
 Response body example:
 
-```
+```json
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "versions" : {
+      "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title": "rmDaYfpehl",
-      "name": "mniouUnmal",
-      "sameAs": "http://host/url1",
-      "derivedFrom" : "http://host/url1",
+      "title":       "rmDaYfpehl",
+      "name":        "mniouUnmal",
+      "sameAs":      "http://host/url1",
+      "derivedFrom": "http://host/url1",
       "images": [],
       "_links": [  
-         {  
-            "rel": "details",
-            "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
-         },
-         {
-           "rel" : "initial-version",
-           "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
-         }
+        {  
+           "rel":  "details",
+           "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+        },
+        {
+          "rel":  "initial-version",
+          "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+        },
+        {
+          "rel":  "tags",
+          "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/mniouUnmal/tags"
+        }
       ]
    },
    {  
       "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
-      "versions" : {
+      "versions": {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name": "a",
-      "sameAs" : "http://host/url2",        // optional property when no "derivedFrom" exists
-      "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
+      "name":        "a",
+      "sameAs":      "http://host/url2",        // optional property when no "derivedFrom" exists
+      "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
           "location": "image.png",
@@ -638,29 +790,64 @@ Response body example:
         }
       ],
       "_links": [  
-         {  
-            "rel": "details",
-            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
-         },
-         {
-           "rel" : "initial-version",
-           "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
-         }
+        {  
+           "rel":  "details",
+           "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+        },
+        {
+          "rel":  "initial-version",
+          "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "rel":  "tags",
+          "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/a/tags"
+        }
       ]
    }
 ]
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name/files/:location/lineage
+#### GET /knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags
+
+Finds list of tags existing on the Dataset with the given `dsName` on the project with the given `namespace/name`.
+
+**Response**
+
+| Status                       | Description                                                                                   |
+|------------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                     | If tags are found or `[]` if nothing is found                                                 |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                     |
+
+Response body example:
+
+```json
+[
+  {
+    "name":        "name",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "description": "desc",
+    "_links": [
+      {
+        "rel": "dataset-details",
+        "href": "http://t:5511/knowledge-graph/datasets/1232444"
+      }
+    ]
+  }
+]
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
 Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| Status                       | Description                                                                                             |
+|------------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
 
 
 Response body example:
@@ -702,14 +889,91 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/spec.json
+#### GET /knowledge-graph/spec.json
 
 Returns OpenApi json spec 
 
-| Status                     | Description          |
-|----------------------------|----------------------|
-| OK (200)                   | If spec is found     |
-| INTERNAL SERVER ERROR (500)| Otherwise            |
+| Status                       | Description      |
+|------------------------------|------------------|
+| OK (200)                     | If spec is found |
+| INTERNAL SERVER ERROR (500)  | Otherwise        |
+
+#### GET /knowledge-graph/users/:id/projects
+
+Returns all projects of the user with the given GitLab id.
+
+**Filtering:**
+* `state`      - to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
+**Response**
+
+| Status                      | Description                                         |
+|-----------------------------|-----------------------------------------------------|
+| OK (200)                    | If results are found; `[]` if no projects are found |
+| BAD_REQUEST (400)           | If illegal values for query parameters are given    |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated        |
+| INTERNAL SERVER ERROR (500) | Otherwise                                           |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
+
+Response body example:
+
+```json
+[
+  {
+    "name":        "name",
+    "path":        "group/subgroup/name",
+    "visibility":  "public",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "creator":     "Jan Kowalski",
+    "description": "desc",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/projects/group/subgroup/name"
+      }
+    ]
+  },
+  {
+    "id":          123,
+    "name":        "name",
+    "path":        "group/subgroup/name",
+    "visibility":  "public",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "creator":     "Jan Kowalski",
+    "description": "desc",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "_links": [
+      {
+        "rel": "activation",
+        "href": "http://t:5511/projects/123/webhooks",
+        "method": "POST"
+      }
+    ]
+  }
+]
+```
 
 #### GET /metrics  (Internal use only)
 
@@ -717,10 +981,10 @@ Serves Prometheus metrics.
 
 **Response**
 
-| Status                     | Description          |
-|----------------------------|----------------------|
-| OK (200)                   | If metrics are found |
-| INTERNAL SERVER ERROR (500)| Otherwise            |
+| Status                       | Description          |
+|------------------------------|----------------------|
+| OK (200)                     | If metrics are found |
+| INTERNAL SERVER ERROR (500)  | Otherwise            |
 
 #### GET /ping (Internal use only)
 
@@ -728,10 +992,10 @@ Verifies service health.
 
 **Response**
 
-| Status                     | Description             |
-|----------------------------|-------------------------|
-| OK (200)                   | If service is healthy   |
-| INTERNAL SERVER ERROR (500)| Otherwise               |
+| Status                       | Description           |
+|------------------------------|-----------------------|
+| OK (200)                     | If service is healthy |
+| INTERNAL SERVER ERROR (500)  | Otherwise             |
 
 #### GET /version  (Internal use only)
 
@@ -739,10 +1003,10 @@ Returns info about service version
 
 **Response**
 
-| Status                     | Description            |
-|----------------------------|------------------------|
-| OK (200)                   | If version is returned |
-| INTERNAL SERVER ERROR (500)| Otherwise              |
+| Status                       | Description            |
+|------------------------------|------------------------|
+| OK (200)                     | If version is returned |
+| INTERNAL SERVER ERROR (500)  | Otherwise              |
 
 Response body example:
 

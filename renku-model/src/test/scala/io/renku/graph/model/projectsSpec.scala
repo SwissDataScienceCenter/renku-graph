@@ -19,7 +19,6 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -98,9 +97,18 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
   }
 
   "toNamespaces" should {
-    "extract all the path segment except the last" in {
+    "extract all the path segments except the last one" in {
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
         Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toNamespaces shouldBe namespaces.toList
+      }
+    }
+  }
+
+  "toNamespace" should {
+    "extract the namespace from the path" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
+        val namespaceAsString = namespaces.map(_.show).nonEmptyIntercalate("/")
+        Path(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
       }
     }
   }
@@ -110,7 +118,7 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> Gen.oneOf('_', '.', '-'))
     for {
       firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+      otherChars <- nonEmptyList(nonFirstCharGen, min = 5, max = 10)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
   }
 }

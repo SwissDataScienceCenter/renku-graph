@@ -24,10 +24,12 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.circe._
 import io.circe.syntax._
+import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.views._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
+import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
@@ -40,7 +42,7 @@ object datasets {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with UrlConstraint[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
       with AnyResourceRenderer[ResourceId]
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
@@ -98,7 +100,7 @@ object datasets {
   implicit object ImageResourceId
       extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
       with UrlConstraint[ImageResourceId]
-      with EntityIdJsonLdOps[ImageResourceId]
+      with EntityIdJsonLDOps[ImageResourceId]
 
   final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
   implicit object ImagePosition
@@ -117,14 +119,12 @@ object datasets {
     final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
       override type V = String
     }
-    implicit object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative]
+    object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative]
 
     final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
       override type V = String
     }
-    implicit object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute]
-
-    import io.renku.tinytypes.json.TinyTypeEncoders._
+    object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute]
 
     implicit lazy val encoder: Encoder[ImageUri] = Encoder.instance {
       case uri: Relative => Json.fromString(uri.value)
@@ -163,6 +163,11 @@ object datasets {
     implicit lazy val jsonLDDecoder: JsonLDDecoder[DerivedFrom] = JsonLDDecoder.entity(entityTypes) {
       _.downField(schema / "url").downEntityId.as[EntityId].map(DerivedFrom(_))
     }
+
+    val ontology: Type = Type.Def(
+      Class(schema / "URL"),
+      ObjectProperty(schema / "url", Dataset.ontologyClass)
+    )
   }
 
   final class TopmostDerivedFrom private[datasets] (val value: String) extends AnyVal with UrlTinyType
@@ -170,14 +175,11 @@ object datasets {
       extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
       with constraints.Url[TopmostDerivedFrom]
       with UrlResourceRenderer[TopmostDerivedFrom]
-      with EntityIdJsonLdOps[TopmostDerivedFrom] {
+      with EntityIdJsonLDOps[TopmostDerivedFrom] {
 
     final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
 
     final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
-
-    implicit lazy val topmostDerivedFromJsonLdEncoder: JsonLDEncoder[TopmostDerivedFrom] =
-      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
   }
 
   sealed trait SameAs extends Any with UrlTinyType {
@@ -223,16 +225,21 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
-    implicit lazy val jsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
       case sameAs @ InternalSameAs(_) => internalSameAsEncoder(sameAs)
       case sameAs @ ExternalSameAs(_) => externalSameAsEncoder(sameAs)
+    }
+
+    implicit def jsonLDEntityEncoder[S <: SameAs]: EntityIdEncoder[S] = EntityIdEncoder.instance {
+      case sameAs @ InternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
+      case sameAs @ ExternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
     }
 
     private val urlEntityTypes = EntityTypes of (schema / "URL")
 
     implicit lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"$sameAs/${sameAs.value.hashCode}",
+        sameAs.asEntityId,
         urlEntityTypes,
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
       )
@@ -244,7 +251,7 @@ object datasets {
 
     implicit lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"$sameAs/${sameAs.value.hashCode}",
+        sameAs.asEntityId,
         urlEntityTypes,
         schema / "url" -> sameAs.value.asJsonLD
       )
@@ -255,6 +262,11 @@ object datasets {
         .as[String]
         .flatMap(url => SameAs.external(Refined.unsafeApply(url)).leftMap(err => DecodingFailure(err.getMessage, Nil)))
     }
+
+    val ontology: Type = Type.Def(
+      Class(schema / "URL"),
+      ObjectProperty(schema / "url", Dataset.ontologyClass)
+    )
   }
 
   final class TopmostSameAs private[datasets] (val value: String) extends AnyVal with UrlTinyType
@@ -262,27 +274,24 @@ object datasets {
       extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
       with constraints.Url[TopmostSameAs]
       with UrlResourceRenderer[TopmostSameAs]
-      with EntityIdJsonLdOps[TopmostSameAs] {
+      with EntityIdJsonLDOps[TopmostSameAs] {
 
     final def apply(sameAs: SameAs): TopmostSameAs = apply(sameAs.value)
 
     final def apply(entityId: EntityId): TopmostSameAs = apply(entityId.toString)
-
-    implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] = _.asEntityId.asJsonLD
   }
 
   class PartResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartResourceId
       extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
       with UrlConstraint[PartResourceId]
-      with EntityIdJsonLdOps[PartResourceId]
+      with EntityIdJsonLDOps[PartResourceId]
 
   sealed trait Date extends Any with TinyType {
     def instant: Instant
   }
 
   object Date {
-    import io.renku.tinytypes.json.TinyTypeEncoders._
     implicit val encoder: Encoder[Date] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson

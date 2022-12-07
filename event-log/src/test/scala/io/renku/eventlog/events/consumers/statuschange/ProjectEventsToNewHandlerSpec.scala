@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import Generators.projectEventToNewEvents
+import Generators.projectEventsToNewEvents
 import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
@@ -57,7 +57,7 @@ class ProjectEventsToNewHandlerSpec extends AnyWordSpec with should.Matchers wit
   }
 
   private trait TestCase {
-    val event   = projectEventToNewEvents.generateOne
+    val event   = projectEventsToNewEvents.generateOne
     val session = mock[Session[Try]]
 
     val queue   = mock[StatusChangeEventsQueue[Try]]
