@@ -62,6 +62,9 @@ trait GitLabStateQueries {
   def projectCommits(projectId: Id): StateQuery[List[CommitData]] =
     _.commits.get(projectId).map(_.toList).getOrElse(Nil)
 
+  def findProjectAccessTokens(projectId: Id): StateQuery[List[ProjectAccessTokenInfo]] =
+    _.projectAccessTokens.get(projectId).toList
+
   def commitsFor(projectId: Id, maybeAuthedReq: Option[AuthedReq]): StateQuery[List[CommitData]] =
     for {
       project <- findProjectById(projectId, maybeAuthedReq)
@@ -75,7 +78,9 @@ trait GitLabStateQueries {
     commitsFor(projectId, maybeAuthedReq).andThen(_.map(_.toPushEvent(projectId)))
 
   def findAuthedProject(token: ProjectAccessToken): StateQuery[Option[AuthedProject]] =
-    _.projectAccessTokens.find(_._2 == token).map(AuthedProject.tupled)
+    _.projectAccessTokens.find(_._2.token == token).map { case (projectId, tokenInfo) =>
+      AuthedProject(projectId, tokenInfo.token)
+    }
 
   def findAuthedUser(token: UserAccessToken): StateQuery[Option[AuthedUser]] =
     _.users.find(_._2 == token).map(AuthedUser.tupled)
