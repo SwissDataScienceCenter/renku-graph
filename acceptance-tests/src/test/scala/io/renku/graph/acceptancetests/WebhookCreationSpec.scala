@@ -81,7 +81,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
         .jsonBody shouldBe gitLabStub
-        .query(_.projectAccessTokens(project.id))
+        .query(_.projectAccessTokens(project.id).token)
         .unsafeRunSync()
         .asInstanceOf[AccessToken]
         .asJson

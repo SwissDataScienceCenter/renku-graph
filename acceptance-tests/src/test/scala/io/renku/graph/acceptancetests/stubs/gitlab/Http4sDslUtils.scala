@@ -60,6 +60,10 @@ private[gitlab] trait Http4sDslUtils {
       } yield pid
   }
 
+  object ProjectAccessTokenId {
+    def unapply(str: String): Option[Int] = str.toIntOption
+  }
+
   def OkOrNotFound[F[_]: Applicative, A](payload: Option[A])(implicit enc: EntityEncoder[F, A]): F[Response[F]] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._

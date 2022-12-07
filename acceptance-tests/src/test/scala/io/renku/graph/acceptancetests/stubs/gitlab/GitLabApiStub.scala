@@ -19,6 +19,7 @@
 package io.renku.graph.acceptancetests.stubs.gitlab
 
 import GitLabApiStub.State
+import GitLabStateGenerators._
 import GitLabStateQueries._
 import GitLabStateUpdates._
 import JsonEncoders._
@@ -29,7 +30,6 @@ import com.comcast.ip4s.{Host, Port}
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.CommonGraphGenerators.projectAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
@@ -119,11 +119,20 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
         case req @ POST -> Root / ProjectId(projectId) / "access_tokens" =>
           EitherT(req.as[Json].map(_.hcursor.downField("expires_at").as[LocalDate]))
-            .map(expiryDate => projectAccessTokens.generateOne -> expiryDate)
-            .semiflatTap(tokenAndExpiry => update(addProjectAccessToken(projectId, tokenAndExpiry._1)))
-            .semiflatMap(tokenAndExpiry => Created().map(_.withEntity(tokenAndExpiry.asJson)))
+            .map(expiryDate => projectAccessTokenInfos.generateOne.copy(expiryDate = expiryDate))
+            .semiflatTap(tokenInfo => update(addProjectAccessToken(projectId, tokenInfo)))
+            .semiflatMap(tokenInfo => Created().map(_.withEntity(tokenInfo.asJson)))
             .leftSemiflatMap(err => BadRequest(s"No or invalid Project Access Token creation payload: ${err.message}"))
             .merge
+
+        case GET -> Root / ProjectId(id) / "access_tokens" =>
+          query(findProjectAccessTokens(id)).flatMap(Ok(_))
+
+        case DELETE -> Root / ProjectId(id) / "access_tokens" / ProjectAccessTokenId(tokenId) =>
+          query(findProjectAccessTokens(id)).map(_.find(_.tokenId == tokenId)).flatMap {
+            case Some(_) => NoContent()
+            case None    => NotFound()
+          }
 
         case GET -> Root / ProjectId(id) / "hooks" =>
           query(findWebhooks(id)).flatMap(Ok(_))
@@ -197,7 +206,7 @@ object GitLabApiStub {
 
   final case class State(
       users:               Map[GitLabId, UserAccessToken],
-      projectAccessTokens: Map[Id, ProjectAccessToken],
+      projectAccessTokens: Map[Id, ProjectAccessTokenInfo],
       persons:             List[Person],
       projects:            List[Project],
       webhooks:            List[Webhook],
@@ -218,4 +227,5 @@ object GitLabApiStub {
       message:   String,
       parents:   List[CommitId]
   )
+  final case class ProjectAccessTokenInfo(tokenId: Int, name: String, token: ProjectAccessToken, expiryDate: LocalDate)
 }

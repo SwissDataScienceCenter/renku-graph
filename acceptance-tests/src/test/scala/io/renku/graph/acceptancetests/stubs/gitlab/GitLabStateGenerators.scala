@@ -18,16 +18,22 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
+import com.typesafe.config.ConfigFactory
+import io.renku.config.ConfigLoader.find
+import io.renku.generators.CommonGraphGenerators.projectAccessTokens
 import io.renku.generators.Generators
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.CommitData
+import io.renku.generators.Generators._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, ProjectAccessTokenInfo}
 import io.renku.graph.model.GraphModelGenerators
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
 import org.scalacheck.Gen
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
+import scala.util.Try
 
 trait GitLabStateGenerators {
+
   def commitData(commitId: CommitId): Gen[CommitData] =
     for {
       authorName     <- GraphModelGenerators.personNames
@@ -43,6 +49,17 @@ trait GitLabStateGenerators {
       message,
       Nil
     )
+
+  def projectAccessTokenInfos: Gen[ProjectAccessTokenInfo] = for {
+    id     <- positiveInts()
+    token  <- projectAccessTokens
+    expiry <- localDates(min = LocalDate.now().plusWeeks(1))
+  } yield ProjectAccessTokenInfo(
+    id.value,
+    name = find[Try, String]("project-token-name", ConfigFactory.load).fold(throw _, identity),
+    token,
+    expiry
+  )
 }
 
 object GitLabStateGenerators extends GitLabStateGenerators
