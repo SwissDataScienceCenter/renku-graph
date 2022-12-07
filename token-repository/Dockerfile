@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:19-slim-bullseye as builder
+FROM eclipse-temurin:17-jre-alpine as builder
 
 WORKDIR /work
 
@@ -15,7 +15,7 @@ RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     sbt "project token-repository" stage && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
 
-FROM openjdk:19-slim-bullseye
+FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /opt/token-repository
 
