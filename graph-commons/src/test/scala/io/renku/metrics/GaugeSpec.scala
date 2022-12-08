@@ -65,61 +65,69 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
+      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       // iteration 2
       val labelValue2 = projectPaths.generateOne
       val value2      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue2 -> value2) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain.only(
-        (label.value, labelValue1.value, value1),
-        (label.value, labelValue2.value, value2)
-      )
+      // iteration 3 - negative value
+      val labelValue3 = projectPaths.generateOne
+      gauge.set(labelValue3 -> negativeDoubles().generateOne.value) shouldBe MonadThrow[Try].unit
+
+      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
+      underlying.collectValuesFor(label.value, labelValue2.value) shouldBe List(value2)
+      underlying.collectValuesFor(label.value, labelValue3.value) shouldBe List(0)
     }
   }
 
   "update" should {
 
-    "update the value associated with the label - case without a label" in new TestCase {
+    "update the value associated with the label - case without a label and positive update" in new TestCase {
 
       val labelValue = projectPaths.generateOne
       val update     = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> update) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, update))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(update)
     }
 
-    "update the value associated with the label - case with a positive value" in new TestCase {
+    "update the value associated with the label - case without a label and negative update" in new TestCase {
+
+      val labelValue = projectPaths.generateOne
+      val update     = nonNegativeDoubles().generateOne.value
+      gauge.update(labelValue -> -update) shouldBe MonadThrow[Try].unit
+
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
+    }
+
+    "update the value associated with the label - case with a positive update value" in new TestCase {
 
       val labelValue   = projectPaths.generateOne
       val initialValue = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, initialValue))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue)
 
       val update = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> update) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain.only(
-        (label.value, labelValue.value, initialValue + update)
-      )
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue + update)
     }
 
-    "update the value associated with the label - case with a negative value" in new TestCase {
+    "update the value associated with the label - case with a negative update value so current + update < 0" in new TestCase {
 
       val labelValue   = projectPaths.generateOne
       val initialValue = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, initialValue))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(initialValue)
 
-      val update = initialValue * negativeInts(-5).generateOne
+      val update = initialValue * ints(min = 2, max = 5).generateOne
       gauge.update(labelValue -> -update) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain.only(
-        (label.value, labelValue.value, initialValue - update)
-      )
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
     }
   }
 
@@ -132,7 +140,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
+      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       // re-provisioning
       val waitingEvents = waitingEventsGen.generateNonEmptyList().toList.flatten.toMap
@@ -155,7 +163,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value1      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue1.value, value1))
+      underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       gauge.clear() shouldBe MonadThrow[Try].unit
 
@@ -172,12 +180,12 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> value) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
 
       // incrementing
       gauge.increment(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value + 1))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value + 1)
     }
 
     "add label value if one is not present yet" in new TestCase {
@@ -186,7 +194,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       gauge.increment(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, 1))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(1)
     }
   }
 
@@ -199,12 +207,12 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue -> value) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value)
 
       // incrementing
       gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, value - 1))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(value - 1)
     }
 
     "add label value with value 0 if one is not present yet" in new TestCase {
@@ -213,7 +221,17 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
 
-      underlying.collectAllSamples should contain only ((label.value, labelValue.value, 0))
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
+    }
+
+    "set 0 value for the label if it was already 0" in new TestCase {
+
+      val labelValue = projectPaths.generateOne
+
+      gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
+      gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
+
+      underlying.collectValuesFor(label.value, labelValue.value) shouldBe List(0)
     }
   }
 
