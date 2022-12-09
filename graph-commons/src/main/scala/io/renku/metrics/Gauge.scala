@@ -56,9 +56,10 @@ class SingleValueGaugeImpl[F[_]: MonadThrow](val name: String Refined NonEmpty, 
 }
 
 class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue](val name: String Refined NonEmpty,
-                                                     val help:       String Refined NonEmpty,
-                                                     labelName:      String Refined NonEmpty,
-                                                     resetDataFetch: () => F[Map[LabelValue, Double]]
+                                                     val help:            String Refined NonEmpty,
+                                                     labelName:           String Refined NonEmpty,
+                                                     resetDataFetch:      () => F[Map[LabelValue, Double]],
+                                                     allowNegativeValues: Boolean = false
 ) extends LabeledGauge[F, LabelValue]
     with PrometheusCollector {
 
@@ -74,15 +75,20 @@ class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue](val name: String Refined No
 
   override def set(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
     val (labelValue, value) = labelValueAndValue
-    wrappedCollector.labels(labelValue.toString).set(if (value < 0) 0d else value)
+    wrappedCollector.labels(labelValue.toString).set {
+      if (value < 0 && !allowNegativeValues) 0d
+      else value
+    }
   }
 
   override def update(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
     val (labelValue, value) = labelValueAndValue
     val child               = wrappedCollector.labels(labelValue.toString)
-    child.get() + value match {
-      case v if v < 0 => child.set(0d)
-      case v          => child.set(v)
+    child.set {
+      child.get() + value match {
+        case v if v < 0 && !allowNegativeValues => 0d
+        case v                                  => v
+      }
     }
   }
 
@@ -91,9 +97,9 @@ class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue](val name: String Refined No
   }
 
   override def decrement(labelValue: LabelValue): F[Unit] = MonadThrow[F].catchNonFatal {
-    if (wrappedCollector.labels(labelValue.toString).get() != 0)
-      wrappedCollector.labels(labelValue.toString).dec()
-    else ()
+    val child = wrappedCollector.labels(labelValue.toString)
+    if (child.get() == 0 && !allowNegativeValues) ()
+    else child.dec()
   }
 
   override def reset(): F[Unit] = for {
