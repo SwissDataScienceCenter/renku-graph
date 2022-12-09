@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -32,18 +32,19 @@ trait AwaitingTransformationGauge[F[_]] extends LabeledGauge[F, projects.Path]
 object AwaitingTransformationGauge {
   val NumberOfProjects: Int Refined Positive = 20
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[AwaitingTransformationGauge[F]] =
-    MetricsRegistry[F].register {
-      new LabeledGaugeImpl[F, projects.Path](
-        name = "events_awaiting_transformation_count",
-        help = "Number of Events waiting to have their triples transformed by project path.",
-        labelName = "project",
-        resetDataFetch = () =>
-          statsFinder
-            .countEvents(Set(TriplesGenerated), maybeLimit = Some(NumberOfProjects))
-            .map(_.view.mapValues(_.toDouble).toMap)
-      ) with AwaitingTransformationGauge[F]
-    }.widen
-
-  def apply[F[_]](implicit ev: AwaitingTransformationGauge[F]): AwaitingTransformationGauge[F] = ev
+  def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[AwaitingTransformationGauge[F]] =
+    MetricsRegistry[F]
+      .register {
+        new PositiveValuesLabeledGauge[F, projects.Path](
+          name = "events_awaiting_transformation_count",
+          help = "Number of Events waiting to have their triples transformed by project path.",
+          labelName = "project",
+          resetDataFetch = () =>
+            statsFinder
+              .countEvents(Set(TriplesGenerated), maybeLimit = Some(NumberOfProjects))
+              .map(_.view.mapValues(_.toDouble).toMap)
+        ) with AwaitingTransformationGauge[F]
+      }
+      .flatTap(_.clearZeroedValues())
+      .widen
 }

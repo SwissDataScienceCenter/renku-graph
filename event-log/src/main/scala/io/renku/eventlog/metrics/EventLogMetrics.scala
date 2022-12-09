@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.metrics
 
+import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -82,7 +83,7 @@ object EventLogMetrics {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Temporal: Logger: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventLogMetrics[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventLogMetrics[F]] = for {
     categoryNameEventsGauge <- Gauge[F, CategoryName](
                                  name = "category_name_events_count",
                                  help = "Number of events waiting for processing per Category Name.",

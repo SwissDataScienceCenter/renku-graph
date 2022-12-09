@@ -19,97 +19,12 @@
 package io.renku.metrics
 
 import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.prometheus.client.{Gauge => LibGauge}
 
 trait Gauge[F[_]] extends MetricsCollector
-
-trait SingleValueGauge[F[_]] extends Gauge[F] {
-  def set(value: Double): F[Unit]
-}
-
-trait LabeledGauge[F[_], LabelValue] extends Gauge[F] {
-  def set(labelValue:       (LabelValue, Double)): F[Unit]
-  def update(labelValue:    (LabelValue, Double)): F[Unit]
-  def increment(labelValue: LabelValue):           F[Unit]
-  def decrement(labelValue: LabelValue):           F[Unit]
-  def reset(): F[Unit]
-  def clear(): F[Unit]
-}
-
-class SingleValueGaugeImpl[F[_]: MonadThrow](val name: String Refined NonEmpty, val help: String Refined NonEmpty)
-    extends SingleValueGauge[F]
-    with PrometheusCollector {
-
-  type Collector = LibGauge
-
-  private[metrics] lazy val wrappedCollector: Collector =
-    LibGauge
-      .build()
-      .name(name.value)
-      .help(help.value)
-      .create()
-
-  override def set(value: Double): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector set value)
-}
-
-class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue](val name: String Refined NonEmpty,
-                                                     val help:            String Refined NonEmpty,
-                                                     labelName:           String Refined NonEmpty,
-                                                     resetDataFetch:      () => F[Map[LabelValue, Double]],
-                                                     allowNegativeValues: Boolean = false
-) extends LabeledGauge[F, LabelValue]
-    with PrometheusCollector {
-
-  type Collector = LibGauge
-
-  private[metrics] lazy val wrappedCollector: Collector =
-    LibGauge
-      .build()
-      .name(name.value)
-      .help(help.value)
-      .labelNames(labelName.value)
-      .create()
-
-  override def set(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
-    val (labelValue, value) = labelValueAndValue
-    wrappedCollector.labels(labelValue.toString).set {
-      if (value < 0 && !allowNegativeValues) 0d
-      else value
-    }
-  }
-
-  override def update(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
-    val (labelValue, value) = labelValueAndValue
-    val child               = wrappedCollector.labels(labelValue.toString)
-    child.set {
-      child.get() + value match {
-        case v if v < 0 && !allowNegativeValues => 0d
-        case v                                  => v
-      }
-    }
-  }
-
-  override def increment(labelValue: LabelValue): F[Unit] = MonadThrow[F].catchNonFatal {
-    wrappedCollector.labels(labelValue.toString).inc()
-  }
-
-  override def decrement(labelValue: LabelValue): F[Unit] = MonadThrow[F].catchNonFatal {
-    val child = wrappedCollector.labels(labelValue.toString)
-    if (child.get() == 0 && !allowNegativeValues) ()
-    else child.dec()
-  }
-
-  override def reset(): F[Unit] = for {
-    newValues <- resetDataFetch()
-    _         <- clear()
-    _         <- MonadThrow[F].catchNonFatal(newValues foreach set)
-  } yield ()
-
-  override def clear(): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector.clear())
-}
 
 object Gauge {
 
@@ -119,20 +34,20 @@ object Gauge {
   ): F[SingleValueGauge[F]] =
     MetricsRegistry[F].register(new SingleValueGaugeImpl[F](name, help)).widen
 
-  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
+  def apply[F[_]: Async: MetricsRegistry, LabelValue](
       name:      String Refined NonEmpty,
       help:      String Refined NonEmpty,
       labelName: String Refined NonEmpty
   ): F[LabeledGauge[F, LabelValue]] =
     this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])
 
-  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
+  def apply[F[_]: Async: MetricsRegistry, LabelValue](
       name:           String Refined NonEmpty,
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => F[Map[LabelValue, Double]]
   ): F[LabeledGauge[F, LabelValue]] =
     MetricsRegistry[F]
-      .register(new LabeledGaugeImpl[F, LabelValue](name, help, labelName, resetDataFetch))
+      .register(new PositiveValuesLabeledGauge[F, LabelValue](name, help, labelName, resetDataFetch))
       .widen
 }
