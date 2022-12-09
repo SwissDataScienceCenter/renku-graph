@@ -53,13 +53,21 @@ Response body example:
 [
   {
     "id":              "df654c3b1bd105a29d658f78f6380a842feac879",
+    "project":         {
+      "id":   123,
+      "path": "namespace/project-name"
+    },
     "status":          "NEW",
     "processingTimes": [],
     "date":            "2001-09-04T10:48:29.457Z",
     "executionDate":   "2001-09-04T10:48:29.457Z"
   },
   {
-    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
+    "id":      "df654c3b1bd105a29d658f78f6380a842feac878",
+    "project":         {
+      "id":   1234,
+      "path": "namespace2/project-name"
+    },
     "status":  "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure",
     "processingTimes": [
