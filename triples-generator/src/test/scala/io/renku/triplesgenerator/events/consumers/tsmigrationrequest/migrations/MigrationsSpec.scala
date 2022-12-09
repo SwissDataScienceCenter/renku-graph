@@ -41,8 +41,8 @@ class MigrationsSpec extends AnyWordSpec with should.Matchers with IOSpec with M
     }
   }
 
-  private implicit lazy val reProvisioningStatus: ReProvisioningStatus[IO]    = mock[ReProvisioningStatus[IO]]
-  private implicit lazy val logger:               TestLogger[IO]              = TestLogger[IO]()
-  private implicit lazy val timeRecorder:         SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-  private implicit lazy val metricsRegistry:      MetricsRegistry[IO]         = new DisabledMetricsRegistry[IO]
+  private implicit lazy val reProvisioningStatus: ReProvisioningStatus[IO] = mock[ReProvisioningStatus[IO]]
+  private implicit lazy val logger:               TestLogger[IO]           = TestLogger[IO]()
+  private implicit lazy val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private implicit lazy val metricsRegistry: MetricsRegistry[IO] = new DisabledMetricsRegistry[IO]
 }

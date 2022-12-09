@@ -258,7 +258,7 @@ class NodeDetailsFinderSpec
 
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](projectsDSConnectionInfo)
   }
 

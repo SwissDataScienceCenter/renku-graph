@@ -28,17 +28,18 @@ import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.TestSuite
 
 import java.time.Instant
 
 trait FinderSpecOps {
-  self: TestSuite with InMemoryJenaForSpec with ProjectsDataset =>
+  self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
 
   protected[finder] trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val finder = new EntitiesFinderImpl[IO](projectsDSConnectionInfo)
   }
 

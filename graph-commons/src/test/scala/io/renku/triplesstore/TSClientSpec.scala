@@ -398,7 +398,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
     val renkuConnectionConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger:       Logger[IO]                  = TestLogger[IO]()
-    implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
   }
 
   private trait QueryClientTestCase extends TestCase {

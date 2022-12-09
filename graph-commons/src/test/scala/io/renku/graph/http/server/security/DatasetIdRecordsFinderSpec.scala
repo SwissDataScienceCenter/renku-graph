@@ -89,7 +89,7 @@ class DatasetIdRecordsFinderSpec
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val recordsFinder = new DatasetIdRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

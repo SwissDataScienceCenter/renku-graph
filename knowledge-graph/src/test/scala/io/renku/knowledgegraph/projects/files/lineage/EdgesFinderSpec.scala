@@ -31,7 +31,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBa
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
-import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
+import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
@@ -240,7 +240,7 @@ class EdgesFinderSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
-      TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
+      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
     val edgesFinder = new EdgesFinderImpl[IO](projectsDSConnectionInfo, renkuUrl)
   }
 

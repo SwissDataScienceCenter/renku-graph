@@ -108,7 +108,7 @@ class JsonLDUploaderSpec
     val triples = jsonLDEntities.generateOne
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     lazy val storeConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val uploader    = new JsonLDUploaderImpl[IO](storeConfig, retryInterval = 100 millis, maxRetries = 1)
 

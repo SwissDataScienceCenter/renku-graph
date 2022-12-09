@@ -98,16 +98,18 @@ trait InMemoryJena {
 
   def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(dataset)
-      .runUpdate(
-        SparqlQuery.of("delete all data", "CLEAR ALL")
-      )
+      .flatMap {
+        _.runUpdate(
+          SparqlQuery.of("delete all data", "CLEAR ALL")
+        )
+      }
       .unsafeRunSync()
 
   def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
     graphs
       .map(_.flatten.fold(throw _, identity))
       .toList
-      .map(queryRunnerFor(to).uploadPayload(_))
+      .map(g => queryRunnerFor(to).flatMap(_.uploadPayload(g)))
       .sequence
       .void
       .unsafeRunSync()
@@ -119,24 +121,23 @@ trait InMemoryJena {
   ): Unit = upload(to, objects >>= graphsProducer.apply: _*)
 
   def runSelect(on: DatasetName, query: SparqlQuery): IO[List[Map[String, String]]] =
-    queryRunnerFor(on).runQuery(query)
+    queryRunnerFor(on).flatMap(_.runQuery(query))
 
   def runUpdate(on: DatasetName, query: SparqlQuery): IO[Unit] =
-    queryRunnerFor(on).runUpdate(query)
+    queryRunnerFor(on).flatMap(_.runUpdate(query))
 
   def triplesCount(on: DatasetName)(implicit ioRuntime: IORuntime): Long =
     queryRunnerFor(on)
-      .runQuery(
-        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
+      .flatMap(
+        _.runQuery(
+          SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
+        ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       )
-      .map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       .unsafeRunSync()
 
   implicit class QueriesOps(queries: List[SparqlQuery]) {
-    def runAll(on: DatasetName): IO[Unit] = {
-      val runner = queryRunnerFor(on)
-      queries.map(runner.runUpdate).sequence.void
-    }
+    def runAll(on: DatasetName): IO[Unit] =
+      queryRunnerFor(on).flatMap(runner => queries.map(runner.runUpdate).sequence.void)
   }
 
   private def findConnectionInfo(datasetName: DatasetName): DatasetConnectionConfig = datasets
@@ -144,84 +145,91 @@ trait InMemoryJena {
     .find(_.datasetName == datasetName)
     .getOrElse(throw new Exception(s"Dataset '$datasetName' not registered in Test Jena instance"))
 
-  private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
-  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
   private lazy val datasetsCreator = TSAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
 
-  protected def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
+  protected def queryRunnerFor(datasetName: DatasetName) =
+    queryRunner(findConnectionInfo(datasetName))
 
-  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClient[IO](connectionInfo) {
+  private def queryRunner(connectionInfo: DatasetConnectionConfig) =
+    TestSparqlQueryTimeRecorder[IO].map { implicit qtr =>
+      new TSClient[IO](connectionInfo) {
 
-    import io.circe.Decoder._
+        import io.circe.Decoder._
 
-    def uploadPayload(jsonLD: JsonLD) = upload(jsonLD)
+        def uploadPayload(jsonLD: JsonLD) = upload(jsonLD)
 
-    def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
-      queryExpecting[List[Map[String, String]]](query)
+        def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
+          queryExpecting[List[Map[String, String]]](query)
 
-    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(updateQuery = query)
+        def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(updateQuery = query)
 
-    private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
-      for {
-        vars <- cursor.as[List[String]]
-        values <- cursor
-                    .downField("results")
-                    .downField("bindings")
-                    .as[List[Map[String, String]]](decodeList(valuesDecoder(vars)))
-      } yield values
+        private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
+          for {
+            vars <- cursor.as[List[String]]
+            values <- cursor
+                        .downField("results")
+                        .downField("bindings")
+                        .as[List[Map[String, String]]](decodeList(valuesDecoder(vars)))
+          } yield values
+        }
+
+        private implicit lazy val varsDecoder: Decoder[List[String]] =
+          _.downField("head").downField("vars").as[List[Json]].flatMap(_.map(_.as[String]).sequence)
+
+        private def valuesDecoder(vars: List[String]): Decoder[Map[String, String]] =
+          implicit cursor =>
+            vars
+              .map(varToMaybeValue)
+              .sequence
+              .map(_.flatten)
+              .map(_.toMap)
+
+        private def varToMaybeValue(varName: String)(implicit cursor: HCursor) =
+          cursor
+            .downField(varName)
+            .downField("value")
+            .as[Option[String]]
+            .map(maybeValue => maybeValue map (varName -> _))
+      }
     }
-
-    private implicit lazy val varsDecoder: Decoder[List[String]] =
-      _.downField("head").downField("vars").as[List[Json]].flatMap(_.map(_.as[String]).sequence)
-
-    private def valuesDecoder(vars: List[String]): Decoder[Map[String, String]] =
-      implicit cursor =>
-        vars
-          .map(varToMaybeValue)
-          .sequence
-          .map(_.flatten)
-          .map(_.toMap)
-
-    private def varToMaybeValue(varName: String)(implicit cursor: HCursor) =
-      cursor
-        .downField(varName)
-        .downField("value")
-        .as[Option[String]]
-        .map(maybeValue => maybeValue map (varName -> _))
-  }
 }
 
 sealed trait DefaultGraphDataset {
   self: InMemoryJena =>
 
-  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
-    .runUpdate {
-      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
-    }
-    .unsafeRunSync()
+  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(to)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
+      })
+      .unsafeRunSync()
 
-  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
-    .runUpdate {
-      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
-    }
-    .unsafeRunSync()
+  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(from)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
+      })
+      .unsafeRunSync()
 }
 
 sealed trait NamedGraphDataset {
   self: InMemoryJena =>
 
-  def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
-    .runUpdate {
-      SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
-    }
-    .unsafeRunSync()
+  def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(from)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
+      })
+      .unsafeRunSync()
 
-  def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
-    .runUpdate {
-      SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
-    }
-    .unsafeRunSync()
+  def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(to)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
+      })
+      .unsafeRunSync()
 }
 
 trait GraphsProducer[T] {

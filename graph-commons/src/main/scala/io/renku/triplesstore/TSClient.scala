@@ -45,7 +45,7 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     requestTimeoutOverride: Option[Duration] = None,
     logQueries:             Boolean = false
 ) extends RestClient(Throttler.noThrottling,
-                     Some(implicitly[SparqlQueryTimeRecorder[F]].instance),
+                     Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
                      retryInterval,
                      maxRetries,
                      idleTimeoutOverride,
