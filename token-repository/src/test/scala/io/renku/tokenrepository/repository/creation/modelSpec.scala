@@ -58,7 +58,7 @@ class RenkuAccessTokenNameSpec extends AnyWordSpec with should.Matchers {
 
       val Success(actual) = RenkuAccessTokenName[Try](config)
 
-      actual              shouldBe a[RenkuAccessTokenName]
+      actual       shouldBe a[RenkuAccessTokenName]
       actual.value shouldBe name
     }
   }
