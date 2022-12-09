@@ -28,6 +28,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
   def prepareUpdates(project:      Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def postUpdates(project:         Project): List[SparqlQuery]
   def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
@@ -170,4 +171,29 @@ private object UpdatesCreator extends UpdatesCreator {
         )
       }
       .toList
+
+  override def postUpdates(project: Project): List[SparqlQuery] =
+    List(deduplicateDateCreated(project))
+
+  /** Retain the lowest dateCreated date. */
+  private def deduplicateDateCreated(project: Project) = {
+    val resource = project.resourceId.showAs[RdfResource]
+    SparqlQuery.of(
+      name = "transformation - project date created deduplicate",
+      Prefixes.of(schema -> "schema"),
+      s"""|WITH $resource 
+          |DELETE { ?s schema:dateCreated ?date }
+          |WHERE {
+          |  {
+          |    SELECT (min(?date) as ?minDate)
+          |    WHERE {
+          |      ?s schema:dateCreated ?date
+          |    }
+          |  }
+          |  ?s schema:dateCreated ?date.
+          |  FILTER ( ?date != ?minDate )
+          |}
+          |""".stripMargin
+    )
+  }
 }

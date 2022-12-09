@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning
 
 import TransformationStep.{ProjectWithQueries, Transformation}
+import cats.Monoid
 import cats.data.EitherT
-import cats.kernel.Semigroup
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.graph.model.entities.Project
@@ -39,14 +39,23 @@ private[tsprovisioning] object TransformationStep {
   type Transformation[F[_]]     = Project => ProjectWithQueries[F]
   type ProjectWithQueries[F[_]] = EitherT[F, ProcessingRecoverableError, (Project, Queries)]
 
-  final case class Queries(preDataUploadQueries: List[SparqlQuery], postDataUploadQueries: List[SparqlQuery])
+  final case class Queries(preDataUploadQueries: List[SparqlQuery], postDataUploadQueries: List[SparqlQuery]) {
+    def append(other: Queries): Queries =
+      Queries(
+        preDataUploadQueries ::: other.preDataUploadQueries,
+        postDataUploadQueries ::: other.postDataUploadQueries
+      )
+
+    def ++(other: Queries): Queries =
+      append(other)
+  }
 
   object Queries {
     val empty: Queries = Queries(Nil, Nil)
     def preDataQueriesOnly(queries:  List[SparqlQuery]): Queries = Queries(queries, Nil)
     def postDataQueriesOnly(queries: List[SparqlQuery]): Queries = Queries(Nil, queries)
 
-    implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) =>
-      Queries(x.preDataUploadQueries ::: y.preDataUploadQueries, x.postDataUploadQueries ::: y.postDataUploadQueries)
+    implicit val queriesMonoid: Monoid[Queries] =
+      Monoid.instance(empty, _ ++ _)
   }
 }

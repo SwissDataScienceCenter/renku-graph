@@ -23,12 +23,15 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.DateCreated
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -36,17 +39,39 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+import scala.concurrent.duration._
 
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
     with InMemoryJenaForSpec
+    // with ExternalJenaForSpec
     with ProjectsDataset
     with TableDrivenPropertyChecks
     with ScalaCheckPropertyChecks {
 
   import UpdatesCreator._
+
+  "postUpdates" should {
+    "remove duplicate created dates" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project1 =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
+      upload(to = projectsDataset, project1)
+      upload(to = projectsDataset, project2)
+
+      postUpdates(project1).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project1.name.value.some
+      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+    }
+  }
 
   "prepareUpdates" should {
 
@@ -277,4 +302,22 @@ class UpdatesCreatorSpec
       )
     )
     .toSet
+
+  def projectCreatedLens: Lens[entities.Project, DateCreated] =
+    Lens[entities.Project, DateCreated](_.dateCreated) { created =>
+      {
+        case p: entities.NonRenkuProject.WithParent    => p.copy(dateCreated = created)
+        case p: entities.NonRenkuProject.WithoutParent => p.copy(dateCreated = created)
+        case p: entities.RenkuProject.WithParent       => p.copy(dateCreated = created)
+        case p: entities.RenkuProject.WithoutParent    => p.copy(dateCreated = created)
+      }
+    }
+
+  final implicit class InstantTinyTypeOps[A <: InstantTinyType](self: A) {
+    def +(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
+      tf.apply(self.value.plusMillis(duration.toMillis))
+
+    def -(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
+      tf.apply(self.value.minusMillis(duration.toMillis))
+  }
 }
