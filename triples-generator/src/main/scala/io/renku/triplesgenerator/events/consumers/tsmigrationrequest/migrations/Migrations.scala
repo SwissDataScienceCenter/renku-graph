@@ -38,12 +38,14 @@ private[tsmigrationrequest] object Migrations {
     reProvisioning                <- ReProvisioning[F](config)
     removeNotLinkedPersons        <- RemoveNotLinkedPersons[F]
     fixPlansYoungerThanActivities <- FixPlansYoungerThanActivities[F]
+    compositePlan                 <- CompositePlanProvision.create[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
                     reProvisioning,
                     removeNotLinkedPersons,
-                    fixPlansYoungerThanActivities
+                    fixPlansYoungerThanActivities,
+                    compositePlan
                   )
   } yield migrations
 
