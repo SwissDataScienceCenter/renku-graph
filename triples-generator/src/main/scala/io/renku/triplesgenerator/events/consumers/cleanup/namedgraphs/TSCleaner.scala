@@ -63,7 +63,7 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import SameAsHierarchyFixer._
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
-  import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+  import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.SparqlQuery.Prefixes
   private implicit val tsConnection: ProjectsConnectionConfig = connectionConfig

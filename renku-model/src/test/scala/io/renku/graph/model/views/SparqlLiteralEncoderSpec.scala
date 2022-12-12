@@ -23,9 +23,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SparqlValueEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class SparqlLiteralEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  import io.renku.graph.model.views.SparqlValueEncoder._
+  import SparqlLiteralEncoder._
 
   "iriEncode" should {
 

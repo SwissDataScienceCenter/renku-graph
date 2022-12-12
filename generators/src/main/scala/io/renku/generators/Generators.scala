@@ -86,8 +86,8 @@ object Generators {
   }
 
   def sentenceContaining(phrase: NonBlank): Gen[String] = for {
-    prefix <- nonEmptyStrings()
-    suffix <- nonEmptyStrings()
+    prefix <- nonEmptyStrings(minLength = 3)
+    suffix <- nonEmptyStrings(minLength = 3)
   } yield s"$prefix $phrase $suffix"
 
   def blankStrings(maxLength: Int = 10): Gen[String] = for {

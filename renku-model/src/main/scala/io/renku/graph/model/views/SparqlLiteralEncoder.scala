@@ -18,7 +18,7 @@
 
 package io.renku.graph.model.views
 
-object SparqlValueEncoder {
+object SparqlLiteralEncoder {
 
   def sparqlEncode(string: String): String =
     string
