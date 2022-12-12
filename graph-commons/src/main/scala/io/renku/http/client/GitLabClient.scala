@@ -18,6 +18,7 @@
 
 package io.renku.http.client
 
+import cats.MonadThrow
 import cats.effect.{Async, IO}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -30,10 +31,12 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.rest.paging.model.Page
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
-import org.http4s.{EntityEncoder, Method, Uri}
+import org.http4s.{EntityEncoder, Method, Response, Uri}
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -55,7 +58,6 @@ trait GitLabClient[F[_]] {
   def delete[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
       mapResponse:             ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
-
 }
 
 final class GitLabClientImpl[F[_]: Async: Logger](
@@ -142,4 +144,12 @@ object GitLabClient {
                                   maxRetries,
                                   requestTimeoutOverride
   )
+
+  def maybeNextPage[F[_]: MonadThrow](response: Response[F]): F[Option[Page]] =
+    response.headers
+      .get(ci"X-Next-Page")
+      .flatMap(_.head.value.toIntOption)
+      .map(Page.from)
+      .map(MonadThrow[F].fromEither(_))
+      .sequence
 }
