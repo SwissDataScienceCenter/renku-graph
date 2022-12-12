@@ -51,7 +51,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
     (findProjectsInTS(criteria) -> findProjectsInGL(criteria))
       .mapN(mergeFavouringActivated)
       .map(filterBy(criteria.filters.state))
-      .map(_.sortBy(_.name))
+      .map(_.sortBy(_.name.value.toLowerCase))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
 
   private val mergeFavouringActivated

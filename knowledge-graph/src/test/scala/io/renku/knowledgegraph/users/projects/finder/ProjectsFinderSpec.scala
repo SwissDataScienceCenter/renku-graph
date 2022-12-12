@@ -50,7 +50,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name)
+      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name.value.toLowerCase)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
@@ -70,7 +70,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = glProjects.sortBy(_.name)
+      val expectedProjects = glProjects.sortBy(_.name.value.toLowerCase)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
@@ -90,7 +90,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = tsProjects.sortBy(_.name)
+      val expectedProjects = tsProjects.sortBy(_.name.value.toLowerCase)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
