@@ -24,7 +24,7 @@ import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 

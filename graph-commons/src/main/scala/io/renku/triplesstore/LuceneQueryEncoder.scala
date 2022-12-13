@@ -16,16 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.views
+package io.renku.triplesstore
 
-object SparqlValueEncoder {
+import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
 
-  def sparqlEncode(string: String): String =
-    string
-      .map {
-        case c if c.isLetterOrDigit => c.toString
-        case '\''                   => """\'"""
-        case c                      => f"\\u${c.toInt}%04x"
-      }
-      .mkString("")
+object LuceneQueryEncoder {
+
+  def queryAsString(v: String): String = QueryParserUtil.escape(v).replace("\\", "\\\\")
 }

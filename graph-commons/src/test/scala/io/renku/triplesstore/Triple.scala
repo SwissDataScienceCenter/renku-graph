@@ -20,7 +20,7 @@ package io.renku.triplesstore
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
 import io.renku.jsonld.{EntityId, EntityIdEncoder, Property}
 import io.renku.tinytypes.{StringTinyType, TinyType}
 

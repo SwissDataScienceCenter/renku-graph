@@ -95,7 +95,7 @@ class EntitiesFinderSpec
           )
         )
         .generateOne
-      val plan :: Nil = planProject.plans.toList
+      val plan :: Nil = planProject.plans
 
       val notMatchingProject = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
@@ -147,7 +147,7 @@ class EntitiesFinderSpec
           )
         )
         .generateOne
-      val plan :: Nil = planProject.plans.toList
+      val plan :: Nil = planProject.plans
 
       upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
@@ -185,7 +185,7 @@ class EntitiesFinderSpec
           )
         )
         .generateOne
-      val plan :: Nil = planProject.plans.toList
+      val plan :: Nil = planProject.plans
 
       upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
@@ -288,7 +288,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
         .unsafeRunSync()
-        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).toList.sortBy(_.name.value)
+        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).sortBy(_.name.value)
     }
 
     "return entities of many types when multiple types given" in new TestCase {
@@ -556,7 +556,7 @@ class EntitiesFinderSpec
             )
         )
         .generateOne
-      val plan :: _ = project.plans.toList
+      val plan :: _ = project.plans
 
       upload(to = projectsDataset, project)
 
@@ -685,7 +685,7 @@ class EntitiesFinderSpec
             )
         )
         .generateOne
-      val plan :: _ = project.plans.toList
+      val plan :: _ = project.plans
 
       upload(to = projectsDataset, project)
 
@@ -845,7 +845,7 @@ class EntitiesFinderSpec
             )
         )
         .generateOne
-      val plan :: _ = project.plans.toList
+      val plan :: _ = project.plans
 
       upload(to = projectsDataset, project)
 
