@@ -46,6 +46,6 @@ object AwaitingDeletionGauge {
               .map(_.view.mapValues(_.toDouble).toMap)
         ) with AwaitingDeletionGauge[F]
       }
-      .flatTap(_.clearZeroedValues())
+      .flatTap(_.startZeroedValuesCleaning())
       .widen
 }

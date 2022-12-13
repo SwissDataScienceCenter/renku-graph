@@ -217,7 +217,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
     "remove the label if 0 value was set to it" in new TestCase {
 
-      gauge.clearZeroedValues(zeroRemovalTimeout).unsafeRunSync()
+      gauge.startZeroedValuesCleaning(zeroRemovalTimeout).unsafeRunSync()
 
       // setting two positive value labels
       val labelValue1 = projectPaths.generateOne
@@ -249,7 +249,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
     "not remove the label if 0 value was updated to non-0" in new TestCase {
 
-      gauge.clearZeroedValues(zeroRemovalTimeout).unsafeRunSync()
+      gauge.startZeroedValuesCleaning(zeroRemovalTimeout).unsafeRunSync()
 
       // setting non-0 value
       val labelValue = projectPaths.generateOne
@@ -277,7 +277,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
     "remove the label after the value was updated to 0" in new TestCase {
 
-      gauge.clearZeroedValues(zeroRemovalTimeout).unsafeRunSync()
+      gauge.startZeroedValuesCleaning(zeroRemovalTimeout).unsafeRunSync()
 
       // setting non-0 value
       val labelValue = projectPaths.generateOne
@@ -302,7 +302,7 @@ class PositiveValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with s
 
     "remove the label after the value was decremented to 0" in new TestCase {
 
-      gauge.clearZeroedValues(zeroRemovalTimeout).unsafeRunSync()
+      gauge.startZeroedValuesCleaning(zeroRemovalTimeout).unsafeRunSync()
 
       // setting non-0 value
       val labelValue = projectPaths.generateOne

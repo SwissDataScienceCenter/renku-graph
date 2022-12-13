@@ -45,6 +45,6 @@ object AwaitingTransformationGauge {
               .map(_.view.mapValues(_.toDouble).toMap)
         ) with AwaitingTransformationGauge[F]
       }
-      .flatTap(_.clearZeroedValues())
+      .flatTap(_.startZeroedValuesCleaning())
       .widen
 }

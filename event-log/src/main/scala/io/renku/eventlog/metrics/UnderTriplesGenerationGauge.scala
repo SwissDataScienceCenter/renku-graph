@@ -41,6 +41,6 @@ object UnderTriplesGenerationGauge {
             () => statsFinder.countEvents(Set(GeneratingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
         ) with UnderTriplesGenerationGauge[F]
       }
-      .flatTap(_.clearZeroedValues())
+      .flatTap(_.startZeroedValuesCleaning())
       .widen
 }

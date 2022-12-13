@@ -46,6 +46,6 @@ object UnderDeletionGauge {
               .map(_.view.mapValues(_.toDouble).toMap)
         ) with UnderDeletionGauge[F]
       }
-      .flatTap(_.clearZeroedValues())
+      .flatTap(_.startZeroedValuesCleaning())
       .widen
 }

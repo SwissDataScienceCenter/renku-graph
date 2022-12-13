@@ -57,7 +57,7 @@ class PositiveValuesLabeledGauge[F[_]: Async, LabelValue](val name: String Refin
 
   private val zeroedValues = Ref.unsafe[F, List[(LabelValue, Instant)]](List.empty)
 
-  def clearZeroedValues(after: Duration = 2 minutes): F[Unit] = Spawn[F].start {
+  def startZeroedValuesCleaning(after: Duration = 2 minutes): F[Unit] = Spawn[F].start {
     val gracePeriod = JDuration.ofMillis(after.toMillis)
 
     val removeOldZeros: List[(LabelValue, Instant)] => List[(LabelValue, Instant)] = l =>
