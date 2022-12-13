@@ -22,6 +22,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.tinytypes.{IntTinyType, StringTinyType}
 import org.http4s.Uri.Path.{Segment, SegmentEncoder}
+import org.http4s.{QueryParamEncoder, QueryParameterValue}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -43,6 +44,23 @@ class TinyTypeURIEncoderSpec extends AnyWordSpec with should.Matchers {
       val tt = ints().generateAs(TestIntTinyType)
 
       implicitly[SegmentEncoder[TestIntTinyType]].toSegment(tt) shouldBe Segment(tt.value.toString)
+    }
+  }
+
+  "a QueryParamEncoder" should {
+
+    "be provided for StringTinyTypes" in {
+      case class TestStringTinyType(value: String) extends StringTinyType
+      val tt = nonEmptyStrings().generateAs(TestStringTinyType)
+
+      implicitly[QueryParamEncoder[TestStringTinyType]].encode(tt) shouldBe QueryParameterValue(tt.value)
+    }
+
+    "be provided for IntTinyTypes" in {
+      case class TestIntTinyType(value: Int) extends IntTinyType
+      val tt = ints().generateAs(TestIntTinyType)
+
+      implicitly[QueryParamEncoder[TestIntTinyType]].encode(tt) shouldBe QueryParameterValue(tt.value.toString)
     }
   }
 }

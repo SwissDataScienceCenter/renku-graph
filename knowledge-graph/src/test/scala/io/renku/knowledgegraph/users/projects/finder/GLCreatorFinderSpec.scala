@@ -31,6 +31,7 @@ import io.renku.graph.model.persons
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -97,5 +98,5 @@ class GLCreatorFinderSpec
   }
 
   private lazy val endpointName: String Refined NonEmpty = "single-user"
-  private def uri(creatorId: persons.GitLabId) = uri"users" / creatorId.value
+  private def uri(creatorId: persons.GitLabId) = uri"users" / creatorId
 }

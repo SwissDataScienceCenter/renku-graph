@@ -19,7 +19,7 @@
 package io.renku.http.tinytypes
 
 import io.renku.tinytypes.TinyType
-import org.http4s.Uri
+import org.http4s.{QueryParamEncoder, Uri}
 import org.http4s.Uri.Path.SegmentEncoder
 
 object TinyTypeURIEncoder extends TinyTypeURIEncoder
@@ -32,4 +32,8 @@ trait TinyTypeURIEncoder {
   implicit def segmentEncoder[TT <: TinyType](implicit
       valueEncoder: SegmentEncoder[TT#V]
   ): Uri.Path.SegmentEncoder[TT] = valueEncoder.contramap(_.value)
+
+  implicit def queryParamEncoder[TT <: TinyType](implicit
+      valueEncoder: QueryParamEncoder[TT#V]
+  ): QueryParamEncoder[TT] = valueEncoder.contramap(_.value)
 }

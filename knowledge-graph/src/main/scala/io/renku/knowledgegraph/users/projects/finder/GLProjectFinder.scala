@@ -24,6 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.GitLabClient
+import io.renku.http.rest.paging.model.Page
 import io.renku.knowledgegraph.users.projects.model.Project
 import org.typelevel.log4cats.Logger
 
@@ -39,10 +40,12 @@ private object GLProjectFinder {
 private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFinder: GLCreatorFinder[F])
     extends GLProjectFinder[F] {
 
+  import GitLabClient.maybeNextPage
   import cats.syntax.all._
   import creatorFinder._
   import eu.timepit.refined.auto._
   import io.circe._
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s._
   import org.http4s.circe.jsonOf
@@ -60,14 +63,20 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
     case (proj, None) => proj.copy(maybeCreator = None).pure[F]
   }.sequence
 
-  private def findProjectsAndCreators(criteria: Criteria): F[List[ProjectAndCreator]] =
-    GitLabClient[F].get(uri"users" / criteria.userId.value.show / "projects", "user-projects")(
-      mapResponse
-    )(criteria.maybeUser.map(_.accessToken))
+  private def findProjectsAndCreators(criteria: Criteria, page: Page = Page.first): F[List[ProjectAndCreator]] =
+    GitLabClient[F]
+      .get(uri"users" / criteria.userId / "projects" withQueryParam ("page", page), "user-projects")(mapResponse)(
+        criteria.maybeUser.map(_.accessToken)
+      )
+      .flatMap {
+        case (results, None)           => results.pure[F]
+        case (results, Some(nextPage)) => findProjectsAndCreators(criteria, nextPage).map(results ::: _)
+      }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[ProjectAndCreator]]] = {
-    case (Ok, _, response) => response.as[List[ProjectAndCreator]]
-    case (NotFound, _, _)  => List.empty[ProjectAndCreator].pure[F]
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[F], Response[F]), F[(List[ProjectAndCreator], Option[Page])]] = {
+    case (Ok, _, resp)    => (resp.as[List[ProjectAndCreator]], maybeNextPage(resp)).mapN(_ -> _)
+    case (NotFound, _, _) => (List.empty[ProjectAndCreator], Option.empty[Page]).pure[F]
   }
 
   private type ProjectAndCreator = (model.Project.NotActivated, Option[persons.GitLabId])
