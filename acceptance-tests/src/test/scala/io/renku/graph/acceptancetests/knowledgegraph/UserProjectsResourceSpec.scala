@@ -79,7 +79,8 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
       foundProjectsInJson
         .map(_.hcursor.downField("name").as[projects.Name])
         .sequence
-        .fold(fail(_), identity) shouldBe List(activatedProject.name, notActivatedProject.name).sorted
+        .fold(fail(_), identity) shouldBe List(activatedProject.name, notActivatedProject.name)
+        .sortBy(_.value.toLowerCase)
     }
   }
 }
