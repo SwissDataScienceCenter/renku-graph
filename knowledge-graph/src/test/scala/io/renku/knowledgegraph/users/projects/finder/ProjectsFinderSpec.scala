@@ -21,9 +21,11 @@ package finder
 
 import Endpoint.Criteria.Filters
 import Endpoint.Criteria.Filters._
+import ProjectsFinder.nameOrdering
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.Total
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -50,7 +52,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name.value.toLowerCase)
+      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
@@ -70,7 +72,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = glProjects.sortBy(_.name.value.toLowerCase)
+      val expectedProjects = glProjects.sortBy(_.name)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
@@ -90,7 +92,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects = tsProjects.sortBy(_.name.value.toLowerCase)
+      val expectedProjects = tsProjects.sortBy(_.name)
       actualResults.results          shouldBe expectedProjects
       actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
@@ -134,6 +136,15 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       actualResults.results          shouldBe Nil
       actualResults.pagingInfo.total shouldBe Total(0)
+    }
+  }
+
+  "nameOrdering" should {
+
+    "sort names in case insensitive way" in {
+      val a = projects.Name("a")
+      val b = projects.Name("B")
+      List(b, a).sorted shouldBe List(a, b)
     }
   }
 
