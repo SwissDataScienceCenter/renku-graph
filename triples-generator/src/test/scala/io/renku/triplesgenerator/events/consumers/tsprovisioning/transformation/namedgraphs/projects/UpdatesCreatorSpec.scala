@@ -19,6 +19,8 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import TestDataTools._
+import cats.effect.{IO, Spawn}
+import cats.effect.std.CountDownLatch
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -65,6 +67,50 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, project2)
 
       postUpdates(project1).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project1.name.value.some
+      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+    }
+
+    "retain any single date" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      upload(to = projectsDataset, project)
+
+      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project.name.value.some
+      projects.head.maybeDateCreated shouldBe project.dateCreated.some
+    }
+
+    "retain minimum date when delete concurrently" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project1 =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
+      upload(to = projectsDataset, project1)
+      upload(to = projectsDataset, project2)
+
+      val wait  = CountDownLatch[IO](1).unsafeRunSync()
+      val task1 = wait.await *> postUpdates(project1).runAll(projectsDataset)
+      val task2 = wait.await *> postUpdates(project2).runAll(projectsDataset)
+      val run =
+        for {
+          fib <- Spawn[IO].start(List(task1, task2).parSequence)
+          _   <- wait.release
+          _   <- fib.join
+        } yield ()
+
+      run.unsafeRunSync()
 
       val projects = findProjects
       projects.size                  shouldBe 1
