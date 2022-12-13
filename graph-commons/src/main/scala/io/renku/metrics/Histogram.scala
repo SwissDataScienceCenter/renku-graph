@@ -82,12 +82,12 @@ object LabeledHistogram {
   final class ThresholdTimerImpl[F[_]: MonadThrow] private[metrics] (timer: LibHistogram.Timer,
                                                                      labelValue:       String,
                                                                      wrappedCollector: LibHistogram,
-                                                                     threshold:        Double
+                                                                     thresholdMillis:  Double
   ) extends Histogram.Timer[F] {
 
     def observeDuration: F[Double] = MonadThrow[F].catchNonFatal {
       timer.observeDuration() match {
-        case d if (d * 1000d) >= threshold => d
+        case d if (d * 1000d) >= thresholdMillis => d
         case d =>
           wrappedCollector.remove(labelValue)
           d
@@ -115,10 +115,10 @@ class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
       .buckets(buckets: _*)
       .create()
 
-  private val maybeThresholdD = maybeThreshold.map(_.toMillis.toDouble)
+  private val maybeThresholdMillis = maybeThreshold.map(_.toMillis.toDouble)
 
   override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
-    maybeThresholdD match {
+    maybeThresholdMillis match {
       case None => new metrics.LabeledHistogram.NoThresholdTimerImpl(wrappedCollector.labels(labelValue).startTimer())
       case Some(threshold) =>
         new metrics.LabeledHistogram.ThresholdTimerImpl(wrappedCollector.labels(labelValue).startTimer(),
