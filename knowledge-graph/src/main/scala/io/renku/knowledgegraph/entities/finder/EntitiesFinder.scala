@@ -69,7 +69,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
   )
 
   private def `ORDER BY`(sorting: Criteria.Sorting.By): String = sorting.property match {
-    case Criteria.Sorting.ByName          => s"ORDER BY ${sorting.direction}(?name)"
+    case Criteria.Sorting.ByName          => s"ORDER BY ${sorting.direction}(LCASE(?name))"
     case Criteria.Sorting.ByDate          => s"ORDER BY ${sorting.direction}(?date)"
     case Criteria.Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
   }

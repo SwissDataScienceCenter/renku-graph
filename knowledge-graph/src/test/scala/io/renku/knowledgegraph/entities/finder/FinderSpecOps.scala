@@ -29,6 +29,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.TestSuite
 
@@ -110,4 +111,6 @@ trait FinderSpecOps {
   implicit class PersonOps(person: Person) {
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, userAccessTokens.generateOne)
   }
+
+  protected[finder] def nameOrdering[TT <: StringTinyType]: Ordering[TT] = Ordering.by(_.value.toLowerCase)
 }
