@@ -18,37 +18,9 @@
 
 package io.renku.triplesstore
 
+import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
+
 object LuceneQueryEncoder {
 
-  private val specialCharactersEscape =
-    List("+",
-         "-",
-         "&",
-         "&&",
-         "|",
-         "||",
-         "!",
-         "(",
-         ")",
-         "{",
-         "}",
-         "[",
-         "]",
-         "^",
-         """"""",
-         "~",
-         "*",
-         "?",
-         ":",
-         """\""",
-         "/"
-    ).map {
-      case c if c == "}" || c == "]" || c == "*" || c == """\""" => c -> s"""\\$c"""
-      case c                                                     => c -> s"""\\\\$c"""
-    }.toMap
-
-  def queryAsString(v: String): String =
-    specialCharactersEscape.foldLeft(v) { case (escaped, (specialChar, replacement)) =>
-      escaped.replace(specialChar, replacement)
-    }
+  def queryAsString(v: String): String = QueryParserUtil.escape(v).replace("\\", "\\\\")
 }

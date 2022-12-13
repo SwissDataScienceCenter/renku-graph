@@ -40,11 +40,9 @@ class LuceneQueryEncoderSpec
 
   "queryAsString" should {
 
-    List[NonBlank]("""\""",
+    List[NonBlank]("\\",
                    "+",
                    "-",
-                   "&&",
-                   "||",
                    "&",
                    "|",
                    "!",
@@ -55,7 +53,7 @@ class LuceneQueryEncoderSpec
                    "[",
                    "]",
                    "^",
-                   """"""",
+                   "\"",
                    "~",
                    "*",
                    "?",
