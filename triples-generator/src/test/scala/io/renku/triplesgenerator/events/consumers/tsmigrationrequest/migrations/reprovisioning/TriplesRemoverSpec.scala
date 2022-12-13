@@ -22,7 +22,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
+import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
@@ -52,7 +52,7 @@ class TriplesRemoverSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val etr = TestExecutionTimeRecorder[IO]()
-    private implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO](etr)
+    private implicit val tr: SparqlQueryTimeRecorder[IO] = new SparqlQueryTimeRecorder[IO](etr)
     val triplesRemover = new TriplesRemoverImpl[IO](projectsDSConnectionInfo)
   }
 }

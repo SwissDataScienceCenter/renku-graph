@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, MetricsRegistry}
@@ -55,13 +55,14 @@ object EventStatusGauges {
 
   def apply[F[_]](implicit ev: EventStatusGauges[F]): EventStatusGauges[F] = ev
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventStatusGauges[F]] = for {
+  def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventStatusGauges[F]] = for {
     awaitingGeneration     <- AwaitingGenerationGauge(statsFinder)
     underTriplesGeneration <- UnderTriplesGenerationGauge(statsFinder)
     awaitingTransformation <- AwaitingTransformationGauge(statsFinder)
     underTransformation    <- UnderTransformationGauge(statsFinder)
-    awaitingDeletion       <- AwaitingDeletionGauge(statsFinder)
-    deleting               <- UnderDeletionGauge(statsFinder)
+    awaitingDeletion <-
+      AwaitingDeletionGauge(statsFinder)
+    deleting <- UnderDeletionGauge(statsFinder)
   } yield new EventStatusGaugesImpl[F](awaitingGeneration,
                                        underTriplesGeneration,
                                        awaitingTransformation,

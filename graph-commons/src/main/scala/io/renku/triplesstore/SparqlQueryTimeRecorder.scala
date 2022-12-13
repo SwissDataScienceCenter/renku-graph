@@ -22,8 +22,10 @@ import cats.effect.Sync
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.metrics.Histogram
+import io.renku.metrics.LabeledHistogramImpl
 import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration._
 
 class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F])
 
@@ -31,18 +33,18 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
+  def apply[F[_]: Sync: Logger: MetricsRegistry](): F[SparqlQueryTimeRecorder[F]] = MetricsRegistry[F]
+    .register {
+      new LabeledHistogramImpl[F](
+        name = "sparql_execution_times",
+        help = "Sparql execution times",
+        labelName = "query_id",
+        buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 25, 50),
+        maybeThreshold = (750 millis).some
+      )
+    }
+    .flatMap(histogram => ExecutionTimeRecorder[F](maybeHistogram = Some(histogram)))
+    .map(new SparqlQueryTimeRecorder(_))
+
   def apply[F[_]](implicit ev: SparqlQueryTimeRecorder[F]): SparqlQueryTimeRecorder[F] = ev
-
-  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry[F]): F[SparqlQueryTimeRecorder[F]] =
-    SparqlQueryTimeRecorder[F](Sync[F], Logger[F], metricsRegistry)
-
-  def apply[F[_]: Sync: Logger: MetricsRegistry]: F[SparqlQueryTimeRecorder[F]] = for {
-    histogram <- Histogram[F](
-                   name = "sparql_execution_times",
-                   help = "Sparql execution times",
-                   labelName = "query_id",
-                   buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
-                 )
-    executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
-  } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

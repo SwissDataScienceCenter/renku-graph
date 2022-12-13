@@ -174,7 +174,7 @@ class ReProvisioningStatusSpec
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
     private val subscriptionsRegistry   = Ref.unsafe[IO, List[SubscriptionMechanism[IO]]](Nil)

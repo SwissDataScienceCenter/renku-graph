@@ -62,7 +62,7 @@ class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with 
   }
 
   override def startTimer(labelValue: String): IO[Histogram.Timer[IO]] = IO {
-    new Histogram.TimerImpl(wrappedCollector.labels(labelValue).startTimer())
+    new LabeledHistogram.NoThresholdTimerImpl[IO](wrappedCollector.labels(labelValue).startTimer())
   }
 }
 

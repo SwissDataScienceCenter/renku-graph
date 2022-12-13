@@ -25,7 +25,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
-import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
+import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.renku.triplesstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
@@ -76,7 +76,7 @@ class RenkuVersionPairFinderSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
-      TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
+      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
     val versionPairFinder = new RenkuVersionPairFinderImpl[IO](migrationsDSConnectionInfo)
   }
 }

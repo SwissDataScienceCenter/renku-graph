@@ -19,15 +19,15 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling
 
 import cats.effect._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.graph.model.testentities.Project
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.TestMetricsRegistry
+import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.AllProjects.ProjectMetadata
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
@@ -43,7 +43,7 @@ class AllProjectsSpec
   implicit val gitlabUrl: GitLabApiUrl = EntitiesGenerators.gitLabApiUrl
   implicit val logger:    Logger[IO]   = TestLogger[IO]()
   implicit lazy val timeRecorder: SparqlQueryTimeRecorder[IO] =
-    SparqlQueryTimeRecorder(TestMetricsRegistry[IO]).unsafeRunSync()
+    new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
 
   def allProjects: AllProjects[IO] = AllProjects[IO](projectsDSConnectionInfo)
 

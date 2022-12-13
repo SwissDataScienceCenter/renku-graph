@@ -18,11 +18,14 @@
 
 package io.renku.logging
 
-import cats.MonadThrow
+import cats.effect.Sync
+import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object TestSparqlQueryTimeRecorder {
-  def apply[F[_]: MonadThrow: Logger] = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[F]())
-  def apply[F[_]: MonadThrow: Logger](instance: ExecutionTimeRecorder[F]) = new SparqlQueryTimeRecorder(instance)
+  def apply[F[_]: Sync: Logger]: F[SparqlQueryTimeRecorder[F]] = {
+    implicit val metricsRegistry: MetricsRegistry[F] = TestMetricsRegistry[F]
+    SparqlQueryTimeRecorder[F]()
+  }
 }

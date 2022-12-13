@@ -737,7 +737,7 @@ class DatasetFinderSpec
   private trait TestCase {
     implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val datasetFinder = new DatasetFinderImpl[IO](
       new BaseDetailsFinderImpl[IO](projectsDSConnectionInfo),
       new CreatorsFinderImpl[IO](projectsDSConnectionInfo),

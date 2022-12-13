@@ -16,24 +16,29 @@
  * limitations under the License.
  */
 
-package io.renku.graph.metrics
+package io.renku.metrics
 
-import cats.effect.Async
-import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.renku.events.CategoryName
-import io.renku.metrics.{LabeledGauge, MetricsRegistry, PositiveValuesLabeledGauge}
+import cats.MonadThrow
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 
-trait SentEventsGauge[F[_]] extends LabeledGauge[F, CategoryName]
+trait SingleValueGauge[F[_]] extends Gauge[F] {
+  def set(value: Double): F[Unit]
+}
 
-object SentEventsGauge {
+class SingleValueGaugeImpl[F[_]: MonadThrow](val name: String Refined NonEmpty, val help: String Refined NonEmpty)
+    extends SingleValueGauge[F]
+    with PrometheusCollector {
+  import io.prometheus.client.{Gauge => LibGauge}
 
-  def apply[F[_]: Async: MetricsRegistry]: F[SentEventsGauge[F]] = MetricsRegistry[F].register {
-    new PositiveValuesLabeledGauge[F, CategoryName](
-      name = "sent_events_count",
-      help = "Number of sent Events",
-      labelName = "category_mame",
-      resetDataFetch = () => Map.empty[CategoryName, Double].pure[F]
-    ) with SentEventsGauge[F]
-  }.widen
+  type Collector = LibGauge
+
+  private[metrics] lazy val wrappedCollector: Collector =
+    LibGauge
+      .build()
+      .name(name.value)
+      .help(help.value)
+      .create()
+
+  override def set(value: Double): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector set value)
 }
