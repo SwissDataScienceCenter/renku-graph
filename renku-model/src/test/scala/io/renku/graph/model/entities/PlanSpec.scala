@@ -20,24 +20,26 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
+import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators._
+import io.renku.graph.model.entities.PlanLens.{planDateCreated, planInvalidationTime}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 
 class PlanSpec
     extends AnyWordSpec
@@ -92,7 +94,8 @@ class PlanSpec
       message should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
     }
 
-    "fail if invalidation done before the creation date" in {
+    // This test has been temporarily disabled; see https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
+    "fail if invalidation done before the creation date" ignore {
 
       val plan = plans
         .map(_.invalidate())
@@ -117,6 +120,34 @@ class PlanSpec
       message should include {
         show"Invalidation time $invalidationTime on StepPlan ${plan.resourceId} is older than dateCreated ${plan.dateCreated}"
       }
+    }
+
+    // This test has to be removed as part of https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
+    "set creation date as invalidation time if invalidation done before the creation date" in {
+
+      val plan = plans
+        .map(_.invalidate())
+        .generateOne
+        .to[entities.StepPlan]
+
+      val invalidationTime = timestamps(max = plan.dateCreated.value.minusSeconds(1)).generateAs(InvalidationTime)
+      val jsonLD = parse {
+        plan.asJsonLD.toJson.hcursor
+          .downField((prov / "invalidatedAtTime").show)
+          .delete
+          .top
+          .getOrElse(fail("Invalid Json after removing property"))
+          .deepMerge(
+            Json.obj(
+              (prov / "invalidatedAtTime").show -> json"""{"@value": ${invalidationTime.show}}"""
+            )
+          )
+      }.flatMap(_.flatten).fold(throw _, identity)
+
+      jsonLD.cursor.as[List[entities.StepPlan]] shouldBe List(
+        (planDateCreated.set(model.plans.DateCreated(invalidationTime.value)) >>>
+          planInvalidationTime.set(invalidationTime.some))(plan)
+      ).asRight
     }
   }
 

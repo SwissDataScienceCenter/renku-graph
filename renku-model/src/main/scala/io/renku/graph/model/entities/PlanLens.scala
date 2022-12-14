@@ -18,10 +18,10 @@
 
 package io.renku.graph.model.entities
 
-import io.renku.graph.model.plans.DateCreated
 import cats.syntax.option._
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.entities.Plan.Derivation
+import io.renku.graph.model.plans.DateCreated
 import monocle.{Getter, Lens, Setter}
 
 object PlanLens {
@@ -36,9 +36,6 @@ object PlanLens {
 
   val getPlanDerivation: Getter[Plan, Option[Derivation]] =
     Getter[Plan, Option[Derivation]](getModifiedProperties.get(_).map(_._1))
-
-  val getPlanInvalidationTime: Getter[Plan, Option[Option[InvalidationTime]]] =
-    Getter[Plan, Option[Option[InvalidationTime]]](getModifiedProperties.get(_).map(_._2))
 
   val setPlanDerivation: Setter[Plan, Derivation] =
     Setter[Plan, Derivation](f => {
@@ -76,6 +73,20 @@ object PlanLens {
       case plan: StepPlan.Modified         => plan.copy(dateCreated = date)
       case plan: CompositePlan.NonModified => plan.copy(dateCreated = date)
       case plan: CompositePlan.Modified    => plan.copy(dateCreated = date)
+    }
+  }
+
+  val planInvalidationTime: Lens[Plan, Option[InvalidationTime]] = Lens[Plan, Option[InvalidationTime]] {
+    case _:    StepPlan.NonModified      => None
+    case plan: StepPlan.Modified         => plan.maybeInvalidationTime
+    case _:    CompositePlan.NonModified => None
+    case plan: CompositePlan.Modified    => plan.maybeInvalidationTime
+  } { maybeInvalidationTime =>
+    {
+      case plan: StepPlan.NonModified      => plan
+      case plan: StepPlan.Modified         => plan.copy(maybeInvalidationTime = maybeInvalidationTime)
+      case plan: CompositePlan.NonModified => plan
+      case plan: CompositePlan.Modified    => plan.copy(maybeInvalidationTime = maybeInvalidationTime)
     }
   }
 }

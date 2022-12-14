@@ -178,35 +178,40 @@ object StepPlan {
            derivation:               Derivation,
            maybeInvalidationTime:    Option[InvalidationTime]
   ): ValidatedNel[String, StepPlan] = {
+//    This code has been temporarily disabled; see https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
+//    lazy val validateInvalidationTime: ValidatedNel[String, Unit] = maybeInvalidationTime match {
+//      case None => Validated.validNel(())
+//      case Some(time) =>
+//        Validated.condNel(
+//          test = (time.value compareTo dateCreated.value) >= 0,
+//          (),
+//          show"Invalidation time $time on StepPlan $resourceId is older than dateCreated $dateCreated"
+//        )
+//    }
+//
+//    validateInvalidationTime.map(_ =>
 
-    lazy val validateInvalidationTime: ValidatedNel[String, Unit] = maybeInvalidationTime match {
-      case None => Validated.validNel(())
-      case Some(time) =>
-        Validated.condNel(
-          test = (time.value compareTo dateCreated.value) >= 0,
-          (),
-          show"Invalidation time $time on StepPlan $resourceId is older than dateCreated $dateCreated"
-        )
+    val updatedDateCreated = maybeInvalidationTime match {
+      case Some(time) if (time.value compareTo dateCreated.value) < 0 => plans.DateCreated(time.value)
+      case _                                                          => dateCreated
     }
 
-    validateInvalidationTime.map(_ =>
-      Modified(
-        resourceId,
-        name,
-        maybeDescription,
-        creators,
-        dateCreated,
-        keywords,
-        maybeCommand,
-        maybeProgrammingLanguage,
-        parameters,
-        inputs,
-        outputs,
-        successCodes,
-        derivation,
-        maybeInvalidationTime
-      )
-    )
+    Modified(
+      resourceId,
+      name,
+      maybeDescription,
+      creators,
+      updatedDateCreated,
+      keywords,
+      maybeCommand,
+      maybeProgrammingLanguage,
+      parameters,
+      inputs,
+      outputs,
+      successCodes,
+      derivation,
+      maybeInvalidationTime
+    ).validNel
   }
 
   val entityTypes: EntityTypes =
