@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 package namedgraphs.projects
 
 import Generators._
+import cats.data.{NonEmptyList => Nel}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
@@ -139,7 +140,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     maybeAgent     <- cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
   } yield ProjectMutableData(name,
-                             dateCreated,
+                             Nel.of(dateCreated),
                              maybeParentId,
                              visibility,
                              maybeDesc,

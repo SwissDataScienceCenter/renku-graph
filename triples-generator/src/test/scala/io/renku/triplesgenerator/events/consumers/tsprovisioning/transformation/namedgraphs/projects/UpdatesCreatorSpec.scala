@@ -48,7 +48,6 @@ class UpdatesCreatorSpec
     with IOSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    // with ExternalJenaForSpec
     with ProjectsDataset
     with TableDrivenPropertyChecks
     with ScalaCheckPropertyChecks {
@@ -299,7 +298,9 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      dateCreatedDeletion(project, toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne))
+      dateCreatedDeletion(project,
+                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateNonEmptyList())
+      )
         .runAll(on = projectsDataset)
         .unsafeRunSync()
 

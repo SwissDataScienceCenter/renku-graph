@@ -160,7 +160,7 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData) =
     Option
-      .when(project.dateCreated != kgData.dateCreated) {
+      .when(project.dateCreated != kgData.dateCreated.toList.min) {
         val resource = project.resourceId.showAs[RdfResource]
         SparqlQuery.of(
           name = "transformation - project dateCreated delete",
@@ -182,17 +182,18 @@ private object UpdatesCreator extends UpdatesCreator {
       name = "transformation - project date created deduplicate",
       Prefixes.of(schema -> "schema"),
       s"""|WITH $resource 
-          |DELETE { ?p schema:dateCreated ?date }
+          |DELETE { ?id schema:dateCreated ?date }
           |WHERE {
           |  {
-          |    SELECT (min(?cdate) as ?minDate)
+          |    SELECT ?id (min(?cdate) as ?minDate)
           |    WHERE {
-          |      ?_s a schema:Project;
+          |      ?id a schema:Project;
           |          schema:dateCreated ?cdate.
           |    }
+          |    GROUP BY ?id
+          |    HAVING (COUNT(?cdate) > 1)
           |  }
-          |  ?p a schema:Project;
-          |     schema:dateCreated ?date.
+          |  ?id schema:dateCreated ?date.
           |  FILTER ( ?date != ?minDate )
           |}
           |""".stripMargin

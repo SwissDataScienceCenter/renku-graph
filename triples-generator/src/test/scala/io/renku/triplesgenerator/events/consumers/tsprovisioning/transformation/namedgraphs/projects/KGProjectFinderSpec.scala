@@ -47,7 +47,8 @@ class KGProjectFinderSpec
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         upload(to = projectsDataset, project)
 
-        finder.find(project.resourceId).unsafeRunSync() shouldBe toProjectMutableData(project).some
+        val projectData = finder.find(project.resourceId).unsafeRunSync()
+        projectData.map(_.selectEarliestDateCreated) shouldBe toProjectMutableData(project).some
       }
     }
 
