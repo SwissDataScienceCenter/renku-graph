@@ -117,6 +117,25 @@ class UpdatesCreatorSpec
       projects.head.maybeName        shouldBe project1.name.value.some
       projects.head.maybeDateCreated shouldBe project2.dateCreated.some
     }
+
+    "don't confuse with datasets when removing dates" in {
+      val (dataset, project) = anyRenkuProjectEntities
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+        .bimap(identity, _.to[entities.Project])
+      upload(to = projectsDataset, project)
+
+      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project.name.value.some
+      projects.head.maybeDateCreated shouldBe project.dateCreated.some
+
+      val datasets = findDatasets
+      datasets.size      shouldBe 1
+      datasets.head.name shouldBe dataset.identification.title.value.some
+    }
   }
 
   "prepareUpdates" should {
@@ -298,6 +317,8 @@ class UpdatesCreatorSpec
                                          maybeCreatorId:   Option[String]
   )
 
+  private case class CurrentDatasetState(name: Option[String], dateCreated: Option[Instant])
+
   private object CurrentProjectState {
     def from(project: entities.Project): CurrentProjectState = CurrentProjectState(
       project.name.value.some,
@@ -310,6 +331,31 @@ class UpdatesCreatorSpec
       project.maybeCreator.map(_.resourceId.value)
     )
   }
+
+  private def findDatasets: Set[CurrentDatasetState] =
+    runSelect(
+      projectsDataset,
+      SparqlQuery.of(
+        "fetch datasets",
+        Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+        s"""SELECT ?name ?dateCreated
+           |WHERE {
+           |  Graph ?g {
+           |    ?id a schema:Dataset
+           |    OPTIONAL { ?id schema:name ?name }
+           |    OPTIONAL { ?id schema:dateCreated ?dateCreated }
+           |  }
+           |}
+           |""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row =>
+        CurrentDatasetState(
+          name = row.get("name"),
+          dateCreated = row.get("dateCreated").map(d => Instant.parse(d))
+        )
+      )
+      .toSet
 
   private def findProjects: Set[CurrentProjectState] = runSelect(
     on = projectsDataset,

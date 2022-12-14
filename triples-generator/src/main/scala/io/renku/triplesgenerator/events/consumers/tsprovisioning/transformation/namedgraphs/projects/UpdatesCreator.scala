@@ -182,15 +182,17 @@ private object UpdatesCreator extends UpdatesCreator {
       name = "transformation - project date created deduplicate",
       Prefixes.of(schema -> "schema"),
       s"""|WITH $resource 
-          |DELETE { ?s schema:dateCreated ?date }
+          |DELETE { ?p schema:dateCreated ?date }
           |WHERE {
           |  {
-          |    SELECT (min(?date) as ?minDate)
+          |    SELECT (min(?cdate) as ?minDate)
           |    WHERE {
-          |      ?s schema:dateCreated ?date
+          |      ?_s a schema:Project;
+          |          schema:dateCreated ?cdate.
           |    }
           |  }
-          |  ?s schema:dateCreated ?date.
+          |  ?p a schema:Project;
+          |     schema:dateCreated ?date.
           |  FILTER ( ?date != ?minDate )
           |}
           |""".stripMargin
