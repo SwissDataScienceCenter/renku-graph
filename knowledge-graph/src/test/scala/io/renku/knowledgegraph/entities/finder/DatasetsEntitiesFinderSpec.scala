@@ -57,7 +57,7 @@ class DatasetsEntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
-        .results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
+        .results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
     }
 
     "de-duplicate datasets having equal sameAs - case of an Exported DS" in new TestCase {
@@ -133,7 +133,7 @@ class DatasetsEntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
-        .results shouldBe List(importedDSAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
+        .results shouldBe List(importedDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
     }
   }
 

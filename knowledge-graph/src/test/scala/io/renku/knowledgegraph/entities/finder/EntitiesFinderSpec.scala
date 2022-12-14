@@ -62,7 +62,7 @@ class EntitiesFinderSpec
       upload(to = projectsDataset, project)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe
-        allEntitiesFrom(project).sortBy(_.name.value)
+        allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -112,7 +112,7 @@ class EntitiesFinderSpec
         dsAndProject.to[model.Entity.Dataset],
         (plan -> planProject).to[model.Entity.Workflow],
         person.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return entities which keywords matches the given query, sorted by name" in new TestCase {
@@ -158,7 +158,7 @@ class EntitiesFinderSpec
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         (plan -> planProject).to[model.Entity.Workflow]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return entities which description matches the given query, sorted by name" in new TestCase {
@@ -196,7 +196,7 @@ class EntitiesFinderSpec
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         (plan -> planProject).to[model.Entity.Workflow]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return project entities which namespace matches the given query, sorted by name" in new TestCase {
@@ -213,7 +213,7 @@ class EntitiesFinderSpec
         .unsafeRunSync()
         .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return entities which creator name matches the given query, sorted by name" in new TestCase {
@@ -243,7 +243,7 @@ class EntitiesFinderSpec
         dsAndProject.to[model.Entity.Dataset],
         projectCreator.to[model.Entity.Person],
         dsCreator.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -260,7 +260,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
         .unsafeRunSync()
-        .results shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
+        .results shouldBe List(project.to[model.Entity.Project]).sortBy(_.name)(nameOrdering)
     }
 
     "return only datasets when 'dataset' type given" in new TestCase {
@@ -274,7 +274,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
         .unsafeRunSync()
-        .results shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
+        .results shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
     }
 
     "return only workflows when 'workflow' type given" in new TestCase {
@@ -288,7 +288,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
         .unsafeRunSync()
-        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).sortBy(_.name.value)
+        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).sortBy(_.name)(nameOrdering)
     }
 
     "return entities of many types when multiple types given" in new TestCase {
@@ -306,7 +306,7 @@ class EntitiesFinderSpec
         .results shouldBe List(
         project.to[model.Entity.Project],
         person.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return multiple types datasets when 'person' type given" in new TestCase {
@@ -321,7 +321,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
         .unsafeRunSync()
-        .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name)
+        .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -353,7 +353,7 @@ class EntitiesFinderSpec
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         creator.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return entities creator matches in a case-insensitive way" in new TestCase {
@@ -382,7 +382,7 @@ class EntitiesFinderSpec
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         creator.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return entities that matches at least one of the given creators" in new TestCase {
@@ -413,7 +413,7 @@ class EntitiesFinderSpec
         dsAndProject.to[model.Entity.Dataset],
         projectCreator.to[model.Entity.Person],
         dsCreator.to[model.Entity.Person]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return no entities when there's no match on creator" in new TestCase {
@@ -465,7 +465,7 @@ class EntitiesFinderSpec
         .results shouldBe allEntitiesFrom(publicProject)
         .addAllEntitiesFrom(privateProject)
         .addAllPersonsFrom(internalProject)
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
     }
 
     "return no entities when no match on visibility" in new TestCase {
@@ -509,7 +509,7 @@ class EntitiesFinderSpec
         .unsafeRunSync()
         .results shouldBe allEntitiesFrom(matchingProject)
         .removeAllPersons()
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
     }
 
     "return no namespace aware entities when no match on namespace" in new TestCase {
@@ -567,7 +567,7 @@ class EntitiesFinderSpec
         project.to[model.Entity.Project],
         (ds   -> project).to[model.Entity.Dataset],
         (plan -> project).to[model.Entity.Workflow]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return no entities with date < 'since'" in new TestCase {
@@ -652,7 +652,7 @@ class EntitiesFinderSpec
         .unsafeRunSync()
         .results shouldBe List(
         (matchingDS -> dsProject).to[model.Entity.Dataset]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -696,7 +696,7 @@ class EntitiesFinderSpec
         project.to[model.Entity.Project],
         (ds   -> project).to[model.Entity.Dataset],
         (plan -> project).to[model.Entity.Workflow]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
 
     "return no entities with date > 'until'" in new TestCase {
@@ -780,7 +780,7 @@ class EntitiesFinderSpec
         .unsafeRunSync()
         .results shouldBe List(
         (matchingDS -> dsProject).to[model.Entity.Dataset]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -857,16 +857,18 @@ class EntitiesFinderSpec
         (dsInternal -> project).to[model.Entity.Dataset],
         (dsExternal -> project).to[model.Entity.Dataset],
         (plan       -> project).to[model.Entity.Workflow]
-      ).sortBy(_.name.value)
+      ).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with sorting" should {
 
-    "be sorting by Name if requested" in new TestCase {
+    "be sorting by Name if requested in case-insensitive way" in new TestCase {
+      val commonPart = nonEmptyStrings().generateOne
       val project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectName(projects.Name(s"a$commonPart")))
         .withActivities(activityEntities(stepPlanEntities()))
-        .withDatasets(datasetEntities(provenanceNonModified))
+        .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSName(datasets.Name(s"B$commonPart"))))
         .generateOne
 
       upload(to = projectsDataset, project)
@@ -876,7 +878,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(Criteria(sorting = Sorting.By(Sorting.ByName, direction)))
         .unsafeRunSync()
-        .results shouldBe allEntitiesFrom(project).sortBy(_.name.value).use(direction)
+        .results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering).use(direction)
     }
 
     "be sorting by Date if requested" in new TestCase {
@@ -968,7 +970,9 @@ class EntitiesFinderSpec
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
-      results.results shouldBe List(project.to[model.Entity.Project]).addAllDatasetsFrom(project).sortBy(_.name.value)
+      results.results shouldBe List(project.to[model.Entity.Project])
+        .addAllDatasetsFrom(project)
+        .sortBy(_.name)(nameOrdering)
     }
 
     "return the requested page with info if there are more" in new TestCase {
@@ -987,7 +991,7 @@ class EntitiesFinderSpec
       results.pagingInfo.total         shouldBe Total(3)
       results.results shouldBe List(project.to[model.Entity.Project])
         .addAllDatasetsFrom(project)
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
         .get(paging.page.value - 1)
         .toList
     }
@@ -1041,7 +1045,7 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(publicProject)
         .addAllPersonsFrom(internalProject)
         .addAllPersonsFrom(privateProject)
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
     }
 
     "return public and internal entities only if auth user is given" in new TestCase {
@@ -1060,7 +1064,7 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(publicProject)
         .addAllEntitiesFrom(internalProject)
         .addAllPersonsFrom(privateProject)
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
     }
 
     "return any visibility entities if the given auth user has access to them" in new TestCase {
@@ -1077,7 +1081,7 @@ class EntitiesFinderSpec
         .addAllEntitiesFrom(publicProject)
         .addAllEntitiesFrom(internalProject)
         .addAllEntitiesFrom(privateProject)
-        .sortBy(_.name.value)
+        .sortBy(_.name)(nameOrdering)
     }
   }
 }
