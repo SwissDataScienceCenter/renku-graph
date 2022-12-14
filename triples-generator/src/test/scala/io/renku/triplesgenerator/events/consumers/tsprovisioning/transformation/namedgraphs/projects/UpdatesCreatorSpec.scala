@@ -19,16 +19,21 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import TestDataTools._
+import cats.effect.{IO, Spawn}
+import cats.effect.std.CountDownLatch
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.DateCreated
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -36,6 +41,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+import scala.concurrent.duration._
 
 class UpdatesCreatorSpec
     extends AnyWordSpec
@@ -47,6 +53,89 @@ class UpdatesCreatorSpec
     with ScalaCheckPropertyChecks {
 
   import UpdatesCreator._
+
+  "postUpdates" should {
+    "remove duplicate created dates" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project1 =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
+      upload(to = projectsDataset, project1)
+      upload(to = projectsDataset, project2)
+
+      postUpdates(project1).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project1.name.value.some
+      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+    }
+
+    "retain any single date" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      upload(to = projectsDataset, project)
+
+      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project.name.value.some
+      projects.head.maybeDateCreated shouldBe project.dateCreated.some
+    }
+
+    "retain minimum date when delete concurrently" in {
+      val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
+      val project1 =
+        projectCreatedLens.set(dateCreated)(
+          anyProjectEntities.generateOne.to[entities.Project]
+        )
+      val project2 = projectCreatedLens.modify(_ - 1.days).apply(project1)
+      upload(to = projectsDataset, project1)
+      upload(to = projectsDataset, project2)
+
+      val wait  = CountDownLatch[IO](1).unsafeRunSync()
+      val task1 = wait.await *> postUpdates(project1).runAll(projectsDataset)
+      val task2 = wait.await *> postUpdates(project2).runAll(projectsDataset)
+      val run =
+        for {
+          fib <- Spawn[IO].start(List(task1, task2).parSequence)
+          _   <- wait.release
+          _   <- fib.join
+        } yield ()
+
+      run.unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project1.name.value.some
+      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+    }
+
+    "don't confuse with datasets when removing dates" in {
+      val (dataset, project) = anyRenkuProjectEntities
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+        .bimap(identity, _.to[entities.Project])
+      upload(to = projectsDataset, project)
+
+      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
+
+      val projects = findProjects
+      projects.size                  shouldBe 1
+      projects.head.maybeName        shouldBe project.name.value.some
+      projects.head.maybeDateCreated shouldBe project.dateCreated.some
+
+      val datasets = findDatasets
+      datasets.size      shouldBe 1
+      datasets.head.name shouldBe dataset.identification.title.value.some
+    }
+  }
 
   "prepareUpdates" should {
 
@@ -209,7 +298,9 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      dateCreatedDeletion(project, toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne))
+      dateCreatedDeletion(project,
+                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateNonEmptyList())
+      )
         .runAll(on = projectsDataset)
         .unsafeRunSync()
 
@@ -227,6 +318,8 @@ class UpdatesCreatorSpec
                                          maybeCreatorId:   Option[String]
   )
 
+  private case class CurrentDatasetState(name: Option[String], dateCreated: Option[Instant])
+
   private object CurrentProjectState {
     def from(project: entities.Project): CurrentProjectState = CurrentProjectState(
       project.name.value.some,
@@ -239,6 +332,31 @@ class UpdatesCreatorSpec
       project.maybeCreator.map(_.resourceId.value)
     )
   }
+
+  private def findDatasets: Set[CurrentDatasetState] =
+    runSelect(
+      projectsDataset,
+      SparqlQuery.of(
+        "fetch datasets",
+        Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+        s"""SELECT ?name ?dateCreated
+           |WHERE {
+           |  Graph ?g {
+           |    ?id a schema:Dataset
+           |    OPTIONAL { ?id schema:name ?name }
+           |    OPTIONAL { ?id schema:dateCreated ?dateCreated }
+           |  }
+           |}
+           |""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row =>
+        CurrentDatasetState(
+          name = row.get("name"),
+          dateCreated = row.get("dateCreated").map(d => Instant.parse(d))
+        )
+      )
+      .toSet
 
   private def findProjects: Set[CurrentProjectState] = runSelect(
     on = projectsDataset,
@@ -277,4 +395,22 @@ class UpdatesCreatorSpec
       )
     )
     .toSet
+
+  def projectCreatedLens: Lens[entities.Project, DateCreated] =
+    Lens[entities.Project, DateCreated](_.dateCreated) { created =>
+      {
+        case p: entities.NonRenkuProject.WithParent    => p.copy(dateCreated = created)
+        case p: entities.NonRenkuProject.WithoutParent => p.copy(dateCreated = created)
+        case p: entities.RenkuProject.WithParent       => p.copy(dateCreated = created)
+        case p: entities.RenkuProject.WithoutParent    => p.copy(dateCreated = created)
+      }
+    }
+
+  final implicit class InstantTinyTypeOps[A <: InstantTinyType](self: A) {
+    def +(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
+      tf.apply(self.value.plusMillis(duration.toMillis))
+
+    def -(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
+      tf.apply(self.value.minusMillis(duration.toMillis))
+  }
 }

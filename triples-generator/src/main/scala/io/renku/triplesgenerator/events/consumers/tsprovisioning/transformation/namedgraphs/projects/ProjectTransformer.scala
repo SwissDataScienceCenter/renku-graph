@@ -25,7 +25,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.preDataQueriesOnly
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
@@ -65,7 +64,7 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
 
   private def addOtherUpdates(kgData: ProjectMutableData): ((Project, Queries)) => (Project, Queries) = {
     case (project, queries) =>
-      (project, queries |+| preDataQueriesOnly(prepareUpdates(project, kgData)))
+      (project, queries ++ Queries(prepareUpdates(project, kgData), postUpdates(project)))
   }
 }
 

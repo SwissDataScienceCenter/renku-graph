@@ -28,6 +28,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
   def prepareUpdates(project:      Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def postUpdates(project:         Project): List[SparqlQuery]
   def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
@@ -159,7 +160,7 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData) =
     Option
-      .when(project.dateCreated != kgData.dateCreated) {
+      .when(project.dateCreated != kgData.dateCreated.toList.min) {
         val resource = project.resourceId.showAs[RdfResource]
         SparqlQuery.of(
           name = "transformation - project dateCreated delete",
@@ -170,4 +171,32 @@ private object UpdatesCreator extends UpdatesCreator {
         )
       }
       .toList
+
+  override def postUpdates(project: Project): List[SparqlQuery] =
+    List(deduplicateDateCreated(project))
+
+  /** Retain the lowest dateCreated date. */
+  private def deduplicateDateCreated(project: Project) = {
+    val resource = project.resourceId.showAs[RdfResource]
+    SparqlQuery.of(
+      name = "transformation - project date created deduplicate",
+      Prefixes.of(schema -> "schema"),
+      s"""|WITH $resource 
+          |DELETE { ?id schema:dateCreated ?date }
+          |WHERE {
+          |  {
+          |    SELECT ?id (min(?cdate) as ?minDate)
+          |    WHERE {
+          |      ?id a schema:Project;
+          |          schema:dateCreated ?cdate.
+          |    }
+          |    GROUP BY ?id
+          |    HAVING (COUNT(?cdate) > 1)
+          |  }
+          |  ?id schema:dateCreated ?date.
+          |  FILTER ( ?date != ?minDate )
+          |}
+          |""".stripMargin
+    )
+  }
 }

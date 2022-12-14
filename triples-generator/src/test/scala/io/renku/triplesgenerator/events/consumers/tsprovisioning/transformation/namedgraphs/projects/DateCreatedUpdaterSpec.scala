@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 package namedgraphs.projects
 
+import cats.data.{NonEmptyList => Nel}
 import Generators.queriesGen
 import TestDataTools._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
@@ -41,7 +42,7 @@ class DateCreatedUpdaterSpec extends AnyWordSpec with should.Matchers with MockF
       "if project dateCreated on the model is < dateCreated currently in KG" in new TestCase {
         val project = anyProjectEntities.generateOne.to[entities.Project]
         val kgData = toProjectMutableData(project).copy(dateCreated =
-          timestampsNotInTheFuture(butYoungerThan = project.dateCreated.value).generateAs(DateCreated)
+          Nel.of(timestampsNotInTheFuture(butYoungerThan = project.dateCreated.value).generateAs(DateCreated))
         )
 
         val updateQueries = sparqlQueries.generateList()
@@ -58,7 +59,7 @@ class DateCreatedUpdaterSpec extends AnyWordSpec with should.Matchers with MockF
       "if project dateCreated on the model is > dateCreated currently in KG" in new TestCase {
         val project       = anyProjectEntities.generateOne.to[entities.Project]
         val kgDateCreated = timestamps(max = project.dateCreated.value.minusMillis(1)).generateAs(DateCreated)
-        val kgData        = toProjectMutableData(project).copy(dateCreated = kgDateCreated)
+        val kgData        = toProjectMutableData(project).copy(dateCreated = Nel.of(kgDateCreated))
 
         val updatedProject -> queries = updater.updateDateCreated(kgData)(project -> initialQueries)
 
