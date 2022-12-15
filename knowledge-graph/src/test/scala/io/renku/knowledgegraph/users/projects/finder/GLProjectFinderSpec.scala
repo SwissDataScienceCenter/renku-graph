@@ -153,7 +153,7 @@ class GLProjectFinderSpec
   private lazy val endpointName: String Refined NonEmpty = "user-projects"
 
   private trait TestCase {
-    val pageSize = 20
+    val pageSize = GLProjectFinder.requestPageSize.value
     implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val glCreatorFinder = mock[GLCreatorFinder[IO]]
@@ -179,7 +179,9 @@ class GLProjectFinderSpec
   }
 
   private def uri(criteria: Criteria, page: Page) =
-    uri"users" / criteria.userId / "projects" withQueryParam ("page", page)
+    (uri"users" / criteria.userId / "projects")
+      .withQueryParam("page", page)
+      .withQueryParam("per_page", GLProjectFinder.requestPageSize)
 
   private implicit lazy val projectEncoder: Encoder[ResultItem] = Encoder.instance { case (project, maybeCreatorId) =>
     json"""{
