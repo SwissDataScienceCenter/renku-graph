@@ -60,19 +60,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
         |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
-        |            ${filters.onQuery(
-    s"""|            {
-        |              SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
-        |              WHERE {
-        |                (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
-        |                GRAPH ?g {
-        |                  ?wkId a prov:Plan;
-        |                        ^renku:hasPlan ?projId
-        |                }
-        |              }
-        |              GROUP BY ?wkId
-        |            }
-        |""")}
+        |            ${filters.foldQuery(withQuerySnippet, withoutQuerySnippet)}
         |            OPTIONAL {
         |              GRAPH ?childProjectId {
         |                ?childWkId prov:wasDerivedFrom ?wkId;
@@ -117,6 +105,30 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |""".stripMargin
     // format: on
   }
+
+  private def withoutQuerySnippet: String =
+    """
+      |BIND (xsd:float(1.0) AS ?matchingScore)
+      |GRAPH ?projectId {
+      |   ?wkId a prov:Plan;
+      |         ^renku:hasPlan ?projectId.
+      |}
+      |""".stripMargin
+
+  def withQuerySnippet(query: String) =
+    s"""
+       |{
+       |  SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
+       |  WHERE {
+       |    (?wkId ?score) text:query (schema:name schema:keywords schema:description '$query').
+       |    GRAPH ?g {
+       |      ?wkId a prov:Plan;
+       |            ^renku:hasPlan ?projId
+       |      }
+       |    }
+       |    GROUP BY ?wkId
+       |}
+       |""".stripMargin
 
   override def decoder[EE >: Entity.Workflow]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._

@@ -35,7 +35,7 @@ import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
+import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -61,8 +61,24 @@ class EntitiesFinderSpec
 
       upload(to = projectsDataset, project)
 
-      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe
-        allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
+      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe allEntitiesFrom(project).sortBy(_.name)(
+        nameOrdering
+      )
+    }
+
+    "return all entities sorted by name if no query is given with modified plans" in new TestCase {
+      val projectBase = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(stepPlanEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      val newPlan = projectBase.plans.head.createModification()
+      val project = projectBase.copy(unlinkedPlans = newPlan.asInstanceOf[StepPlan] :: projectBase.unlinkedPlans)
+
+      upload(to = projectsDataset, project)
+      val results =
+        finder.findEntities(Criteria()).unsafeRunSync().results
+      results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
     }
   }
 
