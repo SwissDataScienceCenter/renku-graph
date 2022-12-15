@@ -30,9 +30,9 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.tinytypes.syntax.all._
 import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -405,12 +405,4 @@ class UpdatesCreatorSpec
         case p: entities.RenkuProject.WithoutParent    => p.copy(dateCreated = created)
       }
     }
-
-  final implicit class InstantTinyTypeOps[A <: InstantTinyType](self: A) {
-    def +(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
-      tf.apply(self.value.plusMillis(duration.toMillis))
-
-    def -(duration: FiniteDuration)(implicit tf: TinyTypeFactory[A]): A =
-      tf.apply(self.value.minusMillis(duration.toMillis))
-  }
 }

@@ -33,19 +33,21 @@ private[tsmigrationrequest] object Migrations {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[List[Migration[F]]] = for {
-    datasetsCreator               <- DatasetsCreator[F]
-    datasetsRemover               <- DatasetsRemover[F]
-    reProvisioning                <- ReProvisioning[F](config)
-    removeNotLinkedPersons        <- RemoveNotLinkedPersons[F]
-    fixPlansYoungerThanActivities <- FixPlansYoungerThanActivities[F]
-    compositePlan                 <- CompositePlanProvision.create[F]
+    datasetsCreator                <- DatasetsCreator[F]
+    datasetsRemover                <- DatasetsRemover[F]
+    reProvisioning                 <- ReProvisioning[F](config)
+    removeNotLinkedPersons         <- RemoveNotLinkedPersons[F]
+    fixPlansYoungerThanActivities  <- FixPlansYoungerThanActivities[F]
+    compositePlan                  <- CompositePlanProvision.create[F]
+    fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
                     reProvisioning,
                     removeNotLinkedPersons,
                     fixPlansYoungerThanActivities,
-                    compositePlan
+                    compositePlan,
+                    fixMultipleProjectCreatedDates
                   )
   } yield migrations
 
