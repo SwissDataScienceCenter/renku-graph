@@ -45,7 +45,6 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
   import GLProjectFinder.requestPageSize
   import GitLabClient.maybeNextPage
   import cats.syntax.all._
-  import creatorFinder._
   import eu.timepit.refined.auto._
   import io.circe._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -58,13 +57,33 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
   override def findProjectsInGL(criteria: Criteria): F[List[Project.NotActivated]] =
     findProjectsAndCreators(criteria) >>= addCreators(criteria)
 
-  private def addCreators(criteria: Criteria): List[ProjectAndCreator] => F[List[Project.NotActivated]] = _.map {
-    case (proj, Some(creatorId)) =>
-      findCreatorName(creatorId)(criteria.maybeUser.map(_.accessToken)).map(creatorName =>
-        proj.copy(maybeCreator = creatorName)
-      )
-    case (proj, None) => proj.copy(maybeCreator = None).pure[F]
-  }.sequence
+  private def addCreators(
+      criteria:          Criteria
+  )(projectsAndCreators: List[ProjectAndCreator]): F[List[Project.NotActivated]] =
+    findDistinctCreatorIds(projectsAndCreators)
+      .map(fetchCreatorName(criteria))
+      .sequence
+      .map(updateProjects(projectsAndCreators))
+
+  private val findDistinctCreatorIds: List[ProjectAndCreator] => List[persons.GitLabId] =
+    _.flatMap(_._2).distinct
+
+  private type CreatorInfo = (persons.GitLabId, Option[persons.Name])
+
+  private def fetchCreatorName(criteria: Criteria)(id: persons.GitLabId): F[CreatorInfo] =
+    creatorFinder.findCreatorName(id)(criteria.maybeUser.map(_.accessToken)).map(id -> _)
+
+  private def updateProjects(
+      projectsAndCreators: List[ProjectAndCreator]
+  ): List[CreatorInfo] => List[model.Project.NotActivated] = creators =>
+    projectsAndCreators.map {
+      case (proj, Some(creatorId)) =>
+        creators
+          .find(_._1 == creatorId)
+          .map { case (_, maybeName) => proj.copy(maybeCreator = maybeName) }
+          .getOrElse(proj)
+      case (proj, None) => proj
+    }
 
   private def findProjectsAndCreators(criteria: Criteria, page: Page = Page.first): F[List[ProjectAndCreator]] =
     GitLabClient[F]
@@ -73,9 +92,7 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
           .withQueryParam("page", page)
           .withQueryParam("per_page", requestPageSize),
         "user-projects"
-      )(mapResponse)(
-        criteria.maybeUser.map(_.accessToken)
-      )
+      )(mapResponse)(criteria.maybeUser.map(_.accessToken))
       .flatMap {
         case (results, None)           => results.pure[F]
         case (results, Some(nextPage)) => findProjectsAndCreators(criteria, nextPage).map(results ::: _)

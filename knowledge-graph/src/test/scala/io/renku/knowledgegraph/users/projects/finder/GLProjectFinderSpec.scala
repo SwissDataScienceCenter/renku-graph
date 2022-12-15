@@ -30,7 +30,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.generators.CommonGraphGenerators.pages
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.personGitLabIds
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames}
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -112,6 +112,41 @@ class GLProjectFinderSpec
             .expects(creatorId, criteria.maybeUser.map(_.accessToken))
             .returning(project.maybeCreator.pure[IO])
         case (_, None) => ()
+      }
+
+      finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projectsAndCreators.map(_._1)
+    }
+
+    "find creator name once for the same creator id" in new TestCase {
+
+      val criteria = criterias.generateOne
+
+      val projectsAndCreators = {
+        val commonCreatorName = personNames.generateOne
+        val commonCreatorId   = personGitLabIds.generateOne
+        List(
+          notActivatedProjects.map(p => p.copy(maybeCreator = commonCreatorName.some) -> commonCreatorId.some),
+          notActivatedProjects.map(p => p.copy(maybeCreator = commonCreatorName.some) -> commonCreatorId.some),
+          notActivatedProjects.map(p => p -> p.maybeCreator.map(_ => personGitLabIds.generateOne))
+        ).map(_.generateOne)
+      }
+
+      (gitLabClient
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ResultsChunk])(_: Option[AccessToken]))
+        .expects(uri(criteria, Page.first), endpointName, *, criteria.maybeUser.map(_.accessToken))
+        .returning((projectsAndCreators -> Option.empty[Page]).pure[IO])
+
+      val distinctCreators = projectsAndCreators.flatMap { case (proj, maybeCreatorId) =>
+        (proj.maybeCreator -> maybeCreatorId).mapN(_ -> _)
+      }.distinct
+
+      distinctCreators.size shouldBe 2
+
+      distinctCreators.foreach { case (creatorName, creatorId) =>
+        (glCreatorFinder
+          .findCreatorName(_: persons.GitLabId)(_: Option[AccessToken]))
+          .expects(creatorId, criteria.maybeUser.map(_.accessToken))
+          .returning(creatorName.some.pure[IO])
       }
 
       finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projectsAndCreators.map(_._1)
