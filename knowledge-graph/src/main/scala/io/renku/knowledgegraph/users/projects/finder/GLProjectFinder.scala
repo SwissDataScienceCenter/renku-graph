@@ -24,7 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.GitLabClient
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.knowledgegraph.users.projects.model.Project
 import org.typelevel.log4cats.Logger
 
@@ -35,11 +35,14 @@ private trait GLProjectFinder[F[_]] {
 private object GLProjectFinder {
   def apply[F[_]: Async: GitLabClient: Logger]: F[GLProjectFinder[F]] =
     GLCreatorFinder[F].map(new GLProjectFinderImpl[F](_))
+
+  val requestPageSize: PerPage = PerPage(100)
 }
 
 private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFinder: GLCreatorFinder[F])
     extends GLProjectFinder[F] {
 
+  import GLProjectFinder.requestPageSize
   import GitLabClient.maybeNextPage
   import cats.syntax.all._
   import creatorFinder._
@@ -65,7 +68,12 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
 
   private def findProjectsAndCreators(criteria: Criteria, page: Page = Page.first): F[List[ProjectAndCreator]] =
     GitLabClient[F]
-      .get(uri"users" / criteria.userId / "projects" withQueryParam ("page", page), "user-projects")(mapResponse)(
+      .get(
+        (uri"users" / criteria.userId / "projects")
+          .withQueryParam("page", page)
+          .withQueryParam("per_page", requestPageSize),
+        "user-projects"
+      )(mapResponse)(
         criteria.maybeUser.map(_.accessToken)
       )
       .flatMap {
