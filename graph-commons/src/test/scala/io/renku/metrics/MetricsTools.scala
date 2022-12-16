@@ -38,5 +38,8 @@ object MetricsTools {
       (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN { case (labelName, labelValue) =>
         (labelName, labelValue, sample.value)
       }
+
+    def collectValuesFor(label: String, labelValue: String): List[Double] =
+      collectAllSamples.collect { case (l, lv, v) if l == label && lv == labelValue => v }.toList
   }
 }

@@ -160,6 +160,24 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
       ).pure[Try]
     }
 
+    "successfully add the given paging request to the SparqlQuery " +
+      "if there's 'ORDER BY' clause with additional functions like 'lcase'" in {
+        val query = SparqlQuery(
+          name = "test query",
+          prefixes = Set.empty,
+          body = s"""|${sentences().generateOne.value}
+                     |ORDER BY ASC(lcase(?field))
+                     |""".stripMargin
+        )
+        val pagingRequest = pagingRequests.generateOne
+
+        query.include[Try](pagingRequest) shouldBe SparqlQuery(name = "test query",
+                                                               query.prefixes,
+                                                               query.body,
+                                                               Some(pagingRequest)
+        ).pure[Try]
+      }
+
     "successfully add the given paging request to the SparqlQuery if there's 'order by' clause in the body" +
       "with more than one sort variable" in {
         val query = SparqlQuery(

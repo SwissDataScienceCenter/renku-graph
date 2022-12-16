@@ -47,7 +47,8 @@ class KGProjectFinderSpec
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         upload(to = projectsDataset, project)
 
-        finder.find(project.resourceId).unsafeRunSync() shouldBe toProjectMutableData(project).some
+        val projectData = finder.find(project.resourceId).unsafeRunSync()
+        projectData.map(_.selectEarliestDateCreated) shouldBe toProjectMutableData(project).some
       }
     }
 
@@ -74,7 +75,7 @@ class KGProjectFinderSpec
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val finder = new KGProjectFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

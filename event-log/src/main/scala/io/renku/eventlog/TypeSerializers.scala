@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.eventlog.events.producers.eventdelivery._
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -48,6 +48,11 @@ trait TypeSerializers {
   val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
   val projectPathEncoder: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
+
+  val projectIdsDecoder: Decoder[EventInfo.ProjectIds] =
+    (projectIdDecoder, projectPathDecoder).mapN(EventInfo.ProjectIds.apply)
+  val projectIdsEncoder: Encoder[EventInfo.ProjectIds] =
+    (projectIdEncoder, projectPathEncoder).contramapN(a => (a.id, a.path))
 
   val eventBodyDecoder: Decoder[EventBody] = text.map(EventBody.apply)
   val eventBodyEncoder: Encoder[EventBody] = text.values.contramap(_.value)

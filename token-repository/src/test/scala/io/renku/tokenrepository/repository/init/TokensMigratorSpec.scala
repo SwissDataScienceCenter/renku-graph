@@ -19,9 +19,14 @@
 package io.renku.tokenrepository.repository
 package init
 
-import cats.data.Kleisli
+import AccessTokenCrypto.EncryptedAccessToken
+import RepositoryGenerators.encryptedAccessTokens
+import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
+import creation.TokenDates.{CreatedAt, ExpiryDate}
+import creation._
+import deletion.TokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
@@ -30,15 +35,8 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info, Warn}
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.AccessTokenCrypto
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import io.renku.tokenrepository.repository.association.TokenDates.{CreatedAt, ExpiryDate}
-import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
-import io.renku.tokenrepository.repository.association._
-import io.renku.tokenrepository.repository.deletion.TokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -118,8 +116,6 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
-
-      logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject token invalid; deleting"))
     }
 
     "remove the existing token if new token creation failed with Forbidden" in new TestCase {
@@ -133,14 +129,12 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       givenTokenValidation(oldToken, returning = true.pure[IO])
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = None.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.none)
 
       migration.run().unsafeRunSync() shouldBe ()
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
-
-      logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject cannot generate new token; deleting"))
     }
 
     "log an error and remove the token if decryption fails" in new TestCase {
@@ -153,8 +147,6 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       migration.run().unsafeRunSync() shouldBe ()
 
       findToken(oldTokenProject.id) shouldBe None
-
-      logger.loggedOnly(Error(show"$logPrefix $oldTokenProject token decryption failed; deleting", exception))
     }
 
     "retry for exceptions on token validation check" in new TestCase {
@@ -174,7 +166,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -201,7 +193,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val exception = exceptions.generateOne
       givenProjectTokenCreator(oldTokenProject.id,
                                oldToken,
-                               returning = exception.raiseError[IO, Option[TokenCreationInfo]]
+                               returning = OptionT.liftF(exception.raiseError[IO, TokenCreationInfo])
       )
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
@@ -209,7 +201,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -234,25 +226,24 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tokenCrypto               = mock[AccessTokenCrypto[IO]]
-    val tokenValidator            = mock[TokenValidator[IO]]
-    val tokenRemover              = TokenRemover[IO](queriesExecTimes)
-    val projectAccessTokenCreator = mock[ProjectAccessTokenCreator[IO]]
-    val associationPersister      = AssociationPersister[IO](queriesExecTimes)
+    val tokenCrypto     = mock[AccessTokenCrypto[IO]]
+    val tokenValidator  = mock[TokenValidator[IO]]
+    val tokenRemover    = TokenRemover[IO]
+    val tokensCreator   = mock[NewTokensCreator[IO]]
+    val tokensPersister = TokensPersister[IO]
     val migration = new TokensMigrator[IO](tokenCrypto,
                                            tokenValidator,
                                            tokenRemover,
-                                           projectAccessTokenCreator,
-                                           associationPersister,
-                                           queriesExecTimes,
+                                           tokensCreator,
+                                           tokensPersister,
                                            retryInterval = 500 millis
     )
 
     val logPrefix = "token migration:"
 
     def insert(project: Project, encryptedToken: EncryptedAccessToken) =
-      associationPersister
-        .persistAssociation(
+      tokensPersister
+        .persistToken(
           TokenStoringInfo(project,
                            encryptedToken,
                            TokenDates(timestampsNotInTheFuture.generateAs(CreatedAt), localDates.generateAs(ExpiryDate))
@@ -289,7 +280,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
       )
 
-      givenProjectTokenCreator(project.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(project.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -315,8 +306,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: AccessToken,
-                                 returning:       IO[Option[TokenCreationInfo]]
-    ) = (projectAccessTokenCreator.createPersonalAccessToken _)
+                                 returning:       OptionT[IO, TokenCreationInfo]
+    ) = (tokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
   }

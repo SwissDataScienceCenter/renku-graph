@@ -18,7 +18,7 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import GitLabApiStub.{CommitData, State, Webhook}
+import GitLabApiStub._
 import GitLabStateGenerators._
 import cats.Monoid
 import cats.data.NonEmptyList
@@ -30,7 +30,6 @@ import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 import io.renku.graph.model.{RenkuUrl, entities, projects}
-import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s.Uri
 
@@ -108,7 +107,7 @@ trait GitLabStateUpdates {
       addCommits(project.id, commits) >>
       addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson))
 
-  def addProjectAccessToken(projectId: projects.Id, token: ProjectAccessToken): StateUpdate =
+  def addProjectAccessToken(projectId: projects.Id, token: ProjectAccessTokenInfo): StateUpdate =
     state => state.copy(projectAccessTokens = state.projectAccessTokens.updated(projectId, token))
 
   private lazy val toPerson: entities.Person => Person = person =>

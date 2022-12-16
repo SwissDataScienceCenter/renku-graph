@@ -25,11 +25,11 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
 import skunk.data.Completion
@@ -39,11 +39,10 @@ private[producers] trait EventDelivery[F[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit]
 }
 
-private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
+private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes, CategoryEvent](
     eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
-    queriesExecTimes:         LabeledHistogram[F],
     sourceUrl:                MicroserviceBaseUrl
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventDelivery[F, CategoryEvent]
     with TypeSerializers {
 
@@ -116,13 +115,12 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource, Categor
 
 private[producers] object EventDelivery {
 
-  def apply[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
-      eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
-      queriesExecTimes:         LabeledHistogram[F]
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes, CategoryEvent](
+      eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()
-  } yield new EventDeliveryImpl[F, CategoryEvent](eventDeliveryIdExtractor, queriesExecTimes, microserviceUrl)
+  } yield new EventDeliveryImpl[F, CategoryEvent](eventDeliveryIdExtractor, microserviceUrl)
 
   def noOp[F[_]: MonadThrow, CategoryEvent]: F[EventDelivery[F, CategoryEvent]] =
     new NoOpEventDelivery[F, CategoryEvent]()

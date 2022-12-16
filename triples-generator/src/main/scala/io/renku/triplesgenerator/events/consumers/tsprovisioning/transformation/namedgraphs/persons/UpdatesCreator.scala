@@ -24,7 +24,6 @@ import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 
@@ -87,7 +86,7 @@ private trait UpdatesCreator {
           |WHERE {
           |  GRAPH <${GraphClass.Persons.id.show}> {
           |    {
-          |      SELECT ?id
+          |      SELECT ?id (max(?e) as ?name)
           |      WHERE {
           |        BIND ($resource AS ?id)
           |        ?id a schema:Person;
@@ -96,15 +95,13 @@ private trait UpdatesCreator {
           |      GROUP BY ?id
           |      HAVING (COUNT(?e) > 1)
           |    }
-          |    ?id schema:name ?name.
-          |    FILTER (?name != '${sparqlEncode(person.name.show)}')
           |  }
           |}
           |""".stripMargin
     )
   }
 
-  private def deduplicateEmail(person: Person) = person.maybeEmail.map { email =>
+  private def deduplicateEmail(person: Person) = person.maybeEmail.map { _ =>
     val resource = person.resourceId.showAs[RdfResource]
     SparqlQuery.of(
       name = "transformation - person email deduplicate",
@@ -113,7 +110,7 @@ private trait UpdatesCreator {
           |WHERE {
           |  GRAPH <${GraphClass.Persons.id.show}> {
           |    {
-          |      SELECT ?id
+          |      SELECT ?id (max(?e) as ?email)
           |      WHERE {
           |        BIND ($resource AS ?id)
           |        ?id a schema:Person;
@@ -122,15 +119,13 @@ private trait UpdatesCreator {
           |      GROUP BY ?id
           |      HAVING (COUNT(?e) > 1)
           |    }
-          |    ?id schema:email ?email.
-          |    FILTER (?email != '${sparqlEncode(email.show)}')
           |  }
           |}
           |""".stripMargin
     )
   }
 
-  private def deduplicateAffiliation(person: Person) = person.maybeAffiliation.map { affiliation =>
+  private def deduplicateAffiliation(person: Person) = person.maybeAffiliation.map { _ =>
     val resource = person.resourceId.showAs[RdfResource]
     SparqlQuery.of(
       name = "transformation - person affiliation deduplicate",
@@ -139,7 +134,7 @@ private trait UpdatesCreator {
           |WHERE {
           |  GRAPH <${GraphClass.Persons.id.show}> {
           |    {
-          |      SELECT ?id
+          |      SELECT ?id (max(?e) as ?affiliation)
           |      WHERE {
           |        BIND ($resource AS ?id)
           |        ?id a schema:Person;
@@ -148,8 +143,6 @@ private trait UpdatesCreator {
           |      GROUP BY ?id
           |      HAVING (COUNT(?e) > 1)
           |    }
-          |    ?id schema:affiliation ?affiliation.
-          |    FILTER (?affiliation != '${sparqlEncode(affiliation.show)}')
           |  }
           |}
           |""".stripMargin

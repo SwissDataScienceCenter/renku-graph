@@ -24,6 +24,7 @@ import Endpoint._
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.PagingResponse
 import io.renku.triplesstore.SparqlQueryTimeRecorder
@@ -37,6 +38,8 @@ private[projects] trait ProjectsFinder[F[_]] {
 private[projects] object ProjectsFinder {
   def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
     (TSProjectFinder[F], GLProjectFinder[F]).mapN(new ProjectsFinderImpl(_, _))
+
+  implicit val nameOrdering: Ordering[projects.Name] = Ordering.by(_.value.toLowerCase)
 }
 
 private class ProjectsFinderImpl[F[_]: MonadThrow](
@@ -44,6 +47,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
     glProjectsFinder: GLProjectFinder[F]
 ) extends ProjectsFinder[F] {
 
+  import ProjectsFinder.nameOrdering
   import glProjectsFinder._
   import tsProjectsFinder._
 

@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
-import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -86,9 +86,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
 
 object ProcessingStatusEndpoint {
 
-  def apply[F[_]: Async: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[ProcessingStatusEndpoint[F]] = for {
-    statusFinder <- ProcessingStatusFinder(queriesExecTimes)
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[ProcessingStatusEndpoint[F]] = for {
+    statusFinder <- ProcessingStatusFinder[F]
   } yield new ProcessingStatusEndpointImpl[F](statusFinder)
 }

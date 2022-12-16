@@ -18,22 +18,29 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.GeneratingTriples
 import io.renku.graph.model.projects
-import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
+import io.renku.metrics.{LabeledGauge, MetricsRegistry, PositiveValuesLabeledGauge}
+
+trait UnderTriplesGenerationGauge[F[_]] extends LabeledGauge[F, projects.Path]
 
 object UnderTriplesGenerationGauge {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
-    Gauge[F, projects.Path](
-      name = "events_under_triples_generation_count",
-      help = "Number of Events under triples generation by project path.",
-      labelName = "project",
-      resetDataFetch =
-        () => statsFinder.countEvents(Set(GeneratingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
-    )
+  def apply[F[_]: Async: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderTriplesGenerationGauge[F]] =
+    MetricsRegistry[F]
+      .register {
+        new PositiveValuesLabeledGauge[F, projects.Path](
+          name = "events_under_triples_generation_count",
+          help = "Number of Events under triples generation by project path.",
+          labelName = "project",
+          resetDataFetch =
+            () => statsFinder.countEvents(Set(GeneratingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
+        ) with UnderTriplesGenerationGauge[F]
+      }
+      .flatTap(_.startZeroedValuesCleaning())
+      .widen
 }

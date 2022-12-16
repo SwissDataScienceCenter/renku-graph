@@ -149,10 +149,15 @@ private object Generators {
 
   def stepPlanGenFactory: StepPlanGenFactory =
     for {
-      params <- ProjectBasedGenFactory.liftF(commandParametersLists)
-      plan   <- stepPlanEntities(params: _*)
+      params     <- ProjectBasedGenFactory.liftF(commandParametersLists)
+      explParams <- ProjectBasedGenFactory.liftF(explicitCommandParameterObjects)
+      plan       <- stepPlanEntities((explParams :: params): _*)
     } yield plan
 
   def compositePlanGen(minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
     compositePlanGenFactory(minChildren, maxChildren).generateOne
+
+  def compositePlanNonEmptyMappings: CompositePlanGenFactory =
+    compositePlanEntities(stepPlanGenFactory.mapF(_.toGeneratorOfList(min = 3)))
+      .mapF(_.suchThat(_.mappings.nonEmpty))
 }

@@ -24,28 +24,27 @@ import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
 import io.circe.DecodingFailure
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.EventMessage
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventMessage, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import java.time.{Duration => JDuration}
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
+private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
     override val categoryName: CategoryName,
     eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
-    deliveryInfoRemover:       DeliveryInfoRemover[F],
-    queriesExecTimes:          LabeledHistogram[F]
+    deliveryInfoRemover:       DeliveryInfoRemover[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   private val applicative = Applicative[F]
@@ -101,7 +100,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
       event:                 E
   )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = {
     for {
-      factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
+      factory <- updaterFactory(eventsQueue, deliveryInfoRemover)
       result  <- statusChanger.updateStatuses(event)(factory)
     } yield result
   } recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
@@ -112,38 +111,24 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
 
 private object EventHandler {
 
-  def apply[F[_]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry](
-      eventsQueue:                        StatusChangeEventsQueue[F],
-      queriesExecTimes:                   LabeledHistogram[F],
-      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
-      deletingGauge:                      LabeledGauge[F, projects.Path]
+  def apply[F[
+      _
+  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+      eventsQueue: StatusChangeEventsQueue[F]
   ): F[EventHandler[F]] = for {
-    deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
-    gaugesUpdater <- MonadThrow[F].catchNonFatal(
-                       new GaugesUpdaterImpl[F](
-                         awaitingTriplesGenerationGauge,
-                         awaitingTriplesTransformationGauge,
-                         underTriplesTransformationGauge,
-                         underTriplesGenerationGauge,
-                         awaitingDeletionGauge,
-                         deletingGauge
-                       )
-                     )
-    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
-    _             <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes)
-  } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
+    deliveryInfoRemover <- DeliveryInfoRemover[F]
+    gaugesUpdater       <- MonadThrow[F].catchNonFatal(new GaugesUpdaterImpl[F])
+    statusChanger       <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
+    _                   <- registerHandlers(eventsQueue, statusChanger)
+  } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover)
 
-  private def registerHandlers[F[_]: Async: AccessTokenFinder: Logger](eventsQueue: StatusChangeEventsQueue[F],
-                                                                       statusChanger:    StatusChanger[F],
-                                                                       queriesExecTimes: LabeledHistogram[F]
+  private def registerHandlers[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes](
+      eventsQueue:   StatusChangeEventsQueue[F],
+      statusChanger: StatusChanger[F]
   ) = for {
-    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
+    projectsToNewUpdater <- ProjectEventsToNewUpdater[F]
     _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
-    redoProjectTransformation <- RedoProjectTransformationUpdater(queriesExecTimes)
+    redoProjectTransformation <- RedoProjectTransformationUpdater[F]
     _ <- eventsQueue.register[RedoProjectTransformation](statusChanger.updateStatuses(_)(redoProjectTransformation))
   } yield ()
 

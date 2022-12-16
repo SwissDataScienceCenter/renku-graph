@@ -25,9 +25,9 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.events.consumers.statuschange.Generators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.Project
@@ -37,7 +37,7 @@ import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.json.JsonOps._
-import io.renku.metrics.{MetricsRegistry, TestLabeledHistogram, TestMetricsRegistry}
+import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -148,13 +148,13 @@ class EventHandlerSpec
 
   private trait TestCase {
 
-    implicit val logger:                  TestLogger[IO]      = TestLogger[IO]()
-    private implicit val metricsRegistry: MetricsRegistry[IO] = TestMetricsRegistry[IO]
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  MetricsRegistry[IO]       = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     private val statusChanger       = mock[StatusChanger[IO]]
     private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
-    private val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queryExec)
+    val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover)
 
     def stubUpdateStatuses[E <: StatusChangeEvent](
         updateResult: IO[Unit]

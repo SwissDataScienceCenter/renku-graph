@@ -18,18 +18,19 @@
 
 package io.renku.eventlog.events.consumers.globalcommitsyncrequest
 
+import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.LastSyncedDate
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.graph.model.events.{EventDate, LastSyncedDate}
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -73,8 +74,6 @@ class GlobalCommitSyncForcerSpec
           now.minus(syncFrequency).plus(delayOnRequest)
         ).some
         findSyncTime(projectId, otherCategoryName) shouldBe otherCategorySyncDate.some
-
-        queriesExecTimes.verifyExecutionTimeMeasured("global_commit_sync_request - move last_synced")
       }
 
     "upsert a new project " +
@@ -90,9 +89,6 @@ class GlobalCommitSyncForcerSpec
 
         findSyncTime(projectId, globalcommitsync.categoryName) shouldBe None
         findProjects shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
-
-        queriesExecTimes.verifyExecutionTimeMeasured("global_commit_sync_request - move last_synced")
-        queriesExecTimes.verifyExecutionTimeMeasured("global_commit_sync_request - insert project")
       }
 
     "do nothing " +
@@ -111,8 +107,6 @@ class GlobalCommitSyncForcerSpec
 
         findSyncTime(projectId, globalcommitsync.categoryName) shouldBe None
         findProjects.map(proj => proj._1 -> proj._2)           shouldBe List(projectId -> projectPath)
-
-        queriesExecTimes.verifyExecutionTimeMeasured("global_commit_sync_request - move last_synced")
       }
   }
 
@@ -122,7 +116,8 @@ class GlobalCommitSyncForcerSpec
     val currentTime    = mockFunction[Instant]
     val now            = Instant.now().truncatedTo(MICROS)
     currentTime.expects().returning(now)
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val forcer           = new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest, currentTime)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val forcer = new GlobalCommitSyncForcerImpl[IO](syncFrequency, delayOnRequest, currentTime)
   }
 }

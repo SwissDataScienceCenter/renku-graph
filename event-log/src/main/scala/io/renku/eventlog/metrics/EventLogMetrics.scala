@@ -18,8 +18,11 @@
 
 package io.renku.eventlog.metrics
 
+import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus
 import io.renku.metrics._
@@ -68,8 +71,9 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
     statusesGauge set (status -> count.toDouble)
   }
 
-  private def logError(gaugeName: String): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"Problem with gathering metrics for $gaugeName")
+  private def logError(gaugeName: String Refined NonEmpty): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(s"Problem with gathering metrics for $gaugeName")
   }
 }
 
@@ -79,7 +83,7 @@ object EventLogMetrics {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Temporal: Logger: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventLogMetrics[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventLogMetrics[F]] = for {
     categoryNameEventsGauge <- Gauge[F, CategoryName](
                                  name = "category_name_events_count",
                                  help = "Number of events waiting for processing per Category Name.",

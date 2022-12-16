@@ -24,11 +24,11 @@ import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: Concurrent: Logger](
@@ -62,6 +62,6 @@ private class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] =
-    EventProcessor[F](queriesExecTimes).map(new EventHandler[F](_))
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[EventHandler[F]] =
+    EventProcessor[F].map(new EventHandler[F](_))
 }

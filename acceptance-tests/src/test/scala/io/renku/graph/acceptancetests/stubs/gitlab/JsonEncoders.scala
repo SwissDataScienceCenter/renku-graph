@@ -24,14 +24,13 @@ import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.data.Project.Permissions._
 import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, PushEvent, Webhook}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
 import io.renku.graph.model.testentities.{Parent, Person}
-import io.renku.http.client.AccessToken.ProjectAccessToken
 import org.http4s.Uri
 
-import java.time.{Instant, LocalDate}
+import java.time.Instant
 
 trait JsonEncoders {
   implicit val uriEncoder: Encoder[Uri] =
@@ -71,9 +70,11 @@ trait JsonEncoders {
       )
     }
 
-  implicit val personalAccessTokenCreationEncoder: Encoder[(ProjectAccessToken, LocalDate)] =
-    Encoder.instance { case (token, expiryDate) =>
+  implicit val personalAccessTokenCreationEncoder: Encoder[ProjectAccessTokenInfo] =
+    Encoder.instance { case ProjectAccessTokenInfo(tokenId, name, token, expiryDate) =>
       json"""{
+        "id":         $tokenId,
+        "name":       $name,
         "token":      ${token.value},
         "created_at": ${Instant.now()},
         "expires_at": $expiryDate

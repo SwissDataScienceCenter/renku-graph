@@ -30,7 +30,7 @@ import java.time._
 
 object TinyTypeDecoders {
 
-  type NonBlank = String Refined NonEmpty
+  private type NonBlank = String Refined NonEmpty
 
   implicit def stringDecoder[TT <: StringTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>

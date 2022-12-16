@@ -25,7 +25,9 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities}
+import io.renku.http.client.UrlEncoder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.persons.UpdatesCreatorSpec.PersonData
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
 import org.scalatest.matchers.should
@@ -57,11 +59,12 @@ class UpdatesCreatorSpec
         upload(to = projectsDataset, kgPerson)
 
         findPersons shouldBe Set(
-          (kgPerson.resourceId.value,
-           kgPerson.name.value.some,
-           kgPerson.maybeEmail.map(_.value),
-           kgPerson.maybeAffiliation.map(_.value),
-           kgPerson.gitLabId.value.some
+          PersonData(
+            kgPerson.resourceId.value,
+            kgPerson.name.value.some,
+            kgPerson.maybeEmail.map(_.value),
+            kgPerson.maybeAffiliation.map(_.value),
+            kgPerson.gitLabId.value.some
           )
         )
 
@@ -69,7 +72,7 @@ class UpdatesCreatorSpec
 
         queries.runAll(on = projectsDataset).unsafeRunSync()
 
-        findPersons shouldBe Set((kgPerson.resourceId.value, None, None, None, kgPerson.gitLabId.value.some))
+        findPersons shouldBe Set(PersonData(kgPerson.resourceId.value, None, None, None, kgPerson.gitLabId.value.some))
       }
 
     "generate queries which delete person's name, email and affiliation " +
@@ -84,11 +87,12 @@ class UpdatesCreatorSpec
         upload(to = projectsDataset, kgPerson)
 
         findPersons shouldBe Set(
-          (kgPerson.resourceId.value,
-           kgPerson.name.value.some,
-           kgPerson.maybeEmail.map(_.value),
-           kgPerson.maybeAffiliation.map(_.value),
-           kgPerson.gitLabId.value.some
+          PersonData(
+            kgPerson.resourceId.value,
+            kgPerson.name.value.some,
+            kgPerson.maybeEmail.map(_.value),
+            kgPerson.maybeAffiliation.map(_.value),
+            kgPerson.gitLabId.value.some
           )
         )
 
@@ -97,7 +101,7 @@ class UpdatesCreatorSpec
         queries.runAll(on = projectsDataset).unsafeRunSync()
 
         findPersons shouldBe Set(
-          (kgPerson.resourceId.value, Some(kgPerson.name.value), None, None, kgPerson.gitLabId.value.some)
+          PersonData(kgPerson.resourceId.value, Some(kgPerson.name.value), None, None, kgPerson.gitLabId.value.some)
         )
       }
 
@@ -142,14 +146,15 @@ class UpdatesCreatorSpec
 
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
-      findPersons shouldBe Set(
-        (person.resourceId.value,
-         person.name.value.some,
-         person.maybeEmail.map(_.value),
-         person.maybeAffiliation.map(_.value),
-         person.gitLabId.value.some
-        )
-      )
+      val givenPersons = List(person, duplicatePerson)
+      val persons      = findPersons
+      persons.size shouldBe 1
+
+      // TODO the givenPersons.name is url-encoded whereas persons.head.name is not (?)
+      persons.head.name.map(UrlEncoder.urlEncode) should contain oneElementOf givenPersons.flatMap(_.name).map(_.value)
+
+      persons.head.email       should contain oneElementOf givenPersons.flatMap(_.maybeEmail).map(_.value)
+      persons.head.affiliation should contain oneElementOf givenPersons.flatMap(_.maybeAffiliation).map(_.value)
     }
 
     "generate queries which do nothing if there are no duplicates" in {
@@ -162,11 +167,11 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, person)
 
       findPersons shouldBe Set(
-        (person.resourceId.value,
-         person.name.value.some,
-         person.maybeEmail.map(_.value),
-         person.maybeAffiliation.map(_.value),
-         person.gitLabId.value.some
+        PersonData(person.resourceId.value,
+                   person.name.value.some,
+                   person.maybeEmail.map(_.value),
+                   person.maybeAffiliation.map(_.value),
+                   person.gitLabId.value.some
         )
       )
 
@@ -175,17 +180,17 @@ class UpdatesCreatorSpec
       queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findPersons shouldBe Set(
-        (person.resourceId.value,
-         person.name.value.some,
-         person.maybeEmail.map(_.value),
-         person.maybeAffiliation.map(_.value),
-         person.gitLabId.value.some
+        PersonData(person.resourceId.value,
+                   person.name.value.some,
+                   person.maybeEmail.map(_.value),
+                   person.maybeAffiliation.map(_.value),
+                   person.gitLabId.value.some
         )
       )
     }
   }
 
-  private def findPersons: Set[(String, Option[String], Option[String], Option[String], Option[Int])] =
+  private def findPersons: Set[PersonData] =
     runSelect(
       on = projectsDataset,
       SparqlQuery.of(
@@ -209,17 +214,32 @@ class UpdatesCreatorSpec
       )
     ).unsafeRunSync()
       .map(row =>
-        (row("id"), row.get("name"), row.get("email"), row.get("affiliation"), row.get("gitlabId").map(_.toInt))
+        PersonData(row("id"),
+                   row.get("name"),
+                   row.get("email"),
+                   row.get("affiliation"),
+                   row.get("gitlabId").map(_.toInt)
+        )
       )
       .toSet
 
   private implicit class QueryResultsOps(
-      records: Set[(String, Option[String], Option[String], Option[String], Option[Int])]
+      records: Set[PersonData]
   ) {
     lazy val toIdAndPropertyPairs: Set[(String, String)] =
       records.foldLeft(Set.empty[(String, String)]) {
-        case (pairs, (id, maybeName, maybeEmail, maybeAffiliation, maybeGitLabId)) =>
+        case (pairs, PersonData(id, maybeName, maybeEmail, maybeAffiliation, maybeGitLabId)) =>
           pairs ++ Set(maybeName, maybeEmail, maybeAffiliation, maybeGitLabId.map(_.toString)).flatten.map(id -> _)
       }
   }
+}
+
+object UpdatesCreatorSpec {
+  final case class PersonData(
+      id:          String,
+      name:        Option[String],
+      email:       Option[String],
+      affiliation: Option[String],
+      gitlabId:    Option[Int]
+  )
 }

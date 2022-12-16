@@ -25,11 +25,11 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, TransformingTriples, TriplesGenerated}
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
@@ -40,10 +40,9 @@ private trait ZombieStatusCleaner[F[_]] {
   def cleanZombieStatus(event: ZombieEvent): F[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ZombieStatusCleaner[F]
     with TypeSerializers {
 
@@ -87,6 +86,6 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
 }
 
 private object ZombieStatusCleaner {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ZombieStatusCleaner[F]] =
-    MonadThrow[F].catchNonFatal(new ZombieStatusCleanerImpl(queriesExecTimes))
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ZombieStatusCleaner[F]] =
+    MonadThrow[F].catchNonFatal(new ZombieStatusCleanerImpl[F]())
 }

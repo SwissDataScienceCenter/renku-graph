@@ -60,7 +60,7 @@ class MigrationExecutionRegisterSpec
 
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val register = new MigrationExecutionRegisterImpl[IO](serviceVersion, migrationsDSConnectionInfo)
   }
 }

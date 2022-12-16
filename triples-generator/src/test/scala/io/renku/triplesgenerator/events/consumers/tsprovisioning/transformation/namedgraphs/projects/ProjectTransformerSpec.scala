@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 package namedgraphs.projects
 
 import Generators._
+import cats.data.{NonEmptyList => Nel}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
@@ -29,7 +30,7 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.preDataQueriesOnly
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.{postDataQueriesOnly, preDataQueriesOnly}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -55,15 +56,23 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = project -> Queries.empty, out = step1Result))
 
       val otherQueries = sparqlQueries.generateList()
+      val postQueries  = sparqlQueries.generateList()
       (updatesCreator.prepareUpdates _)
         .expects(step1UpdatedProject, kgProjectData)
         .returning(otherQueries)
+
+      (updatesCreator.postUpdates _)
+        .expects(step1UpdatedProject)
+        .returning(postQueries)
 
       val step = transformer.createTransformationStep
 
       step.name.value shouldBe "Project Details Updates"
       val Success(Right(updateResult)) = (step run project).value
-      updateResult shouldBe (step1UpdatedProject, step1Queries |+| preDataQueriesOnly(otherQueries))
+      updateResult shouldBe (
+        step1UpdatedProject,
+        List(step1Queries, preDataQueriesOnly(otherQueries), postDataQueriesOnly(postQueries)).combineAll
+      )
     }
 
     "do nothing if no project found in KG" in new TestCase {
@@ -131,7 +140,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     maybeAgent     <- cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
   } yield ProjectMutableData(name,
-                             dateCreated,
+                             Nel.of(dateCreated),
                              maybeParentId,
                              visibility,
                              maybeDesc,

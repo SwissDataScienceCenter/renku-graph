@@ -20,17 +20,28 @@ package io.renku.metrics
 
 import cats.data.NonEmptyList
 import cats.effect.IO
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 import org.scalatest.Assertions.fail
 
-import scala.jdk.CollectionConverters._
-
-class TestLabeledHistogram(val wrappedCollector: LibHistogram) extends LabeledHistogram[IO] {
+class TestLabeledHistogram(labelName: String) extends LabeledHistogram[IO] with PrometheusCollector {
 
   import MetricsTools._
 
-  override lazy val name: String = wrappedCollector.describe().asScala.head.name
-  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+  type Collector = LibHistogram
+
+  override lazy val name: String Refined NonEmpty = "test_metrics"
+  override lazy val help: String Refined NonEmpty = "test metrics help"
+
+  private[metrics] val wrappedCollector: LibHistogram = LibHistogram
+    .build()
+    .name(name.value)
+    .help(help.value)
+    .labelNames(labelName)
+    .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1)
+    .create()
 
   def verifyExecutionTimeMeasured(forLabelValue: String, other: String*): Unit =
     (forLabelValue +: other) diff wrappedCollector.collectAllSamples.map(_._2) match {
@@ -51,20 +62,12 @@ class TestLabeledHistogram(val wrappedCollector: LibHistogram) extends LabeledHi
   }
 
   override def startTimer(labelValue: String): IO[Histogram.Timer[IO]] = IO {
-    new Histogram.TimerImpl(wrappedCollector.labels(labelValue).startTimer())
+    new LabeledHistogram.NoThresholdTimerImpl[IO](wrappedCollector.labels(labelValue).startTimer())
   }
 }
 
 object TestLabeledHistogram {
 
   def apply[LabelValue](labelName: String): TestLabeledHistogram =
-    new TestLabeledHistogram(
-      LibHistogram
-        .build()
-        .name("test_metrics")
-        .help("test metrics help")
-        .labelNames(labelName)
-        .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1)
-        .create()
-    )
+    new TestLabeledHistogram(labelName)
 }

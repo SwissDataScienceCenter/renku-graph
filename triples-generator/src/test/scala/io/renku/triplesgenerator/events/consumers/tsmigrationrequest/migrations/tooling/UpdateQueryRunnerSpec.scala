@@ -60,7 +60,7 @@ class UpdateQueryRunnerSpec
     val entityId = entityIds.generateOne
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val runner = new UpdateQueryRunnerImpl[IO](projectsDSConnectionInfo)
 
     def findString = runSelect(

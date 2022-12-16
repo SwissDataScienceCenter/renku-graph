@@ -18,17 +18,22 @@
 
 package io.renku.graph.metrics
 
-import cats.MonadThrow
+import cats.effect.Async
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.CategoryName
-import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
+import io.renku.metrics.{LabeledGauge, MetricsRegistry, PositiveValuesLabeledGauge}
+
+trait SentEventsGauge[F[_]] extends LabeledGauge[F, CategoryName]
 
 object SentEventsGauge {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledGauge[F, CategoryName]] =
-    Gauge[F, CategoryName](
+  def apply[F[_]: Async: MetricsRegistry]: F[SentEventsGauge[F]] = MetricsRegistry[F].register {
+    new PositiveValuesLabeledGauge[F, CategoryName](
       name = "sent_events_count",
       help = "Number of sent Events",
-      labelName = "category_mame"
-    )
+      labelName = "category_mame",
+      resetDataFetch = () => Map.empty[CategoryName, Double].pure[F]
+    ) with SentEventsGauge[F]
+  }.widen
 }

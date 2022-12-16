@@ -57,9 +57,7 @@ class MicroserviceRunnerSpec
 
       logger.loggedOnly(Info("Service started"))
 
-      eventually(
-        microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
-      )
+      verifyRoutesNotified
     }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -127,5 +125,9 @@ class MicroserviceRunnerSpec
     }
     val runner =
       new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer, microserviceRoutes)
+
+    def verifyRoutesNotified = eventually {
+      microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
+    }
   }
 }

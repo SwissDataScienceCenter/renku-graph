@@ -19,20 +19,18 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesStore
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.SqlState.DeadlockDetected
 import skunk.data.Completion
 import skunk.implicits._
@@ -40,11 +38,10 @@ import skunk.{Session, ~}
 
 import java.time.Instant
 
-private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
+private class ToTriplesStoreUpdater[F[_]: Async: QueriesExecutionTimes](
     deliveryInfoRemover: DeliveryInfoRemover[F],
-    queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, ToTriplesStore] {
 
   import deliveryInfoRemover._

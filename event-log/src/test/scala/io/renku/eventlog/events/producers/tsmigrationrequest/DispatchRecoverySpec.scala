@@ -21,20 +21,20 @@ package tsmigrationrequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
 import io.renku.eventlog._
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.eventlog.events.producers.EventsSender.SendingResult.TemporarilyUnavailable
 import io.renku.eventlog.events.producers.Generators.sendingResults
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -146,10 +146,11 @@ class DispatchRecoverySpec
     val changeDate = changeDates.generateOne
     val now        = Instant.now().truncatedTo(MICROS)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val currentTime      = mockFunction[Instant]
-    val recovery         = new DispatchRecoveryImpl[IO](queriesExecTimes, currentTime)
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val currentTime = mockFunction[Instant]
+    val recovery    = new DispatchRecoveryImpl[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }

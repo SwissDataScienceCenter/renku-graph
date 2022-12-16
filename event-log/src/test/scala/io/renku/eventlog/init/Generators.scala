@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.init
 
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds, eventStatuses}

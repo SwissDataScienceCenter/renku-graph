@@ -18,22 +18,22 @@
 
 package io.renku.eventlog.metrics
 
+import cats.effect.IO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
 import io.renku.eventlog.events.producers._
+import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -275,8 +275,6 @@ class StatsFinderSpec
         Deleting                            -> statuses.count(_ == Deleting),
         AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
       )
-
-      queriesExecTimes.verifyExecutionTimeMeasured("statuses count")
     }
   }
 
@@ -297,8 +295,6 @@ class StatsFinderSpec
           }
         }
         .filter { case (_, count) => count > 0 }
-
-      queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
     }
 
     "return info about number of events with the given status in the queue from the first given number of projects" in {
@@ -325,13 +321,12 @@ class StatsFinderSpec
         .filter { case (_, count) => count > 0 }
         .take(limit.value)
         .toMap
-
-      queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
     }
   }
 
-  private lazy val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-  private lazy val stats            = new StatsFinderImpl(queriesExecTimes)
+  private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+  private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+  private lazy val stats = new StatsFinderImpl[IO]
 
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
     case (projectPath, eventId, status, eventDate) =>

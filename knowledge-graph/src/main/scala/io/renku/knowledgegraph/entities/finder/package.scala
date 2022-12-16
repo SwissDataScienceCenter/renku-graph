@@ -53,10 +53,11 @@ package object finder {
 
   private[finder] implicit class FiltersOps(filters: Filters) {
 
-    import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+    import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
+    import io.renku.triplesstore.LuceneQueryEncoder.queryAsString
 
     private val queryAll: String = "*"
-    lazy val query:       String = filters.maybeQuery.map(_.value).getOrElse(queryAll)
+    lazy val query:       String = filters.maybeQuery.map(q => queryAsString(q.value)).getOrElse(queryAll)
 
     def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
       val typeMatching = filters.entityTypes match {

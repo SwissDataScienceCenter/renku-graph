@@ -18,16 +18,17 @@
 
 package io.renku.eventlog.events.consumers.zombieevents
 
+import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, TransformingTriples, TriplesGenerated}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.graph.model.events._
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -66,8 +67,6 @@ class ZombieStatusCleanerSpec
           updater.cleanZombieStatus(ZombieEvent(eventId, projectPath, currentStatus)).unsafeRunSync() shouldBe Updated
 
           findEvent(eventId) shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
-
-          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
         }
 
       s"update event status to $afterUpdateStatus and remove the existing event delivery info " +
@@ -83,8 +82,6 @@ class ZombieStatusCleanerSpec
 
           findEvent(eventId)               shouldBe (ExecutionDate(now), afterUpdateStatus, None).some
           findAllEventDeliveries.map(_._1) shouldBe Nil
-
-          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
         }
     }
 
@@ -101,15 +98,14 @@ class ZombieStatusCleanerSpec
         .unsafeRunSync() shouldBe NotUpdated
 
       findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
-
-      queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
     }
   }
 
   private trait TestCase {
-    val currentTime      = mockFunction[Instant]
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val updater          = new ZombieStatusCleanerImpl(queriesExecTimes, currentTime)
+    val currentTime = mockFunction[Instant]
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val updater = new ZombieStatusCleanerImpl[IO](currentTime)
 
     val eventId       = compoundEventIds.generateOne
     val projectPath   = projectPaths.generateOne

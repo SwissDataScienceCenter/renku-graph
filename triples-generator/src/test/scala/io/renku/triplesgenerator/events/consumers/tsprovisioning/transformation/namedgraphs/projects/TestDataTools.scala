@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
+import cats.data.{NonEmptyList => Nel}
 import cats.syntax.all._
 import io.renku.graph.model.entities
 
@@ -25,7 +26,7 @@ private object TestDataTools {
 
   def toProjectMutableData(project: entities.Project): ProjectMutableData = ProjectMutableData(
     project.name,
-    project.dateCreated,
+    Nel.of(project.dateCreated),
     findParent(project),
     project.visibility,
     project.maybeDescription,

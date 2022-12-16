@@ -20,12 +20,12 @@ package io.renku.tokenrepository.repository.deletion
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.Id
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
+import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -34,25 +34,28 @@ private[repository] trait TokenRemover[F[_]] {
 }
 
 private[repository] object TokenRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokenRemover[F] =
-    new TokenRemoverImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]: TokenRemover[F] =
+    new TokenRemoverImpl[F]
 }
 
-private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with TokenRemover[F]
     with TokenRepositoryTypeSerializers {
 
-  override def delete(projectId: Id): F[Unit] = SessionResource[F].useK {
-    measureExecutionTime {
-      SqlStatement(name = "remove token")
-        .command[Id](sql"""delete from projects_tokens
-                           where project_id = $projectIdEncoder""".command)
-        .arguments(projectId)
-        .build
-        .flatMapResult(failIfMultiUpdate(projectId))
-    }
-  }
+  override def delete(projectId: Id): F[Unit] =
+    SessionResource[F].useK {
+      measureExecutionTime(query(projectId))
+    } >> Logger[F].info(show"token removed for $projectId")
+
+  private def query(projectId: Id) =
+    SqlStatement
+      .named("remove token")
+      .command[Id](sql"""DELETE FROM projects_tokens
+                         WHERE project_id = $projectIdEncoder""".command)
+      .arguments(projectId)
+      .build
+      .flatMapResult(failIfMultiUpdate(projectId))
 
   private def failIfMultiUpdate(projectId: Id): Completion => F[Unit] = {
     case Completion.Delete(0 | 1) => ().pure[F]

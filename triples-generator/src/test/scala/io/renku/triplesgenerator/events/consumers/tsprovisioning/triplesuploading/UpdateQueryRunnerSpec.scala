@@ -101,7 +101,7 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalService
     val query = sparqlQueries.generateOne
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     lazy val storeConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val queryRunner = new UpdateQueryRunnerImpl[IO](storeConfig, retryInterval = 100 millis, maxRetries = 1)
 

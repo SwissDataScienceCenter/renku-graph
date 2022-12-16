@@ -30,7 +30,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
+import io.renku.tokenrepository.repository.creation.CreateTokenEndpoint
 import io.renku.tokenrepository.repository.{deletion, fetching}
 import org.http4s.Method._
 import org.http4s.Status._
@@ -122,8 +122,8 @@ class MicroserviceRoutesSpec
       val projectId = projectIds.generateOne
       val request   = Request[IO](POST, uri"/projects" / projectId.toString / "tokens")
 
-      (associateEndpoint
-        .associateToken(_: projects.Id, _: Request[IO]))
+      (createEndpoint
+        .createToken(_: projects.Id, _: Request[IO]))
         .expects(projectId, request)
         .returning(IO.pure(Response[IO](NoContent)))
 
@@ -167,14 +167,14 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val fetchEndpoint     = mock[fetching.FetchTokenEndpoint[IO]]
-    val associateEndpoint = mock[AssociateTokenEndpoint[IO]]
-    val deleteEndpoint    = mock[deletion.DeleteTokenEndpoint[IO]]
-    val routesMetrics     = TestRoutesMetrics()
-    val versionRoutes     = mock[version.Routes[IO]]
+    val fetchEndpoint  = mock[fetching.FetchTokenEndpoint[IO]]
+    val createEndpoint = mock[CreateTokenEndpoint[IO]]
+    val deleteEndpoint = mock[deletion.DeleteTokenEndpoint[IO]]
+    val routesMetrics  = TestRoutesMetrics()
+    val versionRoutes  = mock[version.Routes[IO]]
     private val microserviceRoutes = new MicroserviceRoutesImpl[IO](
       fetchEndpoint,
-      associateEndpoint,
+      createEndpoint,
       deleteEndpoint,
       routesMetrics,
       versionRoutes,

@@ -41,7 +41,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
-    implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO](mr)
+    implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
     certificateLoader                            <- CertificateLoader[IO]
     sentryInitializer                            <- SentryInitializer[IO]
     kgMetrics                                    <- KGMetrics[IO]

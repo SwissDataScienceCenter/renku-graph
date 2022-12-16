@@ -21,47 +21,37 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import association.TokenStoringInfo.Project
-import association._
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import creation._
 import deletion.TokenRemover
 import io.renku.db.DbClient
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 import skunk.~
 
 import scala.concurrent.duration._
 
 private object TokensMigrator {
-  def apply[F[_]: Async: GitLabClient: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DBMigration[F]] = for {
-    accessTokenCrypto         <- AccessTokenCrypto[F]()
-    tokenValidator            <- TokenValidator[F]
-    tokenRemover              <- TokenRemover[F](queriesExecTimes).pure[F]
-    projectAccessTokenCreator <- ProjectAccessTokenCreator[F]()
-    associationPersister      <- AssociationPersister[F](queriesExecTimes).pure[F]
-  } yield new TokensMigrator[F](accessTokenCrypto,
-                                tokenValidator,
-                                tokenRemover,
-                                projectAccessTokenCreator,
-                                associationPersister,
-                                queriesExecTimes
-  )
+  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes]: F[DBMigration[F]] = for {
+    accessTokenCrypto    <- AccessTokenCrypto[F]()
+    tokenValidator       <- TokenValidator[F]
+    tokenRemover         <- TokenRemover[F].pure[F]
+    tokensCreator        <- NewTokensCreator[F]()
+    associationPersister <- TokensPersister[F].pure[F]
+  } yield new TokensMigrator[F](accessTokenCrypto, tokenValidator, tokenRemover, tokensCreator, associationPersister)
 }
 
-private class TokensMigrator[F[_]: Async: SessionResource: Logger](
-    tokenCrypto:               AccessTokenCrypto[F],
-    tokenValidator:            TokenValidator[F],
-    tokenRemover:              TokenRemover[F],
-    projectAccessTokenCreator: ProjectAccessTokenCreator[F],
-    associationPersister:      AssociationPersister[F],
-    queriesExecTimes:          LabeledHistogram[F],
-    retryInterval:             Duration = 5 seconds
-) extends DbClient[F](Some(queriesExecTimes))
+private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes](
+    tokenCrypto:          AccessTokenCrypto[F],
+    tokenValidator:       TokenValidator[F],
+    tokenRemover:         TokenRemover[F],
+    tokensCreator:        NewTokensCreator[F],
+    associationPersister: TokensPersister[F],
+    retryInterval:        Duration = 5 seconds
+) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with DBMigration[F]
     with TokenRepositoryTypeSerializers {
 
@@ -70,11 +60,11 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   import associationPersister._
   import fs2.Stream
   import io.renku.db.SqlStatement
-  import projectAccessTokenCreator._
   import skunk.Void
   import skunk.implicits._
   import tokenCrypto._
   import tokenValidator._
+  import tokensCreator._
 
   override def run(): F[Unit] =
     Stream
@@ -117,36 +107,29 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   private def decryptOrDelete(project: Project, encToken: EncryptedAccessToken): F[Option[(Project, AccessToken)]] =
     decrypt(encToken)
       .map(t => Option(project -> t))
-      .recoverWith { case ex: Throwable =>
-        Logger[F].error(ex)(show"$logPrefix $project token decryption failed; deleting") >>
-          tokenRemover.delete(project.id) >>
-          Option.empty[(Project, AccessToken)].pure[F]
-      }
+      .recoverWith { case _ => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F] }
 
   private def deleteWhenInvalidWithRetry(project: Project, token: AccessToken): F[Option[(Project, AccessToken)]] = {
     checkValid(token) >>= {
-      case true => (project, token).some.pure[F]
-      case false =>
-        Logger[F].warn(show"$logPrefix $project token invalid; deleting") >>
-          tokenRemover.delete(project.id) >>
-          Option.empty[(Project, AccessToken)].pure[F]
+      case true  => (project, token).some.pure[F]
+      case false => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F]
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 
-  private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] = {
-    createPersonalAccessToken(project.id, token) >>= {
-      case Some(creationInfo) => (project -> creationInfo).some.pure[F]
-      case None =>
-        Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >>
-          tokenRemover.delete(project.id).map(_ => Option.empty[(Project, TokenCreationInfo)])
-    }
-  }.recoverWith(retry(createTokenWithRetry(project, token))(project))
+  private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] =
+    createPersonalAccessToken(project.id, token)
+      .map(project -> _)
+      .flatTapNone(
+        Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >> tokenRemover.delete(project.id)
+      )
+      .value
+      .recoverWith(retry(createTokenWithRetry(project, token))(project))
 
   private def persistWithRetry(project:        Project,
                                newTokenInfo:   TokenCreationInfo,
                                encryptedToken: EncryptedAccessToken
   ): F[Unit] =
-    persistAssociation(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates))
+    persistToken(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates))
       .recoverWith(retry(persistWithRetry(project, newTokenInfo, encryptedToken))(project))
 
   private def retry[O](thunk: => F[O])(project: Project): PartialFunction[Throwable, F[O]] = { case ex: Exception =>

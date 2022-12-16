@@ -58,7 +58,7 @@ class ProjectsFinderSpec
          |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?path } }""".stripMargin
     )
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val projectsFinder = new ProjectsFinderImpl[IO](query, projectsDSConnectionInfo)
   }
 }

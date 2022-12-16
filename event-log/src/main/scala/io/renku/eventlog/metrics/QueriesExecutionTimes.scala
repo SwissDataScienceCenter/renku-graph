@@ -19,15 +19,25 @@
 package io.renku.eventlog.metrics
 
 import cats.MonadThrow
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.{LabeledHistogram, LabeledHistogramImpl, MetricsRegistry}
+
+import scala.concurrent.duration._
+
+trait QueriesExecutionTimes[F[_]] extends LabeledHistogram[F]
 
 object QueriesExecutionTimes {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledHistogram[F]] = Histogram[F](
-    name = "event_log_queries_execution_times",
-    help = "Event Log queries execution times",
-    labelName = "query_id",
-    buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
-  )
+  def apply[F[_]: MonadThrow: MetricsRegistry](): F[QueriesExecutionTimes[F]] = MetricsRegistry[F].register {
+    new LabeledHistogramImpl[F](
+      name = "event_log_queries_execution_times",
+      help = "Event Log queries execution times",
+      labelName = "query_id",
+      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50),
+      maybeThreshold = (750 millis).some
+    ) with QueriesExecutionTimes[F]
+  }.widen
+
+  def apply[F[_]](implicit ev: QueriesExecutionTimes[F]): QueriesExecutionTimes[F] = ev
 }

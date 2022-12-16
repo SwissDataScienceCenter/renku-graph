@@ -19,17 +19,18 @@
 package io.renku.eventlog.processingstatus
 
 import cats.data.NonEmptyList
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, EventStatus}
 import io.renku.graph.model.projects.Id
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -72,8 +73,6 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with IOSpec with InMemoryEv
         processingStatus.done.value           shouldBe doneEvents.size
         processingStatus.total.value          shouldBe expectedTotal
         processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
-
-        queriesExecTimes.verifyExecutionTimeMeasured("processing status")
       }
 
     "return ProcessingStatus for the latest batch only" in new TestCase {
@@ -121,9 +120,10 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with IOSpec with InMemoryEv
   }
 
   private trait TestCase {
-    val projectId              = projectIds.generateOne
-    val queriesExecTimes       = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val processingStatusFinder = new ProcessingStatusFinderImpl(queriesExecTimes)
+    val projectId = projectIds.generateOne
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val processingStatusFinder = new ProcessingStatusFinderImpl[IO]
 
     def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {

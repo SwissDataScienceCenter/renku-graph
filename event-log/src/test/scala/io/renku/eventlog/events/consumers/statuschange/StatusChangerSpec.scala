@@ -23,7 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.Generators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._

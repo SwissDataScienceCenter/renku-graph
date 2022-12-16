@@ -26,8 +26,8 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Sent
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToNonRecoverableFailure, ToRecoverableFailure}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.metrics.LabeledHistogram
 
 import java.time.Instant
 
@@ -35,9 +35,9 @@ private trait StatusUpdater[F[_]] {
   def updateStatus(event: Event): F[Unit]
 }
 
-private class StatusUpdaterImpl[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                              now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class StatusUpdaterImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with StatusUpdater[F]
     with TSMigtationTypeSerializers {
   import skunk._
@@ -77,6 +77,6 @@ private class StatusUpdaterImpl[F[_]: Async: SessionResource](queriesExecTimes: 
 }
 
 private object StatusUpdater {
-  def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[StatusUpdater[F]] =
-    new StatusUpdaterImpl[F](queriesExecTimes).pure[F].widen[StatusUpdater[F]]
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[StatusUpdater[F]] =
+    new StatusUpdaterImpl[F]().pure[F].widen[StatusUpdater[F]]
 }

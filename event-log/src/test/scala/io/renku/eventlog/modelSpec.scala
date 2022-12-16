@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import io.renku.data.ErrorMessage
 import io.renku.generators.Generators._
+import io.renku.graph.model.events.{CreatedDate, EventDate, EventMessage, ExecutionDate}
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

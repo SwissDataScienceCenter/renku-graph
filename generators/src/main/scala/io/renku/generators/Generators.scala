@@ -86,8 +86,8 @@ object Generators {
   }
 
   def sentenceContaining(phrase: NonBlank): Gen[String] = for {
-    prefix <- nonEmptyStrings()
-    suffix <- nonEmptyStrings()
+    prefix <- nonEmptyStrings(minLength = 3)
+    suffix <- nonEmptyStrings(minLength = 3)
   } yield s"$prefix $phrase $suffix"
 
   def blankStrings(maxLength: Int = 10): Gen[String] = for {
@@ -166,6 +166,9 @@ object Generators {
 
   def durations(min: FiniteDuration = 0 millis, max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(min.toMillis, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
+
+  def periods(min: LocalDate = LocalDate.EPOCH, max: LocalDate = LocalDate.now().plus(2000, JAVA_DAYS)): Gen[Period] =
+    Period.between(min, max)
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,

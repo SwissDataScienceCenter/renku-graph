@@ -29,10 +29,11 @@ import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -41,7 +42,7 @@ import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
 import io.renku.http.server.version
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import org.http4s._
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -219,18 +220,17 @@ private class MicroserviceRoutes[F[_]: Sync](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry](
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes](
       consumersRegistry:      EventConsumersRegistry[F],
-      queriesExecTimes:       LabeledHistogram[F],
       eventProducersRegistry: EventProducersRegistry[F],
       isMigrating:            Ref[F, Boolean]
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint            <- EventEndpoint[F](consumersRegistry)
-    eventsEndpoint           <- EventsEndpoint(queriesExecTimes)
-    processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
+    eventsEndpoint           <- EventsEndpoint[F]
+    processingStatusEndpoint <- ProcessingStatusEndpoint[F]
     subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
-    eventDetailsEndpoint     <- EventDetailsEndpoint(queriesExecTimes)
-    eventPayloadEndpoint = EventPayloadEndpoint(queriesExecTimes)
+    eventDetailsEndpoint     <- EventDetailsEndpoint[F]
+    eventPayloadEndpoint = EventPayloadEndpoint[F]
     versionRoutes <- version.Routes[F]
   } yield new MicroserviceRoutes(
     eventEndpoint,

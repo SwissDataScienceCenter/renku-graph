@@ -18,7 +18,8 @@
 
 package io.renku.interpreters
 
-import cats.Monad
+import cats.syntax.all._
+import cats.{Monad, Show}
 import io.renku.interpreters.TestLogger.LogMessage._
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
@@ -132,9 +133,11 @@ object TestLogger {
 
   def apply[F[_]: Monad](): TestLogger[F] = new TestLogger[F]
 
-  private[TestLogger] case class LogEntry(level: Level, message: LogMessage)
+  private[TestLogger] case class LogEntry(level: Level, message: LogMessage) {
+    override lazy val toString = show"\n\t$level: $message"
+  }
 
-  sealed trait Level {
+  sealed trait Level extends Product with Serializable {
 
     def apply(message: String): LogEntry =
       LogEntry(this, Message(message))
@@ -152,6 +155,8 @@ object TestLogger {
     final case object Info  extends Level
     final case object Debug extends Level
     final case object Trace extends Level
+
+    implicit lazy val show: Show[Level] = Show.show(_.productPrefix.toUpperCase)
   }
 
   sealed trait LogMessage {
@@ -168,6 +173,12 @@ object TestLogger {
           (message == otherMessage) && (otherMatcher matches throwable)
         case _ => false
       }
+    }
+
+    implicit lazy val show: Show[LogMessage] = Show.show {
+      case Message(m)                        => m
+      case MessageAndThrowableMatcher(m, _)  => m
+      case MessageAndThrowable(m, throwable) => s"$m; ${throwable.getClass.getName}: ${throwable.getMessage}"
     }
   }
 

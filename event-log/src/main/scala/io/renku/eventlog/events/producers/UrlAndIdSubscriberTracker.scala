@@ -23,9 +23,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
 import skunk.data.Completion
@@ -36,10 +36,9 @@ private trait UrlAndIdSubscriberTracker[F[_]] extends SubscriberTracker[F, UrlAn
   def remove(subscriberUrl: SubscriberUrl):            F[Boolean]
 }
 
-private class UrlAndIdSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F],
-    sourceUrl:        MicroserviceBaseUrl
-) extends DbClient(Some(queriesExecTimes))
+private class UrlAndIdSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    sourceUrl: MicroserviceBaseUrl
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with UrlAndIdSubscriberTracker[F]
     with TypeSerializers {
 
@@ -88,10 +87,8 @@ private object UrlAndIdSubscriberTracker {
 
   def apply[F[_]](implicit tracker: UrlAndIdSubscriberTracker[F]): UrlAndIdSubscriberTracker[F] = tracker
 
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[UrlAndIdSubscriberTracker[F]] = for {
+  def create[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[UrlAndIdSubscriberTracker[F]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new UrlAndIdSubscriberTrackerImpl[F](queriesExecTimes, sourceUrl)
+  } yield new UrlAndIdSubscriberTrackerImpl[F](sourceUrl)
 }

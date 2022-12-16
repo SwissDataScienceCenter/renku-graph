@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
+import cats.data.{NonEmptyList => Nel}
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
@@ -48,7 +49,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeParent ?visibility ?maybeDescription
+    s"""|SELECT DISTINCT ?name (GROUP_CONCAT(?dateCreated; separator=',') AS ?createdDates) ?maybeParent ?visibility ?maybeDescription
         |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
         |WHERE {
         |  GRAPH ${resourceId.showAs[RdfResource]} {
@@ -65,6 +66,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  }
         |}
         |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDescription ?maybeAgent ?maybeCreatorId
+        |LIMIT 1
         |""".stripMargin
   )
 
@@ -75,9 +77,18 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
           .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
           .map(_.getOrElse(Set.empty))
 
+      val toListOfDates: Option[String] => Decoder.Result[Nel[projects.DateCreated]] =
+        _.toList
+          .flatMap(_.split(',').toList)
+          .map(io.circe.Json.fromString)
+          .traverse(_.as[projects.DateCreated])
+          .flatMap(list =>
+            Nel.fromList(list).toRight(DecodingFailure(show"No dateCreated provided for project $resourceId", Nil))
+          )
+
       for {
         name             <- extract[projects.Name]("name")
-        dateCreated      <- extract[projects.DateCreated]("dateCreated")
+        dateCreated      <- extract[Option[String]]("createdDates") >>= toListOfDates
         maybeParent      <- extract[Option[projects.ResourceId]]("maybeParent")
         visibility       <- extract[projects.Visibility]("visibility")
         maybeDescription <- extract[Option[projects.Description]]("maybeDescription")

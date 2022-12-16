@@ -28,15 +28,15 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
+import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.EventFinder
 import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
 import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -46,16 +46,13 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
-    waitingEventsGauge:    LabeledGauge[F, projects.Path],
-    underProcessingGauge:  LabeledGauge[F, projects.Path],
-    queriesExecTimes:      LabeledHistogram[F],
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExecutionTimes: EventStatusGauges](
     now:                   () => Instant = () => Instant.now,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation[F],
     pickRandomlyFrom: List[producers.ProjectIds] => Option[producers.ProjectIds] = ids =>
       ids.get(Random nextInt ids.size)
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, AwaitingGenerationEvent]
     with producers.SubscriptionTypeSerializers
     with TypeSerializers {
@@ -204,10 +201,8 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
                                  maybeBody:    Option[AwaitingGenerationEvent]
   ) = (maybeBody, maybeProject) mapN { case (_, producers.ProjectIds(_, projectPath)) =>
     Kleisli.liftF {
-      for {
-        _ <- waitingEventsGauge decrement projectPath
-        _ <- underProcessingGauge increment projectPath
-      } yield ()
+      (EventStatusGauges[F].awaitingGeneration decrement projectPath) >>
+        (EventStatusGauges[F].underGeneration increment projectPath)
     }
   } getOrElse Kleisli.pure[F, Session[F], Unit](())
 
@@ -219,16 +214,10 @@ private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 20
 
-  def apply[F[_]: Async: Parallel: UrlAndIdSubscribers: SessionResource](
-      waitingEventsGauge:   LabeledGauge[F, projects.Path],
-      underProcessingGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:     LabeledHistogram[F]
-  ): F[EventFinder[F, AwaitingGenerationEvent]] = for {
+  def apply[F[_]: Async: Parallel: UrlAndIdSubscribers: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[EventFinder[F, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation[F]
-  } yield new EventFinderImpl(waitingEventsGauge,
-                              underProcessingGauge,
-                              queriesExecTimes,
-                              projectsFetchingLimit = ProjectsFetchingLimit,
+  } yield new EventFinderImpl(projectsFetchingLimit = ProjectsFetchingLimit,
                               projectPrioritisation = projectPrioritisation
   )
 }

@@ -43,9 +43,9 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
     requestTimeoutOverride: Option[Duration] = None,
-    logQueries:             Boolean = false
+    printQueries:           Boolean = false
 ) extends RestClient(Throttler.noThrottling,
-                     Some(implicitly[SparqlQueryTimeRecorder[F]].instance),
+                     Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
                      retryInterval,
                      maxRetries,
                      idleTimeoutOverride,
@@ -113,7 +113,7 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
   } yield result
 
-  private def log(query: SparqlQuery) = whenA(logQueries)(Logger[F] info query.show)
+  private def log(query: SparqlQuery) = whenA(printQueries)(println(query.show).pure[F])
 
   private def sparqlQueryRequest(uri: Uri, queryType: SparqlQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, triplesStoreConfig.authCredentials)

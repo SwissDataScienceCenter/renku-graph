@@ -21,6 +21,7 @@ package io.renku.eventlog.metrics
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames

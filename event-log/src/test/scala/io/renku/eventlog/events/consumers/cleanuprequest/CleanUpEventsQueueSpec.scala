@@ -19,11 +19,11 @@
 package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -67,9 +67,10 @@ class CleanUpEventsQueueSpec
   private trait TestCase {
     val now = OffsetDateTime.now()
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val currentTime      = mockFunction[OffsetDateTime]
-    val queue            = new CleanUpEventsQueueImpl[IO](queriesExecTimes, currentTime)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val currentTime = mockFunction[OffsetDateTime]
+    val queue       = new CleanUpEventsQueueImpl[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }

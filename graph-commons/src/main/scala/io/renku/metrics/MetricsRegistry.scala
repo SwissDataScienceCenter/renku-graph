@@ -68,11 +68,11 @@ object MetricsRegistry {
 
     override def register[C <: MetricsCollector with PrometheusCollector](collector: C): F[C] =
       wrappersRegistrationLeger.modify {
-        case leger if leger contains collector.name =>
-          leger -> leger(collector.name).asInstanceOf[C]
+        case leger if leger contains collector.name.value =>
+          leger -> leger(collector.name.value).asInstanceOf[C]
         case leger =>
           registry register collector.wrappedCollector
-          (leger + (collector.name -> collector)) -> collector
+          (leger + (collector.name.value -> collector)) -> collector
       }
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = Some(registry)

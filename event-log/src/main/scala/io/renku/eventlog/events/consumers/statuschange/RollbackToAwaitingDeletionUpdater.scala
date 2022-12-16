@@ -23,23 +23,21 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
-import io.renku.graph.model.events.EventStatus
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
+import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
 
-private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, RollbackToAwaitingDeletion] {
 
   override def updateDB(event: RollbackToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {

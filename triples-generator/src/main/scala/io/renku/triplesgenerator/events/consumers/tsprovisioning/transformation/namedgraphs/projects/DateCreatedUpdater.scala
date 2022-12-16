@@ -35,14 +35,15 @@ private class DateCreatedUpdaterImpl(updatesCreator: UpdatesCreator) extends Dat
   import updatesCreator._
 
   override def updateDateCreated(kgData: ProjectMutableData): ((Project, Queries)) => (Project, Queries) = {
-    case (project, queries) if (project.dateCreated compareTo kgData.dateCreated) < 0 =>
+    case (project, queries) if project.dateCreated < kgData.earliestDateCreated =>
       project -> (queries |+| preDataQueriesOnly(dateCreatedDeletion(project, kgData)))
-    case (project, queries) if (project.dateCreated compareTo kgData.dateCreated) > 0 =>
+    case (project, queries) if project.dateCreated > kgData.earliestDateCreated =>
+      val kgDataCreated = kgData.earliestDateCreated
       val updatedProj = project match {
-        case p: RenkuProject.WithoutParent    => p.copy(dateCreated = kgData.dateCreated)
-        case p: RenkuProject.WithParent       => p.copy(dateCreated = kgData.dateCreated)
-        case p: NonRenkuProject.WithoutParent => p.copy(dateCreated = kgData.dateCreated)
-        case p: NonRenkuProject.WithParent    => p.copy(dateCreated = kgData.dateCreated)
+        case p: RenkuProject.WithoutParent    => p.copy(dateCreated = kgDataCreated)
+        case p: RenkuProject.WithParent       => p.copy(dateCreated = kgDataCreated)
+        case p: NonRenkuProject.WithoutParent => p.copy(dateCreated = kgDataCreated)
+        case p: NonRenkuProject.WithParent    => p.copy(dateCreated = kgDataCreated)
       }
       updatedProj -> queries
     case (project, queries) => project -> queries

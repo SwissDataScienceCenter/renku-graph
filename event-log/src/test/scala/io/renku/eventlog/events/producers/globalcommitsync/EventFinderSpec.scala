@@ -22,19 +22,19 @@ package globalcommitsync
 import GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -221,15 +221,13 @@ class EventFinderSpec
   }
 
   private trait TestCase {
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val syncFrequency         = Duration ofDays 7
     val lastSyncedDateUpdater = mock[LastSyncedDateUpdater[IO]]
     val currentTime           = mockFunction[Instant]
     val now                   = Instant.now()
-    val finder = new EventFinderImpl(lastSyncedDateUpdater,
-                                     TestLabeledHistogram[SqlStatement.Name]("query_id"),
-                                     syncFrequency,
-                                     currentTime
-    )
+    val finder                = new EventFinderImpl(lastSyncedDateUpdater, syncFrequency, currentTime)
 
     def givenTheLastSyncedDateIsUpdated(project: Project) = {
       currentTime.expects().returning(now)

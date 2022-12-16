@@ -23,12 +23,13 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoSynchronizer[F[_]] {
@@ -88,11 +89,12 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private object ProjectInfoSynchronizer {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[ProjectInfoSynchronizer[F]] = for {
+  def apply[F[
+      _
+  ]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[ProjectInfoSynchronizer[F]] = for {
     gitLabProjectFetcher <- GitLabProjectFetcher[F]
-    projectRemover       <- ProjectRemover[F](queriesExecTimes)
+    projectRemover       <- ProjectRemover[F]
     eventSender          <- EventSender[F]
   } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender)
 }

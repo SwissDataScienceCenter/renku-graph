@@ -25,8 +25,8 @@ import io.circe.Json
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.events.producers.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait EventProducersRegistry[F[_]] {
@@ -60,28 +60,19 @@ object EventProducersRegistry {
   final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
-      underGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-      underTransformationGauge:    LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
-      deletingGauge:               LabeledGauge[F, projects.Path],
-      queriesExecTimes:            LabeledHistogram[F]
-  ): F[EventProducersRegistry[F]] = for {
-    implicit0(subscriberTracker: UrlAndIdSubscriberTracker[F]) <- UrlAndIdSubscriberTracker[F](queriesExecTimes)
-    awaitingGenerationCategory <-
-      awaitinggeneration.SubscriptionCategory(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
-    memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes)
-    commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes)
-    globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
-    projectSyncCategory      <- projectsync.SubscriptionCategory(queriesExecTimes)
-    triplesGeneratedCategory <-
-      triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
-    cleanUpEventCategory   <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
-    zombieEventsCategory   <- zombieevents.SubscriptionCategory(queriesExecTimes)
-    tsMigrationCategory    <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
-    minProjectInfoCategory <- minprojectinfo.SubscriptionCategory(queriesExecTimes)
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+      : F[EventProducersRegistry[F]] = for {
+    implicit0(st: UrlAndIdSubscriberTracker[F]) <- UrlAndIdSubscriberTracker.create[F]
+    awaitingGenerationCategory                  <- awaitinggeneration.SubscriptionCategory[F]
+    memberSyncCategory                          <- membersync.SubscriptionCategory[F]
+    commitSyncCategory                          <- commitsync.SubscriptionCategory[F]
+    globalCommitSyncCategory                    <- globalcommitsync.SubscriptionCategory[F]
+    projectSyncCategory                         <- projectsync.SubscriptionCategory[F]
+    triplesGeneratedCategory                    <- triplesgenerated.SubscriptionCategory[F]
+    cleanUpEventCategory                        <- cleanup.SubscriptionCategory[F]
+    zombieEventsCategory                        <- zombieevents.SubscriptionCategory[F]
+    tsMigrationCategory                         <- tsmigrationrequest.SubscriptionCategory[F]
+    minProjectInfoCategory                      <- minprojectinfo.SubscriptionCategory[F]
   } yield new EventProducersRegistryImpl(
     Set(
       awaitingGenerationCategory,

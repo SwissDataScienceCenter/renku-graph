@@ -37,6 +37,7 @@ private class GLCreatorFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLC
 
   import eu.timepit.refined.auto._
   import io.circe._
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
   import org.http4s.implicits._
@@ -44,7 +45,7 @@ private class GLCreatorFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLC
 
   override def findCreatorName(id: persons.GitLabId)(implicit
       maybeAccessToken:            Option[AccessToken]
-  ): F[Option[persons.Name]] = GitLabClient[F].get(uri"users" / id.value, "single-user")(mapResponse)
+  ): F[Option[persons.Name]] = GitLabClient[F].get(uri"users" / id, "single-user")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[persons.Name]]] = {
     case (Ok, _, response) => response.as[Option[persons.Name]]

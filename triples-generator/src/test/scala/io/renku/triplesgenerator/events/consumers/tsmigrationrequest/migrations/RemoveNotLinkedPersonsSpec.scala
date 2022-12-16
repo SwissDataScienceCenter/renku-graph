@@ -71,7 +71,7 @@ class RemoveNotLinkedPersonsSpec
   "apply" should {
     "return an QueryBasedMigration" in {
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
-      implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+      implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
       RemoveNotLinkedPersons[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }

@@ -21,16 +21,16 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.effect.{Async, IO, Ref}
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.consumers.statuschange.Generators.projectEventsToNewEvents
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -114,7 +114,7 @@ class StatusChangeEventsQueueSpec
     }
 
     "continue if there are general problems with dequeueing" in {
-      val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
+      implicit val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
         Session.single[IO](
           host = dbConfig.host.value,
           port = positiveInts().generateOne.value,
@@ -123,9 +123,11 @@ class StatusChangeEventsQueueSpec
           password = Some(nonEmptyStrings().generateOne)
         )
       )
-      val logger: TestLogger[IO] = TestLogger[IO]()
-      val queryExec = TestLabeledHistogram[SqlStatement.Name]("query_id")
-      val queue = new StatusChangeEventsQueueImpl[IO](queryExec)(implicitly[Async[IO]], logger, failingSessionResource)
+      implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
+      implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+      implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+      val queue =
+        new StatusChangeEventsQueueImpl[IO]()(implicitly[Async[IO]], logger, failingSessionResource, queriesExecTimes)
 
       val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
       queue.register(handler).unsafeRunSync()
@@ -146,8 +148,9 @@ class StatusChangeEventsQueueSpec
     val dequeuedEvents: Ref[IO, List[ProjectEventsToNew]] = Ref.unsafe[IO, List[ProjectEventsToNew]](List.empty)
     val eventHandler:   ProjectEventsToNew => IO[Unit]    = e => dequeuedEvents.update(_ ::: e :: Nil)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queryExec = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val queue     = new StatusChangeEventsQueueImpl[IO](queryExec)
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val queue = new StatusChangeEventsQueueImpl[IO]
   }
 }

@@ -22,19 +22,19 @@ package globalcommitsync
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement.Name
-import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -98,7 +98,10 @@ class LastSyncedDateUpdaterSpec
 
   private trait TestCase {
     val project = consumerProjects.generateOne
-    val updater = new LastSyncedDateUpdateImpl[IO](TestLabeledHistogram[Name]("query_id"))
+
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val updater = new LastSyncedDateUpdateImpl[IO]
 
     upsertProject(project.id, project.path, eventDates.generateOne)
   }

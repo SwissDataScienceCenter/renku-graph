@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds}

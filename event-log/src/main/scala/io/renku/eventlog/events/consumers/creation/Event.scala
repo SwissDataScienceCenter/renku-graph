@@ -18,11 +18,10 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import io.renku.eventlog.{CompoundId, EventDate, EventMessage}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventDate, EventId, EventMessage, EventStatus}
 
-private sealed trait Event extends CompoundId {
+private sealed trait Event {
   def id:        EventId
   def project:   Project
   def date:      EventDate

@@ -24,8 +24,8 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 
 import java.time.OffsetDateTime
@@ -35,13 +35,13 @@ private trait CleanUpEventsQueue[F[_]] {
 }
 
 private object CleanUpEventsQueue {
-  def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[CleanUpEventsQueue[F]] =
-    MonadThrow[F].catchNonFatal(new CleanUpEventsQueueImpl[F](queriesExecTimes))
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[CleanUpEventsQueue[F]] =
+    MonadThrow[F].catchNonFatal(new CleanUpEventsQueueImpl[F]())
 }
 
-private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                   now: () => OffsetDateTime = () => OffsetDateTime.now
-) extends DbClient[F](Some(queriesExecTimes))
+private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => OffsetDateTime = () => OffsetDateTime.now
+) extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with CleanUpEventsQueue[F]
     with TypeSerializers {
 

@@ -24,12 +24,12 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -38,9 +38,8 @@ import skunk.implicits._
 import java.time.Duration
 import java.time.Instant.now
 
-private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
@@ -106,9 +105,8 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
 }
 
 private object LostZombieEventFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
-    new LostZombieEventFinder(queriesExecTimes)
-  }
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
+    MonadThrow[F].catchNonFatal {
+      new LostZombieEventFinder[F]
+    }
 }

@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._

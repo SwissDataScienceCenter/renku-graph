@@ -20,17 +20,18 @@ package io.renku.eventlog.events.consumers.creation
 
 import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.db.SqlStatement
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result._
 import io.renku.eventlog.events.consumers.creation.Generators._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
+import TestEventStatusGauges._
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -53,95 +54,96 @@ class EventPersisterSpec
 
     "add a *new* event if there is no event with the given id for the given project " +
       "and there's no batch waiting or under processing" in new TestCase {
-        val newEvent = newEvents.generateOne
 
         // storeNewEvent 1
-        (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
+        val event1 = newEvents.generateOne
 
-        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe Created(newEvent)
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created(event1)
 
-        storedEvent(newEvent.compoundEventId) shouldBe (
-          newEvent.compoundEventId,
+        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+
+        storedEvent(event1.compoundEventId) shouldBe (
+          event1.compoundEventId,
           New,
           CreatedDate(now),
           ExecutionDate(now),
-          newEvent.date,
-          newEvent.body,
+          event1.date,
+          event1.body,
           None
         )
-        storedProjects shouldBe List((newEvent.project.id, newEvent.project.path, newEvent.date))
+        storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
 
         // storeNewEvent 2 - different event id and different project
         val event2 = newEvents.generateOne
-        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created(event2)
 
-        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-        save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
-        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
 
-        queriesExecTimes.verifyExecutionTimeMeasured("new - check existence",
-                                                     "new - find batch",
-                                                     "new - create (NEW)",
-                                                     "new - upsert project"
-        )
+        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
+        save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
+        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
       }
 
     "add a new event if there is no event with the given id for the given project " +
       "and there's a batch for that project waiting and under processing" in new TestCase {
-        val newEvent = newEvents.generateOne
 
         // storeNewEvent 1
-        (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
+        val event1 = newEvents.generateOne
 
-        persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
 
         findEvents(status = New).head shouldBe (
-          newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate
+          event1.compoundEventId, ExecutionDate(now), event1.batchDate
         )
 
         // storeNewEvent 2 - different event id and batch date but same project
-        val event2 = newEvent.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
-        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val event2 = event1.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
 
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
+        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 2d
+
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-        save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
-        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), newEvent.batchDate)
+        save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
+        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event1.batchDate)
       }
 
     "update latest_event_date for a project " +
       "only if there's an event with more recent Event Date added" in new TestCase {
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         // storing event 1
-        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
+        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+
         // storing event 2 for the same project but more recent Event Date
-        val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
-        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val event2       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
+        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 2d
+
         // storing event 3 for the same project but less recent Event Date
-        val event3 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
-        (waitingEventsGauge.increment _).expects(event3.project.path).returning(IO.unit)
+        val event3       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
         val nowForEvent3 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent3)
 
         persister.storeNewEvent(event3).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event3.project.path).unsafeRunSync() shouldBe 3d
 
         val savedEvent1 +: savedEvent2 +: savedEvent3 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -152,22 +154,24 @@ class EventPersisterSpec
 
     "update latest_event_date and project_path for a project " +
       "only if there's an event with more recent Event Date added" in new TestCase {
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         // storing event 1
-        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
 
         // storing event 2 for the same project but with different project_path and more recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
                                                 date = EventDate(now.minus(1, HOURS))
         )
-        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -177,22 +181,24 @@ class EventPersisterSpec
 
     "do not update latest_event_date and project_path for a project " +
       "only if there's an event with less recent Event Date added" in new TestCase {
-        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         // storing event 1
-        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
 
         // storing event 2 for the same project but with different project_path and less recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
                                                 date = EventDate(now.minus(3, HOURS))
         )
-        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
+
+        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
@@ -219,7 +225,6 @@ class EventPersisterSpec
       findEvents(status =
         TriplesStore
       ).eventIdsOnly should contain theSameElementsAs event1.compoundEventId :: event2.compoundEventId :: Nil
-
     }
 
     "add a *SKIPPED* event if there is no event with the given id for the given project " in new TestCase {
@@ -250,57 +255,54 @@ class EventPersisterSpec
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = Skipped)
       save2Event1 shouldBe (skippedEvent.compoundEventId, ExecutionDate(now), skippedEvent.batchDate)
       save2Event2 shouldBe (skippedEvent2.compoundEventId, ExecutionDate(nowForEvent2), skippedEvent2.batchDate)
-
-      queriesExecTimes.verifyExecutionTimeMeasured("new - check existence",
-                                                   "new - find batch",
-                                                   "new - create (SKIPPED)",
-                                                   "new - upsert project"
-      )
     }
 
     "add a new event if there is another event with the same id but for a different project" in new TestCase {
-      val newEvent = newEvents.generateOne
 
       // Save 1
-      (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
+      val event1 = newEvents.generateOne
 
-      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
+      persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
+
+      gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
 
       val save1Event1 +: Nil = findEvents(status = New)
-      save1Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
+      save1Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
 
       // Save 2 - the same event id but different project
-      val event2 = newEvents.generateOne.copy(id = newEvent.id)
-      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+      val event2 = newEvents.generateOne.copy(id = event1.id)
 
       val nowForEvent2 = Instant.now().truncatedTo(MICROS)
       currentTime.expects().returning(nowForEvent2)
 
       persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
+      gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
+
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
+      save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
       save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
     }
 
     "do nothing if there is an event with the same id and project in the DB already" in new TestCase {
-      val newEvent = newEvents.generateOne
 
-      (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
+      val event = newEvents.generateOne
 
-      persister.storeNewEvent(newEvent).unsafeRunSync() shouldBe a[Created]
+      persister.storeNewEvent(event).unsafeRunSync() shouldBe a[Created]
 
-      storedEvent(newEvent.compoundEventId)._1 shouldBe newEvent.compoundEventId
+      storedEvent(event.compoundEventId)._1 shouldBe event.compoundEventId
 
-      persister.storeNewEvent(newEvent.copy(body = eventBodies.generateOne)).unsafeRunSync() shouldBe Existed
+      persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync() shouldBe Existed
 
-      storedEvent(newEvent.compoundEventId) shouldBe (
-        newEvent.compoundEventId,
+      gauges.awaitingGeneration.getValue(event.project.path).unsafeRunSync() shouldBe 1d
+
+      storedEvent(event.compoundEventId) shouldBe (
+        event.compoundEventId,
         New,
         CreatedDate(now),
         ExecutionDate(now),
-        newEvent.date,
-        newEvent.body,
+        event.date,
+        event.body,
         None
       )
     }
@@ -308,10 +310,11 @@ class EventPersisterSpec
 
   private trait TestCase {
 
-    val currentTime        = mockFunction[Instant]
-    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val persister          = new EventPersisterImpl(waitingEventsGauge, queriesExecTimes, currentTime)
+    implicit val gauges:                   EventStatusGauges[IO]     = TestEventStatusGauges[IO]
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val currentTime = mockFunction[Instant]
+    val persister   = new EventPersisterImpl[IO](currentTime)
 
     val now = Instant.now().truncatedTo(MICROS)
     currentTime.expects().returning(now)

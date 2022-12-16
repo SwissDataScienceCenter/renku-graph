@@ -23,23 +23,21 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
-import io.renku.graph.model.events.EventId
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{TransformingTriples, TriplesGenerated}
+import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
 
-private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F],
-    now:              () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, RollbackToTriplesGenerated] {
 
   override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[F] = measureExecutionTime {

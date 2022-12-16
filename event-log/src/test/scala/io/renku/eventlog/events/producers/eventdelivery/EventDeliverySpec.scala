@@ -21,15 +21,15 @@ package eventdelivery
 
 import TestCompoundIdEvent.testCompoundIdEvent
 import cats.effect.IO
-import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.CompoundEventId
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -108,24 +108,25 @@ class EventDeliverySpec
   }
 
   private trait CommonTestCase {
-    val event            = testCompoundIdEvent.generateOne
-    val subscriberId     = subscriberIds.generateOne
-    val subscriberUrl    = subscriberUrls.generateOne
-    val sourceUrl        = microserviceBaseUrls.generateOne
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val event         = testCompoundIdEvent.generateOne
+    val subscriberId  = subscriberIds.generateOne
+    val subscriberUrl = subscriberUrls.generateOne
+    val sourceUrl     = microserviceBaseUrls.generateOne
+    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
   }
 
   private trait TestCase extends CommonTestCase {
 
     val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId = e =>
       CompoundEventDeliveryId(e.compoundEventId)
-    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, queriesExecTimes, sourceUrl)
+    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
   }
 
   private trait DeletingProjectTestCase extends CommonTestCase {
 
     val compoundIdExtractor: TestCompoundIdEvent => EventDeliveryId = event => DeletingProjectDeliverId(event.projectId)
-    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, queriesExecTimes, sourceUrl)
+    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, sourceUrl)
   }
 
   private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,

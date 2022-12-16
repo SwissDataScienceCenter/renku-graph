@@ -30,12 +30,11 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.producers
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
 import skunk.codec.all.{int4, int8}
 import skunk.data.Completion
@@ -45,15 +44,12 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class EventFinderImpl[F[_]: Async: SessionResource](
-    awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-    underTransformationGauge:    LabeledGauge[F, projects.Path],
-    queriesExecTimes:            LabeledHistogram[F],
-    now:                         () => Instant = () => Instant.now,
-    projectsFetchingLimit:       Int Refined Positive,
-    projectPrioritisation:       ProjectPrioritisation,
-    pickRandomlyFrom: List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
-) extends DbClient(Some(queriesExecTimes))
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges](
+    now:                   () => Instant = () => Instant.now,
+    projectsFetchingLimit: Int Refined Positive,
+    projectPrioritisation: ProjectPrioritisation,
+    pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {
 
@@ -195,26 +191,21 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
   }
 
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[TriplesGeneratedEvent]) =
-    (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
-      for {
-        _ <- awaitingTransformationGauge decrement projectPath
-        _ <- underTransformationGauge increment projectPath
-      } yield ()
-    } getOrElse ().pure[F]
+    (maybeBody, maybeProject)
+      .mapN { case (_, ProjectIds(_, projectPath)) =>
+        (EventStatusGauges[F].awaitingTransformation decrement projectPath) >>
+          (EventStatusGauges[F].underTransformation increment projectPath)
+      }
+      .getOrElse(().pure[F])
 }
 
 private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply[F[_]: Async: SessionResource](awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-                                          underTransformationGauge: LabeledGauge[F, projects.Path],
-                                          queriesExecTimes:         LabeledHistogram[F]
-  ): F[producers.EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl(
-      awaitingTransformationGauge,
-      underTransformationGauge,
-      queriesExecTimes,
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[producers.EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
+    new EventFinderImpl[F](
       projectsFetchingLimit = ProjectsFetchingLimit,
       projectPrioritisation = new ProjectPrioritisation()
     )
