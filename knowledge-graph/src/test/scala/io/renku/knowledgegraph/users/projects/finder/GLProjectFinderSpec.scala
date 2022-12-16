@@ -117,7 +117,7 @@ class GLProjectFinderSpec
       finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projectsAndCreators.map(_._1)
     }
 
-    "find creator name once for the same creator id" in new TestCase {
+    "reach to GL once for the same creator id" in new TestCase {
 
       val criteria = criterias.generateOne
 
@@ -140,9 +140,9 @@ class GLProjectFinderSpec
         (proj.maybeCreator -> maybeCreatorId).mapN(_ -> _)
       }.distinct
 
-      distinctCreators.size shouldBe 2
+      distinctCreators.size should be <= 2
 
-      distinctCreators.foreach { case (creatorName, creatorId) =>
+      distinctCreators foreach { case (creatorName, creatorId) =>
         (glCreatorFinder
           .findCreatorName(_: persons.GitLabId)(_: Option[AccessToken]))
           .expects(creatorId, criteria.maybeUser.map(_.accessToken))
