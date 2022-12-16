@@ -34,7 +34,7 @@ private object AddRenkuPlanWhereMissing {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Remove too many project createdDates")
+  private lazy val name = Migration.Name("Add missing renku:Plan types")
 
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
