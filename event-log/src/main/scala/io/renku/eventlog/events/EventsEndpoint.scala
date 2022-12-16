@@ -81,7 +81,7 @@ object EventsEndpoint {
     sealed trait FiltersOnDate extends Filters
 
     object Filters {
-      final case class ProjectEvents(projectPath: projects.Path,
+      final case class ProjectEvents(projectId:   projects.Identifier,
                                      maybeStatus: Option[EventStatus],
                                      maybeDates:  Option[FiltersOnDate]
       ) extends Filters
@@ -107,12 +107,16 @@ object EventsEndpoint {
   }
 
   implicit val show: Show[Criteria] = Show.show {
+    implicit def idParamShow[I <: projects.Identifier]: Show[I] = Show.show {
+      case path: projects.Path => s"project-path: $path"
+      case id:   projects.Id   => s"project-id: $id"
+    }
     _.filters match {
-      case Filters.ProjectEvents(path, Some(status), Some(dates)) => show"project-path: $path; status: $status; $dates"
-      case Filters.ProjectEvents(path, Some(status), None)        => show"project-path: $path; status: $status"
-      case Filters.ProjectEvents(path, None, Some(dates))         => show"project-path: $path; $dates"
-      case Filters.ProjectEvents(path, None, _)                   => show"project-path: $path"
-      case Filters.EventsWithStatus(status, _)                    => show"status: $status"
+      case Filters.ProjectEvents(id, Some(status), Some(dates)) => show"$id; status: $status; $dates"
+      case Filters.ProjectEvents(id, Some(status), None)        => show"$id; status: $status"
+      case Filters.ProjectEvents(id, None, Some(dates))         => show"$id; $dates"
+      case Filters.ProjectEvents(id, None, _)                   => show"$id"
+      case Filters.EventsWithStatus(status, _)                  => show"status: $status"
       case filterOnDate: Criteria.FiltersOnDate => filterOnDate.show
     }
   }

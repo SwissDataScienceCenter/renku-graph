@@ -78,7 +78,7 @@ private class MicroserviceRoutes[F[_]: Sync](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, since, until, page, perPage, sortBy, request))
+    case request @ GET  -> Root / "events" :? `project-id`(validatedProjectId) +& `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectPath, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
@@ -95,14 +95,15 @@ private class MicroserviceRoutes[F[_]: Sync](
   }
 
   private object ProjectIdParameter {
-
-    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] = (value: QueryParameterValue) =>
-      {
-        for {
-          int <- Try(value.value.toInt).toEither
-          id  <- projects.Id.from(int)
-        } yield id
-      }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
+      (value: QueryParameterValue) => {
+        val error = ParseFailure(s"'${`project-id`}' parameter with invalid value", "")
+        Either
+          .fromOption(value.value.toIntOption, ifNone = error)
+          .flatMap(projects.Id.from)
+          .leftMap(_ => error)
+          .toValidatedNel
+      }
 
     object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
       val parameterName:     String = "project-id"
@@ -155,7 +156,8 @@ private class MicroserviceRoutes[F[_]: Sync](
     }
   }
 
-  private def maybeFindEvents(maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
+  private def maybeFindEvents(maybeProjectId:   Option[ValidatedNel[ParseFailure, projects.Id]],
+                              maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
                               maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
                               maybeSince:       Option[ValidatedNel[ParseFailure, EventDate]],
                               maybeUntil:       Option[ValidatedNel[ParseFailure, EventDate]],
@@ -174,11 +176,11 @@ private class MicroserviceRoutes[F[_]: Sync](
       case _ => None
     }
 
-    (maybeProjectPath, maybeStatus, filtersOnDate) match {
+    (maybeProjectId orElse maybeProjectPath, maybeStatus, filtersOnDate) match {
       case (None, None, None) => resourceNotFound
-      case (Some(validatedPath), maybeStatus, maybeDates) =>
+      case (Some(validatedIdentifier), maybeStatus, maybeDates) =>
         (
-          validatedPath,
+          validatedIdentifier,
           maybeStatus.sequence,
           maybeDates.sequence,
           maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),

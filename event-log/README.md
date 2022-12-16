@@ -7,7 +7,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                        | Description                                                                |
 |--------|---------------------------------------------|----------------------------------------------------------------------------|
 | GET    | ```/events```                               | Returns info about events                                                  |
-| GET    | ```/events/:event-id/:project-path```         | Returns info about event with the given `id` and `project-path`              |
+| GET    | ```/events/:event-id/:project-path```       | Returns info about event with the given `id` and `project-path`            |
 | GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
 | POST   | ```/events```                               | Sends an event for processing                                              |
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
@@ -23,19 +23,20 @@ All endpoints (except for `/ping` and `/metrics`) will return 503 while the data
 
 Returns information about the selected events.
 
-| Query Parameter | Mandatory | Default        | Description                                                                           |
-|-----------------|-----------|----------------|---------------------------------------------------------------------------------------|
-| project-path    | No        | -              | Url-encoded non-blank project path                                                    |
-| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                                |
+| Query Parameter | Mandatory | Default        | Description                                                                       |
+|-----------------|-----------|----------------|-----------------------------------------------------------------------------------|
+| project-id      | No        | -              | Project id                                                                        |
+| project-path    | No        | -              | Url-encoded non-blank project path                                                |
+| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                            |
 | since           | No        | -              | To find events after or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
-| until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ`|
-| page            | No        | 1              | Page number                                                                           |
-| per_page        | No        | 20             | Number of items per page                                                              |
-| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`                   |
+| until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
+| page            | No        | 1              | Page number                                                                       |
+| per_page        | No        | 20             | Number of items per page                                                          |
+| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`               |
 
 NOTES:
 
-* at least `project-path` or `status` query parameter has to be given.
+* at least `project-id`, `project-path` or `status` query parameter has to be given.
 * the returned events are sorted by the `event_date`.
 
 **Response**
