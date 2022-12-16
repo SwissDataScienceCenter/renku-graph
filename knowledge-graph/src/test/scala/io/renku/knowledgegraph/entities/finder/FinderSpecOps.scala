@@ -88,7 +88,7 @@ trait FinderSpecOps {
     }.distinct
 
     def addAllPlansFrom(project: RenkuProject): List[model.Entity] = {
-      project.plans.toList.map(_ -> project).map(_.to[model.Entity.Workflow]) ::: entities
+      project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]) ::: entities
     }.distinct
 
     def addAllPersonsFrom(project: RenkuProject): List[model.Entity] =
