@@ -106,11 +106,9 @@ class EventSenderImpl[F[_]: Async: Logger](
       waitAndRetry(retry, exception, context.errorMessage)
   }
 
-  private def waitAndRetry(retry: Eval[F[Status]], exception: Throwable, errorMessage: String) = for {
-    _      <- Logger[F].error(exception)(errorMessage)
-    _      <- Temporal[F] sleep onErrorSleep
-    result <- retry.value
-  } yield result
+  private def waitAndRetry(retry: Eval[F[Status]], exception: Throwable, errorMessage: String) =
+    Temporal[F].andWait(Logger[F].error(exception)(errorMessage), onErrorSleep) >>
+      retry.value
 
   private lazy val responseMapping: PartialFunction[(Status, Request[F], Response[F]), F[Status]] = {
     case (Accepted, _, _) => Accepted.pure[F]

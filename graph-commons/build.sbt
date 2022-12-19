@@ -25,11 +25,11 @@ libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfig
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 libraryDependencies += "eu.timepit"       %% "refined-pureconfig" % "0.10.1"
-libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.9.2"
+libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.10.0"
 libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % "9.4.2"
 
 val http4sVersion           = "0.23.16"
-val http4sBlazeVersion      = "0.23.12"
+val http4sBlazeVersion      = "0.23.13"
 val http4sPrometheusVersion = "0.24.2"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sBlazeVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sBlazeVersion

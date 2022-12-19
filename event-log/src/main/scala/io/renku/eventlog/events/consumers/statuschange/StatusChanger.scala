@@ -24,8 +24,6 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import skunk.Transaction
 
-import scala.util.control.NonFatal
-
 private trait StatusChanger[F[_]] {
   def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit]
 }
@@ -46,7 +44,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
                 .updateDB(event)
                 .flatMapF(res => transaction.commit.map(_ => res))
                 .recoverWith(rollback(transaction)(savepoint)(event))
-            _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
+            _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case _ => Kleisli.pure(()) }
           } yield ()
         } run session
       }
@@ -54,7 +52,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
       implicit dbUpdater:                                   DBUpdater[F, E]
-  ): PartialFunction[Throwable, UpdateResult[F]] = { case NonFatal(err) =>
+  ): PartialFunction[Throwable, UpdateResult[F]] = { case err =>
     Kleisli.liftF {
       for {
         _ <- transaction.rollback(savepoint)

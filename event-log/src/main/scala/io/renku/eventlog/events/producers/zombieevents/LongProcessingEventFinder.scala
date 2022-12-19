@@ -109,7 +109,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
       )
       .arguments(
         projectId ~ status ~ zombieMessage ~
-          ExecutionDate(now()) ~ EventProcessingTime(Duration ofMinutes 5) ~
+          ExecutionDate(now()) ~ EventProcessingTime(Duration ofMinutes 10) ~
           ExecutionDate(now()) ~ findGracePeriod(status)
       )
       .build(_.option)

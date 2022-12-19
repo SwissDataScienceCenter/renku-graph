@@ -32,8 +32,7 @@ import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.graph.model.SchemaVersion
-import io.renku.graph.model.events.{CompoundEventId, EventBody, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -52,8 +51,6 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 
   import eventBodyDeserializer._
   import eventProcessor._
-  import io.circe.Decoder
-  import io.renku.tinytypes.json.TinyTypeDecoders._
   import tsReadinessChecker._
 
   override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
@@ -80,13 +77,6 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 
   private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
     s"$eventId, projectPath = ${project.path}"
-  }
-
-  private implicit val eventBodyDecoder: Decoder[(EventBody, SchemaVersion)] = { implicit cursor =>
-    for {
-      schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
-      eventBody     <- cursor.downField("payload").as[EventBody]
-    } yield (eventBody, schemaVersion)
   }
 }
 
