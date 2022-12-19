@@ -72,16 +72,15 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     } yield ()
   } recoverWith logError(event)
 
-  private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = {
-    case NonFatal(exception) =>
-      Logger[F].error(exception)(show"$categoryName: processing failure: $event")
+  private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = { case exception =>
+    Logger[F].error(exception)(show"$categoryName: processing failure: $event")
   }
 
   private def transformAndUpload(
       event:      TriplesGeneratedEvent
   )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
-      project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
+      project <- buildEntity(event) leftSemiflatMap toRecoverableError(event)
       result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
@@ -112,7 +111,9 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         .map(_ => NonRecoverableError(event, exception))
   }
 
-  private def toUploadingError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
+  private def toRecoverableError(
+      event: TriplesGeneratedEvent
+  ): PartialFunction[ProcessingRecoverableError, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.getMessage}")
@@ -165,12 +166,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def logMessageCommon(event: TriplesGeneratedEvent): String = show"$categoryName: $event"
 
-  private def rollback(
-      triplesGeneratedEvent: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, F[Option[AccessToken]]] = { case NonFatal(exception) =>
-    statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId,
-                                             triplesGeneratedEvent.project.path
-    ) >> new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
+  private def rollback(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
+    case exception =>
+      statusUpdater.rollback[TriplesGenerated](event.compoundEventId, event.project.path) >>
+        new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 
   private sealed trait EventUploadingResult extends UploadingResult {

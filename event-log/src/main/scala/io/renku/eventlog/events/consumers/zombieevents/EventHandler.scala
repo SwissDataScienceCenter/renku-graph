@@ -34,8 +34,6 @@ import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
     override val categoryName: CategoryName,
     zombieStatusCleaner:       ZombieStatusCleaner[F]
@@ -61,7 +59,7 @@ private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
       case Updated => updateGauges(event)
       case _       => ().pure[F]
     }
-  } recoverWith { case NonFatal(exception) => Logger[F].logError(event, exception) }
+  } recoverWith { case exception => Logger[F].logError(event, exception) }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case ZombieEvent(_, projectPath, GeneratingTriples) =>
