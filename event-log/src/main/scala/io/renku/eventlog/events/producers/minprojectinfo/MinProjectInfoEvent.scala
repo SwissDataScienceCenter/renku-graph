@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private case class MinProjectInfoEvent(projectId: projects.Id, projectPath: projects.Path)
+private case class MinProjectInfoEvent(projectId: projects.GitLabId, projectPath: projects.Path)
 
 private object MinProjectInfoEvent {
   implicit val show: Show[MinProjectInfoEvent] = Show.show { case MinProjectInfoEvent(id, path) =>

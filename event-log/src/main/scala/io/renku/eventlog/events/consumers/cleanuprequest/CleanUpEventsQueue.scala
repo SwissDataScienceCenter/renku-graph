@@ -31,7 +31,7 @@ import skunk.data.Completion
 import java.time.OffsetDateTime
 
 private trait CleanUpEventsQueue[F[_]] {
-  def offer(projectId: projects.Id, projectPath: projects.Path): F[Unit]
+  def offer(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
 }
 
 private object CleanUpEventsQueue {
@@ -50,10 +50,10 @@ private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource: QueriesExecut
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def offer(projectId: projects.Id, projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
+  override def offer(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement[F](name = "clean_up_events_queue - offer")
-        .command[OffsetDateTime ~ projects.Id ~ projects.Path](
+        .command[OffsetDateTime ~ projects.GitLabId ~ projects.Path](
           sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
                 VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)
                 ON CONFLICT DO NOTHING

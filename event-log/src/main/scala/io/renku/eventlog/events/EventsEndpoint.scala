@@ -108,8 +108,8 @@ object EventsEndpoint {
 
   implicit val show: Show[Criteria] = Show.show {
     implicit def idParamShow[I <: projects.Identifier]: Show[I] = Show.show {
-      case path: projects.Path => s"project-path: $path"
-      case id:   projects.Id   => s"project-id: $id"
+      case path: projects.Path     => s"project-path: $path"
+      case id:   projects.GitLabId => s"project-id: $id"
     }
     _.filters match {
       case Filters.ProjectEvents(id, Some(status), Some(dates)) => show"$id; status: $status; $dates"

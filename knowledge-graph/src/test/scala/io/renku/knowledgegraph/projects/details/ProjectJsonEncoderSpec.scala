@@ -67,7 +67,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   private def decoder(project: Project): Decoder[Project] = cursor =>
     for {
-      id               <- cursor.downField("identifier").as[Id]
+      id               <- cursor.downField("identifier").as[GitLabId]
       path             <- cursor.downField("path").as[Path]
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]

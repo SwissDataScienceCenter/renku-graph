@@ -21,7 +21,7 @@ package io.renku.webhookservice.hookcreation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -40,7 +40,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait HookCreationEndpoint[F[_]] {
-  def createHook(projectId: Id, authUser: AuthUser): F[Response[F]]
+  def createHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
 class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
@@ -48,7 +48,7 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
 ) extends Http4sDsl[F]
     with HookCreationEndpoint[F] {
 
-  def createHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
+  def createHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     for {
       creationResult <- hookCreator.createHook(projectId, authUser.accessToken)
       response       <- toHttpResponse(creationResult)

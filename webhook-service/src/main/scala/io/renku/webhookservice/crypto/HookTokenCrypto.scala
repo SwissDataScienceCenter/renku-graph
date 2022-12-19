@@ -29,7 +29,7 @@ import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.crypto.AesCrypto
 import io.renku.crypto.AesCrypto.Secret
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
@@ -70,7 +70,7 @@ class HookTokenCryptoImpl[F[_]: MonadThrow](
   }
 
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
-    cursor.downField("projectId").as[Id].map(HookToken)
+    cursor.downField("projectId").as[GitLabId].map(HookToken)
 
   private def deserialize(json: String): F[HookToken] = MonadThrow[F].fromEither {
     parse(json).flatMap(_.as[HookToken])

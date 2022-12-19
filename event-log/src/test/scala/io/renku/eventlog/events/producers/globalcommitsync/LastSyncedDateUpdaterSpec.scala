@@ -108,7 +108,7 @@ class LastSyncedDateUpdaterSpec
 
   private def getLastSyncedDate(project: Project): Option[LastSyncedDate] = execute {
     Kleisli { session =>
-      val query: Query[projects.Id ~ CategoryName, LastSyncedDate] =
+      val query: Query[projects.GitLabId ~ CategoryName, LastSyncedDate] =
         sql"""SELECT sync_time.last_synced FROM subscription_category_sync_time sync_time
                 WHERE sync_time.project_id = $projectIdEncoder 
                 AND sync_time.category_name = $categoryNameEncoder

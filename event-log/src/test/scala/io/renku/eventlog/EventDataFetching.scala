@@ -45,9 +45,9 @@ trait EventDataFetching {
       }
     }
 
-  protected def findAllProjectEvents(projectId: projects.Id): List[CompoundEventId] = execute {
+  protected def findAllProjectEvents(projectId: projects.GitLabId): List[CompoundEventId] = execute {
     Kleisli { session =>
-      val query: Query[projects.Id, CompoundEventId] = sql"""
+      val query: Query[projects.GitLabId, CompoundEventId] = sql"""
             SELECT event_id, project_id
             FROM event
             WHERE project_id = $projectIdEncoder
@@ -60,7 +60,7 @@ trait EventDataFetching {
 
   protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, ZippedEventPayload)] = execute {
     Kleisli { session =>
-      val query: Query[EventId ~ projects.Id, (CompoundEventId, ZippedEventPayload)] =
+      val query: Query[EventId ~ projects.GitLabId, (CompoundEventId, ZippedEventPayload)] =
         sql"""SELECT event_id, project_id, payload
               FROM event_payload
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
@@ -72,21 +72,22 @@ trait EventDataFetching {
     }
   }
 
-  protected def findAllProjectPayloads(projectId: projects.Id): List[(CompoundEventId, ZippedEventPayload)] = execute {
-    Kleisli { session =>
-      val query: Query[projects.Id, (CompoundEventId, ZippedEventPayload)] =
-        sql"""SELECT event_id, project_id, payload
+  protected def findAllProjectPayloads(projectId: projects.GitLabId): List[(CompoundEventId, ZippedEventPayload)] =
+    execute {
+      Kleisli { session =>
+        val query: Query[projects.GitLabId, (CompoundEventId, ZippedEventPayload)] =
+          sql"""SELECT event_id, project_id, payload
               FROM event_payload
               WHERE project_id = $projectIdEncoder"""
-          .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
-          .map { case eventId ~ projectId ~ eventPayload => (CompoundEventId(eventId, projectId), eventPayload) }
-      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+            .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
+            .map { case eventId ~ projectId ~ eventPayload => (CompoundEventId(eventId, projectId), eventPayload) }
+        session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+      }
     }
-  }
 
-  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
+  protected def findProjects: List[(projects.GitLabId, projects.Path, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
+      val query: Query[Void, (projects.GitLabId, projects.Path, EventDate)] =
         sql"""SELECT * FROM project"""
           .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
           .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
@@ -107,7 +108,7 @@ trait EventDataFetching {
   protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
     execute {
       Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
+        val query: Query[EventId ~ projects.GitLabId, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
           SELECT execution_date, status, message
           FROM event
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
@@ -121,7 +122,7 @@ trait EventDataFetching {
   protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
     execute {
       Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, (CompoundEventId, EventProcessingTime)] = sql"""
+        val query: Query[EventId ~ projects.GitLabId, (CompoundEventId, EventProcessingTime)] = sql"""
           SELECT event_id, project_id, processing_time
           FROM status_processing_time
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;
@@ -134,10 +135,10 @@ trait EventDataFetching {
       }
     }
 
-  protected def findProjectProcessingTimes(projectId: projects.Id): List[(CompoundEventId, EventProcessingTime)] =
+  protected def findProjectProcessingTimes(projectId: projects.GitLabId): List[(CompoundEventId, EventProcessingTime)] =
     execute {
       Kleisli { session =>
-        val query: Query[projects.Id, (CompoundEventId, EventProcessingTime)] = sql"""
+        val query: Query[projects.GitLabId, (CompoundEventId, EventProcessingTime)] = sql"""
           SELECT event_id, project_id, processing_time
           FROM status_processing_time
           WHERE project_id = $projectIdEncoder"""

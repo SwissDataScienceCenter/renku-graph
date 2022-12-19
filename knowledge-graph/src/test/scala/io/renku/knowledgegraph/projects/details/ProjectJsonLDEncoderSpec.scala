@@ -45,7 +45,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
     cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
-        identifier   <- cursor.downField(schema / "identifier").as[projects.Id]
+        identifier   <- cursor.downField(schema / "identifier").as[projects.GitLabId]
         path         <- cursor.downField(renku / "projectPath").as[projects.Path]
         name         <- cursor.downField(schema / "name").as[projects.Name]
         maybeDesc    <- cursor.downField(schema / "description").as[Option[projects.Description]]

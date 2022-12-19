@@ -34,7 +34,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -372,7 +372,7 @@ private class EventFinderSpec
                           eventDate:     EventDate = eventDates.generateOne,
                           executionDate: ExecutionDate = executionDatesInThePast.generateOne,
                           batchDate:     BatchDate = batchDates.generateOne,
-                          projectId:     Id = projectIds.generateOne,
+                          projectId:     GitLabId = projectIds.generateOne,
                           projectPath:   Path = projectPaths.generateOne
   ): (CompoundEventId, EventBody, EventDate, Path) = {
     val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)

@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.projects.{DateCreated, Description, Id, Keyword, Name, Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{DateCreated, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.tinytypes._
@@ -40,7 +40,7 @@ private object model {
   import Urls._
 
   final case class Project(resourceId:       ResourceId,
-                           id:               Id,
+                           id:               GitLabId,
                            path:             Path,
                            name:             Name,
                            maybeDescription: Option[Description],

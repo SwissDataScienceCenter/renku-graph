@@ -64,7 +64,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - status update")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event evt
               SET status = '#${TriplesGenerated.value}', 
                 execution_date = $executionDateEncoder, 
@@ -103,7 +103,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateProcessingTime(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - processing_time add")
-      .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
+      .command[EventId ~ projects.GitLabId ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
               VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
               ON CONFLICT (event_id, project_id, status)
@@ -117,7 +117,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateAncestorsStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - ancestors update")
-      .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId ~ EventStatus](
+      .select[ExecutionDate ~ projects.GitLabId ~ projects.GitLabId ~ EventId ~ EventId, EventId ~ EventStatus](
         sql"""UPDATE event evt
               SET status = '#${TriplesGenerated.value}', 
                   execution_date = $executionDateEncoder, 
@@ -172,13 +172,15 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
     _ <- removeAwaitingDeletionEvents(eventsWindow, event)
   } yield ()
 
-  private def removeAncestorsProcessingTimes(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
+  private def removeAncestorsProcessingTimes(idsAndStatuses: List[(EventId, EventStatus)],
+                                             projectId:      projects.GitLabId
+  ) =
     idsAndStatuses.filterNot { case (_, status) => Set(New, GeneratingTriples, Skipped).contains(status) } match {
       case Nil => Kleisli.pure(())
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - processing_times removal")
-            .command[projects.Id](
+            .command[projects.GitLabId](
               sql"""DELETE FROM status_processing_time
                     WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
                       AND project_id = $projectIdEncoder""".command
@@ -189,7 +191,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
         }
     }
 
-  private def removeAncestorsPayloads(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.Id) =
+  private def removeAncestorsPayloads(idsAndStatuses: List[(EventId, EventStatus)], projectId: projects.GitLabId) =
     idsAndStatuses.filterNot { case (_, status) =>
       Set(New, GeneratingTriples, Skipped).contains(status)
     } match {
@@ -197,7 +199,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - payloads removal")
-            .command[projects.Id](
+            .command[projects.GitLabId](
               sql"""DELETE FROM event_payload
                     WHERE event_id IN (#${eventIdsToRemove.map { case (id, _) => s"'$id'" }.mkString(",")})
                       AND project_id = $projectIdEncoder""".command
@@ -214,7 +216,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")
-            .command[projects.Id](
+            .command[projects.GitLabId](
               sql"""DELETE FROM event
                     WHERE event_id IN (#${eventIdsToRemove.map(id => s"'$id'").mkString(",")})
                       AND project_id = $projectIdEncoder""".command

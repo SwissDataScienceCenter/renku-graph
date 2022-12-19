@@ -96,7 +96,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
     case Some((project, maybeLastSyncedDate)) =>
       measureExecutionTime {
         SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-          .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](sql"""
+          .select[projects.GitLabId ~ projects.GitLabId, (Long, Option[CommitId])](sql"""
             SELECT
               (SELECT COUNT(event_id) FROM event 
                 WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,

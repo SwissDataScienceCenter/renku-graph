@@ -46,7 +46,7 @@ trait EventLogDataProvisioning {
 
   protected def storeGeneratedEvent(status:      EventStatus,
                                     eventDate:   EventDate,
-                                    projectId:   projects.Id,
+                                    projectId:   projects.GitLabId,
                                     projectPath: projects.Path,
                                     message:     Option[EventMessage] = None
   ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) = {
@@ -112,7 +112,7 @@ trait EventLogDataProvisioning {
       maybeMessage match {
         case None =>
           val query: Command[
-            EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
           ] =
             sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
@@ -128,7 +128,7 @@ trait EventLogDataProvisioning {
             .void
         case Some(message) =>
           val query: Command[
-            EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
+            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
           ] =
             sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
@@ -152,9 +152,9 @@ trait EventLogDataProvisioning {
   protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
     upsertProject(project.id, project.path, eventDate)
 
-  protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit = execute {
+  protected def upsertProject(projectId: projects.GitLabId, projectPath: Path, eventDate: EventDate): Unit = execute {
     Kleisli { session =>
-      val query: Command[projects.Id ~ projects.Path ~ EventDate] =
+      val query: Command[projects.GitLabId ~ projects.Path ~ EventDate] =
         sql"""INSERT INTO project (project_id, project_path, latest_event_date)
               VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
               ON CONFLICT (project_id)
@@ -173,7 +173,7 @@ trait EventLogDataProvisioning {
         .map { payload =>
           execute[Unit] {
             Kleisli { session =>
-              val query: Command[EventId ~ projects.Id ~ ZippedEventPayload] = sql"""
+              val query: Command[EventId ~ projects.GitLabId ~ ZippedEventPayload] = sql"""
                 INSERT INTO event_payload (event_id, project_id, payload)
                 VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
                 ON CONFLICT (event_id, project_id)
@@ -195,7 +195,7 @@ trait EventLogDataProvisioning {
                                      processingTime:  EventProcessingTime
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime] =
+      val query: Command[EventId ~ projects.GitLabId ~ EventStatus ~ EventProcessingTime] =
         sql"""INSERT INTO
               status_processing_time (event_id, project_id, status, processing_time)
               VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
@@ -240,7 +240,7 @@ trait EventLogDataProvisioning {
                                     deliveryId: SubscriberId = subscriberIds.generateOne
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[EventId ~ projects.Id ~ SubscriberId] =
+      val query: Command[EventId ~ projects.GitLabId ~ SubscriberId] =
         sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
               VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
               ON CONFLICT (event_id, project_id)
@@ -264,9 +264,9 @@ trait EventLogDataProvisioning {
     }
   }
 
-  protected def findAllProjectDeliveries: List[(projects.Id, SubscriberId, EventTypeId)] = execute {
+  protected def findAllProjectDeliveries: List[(projects.GitLabId, SubscriberId, EventTypeId)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (projects.Id, SubscriberId, EventTypeId)] =
+      val query: Query[Void, (projects.GitLabId, SubscriberId, EventTypeId)] =
         sql"""SELECT project_id, delivery_id, event_type_id
               FROM event_delivery
               WHERE event_id IS NULL"""

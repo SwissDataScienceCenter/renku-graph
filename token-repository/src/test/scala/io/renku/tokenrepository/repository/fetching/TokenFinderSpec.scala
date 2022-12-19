@@ -26,7 +26,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto
@@ -46,7 +46,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Id))
+        .findStoredToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 
@@ -64,7 +64,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
       val projectId = projectIds.generateOne
 
       (tokenInRepoFinder
-        .findStoredToken(_: Id))
+        .findStoredToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
@@ -77,7 +77,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val exception = exceptions.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Id))
+        .findStoredToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](exception.raiseError[IO, EncryptedAccessToken]))
 
@@ -98,7 +98,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
         val encryptedToken = encryptedAccessTokens.generateOne
         (tokenInRepoFinder
-          .findStoredToken(_: Id))
+          .findStoredToken(_: GitLabId))
           .expects(projectId)
           .returning(OptionT.some(encryptedToken))
 
@@ -109,7 +109,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
           .returning(exception.raiseError[IO, AccessToken])
 
         (tokenInRepoFinder
-          .findStoredToken(_: Id))
+          .findStoredToken(_: GitLabId))
           .expects(projectId)
           .returning(OptionT.some(encryptedToken))
 
@@ -131,7 +131,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val encryptedToken = encryptedAccessTokens.generateOne
       (tokenInRepoFinder
-        .findStoredToken(_: Id))
+        .findStoredToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.some(encryptedToken))
 

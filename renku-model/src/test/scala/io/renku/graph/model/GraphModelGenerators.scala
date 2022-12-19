@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name, Username}
-import io.renku.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{FilePath, GitLabId, Path, ResourceId, Visibility}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 
@@ -96,7 +96,7 @@ object GraphModelGenerators {
       .map(_.mkString("https://orcid.org/", "-", ""))
       .toGeneratorOf(persons.OrcidId)
 
-  implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
+  implicit val projectIds:   Gen[GitLabId]      = Gen.uuid.map(_ => GitLabId(Random.nextInt(1000000) + 1))
   implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)

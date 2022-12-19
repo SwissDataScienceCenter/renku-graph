@@ -23,7 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -125,7 +125,7 @@ object HookEventEndpoint {
   private implicit val projectDecoder: Decoder[Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
     for {
-      id   <- cursor.downField("id").as[Id]
+      id   <- cursor.downField("id").as[GitLabId]
       path <- cursor.downField("path_with_namespace").as[Path]
     } yield Project(id, path)
   }

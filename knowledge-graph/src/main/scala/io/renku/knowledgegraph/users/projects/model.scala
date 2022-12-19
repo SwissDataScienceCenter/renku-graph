@@ -73,7 +73,7 @@ private object model {
     }
 
     final case class NotActivated(
-        id:           projects.Id,
+        id:           projects.GitLabId,
         name:         projects.Name,
         path:         projects.Path,
         visibility:   projects.Visibility,

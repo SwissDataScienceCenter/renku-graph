@@ -142,7 +142,7 @@ private object EventHandler {
     case EventRequestContent.WithPayload(event, payload: ZippedEventPayload) =>
       for {
         id             <- event.hcursor.downField("id").as[EventId]
-        projectId      <- event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectId      <- event.hcursor.downField("project").downField("id").as[projects.GitLabId]
         projectPath    <- event.hcursor.downField("project").downField("path").as[projects.Path]
         processingTime <- event.hcursor.downField("processingTime").as[EventProcessingTime]
         _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
@@ -157,7 +157,7 @@ private object EventHandler {
     request =>
       for {
         id             <- request.event.hcursor.downField("id").as[EventId]
-        projectId      <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectId      <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
         projectPath    <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
         processingTime <- request.event.hcursor.downField("processingTime").as[EventProcessingTime]
         _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
@@ -171,7 +171,7 @@ private object EventHandler {
       : EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = { request =>
     for {
       id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       message     <- request.event.hcursor.downField("message").as[EventMessage]
       eventId = CompoundEventId(id, projectId)
@@ -221,7 +221,7 @@ private object EventHandler {
     request =>
       for {
         id          <- request.event.hcursor.downField("id").as[EventId]
-        projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+        projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
         projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
         _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
                case New    => Right(())
@@ -234,7 +234,7 @@ private object EventHandler {
       : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { request =>
     for {
       id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
              case TriplesGenerated => Right(())
@@ -247,7 +247,7 @@ private object EventHandler {
       : EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { request =>
     for {
       id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
              case AwaitingDeletion => Right(())
@@ -259,7 +259,7 @@ private object EventHandler {
   private implicit lazy val eventRollbackToAwaitingDeletionDecoder
       : EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
     for {
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
              case AwaitingDeletion => Right(())
@@ -282,7 +282,7 @@ private object EventHandler {
   private implicit lazy val eventToProjectEventsToNewDecoder
       : EventRequestContent => Either[DecodingFailure, ProjectEventsToNew] = { request =>
     for {
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
              case New    => Right(())

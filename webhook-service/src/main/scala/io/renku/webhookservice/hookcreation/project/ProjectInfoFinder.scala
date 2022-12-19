@@ -29,7 +29,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private[hookcreation] trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
+  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
 }
 
 private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectInfoFinder[F] {
@@ -42,7 +42,7 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Log
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
+  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
     GitLabClient[F].get(uri"projects" / projectId.show, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
@@ -53,7 +53,7 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Log
   private implicit lazy val projectInfoDecoder: EntityDecoder[F, ProjectInfo] = {
     implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
       for {
-        id         <- cursor.downField("id").as[projects.Id]
+        id         <- cursor.downField("id").as[projects.GitLabId]
         visibility <- cursor.downField("visibility").as[Option[Visibility]] map defaultToPublic
         path       <- cursor.downField("path_with_namespace").as[projects.Path]
       } yield ProjectInfo(id, visibility, path)

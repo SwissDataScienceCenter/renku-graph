@@ -34,7 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
@@ -359,9 +359,9 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       maxRetries
     )
 
-    def givenStoredTokenFinder(projectId: projects.Id, returning: OptionT[Try, EncryptedAccessToken]) =
+    def givenStoredTokenFinder(projectId: projects.GitLabId, returning: OptionT[Try, EncryptedAccessToken]) =
       (tokensFinder
-        .findStoredToken(_: Id))
+        .findStoredToken(_: GitLabId))
         .expects(projectId)
         .returning(returning)
         .noMoreThanOnce()
@@ -382,28 +382,31 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(of)
         .returning(returning)
 
-    def givenTokenDueCheck(projectId: projects.Id, returning: Try[Boolean]) =
+    def givenTokenDueCheck(projectId: projects.GitLabId, returning: Try[Boolean]) =
       (tokenDueChecker.checkTokenDue _)
         .expects(projectId)
         .returning(returning)
 
-    def givenStoredPathFinder(projectId: projects.Id, returning: Try[projects.Path]) =
+    def givenStoredPathFinder(projectId: projects.GitLabId, returning: Try[projects.Path]) =
       (persistedPathFinder.findPersistedProjectPath _)
         .expects(projectId)
         .returning(returning)
 
-    def givenPathFinder(projectId: projects.Id, accessToken: AccessToken, returning: OptionT[Try, projects.Path]) =
+    def givenPathFinder(projectId:   projects.GitLabId,
+                        accessToken: AccessToken,
+                        returning:   OptionT[Try, projects.Path]
+    ) =
       (projectPathFinder.findProjectPath _)
         .expects(projectId, accessToken)
         .returning(returning)
 
-    def givenPathHasNotChanged(projectId: projects.Id, accessToken: AccessToken) = {
+    def givenPathHasNotChanged(projectId: projects.GitLabId, accessToken: AccessToken) = {
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, accessToken, OptionT.some[Try](projectPath))
       givenStoredPathFinder(projectId, returning = projectPath.pure[Try])
     }
 
-    def givenProjectTokenCreator(projectId:       projects.Id,
+    def givenProjectTokenCreator(projectId:       projects.GitLabId,
                                  userAccessToken: UserAccessToken,
                                  returning:       OptionT[Try, TokenCreationInfo]
     ) = (newTokensCreator.createPersonalAccessToken _)
@@ -423,12 +426,12 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(project)
         .returning(returning)
 
-    def givenTokenRemoval(projectId: projects.Id, returning: Try[Unit]) =
+    def givenTokenRemoval(projectId: projects.GitLabId, returning: Try[Unit]) =
       (tokenRemover.delete _)
         .expects(projectId)
         .returning(returning)
 
-    def givenIntegrityCheckPasses(projectId:            projects.Id,
+    def givenIntegrityCheckPasses(projectId:            projects.GitLabId,
                                   token:                ProjectAccessToken,
                                   encryptedAccessToken: EncryptedAccessToken
     ) = {
@@ -452,7 +455,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
     }
 
-    def givenSuccessfulOldTokenRevoking(projectId: projects.Id, accessToken: AccessToken) = {
+    def givenSuccessfulOldTokenRevoking(projectId: projects.GitLabId, accessToken: AccessToken) = {
       val tokensToRevoke = accessTokenIds.generateList()
       givenTokensToRevokeFinding(projectId, accessToken, returning = tokensToRevoke.pure[Try])
 
@@ -463,7 +466,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       }
     }
 
-    def givenTokensToRevokeFinding(projectId:   projects.Id,
+    def givenTokensToRevokeFinding(projectId:   projects.GitLabId,
                                    accessToken: AccessToken,
                                    returning:   Try[List[AccessTokenId]]
     ) = (revokeCandidatesFinder.findTokensToRemove _)

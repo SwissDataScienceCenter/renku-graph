@@ -108,12 +108,14 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
     val eventSender          = mock[EventSender[Try]]
     val synchronizer         = new ProjectInfoSynchronizerImpl[Try](gitLabProjectFetcher, projectRemover, eventSender)
 
-    def givenGitLabProject(by: projects.Id, returning: Try[Either[UnauthorizedException, Option[projects.Path]]]) =
+    def givenGitLabProject(by:        projects.GitLabId,
+                           returning: Try[Either[UnauthorizedException, Option[projects.Path]]]
+    ) =
       (gitLabProjectFetcher.fetchGitLabProject _)
         .expects(by)
         .returning(returning)
 
-    def givenProjectRemovedFromDB(id: projects.Id, returning: Try[Unit]) =
+    def givenProjectRemovedFromDB(id: projects.GitLabId, returning: Try[Unit]) =
       (projectRemover.removeProject _)
         .expects(id)
         .returning(returning)
@@ -128,7 +130,7 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
         .returning(returning)
   }
 
-  private def commitSyncRequestEvent(id:   projects.Id,
+  private def commitSyncRequestEvent(id:   projects.GitLabId,
                                      path: projects.Path
   ): (CategoryName, EventRequestContent.NoPayload) = {
     val category = commitsyncrequest.categoryName

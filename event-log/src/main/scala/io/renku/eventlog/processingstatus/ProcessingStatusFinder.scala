@@ -31,14 +31,14 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import skunk._
 import skunk.implicits._
 
 import scala.math.BigDecimal.RoundingMode
 
 trait ProcessingStatusFinder[F[_]] {
-  def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus]
+  def fetchStatus(projectId: GitLabId): OptionT[F, ProcessingStatus]
 }
 
 class ProcessingStatusFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
@@ -48,12 +48,12 @@ class ProcessingStatusFinderImpl[F[_]: Async: SessionResource: QueriesExecutionT
   import eu.timepit.refined.auto._
   import io.renku.eventlog.TypeSerializers._
 
-  override def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus] = OptionT {
+  override def fetchStatus(projectId: GitLabId): OptionT[F, ProcessingStatus] = OptionT {
     SessionResource[F].useK(measureExecutionTime(latestBatchStatues(projectId))) >>= toProcessingStatus
   }
 
-  private def latestBatchStatues(projectId: Id) = SqlStatement[F](name = "processing status")
-    .select[Id ~ Id, EventStatus](
+  private def latestBatchStatues(projectId: GitLabId) = SqlStatement[F](name = "processing status")
+    .select[GitLabId ~ GitLabId, EventStatus](
       sql"""SELECT evt.status
             FROM event evt
             INNER JOIN (

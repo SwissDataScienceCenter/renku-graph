@@ -114,4 +114,4 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   }
 }
 
-private final case class Project(id: projects.Id, path: projects.Path)
+private final case class Project(id: projects.GitLabId, path: projects.Path)

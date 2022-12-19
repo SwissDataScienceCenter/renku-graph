@@ -176,7 +176,7 @@ class ProjectEventsFinderSpec
       }"""
   }
 
-  private case class GitLabPushEvent(projectId:       projects.Id,
+  private case class GitLabPushEvent(projectId:       projects.GitLabId,
                                      maybeCommitFrom: Option[CommitId],
                                      maybeCommitTo:   Option[CommitId],
                                      authorId:        persons.GitLabId,

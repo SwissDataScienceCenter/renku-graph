@@ -29,7 +29,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import java.time.{LocalDate, Period}
 
 private[tokenrepository] trait NewTokensCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
+  def createPersonalAccessToken(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
 }
 
 private[tokenrepository] object NewTokensCreator {
@@ -61,7 +61,7 @@ private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def createPersonalAccessToken(projectId:   projects.Id,
+  override def createPersonalAccessToken(projectId:   projects.GitLabId,
                                          accessToken: AccessToken
   ): OptionT[F, TokenCreationInfo] = OptionT {
     GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",

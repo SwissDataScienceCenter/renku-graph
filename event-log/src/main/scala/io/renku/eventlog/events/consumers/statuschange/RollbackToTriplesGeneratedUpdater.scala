@@ -42,7 +42,7 @@ private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow: QueriesE
 
   override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[F] = measureExecutionTime {
     SqlStatement[F](name = "to_triples_generated rollback - status update")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 

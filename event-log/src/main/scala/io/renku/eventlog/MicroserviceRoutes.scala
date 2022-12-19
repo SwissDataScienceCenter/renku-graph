@@ -95,17 +95,17 @@ private class MicroserviceRoutes[F[_]: Sync](
   }
 
   private object ProjectIdParameter {
-    private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
+    private implicit val queryParameterDecoder: QueryParamDecoder[projects.GitLabId] =
       (value: QueryParameterValue) => {
         val error = ParseFailure(s"'${`project-id`}' parameter with invalid value", "")
         Either
           .fromOption(value.value.toIntOption, ifNone = error)
-          .flatMap(projects.Id.from)
+          .flatMap(projects.GitLabId.from)
           .leftMap(_ => error)
           .toValidatedNel
       }
 
-    object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
+    object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.GitLabId]("project-id") {
       val parameterName:     String = "project-id"
       override val toString: String = parameterName
     }
@@ -156,7 +156,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     }
   }
 
-  private def maybeFindEvents(maybeProjectId:   Option[ValidatedNel[ParseFailure, projects.Id]],
+  private def maybeFindEvents(maybeProjectId:   Option[ValidatedNel[ParseFailure, projects.GitLabId]],
                               maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
                               maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
                               maybeSince:       Option[ValidatedNel[ParseFailure, EventDate]],
@@ -210,7 +210,7 @@ private class MicroserviceRoutes[F[_]: Sync](
   }
 
   private def maybeFindProcessingStatus(
-      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.Id]]
+      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.GitLabId]]
   ): F[Response[F]] = maybeProjectId match {
     case None => NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
     case Some(validatedProjectId) =>

@@ -91,7 +91,7 @@ class MicroserviceRoutesSpec
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       val request        = Request[IO](Method.DELETE, uri"/projects" / projectId.toString / "webhooks")
       (hookDeletionEndpoint
-        .deleteHook(_: projects.Id, _: AuthUser))
+        .deleteHook(_: projects.GitLabId, _: AuthUser))
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
@@ -104,7 +104,7 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.GET, uri"/projects" / projectId.toString / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (processingStatusEndpoint
-        .fetchProcessingStatus(_: projects.Id))
+        .fetchProcessingStatus(_: projects.GitLabId))
         .expects(projectId)
         .returning(IO.pure(Response[IO](responseStatus)))
 
@@ -121,7 +121,7 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookCreationEndpoint
-        .createHook(_: projects.Id, _: AuthUser))
+        .createHook(_: projects.GitLabId, _: AuthUser))
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
@@ -143,7 +143,7 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookValidationEndpoint
-        .validateHook(_: projects.Id, _: AuthUser))
+        .validateHook(_: projects.GitLabId, _: AuthUser))
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 

@@ -95,7 +95,7 @@ class ZombieEventDetectionSpec
   }
 
   private def insertProjectToDB(project: data.Project, eventDate: EventDate): Int = EventLog.execute { session =>
-    val query: Command[Id ~ Path ~ EventDate] =
+    val query: Command[GitLabId ~ Path ~ EventDate] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
           VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
           ON CONFLICT (project_id)
@@ -114,7 +114,7 @@ class ZombieEventDetectionSpec
       project:        data.Project,
       eventDate:      EventDate
   )(implicit session: Session[IO]) = {
-    val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
+    val query: Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
           VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder,
@@ -142,7 +142,7 @@ class ZombieEventDetectionSpec
   }
 
   private def insertEventDeliveryToDB(commitId: CommitId, project: data.Project)(implicit session: Session[IO]) = {
-    val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
+    val query: Command[EventId ~ GitLabId ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)
           """.command

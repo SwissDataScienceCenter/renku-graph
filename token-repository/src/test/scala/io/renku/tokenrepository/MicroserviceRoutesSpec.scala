@@ -79,7 +79,7 @@ class MicroserviceRoutesSpec
       val projectId = projectIds.generateOne
 
       (fetchEndpoint
-        .fetchToken(_: projects.Id)(_: projects.Id => OptionT[IO, AccessToken]))
+        .fetchToken(_: projects.GitLabId)(_: projects.GitLabId => OptionT[IO, AccessToken]))
         .expects(projectId, *)
         .returning(IO.pure(Response[IO](Ok)))
 
@@ -123,7 +123,7 @@ class MicroserviceRoutesSpec
       val request   = Request[IO](POST, uri"/projects" / projectId.toString / "tokens")
 
       (createEndpoint
-        .createToken(_: projects.Id, _: Request[IO]))
+        .createToken(_: projects.GitLabId, _: Request[IO]))
         .expects(projectId, request)
         .returning(IO.pure(Response[IO](NoContent)))
 
@@ -145,7 +145,7 @@ class MicroserviceRoutesSpec
 
       val projectId = projectIds.generateOne
       (deleteEndpoint
-        .deleteToken(_: projects.Id))
+        .deleteToken(_: projects.GitLabId))
         .expects(projectId)
         .returning(IO.pure(Response[IO](NoContent)))
 

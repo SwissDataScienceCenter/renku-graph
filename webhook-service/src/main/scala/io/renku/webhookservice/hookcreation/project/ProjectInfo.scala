@@ -18,11 +18,11 @@
 
 package io.renku.webhookservice.hookcreation.project
 
-import io.renku.graph.model.projects.{Id, Path, Visibility}
+import io.renku.graph.model.projects.{GitLabId, Path, Visibility}
 import io.renku.webhookservice.model.Project
 
 final case class ProjectInfo(
-    id:         Id,
+    id:         GitLabId,
     visibility: Visibility,
     path:       Path
 ) {

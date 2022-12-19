@@ -125,8 +125,8 @@ class EventHandlerSpec
     val handler          = new EventHandler[IO](categoryName, commitSyncForcer)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(projects.Id, projects.Path)] =
-    Encoder.instance[(projects.Id, projects.Path)] { case (id, path) =>
+  private implicit lazy val eventEncoder: Encoder[(projects.GitLabId, projects.Path)] =
+    Encoder.instance[(projects.GitLabId, projects.Path)] { case (id, path) =>
       json"""{
         "categoryName": "COMMIT_SYNC_REQUEST",
         "project": {

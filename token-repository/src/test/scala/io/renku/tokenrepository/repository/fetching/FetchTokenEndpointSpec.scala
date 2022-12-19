@@ -27,7 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._
 import io.renku.http.server.EndpointTester._
@@ -51,7 +51,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
       val projectId = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: Id))
+        .findToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
@@ -71,7 +71,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
       val projectId = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: Id))
+        .findToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.some[IO](accessToken))
 
@@ -110,7 +110,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
       val projectId = projectIds.generateOne
 
       (tokensFinder
-        .findToken(_: Id))
+        .findToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.none[IO, AccessToken])
 
@@ -132,7 +132,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
 
       val exception = exceptions.generateOne
       (tokensFinder
-        .findToken(_: Id))
+        .findToken(_: GitLabId))
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
 

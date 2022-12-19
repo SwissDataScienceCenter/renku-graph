@@ -56,7 +56,7 @@ class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFacto
     "fail for a Partial event when projectId cannot be found in the project table" in new TestCase {
       val projectPath = projectPaths.generateOne
 
-      (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.Id].pure[Try])
+      (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.GitLabId].pure[Try])
 
       val Failure(exception) = processor.process(CleanUpRequestEvent(projectPath))
 

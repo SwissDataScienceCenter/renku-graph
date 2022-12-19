@@ -65,7 +65,7 @@ private class ProjectPrioritisation {
 
 private object ProjectPrioritisation {
 
-  final case class ProjectInfo(id:               projects.Id,
+  final case class ProjectInfo(id:               projects.GitLabId,
                                path:             projects.Path,
                                latestEventDate:  EventDate,
                                currentOccupancy: Int Refined NonNegative

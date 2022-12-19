@@ -33,7 +33,7 @@ private object TestCategoryEvent {
   implicit lazy val show: Show[TestCategoryEvent] = Show.fromToString
 }
 
-private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.Id) {
+private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.GitLabId) {
   lazy val compoundEventId: CompoundEventId = CompoundEventId(eventId, projectId)
 }
 

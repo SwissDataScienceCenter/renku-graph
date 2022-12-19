@@ -138,7 +138,7 @@ object EventLogClient {
 
     override val baseUrl: String Refined Url = "http://localhost:9005"
 
-    def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): ClientResponse =
+    def fetchProcessingStatus(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): ClientResponse =
       GET(s"processing-status?project-id=$projectId")
 
     def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =

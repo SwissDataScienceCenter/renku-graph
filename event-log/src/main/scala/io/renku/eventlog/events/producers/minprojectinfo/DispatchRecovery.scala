@@ -54,7 +54,7 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.value.toLowerCase} - dispatch recovery")
-        .command[projects.Id ~ CategoryName](sql"""
+        .command[projects.GitLabId ~ CategoryName](sql"""
           DELETE FROM subscription_category_sync_time
           WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)

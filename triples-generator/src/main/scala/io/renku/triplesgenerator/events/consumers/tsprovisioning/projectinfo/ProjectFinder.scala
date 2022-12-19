@@ -82,7 +82,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        id               <- cursor.downField("id").as[projects.Id]
+        id               <- cursor.downField("id").as[projects.GitLabId]
         path             <- cursor.downField("path_with_namespace").as[projects.Path]
         name             <- cursor.downField("name").as[projects.Name]
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]

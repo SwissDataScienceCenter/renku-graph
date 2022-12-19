@@ -52,12 +52,12 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
     queryProjectsToCheck >>= lookForZombie >>= markEventTaken
   }
 
-  private type Candidate = (projects.Id, ProcessingStatus)
+  private type Candidate = (projects.GitLabId, ProcessingStatus)
 
   private def queryProjectsToCheck = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find projects")
-      .select[Void, (projects.Id, EventStatus)](
+      .select[Void, (projects.GitLabId, EventStatus)](
         sql"""SELECT DISTINCT evt.project_id, evt.status
               FROM event evt
               WHERE evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
@@ -71,7 +71,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
         case (id, status: ProcessingStatus) => (id -> status).pure[F]
         case (_, status: EventStatus) =>
           new Exception(show"Long Processing Event finder cannot work with $status")
-            .raiseError[F, (projects.Id, ProcessingStatus)]
+            .raiseError[F, (projects.GitLabId, ProcessingStatus)]
       }.sequence)
   }
 
@@ -84,11 +84,11 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
       }
   }
 
-  private def queryZombieEvent(projectId: projects.Id, status: ProcessingStatus) = measureExecutionTime {
+  private def queryZombieEvent(projectId: projects.GitLabId, status: ProcessingStatus) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find")
       .select[
-        projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime ~ ExecutionDate ~ EventProcessingTime,
+        projects.GitLabId ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime ~ ExecutionDate ~ EventProcessingTime,
         ZombieEvent
       ](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
@@ -129,7 +129,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - update message")
-      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
+      .command[String ~ ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
               SET message = $text, execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder

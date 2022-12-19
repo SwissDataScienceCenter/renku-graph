@@ -27,7 +27,7 @@ import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
@@ -55,13 +55,13 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     "return OK with the progress status for the given projectId if the webhook exists" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
       val processingStatus = processingStatuses.generateOne
       (processingStatusFetcher
-        .fetchProcessingStatus(_: Id))
+        .fetchProcessingStatus(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.some(processingStatus))
 
@@ -71,8 +71,8 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
       response.contentType shouldBe Some(`Content-Type`(application.json))
       response.as[Json].unsafeRunSync() shouldBe
         json"""{
-        "done": ${processingStatus.done.value},
-        "total": ${processingStatus.total.value},
+        "done":     ${processingStatus.done.value},
+        "total":    ${processingStatus.total.value},
         "progress": ${processingStatus.progress.value}
       }"""
 
@@ -85,12 +85,12 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
       "but there are no events in the Event Log yet" in new TestCase {
 
         (hookValidator
-          .validateHook(_: Id, _: Option[AccessToken]))
+          .validateHook(_: GitLabId, _: Option[AccessToken]))
           .expects(projectId, None)
           .returning(context.pure(HookExists))
 
         (processingStatusFetcher
-          .fetchProcessingStatus(_: Id))
+          .fetchProcessingStatus(_: GitLabId))
           .expects(projectId)
           .returning(OptionT.none[IO, ProcessingStatus])
 
@@ -98,17 +98,16 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
-        response.as[Json].unsafeRunSync() shouldBe
-          json"""{
-        "done": ${0},
-        "total": ${0}
-      }"""
+        response.as[Json].unsafeRunSync() shouldBe json"""{
+          "done":  ${0},
+          "total": ${0}
+        }"""
       }
 
     "return NOT_FOUND if the webhook does not exist" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookMissing))
 
@@ -124,7 +123,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     "return NOT_FOUND if no Access Token found" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.raiseError(NoAccessTokenException("error")))
 
@@ -141,7 +140,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val exception = exceptions.generateOne
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.raiseError(exception))
 
@@ -159,13 +158,13 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     "return INTERNAL_SERVER_ERROR when finding progress status fails" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, None)
         .returning(context.pure(HookExists))
 
       val exception = exceptions.generateOne
       (processingStatusFetcher
-        .fetchProcessingStatus(_: Id))
+        .fetchProcessingStatus(_: GitLabId))
         .expects(projectId)
         .returning(OptionT.liftF(context.raiseError(exception)))
 

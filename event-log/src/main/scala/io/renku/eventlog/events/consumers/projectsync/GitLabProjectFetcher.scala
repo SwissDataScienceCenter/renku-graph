@@ -31,7 +31,7 @@ import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthor
 import org.http4s.{EntityDecoder, Request, Response, Status}
 
 private trait GitLabProjectFetcher[F[_]] {
-  def fetchGitLabProject(projectId: projects.Id): F[Either[UnauthorizedException, Option[projects.Path]]]
+  def fetchGitLabProject(projectId: projects.GitLabId): F[Either[UnauthorizedException, Option[projects.Path]]]
 }
 
 private object GitLabProjectFetcher {
@@ -45,7 +45,9 @@ private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient: AccessTokenFin
   import org.http4s.implicits._
   import tokenFinder._
 
-  override def fetchGitLabProject(projectId: projects.Id): F[Either[UnauthorizedException, Option[projects.Path]]] =
+  override def fetchGitLabProject(
+      projectId: projects.GitLabId
+  ): F[Either[UnauthorizedException, Option[projects.Path]]] =
     findAccessToken(projectId) >>= { implicit accessToken =>
       GitLabClient[F].get[Either[UnauthorizedException, Option[projects.Path]]](uri"projects" / projectId.show,
                                                                                 "single-project"

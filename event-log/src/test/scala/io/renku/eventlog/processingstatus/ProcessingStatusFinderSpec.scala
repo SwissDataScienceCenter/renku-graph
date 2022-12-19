@@ -29,7 +29,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, EventStatus}
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -125,7 +125,7 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with IOSpec with InMemoryEv
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val processingStatusFinder = new ProcessingStatusFinderImpl[IO]
 
-    def storeEvents(projectId: Id, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
+    def storeEvents(projectId: GitLabId, batchDate: BatchDate, statuses: NonEmptyList[EventStatus]) =
       statuses map {
         storeEvent(
           compoundEventIds.generateOne.copy(projectId = projectId),

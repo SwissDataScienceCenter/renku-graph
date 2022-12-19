@@ -51,7 +51,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
   private def findEvent = measureExecutionTime {
     SqlStatement
       .named(name = s"${categoryName.value.toLowerCase} - find event")
-      .select[LastSyncedDate, (projects.Id, Option[LastSyncedDate], ProjectSyncEvent)](
+      .select[LastSyncedDate, (projects.GitLabId, Option[LastSyncedDate], ProjectSyncEvent)](
         sql"""SELECT candidate.project_id, candidate.real_sync, candidate.project_path
               FROM (
                 SELECT proj.project_id, 
@@ -81,17 +81,17 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
       .build(_.option)
   }
 
-  private def setSyncDate(projectId:       projects.Id,
+  private def setSyncDate(projectId:       projects.GitLabId,
                           maybeSyncedDate: Option[LastSyncedDate]
   ): Kleisli[F, Session[F], Boolean] = {
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
   } recoverWith falseForForeignKeyViolation
 
-  private def updateLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+  private def updateLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
       .named(name = s"${categoryName.value.toLowerCase} - update last_synced")
-      .command[LastSyncedDate ~ projects.Id](sql"""
+      .command[LastSyncedDate ~ projects.GitLabId](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = '#${categoryName.show}'
@@ -107,10 +107,10 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
       }
   }
 
-  private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+  private def insertLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
       .named(name = s"${categoryName.value.toLowerCase} - insert last_synced")
-      .command[projects.Id ~ LastSyncedDate](sql"""
+      .command[projects.GitLabId ~ LastSyncedDate](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, '#${categoryName.show}', $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)

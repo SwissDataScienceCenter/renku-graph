@@ -86,7 +86,7 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lse - update message")
-      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](sql"""
+      .command[String ~ ExecutionDate ~ EventId ~ projects.GitLabId](sql"""
         UPDATE event
         SET message = $text, execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder

@@ -90,7 +90,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val processor = mock[EventProcessor[IO]]
     val handler   = new EventHandler[IO](processor)
 
-    def eventRequest(projectId: projects.Id, projectPath: projects.Path) = EventRequestContent.NoPayload(json"""{
+    def eventRequest(projectId: projects.GitLabId, projectPath: projects.Path) = EventRequestContent.NoPayload(json"""{
       "categoryName": "CLEAN_UP_REQUEST",
       "project": {
         "id":   ${projectId.value},

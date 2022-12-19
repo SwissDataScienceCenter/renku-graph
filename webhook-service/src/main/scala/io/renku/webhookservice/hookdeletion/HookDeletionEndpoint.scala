@@ -21,7 +21,7 @@ package io.renku.webhookservice.hookdeletion
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait HookDeletionEndpoint[F[_]] {
-  def deleteHook(projectId: Id, authUser: AuthUser): F[Response[F]]
+  def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
 class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
@@ -59,7 +59,7 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
       Logger[F].error(exception)(exception.getMessage) >> InternalServerError(ErrorMessage(exception))
   }
 
-  def deleteHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
+  def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     for {
       deletionResult <- hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
       response       <- toHttpResponse(deletionResult)

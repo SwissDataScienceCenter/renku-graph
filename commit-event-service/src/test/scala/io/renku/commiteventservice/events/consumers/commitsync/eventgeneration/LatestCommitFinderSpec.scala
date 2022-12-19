@@ -66,7 +66,7 @@ class LatestCommitFinderSpec
 
       setGitLabClientExpectation(maybeAccessToken = None)
 
-      latestCommitFinder.findLatestCommit(projectId)(maybeAccessToken = None).unsafeRunSync() shouldBe
+      latestCommitFinder.findLatestCommit(projectId)(Option.empty[AccessToken]).unsafeRunSync() shouldBe
         Some(commitInfo)
     }
 

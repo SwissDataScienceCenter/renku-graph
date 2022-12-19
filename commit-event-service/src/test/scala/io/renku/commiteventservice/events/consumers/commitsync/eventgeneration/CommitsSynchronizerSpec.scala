@@ -34,7 +34,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
 import io.renku.http.client.AccessToken
@@ -202,7 +202,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenAccessTokenIsFound(event.project.id)
 
         (latestCommitFinder
-          .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
+          .findLatestCommit(_: projects.GitLabId)(_: Option[AccessToken]))
           .expects(event.project.id, maybeAccessToken)
           .returning(Option.empty[CommitInfo].pure[Try])
 
@@ -345,7 +345,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val exception = exceptions.generateOne
         (commitInfoFinder
-          .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
+          .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
           .expects(event.project.id, parent1Commit.id, maybeAccessToken)
           .returning(Failure(exception))
 
@@ -560,7 +560,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       val exception = exceptions.generateOne
 
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(event.project.id, projectIdToPath)
         .returning(Failure(exception))
 
@@ -595,33 +595,33 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                                                clock
     )
 
-    def givenAccessTokenIsFound(projectId: Id) = (accessTokenFinder
-      .findAccessToken(_: Id)(_: Id => String))
+    def givenAccessTokenIsFound(projectId: GitLabId) = (accessTokenFinder
+      .findAccessToken(_: GitLabId)(_: GitLabId => String))
       .expects(projectId, projectIdToPath)
       .returning(Success(maybeAccessToken))
 
-    def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: Id) =
+    def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: GitLabId) =
       (latestCommitFinder
-        .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
+        .findLatestCommit(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
         .returning(commitInfo.some.pure[Try])
 
-    def givenCommitIsInGL(commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder
-      .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
+    def givenCommitIsInGL(commitInfo: CommitInfo, projectId: GitLabId) = (commitInfoFinder
+      .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
       .expects(projectId, commitInfo.id, maybeAccessToken)
       .returning(Success(commitInfo.some))
 
-    def givenEventIsInEL(commitId: CommitId, projectId: Id)(returning: CommitWithParents) =
+    def givenEventIsInEL(commitId: CommitId, projectId: GitLabId)(returning: CommitWithParents) =
       (eventDetailsFinder.getEventDetails _)
         .expects(projectId, commitId)
         .returning(Some(returning).pure[Try])
 
-    def givenEventIsNotInEL(commitInfo: CommitInfo, projectId: Id) =
+    def givenEventIsNotInEL(commitInfo: CommitInfo, projectId: GitLabId) =
       (eventDetailsFinder.getEventDetails _).expects(projectId, commitInfo.id).returning(Success(None))
 
-    def givenCommitIsNotInGL(commitId: CommitId, projectId: Id) =
+    def givenCommitIsNotInGL(commitId: CommitId, projectId: GitLabId) =
       (commitInfoFinder
-        .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
+        .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
         .expects(projectId, commitId, maybeAccessToken)
         .returning(Success(None))
 

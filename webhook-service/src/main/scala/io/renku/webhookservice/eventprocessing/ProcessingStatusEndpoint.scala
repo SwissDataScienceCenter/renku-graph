@@ -26,7 +26,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -44,7 +44,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait ProcessingStatusEndpoint[F[_]] {
-  def fetchProcessingStatus(projectId: Id): F[Response[F]]
+  def fetchProcessingStatus(projectId: GitLabId): F[Response[F]]
 }
 
 class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
@@ -58,7 +58,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecord
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: Id): F[Response[F]] = measureExecutionTime {
+  def fetchProcessingStatus(projectId: GitLabId): F[Response[F]] = measureExecutionTime {
     {
       for {
         _        <- validateHook(projectId)
@@ -68,11 +68,11 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecord
       .recoverWith(httpResponse(projectId))
   } map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
-  private def validateHook(projectId: Id): OptionT[F, Unit] = OptionT {
+  private def validateHook(projectId: GitLabId): OptionT[F, Unit] = OptionT {
     hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
   }
 
-  private def findStatus(projectId: Id): OptionT[F, Response[F]] = OptionT.liftF {
+  private def findStatus(projectId: GitLabId): OptionT[F, Response[F]] = OptionT.liftF {
     processingStatusFetcher
       .fetchProcessingStatus(projectId)
       .semiflatMap(processingStatus => Ok(processingStatus.asJson))
@@ -89,7 +89,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecord
   }
 
   private def httpResponse(
-      projectId: projects.Id
+      projectId: projects.GitLabId
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     Logger[F].error(exception)(s"Finding progress status for project '$projectId' failed") >>
       InternalServerError(ErrorMessage(exception))

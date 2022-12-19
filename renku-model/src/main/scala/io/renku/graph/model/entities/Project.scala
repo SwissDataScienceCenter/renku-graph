@@ -593,7 +593,7 @@ object Project {
     )
   }
 
-  final case class GitLabProjectInfo(id:               Id,
+  final case class GitLabProjectInfo(id:               GitLabId,
                                      name:             Name,
                                      path:             Path,
                                      dateCreated:      DateCreated,

@@ -76,7 +76,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimi
 
     private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
       for {
-        projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+        projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
         projectPath <- cursor.downField("project").downField("path").as[projects.Path]
       } yield Project(projectId, projectPath)
     }
@@ -84,7 +84,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimi
     private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>
       for {
         id        <- cursor.downField("id").as[EventId]
-        projectId <- cursor.downField("project").downField("id").as[projects.Id]
+        projectId <- cursor.downField("project").downField("id").as[projects.GitLabId]
       } yield CompoundEventId(id, projectId)
     }
   }

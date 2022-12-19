@@ -36,7 +36,7 @@ object EventContentGenerators {
 
   def eventInfos(
       projectPathGen: Gen[projects.Path] = projectPaths,
-      projectIdGen:   Gen[projects.Id] = projectIds
+      projectIdGen:   Gen[projects.GitLabId] = projectIds
   ): Gen[EventInfo] = for {
     id            <- eventIds
     projectPath   <- projectPathGen

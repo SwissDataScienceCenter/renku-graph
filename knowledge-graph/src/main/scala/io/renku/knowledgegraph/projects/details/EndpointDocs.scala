@@ -82,7 +82,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
 
   private val example = Project(
     projects.ResourceId("http://renkulab.io/projects/namespace/name"),
-    projects.Id(123),
+    projects.GitLabId(123),
     projects.Path("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,

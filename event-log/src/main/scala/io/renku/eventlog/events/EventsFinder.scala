@@ -76,8 +76,8 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
         case path: projects.Path =>
           val fragment: Fragment[projects.Path] = sql"""AND prj.project_path = $projectPathEncoder"""
           fragment(path)
-        case id: projects.Id =>
-          val fragment: Fragment[projects.Id] = sql"""AND prj.project_id = $projectIdEncoder"""
+        case id: projects.GitLabId =>
+          val fragment: Fragment[projects.GitLabId] = sql"""AND prj.project_id = $projectIdEncoder"""
           fragment(id)
       }
 
@@ -245,8 +245,8 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
            """
           query(projectPath) |+| whereEventDate(maybeDates)
-        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.Id, None, maybeDates), _, _) =>
-          val query: Fragment[projects.Id] = sql"""
+        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, None, maybeDates), _, _) =>
+          val query: Fragment[projects.GitLabId] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
              WHERE evt.project_id = $projectIdEncoder
@@ -260,8 +260,8 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
              WHERE evt.status = $eventStatusEncoder
            """
           query(projectPath ~ status) |+| andEventDate(maybeDates)
-        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.Id, Some(status), maybeDates), _, _) =>
-          val query: Fragment[projects.Id ~ EventStatus] = sql"""
+        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, Some(status), maybeDates), _, _) =>
+          val query: Fragment[projects.GitLabId ~ EventStatus] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
              WHERE evt.project_id = $projectIdEncoder AND evt.status = $eventStatusEncoder

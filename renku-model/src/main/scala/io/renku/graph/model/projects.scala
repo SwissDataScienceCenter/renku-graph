@@ -32,8 +32,11 @@ object projects {
 
   sealed trait Identifier extends Any
 
-  final class Id private (val value: Int) extends AnyVal with IntTinyType with Identifier
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt[Id] with TinyTypeJsonLDOps[Id]
+  final class GitLabId private (val value: Int) extends AnyVal with IntTinyType with Identifier
+  implicit object GitLabId
+      extends TinyTypeFactory[GitLabId](new GitLabId(_))
+      with NonNegativeInt[GitLabId]
+      with TinyTypeJsonLDOps[GitLabId]
 
   final class Path private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
   implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath[Path] with TinyTypeJsonLDOps[Path] {

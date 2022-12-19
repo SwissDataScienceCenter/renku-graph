@@ -101,7 +101,7 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
       .asJson,
     model.Project
       .NotActivated(
-        projects.Id(1),
+        projects.GitLabId(1),
         projects.Name("name"),
         projects.Path("group/subgroup/name"),
         projects.Visibility.Public,

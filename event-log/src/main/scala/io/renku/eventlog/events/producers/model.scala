@@ -27,7 +27,7 @@ import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonNegativeInt, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 
-private final case class ProjectIds(id: projects.Id, path: projects.Path)
+private final case class ProjectIds(id: projects.GitLabId, path: projects.Path)
 
 private final class Capacity private (val value: Int) extends AnyVal with IntTinyType
 private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt[Capacity] {
