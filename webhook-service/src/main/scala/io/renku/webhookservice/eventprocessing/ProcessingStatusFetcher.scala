@@ -18,23 +18,17 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
 import io.renku.control.Throttler
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient
-import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import org.typelevel.log4cats.Logger
 
-import scala.math.BigDecimal.RoundingMode
-
 private trait ProcessingStatusFetcher[F[_]] {
-  def fetchProcessingStatus(projectId: projects.GitLabId): OptionT[F, ProcessingStatus]
+  def fetchProcessingStatus(projectId: projects.GitLabId): F[ProgressStatus]
 }
 
 private object ProcessingStatusFetcher {
@@ -44,45 +38,13 @@ private object ProcessingStatusFetcher {
   def apply[F[_]: Async: Logger]: F[ProcessingStatusFetcher[F]] =
     EventLogUrl[F]().map(new ProcessingStatusFetcherImpl(_))
 
-  implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
+  implicit lazy val processingStatusDecoder: Decoder[ProgressStatus] = cursor =>
     for {
       done           <- cursor.downField("done").as[Int]
       total          <- cursor.downField("total").as[Int]
       progress       <- cursor.downField("progress").as[Double]
-      progressStatus <- ProcessingStatus.from(done, total, progress).leftMap(DecodingFailure(_, Nil))
+      progressStatus <- ProgressStatus.from(done, total, progress).leftMap(DecodingFailure(_, Nil))
     } yield progressStatus
-
-  import ProcessingStatus._
-
-  case class ProcessingStatus private (
-      done:     Done,
-      total:    Total,
-      progress: Progress
-  )
-
-  object ProcessingStatus {
-
-    type Done     = Int Refined NonNegative
-    type Total    = Int Refined NonNegative
-    type Progress = Double Refined NonNegative
-
-    def from(
-        done:     Int,
-        total:    Int,
-        progress: Double
-    ): Either[String, ProcessingStatus] = {
-      import eu.timepit.refined.api.RefType.applyRef
-
-      for {
-        validDone     <- applyRef[Done](done).leftMap(_ => "ProcessingStatus's 'done' cannot be negative")
-        validTotal    <- applyRef[Total](total).leftMap(_ => "ProcessingStatus's 'total' cannot be negative")
-        validProgress <- applyRef[Progress](progress).leftMap(_ => "ProcessingStatus's 'progress' cannot be negative")
-        _             <- if (done <= total) Right(()) else Left("ProcessingStatus's 'done' > 'total'")
-        expectedProgress = BigDecimal((done.toDouble / total) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-        _ <- if (expectedProgress == progress) Right(()) else Left("ProcessingStatus's 'progress' is invalid")
-      } yield new ProcessingStatus(validDone, validTotal, validProgress)
-    }
-  }
 }
 
 private class ProcessingStatusFetcherImpl[F[_]: Async: Logger](
@@ -96,19 +58,16 @@ private class ProcessingStatusFetcherImpl[F[_]: Async: Logger](
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def fetchProcessingStatus(projectId: projects.GitLabId): OptionT[F, ProcessingStatus] =
-    OptionT {
-      for {
-        uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
-        latestEvents <- send(request(GET, uri))(mapResponse)
-      } yield latestEvents
-    }
+  override def fetchProcessingStatus(projectId: projects.GitLabId): F[ProgressStatus] =
+    for {
+      uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
+      latestEvents <- send(request(GET, uri))(mapResponse)
+    } yield latestEvents
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[ProcessingStatus]]] = {
-    case (NotFound, _, _)  => Option.empty[ProcessingStatus].pure[F]
-    case (Ok, _, response) => response.as[ProcessingStatus].map(Option.apply)
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProgressStatus]] = {
+    case (NotFound, _, _)  => ProgressStatus.Zero.pure[F].widen
+    case (Ok, _, response) => response.as[ProgressStatus]
   }
 
-  private implicit lazy val entityDecoder: EntityDecoder[F, ProcessingStatus] =
-    jsonOf[F, ProcessingStatus]
+  private implicit lazy val entityDecoder: EntityDecoder[F, ProgressStatus] = jsonOf[F, ProgressStatus]
 }

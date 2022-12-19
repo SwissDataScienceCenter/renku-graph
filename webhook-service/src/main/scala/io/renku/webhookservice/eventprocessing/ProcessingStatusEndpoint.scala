@@ -22,16 +22,13 @@ import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
-import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
@@ -41,30 +38,23 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 trait ProcessingStatusEndpoint[F[_]] {
   def fetchProcessingStatus(projectId: GitLabId): F[Response[F]]
 }
 
-class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
+private class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
     hookValidator:           HookValidator[F],
     processingStatusFetcher: ProcessingStatusFetcher[F]
 ) extends Http4sDsl[F]
     with ProcessingStatusEndpoint[F] {
 
   import HookValidationResult._
-  import ProcessingStatusEndpointImpl._
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: GitLabId): F[Response[F]] = measureExecutionTime {
-    {
-      for {
-        _        <- validateHook(projectId)
-        response <- findStatus(projectId)
-      } yield response
-    }.getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
+    (validateHook(projectId) >> findStatus(projectId))
+      .getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
       .recoverWith(httpResponse(projectId))
   } map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
@@ -75,8 +65,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecord
   private def findStatus(projectId: GitLabId): OptionT[F, Response[F]] = OptionT.liftF {
     processingStatusFetcher
       .fetchProcessingStatus(projectId)
-      .semiflatMap(processingStatus => Ok(processingStatus.asJson))
-      .getOrElseF(Ok(zeroProcessingStatusJson))
+      .flatMap(status => Ok(status.asJson))
   }
 
   private lazy val hookMissingToNone: HookValidationResult => Option[Unit] = {
@@ -90,29 +79,10 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecord
 
   private def httpResponse(
       projectId: projects.GitLabId
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case exception =>
     Logger[F].error(exception)(s"Finding progress status for project '$projectId' failed") >>
       InternalServerError(ErrorMessage(exception))
   }
-}
-
-private object ProcessingStatusEndpointImpl {
-
-  implicit val processingStatusEncoder: Encoder[ProcessingStatus] = { case ProcessingStatus(done, total, progress) =>
-    json"""
-      {
-       "done": ${done.value},
-       "total": ${total.value},
-       "progress": ${progress.value}
-      }"""
-  }
-
-  val zeroProcessingStatusJson: Json =
-    json"""
-      {
-       "done": ${0},
-       "total": ${0}
-      }"""
 }
 
 object ProcessingStatusEndpoint {
