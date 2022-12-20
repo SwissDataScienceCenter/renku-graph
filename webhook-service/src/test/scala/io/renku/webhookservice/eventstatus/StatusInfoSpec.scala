@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice.eventstatus
 
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
-import io.renku.webhookservice.eventprocessing.Generators._
+import io.renku.webhookservice.eventstatus.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

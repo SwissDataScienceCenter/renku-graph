@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice.eventstatus
 
 import cats.effect.IO
 import cats.syntax.all._

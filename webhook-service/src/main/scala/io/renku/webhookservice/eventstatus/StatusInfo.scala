@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice.eventstatus
 
 import io.circe.Encoder
 import io.circe.literal._

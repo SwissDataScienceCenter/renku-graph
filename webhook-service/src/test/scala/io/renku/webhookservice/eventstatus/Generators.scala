@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice.eventstatus
 
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.eventStatuses

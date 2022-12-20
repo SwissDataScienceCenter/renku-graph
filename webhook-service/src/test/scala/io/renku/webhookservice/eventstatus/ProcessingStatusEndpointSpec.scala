@@ -17,7 +17,7 @@
  */
 
 package io.renku.webhookservice
-package eventprocessing
+package eventstatus
 
 import Generators._
 import cats.data.EitherT

@@ -19,7 +19,7 @@
 package io.renku.webhookservice
 
 import cats.MonadThrow
-import cats.effect.{Async, Clock, Resource}
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
@@ -30,7 +30,7 @@ import io.renku.http.server.version
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.webhookservice.crypto.HookTokenCrypto
-import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
+import io.renku.webhookservice.eventstatus.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
@@ -49,8 +49,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     authMiddleware:           AuthMiddleware[F, AuthUser],
     routesMetrics:            RoutesMetrics[F],
     versionRoutes:            version.Routes[F]
-)(implicit clock:             Clock[F])
-    extends Http4sDsl[F] {
+) extends Http4sDsl[F] {
 
   import hookCreationEndpoint._
   import hookDeletionEndpoint._
@@ -86,7 +85,7 @@ private object MicroserviceRoutes {
     hookTokenCrypto          <- HookTokenCrypto[F]()
     hookEventEndpoint        <- HookEventEndpoint(hookTokenCrypto)
     hookCreatorEndpoint      <- HookCreationEndpoint(projectHookUrl, hookTokenCrypto)
-    processingStatusEndpoint <- eventprocessing.ProcessingStatusEndpoint(projectHookUrl)
+    processingStatusEndpoint <- eventstatus.ProcessingStatusEndpoint(projectHookUrl)
     hookValidationEndpoint   <- HookValidationEndpoint(projectHookUrl)
     hookDeletionEndpoint     <- HookDeletionEndpoint(projectHookUrl)
     authenticator            <- GitLabAuthenticator[F]
