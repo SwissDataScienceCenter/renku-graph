@@ -20,6 +20,7 @@ package io.renku.graph.model
 package testentities
 
 import io.renku.graph.model.entities.EntityFunctions
+import io.renku.graph.model.images.{ImagePosition, ImageResourceId, ImageUri}
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
@@ -36,6 +37,7 @@ trait Project extends Product with Serializable {
   val forksCount:       ForksCount
   val keywords:         Set[Keyword]
   val members:          Set[Person]
+  val images:           List[ImageUri]
 
   type ProjectType <: Project
 }
@@ -74,4 +76,7 @@ object Project {
 
   def toEntityId(projectPath: Path)(implicit renkuUrl: RenkuUrl): EntityId =
     EntityId.of(renkuUrl / "projects" / projectPath)
+
+  def projectImageId(projectEntityId: EntityId, position: ImagePosition): ImageResourceId =
+    ImageResourceId((projectEntityId.asUrlEntityId / "images" / position.toString).show)
 }

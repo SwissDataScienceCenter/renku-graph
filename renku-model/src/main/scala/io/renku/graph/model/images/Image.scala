@@ -19,6 +19,7 @@
 package io.renku.graph.model.images
 
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.projects
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
@@ -26,6 +27,9 @@ import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
 
 object Image {
+  def gitlabProjectAvatar(projectId: projects.ResourceId, uri: ImageUri): Image =
+    Image(ImageResourceId.gitlabProjectAvatar(projectId), uri, ImagePosition(0))
+
   private val imageEntityTypes = EntityTypes of schema / "ImageObject"
 
   implicit val jsonLDEncoder: JsonLDEncoder[Image] = JsonLDEncoder.instance { case Image(resourceId, uri, position) =>

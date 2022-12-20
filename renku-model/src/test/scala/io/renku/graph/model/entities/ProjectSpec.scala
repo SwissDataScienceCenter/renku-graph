@@ -126,7 +126,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             addTo(dataset1,
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
-            plan1 :: plan2 :: plan3 :: Nil
+            plan1 :: plan2 :: plan3 :: Nil,
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -192,7 +193,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
+            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -217,7 +219,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             creator.some.map(_.toPerson),
             info.visibility,
             info.keywords,
-            members.map(_.toPerson)
+            members.map(_.toPerson),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -243,7 +246,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             info.visibility,
             info.keywords,
             members.map(_.toPerson),
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
+            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -715,7 +719,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           activities = Nil,
           List(dataset1, dataset2, dateset2Modified).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
           plans = Nil,
-          projects.ResourceId(parentPath)
+          projects.ResourceId(parentPath),
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -794,7 +799,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -861,7 +867,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -897,7 +904,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -906,10 +914,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
-      val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
-                                                            dateCreated = gitlabDate,
-                                                            maybeDescription = projectDescriptions.generateSome,
-                                                            keywords = projectKeywords.generateSet(min = 1)
+      val projectInfo = gitLabProjectInfos.generateOne.copy(
+        maybeParentPath = None,
+        dateCreated = gitlabDate,
+        maybeDescription = projectDescriptions.generateSome,
+        keywords = projectKeywords.generateSet(min = 1)
       )
       val resourceId = projects.ResourceId(projectInfo.path)
 
@@ -938,7 +947,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -979,7 +989,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }

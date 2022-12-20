@@ -19,6 +19,7 @@
 package io.renku.graph.model.testentities
 
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
@@ -35,7 +36,8 @@ object NonRenkuProject {
                                  visibility:       Visibility,
                                  forksCount:       ForksCount,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person]
+                                 members:          Set[Person],
+                                 images:           List[ImageUri]
   ) extends NonRenkuProject {
     override type ProjectType = NonRenkuProject.WithoutParent
   }
@@ -49,7 +51,8 @@ object NonRenkuProject {
                               forksCount:       ForksCount,
                               keywords:         Set[Keyword],
                               members:          Set[Person],
-                              parent:           NonRenkuProject
+                              parent:           NonRenkuProject,
+                              images:           List[ImageUri]
   ) extends NonRenkuProject
       with Parent {
     override type ProjectType = NonRenkuProject.WithParent
@@ -73,7 +76,8 @@ object NonRenkuProject {
         project.maybeCreator.map(_.to[entities.Person]),
         project.visibility,
         project.keywords,
-        project.members.map(_.to[entities.Person])
+        project.members.map(_.to[entities.Person]),
+        convertImageUris(project.asEntityId)(project.images)
       )
 
   implicit def toEntitiesNonRenkuProjectWithParent(implicit
@@ -90,7 +94,8 @@ object NonRenkuProject {
         project.visibility,
         project.keywords,
         project.members.map(_.to[entities.Person]),
-        projects.ResourceId(project.parent.asEntityId)
+        projects.ResourceId(project.parent.asEntityId),
+        convertImageUris(project.asEntityId)(project.images)
       )
 
   implicit def encoder[P <: NonRenkuProject](implicit

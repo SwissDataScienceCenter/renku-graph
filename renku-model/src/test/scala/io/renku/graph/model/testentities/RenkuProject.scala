@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, DatasetGenFactory, ProjectBasedGenFactory}
@@ -82,7 +83,8 @@ object RenkuProject {
                                  activities:           List[Activity],
                                  datasets:             List[Dataset[Dataset.Provenance]],
                                  unlinkedPlans:        List[StepPlan] = List.empty,
-                                 createCompositePlans: List[CreateCompositePlan] = List.empty
+                                 createCompositePlans: List[CreateCompositePlan] = List.empty,
+                                 images:               List[ImageUri] = Nil
   ) extends RenkuProject {
 
     validateDates(dateCreated, activities, datasets)
@@ -158,7 +160,8 @@ object RenkuProject {
                               datasets:             List[Dataset[Dataset.Provenance]],
                               parent:               RenkuProject,
                               unlinkedPlans:        List[StepPlan] = Nil,
-                              createCompositePlans: List[CreateCompositePlan] = Nil
+                              createCompositePlans: List[CreateCompositePlan] = Nil,
+                              images:               List[ImageUri] = Nil
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
@@ -238,7 +241,8 @@ object RenkuProject {
           project.version,
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          project.plans.map(_.to[entities.Plan])
+          project.plans.map(_.to[entities.Plan]),
+          convertImageUris(project.asEntityId)(project.images)
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
@@ -262,7 +266,8 @@ object RenkuProject {
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
           project.plans.map(_.to[entities.Plan]),
-          projects.ResourceId(project.parent.asEntityId)
+          projects.ResourceId(project.parent.asEntityId),
+          convertImageUris(project.asEntityId)(project.images)
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 

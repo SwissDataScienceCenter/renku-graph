@@ -265,7 +265,8 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
       maybeParentPath = project match {
         case p: Project with Parent => p.parent.path.some
         case _ => None
-      }
+      },
+      project.images.headOption
     )
 
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]

@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.images
 
+import io.renku.graph.model.projects
 import io.renku.graph.model.views.EntityIdJsonLDOps
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{Url => UrlConstraint}
@@ -27,4 +28,8 @@ final class ImageResourceId private (val value: String) extends AnyVal with Stri
 object ImageResourceId
     extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
     with UrlConstraint[ImageResourceId]
-    with EntityIdJsonLDOps[ImageResourceId]
+    with EntityIdJsonLDOps[ImageResourceId] {
+
+  def gitlabProjectAvatar(projectId: projects.ResourceId): ImageResourceId =
+    ImageResourceId(s"${projectId.value}#GitLabProjectAvatar")
+}
