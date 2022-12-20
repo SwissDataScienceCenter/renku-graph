@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.effect.kernel.Concurrent
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -36,7 +36,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait CreateTokenEndpoint[F[_]] {
-  def createToken(projectId: Id, request: Request[F]): F[Response[F]]
+  def createToken(projectId: GitLabId, request: Request[F]): F[Response[F]]
 }
 
 class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
@@ -46,7 +46,7 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
 
   import tokensCreator._
 
-  override def createToken(projectId: Id, request: Request[F]): F[Response[F]] = {
+  override def createToken(projectId: GitLabId, request: Request[F]): F[Response[F]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
       _           <- create(projectId, accessToken)
@@ -62,7 +62,7 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
     MonadThrow[F].raiseError(BadRequestError(exception))
   }
 
-  private def httpResponse(projectId: Id): PartialFunction[Throwable, F[Response[F]]] = {
+  private def httpResponse(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>

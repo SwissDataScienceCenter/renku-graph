@@ -86,7 +86,7 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
   private def updateExecutionDate(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lze - update execution date")
-      .command[ExecutionDate ~ EventId ~ projects.Id ~ String](sql"""
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId ~ String](sql"""
         UPDATE event
         SET execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text

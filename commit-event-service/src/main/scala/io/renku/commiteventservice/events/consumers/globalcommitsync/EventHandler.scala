@@ -76,7 +76,7 @@ private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
     for {
-      id   <- cursor.downField("id").as[projects.Id]
+      id   <- cursor.downField("id").as[projects.GitLabId]
       path <- cursor.downField("path").as[projects.Path]
     } yield Project(id, path)
 }

@@ -31,7 +31,7 @@ import java.time.LocalDate.now
 import java.time.Period
 
 private trait TokenDueChecker[F[_]] {
-  def checkTokenDue(projectId: projects.Id): F[Boolean]
+  def checkTokenDue(projectId: projects.GitLabId): F[Boolean]
 }
 
 private object TokenDueChecker {
@@ -47,16 +47,16 @@ private class TokenDueCheckerImpl[F[_]: MonadCancelThrow: SessionResource: Queri
 
   import skunk.implicits._
 
-  override def checkTokenDue(projectId: projects.Id): F[Boolean] =
+  override def checkTokenDue(projectId: projects.GitLabId): F[Boolean] =
     SessionResource[F].useK(measureExecutionTime(query(projectId))).map {
       case None         => false
       case Some(expiry) => (now().plus(tokenDuePeriod) compareTo expiry.value) >= 0
     }
 
-  private def query(projectId: projects.Id) =
+  private def query(projectId: projects.GitLabId) =
     SqlStatement
       .named(name = "find token due")
-      .select[projects.Id, ExpiryDate](
+      .select[projects.GitLabId, ExpiryDate](
         sql"""SELECT expiry_date
               FROM projects_tokens
               WHERE project_id = $projectIdEncoder

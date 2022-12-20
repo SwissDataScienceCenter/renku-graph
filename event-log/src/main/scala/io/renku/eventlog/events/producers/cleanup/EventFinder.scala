@@ -109,7 +109,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
       measureExecutionTime {
         SqlStatement
           .named(s"${categoryName.show.toLowerCase} - update status")
-          .command[ExecutionDate ~ projects.Id](sql"""
+          .command[ExecutionDate ~ projects.GitLabId](sql"""
             UPDATE event
             SET status = '#${Deleting.value}', execution_date = $executionDateEncoder
             WHERE status = '#${AwaitingDeletion.value}'

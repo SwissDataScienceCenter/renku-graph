@@ -35,19 +35,19 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class IdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ProjectGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "instantiation" should {
 
     "be successful for non-negative values" in {
       forAll(nonNegativeInts()) { id =>
-        Id(id.value).value shouldBe id.value
+        GitLabId(id.value).value shouldBe id.value
       }
     }
 
     "fail for negative ids" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        Id(-1).value
+        GitLabId(-1).value
       }
     }
   }

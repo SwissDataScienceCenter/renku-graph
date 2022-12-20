@@ -25,13 +25,13 @@ import io.renku.graph.model.projects
 private trait CleanUpRequestEvent extends Product with Serializable
 
 private object CleanUpRequestEvent {
-  def apply(projectId: projects.Id, projectPath: projects.Path): CleanUpRequestEvent =
+  def apply(projectId: projects.GitLabId, projectPath: projects.Path): CleanUpRequestEvent =
     CleanUpRequestEvent.Full(projectId, projectPath)
   def apply(projectPath: projects.Path): CleanUpRequestEvent =
     CleanUpRequestEvent.Partial(projectPath)
 
-  final case class Full(projectId: projects.Id, projectPath: projects.Path) extends CleanUpRequestEvent
-  final case class Partial(projectPath: projects.Path)                      extends CleanUpRequestEvent
+  final case class Full(projectId: projects.GitLabId, projectPath: projects.Path) extends CleanUpRequestEvent
+  final case class Partial(projectPath: projects.Path)                            extends CleanUpRequestEvent
 
   implicit val show: Show[CleanUpRequestEvent] = Show.show {
     case e: Full    => e.show

@@ -25,7 +25,7 @@ import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-final case class Project(id: projects.Id, path: projects.Path)
+final case class Project(id: projects.GitLabId, path: projects.Path)
 
 object Project {
   implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>

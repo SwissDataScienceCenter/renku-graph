@@ -33,7 +33,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectIdToPath
 import io.renku.http.client.AccessToken
@@ -182,7 +182,7 @@ class CommitsSynchronizerSpec
       val exception = exceptions.generateOne
 
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(event.project.id, projectIdToPath)
         .returning(exception.raiseError[IO, Option[AccessToken]])
 
@@ -247,38 +247,38 @@ class CommitsSynchronizerSpec
 
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def givenAccessTokenFound(projectId: Id) = (accessTokenFinder
-      .findAccessToken(_: Id)(_: Id => String))
+    def givenAccessTokenFound(projectId: GitLabId) = (accessTokenFinder
+      .findAccessToken(_: GitLabId)(_: GitLabId => String))
       .expects(projectId, projectIdToPath)
       .returning(maybeAccessToken.pure[IO])
 
-    def givenProjectDoesntExistInGL(projectId: Id) =
+    def givenProjectDoesntExistInGL(projectId: GitLabId) =
       (gitLabCommitStatFetcher
-        .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
+        .fetchCommitStats(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
         .returning(None.pure[IO])
 
-    def givenCommitStatsInGL(projectId: Id, commitsInfo: CommitsInfo) =
+    def givenCommitStatsInGL(projectId: GitLabId, commitsInfo: CommitsInfo) =
       (gitLabCommitStatFetcher
-        .fetchCommitStats(_: projects.Id)(_: Option[AccessToken]))
+        .fetchCommitStats(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
         .returning(Some(ProjectCommitStats(Some(commitsInfo.latest), commitsInfo.count)).pure[IO])
 
-    def givenCommitsInGL(projectId: Id, condition: DateCondition, pageResults: PageResult*) = {
+    def givenCommitsInGL(projectId: GitLabId, condition: DateCondition, pageResults: PageResult*) = {
       val lastPage =
         if (pageResults.isEmpty) Page.first
         else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
 
       if (pageResults.isEmpty)
         (gitLabCommitFetcher
-          .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
+          .fetchGitLabCommits(_: projects.GitLabId, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
           .expects(projectId, condition, pageRequest(Page.first), maybeAccessToken)
           .returning(PageResult.empty.pure[IO])
       else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (gitLabCommitFetcher
-            .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
+            .fetchGitLabCommits(_: projects.GitLabId, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
             .expects(projectId, condition, pageRequest(previousPage), maybeAccessToken)
             .returning(pageResult.pure[IO])
         }

@@ -21,7 +21,7 @@ package io.renku.webhookservice.hookvalidation
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait HookValidator[F[_]] {
-  def validateHook(projectId: Id, maybeAccessToken: Option[AccessToken]): F[HookValidationResult]
+  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[HookValidationResult]
 }
 
 class HookValidatorImpl[F[_]: MonadThrow: Logger](
@@ -55,7 +55,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   import applicative._
   import projectHookVerifier._
 
-  def validateHook(projectId: Id, maybeAccessToken: Option[AccessToken]): F[HookValidationResult] =
+  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[HookValidationResult] =
     findToken(projectId, maybeAccessToken) flatMap {
       case GivenToken(token) =>
         for {
@@ -73,17 +73,17 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
     } recoverWith loggingError(projectId)
 
   private def findToken(
-      projectId:        Id,
+      projectId:        GitLabId,
       maybeAccessToken: Option[AccessToken]
   ): F[Token] =
     maybeAccessToken
       .map(token => (GivenToken(token): Token).pure[F])
       .getOrElse(findStoredToken(projectId))
 
-  private def findStoredToken(projectId: Id): F[Token] =
+  private def findStoredToken(projectId: GitLabId): F[Token] =
     findAccessToken(projectId) flatMap getOrError(projectId) recoverWith storedAccessTokenError(projectId)
 
-  private def getOrError(projectId: Id): Option[AccessToken] => F[Token] = {
+  private def getOrError(projectId: GitLabId): Option[AccessToken] => F[Token] = {
     case Some(token) =>
       (StoredToken(token): Token).pure[F]
     case None =>
@@ -91,7 +91,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   }
 
   private def storedAccessTokenError(
-      projectId: Id
+      projectId: GitLabId
   ): PartialFunction[Throwable, F[Token]] = { case UnauthorizedException =>
     new Exception(s"Stored access token for $projectId is invalid").raiseError[F, Token]
   }
@@ -99,7 +99,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing
 
-  private def loggingError(projectId: Id): PartialFunction[Throwable, F[HookValidationResult]] = {
+  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[HookValidationResult]] = {
     case exception @ NoAccessTokenException(message) =>
       Logger[F].info(s"Hook validation failed: $message") >>
         exception.raiseError[F, HookValidationResult]

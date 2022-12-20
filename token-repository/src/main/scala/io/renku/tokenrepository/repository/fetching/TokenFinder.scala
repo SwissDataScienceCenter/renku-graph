@@ -23,7 +23,7 @@ import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.AccessTokenCrypto
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -32,8 +32,8 @@ import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import scala.util.control.NonFatal
 
 private trait TokenFinder[F[_]] {
-  def findToken(projectPath: Path): OptionT[F, AccessToken]
-  def findToken(projectId:   Id):   OptionT[F, AccessToken]
+  def findToken(projectPath: Path):     OptionT[F, AccessToken]
+  def findToken(projectId:   GitLabId): OptionT[F, AccessToken]
 }
 
 private class TokenFinderImpl[F[_]: MonadThrow](
@@ -52,7 +52,7 @@ private class TokenFinderImpl[F[_]: MonadThrow](
         .recoverWith(retry(() => findStoredToken(projectPath)))
     }
 
-  override def findToken(projectId: Id): OptionT[F, AccessToken] =
+  override def findToken(projectId: GitLabId): OptionT[F, AccessToken] =
     findStoredToken(projectId) >>= { encryptedToken =>
       OptionT
         .liftF(decrypt(encryptedToken))

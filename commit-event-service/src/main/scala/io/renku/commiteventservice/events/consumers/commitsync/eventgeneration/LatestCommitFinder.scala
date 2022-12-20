@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.commiteventservice.events.consumers.common.CommitInfo
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
@@ -32,7 +32,7 @@ import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
 private trait LatestCommitFinder[F[_]] {
-  def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]]
+  def findLatestCommit(projectId: GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]]
 }
 
 private class LatestCommitFinderImpl[F[_]: Async: GitLabClient: Logger] extends LatestCommitFinder[F] {
@@ -41,15 +41,17 @@ private class LatestCommitFinderImpl[F[_]: Async: GitLabClient: Logger] extends 
   import org.http4s.Status._
   import org.http4s.{Request, Response}
 
-  override def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]] =
+  override def findLatestCommit(projectId: GitLabId)(implicit mat: Option[AccessToken]): F[Option[CommitInfo]] =
     GitLabClient[F].get(uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
                         "commits"
     )(mapResponse(projectId))
 
-  private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
+  private def mapResponse(
+      projectId: GitLabId
+  ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
     case (Ok, _, response)                      => response.as[List[CommitInfo]] map (_.headOption)
     case (NotFound | InternalServerError, _, _) => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized | Forbidden, _, _)       => findLatestCommit(projectId)(maybeAccessToken = None)
+    case (Unauthorized | Forbidden, _, _)       => findLatestCommit(projectId)(Option.empty[AccessToken])
   }
 
   private implicit val commitInfosEntityDecoder: EntityDecoder[F, List[CommitInfo]] = {

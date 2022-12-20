@@ -87,7 +87,7 @@ private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
 
     for {
       id          <- cursor.downField("id").as[EventId]
-      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- cursor.downField("project").downField("path").as[projects.Path]
       status      <- cursor.downField("status").as[EventStatus.ProcessingStatus]
     } yield ZombieEvent(CompoundEventId(id, projectId), projectPath, status)

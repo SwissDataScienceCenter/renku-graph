@@ -51,7 +51,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
     "remove the token and the webhook of the specified project" in new TestCase {
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
@@ -70,7 +70,7 @@ class ProjectWebhookAndTokenRemoverSpec
     NotFound :: Unauthorized :: Forbidden :: Nil foreach { status =>
       s"remove the token even if the webhook removal returned $status" in new TestCase {
         (accessTokenFinder
-          .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+          .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
           .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
           .returns(accessToken.some.pure[IO])
         stubFor {
@@ -91,7 +91,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
     "do nothing when the tokenFinder returns no token for the project" in new TestCase {
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(None.pure[IO])
 
@@ -101,7 +101,7 @@ class ProjectWebhookAndTokenRemoverSpec
     "fail when the tokenFinder fails" in new TestCase {
       val exception = exceptions.generateOne
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(exception.raiseError[IO, Option[AccessToken]])
       intercept[Exception] {
@@ -111,7 +111,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
     s"do nothing when the webhook deletion ends with $InternalServerError" in new TestCase {
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
@@ -127,7 +127,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
     "fail when the webhook deletion fails" in new TestCase {
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
@@ -142,7 +142,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
     "fail when the token deletion fails" in new TestCase {
       (accessTokenFinder
-        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .findAccessToken[projects.GitLabId](_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {

@@ -25,7 +25,7 @@ import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -43,7 +43,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
     "respond with NO_CONTENT if the token removal was successful" in new TestCase {
 
       (tokenRemover
-        .delete(_: Id))
+        .delete(_: GitLabId))
         .expects(projectId)
         .returning(IO.unit)
 
@@ -59,7 +59,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val exception = exceptions.generateOne
       (tokenRemover
-        .delete(_: Id))
+        .delete(_: GitLabId))
         .expects(projectId)
         .returning(exception.raiseError[IO, Unit])
 

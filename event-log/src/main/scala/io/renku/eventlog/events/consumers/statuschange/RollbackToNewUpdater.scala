@@ -42,7 +42,7 @@ private class RollbackToNewUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes
 
   override def updateDB(event: RollbackToNew): UpdateResult[F] = measureExecutionTime {
     SqlStatement[F](name = "to_new rollback - status update")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
               SET status = '#${New.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 

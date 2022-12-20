@@ -76,13 +76,13 @@ trait TSProvisioning
     `wait for events to be processed`(project.id)
   }
 
-  def `wait for events to be processed`(projectId: projects.Id)(implicit ioRuntime: IORuntime): Assertion = eventually {
+  def `wait for events to be processed`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Assertion = eventually {
     val ClientResponse(status, jsonBody, _) = eventLogClient.fetchProcessingStatus(projectId)
     status                                            shouldBe Ok
     jsonBody.hcursor.downField("progress").as[Double] shouldBe Right(100d)
   }
 
-  def `wait for the Fast Tract event`(projectId: projects.Id)(implicit ioRuntime: IORuntime): Unit = eventually {
+  def `wait for the Fast Tract event`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Unit = eventually {
 
     val sleepTime = 1 second
 

@@ -171,7 +171,7 @@ class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
   }
 }
 
-class GitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PersonGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import persons.GitLabId
 

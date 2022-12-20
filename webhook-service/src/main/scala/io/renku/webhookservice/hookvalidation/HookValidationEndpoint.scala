@@ -21,7 +21,7 @@ package io.renku.webhookservice.hookvalidation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -38,7 +38,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait HookValidationEndpoint[F[_]] {
-  def validateHook(projectId: Id, authUser: AuthUser): F[Response[F]]
+  def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
 class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
@@ -46,7 +46,7 @@ class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
 ) extends Http4sDsl[F]
     with HookValidationEndpoint[F] {
 
-  def validateHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
+  def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
     for {
       creationResult <- hookValidator.validateHook(projectId, Some(authUser.accessToken))
       response       <- toHttpResponse(creationResult)

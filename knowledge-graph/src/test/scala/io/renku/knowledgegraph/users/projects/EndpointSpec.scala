@@ -137,7 +137,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         } yield model.Project.Activated(name, path, visibility, date, maybeCreator, keywords, maybeDesc)
       case links if links.get(Links.Rel("activation")).isDefined =>
         for {
-          id           <- cursor.downField("id").as[projects.Id]
+          id           <- cursor.downField("id").as[projects.GitLabId]
           path         <- cursor.downField("path").as[projects.Path]
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]

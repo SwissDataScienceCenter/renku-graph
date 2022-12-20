@@ -33,10 +33,13 @@ trait CleanUpEventsProvisioning {
   protected def insertCleanUpEvent(project: consumers.Project, date: OffsetDateTime = OffsetDateTime.now()): Unit =
     insertCleanUpEvent(project.id, project.path, date)
 
-  protected def insertCleanUpEvent(projectId: projects.Id, projectPath: projects.Path, date: OffsetDateTime): Unit =
+  protected def insertCleanUpEvent(projectId:   projects.GitLabId,
+                                   projectPath: projects.Path,
+                                   date:        OffsetDateTime
+  ): Unit =
     execute {
       Kleisli { session =>
-        val query: Command[OffsetDateTime ~ projects.Id ~ projects.Path] = sql"""
+        val query: Command[OffsetDateTime ~ projects.GitLabId ~ projects.Path] = sql"""
           INSERT INTO clean_up_events_queue (date, project_id, project_path)
           VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
         session
@@ -46,9 +49,9 @@ trait CleanUpEventsProvisioning {
       }
     }
 
-  protected def findCleanUpEvents: List[(projects.Id, projects.Path)] = execute {
+  protected def findCleanUpEvents: List[(projects.GitLabId, projects.Path)] = execute {
     Kleisli { session =>
-      val query: Query[Void, projects.Id ~ projects.Path] = sql"""
+      val query: Query[Void, projects.GitLabId ~ projects.Path] = sql"""
         SELECT project_id, project_path
         FROM clean_up_events_queue
         ORDER BY date DESC"""

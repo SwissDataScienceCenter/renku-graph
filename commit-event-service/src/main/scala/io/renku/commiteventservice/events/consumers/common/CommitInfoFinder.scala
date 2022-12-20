@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound}
 import org.http4s.circe.jsonOf
@@ -33,11 +33,11 @@ import org.typelevel.log4cats.Logger
 private[consumers] trait CommitInfoFinder[F[_]] {
 
   def findCommitInfo(
-      projectId:               Id,
+      projectId:               GitLabId,
       commitId:                CommitId
   )(implicit maybeAccessToken: Option[AccessToken]): F[CommitInfo]
 
-  def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
+  def getMaybeCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
       maybeAccessToken:             Option[AccessToken]
   ): F[Option[CommitInfo]]
 }
@@ -48,17 +48,17 @@ private[consumers] class CommitInfoFinderImpl[F[_]: Async: GitLabClient: Logger]
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
-  def findCommitInfo(projectId: Id, commitId: CommitId)(implicit
+  def findCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
       maybeAccessToken:         Option[AccessToken]
   ): F[CommitInfo] =
     fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow(projectId, commitId))
 
-  def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
+  def getMaybeCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
       maybeAccessToken:             Option[AccessToken]
   ): F[Option[CommitInfo]] =
     fetchCommitInfo(projectId, commitId)(mapToMaybeCommit(projectId, commitId))
 
-  private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId)(
+  private def fetchCommitInfo[ResultType](projectId: GitLabId, commitId: CommitId)(
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
         ResultType
       ]]
@@ -67,14 +67,14 @@ private[consumers] class CommitInfoFinderImpl[F[_]: Async: GitLabClient: Logger]
       mapResponse
     )
 
-  private def mapToCommitOrThrow(projectId: Id,
+  private def mapToCommitOrThrow(projectId: GitLabId,
                                  commitId:  CommitId
   ): PartialFunction[(Status, Request[F], Response[F]), F[CommitInfo]] = {
     case (Ok, _, response)                => response.as[CommitInfo]
     case (Unauthorized | Forbidden, _, _) => findCommitInfo(projectId, commitId)(maybeAccessToken = None)
   }
 
-  private def mapToMaybeCommit(projectId: Id,
+  private def mapToMaybeCommit(projectId: GitLabId,
                                commitId:  CommitId
   ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
     case (Ok, _, response)                      => response.as[CommitInfo].map(Some(_))

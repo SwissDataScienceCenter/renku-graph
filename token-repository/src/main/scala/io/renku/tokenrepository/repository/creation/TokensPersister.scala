@@ -26,7 +26,7 @@ import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import skunk._
 import skunk.data.Completion
@@ -61,7 +61,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def deleteAssociation(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - delete")
-      .command[Id ~ Path](sql"""
+      .command[GitLabId ~ Path](sql"""
         DELETE FROM projects_tokens 
         WHERE project_id = $projectIdEncoder OR project_path = $projectPathEncoder
       """.command)
@@ -79,7 +79,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def insert(storingInfo: TokenStoringInfo) = measureExecutionTime {
     SqlStatement
       .named("associate token - insert")
-      .command[Id ~ Path ~ EncryptedAccessToken ~ CreatedAt ~ ExpiryDate](sql"""
+      .command[GitLabId ~ Path ~ EncryptedAccessToken ~ CreatedAt ~ ExpiryDate](sql"""
         INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
         VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
       """.command)
@@ -93,7 +93,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def updatePathQuery(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - update path")
-      .command[Path ~ Id](sql"""
+      .command[Path ~ GitLabId](sql"""
         UPDATE projects_tokens
         SET project_path = $projectPathEncoder
         WHERE project_id = $projectIdEncoder
@@ -103,7 +103,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
       .flatMapResult(failIfMultiUpdate(project.id))
   }
 
-  private def failIfMultiUpdate(projectId: Id): Completion => F[Unit] = {
+  private def failIfMultiUpdate(projectId: GitLabId): Completion => F[Unit] = {
     case Completion.Update(0 | 1) => ().pure[F]
     case completion =>
       new RuntimeException(s"Updating path for a projectId: $projectId failed with completion code $completion")

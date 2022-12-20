@@ -39,7 +39,7 @@ object events {
 
   object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture[CreatedDate]
 
-  final case class CompoundEventId(id: EventId, projectId: projects.Id) {
+  final case class CompoundEventId(id: EventId, projectId: projects.GitLabId) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
@@ -47,7 +47,7 @@ object events {
     implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
   }
 
-  final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
+  final case class EventDetails(id: EventId, projectId: projects.GitLabId, eventBody: EventBody) {
     override lazy val toString: String          = s"id = $id, projectId = $projectId"
     lazy val compoundEventId:   CompoundEventId = CompoundEventId(id, projectId)
   }
@@ -269,7 +269,7 @@ object events {
   }
 
   object EventInfo {
-    final case class ProjectIds(id: projects.Id, path: projects.Path)
+    final case class ProjectIds(id: projects.GitLabId, path: projects.Path)
     object ProjectIds {
       implicit val jsonDecoder: Decoder[ProjectIds] =
         io.circe.generic.semiauto.deriveDecoder[ProjectIds]

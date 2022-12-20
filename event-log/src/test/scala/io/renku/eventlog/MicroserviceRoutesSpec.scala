@@ -85,6 +85,13 @@ class MicroserviceRoutesSpec
             )
           )
           .generateOne,
+        projectIds
+          .map(id =>
+            uri"/events" +? ("project-id" -> id.value) -> Criteria(
+              Filters.ProjectEvents(id, maybeStatus = None, maybeDates = None)
+            )
+          )
+          .generateOne,
         (projectPaths -> eventStatuses).mapN { case (path, status) =>
           uri"/events" +? ("project-path" -> path.value) +? ("status" -> status.value) -> Criteria(
             Filters.ProjectEvents(path, Some(status), maybeDates = None)
@@ -184,6 +191,7 @@ class MicroserviceRoutesSpec
 
     Set(
       uri"/events".withQueryParam("project-path", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("project-id", nonEmptyStrings().generateOne),
       uri"/events".withQueryParam("status", nonEmptyStrings().generateOne),
       uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)

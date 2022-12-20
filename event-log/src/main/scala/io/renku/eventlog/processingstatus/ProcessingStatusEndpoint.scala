@@ -32,7 +32,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait ProcessingStatusEndpoint[F[_]] {
-  def findProcessingStatus(projectId: projects.Id): F[Response[F]]
+  def findProcessingStatus(projectId: projects.GitLabId): F[Response[F]]
 }
 
 class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
@@ -51,7 +51,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
   import org.http4s.circe._
   import processingStatusFinder._
 
-  override def findProcessingStatus(projectId: projects.Id): F[Response[F]] = {
+  override def findProcessingStatus(projectId: projects.GitLabId): F[Response[F]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
       response              <- maybeProcessingStatus.toResponse
@@ -76,7 +76,7 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
   }
 
   private def internalServerError(
-      projectId: projects.Id
+      projectId: projects.GitLabId
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
     Logger[F].error(exception)(errorMessage.value)

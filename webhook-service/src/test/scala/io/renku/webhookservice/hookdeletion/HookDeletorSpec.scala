@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -50,7 +50,7 @@ class HookDeletorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returns(idsAndUrls.pure[IO])
 
       (projectHookDeletor
-        .delete(_: Id, _: HookIdAndUrl, _: AccessToken))
+        .delete(_: GitLabId, _: HookIdAndUrl, _: AccessToken))
         .expects(projectHookId.projectId, hookToDelete, accessToken)
         .returning(HookDeleted.pure[IO])
 
@@ -81,7 +81,7 @@ class HookDeletorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       val exception = exceptions.generateOne
       (projectHookDeletor
-        .delete(_: Id, _: HookIdAndUrl, _: AccessToken))
+        .delete(_: GitLabId, _: HookIdAndUrl, _: AccessToken))
         .expects(projectHookId.projectId, hookToDelete, accessToken)
         .returning(exception.raiseError[IO, DeletionResult])
 

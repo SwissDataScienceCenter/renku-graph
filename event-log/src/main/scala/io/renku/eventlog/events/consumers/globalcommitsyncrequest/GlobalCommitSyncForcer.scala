@@ -37,7 +37,7 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 
 private trait GlobalCommitSyncForcer[F[_]] {
-  def moveGlobalCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
+  def moveGlobalCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
 }
 
 private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
@@ -49,7 +49,7 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
-  override def moveGlobalCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit] =
+  override def moveGlobalCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] =
     SessionResource[F].useK {
       scheduleGlobalSync(projectId) >>= {
         case true  => upsertProject(projectId, projectPath)
@@ -57,9 +57,9 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
       }
     }
 
-  private def scheduleGlobalSync(projectId: projects.Id) = measureExecutionTime {
+  private def scheduleGlobalSync(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move last_synced"))
-      .command[LastSyncedDate ~ projects.Id](sql"""
+      .command[LastSyncedDate ~ projects.GitLabId](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = '#${globalcommitsync.categoryName.show}'
@@ -72,9 +72,9 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
       }
   }
 
-  private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
+  private def upsertProject(projectId: projects.GitLabId, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))
-      .command[projects.Id ~ projects.Path ~ EventDate](sql"""
+      .command[projects.GitLabId ~ projects.Path ~ EventDate](sql"""
         INSERT INTO project (project_id, project_path, latest_event_date)
         VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
         ON CONFLICT (project_id)

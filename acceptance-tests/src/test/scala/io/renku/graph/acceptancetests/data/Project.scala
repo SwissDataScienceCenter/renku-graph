@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
-import io.renku.graph.model.projects.{Id, Name, Path}
+import io.renku.graph.model.projects.{GitLabId, Name, Path}
 import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -34,7 +34,7 @@ import java.net.{MalformedURLException, URL}
 import java.time.Instant
 
 final case class Project(entitiesProject: testentities.RenkuProject,
-                         id:              Id,
+                         id:              GitLabId,
                          updatedAt:       DateUpdated,
                          urls:            Urls,
                          starsCount:      StarsCount,

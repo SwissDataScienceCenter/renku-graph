@@ -91,7 +91,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
-      .select[ExecutionDate ~ projects.Id ~ projects.Path, EventStatus](sql"""
+      .select[ExecutionDate ~ projects.GitLabId ~ projects.Path, EventStatus](sql"""
         UPDATE event evt
         SET status = '#${New.value}',
             execution_date = $executionDateEncoder,
@@ -117,7 +117,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
 
   private def removeProcessingTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - processing_times removal")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM status_processing_time 
         WHERE project_id IN (
           SELECT t.project_id
@@ -133,7 +133,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
 
   private def removePayloads(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - payloads removal")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM event_payload 
         WHERE project_id IN (
           SELECT ep.project_id
@@ -150,7 +150,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
   private def removeEvents(project: Project, status: EventStatus) = measureExecutionTime {
     SqlStatement
       .named(show"project_to_new - $status removal")
-      .command[EventStatus ~ projects.Id ~ projects.Path](sql"""
+      .command[EventStatus ~ projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM event
         WHERE status = $eventStatusEncoder AND project_id IN (
           SELECT e.project_id
@@ -170,7 +170,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
 
   private def removeDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
-      .command[projects.Id ~ projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM event_delivery 
         WHERE project_id = $projectIdEncoder
           AND event_id NOT IN (
@@ -189,7 +189,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
   private def removeCategorySyncTimes(project: Project) = measureExecutionTime {
     SqlStatement
       .named("project_to_new - delivery removal")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM subscription_category_sync_time
         WHERE category_name = '#${minprojectinfo.categoryName.show}' AND project_id IN (
           SELECT st.project_id
@@ -206,7 +206,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
 
   private def findLatestEventDate(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - get latest event date")
-      .select[projects.Id ~ projects.Path, EventDate](sql"""
+      .select[projects.GitLabId ~ projects.Path, EventDate](sql"""
         SELECT event_date
         FROM event e
         JOIN project p ON e.project_id = p.project_id 
@@ -222,7 +222,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger: QueriesExecutio
     case Some(eventDate) =>
       measureExecutionTime {
         SqlStatement(name = "project_to_new - set latest event date")
-          .command[EventDate ~ projects.Id](sql"""
+          .command[EventDate ~ projects.GitLabId](sql"""
             UPDATE project
             SET latest_event_date = $eventDateEncoder
             WHERE project_id = $projectIdEncoder

@@ -81,6 +81,6 @@ class TokenDueCheckerSpec
     val dueChecker     = new TokenDueCheckerImpl[IO](tokenDuePeriod)
   }
 
-  private def insertToken(projectId: projects.Id, expiryDate: ExpiryDate): Unit =
+  private def insertToken(projectId: projects.GitLabId, expiryDate: ExpiryDate): Unit =
     insert(projectId, projectPaths.generateOne, encryptedAccessTokens.generateOne, expiryDate)
 }

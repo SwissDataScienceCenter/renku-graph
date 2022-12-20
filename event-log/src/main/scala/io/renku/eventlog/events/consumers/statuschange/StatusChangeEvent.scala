@@ -171,7 +171,7 @@ private object StatusChangeEvent {
     }
     implicit lazy val decoder: Decoder[ProjectEventsToNew] = cursor =>
       for {
-        id   <- cursor.downField("project").downField("id").as[projects.Id]
+        id   <- cursor.downField("project").downField("id").as[projects.GitLabId]
         path <- cursor.downField("project").downField("path").as[projects.Path]
       } yield ProjectEventsToNew(Project(id, path))
 

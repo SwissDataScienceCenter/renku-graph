@@ -22,10 +22,8 @@ import GitLabStateUpdates.stateUpdateMonoid
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.{RenkuUrl, persons, projects}
 import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
@@ -42,7 +40,7 @@ trait GitLabStubIOSyntax { self: IOSpec =>
       self.update(GitLabStateUpdates.clearState).unsafeRunSync()
 
     /** Adds an authenticated gitlab user. */
-    def addAuthenticated(userId: GitLabId, token: UserAccessToken): Unit =
+    def addAuthenticated(userId: persons.GitLabId, token: UserAccessToken): Unit =
       self.update(GitLabStateUpdates.addUser(userId, token)).unsafeRunSync()
 
     /** Adds an authenticated gitlab user. */
@@ -68,23 +66,23 @@ trait GitLabStubIOSyntax { self: IOSpec =>
       addProject(project)
 
     /** Removes all existing commits of the project with `id` and associates the given commits. */
-    def replaceCommits(id: Id, commits: CommitId*): Unit =
+    def replaceCommits(id: projects.GitLabId, commits: CommitId*): Unit =
       self.update(GitLabStateUpdates.replaceCommits(id, commits)).unsafeRunSync()
 
     /** Removes a project, its commits and webhooks. */
-    def removeProject(id: Id): Unit =
+    def removeProject(id: projects.GitLabId): Unit =
       self.update(GitLabStateUpdates.removeProject(id)).unsafeRunSync()
 
     /** Marks a project to be "broken". Some endpoints will return an internal server error for this project. */
-    def markProjectBroken(id: Id): Unit =
+    def markProjectBroken(id: projects.GitLabId): Unit =
       self.update(GitLabStateUpdates.markProjectBroken(id)).unsafeRunSync()
 
     /** Removes the project from the "broken" ones. */
-    def unmarkProjectBroken(id: Id): Unit =
+    def unmarkProjectBroken(id: projects.GitLabId): Unit =
       self.update(GitLabStateUpdates.unmarkProjectBroken(id)).unsafeRunSync()
 
     /** Removes all webhooks for the project. */
-    def removeWebhook(project: Id): Unit =
+    def removeWebhook(project: projects.GitLabId): Unit =
       self.update(GitLabStateUpdates.removeWebhooks(project)).unsafeRunSync()
   }
 }

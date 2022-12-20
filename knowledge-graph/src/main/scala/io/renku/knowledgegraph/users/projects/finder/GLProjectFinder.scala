@@ -110,7 +110,7 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        id              <- cursor.downField("id").as[projects.Id]
+        id              <- cursor.downField("id").as[projects.GitLabId]
         name            <- cursor.downField("name").as[projects.Name]
         path            <- cursor.downField("path_with_namespace").as[projects.Path]
         maybeVisibility <- cursor.downField("visibility").as[Option[projects.Visibility]]

@@ -26,10 +26,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
-import io.renku.graph.model.{RenkuUrl, entities, projects}
+import io.renku.graph.model._
 import io.renku.http.client.UserAccessToken
 import org.http4s.Uri
 
@@ -48,25 +46,25 @@ trait GitLabStateUpdates {
   def clearState: StateUpdate =
     _ => State.empty
 
-  def addUser(id: GitLabId, token: UserAccessToken): StateUpdate =
+  def addUser(id: persons.GitLabId, token: UserAccessToken): StateUpdate =
     state => state.copy(users = state.users.updated(id, token))
 
-  def addWebhook(projectId: Id, url: Uri): StateUpdate = state => {
+  def addWebhook(projectId: projects.GitLabId, url: Uri): StateUpdate = state => {
     val nextId = state.webhooks.size
     state.copy(webhooks =
       Webhook(nextId, projectId, url) :: state.webhooks.filter(p => p.projectId != projectId || p.url != url)
     )
   }
 
-  def removeWebhook(projectId: Id, hookId: Int): StateUpdateGet[Boolean] = state => {
+  def removeWebhook(projectId: projects.GitLabId, hookId: Int): StateUpdateGet[Boolean] = state => {
     val filtered = state.webhooks.filterNot(h => h.projectId == projectId && h.webhookId == hookId)
     (state.copy(webhooks = filtered), filtered != state.webhooks)
   }
 
-  def removeWebhooks(projectId: Id): StateUpdate =
+  def removeWebhooks(projectId: projects.GitLabId): StateUpdate =
     state => state.copy(webhooks = state.webhooks.filterNot(_.projectId == projectId))
 
-  def addCommitData(projectId: Id, commits: Seq[CommitData]): StateUpdate = state => {
+  def addCommitData(projectId: projects.GitLabId, commits: Seq[CommitData]): StateUpdate = state => {
     def connectParents(list: Seq[CommitData]): List[CommitData] =
       list.foldRight(List.empty[CommitData]) { (el, res) =>
         el.copy(parents = res.headOption.map(_.commitId).toList) :: res
@@ -79,13 +77,13 @@ trait GitLabStateUpdates {
     state.copy(commits = next)
   }
 
-  def addCommits(projectId: Id, commits: Seq[CommitId]): StateUpdate =
+  def addCommits(projectId: projects.GitLabId, commits: Seq[CommitId]): StateUpdate =
     addCommitData(projectId, commits.map(id => commitData(id).generateOne))
 
-  def removeCommits(projectId: Id): StateUpdate =
+  def removeCommits(projectId: projects.GitLabId): StateUpdate =
     state => state.copy(commits = state.commits.removed(projectId))
 
-  def replaceCommits(projectId: Id, commits: Seq[CommitId]): StateUpdate =
+  def replaceCommits(projectId: projects.GitLabId, commits: Seq[CommitId]): StateUpdate =
     removeCommits(projectId) >> addCommits(projectId, commits)
 
   def addPerson(person: Person*): StateUpdate =
@@ -107,7 +105,7 @@ trait GitLabStateUpdates {
       addCommits(project.id, commits) >>
       addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson))
 
-  def addProjectAccessToken(projectId: projects.Id, token: ProjectAccessTokenInfo): StateUpdate =
+  def addProjectAccessToken(projectId: projects.GitLabId, token: ProjectAccessTokenInfo): StateUpdate =
     state => state.copy(projectAccessTokens = state.projectAccessTokens.updated(projectId, token))
 
   private lazy val toPerson: entities.Person => Person = person =>
@@ -119,15 +117,15 @@ trait GitLabStateUpdates {
       person.maybeAffiliation
     )
 
-  def removeProject(projectId: Id): StateUpdate =
+  def removeProject(projectId: projects.GitLabId): StateUpdate =
     removeCommits(projectId) >>
       removeWebhooks(projectId) >>
       (state => state.copy(projects = state.projects.filterNot(_.id == projectId)))
 
-  def markProjectBroken(id: Id): StateUpdate =
+  def markProjectBroken(id: projects.GitLabId): StateUpdate =
     state => state.copy(brokenProjects = state.brokenProjects + id)
 
-  def unmarkProjectBroken(id: Id): StateUpdate =
+  def unmarkProjectBroken(id: projects.GitLabId): StateUpdate =
     state => state.copy(brokenProjects = state.brokenProjects - id)
 }
 

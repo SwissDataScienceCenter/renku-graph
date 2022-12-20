@@ -122,14 +122,14 @@ class GitLabProjectFetcherSpec
       projectPaths.generateOption.asRight[UnauthorizedException]
     )
 
-    def givenFindAccessToken(by: projects.Id, returning: IO[Option[AccessToken]]) =
+    def givenFindAccessToken(by: projects.GitLabId, returning: IO[Option[AccessToken]]) =
       (accessTokenFinder
-        .findAccessToken(_: projects.Id)(_: projects.Id => String))
+        .findAccessToken(_: projects.GitLabId)(_: projects.GitLabId => String))
         .expects(by, projectIdToPath)
         .returning(returning)
   }
 
-  private def toResponseEntity(id: projects.Id, path: projects.Path): Json = json"""{
+  private def toResponseEntity(id: projects.GitLabId, path: projects.Path): Json = json"""{
     "id": ${id.value},
     "path_with_namespace": ${path.value}
   }"""

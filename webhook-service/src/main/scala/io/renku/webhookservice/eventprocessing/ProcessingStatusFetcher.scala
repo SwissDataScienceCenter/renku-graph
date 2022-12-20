@@ -34,7 +34,7 @@ import org.typelevel.log4cats.Logger
 import scala.math.BigDecimal.RoundingMode
 
 private trait ProcessingStatusFetcher[F[_]] {
-  def fetchProcessingStatus(projectId: projects.Id): OptionT[F, ProcessingStatus]
+  def fetchProcessingStatus(projectId: projects.GitLabId): OptionT[F, ProcessingStatus]
 }
 
 private object ProcessingStatusFetcher {
@@ -96,7 +96,7 @@ private class ProcessingStatusFetcherImpl[F[_]: Async: Logger](
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def fetchProcessingStatus(projectId: projects.Id): OptionT[F, ProcessingStatus] =
+  override def fetchProcessingStatus(projectId: projects.GitLabId): OptionT[F, ProcessingStatus] =
     OptionT {
       for {
         uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))

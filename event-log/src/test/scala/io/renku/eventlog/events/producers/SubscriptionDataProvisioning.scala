@@ -30,12 +30,12 @@ import skunk.implicits._
 trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {
   self: InMemoryEventLogDb =>
 
-  protected def upsertCategorySyncTime(projectId:    projects.Id,
+  protected def upsertCategorySyncTime(projectId:    projects.GitLabId,
                                        categoryName: CategoryName,
                                        lastSynced:   LastSyncedDate
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+      val query: Command[projects.GitLabId ~ CategoryName ~ LastSyncedDate] = sql"""
         INSERT INTO subscription_category_sync_time (project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
@@ -45,26 +45,28 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
     }
   }
 
-  protected def findSyncTime(projectId: projects.Id, categoryName: CategoryName): Option[LastSyncedDate] = execute {
-    Kleisli { session =>
-      val query: Query[projects.Id ~ CategoryName, LastSyncedDate] = sql"""
+  protected def findSyncTime(projectId: projects.GitLabId, categoryName: CategoryName): Option[LastSyncedDate] =
+    execute {
+      Kleisli { session =>
+        val query: Query[projects.GitLabId ~ CategoryName, LastSyncedDate] = sql"""
         SELECT last_synced
         FROM subscription_category_sync_time
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
       """.query(lastSyncedDateDecoder)
-      session.prepare(query).use(_.option(projectId ~ categoryName))
+        session.prepare(query).use(_.option(projectId ~ categoryName))
+      }
     }
-  }
 
-  protected def findProjectCategorySyncTimes(projectId: projects.Id): List[(CategoryName, LastSyncedDate)] = execute {
-    Kleisli { session =>
-      val query: Query[projects.Id, (CategoryName, LastSyncedDate)] =
-        sql"""SELECT category_name, last_synced
+  protected def findProjectCategorySyncTimes(projectId: projects.GitLabId): List[(CategoryName, LastSyncedDate)] =
+    execute {
+      Kleisli { session =>
+        val query: Query[projects.GitLabId, (CategoryName, LastSyncedDate)] =
+          sql"""SELECT category_name, last_synced
               FROM subscription_category_sync_time
               WHERE project_id = $projectIdEncoder"""
-          .query(varchar ~ lastSyncedDateDecoder)
-          .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
-      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+            .query(varchar ~ lastSyncedDateDecoder)
+            .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
+        session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+      }
     }
-  }
 }

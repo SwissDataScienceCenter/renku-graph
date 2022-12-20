@@ -61,7 +61,7 @@ private class ToTriplesStoreUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateStatus(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "to_triples_store - status update")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event evt
               SET status = '#${EventStatus.TriplesStore.value}',
                 execution_date = $executionDateEncoder,
@@ -86,7 +86,7 @@ private class ToTriplesStoreUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateProcessingTime(event: ToTriplesStore) = measureExecutionTime {
     SqlStatement(name = "to_triples_store - processing_time add")
-      .command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime](
+      .command[EventId ~ projects.GitLabId ~ EventStatus ~ EventProcessingTime](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
               VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
               ON CONFLICT (event_id, project_id, status)
@@ -111,7 +111,7 @@ private class ToTriplesStoreUpdater[F[_]: Async: QueriesExecutionTimes](
                                      TransformationRecoverableFailure
           )
           SqlStatement(name = "to_triples_store - ancestors update")
-            .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventStatus](
+            .select[ExecutionDate ~ projects.GitLabId ~ projects.GitLabId ~ EventId ~ EventId, EventStatus](
               sql"""UPDATE event evt
                 SET status = '#${EventStatus.TriplesStore.value}',
                     execution_date = $executionDateEncoder,

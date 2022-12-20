@@ -128,7 +128,7 @@ class GitLabCommitStatFetcherSpec
 
     def givenLatestCommitFetcher(returning: IO[Option[CommitId]]) =
       (gitLabCommitFetcher
-        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .fetchLatestGitLabCommit(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
         .returning(returning)
   }

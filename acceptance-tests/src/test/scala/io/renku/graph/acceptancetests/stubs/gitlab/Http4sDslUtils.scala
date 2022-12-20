@@ -24,8 +24,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.{persons, projects}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
@@ -34,11 +33,11 @@ import org.typelevel.log4cats.Logger
 
 private[gitlab] trait Http4sDslUtils {
 
-  object GitLabIdVar {
-    def unapply(str: String): Option[GitLabId] =
+  object UserGitLabId {
+    def unapply(str: String): Option[persons.GitLabId] =
       for {
         idn <- str.toIntOption
-        gid <- GitLabId.from(idn).toOption
+        gid <- persons.GitLabId.from(idn).toOption
       } yield gid
   }
 
@@ -48,15 +47,15 @@ private[gitlab] trait Http4sDslUtils {
   }
 
   object ProjectPath {
-    def unapply(str: String): Option[Path] =
-      Path.from(str).toOption
+    def unapply(str: String): Option[projects.Path] =
+      projects.Path.from(str).toOption
   }
 
   object ProjectId {
-    def unapply(str: String): Option[Id] =
+    def unapply(str: String): Option[projects.GitLabId] =
       for {
         idn <- str.toIntOption
-        pid <- Id.from(idn).toOption
+        pid <- projects.GitLabId.from(idn).toOption
       } yield pid
   }
 

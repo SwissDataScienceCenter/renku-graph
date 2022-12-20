@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
@@ -35,7 +35,7 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectHookDeletor[F[_]] {
   def delete(
-      projectId:     projects.Id,
+      projectId:     projects.GitLabId,
       projectHookId: HookIdAndUrl,
       accessToken:   AccessToken
   ): F[DeletionResult]
@@ -54,7 +54,7 @@ private class ProjectHookDeletorImpl[F[_]: Async: GitLabClient: Logger] extends 
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
-  def delete(projectId: projects.Id, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
+  def delete(projectId: projects.GitLabId, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
     GitLabClient[F].delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete-hook")(
       mapResponse
     )(
@@ -67,7 +67,7 @@ private object ProjectHookDeletor {
     new ProjectHookDeletorImpl[F].pure[F].widen[ProjectHookDeletor[F]]
 
   final case class ProjectHook(
-      projectId:           Id,
+      projectId:           GitLabId,
       projectHookUrl:      ProjectHookUrl,
       serializedHookToken: SerializedHookToken
   )

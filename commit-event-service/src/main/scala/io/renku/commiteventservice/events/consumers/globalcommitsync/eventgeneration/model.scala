@@ -26,7 +26,7 @@ import io.renku.http.rest.paging.model.Page
 import java.time.Instant
 
 private[globalcommitsync] final case class CommitWithParents(id:        CommitId,
-                                                             projectId: projects.Id,
+                                                             projectId: projects.GitLabId,
                                                              parents:   List[CommitId]
 )
 

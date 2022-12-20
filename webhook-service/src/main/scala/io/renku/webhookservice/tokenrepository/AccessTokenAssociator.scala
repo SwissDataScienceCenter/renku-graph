@@ -21,14 +21,14 @@ package io.renku.webhookservice.tokenrepository
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
 import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 
 trait AccessTokenAssociator[F[_]] {
-  def associate(projectId: Id, accessToken: AccessToken): F[Unit]
+  def associate(projectId: GitLabId, accessToken: AccessToken): F[Unit]
 }
 
 class AccessTokenAssociatorImpl[F[_]: Async: Logger](
@@ -42,7 +42,7 @@ class AccessTokenAssociatorImpl[F[_]: Async: Logger](
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def associate(projectId: Id, accessToken: AccessToken): F[Unit] = for {
+  override def associate(projectId: GitLabId, accessToken: AccessToken): F[Unit] = for {
     uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
     requestWithPayload = request(POST, uri).withEntity(accessToken.asJson)
     _ <- send(requestWithPayload)(mapResponse)

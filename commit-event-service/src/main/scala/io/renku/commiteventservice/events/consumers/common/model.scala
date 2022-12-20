@@ -22,18 +22,21 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{New, Skipped}
 import io.renku.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.persons.Email
-import io.renku.graph.model.projects.{Id, Path, Visibility}
+import io.renku.graph.model.projects.{GitLabId, Path, Visibility}
 import io.renku.graph.model.{persons, projects}
 
 private[consumers] final case class ProjectInfo(
-    id:         Id,
+    id:         GitLabId,
     visibility: Visibility,
     path:       Path
 )
 
 private[consumers] final case class Commit(id: CommitId, project: Project)
 
-private[consumers] final case class CommitWithParents(id: CommitId, projectId: projects.Id, parents: List[CommitId])
+private[consumers] final case class CommitWithParents(id:        CommitId,
+                                                      projectId: projects.GitLabId,
+                                                      parents:   List[CommitId]
+)
 
 private[consumers] sealed trait CommitEvent extends Product with Serializable {
   def id:            CommitId

@@ -45,7 +45,7 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: Qu
 
   private def find(eventId: CompoundEventId) =
     SqlStatement[F](name = "find event details")
-      .select[EventId ~ projects.Id, EventDetails](
+      .select[EventId ~ projects.GitLabId, EventDetails](
         sql"""SELECT evt.event_id, evt.project_id, evt.event_body
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
           """.query(compoundEventIdDecoder ~ eventBodyDecoder).map {

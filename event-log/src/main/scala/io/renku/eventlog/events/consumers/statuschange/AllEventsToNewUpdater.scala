@@ -66,7 +66,7 @@ private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
               FROM project proj
               ORDER BY proj.latest_event_date ASC"""
           .query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.Id) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
+          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
       )
       .arguments(Void)
       .buildCursorResource(f)

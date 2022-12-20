@@ -25,7 +25,7 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
@@ -49,7 +49,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return CREATED when webhook is successfully created for project with the given id in in GitLab" in new TestCase {
 
       (hookCreator
-        .createHook(_: Id, _: AccessToken))
+        .createHook(_: GitLabId, _: AccessToken))
         .expects(projectId, authUser.accessToken)
         .returning(IO.pure(HookCreated))
 
@@ -63,7 +63,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return OK when hook was already created" in new TestCase {
 
       (hookCreator
-        .createHook(_: Id, _: AccessToken))
+        .createHook(_: GitLabId, _: AccessToken))
         .expects(projectId, authUser.accessToken)
         .returning(IO.pure(HookExisted))
 
@@ -79,7 +79,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
       val errorMessage = ErrorMessage("some error")
       val exception    = new Exception(errorMessage.toString())
       (hookCreator
-        .createHook(_: Id, _: AccessToken))
+        .createHook(_: GitLabId, _: AccessToken))
         .expects(projectId, authUser.accessToken)
         .returning(IO.raiseError(exception))
 
@@ -97,7 +97,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
 
       (hookCreator
-        .createHook(_: Id, _: AccessToken))
+        .createHook(_: GitLabId, _: AccessToken))
         .expects(projectId, authUser.accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 

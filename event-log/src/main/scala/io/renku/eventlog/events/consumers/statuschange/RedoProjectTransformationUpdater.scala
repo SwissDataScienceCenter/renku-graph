@@ -84,7 +84,7 @@ private class RedoProjectTransformationUpdaterImpl[F[_]: Async: QueriesExecution
   private def toTriplesGenerated(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named[F]("redo_transformation - to TriplesGenerated")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 
