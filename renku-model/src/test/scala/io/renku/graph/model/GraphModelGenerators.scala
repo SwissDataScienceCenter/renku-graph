@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name, Username}
 import io.renku.graph.model.projects.{FilePath, GitLabId, Path, ResourceId, Visibility}
 import org.scalacheck.Gen
@@ -139,7 +140,7 @@ object GraphModelGenerators {
   implicit val datasetTitles:       Gen[datasets.Title] = nonEmptyStrings(minLength = 4) map datasets.Title.apply
   implicit val datasetNames:        Gen[datasets.Name]  = nonEmptyStrings(minLength = 4) map datasets.Name.apply
   implicit val datasetDescriptions: Gen[Description]    = paragraphs() map (_.value) map Description.apply
-  implicit val datasetImageUris:    Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
+  implicit val imageUris:           Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
   def datasetInternalSameAsFrom(renkuUrlGen:  Gen[RenkuUrl] = renkuUrls,

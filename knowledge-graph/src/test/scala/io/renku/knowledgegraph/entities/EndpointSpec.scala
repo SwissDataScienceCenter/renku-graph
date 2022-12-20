@@ -30,6 +30,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links
@@ -146,16 +147,16 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   )(implicit gitLabUrl: GitLabUrl): Decoder[model.Entity] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    def imagesDecoder(projectPath: projects.Path): Decoder[datasets.ImageUri] = Decoder.instance { cursor =>
-      cursor.downField("location").as[datasets.ImageUri] >>= {
-        case uri: datasets.ImageUri.Relative =>
+    def imagesDecoder(projectPath: projects.Path): Decoder[ImageUri] = Decoder.instance { cursor =>
+      cursor.downField("location").as[ImageUri] >>= {
+        case uri: ImageUri.Relative =>
           cursor._links >>= {
             _.get(Rel("view")) match {
               case Some(link) if link.href.value == s"$gitLabUrl/$projectPath/raw/master/$uri" => uri.asRight
               case maybeLink => DecodingFailure(s"'$maybeLink' is not expected absolute DS image view link", Nil).asLeft
             }
           }
-        case uri: datasets.ImageUri.Absolute =>
+        case uri: ImageUri.Absolute =>
           cursor._links >>= {
             _.get(Rel("view")) match {
               case Some(link) if link.href.value == uri.show => uri.asRight

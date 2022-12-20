@@ -25,6 +25,7 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
@@ -158,7 +159,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       List(persons.Name("Jan Kowalski")),
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,
-      List(datasets.ImageUri("image.png")),
+      List(ImageUri("image.png")),
       projects.Path("group/subgroup/name")
     ).asJson,
     Workflow(
