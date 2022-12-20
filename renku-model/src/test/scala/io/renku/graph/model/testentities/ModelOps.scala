@@ -119,7 +119,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
           parentProject.version,
           parentProject.activities,
           parentProject.datasets,
-          parentProject
+          parentProject,
+          child.images
         )
       )
 

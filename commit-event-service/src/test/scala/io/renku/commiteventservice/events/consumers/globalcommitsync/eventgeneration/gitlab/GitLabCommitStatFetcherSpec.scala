@@ -121,8 +121,8 @@ class GitLabCommitStatFetcherSpec
     val uri = uri"projects" / projectId.show withQueryParams Map("statistics" -> true)
     val endpointName: String Refined NonEmpty = "single-project"
 
-    lazy val mapResponse = captureMapping(gitLabCommitStatFetcher, gitLabClient)(
-      _.fetchCommitStats(projectId).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync(),
       commitsCounts.generateOption
     )
 

@@ -81,19 +81,22 @@ trait RenkuProjectEntitiesGenerators {
     version          <- projectSchemaVersions
     activities       <- activityFactories.map(_.apply(dateCreated)).sequence
     datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
-  } yield RenkuProject.WithoutParent(path,
-                                     name,
-                                     maybeDescription,
-                                     agent,
-                                     dateCreated,
-                                     maybeCreator,
-                                     visibility,
-                                     forksCount,
-                                     keywords,
-                                     members ++ maybeCreator,
-                                     version,
-                                     activities,
-                                     datasets
+    images           <- imageUris.toGeneratorOfList()
+  } yield RenkuProject.WithoutParent(
+    path,
+    name,
+    maybeDescription,
+    agent,
+    dateCreated,
+    maybeCreator,
+    visibility,
+    forksCount,
+    keywords,
+    members ++ maybeCreator,
+    version,
+    activities,
+    datasets,
+    images
   )
 
   def renkuProjectWithParentEntities(

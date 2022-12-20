@@ -152,8 +152,8 @@ class CommitAuthorFinderSpec
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new CommitAuthorFinderImpl[IO]
 
-    val mapResponse = captureMapping(finder, gitLabClient)(
-      _.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
+    val mapResponse = captureMapping(gitLabClient)(
+      finder.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
       Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
     )
   }

@@ -105,8 +105,8 @@ class RevokeCandidatesFinderSpec
     val renkuTokenName = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
     val finder         = new RevokeCandidatesFinderImpl[IO](tokenDuePeriod, renkuTokenName)
 
-    lazy val mapResponse = captureMapping(finder, gitLabClient)(
-      findingMethod = _.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = finder.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = tokenInfosWithoutExpiry().generateList()
     )
   }

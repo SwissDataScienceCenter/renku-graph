@@ -101,8 +101,8 @@ class ProjectHookDeletorSpec
     val hookDeletor = new ProjectHookDeletorImpl[IO]
 
     lazy val mapResponse =
-      captureMapping(hookDeletor, gitLabClient)(
-        _.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        hookDeletor.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
         Gen.const(DeletionResult.HookDeleted),
         method = DELETE
       )

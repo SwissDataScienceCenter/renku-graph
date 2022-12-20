@@ -82,9 +82,9 @@ object RenkuProject {
                                  version:              SchemaVersion,
                                  activities:           List[Activity],
                                  datasets:             List[Dataset[Dataset.Provenance]],
+                                 images:               List[ImageUri],
                                  unlinkedPlans:        List[StepPlan] = List.empty,
-                                 createCompositePlans: List[CreateCompositePlan] = List.empty,
-                                 images:               List[ImageUri] = Nil
+                                 createCompositePlans: List[CreateCompositePlan] = List.empty
   ) extends RenkuProject {
 
     validateDates(dateCreated, activities, datasets)
@@ -159,9 +159,9 @@ object RenkuProject {
                               activities:           List[Activity],
                               datasets:             List[Dataset[Dataset.Provenance]],
                               parent:               RenkuProject,
+                              images:               List[ImageUri],
                               unlinkedPlans:        List[StepPlan] = Nil,
-                              createCompositePlans: List[CreateCompositePlan] = Nil,
-                              images:               List[ImageUri] = Nil
+                              createCompositePlans: List[CreateCompositePlan] = Nil
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent

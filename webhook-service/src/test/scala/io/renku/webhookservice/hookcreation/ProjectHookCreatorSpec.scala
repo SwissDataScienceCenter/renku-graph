@@ -122,8 +122,8 @@ class ProjectHookCreatorSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val hookCreator = new ProjectHookCreatorImpl[IO]
 
-    lazy val mapResponse = captureMapping(hookCreator, gitLabClient)(
-      _.create(projectHook, accessToken).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      hookCreator.create(projectHook, accessToken).unsafeRunSync(),
       resultGenerator = Gen.const(()),
       method = POST
     )

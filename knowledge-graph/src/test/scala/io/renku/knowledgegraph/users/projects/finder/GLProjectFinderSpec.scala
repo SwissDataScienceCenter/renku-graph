@@ -194,8 +194,8 @@ class GLProjectFinderSpec
     val glCreatorFinder = mock[GLCreatorFinder[IO]]
     val finder          = new GLProjectFinderImpl[IO](glCreatorFinder)
 
-    lazy val mapResponse = captureMapping(finder, gitLabClient)(
-      finder => {
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      {
         (glCreatorFinder
           .findCreatorName(_: persons.GitLabId)(_: Option[AccessToken]))
           .expects(*, *)
