@@ -37,15 +37,15 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-trait ProcessingStatusEndpoint[F[_]] {
+trait Endpoint[F[_]] {
   def fetchProcessingStatus(projectId: GitLabId): F[Response[F]]
 }
 
-private class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
+private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
     hookValidator:    HookValidator[F],
     statusInfoFinder: StatusInfoFinder[F]
 ) extends Http4sDsl[F]
-    with ProcessingStatusEndpoint[F] {
+    with Endpoint[F] {
 
   import HookValidationResult._
   import hookValidator._
@@ -74,11 +74,11 @@ private class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTi
   }
 }
 
-object ProcessingStatusEndpoint {
+object Endpoint {
   def apply[F[_]: Async: GitLabClient: ExecutionTimeRecorder: Logger](
       projectHookUrl: ProjectHookUrl
-  ): F[ProcessingStatusEndpoint[F]] = for {
+  ): F[Endpoint[F]] = for {
     finder        <- StatusInfoFinder[F]
     hookValidator <- hookvalidation.HookValidator(projectHookUrl)
-  } yield new ProcessingStatusEndpointImpl[F](hookValidator, finder)
+  } yield new EndpointImpl[F](hookValidator, finder)
 }

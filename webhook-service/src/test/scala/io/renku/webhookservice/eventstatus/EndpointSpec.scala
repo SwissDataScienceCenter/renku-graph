@@ -49,7 +49,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "fetchProcessingStatus" should {
 
@@ -150,7 +150,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     private val statusInfoFinder = mock[StatusInfoFinder[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val endpoint = new ProcessingStatusEndpointImpl[IO](hookValidator, statusInfoFinder)
+    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder)
 
     lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
 

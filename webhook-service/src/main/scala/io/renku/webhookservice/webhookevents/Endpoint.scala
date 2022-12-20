@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventstatus
+package io.renku.webhookservice.webhookevents
 
 import cats.data.NonEmptyList
 import cats.effect._
@@ -40,17 +40,17 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait HookEventEndpoint[F[_]] {
+trait Endpoint[F[_]] {
   def processPushEvent(request: Request[F]): F[Response[F]]
 }
 
-class HookEventEndpointImpl[F[_]: Concurrent: Logger](
+class EndpointImpl[F[_]: Concurrent: Logger](
     hookTokenCrypto:         HookTokenCrypto[F],
     commitSyncRequestSender: CommitSyncRequestSender[F]
 ) extends Http4sDsl[F]
-    with HookEventEndpoint[F] {
+    with Endpoint[F] {
 
-  import HookEventEndpoint._
+  import Endpoint._
   import commitSyncRequestSender._
   import hookTokenCrypto._
 
@@ -114,13 +114,13 @@ class HookEventEndpointImpl[F[_]: Concurrent: Logger](
   }
 }
 
-object HookEventEndpoint {
+object Endpoint {
 
   def apply[F[_]: Async: Logger: MetricsRegistry](
       hookTokenCrypto: HookTokenCrypto[F]
-  ): F[HookEventEndpoint[F]] = for {
+  ): F[Endpoint[F]] = for {
     commitSyncRequestSender <- CommitSyncRequestSender[F]
-  } yield new HookEventEndpointImpl[F](hookTokenCrypto, commitSyncRequestSender)
+  } yield new EndpointImpl[F](hookTokenCrypto, commitSyncRequestSender)
 
   private implicit val projectDecoder: Decoder[Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
