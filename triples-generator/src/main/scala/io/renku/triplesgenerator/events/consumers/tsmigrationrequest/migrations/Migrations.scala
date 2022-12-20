@@ -40,6 +40,7 @@ private[tsmigrationrequest] object Migrations {
     fixPlansYoungerThanActivities  <- FixPlansYoungerThanActivities[F]
     compositePlan                  <- CompositePlanProvision.create[F]
     fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
+    addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -47,7 +48,8 @@ private[tsmigrationrequest] object Migrations {
                     removeNotLinkedPersons,
                     fixPlansYoungerThanActivities,
                     compositePlan,
-                    fixMultipleProjectCreatedDates
+                    fixMultipleProjectCreatedDates,
+                    addRenkuPlanWhereMissing
                   )
   } yield migrations
 

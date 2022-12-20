@@ -23,7 +23,8 @@ import io.renku.graph.model.plans.{ResourceId => PlanResourceId}
 
 object ProjectLens {
 
-  val collectStepPlans: List[Plan] => List[StepPlan] = _.collect { case p: StepPlan => p }
+  val collectStepPlans:      List[Plan] => List[StepPlan]      = _.collect { case p: StepPlan => p }
+  val collectCompositePlans: List[Plan] => List[CompositePlan] = _.collect { case p: CompositePlan => p }
 
   def plansLens[P <: Project]: Lens[P, List[Plan]] = Lens[P, List[Plan]](_.plans)(plans => {
     case p: RenkuProject.WithParent    => p.copy(plans = plans).asInstanceOf[P]

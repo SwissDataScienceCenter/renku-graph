@@ -38,7 +38,6 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import java.time.{Duration => JDuration}
-import scala.util.control.NonFatal
 
 private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
     override val categoryName: CategoryName,
@@ -103,7 +102,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutio
       factory <- updaterFactory(eventsQueue, deliveryInfoRemover)
       result  <- statusChanger.updateStatuses(event)(factory)
     } yield result
-  } recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+  } recoverWith { case e => Logger[F].logError(event, e) }
 
   private def logAccepted[E <: StatusChangeEvent](event: E)(implicit show: Show[E]): Accepted => F[Unit] =
     accepted => whenA(!event.silent)(Logger[F].log(event.show)(accepted))

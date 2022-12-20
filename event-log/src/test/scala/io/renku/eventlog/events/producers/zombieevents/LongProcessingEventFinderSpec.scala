@@ -86,19 +86,19 @@ class LongProcessingEventFinderSpec
       "return an event " +
         s"if it's in the $status status " +
         "there's no info about its delivery " +
-        "and it's in status for more than 5 minutes" in new TestCase {
+        "and it's in status for more than 10 minutes" in new TestCase {
 
           val eventId = compoundEventIds.generateOne
           addEvent(
             eventId,
             status,
-            relativeTimestamps(moreThanAgo = Duration ofMinutes 6).generateAs(ExecutionDate)
+            relativeTimestamps(moreThanAgo = Duration ofMinutes 11).generateAs(ExecutionDate)
           )
 
           addEvent(
             compoundEventIds.generateOne,
             status,
-            relativeTimestamps(lessThanAgo = Duration ofMinutes 4).generateAs(ExecutionDate)
+            relativeTimestamps(lessThanAgo = Duration ofMinutes 9).generateAs(ExecutionDate)
           )
 
           finder.popEvent().unsafeRunSync() shouldBe Some(
