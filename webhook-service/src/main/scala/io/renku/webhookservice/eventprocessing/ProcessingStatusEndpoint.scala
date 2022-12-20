@@ -19,19 +19,18 @@
 package io.renku.webhookservice.eventprocessing
 
 import cats.MonadThrow
-import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator
-import io.renku.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Response
 import org.http4s.circe._
@@ -43,45 +42,35 @@ trait ProcessingStatusEndpoint[F[_]] {
 }
 
 private class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
-    hookValidator:           HookValidator[F],
-    processingStatusFetcher: ProcessingStatusFetcher[F]
+    hookValidator:    HookValidator[F],
+    statusInfoFinder: StatusInfoFinder[F]
 ) extends Http4sDsl[F]
     with ProcessingStatusEndpoint[F] {
 
   import HookValidationResult._
+  import hookValidator._
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: GitLabId): F[Response[F]] = measureExecutionTime {
-    (validateHook(projectId) >> findStatus(projectId))
-      .getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
-      .recoverWith(httpResponse(projectId))
-  } map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
+    validateHook(projectId, maybeAccessToken = None)
+      .flatMap {
+        case HookExists  => findStatus(projectId)
+        case HookMissing => Ok(StatusInfo.NotActivated.asJson)
+      }
+      .recoverWith(internalServerError(projectId))
+  } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
 
-  private def validateHook(projectId: GitLabId): OptionT[F, Unit] = OptionT {
-    hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
-  }
+  private def findStatus(projectId: GitLabId) =
+    statusInfoFinder
+      .findStatusInfo(projectId)
+      .biSemiflatMap(internalServerError(projectId), status => Ok(status.asJson))
+      .merge
 
-  private def findStatus(projectId: GitLabId): OptionT[F, Response[F]] = OptionT.liftF {
-    processingStatusFetcher
-      .fetchProcessingStatus(projectId)
-      .flatMap(status => Ok(status.asJson))
-  }
-
-  private lazy val hookMissingToNone: HookValidationResult => Option[Unit] = {
-    case HookExists => Some(())
-    case _          => None
-  }
-
-  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = { case NoAccessTokenException(_) =>
-    None
-  }
-
-  private def httpResponse(
-      projectId: projects.GitLabId
-  ): PartialFunction[Throwable, F[Response[F]]] = { case exception =>
-    Logger[F].error(exception)(s"Finding progress status for project '$projectId' failed") >>
-      InternalServerError(ErrorMessage(exception))
+  private def internalServerError(projectId: projects.GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
+    case exception =>
+      val message = show"Finding status info for project '$projectId' failed"
+      Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
   }
 }
 
@@ -89,7 +78,7 @@ object ProcessingStatusEndpoint {
   def apply[F[_]: Async: GitLabClient: ExecutionTimeRecorder: Logger](
       projectHookUrl: ProjectHookUrl
   ): F[ProcessingStatusEndpoint[F]] = for {
-    fetcher       <- ProcessingStatusFetcher[F]
+    finder        <- StatusInfoFinder[F]
     hookValidator <- hookvalidation.HookValidator(projectHookUrl)
-  } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher)
+  } yield new ProcessingStatusEndpointImpl[F](hookValidator, finder)
 }

@@ -20,6 +20,7 @@ package io.renku.graph.eventlog
 
 import cats.data.Ior
 import cats.effect.Async
+import cats.syntax.all._
 import fs2.{RaiseThrowable, Stream}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.eventlog.EventLogClient._
@@ -133,6 +134,9 @@ object EventLogClient {
       case object EventDateDesc extends Sort
     }
   }
+
+  def apply[F[_]: Async: Logger]: F[EventLogClient[F]] =
+    EventLogUrl[F]().map(apply(_))
 
   def apply[F[_]: Async: Logger](baseUrl: EventLogUrl): EventLogClient[F] =
     new Http4sEventLogClient[F](Uri.unsafeFromString(baseUrl.value))

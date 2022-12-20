@@ -16,28 +16,32 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice
+package eventprocessing
 
 import Generators._
+import cats.data.EitherT
+import cats.data.EitherT.{leftT, right, rightT}
 import cats.effect.IO
 import cats.syntax.all._
+import hookvalidation.HookValidator
+import hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import hookvalidation.HookValidator.NoAccessTokenException
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.hookvalidation.HookValidator
-import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -49,114 +53,117 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
   "fetchProcessingStatus" should {
 
-    "return OK with the progress status for the given projectId if the webhook exists" in new TestCase {
+    "return OK with the status info if webhook for the project exists" in new TestCase {
 
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(HookExists.pure[IO])
+      givenHookValidation(projectId, returning = HookExists.pure[IO])
 
-      val status = progressStatuses.generateOne
-      (processingStatusFetcher
-        .fetchProcessingStatus(_: GitLabId))
-        .expects(projectId)
-        .returning(status.pure[IO])
+      val statusInfo = statusInfos.generateOne
+      givenStatusInfoFinding(projectId, returning = rightT(statusInfo))
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe status.asJson
+      response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
 
       logger.loggedOnly(
-        Warn(s"Finding progress status for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
+        Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
       )
     }
 
-    "return NOT_FOUND if the webhook does not exist" in new TestCase {
+    "return OK with activated = false if the webhook does not exist" in new TestCase {
 
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(HookMissing.pure[IO])
+      givenHookValidation(projectId, returning = HookMissing.pure[IO])
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status      shouldBe NotFound
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(
-        s"Progress status for project '$projectId' not found"
-      ).asJson
+      response.status                   shouldBe Ok
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe StatusInfo.NotActivated.asJson
     }
 
-    "return NOT_FOUND if no Access Token found" in new TestCase {
+    "return INTERNAL_SERVER_ERROR if no Access Token found" in new TestCase {
 
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(NoAccessTokenException("error").raiseError[IO, HookValidator.HookValidationResult])
+      val exception = NoAccessTokenException("error")
+      givenHookValidation(projectId, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status      shouldBe NotFound
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(
-        s"Progress status for project '$projectId' not found"
-      ).asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
+
+      logger.logged(Error(statusInfoFindingErrorMessage, exception))
     }
 
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(exception.raiseError[IO, HookValidator.HookValidationResult])
+      givenHookValidation(projectId, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
 
-      logger.logged(
-        Error(s"Finding progress status for project '$projectId' failed", exception)
-      )
+      logger.logged(Error(statusInfoFindingErrorMessage, exception))
     }
 
-    "return INTERNAL_SERVER_ERROR when finding status fails" in new TestCase {
+    "return INTERNAL_SERVER_ERROR when finding status returns a failure" in new TestCase {
 
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(HookExists.pure[IO])
+      givenHookValidation(projectId, returning = HookExists.pure[IO])
 
       val exception = exceptions.generateOne
-      (processingStatusFetcher
-        .fetchProcessingStatus(_: GitLabId))
-        .expects(projectId)
-        .returning(exception.raiseError[IO, ProgressStatus])
+      givenStatusInfoFinding(projectId, returning = leftT(exception))
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
 
-      logger.logged(
-        Error(s"Finding progress status for project '$projectId' failed", exception)
-      )
+      logger.logged(Error(statusInfoFindingErrorMessage, exception))
+    }
+
+    "return INTERNAL_SERVER_ERROR when finding status info fails" in new TestCase {
+
+      givenHookValidation(projectId, returning = HookExists.pure[IO])
+
+      val exception = exceptions.generateOne
+      givenStatusInfoFinding(projectId, returning = right(exception.raiseError[IO, StatusInfo]))
+
+      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
+
+      logger.logged(Error(statusInfoFindingErrorMessage, exception))
     }
   }
 
   private trait TestCase {
     val projectId = projectIds.generateOne
 
-    val hookValidator           = mock[HookValidator[IO]]
-    val processingStatusFetcher = mock[ProcessingStatusFetcher[IO]]
+    private val hookValidator    = mock[HookValidator[IO]]
+    private val statusInfoFinder = mock[StatusInfoFinder[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val fetchProcessingStatus =
-      new ProcessingStatusEndpointImpl[IO](hookValidator, processingStatusFetcher).fetchProcessingStatus _
+    val endpoint = new ProcessingStatusEndpointImpl[IO](hookValidator, statusInfoFinder)
+
+    lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
+
+    def givenHookValidation(projectId: projects.GitLabId, returning: IO[HookValidator.HookValidationResult]) =
+      (hookValidator
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
+        .expects(projectId, None)
+        .returning(returning)
+
+    def givenStatusInfoFinding(projectId: projects.GitLabId, returning: EitherT[IO, Throwable, StatusInfo]) =
+      (statusInfoFinder
+        .findStatusInfo(_: GitLabId))
+        .expects(projectId)
+        .returning(returning)
   }
 }

@@ -18,30 +18,22 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import org.scalacheck.{Arbitrary, Gen}
-
-import scala.math.BigDecimal.RoundingMode
+import io.renku.graph.model.EventsGenerators.eventStatuses
+import org.scalacheck.Gen
 
 private object Generators {
 
   implicit val statusInfos: Gen[StatusInfo] =
-    (Arbitrary.arbBool.arbitrary, nonZeroProgressStatuses).mapN(StatusInfo)
+    Gen
+      .either(
+        eventStatuses.map(StatusInfo.activated),
+        StatusInfo.NotActivated
+      )
+      .map(_.merge)
 
-  implicit lazy val nonZeroProgressStatuses: Gen[ProgressStatus.NonZero] = for {
-    total <- nonNegativeInts(max = Integer.MAX_VALUE)
-    done  <- nonNegativeInts(max = total.value)
-    progress = Refined.unsafeApply(
-                 if (total.value == 0) 100d
-                 else
-                   BigDecimal((done.value.toDouble / total.value) * 100)
-                     .setScale(2, RoundingMode.HALF_DOWN)
-                     .toDouble
-               ): ProgressStatus.Progress
-  } yield ProgressStatus.NonZero(done, total, progress)
+  implicit lazy val nonZeroProgressStatuses: Gen[ProgressStatus.NonZero] =
+    eventStatuses.map(ProgressStatus.from)
 
   implicit lazy val progressStatuses: Gen[ProgressStatus] =
     Gen.oneOf(nonZeroProgressStatuses, fixed(ProgressStatus.Zero))

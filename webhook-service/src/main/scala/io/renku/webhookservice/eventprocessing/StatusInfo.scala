@@ -18,53 +18,56 @@
 
 package io.renku.webhookservice.eventprocessing
 
-import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
 import io.circe.Encoder
 import io.circe.literal._
+import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
 
-import scala.math.BigDecimal.RoundingMode
+private sealed trait StatusInfo {
+  val activated: Boolean
+  val progress:  ProgressStatus
+}
 
-private final case class StatusInfo(activated: Boolean, progress: ProgressStatus)
+private object StatusInfo {
 
-private trait ProgressStatus extends Product with Serializable
+  final case class ActivatedProject(progress: ProgressStatus.NonZero) extends StatusInfo {
+    override val activated: Boolean = true
+  }
+
+  def activated(eventStatus: EventStatus): StatusInfo.ActivatedProject =
+    ActivatedProject(ProgressStatus.from(eventStatus))
+
+  final case object NotActivated extends StatusInfo {
+    override val activated: Boolean        = false
+    override val progress:  ProgressStatus = ProgressStatus.Zero
+  }
+
+  implicit def encoder[PS <: StatusInfo]: Encoder[PS] = {
+    case ActivatedProject(status: ProgressStatus.NonZero) => json"""{
+        "activated": true,
+        "done":      ${status.statusProgress.stage.value},
+        "total":     ${EventStatusProgress.Stage.Final.value},
+        "progress":  ${status.statusProgress.completion.value}
+      }"""
+    case NotActivated => json"""{
+        "activated": false,
+        "done":      0,
+        "total":     0
+      }"""
+  }
+}
+
+private sealed trait ProgressStatus extends Product with Serializable
 
 private object ProgressStatus {
 
-  type Done     = Int Refined NonNegative
-  type Total    = Int Refined NonNegative
-  type Progress = Double Refined NonNegative
-
-  final case class NonZero private (
-      done:     Done,
-      total:    Total,
-      progress: Progress
-  ) extends ProgressStatus
   final case object Zero extends ProgressStatus
 
-  def from(done: Int, total: Int, progress: Double): Either[String, ProgressStatus.NonZero] = {
-    import eu.timepit.refined.api.RefType.applyRef
-
-    for {
-      validDone     <- applyRef[Done](done).leftMap(_ => "ProcessingStatus's 'done' cannot be negative")
-      validTotal    <- applyRef[Total](total).leftMap(_ => "ProcessingStatus's 'total' cannot be negative")
-      validProgress <- applyRef[Progress](progress).leftMap(_ => "ProcessingStatus's 'progress' cannot be negative")
-      _             <- if (done <= total) Right(()) else Left("ProcessingStatus's 'done' > 'total'")
-      expectedProgress = BigDecimal((done.toDouble / total) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-      _ <- if (expectedProgress == progress) Right(()) else Left("ProcessingStatus's 'progress' is invalid")
-    } yield NonZero(validDone, validTotal, validProgress)
+  final case class NonZero(statusProgress: EventStatusProgress) extends ProgressStatus {
+    lazy val currentStage: EventStatusProgress.Stage      = statusProgress.stage
+    lazy val finalStage:   EventStatusProgress.Stage      = EventStatusProgress.Stage.Final
+    lazy val completion:   EventStatusProgress.Completion = statusProgress.completion
   }
 
-  implicit def processingStatusEncoder[PS <: ProgressStatus]: Encoder[PS] = {
-    case NonZero(done, total, progress) => json"""{
-        "done":     ${done.value},
-        "total":    ${total.value},
-        "progress": ${progress.value}
-      }"""
-    case Zero => json"""{
-       "done":  0,
-       "total": 0
-      }"""
-  }
+  def from(eventStatus: EventStatus): ProgressStatus.NonZero =
+    ProgressStatus.NonZero(EventStatusProgress(eventStatus))
 }
