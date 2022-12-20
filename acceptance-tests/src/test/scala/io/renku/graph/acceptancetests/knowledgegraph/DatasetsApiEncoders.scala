@@ -23,7 +23,8 @@ import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
-import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import io.renku.graph.model.datasets.{DatePublished, Identifier, Title}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.testentities.{Dataset, Person}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Rel, _links}

@@ -25,6 +25,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
+import io.renku.graph.model.images.Image
 import io.renku.jsonld.JsonLDEncoder
 
 import java.time.Instant
@@ -438,37 +439,6 @@ object Dataset {
           maybeVersion <- cursor.downField(schema / "version").as[Option[Version]]
         } yield AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
     }
-  }
-
-  final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
-
-  object Image {
-    private val imageEntityTypes = EntityTypes of schema / "ImageObject"
-
-    private[Dataset] implicit val jsonLDEncoder: JsonLDEncoder[Image] = JsonLDEncoder.instance {
-      case Image(resourceId, uri, position) =>
-        JsonLD.entity(
-          resourceId.asEntityId,
-          imageEntityTypes,
-          (schema / "contentUrl") -> uri.asJsonLD,
-          (schema / "position")   -> position.asJsonLD
-        )
-    }
-
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[Image] = JsonLDDecoder.entity(imageEntityTypes) {
-      cursor =>
-        for {
-          resourceId <- cursor.downEntityId.as[ImageResourceId]
-          uri        <- cursor.downField(schema / "contentUrl").as[ImageUri]
-          position   <- cursor.downField(schema / "position").as[ImagePosition]
-        } yield Image(resourceId, uri, position)
-    }
-
-    val ontology: Type = Type.Def(
-      Class(schema / "ImageObject"),
-      DataProperty(schema / "contentUrl", xsd / "string"),
-      DataProperty(schema / "position", xsd / "int")
-    )
   }
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")

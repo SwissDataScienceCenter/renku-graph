@@ -22,7 +22,8 @@ import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.MonadThrow
 import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.SparqlQuery.Prefixes

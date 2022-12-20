@@ -26,6 +26,7 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
@@ -111,7 +112,7 @@ private object model {
         creators:            List[persons.Name],
         keywords:            List[datasets.Keyword],
         maybeDescription:    Option[datasets.Description],
-        images:              List[datasets.ImageUri],
+        images:              List[ImageUri],
         exemplarProjectPath: projects.Path
     ) extends Entity {
       override type Name = datasets.Name
@@ -124,16 +125,16 @@ private object model {
           renkuApiUrl: renku.ApiUrl
       ): Encoder[model.Entity.Dataset] = {
 
-        implicit lazy val imagesEncoder: Encoder[(List[datasets.ImageUri], projects.Path)] =
-          Encoder.instance[(List[datasets.ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+        implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+          Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
             Json.arr(imageUris.map {
-              case uri: datasets.ImageUri.Relative =>
+              case uri: ImageUri.Relative =>
                 json"""{
                   "location": $uri
                 }""" deepMerge _links(
                   Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
                 )
-              case uri: datasets.ImageUri.Absolute =>
+              case uri: ImageUri.Absolute =>
                 json"""{
                   "location": $uri
                 }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))

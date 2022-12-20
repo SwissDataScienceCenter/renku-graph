@@ -24,7 +24,8 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.config
-import io.renku.graph.model.datasets.{Date, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{Date, DatePublished, Description, Identifier, Keyword, Name, Title}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._

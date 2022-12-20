@@ -23,7 +23,8 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
-import io.renku.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
+import io.renku.graph.model.datasets.{DerivedFrom, SameAs}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.knowledgegraph
