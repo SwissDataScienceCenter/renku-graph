@@ -29,6 +29,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.jsonld.parser._
@@ -336,14 +337,13 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   "encode" should {
 
-    implicit val jsonLDEncoder: JsonLDEncoder[entities.Dataset.Image] = JsonLDEncoder.instance {
-      case entities.Dataset.Image(resourceId, uri, position) =>
-        JsonLD.entity(
-          resourceId.asEntityId,
-          EntityTypes of schema / "ImageObject",
-          schema / "contentUrl" -> uri.asJsonLD,
-          schema / "position"   -> position.asJsonLD
-        )
+    implicit val jsonLDEncoder: JsonLDEncoder[Image] = JsonLDEncoder.instance { case Image(resourceId, uri, position) =>
+      JsonLD.entity(
+        resourceId.asEntityId,
+        EntityTypes of schema / "ImageObject",
+        schema / "contentUrl" -> uri.asJsonLD,
+        schema / "position"   -> position.asJsonLD
+      )
     }
 
     "produce JsonLD with all the relevant properties and only links to Person entities " +

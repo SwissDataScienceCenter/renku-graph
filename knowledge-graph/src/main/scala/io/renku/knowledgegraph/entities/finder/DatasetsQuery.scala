@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
@@ -214,7 +215,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
       maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
       images <- extract[Option[String]]("images") >>=
-                  toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri)
+                  toListOfImageUris[ImageUri, ImageUri.type](ImageUri)
     } yield Entity.Dataset(matchingScore,
                            idPathAndVisibility._1,
                            name,

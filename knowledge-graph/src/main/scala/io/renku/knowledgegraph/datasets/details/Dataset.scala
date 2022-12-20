@@ -28,7 +28,8 @@ import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model
 import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._

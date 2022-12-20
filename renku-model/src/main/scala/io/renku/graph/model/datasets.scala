@@ -32,7 +32,7 @@ import io.renku.jsonld._
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -95,46 +95,6 @@ object datasets {
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
       with TinyTypeJsonLDOps[Keyword]
-
-  class ImageResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ImageResourceId
-      extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
-      with UrlConstraint[ImageResourceId]
-      with EntityIdJsonLDOps[ImageResourceId]
-
-  final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
-  implicit object ImagePosition
-      extends TinyTypeFactory[ImagePosition](new ImagePosition(_))
-      with NonNegativeInt[ImagePosition]
-      with TinyTypeJsonLDOps[ImagePosition]
-
-  trait ImageUri extends Any with TinyType { type V = String }
-  object ImageUri extends From[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
-
-    def apply(value: String): ImageUri = from(value).fold(throw _, identity)
-
-    override def from(value: String): Either[IllegalArgumentException, ImageUri] =
-      Relative.from(value) orElse Absolute.from(value)
-
-    final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
-      override type V = String
-    }
-    object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative]
-
-    final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
-      override type V = String
-    }
-    object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute]
-
-    implicit lazy val encoder: Encoder[ImageUri] = Encoder.instance {
-      case uri: Relative => Json.fromString(uri.value)
-      case uri: Absolute => uri.asJson
-    }
-
-    implicit lazy val decoder: Decoder[ImageUri] = Decoder.decodeString.emap { value =>
-      (Relative.from(value) orElse Absolute.from(value)).leftMap(_ => s"Cannot decode $value to $ImageUri")
-    }
-  }
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation
