@@ -20,15 +20,27 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import com.softwaremill.diffx._
-import io.renku.graph.model.commandParameters
-import io.renku.tinytypes.{BooleanTinyType, InstantTinyType, IntTinyType, StringTinyType}
+import io.renku.graph.model.datasets.{ExternalSameAs, InternalSameAs, TopmostSameAs}
+import io.renku.graph.model.entities.Dataset.Provenance.ImportedInternalAncestorExternal
+import io.renku.graph.model.entities.Dataset.{AdditionalInfo, Identification, Provenance}
+import io.renku.graph.model.entityModel.{Location, LocationLike}
+import io.renku.graph.model.images.{Image, ImageUri}
+import io.renku.graph.model.{commandParameters, projects}
+import io.renku.graph.model.projects.Visibility
+import io.renku.tinytypes.{BooleanTinyType, InstantTinyType, IntTinyType, LocalDateTinyType, StringTinyType, UrlTinyType}
 
 trait DiffInstances {
 
   implicit def stringTinyTypeDiff[A <: StringTinyType]: Diff[A] =
     Diff.diffForString.contramap(_.value)
 
+  implicit def urlTinyTypeDiff[A <: UrlTinyType]: Diff[A] =
+    Diff.diffForString.contramap(_.value)
+
   implicit def instantTinyTypeDiff[A <: InstantTinyType]: Diff[A] =
+    Diff.diffForString.contramap(_.value.toString)
+
+  implicit def localDateTinyTypeDiff[A <: LocalDateTinyType]: Diff[A] =
     Diff.diffForString.contramap(_.value.toString)
 
   implicit def intTinyTypeDiff[A <: IntTinyType]: Diff[A] =
@@ -101,12 +113,110 @@ trait DiffInstances {
   implicit val parameterLinkDiff: Diff[ParameterLink] =
     Diff.derived[ParameterLink]
 
+  implicit val fileDiff: Diff[Location.File] =
+    Diff.derived[Location.File]
+
+  implicit val folderDiff: Diff[Location.Folder] =
+    Diff.derived[Location.Folder]
+
+  implicit val fileOrFolderDiff: Diff[Location.FileOrFolder] =
+    Diff.derived[Location.FileOrFolder]
+
+  implicit val locationLikeDiff: Diff[LocationLike] =
+    Diff.derived[LocationLike]
+
+  implicit val commandParameterValueDiff: Diff[ParameterValue.CommandParameterValue] =
+    Diff.derived[ParameterValue.CommandParameterValue]
+
+  implicit val commandInputValueDiff: Diff[ParameterValue.CommandInputValue] =
+    Diff.derived[ParameterValue.CommandInputValue]
+
+  implicit val commandOutputValue: Diff[ParameterValue.CommandOutputValue] =
+    Diff.derived[ParameterValue.CommandOutputValue]
+
+  implicit val locationParameterValueDiff: Diff[ParameterValue.LocationParameterValue] =
+    Diff.derived[ParameterValue.LocationParameterValue]
+
+  implicit val parameterValueDiff: Diff[ParameterValue] =
+    Diff.derived[ParameterValue]
+
   implicit val stepPlanDiff: Diff[StepPlan] = Diff.derived[StepPlan]
 
   implicit val compositePlanDiff: Diff[CompositePlan] = Diff.derived[CompositePlan]
 
   implicit val planDiff: Diff[Plan] = Diff.derived[Plan]
 
+  implicit val visibilityDiff: Diff[Visibility] =
+    Diff.derived[Visibility]
+
+  implicit val agentDiff: Diff[Agent] =
+    Diff.derived[Agent]
+
+  implicit val projectPathDiff: Diff[projects.Path] =
+    Diff.diffForString.contramap(_.value)
+
+  implicit val locationDiff: Diff[Location] =
+    Diff.derived[Location]
+
+  implicit val inputEntityDiff: Diff[Entity.InputEntity] =
+    Diff.derived[Entity.InputEntity]
+
+  implicit val outputEntityDiff: Diff[Entity.OutputEntity] =
+    Diff.derived[Entity.OutputEntity]
+
+  implicit val entityDiff: Diff[Entity] =
+    Diff.derived[Entity]
+
+  implicit val associationDiff: Diff[Association] =
+    Diff.derived[Association]
+
+  implicit val usagesDiff: Diff[Usage] =
+    Diff.derived[Usage]
+
+  implicit val generationDiff: Diff[Generation] =
+    Diff.derived[Generation]
+
+  implicit val activityDiff: Diff[Activity] =
+    Diff.derived[Activity]
+
+  implicit val externalSameAsDiff: Diff[ExternalSameAs] =
+    Diff.derived[ExternalSameAs]
+
+  implicit val internalSameAsDiff: Diff[InternalSameAs] =
+    Diff.derived[InternalSameAs]
+
+  implicit val importedInternalAncestorExternalDiff: Diff[ImportedInternalAncestorExternal] =
+    Diff.derived[ImportedInternalAncestorExternal]
+
+  implicit val provenanceDiff: Diff[Provenance] =
+    Diff.derived[Provenance]
+
+  implicit val identificationDiff: Diff[Identification] =
+    Diff.derived[Identification]
+
+  implicit val additionalInfoDiff: Diff[AdditionalInfo] =
+    Diff.derived[AdditionalInfo]
+
+  implicit val imageUriDiff: Diff[ImageUri] =
+    Diff.diffForString.contramap(_.value)
+
+  implicit val imageDiff: Diff[Image] =
+    Diff.derived[Image]
+
+  implicit val datasetPartDiff: Diff[DatasetPart] =
+    Diff.derived[DatasetPart]
+
+  implicit def datasetDiff: Diff[Dataset[Provenance]] =
+    Diff.derived[Dataset[Provenance]]
+
+  implicit val renkuProjectWithParentDiff: Diff[RenkuProject.WithParent] =
+    Diff.derived[RenkuProject.WithParent]
+
+  implicit val renkuProjectWithoutParentDiff: Diff[RenkuProject.WithoutParent] =
+    Diff.derived[RenkuProject.WithoutParent]
+
+  implicit val renkuProjectDiff: Diff[RenkuProject] =
+    Diff.derived[RenkuProject]
 }
 
 object DiffInstances extends DiffInstances

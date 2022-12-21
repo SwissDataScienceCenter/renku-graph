@@ -32,7 +32,6 @@ import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 
-@annotation.nowarn
 trait GitLabClientTools[F[_]] {
   self: MockFactory =>
 
