@@ -42,17 +42,22 @@ private object StatusInfo {
   }
 
   implicit def encoder[PS <: StatusInfo]: Encoder[PS] = {
-    case ActivatedProject(status: ProgressStatus.NonZero) => json"""{
-        "activated": true,
-        "done":      ${status.statusProgress.stage.value},
-        "total":     ${EventStatusProgress.Stage.Final.value},
-        "progress":  ${status.statusProgress.completion.value}
-      }"""
-    case NotActivated => json"""{
-        "activated": false,
-        "done":      0,
-        "total":     0
-      }"""
+    case info @ ActivatedProject(status: ProgressStatus.NonZero) => json"""{
+      "activated": ${info.activated},
+      "progress": {
+        "done":       ${status.statusProgress.stage.value},
+        "total":      ${EventStatusProgress.Stage.Final.value},
+        "percentage": ${status.statusProgress.completion.value}
+      }
+    }"""
+    case info @ NotActivated => json"""{
+      "activated": ${info.activated},
+      "progress": {
+         "done":       0,
+         "total":      ${EventStatusProgress.Stage.Final.value},
+         "percentage": 0.00
+       }
+    }"""
   }
 }
 
@@ -60,7 +65,9 @@ private sealed trait ProgressStatus extends Product with Serializable
 
 private object ProgressStatus {
 
-  final case object Zero extends ProgressStatus
+  final case object Zero extends ProgressStatus {
+    lazy val finalStage: EventStatusProgress.Stage = EventStatusProgress.Stage.Final
+  }
 
   final case class NonZero(statusProgress: EventStatusProgress) extends ProgressStatus {
     lazy val currentStage: EventStatusProgress.Stage      = statusProgress.stage

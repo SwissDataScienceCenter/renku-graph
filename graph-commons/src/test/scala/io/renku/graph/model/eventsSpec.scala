@@ -118,18 +118,18 @@ class EventStatusProgressSpec extends AnyWordSpec with TableDrivenPropertyChecks
     forAll {
       Table(
         ("status", "stage", "completion"),
-        (New, Stage.Initial, 0f),
+        (New, Stage.Initial, 20f),
         (Skipped, Stage.Final, 100f),
-        (GeneratingTriples, Stage.Generating, 25f),
-        (GenerationRecoverableFailure, Stage.Generating, 25f),
+        (GeneratingTriples, Stage.Generating, 40f),
+        (GenerationRecoverableFailure, Stage.Generating, 40f),
         (GenerationNonRecoverableFailure, Stage.Final, 100f),
-        (TriplesGenerated, Stage.Generated, 50f),
-        (TransformingTriples, Stage.Transforming, 75f),
-        (TransformationRecoverableFailure, Stage.Transforming, 75f),
+        (TriplesGenerated, Stage.Generated, 60f),
+        (TransformingTriples, Stage.Transforming, 80f),
+        (TransformationRecoverableFailure, Stage.Transforming, 80f),
         (TransformationNonRecoverableFailure, Stage.Final, 100f),
         (TriplesStore, Stage.Final, 100f),
-        (AwaitingDeletion, Stage.Removing, 100f),
-        (Deleting, Stage.Removing, 100f)
+        (AwaitingDeletion, Stage.Removing, 0f),
+        (Deleting, Stage.Removing, 0f)
       )
     } { (status, stage, completion) =>
       show"return ProcessingProgress with stage '$stage', progress '$completion' for '$status' status" in {

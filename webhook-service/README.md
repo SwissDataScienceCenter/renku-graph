@@ -56,17 +56,22 @@ Response examples:
 ```
 {
   "activated": false,
-  "done":      0,
-  "total":     0
+  "progress": {
+    "done":       0,
+    "total":      5,
+    "percentage": 0.00
+  }
 }
 ```
 - project activated but some events are still under processing
 ```
 {
   "activated": true,
-  "done":      2,
-  "total":     5,
-  "progress":  100.00
+  "progress": {
+    "done":       1,
+    "total":      5,
+    "percentage": 20.00
+  }
 }
 ```
 

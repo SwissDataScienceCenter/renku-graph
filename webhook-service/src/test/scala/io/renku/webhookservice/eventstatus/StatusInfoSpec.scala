@@ -38,9 +38,11 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
         info.asJson shouldBe json"""{
           "activated": true,
-          "done":      ${progress.currentStage.value},
-          "total":     ${progress.finalStage.value},
-          "progress":  ${progress.completion.value}
+          "progress": {
+            "done":       ${progress.currentStage.value},
+            "total":      ${progress.finalStage.value},
+            "percentage": ${progress.completion.value}
+          }
         }"""
       }
     }
@@ -51,8 +53,11 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
       info.asJson shouldBe json"""{
         "activated": false,
-        "done":      0,
-        "total":     0
+        "progress": {
+          "done":       0,
+          "total":      ${EventStatusProgress.Stage.Final.value},
+          "percentage": 0.00
+        }
       }"""
     }
   }
