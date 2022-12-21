@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice.eventstatus
 
-import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import org.scalacheck.Gen
 
@@ -31,10 +30,4 @@ private object Generators {
         StatusInfo.NotActivated
       )
       .map(_.merge)
-
-  implicit lazy val nonZeroProgressStatuses: Gen[ProgressStatus.NonZero] =
-    eventStatuses.map(ProgressStatus.from)
-
-  implicit lazy val progressStatuses: Gen[ProgressStatus] =
-    Gen.oneOf(nonZeroProgressStatuses, fixed(ProgressStatus.Zero))
 }

@@ -68,9 +68,13 @@ Response examples:
 {
   "activated": true,
   "progress": {
-    "done":       1,
+    "done":       2,
     "total":      5,
-    "percentage": 20.00
+    "percentage": 40.00
+  },
+  "details": {
+    "status":  "in-progress|success|failure",
+    "message": "generating triples"
   }
 }
 ```

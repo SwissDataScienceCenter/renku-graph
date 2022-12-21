@@ -18,36 +18,42 @@
 
 package io.renku.webhookservice.eventstatus
 
+import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
+import EventStatus._
 
 private sealed trait StatusInfo {
   val activated: Boolean
-  val progress:  ProgressStatus
+  val progress:  Progress
 }
 
 private object StatusInfo {
 
-  final case class ActivatedProject(progress: ProgressStatus.NonZero) extends StatusInfo {
+  final case class ActivatedProject(progress: Progress.NonZero, details: Details) extends StatusInfo {
     override val activated: Boolean = true
   }
 
   def activated(eventStatus: EventStatus): StatusInfo.ActivatedProject =
-    ActivatedProject(ProgressStatus.from(eventStatus))
+    ActivatedProject(Progress.from(eventStatus), Details(eventStatus))
 
   final case object NotActivated extends StatusInfo {
-    override val activated: Boolean        = false
-    override val progress:  ProgressStatus = ProgressStatus.Zero
+    override val activated: Boolean  = false
+    override val progress:  Progress = Progress.Zero
   }
 
   implicit def encoder[PS <: StatusInfo]: Encoder[PS] = {
-    case info @ ActivatedProject(status: ProgressStatus.NonZero) => json"""{
+    case info @ ActivatedProject(status: Progress.NonZero, details) => json"""{
       "activated": ${info.activated},
       "progress": {
         "done":       ${status.statusProgress.stage.value},
         "total":      ${EventStatusProgress.Stage.Final.value},
         "percentage": ${status.statusProgress.completion.value}
+      },
+      "details": {
+        "status":  ${details.status},
+        "message": ${details.message}
       }
     }"""
     case info @ NotActivated => json"""{
@@ -61,20 +67,33 @@ private object StatusInfo {
   }
 }
 
-private sealed trait ProgressStatus extends Product with Serializable
+private sealed trait Progress extends Product with Serializable
 
-private object ProgressStatus {
+private object Progress {
 
-  final case object Zero extends ProgressStatus {
+  final case object Zero extends Progress {
     lazy val finalStage: EventStatusProgress.Stage = EventStatusProgress.Stage.Final
   }
 
-  final case class NonZero(statusProgress: EventStatusProgress) extends ProgressStatus {
+  final case class NonZero(statusProgress: EventStatusProgress) extends Progress {
     lazy val currentStage: EventStatusProgress.Stage      = statusProgress.stage
     lazy val finalStage:   EventStatusProgress.Stage      = EventStatusProgress.Stage.Final
     lazy val completion:   EventStatusProgress.Completion = statusProgress.completion
   }
 
-  def from(eventStatus: EventStatus): ProgressStatus.NonZero =
-    ProgressStatus.NonZero(EventStatusProgress(eventStatus))
+  def from(eventStatus: EventStatus): Progress.NonZero =
+    Progress.NonZero(EventStatusProgress(eventStatus))
+}
+
+private final case class Details(eventStatus: EventStatus) {
+
+  lazy val status: String = eventStatus match {
+    case New | GeneratingTriples | GenerationRecoverableFailure | TriplesGenerated | TransformingTriples |
+        TransformationRecoverableFailure | AwaitingDeletion | Deleting =>
+      "in-progress"
+    case Skipped | TriplesStore                                                => "success"
+    case GenerationNonRecoverableFailure | TransformationNonRecoverableFailure => "failure"
+  }
+
+  lazy val message: String = eventStatus.show.toLowerCase.replace('_', ' ')
 }

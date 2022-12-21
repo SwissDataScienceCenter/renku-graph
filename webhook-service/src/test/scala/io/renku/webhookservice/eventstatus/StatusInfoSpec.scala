@@ -18,13 +18,15 @@
 
 package io.renku.webhookservice.eventstatus
 
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
-import io.renku.webhookservice.eventstatus.Generators._
+import EventStatus._
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -33,15 +35,19 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
   "encode" should {
 
     "produce Json from a StatusInfo of an activated project with a NonZero progress" in {
-      forAll { progress: ProgressStatus.NonZero =>
-        val info = StatusInfo.ActivatedProject(progress)
+      forAll { eventStatus: EventStatus =>
+        val info = StatusInfo.activated(eventStatus)
 
         info.asJson shouldBe json"""{
           "activated": true,
           "progress": {
-            "done":       ${progress.currentStage.value},
-            "total":      ${progress.finalStage.value},
-            "percentage": ${progress.completion.value}
+            "done":       ${info.progress.currentStage.value},
+            "total":      ${info.progress.finalStage.value},
+            "percentage": ${info.progress.completion.value}
+          },
+          "details": {
+             "status":  ${info.details.status},
+             "message": ${info.details.message}
           }
         }"""
       }
@@ -63,17 +69,48 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
   }
 }
 
-class ProgressStatusSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "from" should {
 
-    "return ProgressStatus.NonZero for the given EventStatus" in {
+    "return Progress.NonZero for the given EventStatus" in {
       forAll { (eventStatus: EventStatus) =>
-        val progressStatus = ProgressStatus.from(eventStatus)
+        val progressStatus = Progress.from(eventStatus)
 
         progressStatus.currentStage shouldBe EventStatusProgress(eventStatus).stage
         progressStatus.finalStage   shouldBe EventStatusProgress.Stage.Final
         progressStatus.completion   shouldBe EventStatusProgress(eventStatus).completion
+      }
+    }
+  }
+}
+
+class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
+
+  "Details" should {
+
+    forAll(
+      Table(
+        ("eventStatus", "status", "message"),
+        (New, "in-progress", "new"),
+        (Skipped, "success", "skipped"),
+        (GeneratingTriples, "in-progress", "generating triples"),
+        (GenerationRecoverableFailure, "in-progress", "generation recoverable failure"),
+        (GenerationNonRecoverableFailure, "failure", "generation non recoverable failure"),
+        (TriplesGenerated, "in-progress", "triples generated"),
+        (TransformingTriples, "in-progress", "transforming triples"),
+        (TransformationRecoverableFailure, "in-progress", "transformation recoverable failure"),
+        (TransformationNonRecoverableFailure, "failure", "transformation non recoverable failure"),
+        (TriplesStore, "success", "triples store"),
+        (AwaitingDeletion, "in-progress", "awaiting deletion"),
+        (Deleting, "in-progress", "deleting")
+      )
+    ) { (eventStatus, status, message) =>
+      show"provide '$status' as status and '$message' as message for the '$eventStatus' status" in {
+        val details = Details(eventStatus)
+
+        details.status  shouldBe status
+        details.message shouldBe message
       }
     }
   }

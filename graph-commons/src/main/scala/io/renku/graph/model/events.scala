@@ -260,18 +260,15 @@ object events {
     trait Stage extends IntTinyType with Product with Serializable
     object Stage {
       def apply(s: EventStatus): Stage = s match {
-        case New                                 => Initial
-        case Skipped                             => Final
-        case GeneratingTriples                   => Generating
-        case GenerationRecoverableFailure        => Generating
-        case GenerationNonRecoverableFailure     => Final
-        case TriplesGenerated                    => Generated
-        case TransformingTriples                 => Transforming
-        case TransformationRecoverableFailure    => Transforming
-        case TransformationNonRecoverableFailure => Final
-        case TriplesStore                        => Final
-        case AwaitingDeletion                    => Removing
-        case Deleting                            => Removing
+        case New                                                    => Initial
+        case Skipped                                                => Final
+        case GeneratingTriples | GenerationRecoverableFailure       => Generating
+        case GenerationNonRecoverableFailure                        => Final
+        case TriplesGenerated                                       => Generated
+        case TransformingTriples | TransformationRecoverableFailure => Transforming
+        case TransformationNonRecoverableFailure                    => Final
+        case TriplesStore                                           => Final
+        case AwaitingDeletion | Deleting                            => Removing
       }
 
       final case object Initial      extends Stage { override val value: Int = 1 }
