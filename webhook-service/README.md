@@ -46,10 +46,11 @@ Returns information about activation and processing progress of project events.
 
 **Response**
 
-| Status                     | Description                                     |
-|----------------------------|-------------------------------------------------|
-| OK (200)                   | When there is a hook for the project            |
-| INTERNAL SERVER ERROR (500)| When there are problems with finding the status |
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| OK (200)                    | When there is a hook for the project                   |
+| NOT_FOUND (404)             | When project (or a valid access token) cannot be found |
+| INTERNAL SERVER ERROR (500) | When there are problems with finding the status        |
 
 Response examples:
 - project not activated

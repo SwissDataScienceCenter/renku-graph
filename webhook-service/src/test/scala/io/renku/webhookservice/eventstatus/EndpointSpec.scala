@@ -34,10 +34,10 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -82,18 +82,16 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       response.as[Json].unsafeRunSync() shouldBe StatusInfo.NotActivated.asJson
     }
 
-    "return INTERNAL_SERVER_ERROR if no Access Token found" in new TestCase {
+    "return NOT_FOUND if no Access Token found for the project" in new TestCase {
 
       val exception = NoAccessTokenException("error")
       givenHookValidation(projectId, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
 
       val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                   shouldBe InternalServerError
+      response.status                   shouldBe NotFound
       response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(statusInfoFindingErrorMessage).asJson
-
-      logger.logged(Error(statusInfoFindingErrorMessage, exception))
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage("Info about project cannot be found").asJson
     }
 
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
