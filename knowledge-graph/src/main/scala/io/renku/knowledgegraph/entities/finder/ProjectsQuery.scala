@@ -19,10 +19,9 @@
 package io.renku.knowledgegraph.entities
 package finder
 
+import Criteria.Filters.EntityType
 import io.circe.Decoder
 import io.renku.graph.model.{GraphClass, persons, projects}
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
 private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {

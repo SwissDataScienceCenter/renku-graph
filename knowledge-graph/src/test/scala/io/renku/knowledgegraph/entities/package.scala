@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
 package object entities {
-  import Endpoint.Criteria._
+  import Criteria._
   import entities.model._
   import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 

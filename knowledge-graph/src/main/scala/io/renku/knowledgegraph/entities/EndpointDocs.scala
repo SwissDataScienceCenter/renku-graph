@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
+import ModelEncoders._
 import cats.MonadThrow
 import cats.implicits._
 import io.circe.Json

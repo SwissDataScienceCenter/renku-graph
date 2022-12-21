@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.entities
 package finder
 
+import Criteria.Filters.EntityType
 import io.circe.Decoder
 import io.renku.graph.model.{GraphClass, persons}
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
@@ -30,7 +30,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
   override val selectVariables = Set("?entityType", "?matchingScore", "?name")
 
-  override def query(criteria: Endpoint.Criteria) =
+  override def query(criteria: Criteria) =
     (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
       // format: off

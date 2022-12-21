@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.entities
 package finder
 
-import Endpoint._
 import Criteria.Filters._
 import Criteria.{Filters, Sorting}
 import cats.data.NonEmptyList

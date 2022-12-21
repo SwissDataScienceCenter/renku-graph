@@ -245,9 +245,8 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/entities" should {
-    import entities.Endpoint.Criteria.Sorting._
-    import entities.Endpoint.Criteria._
-    import entities.Endpoint._
+    import entities.Criteria.Sorting._
+    import entities.Criteria._
     import entities._
 
     forAll {

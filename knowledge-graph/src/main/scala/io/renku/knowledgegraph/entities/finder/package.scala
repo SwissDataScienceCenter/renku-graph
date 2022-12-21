@@ -18,12 +18,11 @@
 
 package io.renku.knowledgegraph.entities
 
+import Criteria.Filters
 import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
 import io.renku.tinytypes._
 
 import java.time.{Instant, ZoneOffset}

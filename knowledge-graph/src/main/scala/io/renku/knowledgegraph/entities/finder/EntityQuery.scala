@@ -19,9 +19,8 @@
 package io.renku.knowledgegraph.entities
 package finder
 
+import Criteria.Filters.EntityType
 import io.circe.Decoder
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.triplesstore.ResultsDecoder
 
 private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with Product with Serializable {

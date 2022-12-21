@@ -19,8 +19,7 @@
 package io.renku.knowledgegraph.entities
 package finder
 
-import Endpoint.Criteria
-import Endpoint.Criteria.Filters._
+import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._

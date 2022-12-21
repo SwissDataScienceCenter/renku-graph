@@ -19,14 +19,13 @@
 package io.renku.knowledgegraph.entities
 package finder
 
+import Criteria.Filters
+import Criteria.Filters.Query
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.Query
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should

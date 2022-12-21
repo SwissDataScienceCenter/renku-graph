@@ -102,15 +102,9 @@ private class MicroserviceRoutes[F[_]: Async](
 
   // format: off
   private lazy val `GET /entities/*`: AuthedRoutes[Option[AuthUser], F] = {
-    import entities.Endpoint.Criteria._
-    import Filters.CreatorName.creatorNames
-    import Filters.EntityType.entityTypes
-    import Filters.Namespace.namespaces
-    import Filters.Query.query
-    import Filters.Since.since
-    import Filters.Until.until
-    import Filters.Visibility.visibilities
+    import entities.Criteria._
     import Sorting.sort
+    import entities.Endpoint.Decoders._
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
@@ -179,23 +173,23 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def searchForEntities(
-      maybeQuery:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Query]],
-      types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
+      maybeQuery:   Option[ValidatedNel[ParseFailure, entities.Criteria.Filters.Query]],
+      types:        ValidatedNel[ParseFailure, List[entities.Criteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
-      maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
-      maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
-      maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
+      maybeSince:   Option[ValidatedNel[ParseFailure, entities.Criteria.Filters.Since]],
+      maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Criteria.Filters.Until]],
+      maybeSort:    Option[ValidatedNel[ParseFailure, entities.Criteria.Sorting.By]],
       maybePage:    Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]],
       maybeUser:    Option[AuthUser],
       request:      Request[F]
   ): F[Response[F]] = {
-    import entities.Endpoint.Criteria
-    import entities.Endpoint.Criteria.Filters._
-    import entities.Endpoint.Criteria.Sorting._
-    import entities.Endpoint.Criteria.{Filters, Sorting}
+    import entities.Criteria
+    import entities.Criteria.Filters._
+    import entities.Criteria.Sorting._
+    import entities.Criteria.{Filters, Sorting}
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
