@@ -61,7 +61,7 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
         "activated": false,
         "progress": {
           "done":       0,
-          "total":      ${EventStatusProgress.Stage.Final.value},
+          "total":      ${info.progress.finalStage.value},
           "percentage": 0.00
         }
       }"""

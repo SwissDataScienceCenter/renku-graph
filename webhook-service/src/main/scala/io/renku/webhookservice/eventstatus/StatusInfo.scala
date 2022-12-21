@@ -44,12 +44,12 @@ private object StatusInfo {
   }
 
   implicit def encoder[PS <: StatusInfo]: Encoder[PS] = {
-    case info @ ActivatedProject(status: Progress.NonZero, details) => json"""{
+    case info @ ActivatedProject(progress: Progress.NonZero, details) => json"""{
       "activated": ${info.activated},
       "progress": {
-        "done":       ${status.statusProgress.stage.value},
-        "total":      ${EventStatusProgress.Stage.Final.value},
-        "percentage": ${status.statusProgress.completion.value}
+        "done":       ${progress.statusProgress.stage.value},
+        "total":      ${progress.finalStage.value},
+        "percentage": ${progress.statusProgress.completion.value}
       },
       "details": {
         "status":  ${details.status},
@@ -60,7 +60,7 @@ private object StatusInfo {
       "activated": ${info.activated},
       "progress": {
          "done":       0,
-         "total":      ${EventStatusProgress.Stage.Final.value},
+         "total":      ${info.progress.finalStage.value},
          "percentage": 0.00
        }
     }"""
