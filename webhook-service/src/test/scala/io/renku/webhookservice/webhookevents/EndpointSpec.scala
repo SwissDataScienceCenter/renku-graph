@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.eventprocessing
+package io.renku.webhookservice.webhookevents
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -48,7 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "processPushEvent" should {
 
@@ -65,7 +65,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
-      val response = processPushEvent(request).unsafeRunSync()
+      val response = endpoint.processPushEvent(request).unsafeRunSync()
 
       response.status                   shouldBe Accepted
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -84,7 +84,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(Json.obj())
 
-      val response = processPushEvent(request).unsafeRunSync()
+      val response = endpoint.processPushEvent(request).unsafeRunSync()
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -98,7 +98,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
       val request = Request(Method.POST, uri"/webhooks" / "events")
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
-      val response = processPushEvent(request).unsafeRunSync()
+      val response = endpoint.processPushEvent(request).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -116,7 +116,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .withHeaders(Headers("X-Gitlab-Token" -> serializedHookToken.toString))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
-      val response = processPushEvent(request).unsafeRunSync()
+      val response = endpoint.processPushEvent(request).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -135,7 +135,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         .withHeaders(Headers(("X-Gitlab-Token", serializedHookToken.toString)))
         .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
-      val response = processPushEvent(request).unsafeRunSync()
+      val response = endpoint.processPushEvent(request).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -159,10 +159,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
     val hookTokenCrypto         = mock[HookTokenCrypto[IO]]
-    val processPushEvent = new HookEventEndpointImpl[IO](
-      hookTokenCrypto,
-      commitSyncRequestSender
-    ).processPushEvent _
+    val endpoint                = new EndpointImpl[IO](hookTokenCrypto, commitSyncRequestSender)
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto

@@ -28,9 +28,9 @@ import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
@@ -78,7 +78,7 @@ class MicroserviceRoutesSpec
 
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       val request        = Request[IO](Method.POST, uri"/webhooks/events")
-      (hookEventEndpoint
+      (webhookEventsEndpoint
         .processPushEvent(_: Request[IO]))
         .expects(request)
         .returning(IO.pure(Response[IO](responseStatus)))
@@ -89,7 +89,7 @@ class MicroserviceRoutesSpec
 
       val projectId      = projectIds.generateOne
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
-      val request        = Request[IO](Method.DELETE, uri"/projects" / projectId.toString / "webhooks")
+      val request        = Request[IO](Method.DELETE, uri"/projects" / projectId / "webhooks")
       (hookDeletionEndpoint
         .deleteHook(_: projects.GitLabId, _: AuthUser))
         .expects(projectId, authUser)
@@ -101,9 +101,9 @@ class MicroserviceRoutesSpec
     "define a GET projects/:id/events/status endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.GET, uri"/projects" / projectId.toString / "events" / "status")
+      val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
-      (processingStatusEndpoint
+      (eventStatusEndpoint
         .fetchProcessingStatus(_: projects.GitLabId))
         .expects(projectId)
         .returning(IO.pure(Response[IO](responseStatus)))
@@ -118,7 +118,7 @@ class MicroserviceRoutesSpec
     "define a POST projects/:id/webhooks endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks")
+      val request        = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookCreationEndpoint
         .createHook(_: projects.GitLabId, _: AuthUser))
@@ -132,7 +132,7 @@ class MicroserviceRoutesSpec
       override val authenticationResponse = OptionT.none[IO, AuthUser]
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks")
+      val request   = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks")
 
       routes.call(request).status shouldBe Unauthorized
     }
@@ -140,7 +140,7 @@ class MicroserviceRoutesSpec
     "define a POST projects/:id/webhooks/validation endpoint returning response from the endpoint" in new TestCase {
 
       val projectId      = projectIds.generateOne
-      val request        = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
+      val request        = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks" / "validation")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (hookValidationEndpoint
         .validateHook(_: projects.GitLabId, _: AuthUser))
@@ -154,7 +154,7 @@ class MicroserviceRoutesSpec
       override val authenticationResponse = OptionT.none[IO, AuthUser]
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
+      val request   = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks" / "validation")
 
       routes.call(request).status shouldBe Unauthorized
     }
@@ -168,21 +168,21 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val authUser                 = authUsers.generateOne
-    val authenticationResponse   = OptionT.some[IO](authUser)
-    val hookEventEndpoint        = mock[HookEventEndpoint[IO]]
-    val hookCreationEndpoint     = mock[HookCreationEndpoint[IO]]
-    val hookDeletionEndpoint     = mock[HookDeletionEndpoint[IO]]
-    val hookValidationEndpoint   = mock[HookValidationEndpoint[IO]]
-    val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
-    val routesMetrics            = TestRoutesMetrics()
-    val versionRoutes            = mock[version.Routes[IO]]
+    val authUser               = authUsers.generateOne
+    val authenticationResponse = OptionT.some[IO](authUser)
+    val webhookEventsEndpoint  = mock[webhookevents.Endpoint[IO]]
+    val hookCreationEndpoint   = mock[HookCreationEndpoint[IO]]
+    val hookDeletionEndpoint   = mock[HookDeletionEndpoint[IO]]
+    val hookValidationEndpoint = mock[HookValidationEndpoint[IO]]
+    val eventStatusEndpoint    = mock[eventstatus.Endpoint[IO]]
+    private val routesMetrics  = TestRoutesMetrics()
+    private val versionRoutes  = mock[version.Routes[IO]]
     lazy val routes = new MicroserviceRoutes[IO](
-      hookEventEndpoint,
+      webhookEventsEndpoint,
       hookCreationEndpoint,
       hookValidationEndpoint,
       hookDeletionEndpoint,
-      processingStatusEndpoint,
+      eventStatusEndpoint,
       givenAuthMiddleware(returning = authenticationResponse),
       routesMetrics,
       versionRoutes

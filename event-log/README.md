@@ -13,7 +13,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
 | GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
 | GET    | ```/ping```                                 | Verifies service health                                                    |
-| GET    | ```/processing-status?project-id=:id```     | Finds processing status of events belonging to a project                   |
 | POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
 | GET    | ```/version```                              | Returns info about service version                                         |
 
@@ -518,42 +517,6 @@ Response body example:
 ```json
 {
   "isMigrating": false
-}
-```
-
-### GET /processing-status?project-id=:id
-
-Finds processing status of events belonging to the project with the given `id` from the latest batch.
-
-**Response**
-
-| Status                     | Description                                                                        |
-|----------------------------|------------------------------------------------------------------------------------|
-| OK (200)                   | If there are events for the project with the given `id`                            |
-| BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid                              |
-| NOT_FOUND (404)            | If no events can be found for the given project or no `project-id` parameter given |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
-| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
-
-Response body examples:
-
-- all events from the latest batch are processed
-
-```json
-{
-  "done":     20,
-  "total":    20,
-  "progress": 100.00
-}
-```
-
-- some events from the latest batch are being processed
-
-```json
-{
-  "done":     10,
-  "total":    20,
-  "progress": 50.00
 }
 ```
 

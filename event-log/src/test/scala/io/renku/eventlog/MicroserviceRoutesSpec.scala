@@ -18,28 +18,24 @@
 
 package io.renku.eventlog
 
-import io.renku.graph.model.EventContentGenerators._
 import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import eventdetails.EventDetailsEndpoint
+import eventpayload.EventPayloadEndpoint
+import events.producers.SubscriptionsEndpoint
+import events.{EventEndpoint, EventsEndpoint}
 import io.circe.Json
-import io.circe.literal.JsonStringContext
-import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.eventpayload.EventPayloadEndpoint
-import io.renku.eventlog.events.producers.SubscriptionsEndpoint
-import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
-import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
+import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.version
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.InstantTinyType
@@ -273,39 +269,6 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /processing-status?project-id=:id" should {
-
-    s"find processing status and return it with $Ok" in new TestCase with IsNotMigrating {
-      val projectId = projectIds.generateOne
-
-      val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", projectId.toString))
-      (processingStatusEndpoint.findProcessingStatus _).expects(projectId).returning(Response[IO](Ok).pure[IO])
-
-      routes.call(request).status shouldBe Ok
-    }
-
-    s"return $NotFound if no project-id parameter is given" in new TestCase with IsNotMigrating {
-
-      val request = Request[IO](GET, uri"/processing-status")
-
-      val response = routes.call(request)
-
-      response.status            shouldBe NotFound
-      response.contentType       shouldBe Some(`Content-Type`(application.json))
-      response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
-    }
-
-    s"return $BadRequest if illegal project-id parameter value is given" in new TestCase with IsNotMigrating {
-      val request = Request[IO](GET, uri"/processing-status".withQueryParam("project-id", "non int value"))
-
-      val response = routes.call(request)
-
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
-    }
-  }
-
   "POST /subscriptions" should {
 
     s"add a subscription and return $Accepted" in new TestCase with IsNotMigrating {
@@ -365,25 +328,22 @@ class MicroserviceRoutesSpec
   }
 
   private trait TestCase {
-    val eventEndpoint            = mock[EventEndpoint[IO]]
-    val eventsEndpoint           = mock[EventsEndpoint[IO]]
-    val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
-    val subscriptionsEndpoint    = mock[SubscriptionsEndpoint[IO]]
-    val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
-    val eventPayloadEndpoint     = mock[EventPayloadEndpoint[IO]]
-    val routesMetrics            = TestRoutesMetrics()
-    val isMigrating              = mock[Ref[IO, Boolean]]
-    val versionRoutes            = mock[version.Routes[IO]]
-    def routes = new MicroserviceRoutes[IO](
-      eventEndpoint,
-      eventsEndpoint,
-      processingStatusEndpoint,
-      subscriptionsEndpoint,
-      eventDetailsEndpoint,
-      eventPayloadEndpoint,
-      routesMetrics,
-      isMigrating,
-      versionRoutes
+    val eventEndpoint         = mock[EventEndpoint[IO]]
+    val eventsEndpoint        = mock[EventsEndpoint[IO]]
+    val subscriptionsEndpoint = mock[SubscriptionsEndpoint[IO]]
+    val eventDetailsEndpoint  = mock[EventDetailsEndpoint[IO]]
+    val eventPayloadEndpoint  = mock[EventPayloadEndpoint[IO]]
+    val routesMetrics         = TestRoutesMetrics()
+    val isMigrating           = mock[Ref[IO, Boolean]]
+    val versionRoutes         = mock[version.Routes[IO]]
+    def routes = new MicroserviceRoutes[IO](eventEndpoint,
+                                            eventsEndpoint,
+                                            subscriptionsEndpoint,
+                                            eventDetailsEndpoint,
+                                            eventPayloadEndpoint,
+                                            routesMetrics,
+                                            isMigrating,
+                                            versionRoutes
     ).routes.map(_.or(notAvailableResponse))
 
     val versionEndpointResponse = Response[IO](httpStatuses.generateOne)

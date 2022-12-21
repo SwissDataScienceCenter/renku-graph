@@ -30,13 +30,10 @@ import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventStatus}
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -52,15 +49,14 @@ import java.time.Instant
 import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: Sync](
-    eventEndpoint:            EventEndpoint[F],
-    eventsEndpoint:           EventsEndpoint[F],
-    processingStatusEndpoint: ProcessingStatusEndpoint[F],
-    subscriptionsEndpoint:    SubscriptionsEndpoint[F],
-    eventDetailsEndpoint:     EventDetailsEndpoint[F],
-    eventPayloadEndpoint:     EventPayloadEndpoint[F],
-    routesMetrics:            RoutesMetrics[F],
-    isMigrating:              Ref[F, Boolean],
-    versionRoutes:            version.Routes[F]
+    eventEndpoint:         EventEndpoint[F],
+    eventsEndpoint:        EventsEndpoint[F],
+    subscriptionsEndpoint: SubscriptionsEndpoint[F],
+    eventDetailsEndpoint:  EventDetailsEndpoint[F],
+    eventPayloadEndpoint:  EventPayloadEndpoint[F],
+    routesMetrics:         RoutesMetrics[F],
+    isMigrating:           Ref[F, Boolean],
+    versionRoutes:         version.Routes[F]
 ) extends Http4sDsl[F] {
 
   import EventStatusParameter._
@@ -71,7 +67,6 @@ private class MicroserviceRoutes[F[_]: Sync](
   import eventEndpoint._
   import eventsEndpoint._
   import org.http4s.HttpRoutes
-  import processingStatusEndpoint._
   import routesMetrics._
   import subscriptionsEndpoint._
 
@@ -82,7 +77,6 @@ private class MicroserviceRoutes[F[_]: Sync](
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
-    case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
@@ -208,17 +202,6 @@ private class MicroserviceRoutes[F[_]: Sync](
         }.fold(toBadRequest, identity)
     }
   }
-
-  private def maybeFindProcessingStatus(
-      maybeProjectId: Option[ValidatedNel[ParseFailure, projects.GitLabId]]
-  ): F[Response[F]] = maybeProjectId match {
-    case None => NotFound(ErrorMessage(s"No '${`project-id`}' parameter"))
-    case Some(validatedProjectId) =>
-      validatedProjectId.fold(
-        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
-        findProcessingStatus
-      )
-  }
 }
 
 private object MicroserviceRoutes {
@@ -227,22 +210,19 @@ private object MicroserviceRoutes {
       eventProducersRegistry: EventProducersRegistry[F],
       isMigrating:            Ref[F, Boolean]
   ): F[MicroserviceRoutes[F]] = for {
-    eventEndpoint            <- EventEndpoint[F](consumersRegistry)
-    eventsEndpoint           <- EventsEndpoint[F]
-    processingStatusEndpoint <- ProcessingStatusEndpoint[F]
-    subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
-    eventDetailsEndpoint     <- EventDetailsEndpoint[F]
+    eventEndpoint         <- EventEndpoint[F](consumersRegistry)
+    eventsEndpoint        <- EventsEndpoint[F]
+    subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
+    eventDetailsEndpoint  <- EventDetailsEndpoint[F]
     eventPayloadEndpoint = EventPayloadEndpoint[F]
     versionRoutes <- version.Routes[F]
-  } yield new MicroserviceRoutes(
-    eventEndpoint,
-    eventsEndpoint,
-    processingStatusEndpoint,
-    subscriptionsEndpoint,
-    eventDetailsEndpoint,
-    eventPayloadEndpoint,
-    new RoutesMetrics[F],
-    isMigrating,
-    versionRoutes
+  } yield new MicroserviceRoutes(eventEndpoint,
+                                 eventsEndpoint,
+                                 subscriptionsEndpoint,
+                                 eventDetailsEndpoint,
+                                 eventPayloadEndpoint,
+                                 new RoutesMetrics[F],
+                                 isMigrating,
+                                 versionRoutes
   )
 }
