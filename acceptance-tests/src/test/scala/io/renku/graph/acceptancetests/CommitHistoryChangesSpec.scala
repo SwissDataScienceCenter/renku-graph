@@ -120,7 +120,7 @@ class CommitHistoryChangesSpec
 
       sleep((1 second).toMillis)
 
-      `wait for events to be processed`(project.id)
+      `check no hook exists`(project.id)
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 

@@ -25,7 +25,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
@@ -76,11 +75,18 @@ trait TSProvisioning
     `wait for events to be processed`(project.id)
   }
 
-  def `wait for events to be processed`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Assertion = eventually {
-    val ClientResponse(status, jsonBody, _) = eventLogClient.fetchProcessingStatus(projectId)
-    status                                            shouldBe Ok
-    jsonBody.hcursor.downField("progress").as[Double] shouldBe Right(100d)
+  def `wait for events to be processed`(projectId: projects.GitLabId): Assertion = eventually {
+    val response = fetchProcessingStatus(projectId)
+    response.status                                                                    shouldBe Ok
+    response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double] shouldBe Right(100d)
   }
+
+  def `check no hook exists`(projectId: projects.GitLabId): Assertion = eventually {
+    fetchProcessingStatus(projectId).status shouldBe NotFound
+  }
+
+  private def fetchProcessingStatus(projectId: projects.GitLabId) =
+    webhookServiceClient.fetchProcessingStatus(projectId)
 
   def `wait for the Fast Tract event`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Unit = eventually {
 

@@ -18,9 +18,11 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
@@ -30,6 +32,7 @@ import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphClass
+import io.renku.graph.model.events.EventStatusProgress
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
@@ -47,16 +50,16 @@ class EventsProcessingStatusSpec
   private implicit val graph: GraphClass           = GraphClass.Default
   private val numberOfEvents: Int Refined Positive = 5
 
-  Feature("Status of events processing for a given project") {
+  Feature("Status of processing for a given project") {
 
-    Scenario("As a user I would like to see progress of events processing for my project") {
+    Scenario("As a user I would like to see processing status of my project") {
 
       val user    = authUsers.generateOne
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
+      webhookServiceClient.fetchProcessingStatus(project.id).status shouldBe NotFound
 
       When("there is a webhook created")
       And("there are events under processing")
@@ -68,16 +71,21 @@ class EventsProcessingStatusSpec
 
       Then("the status endpoint should return OK with some progress info")
       eventually {
-        val response = webhookServiceClient GET s"projects/${project.id}/events/status"
+        val response = webhookServiceClient.fetchProcessingStatus(project.id)
 
         response.status shouldBe Ok
 
         val responseJson = response.jsonBody.hcursor
-        val Right(done)  = responseJson.downField("done").as[Int]
-        val Right(total) = responseJson.downField("total").as[Int]
-        done                                            should (be <= numberOfEvents.value and be >= 1)
-        total                                           should (be <= numberOfEvents.value and be >= 1)
-        responseJson.downField("progress").as[Double] shouldBe Right(100d)
+        responseJson.downField("activated").as[Boolean] shouldBe true.asRight
+
+        val progressObjCursor = responseJson.downField("progress").as[Json].fold(throw _, identity).hcursor
+        progressObjCursor.downField("done").as[Int]         shouldBe EventStatusProgress.Stage.Final.value.asRight
+        progressObjCursor.downField("total").as[Int]        shouldBe EventStatusProgress.Stage.Final.value.asRight
+        progressObjCursor.downField("percentage").as[Float] shouldBe 100f.asRight
+
+        val detailsObjCursor = responseJson.downField("details").as[Json].fold(throw _, identity).hcursor
+        detailsObjCursor.downField("status").as[String]  shouldBe "success".asRight
+        detailsObjCursor.downField("message").as[String] shouldBe "triples store".asRight
       }
     }
   }
