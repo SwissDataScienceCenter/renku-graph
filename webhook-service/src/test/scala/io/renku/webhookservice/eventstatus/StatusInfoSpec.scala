@@ -83,6 +83,10 @@ class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       }
     }
   }
+
+  "Progress.Zero to have final stage set to EventStatusProgress.Stage.Final" in {
+    Progress.Zero.finalStage shouldBe EventStatusProgress.Stage.Final
+  }
 }
 
 class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {

@@ -67,17 +67,16 @@ private object StatusInfo {
   }
 }
 
-private sealed trait Progress extends Product with Serializable
+private sealed trait Progress extends Product with Serializable {
+  lazy val finalStage: EventStatusProgress.Stage = EventStatusProgress.Stage.Final
+}
 
 private object Progress {
 
-  final case object Zero extends Progress {
-    lazy val finalStage: EventStatusProgress.Stage = EventStatusProgress.Stage.Final
-  }
+  final case object Zero extends Progress
 
   final case class NonZero(statusProgress: EventStatusProgress) extends Progress {
     lazy val currentStage: EventStatusProgress.Stage      = statusProgress.stage
-    lazy val finalStage:   EventStatusProgress.Stage      = EventStatusProgress.Stage.Final
     lazy val completion:   EventStatusProgress.Completion = statusProgress.completion
   }
 
