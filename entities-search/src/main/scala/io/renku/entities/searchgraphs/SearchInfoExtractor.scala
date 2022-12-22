@@ -18,16 +18,22 @@
 
 package io.renku.entities.searchgraphs
 
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.graph.model.entities.{Dataset, Project}
 
-class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers {
+private object SearchInfoExtractor {
 
-  "provisionDatasetsGraph" should {
-
-    "collect all the Datasets that are on latest modifications, " +
-      "extract the Datasets graph relevant data" in new TestCase {}
-  }
-
-  private trait TestCase
+  def extractSearchInfo(datasets: List[Dataset[Dataset.Provenance]], project: Project): List[SearchInfo] =
+    datasets.map { ds =>
+      SearchInfo(
+        ds.identification.resourceId,
+        ds.identification.name,
+        project.visibility,
+        ds.provenance.date,
+        ds.provenance.creators,
+        ds.additionalInfo.keywords,
+        ds.additionalInfo.maybeDescription,
+        ds.additionalInfo.images,
+        List(project.resourceId)
+      )
+    }
 }
