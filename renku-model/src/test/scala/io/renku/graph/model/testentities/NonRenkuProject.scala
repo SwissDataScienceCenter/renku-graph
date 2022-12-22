@@ -40,6 +40,13 @@ object NonRenkuProject {
                                  images:           List[ImageUri]
   ) extends NonRenkuProject {
     override type ProjectType = NonRenkuProject.WithoutParent
+
+    override def fold[A](
+        f1: RenkuProject.WithParent => A,
+        f2: RenkuProject.WithoutParent => A,
+        f3: WithParent => A,
+        f4: WithoutParent => A
+    ): A = f4(this)
   }
 
   final case class WithParent(path:             Path,
@@ -56,6 +63,13 @@ object NonRenkuProject {
   ) extends NonRenkuProject
       with Parent {
     override type ProjectType = NonRenkuProject.WithParent
+
+    override def fold[A](
+        f1: RenkuProject.WithParent => A,
+        f2: RenkuProject.WithoutParent => A,
+        f3: WithParent => A,
+        f4: WithoutParent => A
+    ): A = f3(this)
   }
 
   implicit def toEntitiesNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => entities.NonRenkuProject = {

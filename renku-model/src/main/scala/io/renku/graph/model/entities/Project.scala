@@ -545,7 +545,8 @@ object Project {
           renku / "hasActivity"       -> project.activities.asJsonLD,
           renku / "hasPlan"           -> project.plans.asJsonLD,
           renku / "hasDataset"        -> project.datasets.asJsonLD,
-          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
+          schema / "image"            -> project.images.asJsonLD
         ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
       )
 
@@ -568,7 +569,8 @@ object Project {
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
           schema / "member"           -> project.members.toList.asJsonLD,
-          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
+          schema / "image"            -> project.images.asJsonLD
         )
       }
   }
@@ -587,7 +589,8 @@ object Project {
         ObjectProperty(renku / "hasActivity", Activity.ontology),
         ObjectProperty(renku / "hasPlan", Plan.ontology),
         ObjectProperty(renku / "hasDataset", Dataset.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", projectClass)
+        ObjectProperty(prov / "wasDerivedFrom", projectClass),
+        ObjectProperty(schema / "image", Image.ontology)
       ),
       DataProperties(
         DataProperty(schema / "name", xsd / "string"),

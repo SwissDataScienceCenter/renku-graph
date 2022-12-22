@@ -92,6 +92,13 @@ object RenkuProject {
 
     override type ProjectType = RenkuProject.WithoutParent
 
+    override def fold[A](
+        f1: WithParent => A,
+        f2: WithoutParent => A,
+        f3: NonRenkuProject.WithParent => A,
+        f4: NonRenkuProject.WithoutParent => A
+    ): A = f2(this)
+
     override def addActivities(toAdd: Activity*): RenkuProject.WithoutParent =
       copy(activities = activities ::: toAdd.toList)
 
@@ -165,6 +172,13 @@ object RenkuProject {
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
+
+    override def fold[A](
+        f1: WithParent => A,
+        f2: WithoutParent => A,
+        f3: NonRenkuProject.WithParent => A,
+        f4: NonRenkuProject.WithoutParent => A
+    ): A = f1(this)
 
     override def addActivities(toAdd: Activity*): RenkuProject.WithParent =
       copy(activities = activities ::: toAdd.toList)

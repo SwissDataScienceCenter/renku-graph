@@ -85,7 +85,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         keywords,
         members.map(toPerson),
         ResourceId(parentPath),
-        avatarUrl.map(Image.gitlabProjectAvatar(ResourceId(path), _)).toList
+        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
       )
     case GitLabProjectInfo(_,
                            name,
@@ -109,7 +109,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         visibility,
         keywords,
         members.map(toPerson),
-        avatarUrl.map(Image.gitlabProjectAvatar(ResourceId(path), _)).toList
+        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
       )
   }
 

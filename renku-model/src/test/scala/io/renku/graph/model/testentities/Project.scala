@@ -20,7 +20,7 @@ package io.renku.graph.model
 package testentities
 
 import io.renku.graph.model.entities.EntityFunctions
-import io.renku.graph.model.images.{ImagePosition, ImageResourceId, ImageUri}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
@@ -40,6 +40,13 @@ trait Project extends Product with Serializable {
   val images:           List[ImageUri]
 
   type ProjectType <: Project
+
+  def fold[A](
+      f1: RenkuProject.WithParent => A,
+      f2: RenkuProject.WithoutParent => A,
+      f3: NonRenkuProject.WithParent => A,
+      f4: NonRenkuProject.WithoutParent => A
+  ): A
 }
 
 trait Parent {
@@ -55,12 +62,13 @@ object Project {
   implicit def functions[P <: Project](implicit renkuUrl: RenkuUrl): EntityFunctions[P] =
     EntityFunctions[entities.Project].contramap(implicitly[P => entities.Project])
 
-  implicit def toEntitiesProject(implicit renkuUrl: RenkuUrl): Project => entities.Project = {
-    case p: RenkuProject.WithParent       => toEntitiesRenkuProject(renkuUrl)(p)
-    case p: RenkuProject.WithoutParent    => toEntitiesRenkuProjectWithoutParent(renkuUrl)(p)
-    case p: NonRenkuProject.WithParent    => toEntitiesNonRenkuProjectWithParent(renkuUrl)(p)
-    case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuUrl)(p)
-  }
+  implicit def toEntitiesProject(implicit renkuUrl: RenkuUrl): Project => entities.Project =
+    _.fold(
+      toEntitiesRenkuProjectWithParent(renkuUrl),
+      toEntitiesRenkuProjectWithoutParent(renkuUrl),
+      toEntitiesNonRenkuProjectWithParent(renkuUrl),
+      toEntitiesNonRenkuProjectWithoutParent(renkuUrl)
+    )
 
   implicit def encoder[P <: Project](implicit
       renkuUrl:     RenkuUrl,
@@ -76,7 +84,4 @@ object Project {
 
   def toEntityId(projectPath: Path)(implicit renkuUrl: RenkuUrl): EntityId =
     EntityId.of(renkuUrl / "projects" / projectPath)
-
-  def projectImageId(projectEntityId: EntityId, position: ImagePosition): ImageResourceId =
-    ImageResourceId((projectEntityId.asUrlEntityId / "images" / position.toString).show)
 }

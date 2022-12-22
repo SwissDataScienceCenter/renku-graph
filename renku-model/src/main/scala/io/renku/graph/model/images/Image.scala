@@ -32,7 +32,7 @@ object Image {
       Image(ImageResourceId(projectId.value + "/images/" + index), uri, ImagePosition(index))
     }
 
-  def gitlabProjectAvatar(projectId: projects.ResourceId, uri: ImageUri): Image =
+  def projectImage(projectId: projects.ResourceId, uri: ImageUri): Image =
     projectImage(projectId, List(uri)).head
 
   private val imageEntityTypes = EntityTypes of schema / "ImageObject"

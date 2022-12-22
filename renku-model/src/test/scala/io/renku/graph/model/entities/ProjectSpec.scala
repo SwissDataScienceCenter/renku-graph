@@ -23,6 +23,7 @@ import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.DecodingFailure
+import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -1032,7 +1033,8 @@ class ProjectSpec
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
               renku / "hasDataset"        -> project.datasets.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
           )
           .toJson
@@ -1061,7 +1063,8 @@ class ProjectSpec
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
               schema / "member"           -> project.members.toList.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             )
           )
           .toJson
@@ -1105,7 +1108,8 @@ class ProjectSpec
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
               renku / "hasDataset"        -> project.datasets.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
           )
           .toJson
@@ -1124,6 +1128,48 @@ class ProjectSpec
         }
 
         project.asJsonLD.toJson shouldBe JsonLD
+          .arr(
+            JsonLD.entity(
+              EntityId.of(project.resourceId.show),
+              entities.Project.entityTypes,
+              schema / "name"             -> project.name.asJsonLD,
+              renku / "projectPath"       -> project.path.asJsonLD,
+              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.maybeDescription.asJsonLD,
+              schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
+              renku / "projectVisibility" -> project.visibility.asJsonLD,
+              schema / "keywords"         -> project.keywords.asJsonLD,
+              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
+            )
+          )
+          .toJson
+      }
+    }
+
+    "produce JsonLD with all the relevant properties without images" in {
+      forAll(
+        anyNonRenkuProjectEntities
+          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .modify(replaceImages(Nil))
+          .map(_.to[entities.NonRenkuProject])
+      ) { project =>
+        val maybeParentId = project match {
+          case p: entities.NonRenkuProject.WithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        val modifiedJson =
+          project.asJsonLD.toJson.asArray
+            .getOrElse(Vector.empty)
+            .flatMap(_.asObject)
+            .map(obj => obj.remove((schema / "image").show))
+            .asJson
+
+        modifiedJson shouldBe JsonLD
           .arr(
             JsonLD.entity(
               EntityId.of(project.resourceId.show),

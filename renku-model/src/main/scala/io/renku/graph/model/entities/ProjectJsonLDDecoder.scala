@@ -62,7 +62,14 @@ object ProjectJsonLDDecoder {
         activities <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
         datasets   <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
         resourceId <- ResourceId(gitLabInfo.path).asRight
-        image = gitLabInfo.avatarUrl.map(Image.gitlabProjectAvatar(resourceId, _))
+        images <-
+          cursor
+            .downField(schema / "image")
+            .as[List[Image]]
+            .map(images =>
+              if (images.isEmpty) gitLabInfo.avatarUrl.toList.map(Image.projectImage(resourceId, _)) else images
+            )
+            .map(_.sortBy(_.position))
         project <- newProject(
                      gitLabInfo,
                      resourceId,
@@ -75,7 +82,7 @@ object ProjectJsonLDDecoder {
                      activities,
                      datasets,
                      plans,
-                     image.toList
+                     images
                    )
       } yield project
     }
