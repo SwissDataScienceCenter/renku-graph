@@ -24,7 +24,7 @@ import io.renku.graph.model.entities.{Dataset, Project}
 
 private object DatasetsCollector {
 
-  def collectLastVersions(project: Project): List[Dataset[Dataset.Provenance]] = {
+  lazy val collectLastVersions: Project => List[Dataset[Dataset.Provenance]] = project => {
     val derives = project.datasets.flatMap(ds => findDerivedFrom(ds.provenance))
 
     project.datasets

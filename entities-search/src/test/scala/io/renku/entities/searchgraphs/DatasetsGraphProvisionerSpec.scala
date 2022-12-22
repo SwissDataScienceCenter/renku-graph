@@ -18,16 +18,47 @@
 
 package io.renku.entities.searchgraphs
 
+import DatasetsCollector._
+import SearchInfoExtractor._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.positiveInts
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers {
+import scala.util.Try
+
+class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "provisionDatasetsGraph" should {
 
-    "collect all the Datasets that are on latest modifications, " +
-      "extract the Datasets graph relevant data" in new TestCase {}
+    "collect all the Datasets that are the latest modifications and not invalidations, " +
+      "extract the Datasets graph relevant data and " +
+      "push the data into the TS" in new TestCase {
+
+        val project = anyRenkuProjectEntities
+          .withDatasets(
+            List.fill(positiveInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*
+          )
+          .generateOne
+          .to[entities.Project]
+
+        givenUploadingDSFrom(project, returning = ().pure[Try])
+
+        provisioner.provisionDatasetsGraph(project) shouldBe ().pure[Try]
+      }
   }
 
-  private trait TestCase
+  private trait TestCase {
+    private val searchInfoUploader = mock[SearchInfoUploader[Try]]
+    val provisioner                = new DatasetsGraphProvisionerImpl[Try](searchInfoUploader)
+
+    def givenUploadingDSFrom(project: entities.Project, returning: Try[Unit]) =
+      (searchInfoUploader.upload _)
+        .expects((collectLastVersions >>> (extractSearchInfo(_, project)))(project))
+        .returning(returning)
+  }
 }

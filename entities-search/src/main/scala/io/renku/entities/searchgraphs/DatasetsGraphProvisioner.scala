@@ -23,3 +23,15 @@ import io.renku.graph.model.entities.Project
 trait DatasetsGraphProvisioner[F[_]] {
   def provisionDatasetsGraph(project: Project): F[Unit]
 }
+
+private class DatasetsGraphProvisionerImpl[F[_]](searchInfoUploader: SearchInfoUploader[F])
+    extends DatasetsGraphProvisioner[F] {
+
+  import DatasetsCollector.collectLastVersions
+  import SearchInfoExtractor.extractSearchInfo
+
+  override def provisionDatasetsGraph(project: Project): F[Unit] =
+    searchInfoUploader.upload(
+      collectLastVersions.andThen(extractSearchInfo(_, project))(project)
+    )
+}
