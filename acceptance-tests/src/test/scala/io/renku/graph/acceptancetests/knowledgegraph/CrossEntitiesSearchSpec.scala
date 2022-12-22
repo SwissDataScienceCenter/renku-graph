@@ -30,7 +30,6 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{datasetEntities, renkuProjectEntities, visibilityPublic}
 import io.renku.http.client.UrlEncoder._
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
