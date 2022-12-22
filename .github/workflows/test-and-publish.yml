@@ -30,6 +30,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Unit test
@@ -50,6 +51,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Acceptance tests
@@ -70,6 +72,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Formatter
@@ -96,6 +99,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Write version to Chart.yaml and version.conf files
