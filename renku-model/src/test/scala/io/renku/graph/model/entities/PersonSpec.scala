@@ -35,7 +35,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  GraphClass.all - GraphClass.Project foreach { implicit graph =>
+  (GraphClass.Default :: GraphClass.Default :: Nil) foreach { implicit graph =>
     show"encode as an Entity for the $graph Graph" should {
 
       "use the Person resourceId if there's no GitLabId" in {
