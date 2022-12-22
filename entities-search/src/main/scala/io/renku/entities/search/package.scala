@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
+package io.renku.entities
 
-import Criteria.Filters
 import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.tinytypes._
+import search.Criteria.Filters
 
 import java.time.{Instant, ZoneOffset}
 
-package object finder {
+package object search {
 
-  private[finder] implicit class CriteriaOps(criteria: Criteria) {
+  private[search] implicit class CriteriaOps(criteria: Criteria) {
 
     def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String = criteria.maybeUser match {
       case Some(user) =>
@@ -50,7 +50,7 @@ package object finder {
     }
   }
 
-  private[finder] implicit class FiltersOps(filters: Filters) {
+  private[search] implicit class FiltersOps(filters: Filters) {
 
     import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
     import io.renku.triplesstore.LuceneQueryEncoder.queryAsString
@@ -177,30 +177,5 @@ package object finder {
     private implicit class StringValueOps[TT <: StringTinyType](v: TT)(implicit s: Show[TT]) {
       def toLowerCase(implicit factory: TinyTypeFactory[TT]): TT = factory(v.show.toLowerCase())
     }
-  }
-
-  private[finder] object DecodingTools {
-    import io.circe.{Decoder, DecodingFailure}
-    import io.renku.tinytypes._
-
-    def toListOf[TT <: StringTinyType, TTF <: TinyTypeFactory[TT]](implicit
-        ttFactory: TTF
-    ): Option[String] => Decoder.Result[List[TT]] =
-      _.map(_.split(',').toList.map(v => ttFactory.from(v)).sequence.map(_.sortBy(_.value))).sequence
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-        .map(_.getOrElse(List.empty))
-
-    def toListOfImageUris[TT <: TinyType { type V = String }, TTF <: From[TT]](implicit
-        ttFactory: TTF
-    ): Option[String] => Decoder.Result[List[TT]] =
-      _.map(
-        _.split(",")
-          .map(_.trim)
-          .map { case s"$position:$url" => ttFactory.from(url).map(tt => position.toIntOption.getOrElse(0) -> tt) }
-          .toList
-          .sequence
-          .map(_.distinct.sortBy(_._1).map(_._2))
-          .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-      ).getOrElse(Nil.asRight)
   }
 }

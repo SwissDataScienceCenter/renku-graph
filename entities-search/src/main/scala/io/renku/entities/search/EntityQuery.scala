@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import io.circe.Decoder

@@ -1,3 +1,21 @@
+/*
+ * Copyright 2022 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.knowledgegraph.entities
 
 import cats.syntax.all._
@@ -5,6 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
+import io.renku.entities.search.{Criteria, model}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
@@ -16,16 +35,16 @@ private object ModelEncoders {
   implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Entity.Project] =
     Encoder.instance { project =>
       json"""{
-      "type":          ${Criteria.Filters.EntityType.Project.value},
-      "matchingScore": ${project.matchingScore},
-      "name":          ${project.name},
-      "path":          ${project.path},
-      "namespace":     ${project.path.toNamespaces.mkString("/")},
-      "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
-      "visibility":    ${project.visibility},
-      "date":          ${project.date},
-      "keywords":      ${project.keywords}
-    }"""
+        "type":          ${Criteria.Filters.EntityType.Project.value},
+        "matchingScore": ${project.matchingScore},
+        "name":          ${project.name},
+        "path":          ${project.path},
+        "namespace":     ${project.path.toNamespaces.mkString("/")},
+        "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
+        "visibility":    ${project.visibility},
+        "date":          ${project.date},
+        "keywords":      ${project.keywords}
+      }"""
         .addIfDefined("creator" -> project.maybeCreator)
         .addIfDefined("description" -> project.maybeDescription)
         .deepMerge(
@@ -94,23 +113,23 @@ private object ModelEncoders {
   implicit lazy val workflowEncoder: Encoder[model.Entity.Workflow] =
     Encoder.instance { workflow =>
       json"""{
-      "type":          ${Criteria.Filters.EntityType.Workflow.value},
-      "matchingScore": ${workflow.matchingScore},
-      "name":          ${workflow.name},
-      "visibility":    ${workflow.visibility},
-      "date":          ${workflow.date},
-      "keywords":      ${workflow.keywords},
-      "workflowType": ${workflow.workflowType}
-    }"""
+        "type":          ${Criteria.Filters.EntityType.Workflow.value},
+        "matchingScore": ${workflow.matchingScore},
+        "name":          ${workflow.name},
+        "visibility":    ${workflow.visibility},
+        "date":          ${workflow.date},
+        "keywords":      ${workflow.keywords},
+        "workflowType": ${workflow.workflowType}
+      }"""
         .addIfDefined("description" -> workflow.maybeDescription)
     }
 
   implicit lazy val personEncoder: Encoder[model.Entity.Person] =
     Encoder.instance { person =>
       json"""{
-      "type":          ${Criteria.Filters.EntityType.Person.value},
-      "matchingScore": ${person.matchingScore},
-      "name":          ${person.name}
-    }"""
+        "type":          ${Criteria.Filters.EntityType.Person.value},
+        "matchingScore": ${person.matchingScore},
+        "name":          ${person.name}
+      }"""
     }
 }

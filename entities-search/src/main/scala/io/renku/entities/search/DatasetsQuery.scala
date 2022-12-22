@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import cats.data.NonEmptyList
@@ -25,7 +24,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
-import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
+import model.{Entity, MatchingScore}
 
 private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
 

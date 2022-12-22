@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
+package io.renku.entities.search
 
 import cats.data.NonEmptyList
 import io.circe.{Decoder, Encoder}
@@ -28,7 +28,7 @@ import io.renku.tinytypes.json.TinyTypeDecoders
 
 import java.time.Instant
 
-private object model {
+object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType

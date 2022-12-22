@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
+import EntityConverters._
 import cats.effect.IO
 import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
@@ -38,17 +38,17 @@ import java.time.Instant
 trait FinderSpecOps {
   self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
 
-  protected[finder] trait TestCase {
+  protected[search] trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val finder = new EntitiesFinderImpl[IO](projectsDSConnectionInfo)
   }
 
-  protected[finder] implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
+  protected[search] implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
     lazy val resultsWithSkippedMatchingScore: List[model.Entity] = response.results.skipMatchingScore
   }
 
-  protected[finder] implicit class ResultsOps(results: List[model.Entity]) {
+  protected[search] implicit class ResultsOps(results: List[model.Entity]) {
     lazy val skipMatchingScore: List[model.Entity] = results.map {
       case proj:     model.Entity.Project  => proj.copy(matchingScore = model.MatchingScore.min)
       case ds:       model.Entity.Dataset  => ds.copy(matchingScore = model.MatchingScore.min)
@@ -62,7 +62,7 @@ trait FinderSpecOps {
     }
   }
 
-  protected[finder] implicit class EntityOps(entity: model.Entity) {
+  protected[search] implicit class EntityOps(entity: model.Entity) {
     lazy val dateAsInstant: Instant = entity match {
       case proj:     model.Entity.Project  => proj.date.value
       case ds:       model.Entity.Dataset  => ds.date.instant
@@ -71,10 +71,10 @@ trait FinderSpecOps {
     }
   }
 
-  protected[finder] def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
+  protected[search] def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
     List.empty[model.Entity].addAllEntitiesFrom(project)
 
-  protected[finder] implicit class EntitiesOps(entities: List[model.Entity]) {
+  protected[search] implicit class EntitiesOps(entities: List[model.Entity]) {
 
     def addAllEntitiesFrom(project: RenkuProject): List[model.Entity] = {
       List(project.to[model.Entity.Project])
@@ -112,5 +112,5 @@ trait FinderSpecOps {
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, userAccessTokens.generateOne)
   }
 
-  protected[finder] def nameOrdering[TT <: StringTinyType]: Ordering[TT] = Ordering.by(_.value.toLowerCase)
+  protected[search] def nameOrdering[TT <: StringTinyType]: Ordering[TT] = Ordering.by(_.value.toLowerCase)
 }

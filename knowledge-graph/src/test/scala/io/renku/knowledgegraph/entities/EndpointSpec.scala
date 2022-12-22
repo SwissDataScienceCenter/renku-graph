@@ -24,6 +24,11 @@ import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.entities.search.Criteria.Filters
+import io.renku.entities.search.Generators.modelEntities
+import io.renku.entities.search.{Criteria, EntitiesFinder, model}
+import io.renku.entities.search.model.Entity.Workflow.WorkflowType
+import io.renku.entities.search.model.MatchingScore
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -38,10 +43,6 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.knowledgegraph.entities.Criteria.Filters
-import io.renku.knowledgegraph.entities.finder.EntitiesFinder
-import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
-import io.renku.knowledgegraph.entities.model.MatchingScore
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET

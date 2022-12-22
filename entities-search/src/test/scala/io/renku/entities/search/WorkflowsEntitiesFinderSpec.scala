@@ -16,18 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
-import Criteria.Filters
+import Criteria._
+import EntityConverters._
 import cats.syntax.all._
+import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities._
-import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should

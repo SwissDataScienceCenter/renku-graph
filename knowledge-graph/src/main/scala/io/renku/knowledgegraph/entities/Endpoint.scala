@@ -22,17 +22,15 @@ import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.renku
+import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-import io.renku.knowledgegraph.entities.finder.EntitiesFinder
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
-import org.http4s.{EntityEncoder, Header, ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response, Status}
+import org.http4s.{EntityEncoder, Header, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
-import java.time.LocalDate
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
@@ -40,82 +38,6 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-
-  import Criteria.Filters._
-
-  object Decoders {
-    private implicit val queryParameterDecoder: QueryParamDecoder[Query] =
-      (value: QueryParameterValue) =>
-        Query.from(value.value).leftMap(_ => parsingFailure(query.parameterName)).toValidatedNel
-
-    object query extends OptionalValidatingQueryParamDecoderMatcher[Query]("query") {
-      val parameterName: String = "query"
-    }
-
-    private implicit val entityTypeParameterDecoder: QueryParamDecoder[EntityType] =
-      (value: QueryParameterValue) =>
-        EntityType.from(value.value).leftMap(_ => parsingFailure(entityTypes.parameterName)).toValidatedNel
-
-    object entityTypes extends OptionalMultiQueryParamDecoderMatcher[EntityType]("type") {
-      val parameterName: String = "type"
-    }
-
-    private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =
-      (value: QueryParameterValue) =>
-        persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorNames.parameterName)).toValidatedNel
-
-    object creatorNames extends OptionalMultiQueryParamDecoderMatcher[persons.Name]("creator") {
-      val parameterName: String = "creator"
-    }
-
-    private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
-      (value: QueryParameterValue) =>
-        projects.Visibility
-          .from(value.value)
-          .leftMap(_ => parsingFailure(visibilities.parameterName))
-          .toValidatedNel
-
-    object visibilities extends OptionalMultiQueryParamDecoderMatcher[projects.Visibility]("visibility") {
-      val parameterName: String = "visibility"
-    }
-
-    private implicit val namespaceParameterDecoder: QueryParamDecoder[projects.Namespace] =
-      (value: QueryParameterValue) =>
-        projects.Namespace
-          .from(value.value)
-          .leftMap(_ => parsingFailure(namespaces.parameterName))
-          .toValidatedNel
-
-    object namespaces extends OptionalMultiQueryParamDecoderMatcher[projects.Namespace]("namespace") {
-      val parameterName: String = "namespace"
-    }
-
-    private implicit val sinceParameterDecoder: QueryParamDecoder[Since] =
-      (value: QueryParameterValue) =>
-        Either
-          .catchNonFatal(LocalDate.parse(value.value))
-          .flatMap(Since.from)
-          .leftMap(_ => parsingFailure(since.parameterName))
-          .toValidatedNel
-
-    object since extends OptionalValidatingQueryParamDecoderMatcher[Since]("since") {
-      val parameterName: String = "since"
-    }
-
-    private implicit val untilParameterDecoder: QueryParamDecoder[Until] =
-      (value: QueryParameterValue) =>
-        Either
-          .catchNonFatal(LocalDate.parse(value.value))
-          .flatMap(Until.from)
-          .leftMap(_ => parsingFailure(until.parameterName))
-          .toValidatedNel
-
-    object until extends OptionalValidatingQueryParamDecoderMatcher[Until]("until") {
-      val parameterName: String = "until"
-    }
-  }
-
-  private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     entitiesFinder <- EntitiesFinder[F]
@@ -152,6 +74,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
     import ModelEncoders._
     implicit val apiUrl: renku.ApiUrl = renkuApiUrl
     implicit val glUrl:  GitLabUrl    = gitLabUrl
+
     Encoder.instance {
       case project:  model.Entity.Project  => project.asJson
       case ds:       model.Entity.Dataset  => ds.asJson

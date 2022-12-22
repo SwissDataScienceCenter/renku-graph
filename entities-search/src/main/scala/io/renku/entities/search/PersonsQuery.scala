@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import io.circe.Decoder
 import io.renku.graph.model.{GraphClass, persons}
-import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
+import model.{Entity, MatchingScore}
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 

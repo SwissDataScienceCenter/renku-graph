@@ -157,9 +157,10 @@ lazy val knowledgeGraph = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test",
-  entitiesSearch
+  graphCommons   % "compile->compile",
+  graphCommons   % "test->test",
+  entitiesSearch % "compile->compile",
+  entitiesSearch % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
