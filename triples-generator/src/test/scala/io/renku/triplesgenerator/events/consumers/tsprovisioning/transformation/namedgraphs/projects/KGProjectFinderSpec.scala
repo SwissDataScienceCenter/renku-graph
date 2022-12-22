@@ -56,7 +56,7 @@ class KGProjectFinderSpec
       }
     }
 
-    "return no keywords if there are any for the given project" in new TestCase {
+    "return no keywords if there are none for the given project" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val projectNoKeywords = project match {
           case p: entities.RenkuProject.WithParent       => p.copy(keywords = Set.empty)
@@ -67,7 +67,7 @@ class KGProjectFinderSpec
 
         upload(to = projectsDataset, projectNoKeywords)
 
-        finder.find(project.resourceId).unsafeRunSync() shouldBe
+        finder.find(project.resourceId).unsafeRunSync() shouldMatchTo
           toProjectMutableData(project).copy(keywords = Set.empty).some
       }
     }

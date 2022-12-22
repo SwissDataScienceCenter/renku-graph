@@ -21,6 +21,7 @@ package io.renku.entities.search
 import Criteria._
 import EntityConverters._
 import cats.syntax.all._
+import io.renku.entities.search
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -182,6 +183,21 @@ class WorkflowsEntitiesFinderSpec
       wfs should have size project.plans.size
 
       wfs.map(_.workflowType) should contain theSameElementsAs List(WorkflowType.Step, WorkflowType.Composite)
+    }
+  }
+
+  "findEntities - with images" should {
+
+    "return images if present" in new TestCase {
+      val project = renkuProjectEntities(visibilityPublic)
+        .suchThat(_.images.nonEmpty)
+        .generateOne
+
+      upload(to = projectsDataset, project)
+
+      val results = finder.findEntities(Criteria()).unsafeRunSync()
+      val images  = results.results.collect { case e: search.model.Entity.Project => e.images }.flatten
+      images shouldBe project.images
     }
   }
 }

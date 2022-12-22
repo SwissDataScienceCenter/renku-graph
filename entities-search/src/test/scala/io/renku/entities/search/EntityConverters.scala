@@ -34,7 +34,8 @@ private object EntityConverters {
       project.dateCreated,
       project.maybeCreator.map(_.name),
       project.keywords.toList.sorted,
-      project.maybeDescription
+      project.maybeDescription,
+      project.images
     )
 
   private[search] implicit def datasetConverter[P <: testentities.Project]
@@ -53,26 +54,26 @@ private object EntityConverters {
     )
   }
 
-  private[search] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
-                                                     +P <: testentities.Project
-  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuUrl: RenkuUrl) {
+  private[search] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance, +P <: testentities.Project](
+      datasetAndProject: (testentities.Dataset[PROV], P)
+  )(implicit renkuUrl:   RenkuUrl) {
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 
-  private[search] implicit def planConverter[P <: testentities.Project]
-      : ((testentities.Plan, P)) => Entity.Workflow = { case (plan, project) =>
-    Entity.Workflow(
-      MatchingScore.min,
-      plan.name,
-      project.visibility,
-      plan.dateCreated,
-      plan.keywords.sorted,
-      plan.maybeDescription,
-      plan match {
-        case _: CompositePlan => WorkflowType.Composite
-        case _: StepPlan      => WorkflowType.Step
-      }
-    )
+  private[search] implicit def planConverter[P <: testentities.Project]: ((testentities.Plan, P)) => Entity.Workflow = {
+    case (plan, project) =>
+      Entity.Workflow(
+        MatchingScore.min,
+        plan.name,
+        project.visibility,
+        plan.dateCreated,
+        plan.keywords.sorted,
+        plan.maybeDescription,
+        plan match {
+          case _: CompositePlan => WorkflowType.Composite
+          case _: StepPlan      => WorkflowType.Step
+        }
+      )
   }
 
   private[search] implicit class ProjectPlanOps[+P <: testentities.Project](planAndProject: (testentities.Plan, P)) {

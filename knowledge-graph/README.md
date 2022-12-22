@@ -239,7 +239,18 @@ Response body example:
         "rel":  "details",
         "href": "http://t:5511/projects/group/subgroup/name"
       }
-    ]
+    ],
+    "images": [
+      {
+        "location": "image.png",
+        "_links":[
+          {
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/group/subgroup/name/raw/master/data/mniouUnmal/image.png"
+          }
+        ]
+      }
+    ]    
   },
   {
     "type":          "dataset",

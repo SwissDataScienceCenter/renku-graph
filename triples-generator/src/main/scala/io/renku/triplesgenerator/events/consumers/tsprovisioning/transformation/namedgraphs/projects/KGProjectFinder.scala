@@ -82,7 +82,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
       val toListOfDates: Option[String] => Decoder.Result[Nel[projects.DateCreated]] =
         _.toList
-          .flatMap(_.split(',').toList)
+          .flatMap(_.split(',').toList.distinct)
           .map(io.circe.Json.fromString)
           .traverse(_.as[projects.DateCreated])
           .flatMap(list =>

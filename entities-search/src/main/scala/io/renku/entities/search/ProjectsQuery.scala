@@ -20,6 +20,7 @@ package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import io.circe.Decoder
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GraphClass, persons, projects}
 import model.{Entity, MatchingScore}
 
@@ -44,6 +45,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |    (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |  WHERE {
         |    ${filters.onQuery(
     s"""|    {
@@ -87,6 +89,12 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |      ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |      OPTIONAL { ?projectId schema:description ?maybeDescription }
         |      OPTIONAL { ?projectId schema:keywords ?keyword }
+        |      OPTIONAL {
+        |        ?projectId schema:image ?imageId.
+        |        ?imageId schema:position ?imagePosition;
+        |                 schema:contentUrl ?imageUrl.
+        |        BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |      }
         |    }
         |  }
         |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName ?maybeDescription
@@ -110,6 +118,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       keywords <-
         extract[Option[String]]("keywords") >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
       maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
+      images           <- extract[Option[String]]("images") >>= toListOfImageUris[ImageUri, ImageUri.type](ImageUri)
     } yield Entity.Project(matchingScore,
                            path,
                            name,
@@ -117,7 +126,8 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
                            dateCreated,
                            maybeCreatorName,
                            keywords,
-                           maybeDescription
+                           maybeDescription,
+                           images
     )
   }
 }
