@@ -133,7 +133,7 @@ class ProjectSpec
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
-            Nil // convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
       }
     }

@@ -27,8 +27,13 @@ import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
 
 object Image {
+  def projectImage(projectId: projects.ResourceId, uris: List[ImageUri]): List[Image] =
+    uris.zipWithIndex.map { case (uri, index) =>
+      Image(ImageResourceId(projectId.value + "/images/" + index), uri, ImagePosition(index))
+    }
+
   def gitlabProjectAvatar(projectId: projects.ResourceId, uri: ImageUri): Image =
-    Image(ImageResourceId.gitlabProjectAvatar(projectId), uri, ImagePosition(0))
+    projectImage(projectId, List(uri)).head
 
   private val imageEntityTypes = EntityTypes of schema / "ImageObject"
 
