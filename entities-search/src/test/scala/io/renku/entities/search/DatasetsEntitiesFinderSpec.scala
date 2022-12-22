@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
-import Endpoint._
 import Criteria.{Filters, Sorting}
+import EntityConverters._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

@@ -16,11 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
-import Endpoint.Criteria
-import Endpoint.Criteria.Filters._
+import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
@@ -30,11 +28,11 @@ import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder,
 import model._
 import org.typelevel.log4cats.Logger
 
-private[entities] trait EntitiesFinder[F[_]] {
+trait EntitiesFinder[F[_]] {
   def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
 }
 
-private[entities] object EntitiesFinder {
+object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
     ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_))
 }

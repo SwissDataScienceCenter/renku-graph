@@ -16,17 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.entities.search
 
+import Criteria.Filters.EntityType
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.entities.{CompositePlan, StepPlan}
 import io.renku.graph.model.{plans, projects}
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
-import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
-import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
+import model.Entity.Workflow.WorkflowType
+import model.{Entity, MatchingScore}
 
 private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
@@ -43,7 +42,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
                                      "?workflowTypes"
   )
 
-  override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
+  override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     s"""|{

@@ -18,11 +18,14 @@
 
 package io.renku.knowledgegraph.entities
 
+import ModelEncoders._
 import cats.MonadThrow
 import cats.implicits._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.entities.search.model.Entity._
+import io.renku.entities.search.model.MatchingScore
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
@@ -31,8 +34,6 @@ import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.entities.model.Entity._
-import io.renku.knowledgegraph.entities.model.MatchingScore
 
 import java.time.Instant
 

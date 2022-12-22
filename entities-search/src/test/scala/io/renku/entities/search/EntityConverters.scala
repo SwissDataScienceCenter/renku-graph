@@ -16,41 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph
+package io.renku.entities.search
 
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
+import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.graph.model.testentities.{Entity => _, _}
 import io.renku.graph.model.{RenkuUrl, testentities}
-import org.scalacheck.Gen
-import org.scalacheck.Gen.choose
+import model._
 
-package object entities {
-  import Endpoint.Criteria._
-  import entities.model._
-  import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
+private object EntityConverters {
 
-  val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
-  val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
-  val sinceParams: Gen[Filters.Since]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Since)
-  val untilParams: Gen[Filters.Until]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Until)
-
-  private[entities] val matchingScores: Gen[MatchingScore] =
-    choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
-
-  private[entities] val modelProjects: Gen[model.Entity.Project] = anyProjectEntities.map(_.to[model.Entity.Project])
-  private[entities] val modelDatasets: Gen[model.Entity.Dataset] =
-    anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).map(_.to[model.Entity.Dataset])
-  private[entities] val modelWorkflows: Gen[model.Entity.Workflow] =
-    anyRenkuProjectEntities.withActivities(activityEntities(stepPlanEntities())) map { project =>
-      val plan :: Nil = project.plans
-      (plan -> project).to[model.Entity.Workflow]
-    }
-  private[entities] val modelPersons: Gen[model.Entity.Person] = personEntities.map(_.to[model.Entity.Person])
-  private[entities] val modelEntities: Gen[model.Entity] =
-    Gen.oneOf(modelProjects, modelDatasets, modelWorkflows, modelPersons)
-
-  private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
+  private[search] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
       MatchingScore.min,
       project.path,
@@ -62,7 +37,7 @@ package object entities {
       project.maybeDescription
     )
 
-  private[entities] implicit def datasetConverter[P <: testentities.Project]
+  private[search] implicit def datasetConverter[P <: testentities.Project]
       : ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
       MatchingScore.min,
@@ -78,13 +53,13 @@ package object entities {
     )
   }
 
-  private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
+  private[search] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
                                                      +P <: testentities.Project
   ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuUrl: RenkuUrl) {
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 
-  private[entities] implicit def planConverter[P <: testentities.Project]
+  private[search] implicit def planConverter[P <: testentities.Project]
       : ((testentities.Plan, P)) => Entity.Workflow = { case (plan, project) =>
     Entity.Workflow(
       MatchingScore.min,
@@ -100,10 +75,10 @@ package object entities {
     )
   }
 
-  private[entities] implicit class ProjectPlanOps[+P <: testentities.Project](planAndProject: (testentities.Plan, P)) {
+  private[search] implicit class ProjectPlanOps[+P <: testentities.Project](planAndProject: (testentities.Plan, P)) {
     def to[T](implicit convert: ((testentities.Plan, P)) => T): T = convert(planAndProject)
   }
 
-  private[entities] implicit def personConverter[P <: testentities.Person]: P => Entity.Person = person =>
+  private[search] implicit def personConverter[P <: testentities.Person]: P => Entity.Person = person =>
     Entity.Person(MatchingScore.min, person.name)
 }
