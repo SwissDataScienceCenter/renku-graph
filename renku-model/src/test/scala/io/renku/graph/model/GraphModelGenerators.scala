@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.images.{ImageResourceId, ImageUri}
 import io.renku.graph.model.persons.{Affiliation, Email, Name, Username}
 import io.renku.graph.model.projects.{FilePath, GitLabId, Path, ResourceId, Visibility}
 import org.scalacheck.Gen
@@ -122,6 +122,11 @@ object GraphModelGenerators {
   implicit val projectResourceIds: Gen[ResourceId] = projectResourceIds()(renkuUrls.generateOne)
   def projectResourceIds()(implicit renkuUrl: RenkuUrl): Gen[ResourceId] =
     projectPaths map (path => ResourceId.from(s"$renkuUrl/projects/$path").fold(throw _, identity))
+
+  def projectImageResourceIds(project: projects.ResourceId, max: Int = 5): Gen[List[ImageResourceId]] =
+    Gen
+      .chooseNum(0, max)
+      .map(n => (0 until n).map(i => ImageResourceId(project.value + "/images/" + i)).toList)
 
   implicit val projectKeywords: Gen[projects.Keyword] =
     nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))

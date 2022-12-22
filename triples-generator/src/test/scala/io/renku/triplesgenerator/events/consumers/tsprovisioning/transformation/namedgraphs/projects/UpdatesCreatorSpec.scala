@@ -22,6 +22,8 @@ import TestDataTools._
 import cats.effect.{IO, Spawn}
 import cats.effect.std.CountDownLatch
 import cats.syntax.all._
+import com.softwaremill.diffx.Diff
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -47,6 +49,8 @@ class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with DiffShouldMatcher
+    with MoreDiffInstances
     with InMemoryJenaForSpec
     with ProjectsDataset
     with TableDrivenPropertyChecks
@@ -138,6 +142,35 @@ class UpdatesCreatorSpec
   }
 
   "prepareUpdates" should {
+    "not delete existing images if they did not change" in {
+      val project = anyProjectEntities
+        .suchThat(_.images.nonEmpty)
+        .generateOne
+        .to[entities.Project]
+
+      upload(to = projectsDataset, project)
+
+      prepareUpdates(project, toProjectMutableData(project))
+        .runAll(on = projectsDataset)
+        .unsafeRunSync()
+
+      findProjects shouldMatchTo Set(CurrentProjectState.from(project))
+    }
+
+    "generate queries which delete the project images when changed" in {
+      val project = anyProjectEntities.suchThat(_.images.nonEmpty).generateOne.to[entities.Project]
+
+      upload(to = projectsDataset, project)
+
+      prepareUpdates(
+        project,
+        toProjectMutableData(project).copy(images = projectImageResourceIds(project.resourceId).generateOne)
+      )
+        .runAll(on = projectsDataset)
+        .unsafeRunSync()
+
+      findProjects shouldMatchTo Set(CurrentProjectState.from(project).copy(images = Set.empty))
+    }
 
     "generate queries which delete the project name when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -315,7 +348,8 @@ class UpdatesCreatorSpec
                                          maybeDesc:        Option[String],
                                          keywords:         Set[String],
                                          maybeAgent:       Option[String],
-                                         maybeCreatorId:   Option[String]
+                                         maybeCreatorId:   Option[String],
+                                         images:           Set[String]
   )
 
   private case class CurrentDatasetState(name: Option[String], dateCreated: Option[Instant])
@@ -329,8 +363,12 @@ class UpdatesCreatorSpec
       project.maybeDescription.map(_.value),
       project.keywords.map(_.value),
       findAgent(project).map(_.value),
-      project.maybeCreator.map(_.resourceId.value)
+      project.maybeCreator.map(_.resourceId.value),
+      project.images.map(_.resourceId.value).toSet
     )
+
+    implicit val diff: Diff[CurrentProjectState] =
+      Diff.derived[CurrentProjectState]
   }
 
   private def findDatasets: Set[CurrentDatasetState] =
@@ -365,6 +403,7 @@ class UpdatesCreatorSpec
       Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
       s"""|SELECT ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc
           |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
+          |  (GROUP_CONCAT(?imageId; separator=',') AS ?images)
           |WHERE {
           |  GRAPH ?g {
           |    ?id a schema:Project
@@ -376,6 +415,7 @@ class UpdatesCreatorSpec
           |    OPTIONAL { ?id schema:keywords ?keyword } 
           |    OPTIONAL { ?id schema:agent ?maybeAgent } 
           |    OPTIONAL { ?id schema:creator ?maybeCreatorId }
+          |    OPTIONAL { ?id schema:image ?imageId }
           |  }
           |}
           |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
@@ -391,7 +431,8 @@ class UpdatesCreatorSpec
         maybeDesc = row.get("maybeDesc"),
         keywords = row.get("keywords").map(_.split(',').toList).sequence.flatten.toSet,
         maybeAgent = row.get("maybeAgent"),
-        maybeCreatorId = row.get("maybeCreatorId")
+        maybeCreatorId = row.get("maybeCreatorId"),
+        images = row.get("images").map(_.split(',').toSet).getOrElse(Set.empty)
       )
     )
     .toSet

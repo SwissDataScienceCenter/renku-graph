@@ -22,6 +22,7 @@ import cats.data.{NonEmptyList => Nel}
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.graph.model.images.ImageResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{CliVersion, persons, projects}
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -51,6 +52,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?name (GROUP_CONCAT(?dateCreated; separator=',') AS ?createdDates) ?maybeParent ?visibility ?maybeDescription
         |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
+        |  (GROUP_CONCAT(?imageId; separator=',') AS ?images)
         |WHERE {
         |  GRAPH ${resourceId.showAs[RdfResource]} {
         |    BIND (${resourceId.showAs[RdfResource]} AS ?id)
@@ -63,6 +65,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |    OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent }
         |    OPTIONAL { ?id schema:agent ?maybeAgent }
         |    OPTIONAL { ?id schema:creator ?maybeCreatorId }
+        |    OPTIONAL { ?id schema:image ?imageId }
         |  }
         |}
         |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDescription ?maybeAgent ?maybeCreatorId
@@ -86,6 +89,12 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
             Nel.fromList(list).toRight(DecodingFailure(show"No dateCreated provided for project $resourceId", Nil))
           )
 
+      val toListOfImageResourceId: Option[String] => Decoder.Result[List[ImageResourceId]] =
+        _.toList
+          .flatMap(_.split(',').filter(_.nonEmpty).toSet.toList.sorted)
+          .traverse(ImageResourceId.from)
+          .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+
       for {
         name             <- extract[projects.Name]("name")
         dateCreated      <- extract[Option[String]]("createdDates") >>= toListOfDates
@@ -95,14 +104,17 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         keywords         <- extract[Option[String]]("keywords") >>= toSetOfKeywords
         maybeAgent       <- extract[Option[CliVersion]]("maybeAgent")
         maybeCreatorId   <- extract[Option[persons.ResourceId]]("maybeCreatorId")
-      } yield ProjectMutableData(name,
-                                 dateCreated,
-                                 maybeParent,
-                                 visibility,
-                                 maybeDescription,
-                                 keywords,
-                                 maybeAgent,
-                                 maybeCreatorId
+        images           <- extract[Option[String]]("images") >>= toListOfImageResourceId
+      } yield ProjectMutableData(
+        name,
+        dateCreated,
+        maybeParent,
+        visibility,
+        maybeDescription,
+        keywords,
+        maybeAgent,
+        maybeCreatorId,
+        images
       )
     }(toOption(s"Multiple projects or values for '$resourceId'"))
 }

@@ -25,6 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -37,6 +38,8 @@ class KGProjectFinderSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with AdditionalMatchers
+    with MoreDiffInstances
     with ScalaCheckPropertyChecks
     with InMemoryJenaForSpec
     with ProjectsDataset {
@@ -48,7 +51,8 @@ class KGProjectFinderSpec
         upload(to = projectsDataset, project)
 
         val projectData = finder.find(project.resourceId).unsafeRunSync()
-        projectData.map(_.selectEarliestDateCreated) shouldBe toProjectMutableData(project).some
+        val expected    = toProjectMutableData(project).some
+        projectData.map(_.selectEarliestDateCreated) shouldMatchTo expected
       }
     }
 
