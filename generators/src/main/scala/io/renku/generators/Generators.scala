@@ -20,7 +20,7 @@ package io.renku.generators
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import cats.{Applicative, Functor, Semigroupal}
+import cats.{Functor, Monad, Semigroupal}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -405,9 +405,14 @@ object Generators {
       } yield a -> b
     }
 
-    implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-      override def pure[A](x:   A) = Gen.const(x)
-      override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
+    implicit val genMonad: Monad[Gen] = new Monad[Gen] {
+      override def pure[A](x:        A) = Gen.const(x)
+      override def ap[A, B](ff:      Gen[A => B])(fa: Gen[A]):      Gen[B] = ff.flatMap(f => fa.map(f))
+      override def flatMap[A, B](fa: Gen[A])(f:       A => Gen[B]): Gen[B] = fa.flatMap(f)
+      override def tailRecM[A, B](a: A)(f: A => Gen[Either[A, B]]): Gen[B] = f(a).flatMap {
+        case Left(aValue)  => tailRecM[A, B](aValue)(f)
+        case Right(bValue) => fixed(bValue)
+      }
     }
 
     implicit val functorGen: Functor[Gen] = new Functor[Gen] {

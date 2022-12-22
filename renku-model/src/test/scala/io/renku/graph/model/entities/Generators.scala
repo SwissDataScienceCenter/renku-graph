@@ -22,13 +22,12 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters._
+import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput._
 import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput._
 import io.renku.graph.model.testentities.StepPlanCommandParameter._
-import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, ProjectBasedGenFactory, ProjectBasedGenFactoryOps, StepPlanGenFactory}
-import io.renku.graph.model.testentities.generators.genMonad
 import org.scalacheck.Gen
 
 private object Generators {
