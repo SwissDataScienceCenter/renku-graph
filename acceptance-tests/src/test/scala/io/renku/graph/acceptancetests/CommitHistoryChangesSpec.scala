@@ -167,6 +167,7 @@ class CommitHistoryChangesSpec
       dateCreated = projectEntities.dateCreated,
       maybeCreator = projectEntities.maybeCreator,
       keywords = projectEntities.keywords,
-      members = projectEntities.members
+      members = projectEntities.members,
+      images = projectEntities.images
     )
 }
