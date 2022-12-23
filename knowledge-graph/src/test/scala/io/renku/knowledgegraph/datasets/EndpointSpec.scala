@@ -23,7 +23,6 @@ import Endpoint.Query.{Phrase, query}
 import Endpoint.Sort
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -224,7 +223,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     title             <- datasetTitles
     name              <- datasetNames
     maybeDescription  <- datasetDescriptions.toGeneratorOfOptions
-    creators          <- personEntities.toGeneratorOfNonEmptyList(maxElements = 4)
+    creators          <- personEntities.toGeneratorOfNonEmptyList(max = 4)
     dates             <- datasetDates
     exemplarProjectId <- projectResourceIds
     projectsCount     <- nonNegativeInts() map (_.value) map ProjectsCount.apply

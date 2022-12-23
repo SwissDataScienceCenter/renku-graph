@@ -372,14 +372,12 @@ object Generators {
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
       def toGeneratorOfOptions: Gen[Option[T]] = frequency(3 -> const(None), 7 -> some(generator))
-      def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
-                                    maxElements: Int Refined Positive = 5
-      ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
+      def toGeneratorOfNonEmptyList(min: Int = 1, max: Int = 5): Gen[NonEmptyList[T]] =
+        nonEmptyList(generator, min, max)
 
       def toGeneratorOfList(min: Int = 0, max: Int = 5): Gen[List[T]] = listOf(generator, min, max)
 
-      def toGeneratorOfSet(min: Int = 1, max: Int = 5): Gen[Set[T]] =
-        setOf(generator, min, max)
+      def toGeneratorOfSet(min: Int = 1, max: Int = 5): Gen[Set[T]] = setOf(generator, min, max)
 
       def toGeneratorOf[TT](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
 

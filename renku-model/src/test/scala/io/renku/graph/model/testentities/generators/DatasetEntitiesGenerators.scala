@@ -124,7 +124,7 @@ trait DatasetEntitiesGenerators {
     implicit renkuUrl =>
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
-        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+        creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
       } yield Dataset.Provenance.Internal(Dataset.entityId(identifier),
                                           OriginalIdentifier(identifier),
                                           date,
@@ -141,7 +141,7 @@ trait DatasetEntitiesGenerators {
       for {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
-        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+        creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
       } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
                                                   sameAs,
                                                   OriginalIdentifier(identifier),
@@ -156,7 +156,7 @@ trait DatasetEntitiesGenerators {
           date       <- datasetPublishedDates()
           sameAs     <- datasetInternalSameAs
           originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
-          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
@@ -174,7 +174,7 @@ trait DatasetEntitiesGenerators {
           date       <- datasetCreatedDates(projectDateCreated.value)
           sameAs     <- sameAsGen
           originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
-          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
@@ -191,7 +191,7 @@ trait DatasetEntitiesGenerators {
       implicit renkuUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
-          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     topmostSameAs,
