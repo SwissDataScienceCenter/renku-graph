@@ -18,6 +18,7 @@
 
 package io.renku.entities.searchgraphs
 
+import PersonInfo._
 import cats.data.Kleisli
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
@@ -45,17 +46,16 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
 
       SearchInfoExtractor.extractSearchInfo(project)(datasets) shouldBe datasets.map { ds =>
-        SearchInfo(
-          ds.resourceId,
+        SearchInfo.ProjectSearchInfo(
           ds.provenance.topmostSameAs,
           ds.identification.name,
           project.visibility,
           ds.provenance.date,
-          ds.provenance.creators,
+          ds.provenance.creators.map(toPersonInfo),
           ds.additionalInfo.keywords,
           ds.additionalInfo.maybeDescription,
           ds.additionalInfo.images,
-          List(project.resourceId)
+          Link(ds.resourceId, project.resourceId)
         )
       }
     }

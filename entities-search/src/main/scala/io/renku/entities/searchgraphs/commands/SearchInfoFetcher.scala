@@ -17,24 +17,11 @@
  */
 
 package io.renku.entities.searchgraphs
+package commands
 
-import PersonInfo._
-import io.renku.graph.model.entities.{Dataset, Project}
+import SearchInfo.StoreSearchInfo
+import io.renku.graph.model.datasets.TopmostSameAs
 
-private object SearchInfoExtractor {
-
-  def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
-    datasets.map { ds =>
-      SearchInfo.ProjectSearchInfo(
-        ds.provenance.topmostSameAs,
-        ds.identification.name,
-        project.visibility,
-        ds.provenance.date,
-        ds.provenance.creators.map(toPersonInfo),
-        ds.additionalInfo.keywords,
-        ds.additionalInfo.maybeDescription,
-        ds.additionalInfo.images,
-        Link(ds.identification.resourceId, project.resourceId)
-      )
-    }
+private trait SearchInfoFetcher[F[_]] {
+  def fetchStoreSearchInfo(topmostSameAs: TopmostSameAs): F[Option[StoreSearchInfo]]
 }

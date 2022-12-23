@@ -17,24 +17,23 @@
  */
 
 package io.renku.entities.searchgraphs
+package commands
 
-import PersonInfo._
-import io.renku.graph.model.entities.{Dataset, Project}
+import CommandCalculator.calculateCommand
+import cats.MonadThrow
+import cats.syntax.all._
 
-private object SearchInfoExtractor {
+private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
+  val toUpdateCommands: List[SearchInfo.ProjectSearchInfo] => F[List[UpdateCommand]]
+}
 
-  def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
-    datasets.map { ds =>
-      SearchInfo.ProjectSearchInfo(
-        ds.provenance.topmostSameAs,
-        ds.identification.name,
-        project.visibility,
-        ds.provenance.date,
-        ds.provenance.creators.map(toPersonInfo),
-        ds.additionalInfo.keywords,
-        ds.additionalInfo.maybeDescription,
-        ds.additionalInfo.images,
-        Link(ds.identification.resourceId, project.resourceId)
-      )
-    }
+private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F])
+    extends UpdateCommandsProducer[F] {
+
+  import searchInfoFetcher._
+
+  override lazy val toUpdateCommands: List[SearchInfo.ProjectSearchInfo] => F[List[UpdateCommand]] =
+    _.map { info =>
+      fetchStoreSearchInfo(info.topmostSameAs).map(info -> _).map(calculateCommand)
+    }.sequence
 }

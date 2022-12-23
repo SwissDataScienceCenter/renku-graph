@@ -17,24 +17,13 @@
  */
 
 package io.renku.entities.searchgraphs
+package commands
 
-import PersonInfo._
-import io.renku.graph.model.entities.{Dataset, Project}
+import io.renku.entities.searchgraphs.SearchInfo.{ProjectSearchInfo, StoreSearchInfo}
 
-private object SearchInfoExtractor {
+private object CommandCalculator {
 
-  def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
-    datasets.map { ds =>
-      SearchInfo.ProjectSearchInfo(
-        ds.provenance.topmostSameAs,
-        ds.identification.name,
-        project.visibility,
-        ds.provenance.date,
-        ds.provenance.creators.map(toPersonInfo),
-        ds.additionalInfo.keywords,
-        ds.additionalInfo.maybeDescription,
-        ds.additionalInfo.images,
-        Link(ds.identification.resourceId, project.resourceId)
-      )
-    }
+  def calculateCommand: ((ProjectSearchInfo, Option[StoreSearchInfo])) => UpdateCommand = { _ =>
+    UpdateCommand
+  }
 }

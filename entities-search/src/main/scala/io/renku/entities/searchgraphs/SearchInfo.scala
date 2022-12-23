@@ -22,17 +22,49 @@ import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.{persons, projects}
 
-private final case class SearchInfo(resourceId:       ResourceId,
-                                    topmostSameAs:    TopmostSameAs,
-                                    name:             Name,
-                                    visibility:       Visibility,
-                                    date:             Date,
-                                    creators:         NonEmptyList[Person],
-                                    keywords:         List[Keyword],
-                                    maybeDescription: Option[Description],
-                                    images:           List[Image],
-                                    projectIds:       List[projects.ResourceId]
-)
+private sealed trait SearchInfo {
+  val topmostSameAs:    TopmostSameAs
+  val name:             Name
+  val visibility:       Visibility
+  val date:             Date
+  val creators:         NonEmptyList[PersonInfo]
+  val keywords:         List[Keyword]
+  val maybeDescription: Option[Description]
+  val images:           List[Image]
+}
+
+private object SearchInfo {
+
+  final case class ProjectSearchInfo(topmostSameAs:    TopmostSameAs,
+                                     name:             Name,
+                                     visibility:       Visibility,
+                                     date:             Date,
+                                     creators:         NonEmptyList[PersonInfo],
+                                     keywords:         List[Keyword],
+                                     maybeDescription: Option[Description],
+                                     images:           List[Image],
+                                     link:             Link
+  ) extends SearchInfo
+
+  final case class StoreSearchInfo(topmostSameAs:    TopmostSameAs,
+                                   name:             Name,
+                                   visibility:       Visibility,
+                                   date:             Date,
+                                   creators:         NonEmptyList[PersonInfo],
+                                   keywords:         List[Keyword],
+                                   maybeDescription: Option[Description],
+                                   images:           List[Image],
+                                   links:            List[Link]
+  ) extends SearchInfo
+}
+
+private final case class Link(dataset: ResourceId, project: projects.ResourceId)
+
+private final case class PersonInfo(resourceId: persons.ResourceId, name: persons.Name)
+
+private object PersonInfo {
+  lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
+}
