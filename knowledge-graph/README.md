@@ -661,6 +661,17 @@ Response body example for `Accept: application/json`:
       "rel": "datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
     }
+  ],
+  "images": [
+    {
+      "location": "image.png",
+      "_links":[
+        {
+          "rel":  "view",
+          "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+        }
+      ]
+    }
   ]
 }
 ```

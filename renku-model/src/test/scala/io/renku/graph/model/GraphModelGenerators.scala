@@ -126,7 +126,7 @@ object GraphModelGenerators {
   def projectImageResourceIds(project: projects.ResourceId, max: Int = 5): Gen[List[ImageResourceId]] =
     Gen
       .chooseNum(0, max)
-      .map(n => (0 until n).map(i => ImageResourceId(project.value + "/images/" + i)).toList)
+      .map(n => (0 until n).map(i => ImageResourceId((project / "images" / i.toString).value)).toList)
 
   implicit val projectKeywords: Gen[projects.Keyword] =
     nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))

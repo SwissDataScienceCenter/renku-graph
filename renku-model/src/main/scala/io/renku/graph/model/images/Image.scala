@@ -29,7 +29,7 @@ final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: Ima
 object Image {
   def projectImage(projectId: projects.ResourceId, uris: List[ImageUri]): List[Image] =
     uris.zipWithIndex.map { case (uri, index) =>
-      Image(ImageResourceId(projectId.value + "/images/" + index), uri, ImagePosition(index))
+      Image(ImageResourceId((projectId / "images" / index.toString).value), uri, ImagePosition(index))
     }
 
   def projectImage(projectId: projects.ResourceId, uri: ImageUri): Image =

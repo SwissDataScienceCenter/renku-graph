@@ -20,7 +20,6 @@ package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import io.circe.Decoder
-import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GraphClass, persons, projects}
 import model.{Entity, MatchingScore}
 
@@ -118,7 +117,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       keywords <-
         extract[Option[String]]("keywords") >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
       maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
-      images           <- extract[Option[String]]("images") >>= toListOfImageUris[ImageUri, ImageUri.type](ImageUri)
+      images           <- extract[Option[String]]("images") >>= toListOfImageUris
     } yield Entity.Project(matchingScore,
                            path,
                            name,

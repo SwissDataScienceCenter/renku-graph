@@ -21,9 +21,11 @@ package io.renku.knowledgegraph.projects.details
 import KGProjectFinder._
 import cats.effect.Async
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
@@ -56,6 +58,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |       ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
         |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
         |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
+        |       (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
         |  GRAPH ?resourceId {
@@ -73,6 +76,12 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |        OPTIONAL { ?maybeCreatorResourceId schema:email ?maybeCreatorEmail }
         |        OPTIONAL { ?maybeCreatorResourceId schema:affiliation ?maybeCreatorAffiliation }
         |      }
+        |    }
+        |    OPTIONAL {
+        |      ?resourceId schema:image ?imageId.
+        |      ?imageId schema:position ?imagePosition;
+        |               schema:contentUrl ?imageUrl.
+        |      BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |    OPTIONAL {
         |      ?resourceId prov:wasDerivedFrom ?maybeParentResourceId.
@@ -153,6 +162,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         maybeParentCreatorEmail       <- extract[Option[persons.Email]]("maybeParentCreatorEmail")
         maybeParentCreatorAffiliation <- extract[Option[persons.Affiliation]]("maybeParentCreatorAffiliation")
         maybeVersion                  <- extract[Option[SchemaVersion]]("maybeSchemaVersion")
+        images                        <- extract[Option[String]]("images") >>= toListOfImageUris
       } yield KGProject(
         resourceId,
         path,
@@ -179,10 +189,16 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         },
         maybeVersion,
         maybeDescription,
-        keywords
+        keywords,
+        images
       )
     }(toOption(show"Multiple projects or values for $path"))
   }
+
+  private def toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
+    _.map(ImageUri.fromSplitString(','))
+      .map(_.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
+      .getOrElse(Nil.asRight)
 }
 
 private object KGProjectFinder {
@@ -195,7 +211,8 @@ private object KGProjectFinder {
                              maybeParent:      Option[KGParent],
                              maybeVersion:     Option[SchemaVersion],
                              maybeDescription: Option[Description],
-                             keywords:         Set[Keyword]
+                             keywords:         Set[Keyword],
+                             images:           List[ImageUri]
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
