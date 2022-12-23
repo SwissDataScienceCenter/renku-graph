@@ -19,13 +19,14 @@
 package io.renku.entities.searchgraphs
 
 import cats.data.NonEmptyList
-import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId}
+import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 
 private final case class SearchInfo(resourceId:       ResourceId,
+                                    topmostSameAs:    TopmostSameAs,
                                     name:             Name,
                                     visibility:       Visibility,
                                     date:             Date,

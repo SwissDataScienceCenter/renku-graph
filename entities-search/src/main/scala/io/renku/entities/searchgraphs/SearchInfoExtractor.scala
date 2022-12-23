@@ -26,6 +26,7 @@ private object SearchInfoExtractor {
     datasets.map { ds =>
       SearchInfo(
         ds.identification.resourceId,
+        ds.provenance.topmostSameAs,
         ds.identification.name,
         project.visibility,
         ds.provenance.date,

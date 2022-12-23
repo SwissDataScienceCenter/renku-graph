@@ -47,6 +47,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
       SearchInfoExtractor.extractSearchInfo(project)(datasets) shouldBe datasets.map { ds =>
         SearchInfo(
           ds.resourceId,
+          ds.provenance.topmostSameAs,
           ds.identification.name,
           project.visibility,
           ds.provenance.date,
