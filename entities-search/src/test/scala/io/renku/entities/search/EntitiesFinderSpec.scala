@@ -24,6 +24,7 @@ import EntityConverters._
 import Generators._
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import io.renku.entities.search
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -1027,6 +1028,21 @@ class EntitiesFinderSpec
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
       results.results                  shouldBe Nil
+    }
+  }
+
+  "findEntities - with images" should {
+
+    "return images if present" in new TestCase {
+      val project = renkuProjectEntities(visibilityPublic)
+        .suchThat(_.images.nonEmpty)
+        .generateOne
+
+      upload(to = projectsDataset, project)
+
+      val results = finder.findEntities(Criteria()).unsafeRunSync()
+      val images  = results.results.collect { case e: search.model.Entity.Project => e.images }.flatten
+      images shouldBe project.images
     }
   }
 
