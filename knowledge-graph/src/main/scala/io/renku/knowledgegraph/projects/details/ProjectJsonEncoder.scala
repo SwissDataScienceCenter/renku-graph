@@ -24,25 +24,27 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
+import io.renku.graph.model.GitLabUrl
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
+import io.renku.knowledgegraph.projects.images.ImagesEncoder
 import model.Permissions._
 import model._
 
 private trait ProjectJsonEncoder {
-  def encode(project: model.Project): Json
+  def encode(project: model.Project)(implicit gitLabUrl: GitLabUrl): Json
 }
 
 private object ProjectJsonEncoder {
   def apply[F[_]: MonadThrow]: F[ProjectJsonEncoder] = renku.ApiUrl[F]().map(new ProjectJsonEncoderImpl(_))
 }
 
-private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder {
+private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJsonEncoder with ImagesEncoder {
 
-  override def encode(project: model.Project): Json = project.asJson
+  override def encode(project: model.Project)(implicit gitLabUrl: GitLabUrl): Json = project.asJson
 
-  private implicit lazy val encoder: Encoder[Project] = Encoder.instance[Project] { project =>
+  private implicit def encoder(implicit gitLabUrl: GitLabUrl): Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
       "identifier": ${project.id},
       "path":       ${project.path},
@@ -55,6 +57,7 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
       "keywords":   ${project.keywords.toList.sorted},
       "starsCount": ${project.starsCount},
       "permissions":${project.permissions},
+      "images":     ${project.images -> project.path},
       "statistics": ${project.statistics}
     }""" deepMerge _links(
       Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),

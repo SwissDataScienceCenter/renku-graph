@@ -25,16 +25,17 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.SchemaVersion
+import io.renku.graph.model.{GitLabUrl, SchemaVersion}
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
-import model.Project.{DateUpdated, StarsCount}
+import model.Project.{DateUpdated, ImageLinks, StarsCount}
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import model._
@@ -43,6 +44,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+  implicit val gitLabUrl: GitLabUrl = EntitiesGenerators.gitLabUrl
 
   "encode" should {
 
@@ -81,6 +83,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
       permissions      <- cursor.downField("permissions").as[Permissions]
       statistics       <- cursor.downField("statistics").as[Statistics]
       maybeVersion     <- cursor.downField("version").as[Option[SchemaVersion]]
+      images           <- cursor.downField("images").as[List[ImageLinks]]
     } yield Project(
       project.resourceId,
       id,
@@ -96,7 +99,8 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
       starsCount,
       permissions,
       statistics,
-      maybeVersion
+      maybeVersion,
+      images.map(_.location)
     )
 
   private def creationDecoder(creation: Creation): Decoder[Creation] = cursor =>

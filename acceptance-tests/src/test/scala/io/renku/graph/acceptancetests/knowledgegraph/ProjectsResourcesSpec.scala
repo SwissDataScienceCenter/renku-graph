@@ -88,7 +88,7 @@ class ProjectsResourcesSpec
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
       val projectDetails = projectDetailsResponse.jsonBody
-      projectDetails shouldBe fullJson(project)
+      projectDetails shouldBe fullJson(project)(gitLabUrl)
 
       When("user then fetches project's datasets using the link from the response")
       val datasetsLink = projectDetails._links.fold(throw _, identity).get(Links.Rel("datasets")) getOrElse fail(

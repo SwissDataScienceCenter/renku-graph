@@ -24,6 +24,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
+import io.circe.Decoder
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.{SchemaVersion, persons}
@@ -53,10 +55,16 @@ private object model {
                            starsCount:       StarsCount,
                            permissions:      Permissions,
                            statistics:       Statistics,
-                           maybeVersion:     Option[SchemaVersion]
+                           maybeVersion:     Option[SchemaVersion],
+                           images:           List[ImageUri]
   )
 
   object Project {
+    final case class ImageLinks(location: ImageUri)
+    object ImageLinks {
+      implicit val jsonDecoder: Decoder[ImageLinks] =
+        io.circe.generic.semiauto.deriveDecoder[ImageLinks]
+    }
 
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
     implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt[StarsCount]
