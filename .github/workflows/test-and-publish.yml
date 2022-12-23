@@ -30,6 +30,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Unit test
@@ -50,6 +51,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Acceptance tests
@@ -70,6 +72,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Formatter
@@ -96,6 +99,7 @@ jobs:
         with:
           path: |
             ~/.ivy2
+            ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Write version to Chart.yaml and version.conf files
@@ -114,7 +118,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
-      - name: Wait for chart to be available
+      - name: Wait for the chart to become available
         run: sleep 120
       - name: Update component version
         uses: SwissDataScienceCenter/renku-actions/update-component-version@v1.4.2
