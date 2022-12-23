@@ -58,7 +58,7 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
 
     def givenUploadingDSFrom(project: entities.Project, returning: Try[Unit]) =
       (searchInfoUploader.upload _)
-        .expects((collectLastVersions >>> (extractSearchInfo(_, project)))(project))
+        .expects((collectLastVersions >>> extractSearchInfo(project))(project))
         .returning(returning)
   }
 }

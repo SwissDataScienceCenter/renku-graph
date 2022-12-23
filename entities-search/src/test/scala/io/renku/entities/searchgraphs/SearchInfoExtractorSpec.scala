@@ -44,7 +44,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
       val datasets = (modifiedDatasets ::: nonModifiedDatasets)
         .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
 
-      SearchInfoExtractor.extractSearchInfo(datasets, project) shouldBe datasets.map { ds =>
+      SearchInfoExtractor.extractSearchInfo(project)(datasets) shouldBe datasets.map { ds =>
         SearchInfo(
           ds.resourceId,
           ds.identification.name,

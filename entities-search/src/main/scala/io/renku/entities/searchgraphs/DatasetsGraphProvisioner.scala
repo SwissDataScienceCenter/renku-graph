@@ -32,6 +32,6 @@ private class DatasetsGraphProvisionerImpl[F[_]](searchInfoUploader: SearchInfoU
 
   override def provisionDatasetsGraph(project: Project): F[Unit] =
     searchInfoUploader.upload(
-      collectLastVersions.andThen(extractSearchInfo(_, project))(project)
+      collectLastVersions.andThen(extractSearchInfo(project))(project)
     )
 }

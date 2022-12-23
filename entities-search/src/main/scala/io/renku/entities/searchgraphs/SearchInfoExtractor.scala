@@ -22,7 +22,7 @@ import io.renku.graph.model.entities.{Dataset, Project}
 
 private object SearchInfoExtractor {
 
-  def extractSearchInfo(datasets: List[Dataset[Dataset.Provenance]], project: Project): List[SearchInfo] =
+  def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
     datasets.map { ds =>
       SearchInfo(
         ds.identification.resourceId,
