@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,8 +22,10 @@ import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.tooling.ApplicationServices
 import io.renku.http.client.AccessToken
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.IOSpec
 import org.http4s.Status._
+import org.http4s.implicits._
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
 
@@ -32,5 +34,5 @@ trait AccessTokenPresence extends should.Matchers {
 
   def givenAccessTokenPresentFor(project: Project, accessToken: AccessToken): Assertion =
     tokenRepositoryClient
-      .POST(s"projects/${project.id}/tokens", accessToken.asJson, None) shouldBe NoContent
+      .POST((uri"projects" / project.id / "tokens").renderString, accessToken.asJson, None) shouldBe NoContent
 }

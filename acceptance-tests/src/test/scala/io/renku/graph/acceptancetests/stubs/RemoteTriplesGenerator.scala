@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,6 +60,19 @@ trait RemoteTriplesGenerator {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
           ok(triples.flatten.fold(throw _, _.toJson.spaces2))
+        )
+    }
+    ()
+  }
+
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK with broken payload`(
+      project:  data.Project,
+      commitId: CommitId
+  ): Unit = {
+    stubFor {
+      get(s"/projects/${project.id}/commits/$commitId")
+        .willReturn(
+          ok(JsonLD.arr().toJson.spaces2)
         )
     }
     ()
