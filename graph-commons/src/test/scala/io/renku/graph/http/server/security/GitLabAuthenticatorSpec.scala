@@ -114,8 +114,8 @@ class GitLabAuthenticatorSpec
     val authenticator = new GitLabAuthenticatorImpl[IO]
 
     lazy val mapResponse =
-      captureMapping(authenticator, gitLabClient)(
-        _.authenticate(accessToken).unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        authenticator.authenticate(accessToken).unsafeRunSync(),
         Gen.const(Right(AuthUser(personGitLabIds.generateOne, accessToken)))
       )
   }

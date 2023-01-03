@@ -50,7 +50,8 @@ object model {
         date:             projects.DateCreated,
         maybeCreator:     Option[persons.Name],
         keywords:         List[projects.Keyword],
-        maybeDescription: Option[projects.Description]
+        maybeDescription: Option[projects.Description],
+        images:           List[ImageUri]
     ) extends Entity {
       override type Name = projects.Name
       override type Date = projects.DateCreated

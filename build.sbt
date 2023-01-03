@@ -218,6 +218,8 @@ lazy val commonSettings = Seq(
     "-Ycache-macro-class-loader:last-modified", // and macro definitions. This can lead to performance improvements.
     "-Ywarn-value-discard" // Emit warning and location for usages of deprecated APIs.
   ),
+  Compile / console / scalacOptions := (Compile / scalacOptions).value.filterNot(_ == "-Xfatal-warnings"),
+  Test / console / scalacOptions := (Compile / console / scalacOptions).value,
   // Format: on
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

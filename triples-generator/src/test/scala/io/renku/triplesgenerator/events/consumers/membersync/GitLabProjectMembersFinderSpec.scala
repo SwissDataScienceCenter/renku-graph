@@ -129,8 +129,8 @@ class GitLabProjectMembersFinderSpec
         implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
 
         override val mapResponse =
-          captureMapping(finder, gitLabClient)(
-            _.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+          captureMapping(gitLabClient)(
+            finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
             Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
             expectedNumberOfCalls = 2
           )
@@ -150,8 +150,8 @@ class GitLabProjectMembersFinderSpec
         implicit override val maybeAccessToken: Option[AccessToken] = Option.empty[AccessToken]
 
         override val mapResponse =
-          captureMapping(finder, gitLabClient)(
-            _.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+          captureMapping(gitLabClient)(
+            finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
             Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
             expectedNumberOfCalls = 2
           )
@@ -196,8 +196,8 @@ class GitLabProjectMembersFinderSpec
     }
 
     val mapResponse =
-      captureMapping(finder, gitLabClient)(
-        _.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
         Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
         expectedNumberOfCalls = 2
       )

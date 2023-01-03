@@ -35,12 +35,12 @@ import org.scalamock.scalatest.MockFactory
 trait GitLabClientTools[F[_]] {
   self: MockFactory =>
 
-  def captureMapping[FinderType, ResultType, A](finder: FinderType, gitLabClient: GitLabClient[F])(
-      findingMethod:                                    FinderType => A,
-      resultGenerator:                                  Gen[ResultType],
-      method:                                           Method = GET,
-      expectedNumberOfCalls:                            Int = 1
-  )(implicit applicative:                               Applicative[F]): ResponseMappingF[F, ResultType] = {
+  def captureMapping[ResultType](gitLabClient: GitLabClient[F])(
+      findingMethod:                           => Any,
+      resultGenerator:                         Gen[ResultType],
+      method:                                  Method = GET,
+      expectedNumberOfCalls:                   Int = 1
+  )(implicit applicative:                      Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
     method match {
@@ -78,7 +78,7 @@ trait GitLabClientTools[F[_]] {
           .repeat(expectedNumberOfCalls)
     }
 
-    findingMethod(finder)
+    findingMethod
     responseMapping.value
   }
 }

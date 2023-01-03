@@ -32,7 +32,9 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,6 +46,7 @@ import scala.language.reflectiveCalls
 import scala.util.{Failure, Try}
 
 class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+  implicit val renkuUrl: RenkuUrl = EntitiesGenerators.renkuUrl
 
   "buildEntity" should {
 
@@ -106,6 +109,7 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
     members         <- projectMembers.toGeneratorOfSet()
     visibility      <- projectVisibilities
     maybeParentPath <- projectPaths.toGeneratorOfOptions
+    avatarUri       <- imageUris.toGeneratorOfOptions
   } yield GitLabProjectInfo(id,
                             name,
                             path,
@@ -115,7 +119,8 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
                             keywords,
                             members,
                             visibility,
-                            maybeParentPath
+                            maybeParentPath,
+                            avatarUri
   )
 
   private implicit class ProjectInfoOps(projectInfo: GitLabProjectInfo) {
@@ -132,18 +137,21 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
                            keywords,
                            members,
                            visibility,
-                           Some(parentPath)
+                           Some(parentPath),
+                           avatarUrl
         ) =>
-      entities.NonRenkuProject.WithParent(ResourceId(path),
-                                          path,
-                                          name,
-                                          maybeDescription,
-                                          dateCreated,
-                                          maybeCreator.map(toPerson),
-                                          visibility,
-                                          keywords,
-                                          members.map(toPerson),
-                                          ResourceId(parentPath)
+      entities.NonRenkuProject.WithParent(
+        ResourceId(path),
+        path,
+        name,
+        maybeDescription,
+        dateCreated,
+        maybeCreator.map(toPerson),
+        visibility,
+        keywords,
+        members.map(toPerson),
+        ResourceId(parentPath),
+        convertImageUris(ResourceId(path).asEntityId)(avatarUrl.toList)
       )
     case GitLabProjectInfo(_,
                            name,
@@ -154,17 +162,20 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
                            keywords,
                            members,
                            visibility,
-                           None
+                           None,
+                           avatarUrl
         ) =>
-      entities.NonRenkuProject.WithoutParent(ResourceId(path),
-                                             path,
-                                             name,
-                                             maybeDescription,
-                                             dateCreated,
-                                             maybeCreator.map(toPerson),
-                                             visibility,
-                                             keywords,
-                                             members.map(toPerson)
+      entities.NonRenkuProject.WithoutParent(
+        ResourceId(path),
+        path,
+        name,
+        maybeDescription,
+        dateCreated,
+        maybeCreator.map(toPerson),
+        visibility,
+        keywords,
+        members.map(toPerson),
+        convertImageUris(ResourceId(path).asEntityId)(avatarUrl.toList)
       )
   }
 

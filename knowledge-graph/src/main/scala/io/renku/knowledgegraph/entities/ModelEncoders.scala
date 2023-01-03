@@ -31,8 +31,23 @@ import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
 
 private object ModelEncoders {
+  implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+      Json.arr(imageUris.map {
+        case uri: ImageUri.Relative =>
+          json"""{
+          "location": $uri
+        }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+          "location": $uri
+        }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
+      }: _*)
+    }
 
-  implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Entity.Project] =
+  implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl): Encoder[model.Entity.Project] =
     Encoder.instance { project =>
       json"""{
         "type":          ${Criteria.Filters.EntityType.Project.value},
@@ -43,7 +58,8 @@ private object ModelEncoders {
         "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
         "visibility":    ${project.visibility},
         "date":          ${project.date},
-        "keywords":      ${project.keywords}
+        "keywords":      ${project.keywords},
+        "images":        ${(project.images -> project.path).asJson}
       }"""
         .addIfDefined("creator" -> project.maybeCreator)
         .addIfDefined("description" -> project.maybeDescription)
@@ -72,24 +88,7 @@ private object ModelEncoders {
   implicit def datasetEncoder(implicit
       gitLabUrl:   GitLabUrl,
       renkuApiUrl: renku.ApiUrl
-  ): Encoder[model.Entity.Dataset] = {
-
-    implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-      Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
-        Json.arr(imageUris.map {
-          case uri: ImageUri.Relative =>
-            json"""{
-              "location": $uri
-            }""" deepMerge _links(
-              Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
-            )
-          case uri: ImageUri.Absolute =>
-            json"""{
-              "location": $uri
-            }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
-        }: _*)
-      }
-
+  ): Encoder[model.Entity.Dataset] =
     Encoder.instance { ds =>
       json"""{
         "type":          ${Criteria.Filters.EntityType.Dataset.value},
@@ -108,7 +107,6 @@ private object ModelEncoders {
           )
         )
     }
-  }
 
   implicit lazy val workflowEncoder: Encoder[model.Entity.Workflow] =
     Encoder.instance { workflow =>

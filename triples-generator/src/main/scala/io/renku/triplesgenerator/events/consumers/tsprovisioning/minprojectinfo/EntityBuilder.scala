@@ -28,6 +28,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.{RenkuUrl, entities, persons}
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -70,18 +71,21 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
                            keywords,
                            members,
                            visibility,
-                           Some(parentPath)
+                           Some(parentPath),
+                           avatarUrl
         ) =>
-      entities.NonRenkuProject.WithParent(ResourceId(path),
-                                          path,
-                                          name,
-                                          maybeDescription,
-                                          dateCreated,
-                                          maybeCreator.map(toPerson),
-                                          visibility,
-                                          keywords,
-                                          members.map(toPerson),
-                                          ResourceId(parentPath)
+      entities.NonRenkuProject.WithParent(
+        ResourceId(path),
+        path,
+        name,
+        maybeDescription,
+        dateCreated,
+        maybeCreator.map(toPerson),
+        visibility,
+        keywords,
+        members.map(toPerson),
+        ResourceId(parentPath),
+        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
       )
     case GitLabProjectInfo(_,
                            name,
@@ -92,17 +96,20 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
                            keywords,
                            members,
                            visibility,
-                           None
+                           None,
+                           avatarUrl
         ) =>
-      entities.NonRenkuProject.WithoutParent(ResourceId(path),
-                                             path,
-                                             name,
-                                             maybeDescription,
-                                             dateCreated,
-                                             maybeCreator.map(toPerson),
-                                             visibility,
-                                             keywords,
-                                             members.map(toPerson)
+      entities.NonRenkuProject.WithoutParent(
+        ResourceId(path),
+        path,
+        name,
+        maybeDescription,
+        dateCreated,
+        maybeCreator.map(toPerson),
+        visibility,
+        keywords,
+        members.map(toPerson),
+        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
       )
   }
 

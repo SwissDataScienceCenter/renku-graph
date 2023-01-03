@@ -41,7 +41,8 @@ private object UpdatesCreator extends UpdatesCreator {
     descriptionDeletion(project, kgData),
     keywordsDeletion(project, kgData),
     agentDeletion(project, kgData),
-    creatorDeletion(project, kgData)
+    creatorDeletion(project, kgData),
+    imageDeletion(project, kgData)
   ).flatten
 
   private def nameDeletion(project: Project, kgData: ProjectMutableData) =
@@ -155,6 +156,19 @@ private object UpdatesCreator extends UpdatesCreator {
         s"""|DELETE { GRAPH $resource { $resource schema:creator ?creator } }
             |WHERE  { GRAPH $resource { $resource schema:creator ?creator } }
             |""".stripMargin
+      )
+    }
+
+  private def imageDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(kgData.images.toSet != project.images.map(_.resourceId).toSet) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - delete project images",
+        Prefixes.of(schema -> "schema"),
+        s"""
+           |DELETE { Graph $resource { $resource schema:image ?img } }
+           |WHERE  { Graph $resource { $resource schema:image ?img } }
+           |""".stripMargin
       )
     }
 

@@ -26,6 +26,7 @@ import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
 import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.JsonLDDecoder.decodeList
@@ -61,6 +62,14 @@ object ProjectJsonLDDecoder {
         activities <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
         datasets   <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
         resourceId <- ResourceId(gitLabInfo.path).asRight
+        images <-
+          cursor
+            .downField(schema / "image")
+            .as[List[Image]]
+            .map(images =>
+              if (images.isEmpty) gitLabInfo.avatarUrl.toList.map(Image.projectImage(resourceId, _)) else images
+            )
+            .map(_.sortBy(_.position))
         project <- newProject(
                      gitLabInfo,
                      resourceId,
@@ -72,7 +81,8 @@ object ProjectJsonLDDecoder {
                      allPersons,
                      activities,
                      datasets,
-                     plans
+                     plans,
+                     images
                    )
       } yield project
     }
@@ -95,7 +105,8 @@ object ProjectJsonLDDecoder {
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
                          datasets:         List[Dataset[Dataset.Provenance]],
-                         plans:            List[Plan]
+                         plans:            List[Plan],
+                         images:           List[Image]
   )(implicit renkuUrl:                     RenkuUrl): Either[DecodingFailure, Project] = {
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
@@ -115,7 +126,8 @@ object ProjectJsonLDDecoder {
             activities,
             datasets,
             plans,
-            parentResourceId = ResourceId(parentPath)
+            parentResourceId = ResourceId(parentPath),
+            images
           )
           .widen[Project]
       case (Some(agent), Some(version), None) =>
@@ -134,7 +146,8 @@ object ProjectJsonLDDecoder {
             version,
             activities,
             datasets,
-            plans
+            plans,
+            images
           )
           .widen[Project]
       case (None, None, Some(parentPath)) =>
@@ -149,7 +162,8 @@ object ProjectJsonLDDecoder {
             gitLabInfo.visibility,
             keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            parentResourceId = ResourceId(parentPath)
+            parentResourceId = ResourceId(parentPath),
+            images
           )
           .validNel[String]
           .widen[Project]
@@ -164,7 +178,8 @@ object ProjectJsonLDDecoder {
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             keywords,
-            members(allJsonLdPersons)(gitLabInfo)
+            members(allJsonLdPersons)(gitLabInfo),
+            images
           )
           .validNel[String]
           .widen[Project]

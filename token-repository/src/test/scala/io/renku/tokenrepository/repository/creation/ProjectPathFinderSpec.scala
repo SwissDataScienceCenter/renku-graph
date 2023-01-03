@@ -114,8 +114,8 @@ class ProjectPathFinderSpec
       "path_with_namespace": ${projectPath.value}
     }"""
 
-    lazy val mapResponse = captureMapping(pathFinder, gitLabClient)(
-      findingMethod = _.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = pathFinder.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
       resultGenerator = projectPaths.generateOption
     )
   }

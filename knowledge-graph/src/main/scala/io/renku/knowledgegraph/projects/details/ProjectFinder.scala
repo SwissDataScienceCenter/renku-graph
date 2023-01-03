@@ -71,7 +71,8 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
-    maybeVersion = kgProject.maybeVersion
+    maybeVersion = kgProject.maybeVersion,
+    images = kgProject.images
   )
 
   private implicit class ParentOps(maybeParent: Option[KGParent]) {

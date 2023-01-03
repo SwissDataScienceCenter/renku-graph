@@ -29,6 +29,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
+import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
@@ -36,6 +37,9 @@ import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 
 trait ModelOps extends Dataset.ProvenanceOps {
+
+  def convertImageUris(project: EntityId)(images: List[ImageUri]): List[Image] =
+    Image.projectImage(projects.ResourceId(project), images)
 
   implicit class PersonOps(person: Person) {
 
@@ -112,7 +116,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
           parentProject.version,
           parentProject.activities,
           parentProject.datasets,
-          parentProject
+          parentProject,
+          child.images
         )
       )
 
@@ -224,7 +229,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
           ForksCount.Zero,
           child.keywords,
           child.members,
-          parentProject
+          parentProject,
+          child.images
         )
       )
   }

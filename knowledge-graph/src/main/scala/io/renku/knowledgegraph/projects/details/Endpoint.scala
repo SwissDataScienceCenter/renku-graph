@@ -22,7 +22,8 @@ import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
-import io.renku.graph.model.projects
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
@@ -50,7 +51,8 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
     projectJsonEncoder:    ProjectJsonEncoder,
     projectJsonLDEncoder:  ProjectJsonLDEncoder,
-    executionTimeRecorder: ExecutionTimeRecorder[F]
+    executionTimeRecorder: ExecutionTimeRecorder[F],
+    gitLabUrl:             GitLabUrl
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -59,6 +61,8 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   import io.renku.http.jsonld4s._
   import io.renku.http.server.endpoint._
   import org.http4s.circe.jsonEncoder
+
+  private implicit lazy val glUrl: GitLabUrl = gitLabUrl
 
   def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
       request:                    Request[F]
@@ -106,7 +110,8 @@ object Endpoint {
       projectFinder         <- ProjectFinder[F]
       jsonEncoder           <- ProjectJsonEncoder[F]
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    } yield new EndpointImpl[F](projectFinder, jsonEncoder, ProjectJsonLDEncoder, executionTimeRecorder)
+      gitLabUrl             <- GitLabUrlLoader[F]()
+    } yield new EndpointImpl[F](projectFinder, jsonEncoder, ProjectJsonLDEncoder, executionTimeRecorder, gitLabUrl)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath)

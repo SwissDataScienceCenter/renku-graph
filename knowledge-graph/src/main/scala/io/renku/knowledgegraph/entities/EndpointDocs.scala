@@ -149,7 +149,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       persons.Name("Jan Kowalski").some,
       List(projects.Keyword("key")),
-      projects.Description("Some project").some
+      projects.Description("Some project").some,
+      List(ImageUri("image.png"))
     ).asJson,
     Dataset(
       MatchingScore(1),

@@ -18,18 +18,18 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
+import io.circe.Encoder
 import io.renku.config.renku
 import io.renku.graph.model.datasets.{DerivedFrom, SameAs}
-import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph
 
-private object ProjectDatasetEncoder {
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.rest.Links.{Rel, _links}
+import io.renku.knowledgegraph
+import io.renku.knowledgegraph.projects.images.ImagesEncoder
+
+private object ProjectDatasetEncoder extends ImagesEncoder {
 
   import ProjectDatasetsFinder._
 
@@ -59,21 +59,5 @@ private object ProjectDatasetEncoder {
             Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, name)
           )
         )
-    }
-
-  private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
-      Json.arr(imageUris.map {
-        case uri: ImageUri.Relative =>
-          json"""{
-            "location": $uri
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
-          )
-        case uri: ImageUri.Absolute =>
-          json"""{
-            "location": $uri
-          }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
-      }: _*)
     }
 }
