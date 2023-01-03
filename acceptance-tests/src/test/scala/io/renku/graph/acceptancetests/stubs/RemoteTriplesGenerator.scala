@@ -65,6 +65,19 @@ trait RemoteTriplesGenerator {
     ()
   }
 
+  def `GET <triples-generator>/projects/:id/commits/:id returning OK with broken payload`(
+      project:  data.Project,
+      commitId: CommitId
+  ): Unit = {
+    stubFor {
+      get(s"/projects/${project.id}/commits/$commitId")
+        .willReturn(
+          ok(JsonLD.arr().toJson.spaces2)
+        )
+    }
+    ()
+  }
+
   def mockCommitDataOnTripleGenerator(
       project:   data.Project,
       triples:   JsonLD,
