@@ -25,7 +25,7 @@ libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfig
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 libraryDependencies += "eu.timepit"       %% "refined-pureconfig" % "0.10.1"
-libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.10.0"
+libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.11.0"
 libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % "9.4.2"
 
 val http4sVersion           = "0.23.16"
