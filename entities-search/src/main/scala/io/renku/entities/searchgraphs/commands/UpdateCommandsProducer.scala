@@ -35,5 +35,5 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
   override lazy val toUpdateCommands: List[SearchInfo.ProjectSearchInfo] => F[List[UpdateCommand]] =
     _.map { info =>
       fetchStoreSearchInfo(info.topmostSameAs).map(info -> _).map(calculateCommand)
-    }.sequence
+    }.sequence.map(_.flatten)
 }

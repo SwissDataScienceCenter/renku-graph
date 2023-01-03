@@ -23,7 +23,7 @@ import io.renku.entities.searchgraphs.SearchInfo.{ProjectSearchInfo, StoreSearch
 
 private object CommandCalculator {
 
-  def calculateCommand: ((ProjectSearchInfo, Option[StoreSearchInfo])) => UpdateCommand = { _ =>
-    UpdateCommand
+  def calculateCommand: ((ProjectSearchInfo, Option[StoreSearchInfo])) => List[UpdateCommand] = { _ =>
+    List()
   }
 }

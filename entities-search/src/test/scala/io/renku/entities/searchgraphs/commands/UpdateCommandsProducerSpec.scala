@@ -44,7 +44,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
         givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
       }
 
-      commandsProducer.toUpdateCommands(searchInfos.map(_._1)) shouldBe searchInfos.map(calculateCommand).pure[Try]
+      commandsProducer.toUpdateCommands(searchInfos.map(_._1)) shouldBe (searchInfos flatMap calculateCommand).pure[Try]
     }
   }
 

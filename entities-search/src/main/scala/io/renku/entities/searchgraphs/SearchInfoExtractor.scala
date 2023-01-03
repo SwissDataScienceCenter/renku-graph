@@ -34,7 +34,7 @@ private object SearchInfoExtractor {
         ds.additionalInfo.keywords,
         ds.additionalInfo.maybeDescription,
         ds.additionalInfo.images,
-        Link(ds.identification.resourceId, project.resourceId)
+        Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
       )
     }
 }

@@ -19,5 +19,10 @@
 package io.renku.entities.searchgraphs
 package commands
 
+import io.renku.triplesstore.model.Quad
+
 private[searchgraphs] trait UpdateCommand
-private[searchgraphs] object UpdateCommand extends UpdateCommand
+private[searchgraphs] object UpdateCommand {
+
+  final case class Insert(quad: Quad)
+}

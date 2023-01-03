@@ -57,14 +57,54 @@ private object SearchInfo {
                                    keywords:         List[Keyword],
                                    maybeDescription: Option[Description],
                                    images:           List[Image],
-                                   links:            List[Link]
+                                   links:            NonEmptyList[Link]
   ) extends SearchInfo
 }
 
-private final case class Link(dataset: ResourceId, project: projects.ResourceId)
+private final case class Link(resourceId: links.ResourceId, dataset: ResourceId, project: projects.ResourceId)
+private object Link {
+  def apply(topmostSameAs: TopmostSameAs,
+            datasetId:     ResourceId,
+            projectId:     projects.ResourceId,
+            projectPath:   projects.Path
+  ): Link = Link(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
+
+  implicit val linkEncoder: QuadsEncoder[Link] = QuadsEncoder.instance { case Link(resourceId, dataset, project) =>
+    List(
+      Quad(GraphClass.Datasets.id, resourceId, rdf / "type", renku / "DatasetProjectLink"),
+      Quad(GraphClass.Datasets.id, resourceId, renku / "project", project.asEntityId),
+      Quad(GraphClass.Datasets.id, resourceId, renku / "dataset", dataset.asEntityId)
+    )
+  }
+}
+
+private object links {
+  import io.renku.graph.model.views.EntityIdJsonLDOps
+  import io.renku.tinytypes.constraints.{Url => UrlConstraint}
+  import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+
+  class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  implicit object ResourceId
+      extends TinyTypeFactory[ResourceId](new ResourceId(_))
+      with UrlConstraint[ResourceId]
+      with EntityIdJsonLDOps[ResourceId] {
+
+    def from(topmostSameAs: TopmostSameAs, projectPath: projects.Path): ResourceId = ResourceId(
+      (topmostSameAs / projectPath).value
+    )
+  }
+}
 
 private final case class PersonInfo(resourceId: persons.ResourceId, name: persons.Name)
 
 private object PersonInfo {
   lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
+
+  implicit val personInfoEncoder: QuadsEncoder[PersonInfo] = QuadsEncoder.instance {
+    case PersonInfo(resourceId, name) =>
+      List(
+        Quad(GraphClass.Datasets.id, resourceId, rdf / "type", Person.Ontology.typeClass.id),
+        Quad(GraphClass.Datasets.id, resourceId, Person.Ontology.name, name)
+      )
+  }
 }
