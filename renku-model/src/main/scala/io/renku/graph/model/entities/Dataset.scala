@@ -499,34 +499,58 @@ object Dataset {
       } yield dataset
     }
 
-  val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
-  lazy val ontology: Type =
-    Type.Def(
-      ontologyClass,
-      ObjectProperties(
-        ObjectProperty(schema / "sameAs", SameAs.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", DerivedFrom.ontology),
-        ObjectProperty(schema / "creator", Person.ontology),
-        ObjectProperty(renku / "topmostSameAs", ontologyClass),
-        ObjectProperty(renku / "topmostDerivedFrom", ontologyClass),
-        ObjectProperty(schema / "image", Image.ontology),
-        ObjectProperty(schema / "hasPart", DatasetPart.ontology)
-      ),
-      DataProperties(
-        DataProperty(schema / "identifier", xsd / "string"),
-        DataProperty(schema / "name", xsd / "string"),
-        DataProperty(renku / "slug", xsd / "string"),
-        DataProperty(schema / "dateCreated", xsd / "dateTime"),
-        DataProperty(schema / "datePublished", xsd / "date"),
-        DataProperty(renku / "originalIdentifier", xsd / "string"),
-        DataProperty(prov / "invalidatedAtTime", xsd / "dateTime"),
-        DataProperty(schema / "description", xsd / "string"),
-        DataProperty(schema / "keywords", xsd / "string"),
-        DataProperty(schema / "license", xsd / "string"),
-        DataProperty(schema / "version", xsd / "string")
-      ),
-      ReverseProperties(PublicationEvent.ontology)
-    )
+  object Ontology {
+
+    val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
+
+    val sameAs:             Property = schema / "sameAs"
+    val wasDerivedFrom:     Property = prov / "wasDerivedFrom"
+    val creator:            Property = schema / "creator"
+    val topmostSameAs:      Property = renku / "topmostSameAs"
+    val topmostDerivedFrom: Property = renku / "topmostDerivedFrom"
+    val image:              Property = schema / "image"
+    val hasPart:            Property = schema / "hasPart"
+
+    val identifier:         Property = schema / "identifier"
+    val name:               Property = schema / "name"
+    val slug:               Property = renku / "slug"
+    val dateCreated:        Property = schema / "dateCreated"
+    val datePublished:      Property = schema / "datePublished"
+    val originalIdentifier: Property = renku / "originalIdentifier"
+    val invalidatedAtTime:  Property = prov / "invalidatedAtTime"
+    val description:        Property = schema / "description"
+    val keywords:           Property = schema / "keywords"
+    val license:            Property = schema / "license"
+    val version:            Property = schema / "version"
+
+    lazy val typeDef: Type =
+      Type.Def(
+        ontologyClass,
+        ObjectProperties(
+          ObjectProperty(sameAs, SameAs.ontology),
+          ObjectProperty(wasDerivedFrom, DerivedFrom.ontology),
+          ObjectProperty(creator, Person.Ontology.typeDef),
+          ObjectProperty(topmostSameAs, ontologyClass),
+          ObjectProperty(topmostDerivedFrom, ontologyClass),
+          ObjectProperty(image, Image.Ontology.typeDef),
+          ObjectProperty(hasPart, DatasetPart.ontology)
+        ),
+        DataProperties(
+          DataProperty(identifier, xsd / "string"),
+          DataProperty(name, xsd / "string"),
+          DataProperty(slug, xsd / "string"),
+          DataProperty(dateCreated, xsd / "dateTime"),
+          DataProperty(datePublished, xsd / "date"),
+          DataProperty(originalIdentifier, xsd / "string"),
+          DataProperty(invalidatedAtTime, xsd / "dateTime"),
+          DataProperty(description, xsd / "string"),
+          DataProperty(keywords, xsd / "string"),
+          DataProperty(license, xsd / "string"),
+          DataProperty(version, xsd / "string")
+        ),
+        ReverseProperties(PublicationEvent.ontology)
+      )
+  }
 }
 
 trait DatasetOps[+P <: Provenance] {

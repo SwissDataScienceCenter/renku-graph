@@ -30,7 +30,7 @@ private trait OntologyGenerator {
 
 private object OntologyGenerator {
   private val types =
-    NonEmptyList.of(Project.ontology, CompositePlan.Ontology.typeDef)
+    NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef)
   private val instance = new OntologyGeneratorImpl(generateOntology(types, Schemas.renku))
   def apply(): OntologyGenerator = instance
 }

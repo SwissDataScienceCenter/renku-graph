@@ -32,7 +32,7 @@ import io.renku.jsonld._
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -126,7 +126,7 @@ object datasets {
 
     val ontology: Type = Type.Def(
       Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.ontologyClass)
+      ObjectProperty(schema / "url", Dataset.Ontology.typeDef)
     )
   }
 
@@ -225,7 +225,7 @@ object datasets {
 
     val ontology: Type = Type.Def(
       Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.ontologyClass)
+      ObjectProperty(schema / "url", Dataset.Ontology.typeDef)
     )
   }
 
@@ -233,6 +233,7 @@ object datasets {
   implicit object TopmostSameAs
       extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
       with constraints.Url[TopmostSameAs]
+      with UrlOps[TopmostSameAs]
       with UrlResourceRenderer[TopmostSameAs]
       with EntityIdJsonLDOps[TopmostSameAs] {
 

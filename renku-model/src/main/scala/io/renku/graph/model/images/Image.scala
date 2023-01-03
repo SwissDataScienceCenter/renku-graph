@@ -21,7 +21,7 @@ package io.renku.graph.model.images
 import io.renku.graph.model.Schemas.schema
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
 
@@ -45,9 +45,16 @@ object Image {
     } yield Image(resourceId, uri, position)
   }
 
-  val ontology: Type = Type.Def(
-    Class(schema / "ImageObject"),
-    DataProperty(schema / "contentUrl", xsd / "string"),
-    DataProperty(schema / "position", xsd / "int")
-  )
+  object Ontology {
+
+    val typeClass:  Class    = Class(schema / "ImageObject")
+    val contentUrl: Property = schema / "contentUrl"
+    val position:   Property = schema / "position"
+
+    val typeDef: Type = Type.Def(
+      typeClass,
+      DataProperty(contentUrl, xsd / "string"),
+      DataProperty(position, xsd / "int")
+    )
+  }
 }
