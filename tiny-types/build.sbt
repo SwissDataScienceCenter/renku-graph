@@ -29,12 +29,6 @@ libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeOpticsVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-libraryDependencies += "io.renku" %% "jsonld4s" % "0.7.0"
-
 val catsVersion = "2.9.0"
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
-
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.17.0"  % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.14"  % Test
-libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test

@@ -30,8 +30,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-  val arbitraryValues: List[Any] =
-    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 
   "toString" should {
 
@@ -66,6 +64,9 @@ class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       }
     }
   }
+
+  private lazy val arbitraryValues: List[Any] =
+    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 }
 
 class SensitiveSpec extends AnyWordSpec with should.Matchers {
@@ -88,8 +89,6 @@ class SensitiveSpec extends AnyWordSpec with should.Matchers {
 }
 
 class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
-  val arbitraryValues: List[Any] =
-    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 
   import TinyTypeTest._
 
@@ -159,6 +158,33 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
       }
     }
   }
+
+  "asTripleObject" should {
+
+    import io.renku.triplesstore.model.{TripleObject, TripleObjectEncoder}
+
+    import java.util.UUID
+
+    "return a TripleObjectEncoder for the TinyType if encoder for its value is available" in {
+
+      case class SomeTinyType(v: UUID) extends TinyType {
+        type V = UUID
+        override val value: UUID = v
+      }
+      object SomeTinyType extends TinyTypeFactory[SomeTinyType](new SomeTinyType(_))
+
+      implicit val uuidEncoder: TripleObjectEncoder[UUID] =
+        TripleObjectEncoder.instance(v => TripleObject.String(v.toString))
+
+      val value = Gen.uuid.generateOne
+      val tt    = SomeTinyType(value)
+
+      implicitly[TripleObjectEncoder[SomeTinyType]].apply(tt) shouldBe TripleObject.String(value.toString)
+    }
+  }
+
+  private lazy val arbitraryValues: List[Any] =
+    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 }
 
 class TypeNameSpec extends AnyWordSpec with should.Matchers {
