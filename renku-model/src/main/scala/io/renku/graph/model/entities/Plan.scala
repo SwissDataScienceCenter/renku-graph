@@ -61,9 +61,22 @@ object Plan {
     }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
-    CompositePlan.decoder
-      .asInstanceOf[JsonLDEntityDecoder[Plan]]
-      .orElse(StepPlan.decoder.asInstanceOf[JsonLDEntityDecoder[Plan]])
+    JsonLDDecoder.entity(EntityTypes.of(prov / "Plan")) { cursor =>
+      cursor.getEntityTypes
+        .flatMap {
+          case ets if ets.contains(StepPlan.entityTypes) =>
+            StepPlan.decoder.apply(cursor)
+          case ets if ets.contains(CompositePlan.Ontology.entityTypes) =>
+            CompositePlan.decoder.apply(cursor)
+          case ets =>
+            Left(
+              DecodingFailure(
+                DecodingFailure.Reason.CustomReason(show"Expected composite plan or step plan, but got: $ets"),
+                cursor.jsonLD.toJson.hcursor
+              )
+            )
+        }
+    }
 
   lazy val ontology: Type =
     Type.Def(
@@ -257,8 +270,11 @@ object StepPlan {
         )
     }
 
+  private val withStrictEntityTypes: Cursor => JsonLDDecoder.Result[Boolean] =
+    _.getEntityTypes.map(_ == StepPlan.entityTypes)
+
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
+    JsonLDDecoder.cacheableEntity(entityTypes, withStrictEntityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId            <- cursor.downEntityId.as[ResourceId]
@@ -444,8 +460,11 @@ object CompositePlan {
       )
     }
 
+  private val withStrictEntityTypes: Cursor => JsonLDDecoder.Result[Boolean] =
+    _.getEntityTypes.map(_ == CompositePlan.Ontology.entityTypes)
+
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDEntityDecoder[CompositePlan] =
-    JsonLDDecoder.cacheableEntity(Ontology.entityTypes) { cursor =>
+    JsonLDDecoder.entity(Ontology.entityTypes, withStrictEntityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId            <- cursor.downEntityId.as[ResourceId]

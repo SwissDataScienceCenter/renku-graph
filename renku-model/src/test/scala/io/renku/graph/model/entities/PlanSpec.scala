@@ -33,6 +33,7 @@ import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.entities.PlanLens.{planDateCreated, planInvalidationTime}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
+import io.renku.graph.model.tools.JsonLDTools
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
@@ -196,6 +197,34 @@ class PlanSpec
 
       spDecoded shouldBe Right(List(sp))
       cpDecoded shouldBe Right(List(cp))
+    }
+
+    "fail decode if not strictly matching entity types (composite plan)" in {
+      val cp = compositePlanGen().generateOne
+        .to[entities.CompositePlan]
+
+      val newJson =
+        JsonLDTools
+          .view(cp)
+          .selectByTypes(entities.CompositePlan.Ontology.entityTypes)
+          .addType(renku / "WorkflowCompositePlan")
+          .value
+
+      newJson.cursor.as[List[entities.CompositePlan]] shouldBe Right(Nil)
+    }
+
+    "fail decode if not strictly matching entity types (step plan)" in {
+      val sp = stepPlanEntities().generateOne
+        .to[entities.StepPlan]
+
+      val newJson =
+        JsonLDTools
+          .view(sp)
+          .selectByTypes(entities.StepPlan.entityTypes)
+          .addType(renku / "WorkflowPlan")
+          .value
+
+      newJson.cursor.as[List[entities.StepPlan]] shouldBe Right(Nil)
     }
 
     "fail decode if a parameter maps to itself" in {
@@ -440,5 +469,5 @@ class PlanSpec
     .run(projectCreatedDates().generateOne)
 
   private def flattenedJsonLD[A: JsonLDEncoder](value: A): JsonLD =
-    JsonLDEncoder[A].apply(value).flatten.fold(fail(_), identity)
+    JsonLDTools.flattenedJsonLD(value)
 }
