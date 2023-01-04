@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 package reprovisioning
 
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.EitherT
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -28,7 +28,6 @@ import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.RenkuVersionPair
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
@@ -44,15 +43,15 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 private class ReProvisioningImpl[F[_]: Temporal: Logger](
-    versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-    reProvisionJudge:          ReProvisionJudge[F],
-    triplesRemover:            TriplesRemover[F],
-    eventSender:               EventSender[F],
-    versionPairUpdater:        RenkuVersionPairUpdater[F],
-    microserviceUrlFinder:     MicroserviceUrlFinder[F],
-    reProvisioningStatus:      ReProvisioningStatus[F],
-    executionTimeRecorder:     ExecutionTimeRecorder[F],
-    retryDelay:                FiniteDuration
+    compatibility:         VersionCompatibilityConfig,
+    reProvisionJudge:      ReProvisionJudge[F],
+    triplesRemover:        TriplesRemover[F],
+    eventSender:           EventSender[F],
+    versionPairUpdater:    RenkuVersionPairUpdater[F],
+    microserviceUrlFinder: MicroserviceUrlFinder[F],
+    reProvisioningStatus:  ReProvisioningStatus[F],
+    executionTimeRecorder: ExecutionTimeRecorder[F],
+    retryDelay:            FiniteDuration
 ) extends ConditionedMigration[F] {
 
   override val name: Migration.Name = migrationName
@@ -79,8 +78,8 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     for {
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
-             .update(versionCompatibilityPairs.head)
-             .recoverWith(tryAgain(versionPairUpdater.update(versionCompatibilityPairs.head)))
+             .update(compatibility.asVersionPair)
+             .recoverWith(tryAgain(versionPairUpdater.update(compatibility.asVersionPair)))
       _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
       _ <- sendStatusChangeEvent() recoverWith tryAgain(sendStatusChangeEvent())
     } yield ()
@@ -129,16 +128,13 @@ private[migrations] object ReProvisioning {
       migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
       eventSender                <- EventSender[F]
       microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
-      compatibilityMatrix        <- VersionCompatibilityConfig[F](config)
+      compatibility              <- VersionCompatibilityConfig.fromConfigF[F](config)
       executionTimeRecorder      <- ExecutionTimeRecorder[F]()
       triplesRemover             <- TriplesRemoverImpl(config)
-      judge <- ReProvisionJudge[F](migrationsConnectionConfig,
-                                   ReProvisioningStatus[F],
-                                   microserviceUrlFinder,
-                                   compatibilityMatrix
-               )
+      judge <-
+        ReProvisionJudge[F](migrationsConnectionConfig, ReProvisioningStatus[F], microserviceUrlFinder, compatibility)
     } yield new ReProvisioningImpl[F](
-      compatibilityMatrix,
+      compatibility,
       judge,
       triplesRemover,
       eventSender,

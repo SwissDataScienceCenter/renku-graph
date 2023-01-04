@@ -18,16 +18,15 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.cliVersions
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.interpreters.TestLogger
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
+import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,57 +41,30 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
     "return true when TS schema version cannot be found" in new TestCase {
       (versionPairFinder.find _).expects().returning(Option.empty[RenkuVersionPair].pure[Try])
 
-      judge(NonEmptyList.one(renkuVersionPairs.generateOne)).reProvisioningNeeded() shouldBe true.pure[Try]
+      judge(compatibilityGen.generateOne).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
     "return true when TS schema version is different than the matrix schema version" in new TestCase {
       val tsVersionPair = renkuVersionPairs.generateOne
       (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
-      val matrixVersionPairs = renkuVersionPairs.generateNonEmptyList(min = 2)
+      val configVersionPairs = compatibilityGen
+        .suchThat(_.schemaVersion != tsVersionPair.schemaVersion)
+        .map(_.copy(reProvisioningNeeded = true))
 
-      judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
+      judge(configVersionPairs.generateOne).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
-    "return true when the top two schema versions in the matrix are the same " +
-      "but TS CLI version is different than the top CLI version in the matrix" in new TestCase {
-        val tsVersionPair = renkuVersionPairs.generateOne
-        (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
-
-        val matrixVersionPairs = renkuVersionPairs
-          .generateNonEmptyList(min = 2)
-          .map(_.copy(schemaVersion = tsVersionPair.schemaVersion))
-
-        judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
-      }
-
     "return false when TS schema version is the same as the matrix schema version " +
-      "and the top two schema versions in the matrix are different " +
       "and there's no ongoing re-provisioning" in new TestCase {
         val tsVersionPair = renkuVersionPairs.generateOne
         (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
-        val matrixVersionPair = NonEmptyList.of(
-          tsVersionPair.copy(cliVersion = cliVersions.generateOne),
-          renkuVersionPairs.generateOne
-        )
+        val matrixVersionPair = VersionCompatibilityConfig(tsVersionPair, true)
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
 
         judge(matrixVersionPair).reProvisioningNeeded() shouldBe false.pure[Try]
-      }
-
-    "return false when TS schema version is the same as the matrix schema version " +
-      "and there's a single row in the matrix" +
-      "and there's no ongoing re-provisioning" in new TestCase {
-        val tsVersionPair = renkuVersionPairs.generateOne
-        (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
-
-        val matrixVersionPair = renkuVersionPairs.generateOne.copy(schemaVersion = tsVersionPair.schemaVersion)
-
-        (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
-
-        judge(NonEmptyList.one(matrixVersionPair)).reProvisioningNeeded() shouldBe false.pure[Try]
       }
 
     "return false if schema and CLI version checks resolve to false " +
@@ -112,7 +84,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (serviceHealthChecker.ping _).expects(controller).returning(true.pure[Try])
 
-        val matrixVersionPairs = NonEmptyList.of(tsVersionPair)
+        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
 
         judge(matrixVersionPairs).reProvisioningNeeded() shouldBe false.pure[Try]
       }
@@ -134,7 +106,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (serviceHealthChecker.ping _).expects(controller).returning(false.pure[Try])
 
-        val matrixVersionPairs = NonEmptyList.of(tsVersionPair)
+        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
 
         judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
       }
@@ -153,7 +125,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[Try])
 
-        val matrixVersionPairs = NonEmptyList.of(tsVersionPair)
+        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
 
         judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
       }
@@ -171,7 +143,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
           .expects()
           .returning(Option.empty[MicroserviceBaseUrl].pure[Try])
 
-        val matrixVersionPairs = NonEmptyList.of(tsVersionPair)
+        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
 
         judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
       }
@@ -180,7 +152,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       val exception = exceptions.generateOne
       (versionPairFinder.find _).expects().returning(exception.raiseError[Try, Option[RenkuVersionPair]])
 
-      judge(NonEmptyList.one(renkuVersionPairs.generateOne)).reProvisioningNeeded() shouldBe exception
+      judge(compatibilityGen.generateOne).reProvisioningNeeded() shouldBe exception
         .raiseError[Try, Boolean]
     }
   }
@@ -191,11 +163,11 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
     val reProvisioningStatus  = mock[ReProvisioningStatus[Try]]
     val microserviceUrlFinder = mock[MicroserviceUrlFinder[Try]]
     val serviceHealthChecker  = mock[ServiceHealthChecker[Try]]
-    def judge(compatibilityMatrix: NonEmptyList[RenkuVersionPair]) = new ReProvisionJudgeImpl(versionPairFinder,
-                                                                                              reProvisioningStatus,
-                                                                                              microserviceUrlFinder,
-                                                                                              serviceHealthChecker,
-                                                                                              compatibilityMatrix
+    def judge(compatibility: VersionCompatibilityConfig) = new ReProvisionJudgeImpl(versionPairFinder,
+                                                                                    reProvisioningStatus,
+                                                                                    microserviceUrlFinder,
+                                                                                    serviceHealthChecker,
+                                                                                    compatibility
     )
   }
 }
