@@ -48,8 +48,8 @@ object SparqlEncoder {
       SparqlEncoder[B](b => fa(f(b)))
   }
 
-  object Implicits extends Implicits
-  trait Implicits {
+  object Instances extends Instances
+  trait Instances {
 
     implicit val entityIdSparqlEncoder: SparqlEncoder[EntityId] = iriEncoder.contramap(_.show)
     implicit val propertySparqlEncoder: SparqlEncoder[Property] = iriEncoder.contramap(_.show)

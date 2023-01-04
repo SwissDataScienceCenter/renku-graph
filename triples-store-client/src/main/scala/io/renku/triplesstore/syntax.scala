@@ -21,7 +21,7 @@ package io.renku.triplesstore
 import model._
 import sparql.{Fragment, SparqlEncoder}
 
-object syntax extends TripleObjectEncoder.Implicits with SparqlEncoder.Implicits {
+object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances {
 
   implicit class ModelOps[T](obj: T) {
 

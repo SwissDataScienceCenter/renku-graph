@@ -28,7 +28,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class TripleObjectEncoderSpec extends AnyWordSpec with should.Matchers {
 
-  import TripleObjectEncoder.Implicits._
+  import TripleObjectEncoder.Instances._
 
   "TripleObjectEncoder" should {
 

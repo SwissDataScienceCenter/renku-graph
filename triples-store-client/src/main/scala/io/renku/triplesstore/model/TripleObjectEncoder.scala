@@ -36,8 +36,8 @@ object TripleObjectEncoder {
       TripleObjectEncoder[B](b => fa(f(b)))
   }
 
-  object Implicits extends Implicits
-  trait Implicits {
+  object Instances extends Instances
+  trait Instances {
 
     implicit val booleanEncoder: TripleObjectEncoder[scala.Boolean] = TripleObjectEncoder.instance(TripleObject.Boolean)
     implicit val intEncoder:     TripleObjectEncoder[scala.Int]     = TripleObjectEncoder.instance(TripleObject.Int)
