@@ -5,7 +5,7 @@ import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.entities.Person
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.model.QuadsEncoder
-import io.renku.triplesstore.model.syntax._
+import io.renku.triplesstore.syntax._
 
 private object Encoders {
 

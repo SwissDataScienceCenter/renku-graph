@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore.sparql
 
-trait QuadsEncoder[T] extends (T => List[Quad])
+import cats.Show
 
-object QuadsEncoder {
+final case class Fragment(sparql: String)
 
-  def instance[T](f: T => List[Quad]): QuadsEncoder[T] = (t: T) => f(t)
+object Fragment {
+  implicit val show: Show[Fragment] = Show.show(_.sparql)
 }

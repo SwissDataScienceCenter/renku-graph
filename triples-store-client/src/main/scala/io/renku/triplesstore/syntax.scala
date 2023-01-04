@@ -16,11 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore
 
-trait QuadsEncoder[T] extends (T => List[Quad])
+import model._
+import sparql.{Fragment, SparqlEncoder}
 
-object QuadsEncoder {
+object syntax extends TripleObjectEncoder.Implicits with SparqlEncoder.Implicits {
 
-  def instance[T](f: T => List[Quad]): QuadsEncoder[T] = (t: T) => f(t)
+  implicit class ModelOps[T](obj: T) {
+
+    def asQuads(implicit enc: QuadsEncoder[T]): List[Quad] = enc(obj)
+
+    def asTripleObject(implicit enc: TripleObjectEncoder[T]): TripleObject = enc(obj)
+
+    def asSparql(implicit enc: SparqlEncoder[T]): Fragment = enc(obj)
+  }
 }

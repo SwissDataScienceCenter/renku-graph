@@ -3,7 +3,7 @@ package io.renku.entities.searchgraphs.commands
 import io.renku.graph.model.GraphClass
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityIdEncoder, Property}
-import io.renku.triplesstore.model.syntax._
+import io.renku.triplesstore.syntax._
 import io.renku.triplesstore.model.{Quad, TripleObjectEncoder}
 
 private object DatasetsQuad {
