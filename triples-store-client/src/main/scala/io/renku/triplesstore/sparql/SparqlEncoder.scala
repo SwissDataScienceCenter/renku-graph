@@ -22,7 +22,7 @@ package sparql
 import cats.Contravariant
 import cats.syntax.all._
 import io.renku.jsonld.{EntityId, Property}
-import model.{Triple, TripleObject}
+import model.{Quad, Triple, TripleObject}
 import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
 
@@ -81,6 +81,12 @@ object SparqlEncoder {
         Fragment(
           s"${entityIdSparqlEncoder(subject).sparql} ${propertySparqlEncoder(predicate).sparql} ${tripleObjectSparqlEncoder(obj).sparql}"
         )
+    }
+
+    implicit val quadSparqlEncoder: SparqlEncoder[Quad] = SparqlEncoder.instance { case Quad(graphId, triple) =>
+      Fragment(
+        s"GRAPH ${entityIdSparqlEncoder(graphId).sparql} { ${tripleSparqlEncoder(triple).sparql} }"
+      )
     }
   }
 }

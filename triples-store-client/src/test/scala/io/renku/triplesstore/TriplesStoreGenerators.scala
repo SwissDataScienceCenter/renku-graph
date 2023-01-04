@@ -21,7 +21,7 @@ package io.renku.triplesstore
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.jsonld.JsonLDGenerators._
-import model.{Triple, TripleObject}
+import model.{Quad, Triple, TripleObject}
 import org.scalacheck.{Arbitrary, Gen}
 
 object TriplesStoreGenerators {
@@ -45,4 +45,7 @@ object TriplesStoreGenerators {
 
   implicit val triples: Gen[Triple] =
     (entityIds, properties, tripleObjects).mapN(Triple)
+
+  implicit val quads: Gen[Quad] =
+    (entityIds, triples).mapN(Quad(_, _))
 }

@@ -22,7 +22,7 @@ package sparql
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.triplesstore.TriplesStoreGenerators._
-import io.renku.triplesstore.model.Triple
+import io.renku.triplesstore.model.{Quad, Triple}
 import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
@@ -74,6 +74,13 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
       forAll { (triple: Triple) =>
         triple.asSparql.sparql shouldBe
           s"<${URIref.encode(triple.subject.show)}> <${URIref.encode(triple.predicate.show)}> ${triple.obj.asSparql.sparql}"
+      }
+    }
+
+    "be able to encode a Quad as Fragment" in {
+      forAll { (quad: Quad) =>
+        quad.asSparql.sparql shouldBe
+          s"GRAPH <${URIref.encode(quad.graphId.show)}> { ${quad.triple.asSparql.sparql} }"
       }
     }
   }
