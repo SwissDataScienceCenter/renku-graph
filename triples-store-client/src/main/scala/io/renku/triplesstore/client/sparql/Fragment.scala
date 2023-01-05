@@ -16,19 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesstore.client.sparql
 
-import model._
-import sparql.{Fragment, SparqlEncoder}
+import cats.Show
 
-object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances {
+final case class Fragment(sparql: String)
 
-  implicit class ModelOps[T](obj: T) {
-
-    def asQuads(implicit enc: QuadsEncoder[T]): List[Quad] = enc(obj)
-
-    def asTripleObject(implicit enc: TripleObjectEncoder[T]): TripleObject = enc(obj)
-
-    def asSparql(implicit enc: SparqlEncoder[T]): Fragment = enc(obj)
-  }
+object Fragment {
+  implicit val show: Show[Fragment] = Show.show(_.sparql)
 }

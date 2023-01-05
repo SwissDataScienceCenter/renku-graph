@@ -16,14 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore.client.model
 
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityId, Property}
 
-final case class Quad(graphId: EntityId, triple: Triple)
-
-object Quad {
-
-  def apply(graphId: EntityId, subject: EntityId, predicate: Property, obj: TripleObject): Quad =
-    Quad(graphId, Triple(subject, predicate, obj))
-}
+final case class Triple(subject: EntityId, predicate: Property, obj: TripleObject)

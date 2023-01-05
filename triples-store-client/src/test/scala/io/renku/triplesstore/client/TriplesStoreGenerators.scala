@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesstore.client
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestamps
 import io.renku.generators.jsonld.JsonLDGenerators._
-import model.{Quad, Triple, TripleObject}
+import io.renku.triplesstore.client.model.{Quad, Triple, TripleObject}
 import org.scalacheck.{Arbitrary, Gen}
 
 object TriplesStoreGenerators {
@@ -32,15 +33,18 @@ object TriplesStoreGenerators {
   implicit val floatTripleObjects:   Gen[TripleObject.Float]   = Arbitrary.arbFloat.arbitrary map TripleObject.Float
   implicit val doubleTripleObjects:  Gen[TripleObject.Double]  = Arbitrary.arbDouble.arbitrary map TripleObject.Double
   implicit val stringTripleObjects:  Gen[TripleObject.String]  = Arbitrary.arbString.arbitrary map TripleObject.String
+  implicit val instantTripleObjects: Gen[TripleObject.Instant] = timestamps map TripleObject.Instant
   implicit val iriTripleObjects:     Gen[TripleObject.Iri]     = entityIds map TripleObject.Iri
 
-  implicit val tripleObjects: Gen[TripleObject] = Gen.oneOf(booleanTripleObjects,
-                                                            intTripleObjects,
-                                                            longTripleObjects,
-                                                            floatTripleObjects,
-                                                            doubleTripleObjects,
-                                                            stringTripleObjects,
-                                                            iriTripleObjects
+  implicit val tripleObjects: Gen[TripleObject] = Gen.oneOf(
+    booleanTripleObjects,
+    intTripleObjects,
+    longTripleObjects,
+    floatTripleObjects,
+    doubleTripleObjects,
+    stringTripleObjects,
+    instantTripleObjects,
+    iriTripleObjects
   )
 
   implicit val triples: Gen[Triple] =

@@ -16,37 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
-package model
+package io.renku.triplesstore.client
+package sparql
 
-import TripleObject._
-import TriplesStoreGenerators._
+import TriplesStoreGenerators.{quads, triples}
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.triplesstore.client.syntax._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
-import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
+class FragmentSpec extends AnyWordSpec with should.Matchers {
 
   "show" should {
 
-    forAll {
-      Table(
-        "type"    -> "value generator",
-        "Boolean" -> booleanTripleObjects,
-        "Int"     -> intTripleObjects,
-        "Long"    -> longTripleObjects,
-        "Float"   -> floatTripleObjects,
-        "Double"  -> doubleTripleObjects,
-        "String"  -> stringTripleObjects,
-        "Iri"     -> iriTripleObjects
-      )
-    } { (objectType, valueGenerator) =>
-      s"return string representation of $objectType type" in {
-        val obj = valueGenerator.generateOne
-        obj.show shouldBe obj.value.toString
-      }
+    "return the sparql property value" in {
+      val fragment = Gen.oneOf(triples.map(_.asSparql), quads.map(_.asSparql)).generateOne
+      fragment.show shouldBe fragment.sparql
     }
   }
 }

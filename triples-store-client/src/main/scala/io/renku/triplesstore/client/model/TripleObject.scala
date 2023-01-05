@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore.client.model
 
 import cats.Show
 import cats.syntax.all._
@@ -53,6 +53,10 @@ object TripleObject {
     override type T = Predef.String
   }
 
+  final case class Instant(value: java.time.Instant) extends AnyVal with TripleObject {
+    override type T = java.time.Instant
+  }
+
   final case class Iri(value: EntityId) extends TripleObject {
     override type T = EntityId
   }
@@ -64,6 +68,7 @@ object TripleObject {
     case v: TripleObject.Float   => v.value.show
     case v: TripleObject.Double  => v.value.show
     case v: TripleObject.String  => v.value.show
+    case v: TripleObject.Instant => v.value.toString
     case v: TripleObject.Iri     => v.value.show
   }
 }

@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
-package model
+package io.renku.triplesstore.client.model
 
 import cats.Contravariant
 import cats.syntax.all._
 import io.renku.jsonld.{EntityId, Property}
+
+import java.time.{Instant => JInstant}
 
 trait TripleObjectEncoder[O] extends (O => TripleObject)
 
@@ -31,7 +32,7 @@ object TripleObjectEncoder {
 
   def instance[T](f: T => TripleObject): TripleObjectEncoder[T] = (t: T) => f(t)
 
-  implicit lazy val contravariant: Contravariant[TripleObjectEncoder] = new Contravariant[TripleObjectEncoder] {
+  implicit lazy val objectContravariant: Contravariant[TripleObjectEncoder] = new Contravariant[TripleObjectEncoder] {
     def contramap[A, B](fa: TripleObjectEncoder[A])(f: B => A): TripleObjectEncoder[B] =
       TripleObjectEncoder[B](b => fa(f(b)))
   }
@@ -39,13 +40,16 @@ object TripleObjectEncoder {
   object Instances extends Instances
   trait Instances {
 
-    implicit val booleanEncoder: TripleObjectEncoder[scala.Boolean] = TripleObjectEncoder.instance(TripleObject.Boolean)
-    implicit val intEncoder:     TripleObjectEncoder[scala.Int]     = TripleObjectEncoder.instance(TripleObject.Int)
-    implicit val longEncoder:    TripleObjectEncoder[scala.Long]    = TripleObjectEncoder.instance(TripleObject.Long)
-    implicit val floatEncoder:   TripleObjectEncoder[scala.Float]   = TripleObjectEncoder.instance(TripleObject.Float)
-    implicit val doubleEncoder:  TripleObjectEncoder[scala.Double]  = TripleObjectEncoder.instance(TripleObject.Double)
-    implicit val stringEncoder:  TripleObjectEncoder[Predef.String] = TripleObjectEncoder.instance(TripleObject.String)
-    implicit val entityIdEncoder: TripleObjectEncoder[EntityId] = TripleObjectEncoder.instance(TripleObject.Iri)
-    implicit val propertyEncoder: TripleObjectEncoder[Property] = entityIdEncoder.contramap(p => EntityId.of(p))
+    implicit val booleanObjEncoder: TripleObjectEncoder[scala.Boolean] =
+      TripleObjectEncoder.instance(TripleObject.Boolean)
+    implicit val intObjEncoder:    TripleObjectEncoder[scala.Int]    = TripleObjectEncoder.instance(TripleObject.Int)
+    implicit val longObjEncoder:   TripleObjectEncoder[scala.Long]   = TripleObjectEncoder.instance(TripleObject.Long)
+    implicit val floatObjEncoder:  TripleObjectEncoder[scala.Float]  = TripleObjectEncoder.instance(TripleObject.Float)
+    implicit val doubleObjEncoder: TripleObjectEncoder[scala.Double] = TripleObjectEncoder.instance(TripleObject.Double)
+    implicit val stringObjEncoder: TripleObjectEncoder[Predef.String] =
+      TripleObjectEncoder.instance(TripleObject.String)
+    implicit val instantObjEncoder:  TripleObjectEncoder[JInstant] = TripleObjectEncoder.instance(TripleObject.Instant)
+    implicit val entityIdObjEncoder: TripleObjectEncoder[EntityId] = TripleObjectEncoder.instance(TripleObject.Iri)
+    implicit val propertyObjEncoder: TripleObjectEncoder[Property] = entityIdObjEncoder.contramap(p => EntityId.of(p))
   }
 }

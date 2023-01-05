@@ -16,15 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore.client.model
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestamps
 import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.jsonld.{EntityId, Property}
 import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class TripleObjectEncoderSpec extends AnyWordSpec with should.Matchers {
 
@@ -62,6 +65,11 @@ class TripleObjectEncoderSpec extends AnyWordSpec with should.Matchers {
       implicitly[TripleObjectEncoder[String]].apply(value) shouldBe TripleObject.String(value)
     }
 
+    "define implicit encoder turning Instant value to TripleObject.Instant" in {
+      val value = timestamps.generateOne
+      implicitly[TripleObjectEncoder[Instant]].apply(value) shouldBe TripleObject.Instant(value)
+    }
+
     "define implicit encoder turning EntityId value to TripleObject.Iri" in {
       val value = entityIds.generateOne
       implicitly[TripleObjectEncoder[EntityId]].apply(value) shouldBe TripleObject.Iri(value)
@@ -78,7 +86,7 @@ class TripleObjectEncoderSpec extends AnyWordSpec with should.Matchers {
     "define implicit Contravariant instance" in {
       case class SomeType(value: String)
 
-      val someTypeEncoder: TripleObjectEncoder[SomeType] = stringEncoder.contramap(v => v.value)
+      val someTypeEncoder: TripleObjectEncoder[SomeType] = stringObjEncoder.contramap(v => v.value)
 
       val value = Arbitrary.arbString.arbitrary.generateAs(SomeType)
 

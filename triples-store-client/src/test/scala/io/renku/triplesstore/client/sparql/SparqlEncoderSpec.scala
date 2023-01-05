@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesstore.client
 package sparql
 
+import TriplesStoreGenerators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.triplesstore.TriplesStoreGenerators._
-import io.renku.triplesstore.model.{Quad, Triple}
+import model.{Quad, Triple}
 import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
@@ -63,6 +63,11 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
     "be able to encode TripleObject.String as sparql with Jena specific characters escaping" in {
       val obj = stringTripleObjects.generateOne
       obj.asSparql.sparql shouldBe s"'${EscapeStr.stringEsc(obj.value)}'"
+    }
+
+    "be able to encode TripleObject.Instant as sparql" in {
+      val obj = instantTripleObjects.generateOne
+      obj.asSparql.sparql shouldBe s"'${obj.value.toString}'^^<http://www.w3.org/2001/XMLSchema#dateTime>"
     }
 
     "be able to encode TripleObject.Iri as sparql with RFC 2396 specific characters encoding" in {

@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore.model
+package io.renku.triplesstore.client.model
 
-import io.renku.jsonld.{EntityId, Property}
+trait QuadsEncoder[T] extends (T => List[Quad])
 
-final case class Triple(subject: EntityId, predicate: Property, obj: TripleObject)
+object QuadsEncoder {
+
+  def instance[T](f: T => List[Quad]): QuadsEncoder[T] = (t: T) => f(t)
+}

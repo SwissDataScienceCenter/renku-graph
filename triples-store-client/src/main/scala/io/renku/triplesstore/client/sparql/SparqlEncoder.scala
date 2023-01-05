@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
-package sparql
+package io.renku.triplesstore.client.sparql
 
 import cats.Contravariant
 import cats.syntax.all._
+import io.renku.jsonld.ontology.xsd
 import io.renku.jsonld.{EntityId, Property}
-import model.{Quad, Triple, TripleObject}
+import io.renku.triplesstore.client.model.{Quad, Triple, TripleObject}
 import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
 
@@ -65,7 +65,11 @@ object SparqlEncoder {
     private val doubleObjectEncoder: SparqlEncoder[TripleObject.Double] =
       nonStringLiteralEncoder.contramap(_.value.toString)
     private val stringObjectEncoder: SparqlEncoder[TripleObject.String] = stringLiteralEncoder.contramap(_.value)
-    private val iriObjectEncoder:    SparqlEncoder[TripleObject.Iri]    = entityIdSparqlEncoder.contramap(_.value)
+    private val instantObjectEncoder: SparqlEncoder[TripleObject.Instant] =
+      SparqlEncoder.instance(v =>
+        Fragment(s"'${EscapeStr.stringEsc(v.value.toString)}'^^${propertySparqlEncoder(xsd / "dateTime").sparql}")
+      )
+    private val iriObjectEncoder: SparqlEncoder[TripleObject.Iri] = entityIdSparqlEncoder.contramap(_.value)
     implicit def tripleObjectSparqlEncoder[T <: TripleObject]: SparqlEncoder[T] = SparqlEncoder.instance {
       case o: TripleObject.Boolean => booleanObjectEncoder(o)
       case o: TripleObject.Int     => intObjectEncoder(o)
@@ -73,6 +77,7 @@ object SparqlEncoder {
       case o: TripleObject.Float   => floatObjectEncoder(o)
       case o: TripleObject.Double  => doubleObjectEncoder(o)
       case o: TripleObject.String  => stringObjectEncoder(o)
+      case o: TripleObject.Instant => instantObjectEncoder(o)
       case o: TripleObject.Iri     => iriObjectEncoder(o)
     }
 
