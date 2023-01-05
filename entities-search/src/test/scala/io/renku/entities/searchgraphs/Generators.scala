@@ -20,9 +20,11 @@ package io.renku.entities.searchgraphs
 
 import PersonInfo._
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.TopmostSameAs
+import io.renku.graph.model.datasets.{Date, TopmostSameAs}
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
@@ -30,17 +32,31 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  val searchInfoObjects: Gen[SearchInfo] = for {
-    topmostSameAs <- datasetTopmostSameAs
-    name          <- datasetNames
-    visibility    <- projectVisibilities
-    date          <- datasetDates
-    creators      <- personEntities.map(_.to[entities.Person]).map(toPersonInfo).toGeneratorOfNonEmptyList(max = 2)
-    keywords      <- datasetKeywords.toGeneratorOfList(max = 2)
-    maybeDesc     <- datasetDescriptions.toGeneratorOfOptions
-    images        <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
-    links         <- linkObjects(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
-  } yield SearchInfo(topmostSameAs, name, visibility, date, creators, keywords, maybeDesc, images, links)
+  lazy val searchInfoObjects: Gen[SearchInfo] = for {
+    topmostSameAs     <- datasetTopmostSameAs
+    name              <- datasetNames
+    visibility        <- projectVisibilities
+    date              <- datasetDates
+    maybeDateModified <- modifiedDates(notYoungerThan = date).toGeneratorOfOptions
+    creators          <- personEntities.map(_.to[entities.Person]).map(toPersonInfo).toGeneratorOfNonEmptyList(max = 2)
+    keywords          <- datasetKeywords.toGeneratorOfList(max = 2)
+    maybeDesc         <- datasetDescriptions.toGeneratorOfOptions
+    images            <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
+    links             <- linkObjects(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
+  } yield SearchInfo(topmostSameAs,
+                     name,
+                     visibility,
+                     date,
+                     maybeDateModified,
+                     creators,
+                     keywords,
+                     maybeDesc,
+                     images,
+                     links
+  )
+
+  def modifiedDates(notYoungerThan: Date): Gen[DateModified] =
+    timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))
 
   def linkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
     (datasetResourceIds, projectResourceIds, projectPaths)

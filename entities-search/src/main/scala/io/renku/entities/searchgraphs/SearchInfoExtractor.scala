@@ -19,25 +19,57 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
+import cats.MonadThrow
 import cats.data.NonEmptyList
+import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfo.DateModified
+import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.{Dataset, Project}
 
 private object SearchInfoExtractor {
 
-  def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
-    datasets.map { ds =>
-      SearchInfo(
-        ds.provenance.topmostSameAs,
-        ds.identification.name,
-        project.visibility,
-        ds.provenance.date,
-        ds.provenance.creators.map(toPersonInfo),
-        ds.additionalInfo.keywords,
-        ds.additionalInfo.maybeDescription,
-        ds.additionalInfo.images,
-        NonEmptyList.one(
-          Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
-        )
+  def extractSearchInfo[F[_]: MonadThrow](
+      project: Project
+  )(datasets:  List[Dataset[Dataset.Provenance]]): F[List[SearchInfo]] =
+    datasets
+      .map(toSearchInfo[F](project))
+      .sequence
+
+  private def toSearchInfo[F[_]: MonadThrow](project: Project)(ds: Dataset[Dataset.Provenance]) = ds.provenance match {
+    case prov: Dataset.Provenance.Modified =>
+      findDateInitial(prov, project)
+        .map(createSearchInfo(ds, _, DateModified(prov.date.instant).some, project))
+    case prov =>
+      createSearchInfo(ds, prov.date, maybeDateModified = None, project).pure[F]
+  }
+
+  private def findDateInitial[F[_]: MonadThrow](prov: Dataset.Provenance.Modified, project: Project): F[datasets.Date] =
+    project.datasets
+      .find(_.identification.resourceId.value == prov.topmostDerivedFrom.value)
+      .map(_.provenance.date.pure[F].widen[datasets.Date])
+      .getOrElse(
+        new Exception(
+          show"Cannot find original Dataset ${prov.topmostDerivedFrom} for project ${project.resourceId}"
+        ).raiseError[F, datasets.Date]
       )
-    }
+      .widen
+
+  private def createSearchInfo(ds:                Dataset[Dataset.Provenance],
+                               dateInitial:       datasets.Date,
+                               maybeDateModified: Option[DateModified],
+                               project:           Project
+  ) = SearchInfo(
+    ds.provenance.topmostSameAs,
+    ds.identification.name,
+    project.visibility,
+    dateInitial,
+    maybeDateModified,
+    ds.provenance.creators.map(toPersonInfo),
+    ds.additionalInfo.keywords,
+    ds.additionalInfo.maybeDescription,
+    ds.additionalInfo.images,
+    NonEmptyList.one(
+      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
+    )
+  )
 }

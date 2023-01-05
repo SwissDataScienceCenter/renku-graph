@@ -18,23 +18,42 @@
 
 package io.renku.entities.searchgraphs
 
+import SearchInfo.DateModified
 import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.tinytypes.constraints.InstantNotInTheFuture
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 
-private final case class SearchInfo(topmostSameAs:    TopmostSameAs,
-                                    name:             Name,
-                                    visibility:       Visibility,
-                                    date:             Date,
-                                    creators:         NonEmptyList[PersonInfo],
-                                    keywords:         List[Keyword],
-                                    maybeDescription: Option[Description],
-                                    images:           List[Image],
-                                    links:            NonEmptyList[Link]
+import java.time.Instant
+
+private final case class SearchInfo(topmostSameAs:     TopmostSameAs,
+                                    name:              Name,
+                                    visibility:        Visibility,
+                                    dateInitial:       Date,
+                                    maybeDateModified: Option[DateModified],
+                                    creators:          NonEmptyList[PersonInfo],
+                                    keywords:          List[Keyword],
+                                    maybeDescription:  Option[Description],
+                                    images:            List[Image],
+                                    links:             NonEmptyList[Link]
 )
+
+private object SearchInfo {
+
+  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateModified
+      extends TinyTypeFactory[DateModified](new DateModified(_))
+      with InstantNotInTheFuture[DateModified]
+      with TinyTypeJsonLDOps[DateModified] {
+
+    def apply(date: datasets.DateCreated): DateModified = DateModified(date.instant)
+  }
+}
 
 private final case class Link(resourceId: links.ResourceId, dataset: ResourceId, project: projects.ResourceId)
 private object Link {

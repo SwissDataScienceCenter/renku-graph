@@ -57,8 +57,10 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
     val provisioner                = new DatasetsGraphProvisionerImpl[Try](searchInfoUploader)
 
     def givenUploadingDSFrom(project: entities.Project, returning: Try[Unit]) =
-      (searchInfoUploader.upload _)
-        .expects((collectLastVersions >>> extractSearchInfo(project))(project))
-        .returning(returning)
+      (collectLastVersions >>> extractSearchInfo[Try](project))(project) foreach { searchInfos =>
+        (searchInfoUploader.upload _)
+          .expects(searchInfos)
+          .returning(returning)
+      }
   }
 }

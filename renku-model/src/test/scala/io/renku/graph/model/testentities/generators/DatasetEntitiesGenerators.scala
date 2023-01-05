@@ -19,7 +19,7 @@
 package io.renku.graph.model.testentities
 package generators
 
-import cats.data.NonEmptyList
+import cats.data.{Kleisli, NonEmptyList}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -254,6 +254,9 @@ trait DatasetEntitiesGenerators {
     def multiple: List[DatasetGenFactory[P]] = List.fill(positiveInts(5).generateOne)(factory)
 
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
+
+    def createModification: DatasetGenFactory[Dataset.Provenance.Modified] =
+      dateCreated => Kleisli(factory).flatMap(ds => Kleisli(ds.createModification())).run(dateCreated)
 
     def toGeneratorFor(project: RenkuProject): Gen[Dataset[P]] = factory(project.dateCreated)
 

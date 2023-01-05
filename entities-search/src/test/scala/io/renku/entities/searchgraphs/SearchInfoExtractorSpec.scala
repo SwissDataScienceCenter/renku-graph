@@ -19,45 +19,81 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
-import cats.data.{Kleisli, NonEmptyList}
+import cats.data.NonEmptyList
+import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.util.Try
+
 class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
 
   "extractSearchInfo" should {
 
-    "convert the given Datasets to SearchInfo objects" in {
+    "convert the given non-modified Datasets to SearchInfo objects" in {
 
-      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+      val project = anyRenkuProjectEntities
+        .withDatasets(List.fill(positiveInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*)
+        .generateOne
+        .to[entities.Project]
 
-      val modifiedDatasets = Kleisli(datasetEntities(provenanceNonModified))
-        .flatMap(ds => Kleisli(ds.createModification()))
-        .run(project.dateCreated)
-        .generateList()
+      val datasets = project.datasets
 
-      val nonModifiedDatasets =
-        Kleisli(datasetEntities(provenanceNonModified)).run(project.dateCreated).generateList(max = 10)
+      SearchInfoExtractor.extractSearchInfo[Try](project)(datasets) shouldBe datasets
+        .map { ds =>
+          SearchInfo(
+            ds.provenance.topmostSameAs,
+            ds.identification.name,
+            project.visibility,
+            ds.provenance.date,
+            maybeDateModified = None,
+            ds.provenance.creators.map(toPersonInfo),
+            ds.additionalInfo.keywords,
+            ds.additionalInfo.maybeDescription,
+            ds.additionalInfo.images,
+            NonEmptyList.one(Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path))
+          )
+        }
+        .pure[Try]
+    }
 
-      val datasets = (modifiedDatasets ::: nonModifiedDatasets)
-        .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+    "convert the given modified Datasets to SearchInfo objects" in {
 
-      SearchInfoExtractor.extractSearchInfo(project)(datasets) shouldBe datasets.map { ds =>
+      val project = anyRenkuProjectEntities
+        .addDatasetAndModifications(datasetEntities(provenanceNonModified),
+                                    level = 2
+        ) // ints(min = 1, max = 2).generateOne)
+        .generateOne
+        .to[entities.Project]
+
+      val originalDataset  = project.datasets.head
+      val lastModification = project.datasets.last
+
+      SearchInfoExtractor.extractSearchInfo[Try](project)(List(lastModification)) shouldBe List(
         SearchInfo(
-          ds.provenance.topmostSameAs,
-          ds.identification.name,
+          lastModification.provenance.topmostSameAs,
+          lastModification.identification.name,
           project.visibility,
-          ds.provenance.date,
-          ds.provenance.creators.map(toPersonInfo),
-          ds.additionalInfo.keywords,
-          ds.additionalInfo.maybeDescription,
-          ds.additionalInfo.images,
-          NonEmptyList.one(Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path))
+          originalDataset.provenance.date,
+          DateModified(lastModification.provenance.date.instant).some,
+          lastModification.provenance.creators.map(toPersonInfo),
+          lastModification.additionalInfo.keywords,
+          lastModification.additionalInfo.maybeDescription,
+          lastModification.additionalInfo.images,
+          NonEmptyList.one(
+            Link(lastModification.provenance.topmostSameAs,
+                 lastModification.resourceId,
+                 project.resourceId,
+                 project.path
+            )
+          )
         )
-      }
+      ).pure[Try]
     }
   }
 }
