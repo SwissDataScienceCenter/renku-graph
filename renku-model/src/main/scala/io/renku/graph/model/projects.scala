@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -62,11 +62,12 @@ object projects {
       with NonBlank[Namespace]
       with TinyTypeJsonLDOps[Namespace]
 
-  final class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  final class ResourceId private (val value: String) extends AnyVal with UrlTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with AnyResourceRenderer[ResourceId]
+      with UrlResourceRenderer[ResourceId]
+      with UrlOps[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
     private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"

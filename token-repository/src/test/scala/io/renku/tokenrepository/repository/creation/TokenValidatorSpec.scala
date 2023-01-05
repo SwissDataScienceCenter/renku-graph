@@ -87,8 +87,8 @@ class TokenValidatorSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val validator = new TokenValidatorImpl[IO]
 
-    lazy val mapResponse = captureMapping(validator, gitLabClient)(
-      findingMethod = _.checkValid(accessTokens.generateOne).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = validator.checkValid(accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = results.generateOne,
       method = HEAD
     )

@@ -139,6 +139,8 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
     maybeAgent     <- cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
+    projId         <- projectResourceIds
+    images         <- projectImageResourceIds(projId)
   } yield ProjectMutableData(name,
                              Nel.of(dateCreated),
                              maybeParentId,
@@ -146,7 +148,8 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
                              maybeDesc,
                              keywords,
                              maybeAgent,
-                             maybeCreatorId
+                             maybeCreatorId,
+                             images
   )
 
   private def generateProjAndQueries =

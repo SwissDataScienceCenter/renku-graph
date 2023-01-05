@@ -77,8 +77,8 @@ class TokensRevokerSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val tokensRevoker = new TokensRevokerImpl[IO]
 
-    lazy val mapResponse = captureMapping(tokensRevoker, gitLabClient)(
-      findingMethod = _.revokeToken(projectId, tokenId, accessTokens.generateOne).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = tokensRevoker.revokeToken(projectId, tokenId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = fixed(()),
       method = DELETE
     )

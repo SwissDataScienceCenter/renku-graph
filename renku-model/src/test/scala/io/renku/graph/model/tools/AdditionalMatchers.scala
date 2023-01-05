@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,15 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.testing
+package io.renku.graph.model.tools
 
-import org.scalatest.concurrent.AbstractPatienceConfiguration
-import org.scalatest.time.{Minutes, Second, Span}
+import com.softwaremill.diffx.Diff
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
+import org.scalatest.Assertions
 
-trait AcceptanceTestPatience extends AbstractPatienceConfiguration {
+trait AdditionalMatchers extends DiffShouldMatcher {
 
-  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(4, Minutes)),
-    interval = scaled(Span(1, Second))
-  )
+  final implicit class EitherDiffMatcher[A, B: Diff](self: Either[A, B]) {
+    def shouldMatchToRight(other: B) =
+      self.fold(a => Assertions.fail(s"Unexpected left value: $a"), b => b shouldMatchTo other)
+  }
+
 }

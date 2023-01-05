@@ -180,6 +180,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
           keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
           maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
+          images       <- cursor.downField("images").as(decodeList(imagesDecoder(path)))
           _ <- Either.cond(path.show startsWith namespace.show,
                            (),
                            DecodingFailure(show"'$path' does not start with '$namespace'", Nil)
@@ -194,7 +195,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                    val expected = renkuApiUrl / "projects" / path
                    Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
                  }
-        } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc)
+        } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc, images)
       case Criteria.Filters.EntityType.Dataset =>
         for {
           score      <- cursor.downField("matchingScore").as[MatchingScore]

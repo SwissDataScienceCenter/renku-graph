@@ -114,8 +114,8 @@ class ProjectHookFetcherSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val fetcher = new ProjectHookFetcherImpl[IO]
 
-    val mapResponse = captureMapping(fetcher, gitLabClient)(_.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
-                                                            Gen.const(List.empty[HookIdAndUrl])
+    val mapResponse = captureMapping(gitLabClient)(fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
+                                                   Gen.const(List.empty[HookIdAndUrl])
     )
   }
 

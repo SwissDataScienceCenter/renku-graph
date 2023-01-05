@@ -114,8 +114,8 @@ class GitLabProjectFetcherSpec
     implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
     val fetcher = new GitLabProjectFetcherImpl[IO]
 
-    lazy val mapResponse = captureMapping(fetcher, gitLabClient)(
-      fetcher => {
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      {
         givenFindAccessToken(by = projectId, returning = maybeAccessToken.pure[IO])
         fetcher.fetchGitLabProject(projectId).unsafeRunSync()
       },

@@ -21,7 +21,9 @@ package io.renku.graph.model.entities
 import PlanLens._
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.DecodingFailure
+import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -47,7 +49,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import java.time.{LocalDate, ZoneOffset}
 import scala.util.Random
 
-class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class ProjectSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffShouldMatcher
+    with DiffInstances {
 
   "ProjectMember.add" should {
 
@@ -108,7 +115,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             activity2 ::
             replaceAgent(activity3, mergedCreator) :: Nil)
             .sortBy(_.startTime)
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
+        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil).head shouldMatchTo
           entities.RenkuProject.WithoutParent(
             resourceId,
             info.path,
@@ -125,9 +132,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             addTo(dataset1,
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
-            plan1 :: plan2 :: plan3 :: Nil
+            plan1 :: plan2 :: plan3 :: Nil,
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
-        ).asRight
       }
     }
 
@@ -191,7 +198,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
+            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -216,7 +224,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             creator.some.map(_.toPerson),
             info.visibility,
             info.keywords,
-            members.map(_.toPerson)
+            members.map(_.toPerson),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -242,7 +251,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             info.visibility,
             info.keywords,
             members.map(_.toPerson),
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
+            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
+            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -714,7 +724,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           activities = Nil,
           List(dataset1, dataset2, dateset2Modified).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
           plans = Nil,
-          projects.ResourceId(parentPath)
+          projects.ResourceId(parentPath),
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -793,7 +804,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -860,7 +872,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -896,7 +909,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -905,10 +919,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
-      val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
-                                                            dateCreated = gitlabDate,
-                                                            maybeDescription = projectDescriptions.generateSome,
-                                                            keywords = projectKeywords.generateSet(min = 1)
+      val projectInfo = gitLabProjectInfos.generateOne.copy(
+        maybeParentPath = None,
+        dateCreated = gitlabDate,
+        maybeDescription = projectDescriptions.generateSome,
+        keywords = projectKeywords.generateSet(min = 1)
       )
       val resourceId = projects.ResourceId(projectInfo.path)
 
@@ -937,7 +952,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -978,7 +994,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           activities = Nil,
           datasets = Nil,
-          plans = Nil
+          plans = Nil,
+          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
         )
       ).asRight
     }
@@ -1015,7 +1032,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
               renku / "hasDataset"        -> project.datasets.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
           )
           .toJson
@@ -1044,7 +1062,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
               schema / "member"           -> project.members.toList.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             )
           )
           .toJson
@@ -1088,7 +1107,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               renku / "hasActivity"       -> project.activities.asJsonLD,
               renku / "hasPlan"           -> project.plans.asJsonLD,
               renku / "hasDataset"        -> project.datasets.asJsonLD,
-              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
             ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
           )
           .toJson
@@ -1107,6 +1127,48 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         }
 
         project.asJsonLD.toJson shouldBe JsonLD
+          .arr(
+            JsonLD.entity(
+              EntityId.of(project.resourceId.show),
+              entities.Project.entityTypes,
+              schema / "name"             -> project.name.asJsonLD,
+              renku / "projectPath"       -> project.path.asJsonLD,
+              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.maybeDescription.asJsonLD,
+              schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
+              renku / "projectVisibility" -> project.visibility.asJsonLD,
+              schema / "keywords"         -> project.keywords.asJsonLD,
+              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD,
+              schema / "image"            -> project.images.asJsonLD
+            )
+          )
+          .toJson
+      }
+    }
+
+    "produce JsonLD with all the relevant properties without images" in {
+      forAll(
+        anyNonRenkuProjectEntities
+          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .modify(replaceImages(Nil))
+          .map(_.to[entities.NonRenkuProject])
+      ) { project =>
+        val maybeParentId = project match {
+          case p: entities.NonRenkuProject.WithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        val modifiedJson =
+          project.asJsonLD.toJson.asArray
+            .getOrElse(Vector.empty)
+            .flatMap(_.asObject)
+            .map(obj => obj.remove((schema / "image").show))
+            .asJson
+
+        modifiedJson shouldBe JsonLD
           .arr(
             JsonLD.entity(
               EntityId.of(project.resourceId.show),

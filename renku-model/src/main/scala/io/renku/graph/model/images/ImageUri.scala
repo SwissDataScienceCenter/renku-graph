@@ -32,6 +32,15 @@ object ImageUri extends From[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
 
   def apply(value: String): ImageUri = from(value).fold(throw _, identity)
 
+  def fromSplitString(separator: Char = ',')(line: String): Either[Exception, List[ImageUri]] =
+    line
+      .split(separator)
+      .map(_.trim)
+      .map { case s"$position:$url" => ImageUri.from(url).map(tt => position.toIntOption.getOrElse(0) -> tt) }
+      .toList
+      .sequence
+      .map(_.distinct.sortBy(_._1).map(_._2))
+
   override def from(value: String): Either[IllegalArgumentException, ImageUri] =
     Relative.from(value) orElse Absolute.from(value)
 

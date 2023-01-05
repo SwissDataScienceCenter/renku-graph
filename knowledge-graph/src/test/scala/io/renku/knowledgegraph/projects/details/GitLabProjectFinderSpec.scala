@@ -110,8 +110,8 @@ class GitLabProjectFinderSpec
     implicit val accessToken: AccessToken             = accessTokens.generateOne
 
     val mapResponse: ResponseMappingF[IO, Option[GitLabProject]] =
-      captureMapping(projectFinder, gitLabClient)(_.findProject(projectPaths.generateOne).unsafeRunSync(),
-                                                  gitLabProjects.toGeneratorOfOptions
+      captureMapping(gitLabClient)(projectFinder.findProject(projectPaths.generateOne).unsafeRunSync(),
+                                   gitLabProjects.toGeneratorOfOptions
       )
   }
 

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.jsonld.JsonLDDecoder
 import model.Project.DateUpdated
 import model._
@@ -56,6 +57,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         maybeParent  <- cursor.downField(prov / "wasDerivedFrom").as[Option[ParentProject]]
         keywords     <- cursor.downField(schema / "keywords").as[List[projects.Keyword]]
         maybeVersion <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
+        images       <- cursor.downField(schema / "image").as[List[ImageUri]]
       } yield Project(
         resourceId,
         identifier,
@@ -71,7 +73,8 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         project.starsCount,
         project.permissions,
         project.statistics,
-        maybeVersion
+        maybeVersion,
+        images
       )
   }
 

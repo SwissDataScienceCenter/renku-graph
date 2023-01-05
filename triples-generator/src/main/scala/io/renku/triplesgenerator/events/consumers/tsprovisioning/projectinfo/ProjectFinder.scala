@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -93,6 +94,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
+        avatarUrl <- cursor.downField("avatar_url").as[Option[ImageUri]]
       } yield GitLabProjectInfo(
         id,
         name,
@@ -103,7 +105,8 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         keywords,
         members = Set.empty,
         maybeVisibility getOrElse projects.Visibility.Public,
-        maybeParentPath
+        maybeParentPath,
+        avatarUrl
       ) -> maybeCreatorId
 
     jsonOf[F, ProjectAndCreator]

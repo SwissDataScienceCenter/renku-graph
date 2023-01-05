@@ -148,8 +148,8 @@ class ProjectInfoFinderSpec
         }""".noSpaces
     }
 
-    lazy val mapResponse = captureMapping(projectInfoFinder, gitLabClient)(
-      _.findProjectInfo(projectId).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      projectInfoFinder.findProjectInfo(projectId).unsafeRunSync(),
       Gen.const(projectInfo)
     )
   }

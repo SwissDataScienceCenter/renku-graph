@@ -32,7 +32,8 @@ private object TestDataTools {
     project.maybeDescription,
     project.keywords,
     findAgent(project),
-    project.maybeCreator.map(_.resourceId)
+    project.maybeCreator.map(_.resourceId),
+    project.images.map(_.resourceId)
   )
 
   def findParent(project: entities.Project) = project match {

@@ -91,8 +91,8 @@ class GLCreatorFinderSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new GLCreatorFinderImpl[IO]
 
-    lazy val mapResponse = captureMapping(finder, gitLabClient)(
-      _.findCreatorName(creatorId).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      finder.findCreatorName(creatorId).unsafeRunSync(),
       personNames.toGeneratorOfOptions
     )
   }

@@ -19,6 +19,7 @@
 package io.renku.graph.model.images
 
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.projects
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld._
@@ -26,6 +27,14 @@ import io.renku.jsonld._
 final case class Image(resourceId: ImageResourceId, uri: ImageUri, position: ImagePosition)
 
 object Image {
+  def projectImage(projectId: projects.ResourceId, uris: List[ImageUri]): List[Image] =
+    uris.zipWithIndex.map { case (uri, index) =>
+      Image(ImageResourceId((projectId / "images" / index.toString).value), uri, ImagePosition(index))
+    }
+
+  def projectImage(projectId: projects.ResourceId, uri: ImageUri): Image =
+    projectImage(projectId, List(uri)).head
+
   private val imageEntityTypes = EntityTypes of schema / "ImageObject"
 
   implicit val jsonLDEncoder: JsonLDEncoder[Image] = JsonLDEncoder.instance { case Image(resourceId, uri, position) =>

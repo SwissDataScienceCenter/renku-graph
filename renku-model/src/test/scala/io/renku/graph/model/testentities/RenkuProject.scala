@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, DatasetGenFactory, ProjectBasedGenFactory}
@@ -81,6 +82,7 @@ object RenkuProject {
                                  version:              SchemaVersion,
                                  activities:           List[Activity],
                                  datasets:             List[Dataset[Dataset.Provenance]],
+                                 images:               List[ImageUri],
                                  unlinkedPlans:        List[StepPlan] = List.empty,
                                  createCompositePlans: List[CreateCompositePlan] = List.empty
   ) extends RenkuProject {
@@ -89,6 +91,13 @@ object RenkuProject {
       .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
     override type ProjectType = RenkuProject.WithoutParent
+
+    override def fold[A](
+        f1: WithParent => A,
+        f2: WithoutParent => A,
+        f3: NonRenkuProject.WithParent => A,
+        f4: NonRenkuProject.WithoutParent => A
+    ): A = f2(this)
 
     override def addActivities(toAdd: Activity*): RenkuProject.WithoutParent =
       copy(activities = activities ::: toAdd.toList)
@@ -157,11 +166,19 @@ object RenkuProject {
                               activities:           List[Activity],
                               datasets:             List[Dataset[Dataset.Provenance]],
                               parent:               RenkuProject,
+                              images:               List[ImageUri],
                               unlinkedPlans:        List[StepPlan] = Nil,
                               createCompositePlans: List[CreateCompositePlan] = Nil
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
+
+    override def fold[A](
+        f1: WithParent => A,
+        f2: WithoutParent => A,
+        f3: NonRenkuProject.WithParent => A,
+        f4: NonRenkuProject.WithoutParent => A
+    ): A = f1(this)
 
     override def addActivities(toAdd: Activity*): RenkuProject.WithParent =
       copy(activities = activities ::: toAdd.toList)
@@ -238,7 +255,8 @@ object RenkuProject {
           project.version,
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          project.plans.map(_.to[entities.Plan])
+          project.plans.map(_.to[entities.Plan]),
+          convertImageUris(project.asEntityId)(project.images)
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
@@ -262,7 +280,8 @@ object RenkuProject {
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
           project.plans.map(_.to[entities.Plan]),
-          projects.ResourceId(project.parent.asEntityId)
+          projects.ResourceId(project.parent.asEntityId),
+          convertImageUris(project.asEntityId)(project.images)
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 

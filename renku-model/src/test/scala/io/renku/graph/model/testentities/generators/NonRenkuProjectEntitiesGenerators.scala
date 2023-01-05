@@ -20,7 +20,7 @@ package io.renku.graph.model.testentities
 package generators
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectCreatedDates, projectDescriptions, projectKeywords, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{imageUris, projectCreatedDates, projectDescriptions, projectKeywords, projectPaths}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import org.scalacheck.Gen
@@ -49,15 +49,18 @@ trait NonRenkuProjectEntitiesGenerators {
     forksCount       <- forksCountGen
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
     members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
-  } yield NonRenkuProject.WithoutParent(path,
-                                        name,
-                                        maybeDescription,
-                                        dateCreated,
-                                        maybeCreator,
-                                        visibility,
-                                        forksCount,
-                                        keywords,
-                                        members ++ maybeCreator
+    images           <- imageUris.toGeneratorOfList()
+  } yield NonRenkuProject.WithoutParent(
+    path,
+    name,
+    maybeDescription,
+    dateCreated,
+    maybeCreator,
+    visibility,
+    forksCount,
+    keywords,
+    members ++ maybeCreator,
+    images
   )
 
   def nonRenkuProjectWithParentEntities(

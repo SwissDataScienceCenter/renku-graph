@@ -46,7 +46,8 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
       schema / "dateModified"     -> project.updatedAt.asJsonLD,
       schema / "keywords"         -> project.keywords.asJsonLD,
       schema / "schemaVersion"    -> project.maybeVersion.asJsonLD,
-      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD
+      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD,
+      schema / "image"            -> project.images.asJsonLD
     )
   }
 

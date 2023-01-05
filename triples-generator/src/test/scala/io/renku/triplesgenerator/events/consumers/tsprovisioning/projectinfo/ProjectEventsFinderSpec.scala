@@ -156,8 +156,8 @@ class ProjectEventsFinderSpec
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new ProjectEventsFinderImpl[IO]
 
-    val mapResponse = captureMapping(finder, gitLabClient)(
-      _.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
+    val mapResponse = captureMapping(gitLabClient)(
+      finder.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
       Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
     )
   }
