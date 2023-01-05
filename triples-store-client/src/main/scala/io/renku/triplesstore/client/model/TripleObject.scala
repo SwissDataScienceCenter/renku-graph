@@ -57,18 +57,23 @@ object TripleObject {
     override type T = java.time.Instant
   }
 
+  final case class LocalDate(value: java.time.LocalDate) extends AnyVal with TripleObject {
+    override type T = java.time.LocalDate
+  }
+
   final case class Iri(value: EntityId) extends TripleObject {
     override type T = EntityId
   }
 
   implicit def show[T <: TripleObject]: Show[T] = Show.show {
-    case v: TripleObject.Boolean => v.value.show
-    case v: TripleObject.Int     => v.value.show
-    case v: TripleObject.Long    => v.value.show
-    case v: TripleObject.Float   => v.value.show
-    case v: TripleObject.Double  => v.value.show
-    case v: TripleObject.String  => v.value.show
-    case v: TripleObject.Instant => v.value.toString
-    case v: TripleObject.Iri     => v.value.show
+    case v: TripleObject.Boolean   => v.value.show
+    case v: TripleObject.Int       => v.value.show
+    case v: TripleObject.Long      => v.value.show
+    case v: TripleObject.Float     => v.value.show
+    case v: TripleObject.Double    => v.value.show
+    case v: TripleObject.String    => v.value.show
+    case v: TripleObject.Instant   => v.value.toString
+    case v: TripleObject.LocalDate => v.value.toString
+    case v: TripleObject.Iri       => v.value.show
   }
 }

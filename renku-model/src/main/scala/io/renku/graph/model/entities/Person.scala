@@ -238,11 +238,11 @@ object Person {
 
   object Ontology {
 
-    val typeClass:   Class    = Class(schema / "Person")
-    val sameAs:      Property = schema / "sameAs"
-    val name:        Property = schema / "name"
-    val email:       Property = schema / "email"
-    val affiliation: Property = schema / "affiliation"
+    val typeClass:    Class            = Class(schema / "Person")
+    val sameAs:       Property         = schema / "sameAs"
+    val nameProperty: DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val email:        Property         = schema / "email"
+    val affiliation:  Property         = schema / "affiliation"
 
     lazy val typeDef: Type = {
       val sameAsType = Type.Def(
@@ -254,10 +254,7 @@ object Person {
       Type.Def(
         typeClass,
         ObjectProperties(ObjectProperty(sameAs, sameAsType)),
-        DataProperties(DataProperty(email, xsd / "string"),
-                       DataProperty(name, xsd / "string"),
-                       DataProperty(affiliation, xsd / "string")
-        )
+        DataProperties(DataProperty(email, xsd / "string"), namePropertyDef, DataProperty(affiliation, xsd / "string"))
       )
     }
   }

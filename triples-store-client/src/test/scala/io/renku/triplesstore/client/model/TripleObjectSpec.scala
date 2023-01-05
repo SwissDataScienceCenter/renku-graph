@@ -40,6 +40,7 @@ class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDriven
         "Double"  -> doubleTripleObjects,
         "String"  -> stringTripleObjects,
         "Instant" -> instantTripleObjects,
+        "LocalDate" -> localDateTripleObjects,
         "Iri"     -> iriTripleObjects
       )
     } { (objectType, valueGenerator) =>

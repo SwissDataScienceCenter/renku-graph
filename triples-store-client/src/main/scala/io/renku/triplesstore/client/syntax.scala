@@ -25,7 +25,7 @@ object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances
 
   final implicit class ModelOps[T](private val obj: T) extends AnyVal {
 
-    def asQuads(implicit enc: QuadsEncoder[T]): List[Quad] = enc(obj)
+    def asQuads(implicit enc: QuadsEncoder[T]): Set[Quad] = enc(obj)
 
     def asTripleObject(implicit enc: TripleObjectEncoder[T]): TripleObject = enc(obj)
 

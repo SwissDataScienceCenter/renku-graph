@@ -511,17 +511,17 @@ object Dataset {
     val image:              Property = schema / "image"
     val hasPart:            Property = schema / "hasPart"
 
-    val identifier:         Property = schema / "identifier"
-    val name:               Property = schema / "name"
-    val slug:               Property = renku / "slug"
-    val dateCreated:        Property = schema / "dateCreated"
-    val datePublished:      Property = schema / "datePublished"
-    val originalIdentifier: Property = renku / "originalIdentifier"
-    val invalidatedAtTime:  Property = prov / "invalidatedAtTime"
-    val description:        Property = schema / "description"
-    val keywords:           Property = schema / "keywords"
-    val license:            Property = schema / "license"
-    val version:            Property = schema / "version"
+    val identifierProperty:         DataProperty.Def = DataProperty(schema / "identifier", xsd / "string")
+    val nameProperty:               DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val slugProperty:               DataProperty.Def = DataProperty(renku / "slug", xsd / "string")
+    val dateCreatedProperty:        DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
+    val datePublishedProperty:      DataProperty.Def = DataProperty(schema / "datePublished", xsd / "date")
+    val originalIdentifierProperty: DataProperty.Def = DataProperty(renku / "originalIdentifier", xsd / "string")
+    val invalidatedAtTimeProperty:  DataProperty.Def = DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+    val descriptionProperty:        DataProperty.Def = DataProperty(schema / "description", xsd / "string")
+    val keywordsProperty:           DataProperty.Def = DataProperty(schema / "keywords", xsd / "string")
+    val licenseProperty:            DataProperty.Def = DataProperty(schema / "license", xsd / "string")
+    val versionProperty:            DataProperty.Def = DataProperty(schema / "version", xsd / "string")
 
     lazy val typeDef: Type =
       Type.Def(
@@ -536,17 +536,17 @@ object Dataset {
           ObjectProperty(hasPart, DatasetPart.ontology)
         ),
         DataProperties(
-          DataProperty(identifier, xsd / "string"),
-          DataProperty(name, xsd / "string"),
-          DataProperty(slug, xsd / "string"),
-          DataProperty(dateCreated, xsd / "dateTime"),
-          DataProperty(datePublished, xsd / "date"),
-          DataProperty(originalIdentifier, xsd / "string"),
-          DataProperty(invalidatedAtTime, xsd / "dateTime"),
-          DataProperty(description, xsd / "string"),
-          DataProperty(keywords, xsd / "string"),
-          DataProperty(license, xsd / "string"),
-          DataProperty(version, xsd / "string")
+          identifierProperty,
+          nameProperty,
+          slugProperty,
+          dateCreatedProperty,
+          datePublishedProperty,
+          originalIdentifierProperty,
+          invalidatedAtTimeProperty,
+          descriptionProperty,
+          keywordsProperty,
+          licenseProperty,
+          versionProperty
         ),
         ReverseProperties(PublicationEvent.ontology)
       )

@@ -22,7 +22,7 @@ import cats.Contravariant
 import cats.syntax.all._
 import io.renku.jsonld.{EntityId, Property}
 
-import java.time.{Instant => JInstant}
+import java.time.{Instant => JInstant, LocalDate => JLocalDate}
 
 trait TripleObjectEncoder[O] extends (O => TripleObject)
 
@@ -48,7 +48,9 @@ object TripleObjectEncoder {
     implicit val doubleObjEncoder: TripleObjectEncoder[scala.Double] = TripleObjectEncoder.instance(TripleObject.Double)
     implicit val stringObjEncoder: TripleObjectEncoder[Predef.String] =
       TripleObjectEncoder.instance(TripleObject.String)
-    implicit val instantObjEncoder:  TripleObjectEncoder[JInstant] = TripleObjectEncoder.instance(TripleObject.Instant)
+    implicit val instantObjEncoder: TripleObjectEncoder[JInstant] = TripleObjectEncoder.instance(TripleObject.Instant)
+    implicit val localDateObjEncoder: TripleObjectEncoder[JLocalDate] =
+      TripleObjectEncoder.instance(TripleObject.LocalDate)
     implicit val entityIdObjEncoder: TripleObjectEncoder[EntityId] = TripleObjectEncoder.instance(TripleObject.Iri)
     implicit val propertyObjEncoder: TripleObjectEncoder[Property] = entityIdObjEncoder.contramap(p => EntityId.of(p))
   }

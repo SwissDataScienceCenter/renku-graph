@@ -582,7 +582,10 @@ object Project {
 
     val projectClass: Class = Class(schema / "Project")
 
-    val projectVisibility: Property = renku / "projectVisibility"
+    val visibilityProperty = DataProperty.top(
+      renku / "projectVisibility",
+      DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
+    )
 
     lazy val typeDef: Type =
       Type.Def(
@@ -604,9 +607,7 @@ object Project {
           DataProperty(renku / "projectNamespaces", xsd / "string"),
           DataProperty(schema / "description", xsd / "string"),
           DataProperty(schema / "dateCreated", xsd / "dateTime"),
-          DataProperty.top(projectVisibility,
-                           DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
-          ),
+          visibilityProperty,
           DataProperty(schema / "keywords", xsd / "string"),
           DataProperty(schema / "schemaVersion", xsd / "string")
         )

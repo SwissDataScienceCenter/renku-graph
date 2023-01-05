@@ -70,6 +70,11 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
       obj.asSparql.sparql shouldBe s"'${obj.value.toString}'^^<http://www.w3.org/2001/XMLSchema#dateTime>"
     }
 
+    "be able to encode TripleObject.LocalDate as sparql" in {
+      val obj = localDateTripleObjects.generateOne
+      obj.asSparql.sparql shouldBe s"'${obj.value.toString}'^^<http://www.w3.org/2001/XMLSchema#date>"
+    }
+
     "be able to encode TripleObject.Iri as sparql with RFC 2396 specific characters encoding" in {
       val obj = iriTripleObjects.generateOne
       obj.asSparql.sparql shouldBe s"<${URIref.encode(obj.show)}>"
