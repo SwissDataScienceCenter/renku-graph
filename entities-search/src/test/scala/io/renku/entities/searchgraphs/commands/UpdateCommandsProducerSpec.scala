@@ -19,10 +19,9 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import Generators.{projectSearchInfoObjects, storeSearchInfoObjects}
+import CommandCalculator.calculateCommand
+import Generators.searchInfoObjects
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfo.StoreSearchInfo
-import io.renku.entities.searchgraphs.commands.CommandCalculator.calculateCommand
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -36,9 +35,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
 
     "fetch the current state of the DS from the TS" in new TestCase {
 
-      val searchInfos = projectSearchInfoObjects
+      val searchInfos = searchInfoObjects
         .generateList()
-        .map(info => info -> storeSearchInfoObjects.generateOption.map(_.copy(topmostSameAs = info.topmostSameAs)))
+        .map(info => info -> searchInfoObjects.generateOption.map(_.copy(topmostSameAs = info.topmostSameAs)))
 
       searchInfos foreach { case (info, maybeStoreInfo) =>
         givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
@@ -52,7 +51,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     private val searchInfoFetcher = mock[SearchInfoFetcher[Try]]
     val commandsProducer          = new UpdateCommandsProducerImpl[Try](searchInfoFetcher)
 
-    def givenSearchInfoFetcher(searchInfo: SearchInfo, returning: Try[Option[StoreSearchInfo]]) =
+    def givenSearchInfoFetcher(searchInfo: SearchInfo, returning: Try[Option[SearchInfo]]) =
       (searchInfoFetcher.fetchStoreSearchInfo _)
         .expects(searchInfo.topmostSameAs)
         .returning(returning)

@@ -25,41 +25,16 @@ import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{persons, projects}
 
-private sealed trait SearchInfo {
-  val topmostSameAs:    TopmostSameAs
-  val name:             Name
-  val visibility:       Visibility
-  val date:             Date
-  val creators:         NonEmptyList[PersonInfo]
-  val keywords:         List[Keyword]
-  val maybeDescription: Option[Description]
-  val images:           List[Image]
-}
-
-private object SearchInfo {
-
-  final case class ProjectSearchInfo(topmostSameAs:    TopmostSameAs,
-                                     name:             Name,
-                                     visibility:       Visibility,
-                                     date:             Date,
-                                     creators:         NonEmptyList[PersonInfo],
-                                     keywords:         List[Keyword],
-                                     maybeDescription: Option[Description],
-                                     images:           List[Image],
-                                     link:             Link
-  ) extends SearchInfo
-
-  final case class StoreSearchInfo(topmostSameAs:    TopmostSameAs,
-                                   name:             Name,
-                                   visibility:       Visibility,
-                                   date:             Date,
-                                   creators:         NonEmptyList[PersonInfo],
-                                   keywords:         List[Keyword],
-                                   maybeDescription: Option[Description],
-                                   images:           List[Image],
-                                   links:            NonEmptyList[Link]
-  ) extends SearchInfo
-}
+private final case class SearchInfo(topmostSameAs:    TopmostSameAs,
+                                    name:             Name,
+                                    visibility:       Visibility,
+                                    date:             Date,
+                                    creators:         NonEmptyList[PersonInfo],
+                                    keywords:         List[Keyword],
+                                    maybeDescription: Option[Description],
+                                    images:           List[Image],
+                                    links:            NonEmptyList[Link]
+)
 
 private final case class Link(resourceId: links.ResourceId, dataset: ResourceId, project: projects.ResourceId)
 private object Link {

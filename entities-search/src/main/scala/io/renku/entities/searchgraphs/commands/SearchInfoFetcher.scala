@@ -19,9 +19,8 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import SearchInfo.StoreSearchInfo
 import io.renku.graph.model.datasets.TopmostSameAs
 
 private trait SearchInfoFetcher[F[_]] {
-  def fetchStoreSearchInfo(topmostSameAs: TopmostSameAs): F[Option[StoreSearchInfo]]
+  def fetchStoreSearchInfo(topmostSameAs: TopmostSameAs): F[Option[SearchInfo]]
 }

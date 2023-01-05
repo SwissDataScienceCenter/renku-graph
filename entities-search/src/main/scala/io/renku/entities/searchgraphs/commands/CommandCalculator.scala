@@ -19,11 +19,9 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import io.renku.entities.searchgraphs.SearchInfo.{ProjectSearchInfo, StoreSearchInfo}
-
 private object CommandCalculator {
 
-  def calculateCommand: ((ProjectSearchInfo, Option[StoreSearchInfo])) => List[UpdateCommand] = { _ =>
+  def calculateCommand: ((SearchInfo, Option[SearchInfo])) => List[UpdateCommand] = { _ =>
     List()
   }
 }

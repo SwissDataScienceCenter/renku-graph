@@ -20,9 +20,9 @@ package io.renku.entities.searchgraphs
 
 import PersonInfo._
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfo.{ProjectSearchInfo, StoreSearchInfo}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
@@ -30,30 +30,7 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  val projectSearchInfoObjects: Gen[ProjectSearchInfo] = for {
-    topmostSameAs <- datasetTopmostSameAs
-    name          <- datasetNames
-    visibility    <- projectVisibilities
-    date          <- datasetDates
-    creators      <- personEntities.map(_.to[entities.Person]).map(toPersonInfo).toGeneratorOfNonEmptyList(max = 2)
-    keywords      <- datasetKeywords.toGeneratorOfList(max = 2)
-    maybeDesc     <- datasetDescriptions.toGeneratorOfOptions
-    datasetId     <- datasetResourceIds
-    images        <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetId))
-    projectId     <- projectResourceIds
-    projectPath   <- projectPaths
-  } yield ProjectSearchInfo(topmostSameAs,
-                            name,
-                            visibility,
-                            date,
-                            creators,
-                            keywords,
-                            maybeDesc,
-                            images,
-                            Link(topmostSameAs, datasetId, projectId, projectPath)
-  )
-
-  val storeSearchInfoObjects: Gen[StoreSearchInfo] = for {
+  val searchInfoObjects: Gen[SearchInfo] = for {
     topmostSameAs <- datasetTopmostSameAs
     name          <- datasetNames
     visibility    <- projectVisibilities
@@ -62,8 +39,10 @@ private object Generators {
     keywords      <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc     <- datasetDescriptions.toGeneratorOfOptions
     images        <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
-    links <- (datasetResourceIds, projectResourceIds, projectPaths)
-               .mapN(Link(topmostSameAs, _, _, _))
-               .toGeneratorOfNonEmptyList(max = 2)
-  } yield StoreSearchInfo(topmostSameAs, name, visibility, date, creators, keywords, maybeDesc, images, links)
+    links         <- linkObjects(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
+  } yield SearchInfo(topmostSameAs, name, visibility, date, creators, keywords, maybeDesc, images, links)
+
+  def linkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
+    (datasetResourceIds, projectResourceIds, projectPaths)
+      .mapN(Link(topmostSameAs, _, _, _))
 }

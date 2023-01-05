@@ -19,7 +19,7 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
-import cats.data.Kleisli
+import cats.data.{Kleisli, NonEmptyList}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -46,7 +46,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         .map(_.to[entities.Dataset[entities.Dataset.Provenance]])
 
       SearchInfoExtractor.extractSearchInfo(project)(datasets) shouldBe datasets.map { ds =>
-        SearchInfo.ProjectSearchInfo(
+        SearchInfo(
           ds.provenance.topmostSameAs,
           ds.identification.name,
           project.visibility,
@@ -55,7 +55,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           ds.additionalInfo.keywords,
           ds.additionalInfo.maybeDescription,
           ds.additionalInfo.images,
-          Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path)
+          NonEmptyList.one(Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path))
         )
       }
     }

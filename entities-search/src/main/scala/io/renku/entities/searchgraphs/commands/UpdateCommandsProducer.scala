@@ -24,7 +24,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
-  val toUpdateCommands: List[SearchInfo.ProjectSearchInfo] => F[List[UpdateCommand]]
+  val toUpdateCommands: List[SearchInfo] => F[List[UpdateCommand]]
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F])
@@ -32,7 +32,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
 
   import searchInfoFetcher._
 
-  override lazy val toUpdateCommands: List[SearchInfo.ProjectSearchInfo] => F[List[UpdateCommand]] =
+  override lazy val toUpdateCommands: List[SearchInfo] => F[List[UpdateCommand]] =
     _.map { info =>
       fetchStoreSearchInfo(info.topmostSameAs).map(info -> _).map(calculateCommand)
     }.sequence.map(_.flatten)

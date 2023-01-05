@@ -19,13 +19,14 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
+import cats.data.NonEmptyList
 import io.renku.graph.model.entities.{Dataset, Project}
 
 private object SearchInfoExtractor {
 
   def extractSearchInfo(project: Project)(datasets: List[Dataset[Dataset.Provenance]]): List[SearchInfo] =
     datasets.map { ds =>
-      SearchInfo.ProjectSearchInfo(
+      SearchInfo(
         ds.provenance.topmostSameAs,
         ds.identification.name,
         project.visibility,
@@ -34,7 +35,9 @@ private object SearchInfoExtractor {
         ds.additionalInfo.keywords,
         ds.additionalInfo.maybeDescription,
         ds.additionalInfo.images,
-        Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
+        NonEmptyList.one(
+          Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
+        )
       )
     }
 }
