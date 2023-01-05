@@ -161,7 +161,7 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
 
   "asTripleObject" should {
 
-    import io.renku.triplesstore.model.{TripleObject, TripleObjectEncoder}
+    import io.renku.triplesstore.client.model.{TripleObject, TripleObjectEncoder}
 
     import java.util.UUID
 
@@ -179,7 +179,7 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
       val value = Gen.uuid.generateOne
       val tt    = SomeTinyType(value)
 
-      implicitly[TripleObjectEncoder[SomeTinyType]].apply(tt) shouldBe TripleObject.String(value.toString)
+      tt.asObject shouldBe TripleObject.String(value.toString)
     }
   }
 

@@ -29,7 +29,7 @@ class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
   "getOntology" should {
 
     "return generated Renku ontology" in {
-      val ontology = generateOntology(Project.ontology, Schemas.renku)
+      val ontology = generateOntology(Project.Ontology.typeDef, Schemas.renku)
 
       new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology
     }

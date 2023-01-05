@@ -32,6 +32,7 @@ import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
 import monocle.Lens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -63,12 +64,13 @@ class KGInfoFinderSpec
           NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
         }
       )
-      insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       activity.resourceId,
-                       prov / "wasAssociatedWith",
-                       person.resourceId
-             )
+      insert(
+        to = projectsDataset,
+        Quad(GraphClass.Project.id(project.resourceId),
+             activity.resourceId.asEntityId,
+             prov / "wasAssociatedWith",
+             person.resourceId.asEntityId
+        )
       )
 
       kgInfoFinder.findActivityAuthors(project.resourceId, activity.resourceId).unsafeRunSync() shouldBe

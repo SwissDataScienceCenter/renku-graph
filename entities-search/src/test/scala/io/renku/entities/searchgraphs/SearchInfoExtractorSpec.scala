@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -55,7 +55,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           ds.additionalInfo.keywords,
           ds.additionalInfo.maybeDescription,
           ds.additionalInfo.images,
-          Link(ds.resourceId, project.resourceId)
+          Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path)
         )
       }
     }

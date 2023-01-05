@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import TestDataTools._
-import cats.effect.{IO, Spawn}
 import cats.effect.std.CountDownLatch
+import cats.effect.{IO, Spawn}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -30,9 +30,10 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.syntax.all._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.tinytypes.syntax.all._
+import io.renku.triplesstore.client.model.Quad
 import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -187,10 +188,10 @@ class UpdatesCreatorSpec
 
         val parentId = projectResourceIds.generateOne
         insert(to = projectsDataset,
-               Quad.edge(GraphClass.Project.id(project.resourceId),
-                         project.resourceId,
-                         prov / "wasDerivedFrom",
-                         parentId.asEntityId
+               Quad(GraphClass.Project.id(project.resourceId),
+                    project.resourceId.asEntityId,
+                    prov / "wasDerivedFrom",
+                    parentId.asEntityId
                )
         )
 

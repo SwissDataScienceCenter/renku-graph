@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,6 +41,7 @@ private object Generators {
     datasetId     <- datasetResourceIds
     images        <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetId))
     projectId     <- projectResourceIds
+    projectPath   <- projectPaths
   } yield ProjectSearchInfo(topmostSameAs,
                             name,
                             visibility,
@@ -49,7 +50,7 @@ private object Generators {
                             keywords,
                             maybeDesc,
                             images,
-                            Link(datasetId, projectId)
+                            Link(topmostSameAs, datasetId, projectId, projectPath)
   )
 
   val storeSearchInfoObjects: Gen[StoreSearchInfo] = for {
@@ -61,6 +62,8 @@ private object Generators {
     keywords      <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc     <- datasetDescriptions.toGeneratorOfOptions
     images        <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
-    links         <- (datasetResourceIds -> projectResourceIds).mapN(Link).toGeneratorOfList(max = 2)
+    links <- (datasetResourceIds, projectResourceIds, projectPaths)
+               .mapN(Link(topmostSameAs, _, _, _))
+               .toGeneratorOfNonEmptyList(max = 2)
   } yield StoreSearchInfo(topmostSameAs, name, visibility, date, creators, keywords, maybeDesc, images, links)
 }

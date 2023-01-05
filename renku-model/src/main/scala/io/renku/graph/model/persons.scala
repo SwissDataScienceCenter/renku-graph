@@ -24,8 +24,8 @@ import io.renku.graph.model.views.{EntityIdJsonLDOps, RdfResource, TinyTypeJsonL
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
-import io.renku.tinytypes.sparql.SparqlEncoder
-import io.renku.tinytypes.sparql.SparqlEncoder._
+import io.renku.triplesstore.client.sparql.SparqlEncoder
+import io.renku.triplesstore.client.syntax._
 import org.apache.jena.util.URIref
 
 object persons {
@@ -121,7 +121,7 @@ object persons {
     }
 
     implicit lazy val sparqlEncoder: SparqlEncoder[ResourceId] =
-      SparqlEncoder.entityIdEncoder.contramap(id => entityIdEncoder(id))
+      SparqlEncoder[EntityId].contramap(id => entityIdEncoder(id))
 
     implicit def entityIdEncoder[ID <: ResourceId]: EntityIdEncoder[ID] = EntityIdEncoder.instance[ID] {
       case id: GitLabIdBased => EntityId.of(id.value)

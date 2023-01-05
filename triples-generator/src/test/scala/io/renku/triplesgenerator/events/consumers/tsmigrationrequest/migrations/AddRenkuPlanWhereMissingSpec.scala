@@ -26,12 +26,14 @@ import io.renku.graph.model.entities.ProjectLens.collectCompositePlans
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -75,12 +77,13 @@ class AddRenkuPlanWhereMissingSpec
                     collectCompositePlans(project3.plans).head.resourceId
       ) should contain theSameElementsAs entities.CompositePlan.Ontology.entityTypes.toList
 
-      delete(from = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project2.resourceId),
-                       project2.plans.head.resourceId,
-                       rdf / "type",
-                       EntityId.of(renku / "Plan")
-             )
+      delete(
+        from = projectsDataset,
+        Quad(GraphClass.Project.id(project2.resourceId),
+             project2.plans.head.resourceId.asEntityId,
+             rdf / "type",
+             EntityId.of(renku / "Plan")
+        )
       )
       findPlanTypes(project2.resourceId,
                     project2.plans.head.resourceId

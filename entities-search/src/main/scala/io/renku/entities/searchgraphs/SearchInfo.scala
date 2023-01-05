@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -68,14 +68,6 @@ private object Link {
             projectId:     projects.ResourceId,
             projectPath:   projects.Path
   ): Link = Link(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
-
-  implicit val linkEncoder: QuadsEncoder[Link] = QuadsEncoder.instance { case Link(resourceId, dataset, project) =>
-    List(
-      Quad(GraphClass.Datasets.id, resourceId, rdf / "type", renku / "DatasetProjectLink"),
-      Quad(GraphClass.Datasets.id, resourceId, renku / "project", project.asEntityId),
-      Quad(GraphClass.Datasets.id, resourceId, renku / "dataset", dataset.asEntityId)
-    )
-  }
 }
 
 private object links {
@@ -99,12 +91,4 @@ private final case class PersonInfo(resourceId: persons.ResourceId, name: person
 
 private object PersonInfo {
   lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
-
-  implicit val personInfoEncoder: QuadsEncoder[PersonInfo] = QuadsEncoder.instance {
-    case PersonInfo(resourceId, name) =>
-      List(
-        Quad(GraphClass.Datasets.id, resourceId, rdf / "type", Person.Ontology.typeClass.id),
-        Quad(GraphClass.Datasets.id, resourceId, Person.Ontology.name, name)
-      )
-  }
 }

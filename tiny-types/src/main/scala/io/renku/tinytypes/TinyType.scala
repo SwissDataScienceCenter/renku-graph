@@ -22,7 +22,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, Order, Show}
 import io.circe.{Encoder, Json}
 import io.renku.tinytypes.constraints.PathSegment
-import io.renku.triplesstore.model.TripleObjectEncoder
+import io.renku.triplesstore.client.model.{TripleObject, TripleObjectEncoder}
 
 import java.time.{Duration, Instant, LocalDate}
 
@@ -80,7 +80,6 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     with Constraints[TT]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]
-    with TinyTypeTripleObjectEncoder[TT]
     with TypeName {
 
   import scala.util.Try
@@ -117,6 +116,9 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
       convert(tinyType).fold(throw _, identity)
 
     def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
+
+    def asObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObject =
+      valueEncoder(tinyType.value)
   }
 
   implicit lazy val show: Show[TT] = Show.show(_.toString)
@@ -144,13 +146,6 @@ trait TinyTypeOrdering[TT <: TinyType] {
     Ordering.by(_.value)
 
   implicit def order(implicit ordering: Ordering[TT]): Order[TT] = Order.fromOrdering
-}
-
-trait TinyTypeTripleObjectEncoder[TT <: TinyType] {
-  self: TinyTypeFactory[TT] =>
-
-  implicit def asTripleObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObjectEncoder[TT] =
-    valueEncoder.contramap(_.value)
 }
 
 trait Constraints[TT <: TinyType] extends TypeName {

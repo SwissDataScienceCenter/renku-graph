@@ -34,6 +34,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.testcontainers.containers
 import org.testcontainers.containers.wait.strategy.Wait
 
@@ -220,14 +222,14 @@ sealed trait NamedGraphDataset {
   def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(from)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
+        SparqlQuery.of("delete quad", show"DELETE DATA { ${quad.asSparql} }")
       })
       .unsafeRunSync()
 
   def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(to)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
+        SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql} }")
       })
       .unsafeRunSync()
 }

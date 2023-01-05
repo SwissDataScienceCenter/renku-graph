@@ -126,7 +126,7 @@ object datasets {
 
     val ontology: Type = Type.Def(
       Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.Ontology.typeDef)
+      ObjectProperty(schema / "url", Dataset.Ontology.ontologyClass)
     )
   }
 
@@ -225,7 +225,7 @@ object datasets {
 
     val ontology: Type = Type.Def(
       Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.Ontology.typeDef)
+      ObjectProperty(schema / "url", Dataset.Ontology.ontologyClass)
     )
   }
 
