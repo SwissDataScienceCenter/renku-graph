@@ -61,7 +61,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       readCompatibilityConfig(config) shouldBe c.pure[Try]
     }
 
-    "return a list of RenkuVersionPairs with the first element of the RenkuDevVersion if it exists and log a warning" in new TestCase {
+    "return a compatibility config with the RenkuDevVersion if it exists and log a warning" in new TestCase {
       val compatConfig = compatibilityGen.suchThat(_.renkuDevVersion.isDefined).generateOne
 
       val unparsedConfigElements =

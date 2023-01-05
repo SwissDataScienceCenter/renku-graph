@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
-    "return Unit if the cli version matches the cli version from the first pair in compatibility config" in {
+    "return Unit if the cli version matches the cli version from the compatibility config" in {
       val cliVersion   = cliVersions.generateOne
       val compatConfig = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
       val checker      = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
@@ -38,7 +38,7 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
       checker.run() shouldBe Success(())
     }
 
-    "fail if the cli version does not match the cli version from the first pair in compatibility config" in {
+    "fail if the cli version does not match the cli version from the compatibility config" in {
       val cliVersion         = cliVersions.generateOne
       val compatConfig       = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
       val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)

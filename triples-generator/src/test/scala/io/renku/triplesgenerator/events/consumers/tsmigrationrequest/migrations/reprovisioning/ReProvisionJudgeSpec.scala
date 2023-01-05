@@ -38,13 +38,29 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
   "reProvisioningNeeded" should {
 
+    "return false when versions don't match and re-provisioning-needed is false" in new TestCase {
+      val compatConfig1 = compatibilityGen.generateOne.copy(reProvisioningNeeded = false)
+      val compatConfig2 = compatibilityGen.suchThat(_ != compatConfig1).generateOne.asVersionPair
+
+      (versionPairFinder.find _).expects().returning(Try(compatConfig2.some))
+      (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
+      judge(compatConfig1).reProvisioningNeeded() shouldBe Try(false)
+    }
+
+    "return false when versions match while re-provisioning-needed is set to true" in new TestCase {
+      val compatConfig = compatibilityGen.generateOne.copy(reProvisioningNeeded = true)
+      (versionPairFinder.find _).expects().returning(Try(compatConfig.asVersionPair.some))
+      (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
+      judge(compatConfig).reProvisioningNeeded() shouldBe Try(false)
+    }
+
     "return true when TS schema version cannot be found" in new TestCase {
       (versionPairFinder.find _).expects().returning(Option.empty[RenkuVersionPair].pure[Try])
 
       judge(compatibilityGen.generateOne).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
-    "return true when TS schema version is different than the matrix schema version" in new TestCase {
+    "return true when TS schema version is different than the config schema version and re-provisioning-needed is true" in new TestCase {
       val tsVersionPair = renkuVersionPairs.generateOne
       (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
@@ -55,16 +71,16 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       judge(configVersionPairs.generateOne).reProvisioningNeeded() shouldBe true.pure[Try]
     }
 
-    "return false when TS schema version is the same as the matrix schema version " +
+    "return false when TS schema version is the same as the config schema version " +
       "and there's no ongoing re-provisioning" in new TestCase {
         val tsVersionPair = renkuVersionPairs.generateOne
         (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
-        val matrixVersionPair = VersionCompatibilityConfig(tsVersionPair, true)
+        val configVersion = VersionCompatibilityConfig(tsVersionPair, true)
 
         (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
 
-        judge(matrixVersionPair).reProvisioningNeeded() shouldBe false.pure[Try]
+        judge(configVersion).reProvisioningNeeded() shouldBe false.pure[Try]
       }
 
     "return false if schema and CLI version checks resolve to false " +
@@ -106,9 +122,9 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (serviceHealthChecker.ping _).expects(controller).returning(false.pure[Try])
 
-        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
+        val configVersion = VersionCompatibilityConfig(tsVersionPair, false)
 
-        judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
+        judge(configVersion).reProvisioningNeeded() shouldBe true.pure[Try]
       }
 
     "return true if schema and CLI version checks resolve to false " +
@@ -125,9 +141,9 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[Try])
 
-        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
+        val configVersion = VersionCompatibilityConfig(tsVersionPair, false)
 
-        judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
+        judge(configVersion).reProvisioningNeeded() shouldBe true.pure[Try]
       }
 
     "return true if schema and CLI version checks resolve to false " +
@@ -143,9 +159,9 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
           .expects()
           .returning(Option.empty[MicroserviceBaseUrl].pure[Try])
 
-        val matrixVersionPairs = VersionCompatibilityConfig(tsVersionPair, false)
+        val configVersion = VersionCompatibilityConfig(tsVersionPair, false)
 
-        judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
+        judge(configVersion).reProvisioningNeeded() shouldBe true.pure[Try]
       }
 
     "fail if finding the TS version pair fails" in new TestCase {
