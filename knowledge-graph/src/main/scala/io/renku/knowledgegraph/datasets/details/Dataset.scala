@@ -116,6 +116,7 @@ private object Dataset {
         dataset.date match {
           case DatePublished(_)  => Option.empty[(String, Json)]
           case DateCreated(date) => ("created" -> date.asJson).some
+          case DateModified(_) =>  Option.empty[(String, Json)]
         },
         ("hasPart" -> dataset.parts.asJson).some,
         ("project" -> dataset.project.asJson).some,

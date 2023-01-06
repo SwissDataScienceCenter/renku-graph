@@ -28,7 +28,7 @@ import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.images.Image
 import io.renku.jsonld.JsonLDEncoder
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
 
 final case class Dataset[+P <: Provenance](identification:    Identification,
                                            provenance:        P,
@@ -303,6 +303,11 @@ object Dataset {
           creators           <- cursor.downField(schema / "creator").as[List[Person]] >>= failIfNoCreators
           maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
           maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
+          maybeDateModified  <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
+          published = maybeDateModified
+                        .map(m => DatePublished(m.value.atOffset(ZoneOffset.UTC).toLocalDate))
+                        .orElse(maybeDatePublished)
+          created = maybeDateModified.map(m => DateCreated(m.value)).orElse(maybeDateCreated)
           maybeInternalSameAs <- cursor
                                    .downField(schema / "sameAs")
                                    .as[InternalSameAs]
@@ -317,13 +322,14 @@ object Dataset {
             cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
           maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[OriginalIdentifier]]
           maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-          provenanceAndFixableFailure <- createProvenance(identification, creators)(maybeDateCreated,
-                                                                                    maybeDatePublished,
-                                                                                    maybeInternalSameAs,
-                                                                                    maybeExternalSameAs,
-                                                                                    maybeDerivedFrom,
-                                                                                    maybeOriginalIdentifier,
-                                                                                    maybeInvalidationTime
+          provenanceAndFixableFailure <- createProvenance(identification, creators)(
+                                           created,
+                                           published,
+                                           maybeInternalSameAs,
+                                           maybeExternalSameAs,
+                                           maybeDerivedFrom,
+                                           maybeOriginalIdentifier,
+                                           maybeInvalidationTime
                                          )
         } yield provenanceAndFixableFailure
       }

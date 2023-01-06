@@ -29,7 +29,7 @@ import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import plans.{Command, DateCreated, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
+import plans.{Command, DateCreated, DateModified, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 import scala.math.Ordering.Implicits._
 
@@ -277,12 +277,14 @@ object StepPlan {
     JsonLDDecoder.cacheableEntity(entityTypes, withStrictEntityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
-        resourceId            <- cursor.downEntityId.as[ResourceId]
-        name                  <- cursor.downField(schema / "name").as[Name]
-        maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
-        maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
-        creators              <- cursor.downField(schema / "creator").as[List[Person]]
-        dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        name             <- cursor.downField(schema / "name").as[Name]
+        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
+        maybeCommand     <- cursor.downField(renku / "command").as[Option[Command]]
+        creators         <- cursor.downField(schema / "creator").as[List[Person]]
+        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        dateModified     <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
+        createdAt = dateModified.map(m => DateCreated(m.value)).getOrElse(dateCreated)
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
         parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
@@ -301,7 +303,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          dateCreated,
+                          createdAt,
                           maybeProgrammingLang,
                           keywords,
                           parameters,
@@ -317,7 +319,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          dateCreated,
+                          createdAt,
                           maybeProgrammingLang,
                           keywords,
                           parameters,
