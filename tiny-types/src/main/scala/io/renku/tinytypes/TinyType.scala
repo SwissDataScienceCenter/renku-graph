@@ -77,6 +77,7 @@ trait Sensitive extends Any {
 abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     extends (TT#V => TT)
     with From[TT]
+    with TinyTypeConversions[TT]
     with Constraints[TT]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]
@@ -107,6 +108,21 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     case exception => new IllegalArgumentException(exception)
   }
 
+  implicit lazy val show: Show[TT] = Show.show(_.toString)
+}
+
+trait TinyTypeConverter[TT <: TinyType, OUT] extends (TT => Either[Exception, OUT])
+
+trait Renderer[View, -T] {
+  def render(value: T): String
+}
+
+trait From[TT <: TinyType] {
+  def from(value: TT#V): Either[IllegalArgumentException, TT]
+}
+
+trait TinyTypeConversions[TT <: TinyType] {
+
   implicit class TinyTypeConverters(tinyType: TT) {
 
     def as[F[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): F[OUT] =
@@ -120,18 +136,6 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     def asObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObject =
       valueEncoder(tinyType.value)
   }
-
-  implicit lazy val show: Show[TT] = Show.show(_.toString)
-}
-
-trait TinyTypeConverter[TT <: TinyType, OUT] extends (TT => Either[Exception, OUT])
-
-trait Renderer[View, -T] {
-  def render(value: T): String
-}
-
-trait From[TT <: TinyType] {
-  def from(value: TT#V): Either[IllegalArgumentException, TT]
 }
 
 trait TinyTypeOrdering[TT <: TinyType] {

@@ -38,7 +38,7 @@ private object Generators {
     visibility        <- projectVisibilities
     date              <- datasetDates
     maybeDateModified <- modifiedDates(notYoungerThan = date).toGeneratorOfOptions
-    creators          <- personEntities.map(_.to[entities.Person]).map(toPersonInfo).toGeneratorOfNonEmptyList(max = 2)
+    creators          <- personInfos.toGeneratorOfNonEmptyList(max = 2)
     keywords          <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc         <- datasetDescriptions.toGeneratorOfOptions
     images            <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
@@ -54,6 +54,9 @@ private object Generators {
                      images,
                      links
   )
+
+  lazy val personInfos: Gen[PersonInfo] =
+    personEntities.map(_.to[entities.Person]).map(toPersonInfo)
 
   def modifiedDates(notYoungerThan: Date): Gen[DateModified] =
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))

@@ -18,17 +18,16 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens.planDateCreated
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
+import PlanLens.{getPlanDerivation, planDateCreated, setPlanDerivation}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
-import io.renku.jsonld.{JsonLDDecoder, Property}
+import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}

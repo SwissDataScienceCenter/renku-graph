@@ -34,7 +34,7 @@ import java.time.Instant
 private final case class SearchInfo(topmostSameAs:     TopmostSameAs,
                                     name:              Name,
                                     visibility:        Visibility,
-                                    dateInitial:       Date,
+                                    dateOriginal:      Date,
                                     maybeDateModified: Option[DateModified],
                                     creators:          NonEmptyList[PersonInfo],
                                     keywords:          List[Keyword],

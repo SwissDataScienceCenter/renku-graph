@@ -37,13 +37,15 @@ private object SearchInfoExtractor {
 
   private def toSearchInfo[F[_]: MonadThrow](project: Project)(ds: Dataset[Dataset.Provenance]) = ds.provenance match {
     case prov: Dataset.Provenance.Modified =>
-      findDateInitial(prov, project)
+      findDateOriginal(prov, project)
         .map(createSearchInfo(ds, _, DateModified(prov.date.instant).some, project))
     case prov =>
       createSearchInfo(ds, prov.date, maybeDateModified = None, project).pure[F]
   }
 
-  private def findDateInitial[F[_]: MonadThrow](prov: Dataset.Provenance.Modified, project: Project): F[datasets.Date] =
+  private def findDateOriginal[F[_]: MonadThrow](prov: Dataset.Provenance.Modified,
+                                                 project: Project
+  ): F[datasets.Date] =
     project.datasets
       .find(_.identification.resourceId.value == prov.topmostDerivedFrom.value)
       .map(_.provenance.date.pure[F].widen[datasets.Date])
@@ -55,14 +57,14 @@ private object SearchInfoExtractor {
       .widen
 
   private def createSearchInfo(ds:                Dataset[Dataset.Provenance],
-                               dateInitial:       datasets.Date,
+                               dateOriginal:      datasets.Date,
                                maybeDateModified: Option[DateModified],
                                project:           Project
   ) = SearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
     project.visibility,
-    dateInitial,
+    dateOriginal,
     maybeDateModified,
     ds.provenance.creators.map(toPersonInfo),
     ds.additionalInfo.keywords,
