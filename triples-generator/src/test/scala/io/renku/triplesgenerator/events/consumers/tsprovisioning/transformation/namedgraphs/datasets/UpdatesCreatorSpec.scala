@@ -165,7 +165,7 @@ class UpdatesCreatorSpec
         )
 
         UpdatesCreator
-          .prepareUpdatesWhenInvalidated(grandparentProject.resourceId, entitiesGrandparent)
+          .prepareUpdatesWhenInvalidatedExt(grandparentProject.resourceId, entitiesGrandparent)
           .runAll(on = projectsDataset)
           .unsafeRunSync()
 
@@ -246,7 +246,7 @@ class UpdatesCreatorSpec
           )
 
           UpdatesCreator
-            .prepareUpdatesWhenInvalidated(parentProject.resourceId, entitiesParent)
+            .prepareUpdatesWhenInvalidatedInt(parentProject.resourceId, entitiesParent)
             .runAll(on = projectsDataset)
             .unsafeRunSync()
 

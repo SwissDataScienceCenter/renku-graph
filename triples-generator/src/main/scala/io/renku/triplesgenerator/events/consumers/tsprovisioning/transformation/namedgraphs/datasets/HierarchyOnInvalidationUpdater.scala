@@ -67,9 +67,9 @@ private class HierarchyOnInvalidationUpdaterImpl[F[_]: MonadThrow](kgDatasetInfo
       case _: Dataset.Provenance.Internal =>
         prepareUpdatesWhenInvalidated(dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]])
       case _: Dataset.Provenance.ImportedExternal =>
-        prepareUpdatesWhenInvalidated(projectId, dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]])
+        prepareUpdatesWhenInvalidatedExt(projectId, dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]])
       case _: Dataset.Provenance.ImportedInternal =>
-        prepareUpdatesWhenInvalidated(projectId, dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]])
+        prepareUpdatesWhenInvalidatedInt(projectId, dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]])
       case _ => Nil
     }
 }
