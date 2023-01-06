@@ -19,13 +19,13 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations.reprovisioning
 
-import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
+import cats.MonadThrow
 import io.renku.graph.model._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
+import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
@@ -35,25 +35,25 @@ private trait ReProvisionJudge[F[_]] {
 
 private object ReProvisionJudge {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: MigrationsConnectionConfig,
-                                                          reProvisioningStatus:      ReProvisioningStatus[F],
-                                                          microserviceUrlFinder:     MicroserviceUrlFinder[F],
-                                                          versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
-  )(implicit renkuUrl:                                                               RenkuUrl) = for {
+                                                          reProvisioningStatus:  ReProvisioningStatus[F],
+                                                          microserviceUrlFinder: MicroserviceUrlFinder[F],
+                                                          compatibility:         VersionCompatibilityConfig
+  )(implicit renkuUrl:                                                           RenkuUrl) = for {
     renkuVersionPairFinder <- RenkuVersionPairFinder(storeConfig)
     serviceHealthChecker   <- ServiceHealthChecker[F]
   } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,
                                       reProvisioningStatus,
                                       microserviceUrlFinder,
                                       serviceHealthChecker,
-                                      versionCompatibilityPairs
+                                      compatibility
   )
 }
 
 private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFinder: RenkuVersionPairFinder[F],
-                                                             reProvisioningStatus:      ReProvisioningStatus[F],
-                                                             microserviceUrlFinder:     MicroserviceUrlFinder[F],
-                                                             serviceHealthChecker:      ServiceHealthChecker[F],
-                                                             versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+                                                             reProvisioningStatus:  ReProvisioningStatus[F],
+                                                             microserviceUrlFinder: MicroserviceUrlFinder[F],
+                                                             serviceHealthChecker:  ServiceHealthChecker[F],
+                                                             compatibility:         VersionCompatibilityConfig
 ) extends ReProvisionJudge[F] {
 
   import serviceHealthChecker._
@@ -61,34 +61,16 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
   override def reProvisioningNeeded(): F[Boolean] =
     (renkuVersionPairFinder.find() flatTap logVersions map decide) >>= checkForZombieReProvisioning
 
+  // decide whether to trigger re-provisioning or not
   private lazy val decide: Option[RenkuVersionPair] => Boolean = {
     case None => true
-    case Some(tsVersionPair) =>
-      `is TS schema version different from latest`(tsVersionPair.schemaVersion) ||
-      `are latest schema versions same but CLI versions different`(tsVersionPair.cliVersion)
+    case Some(RenkuVersionPair(tsCliVersion, tsSchemaVersion)) =>
+      (tsSchemaVersion != compatibility.schemaVersion ||
+        tsCliVersion != compatibility.cliVersion) && compatibility.reProvisioningNeeded
   }
 
-  private lazy val `is TS schema version different from latest`: SchemaVersion => Boolean =
-    _ != versionCompatibilityPairs.head.schemaVersion
-
-  private lazy val `are latest schema versions same but CLI versions different`: CliVersion => Boolean = tsCliVersion =>
-    versionCompatibilityPairs.toList match {
-      case RenkuVersionPair(latestCliVersion, latestSchemaVersion) :: RenkuVersionPair(_, oldSchemaVersion) :: _
-          if latestSchemaVersion == oldSchemaVersion =>
-        tsCliVersion != latestCliVersion
-      case _ => false
-    }
-
   private def logVersions(maybeTSVersionPair: Option[RenkuVersionPair]) = {
-
-    implicit val show: Show[(CliVersion, SchemaVersion)] = Show.show { case (cli, schema) =>
-      show"schema version $schema and CLI version $cli"
-    }
-
-    val expectedVersion = versionCompatibilityPairs.toList match {
-      case RenkuVersionPair(cliVersion, schemaVersion) :: _ => (cliVersion -> schemaVersion).show
-      case _                                                => "unknown"
-    }
+    val expectedVersion = compatibility.show
 
     maybeTSVersionPair match {
       case Some(RenkuVersionPair(cliVersion, schemaVersion)) =>

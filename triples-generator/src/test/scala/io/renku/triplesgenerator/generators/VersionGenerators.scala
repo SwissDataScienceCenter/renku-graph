@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.generators
 
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuVersionPair
+import io.renku.triplesgenerator.config.{RenkuPythonDevVersion, VersionCompatibilityConfig}
 import org.scalacheck.Gen
 
 object VersionGenerators {
@@ -29,4 +30,11 @@ object VersionGenerators {
     schemaVersion <- projectSchemaVersions
   } yield RenkuVersionPair(cliVersion, schemaVersion)
 
+  val compatibilityGen: Gen[VersionCompatibilityConfig] =
+    for {
+      cliVersion      <- cliVersions
+      schemaVersion   <- projectSchemaVersions
+      renkuDevVersion <- Gen.option(cliVersions.map(v => RenkuPythonDevVersion(v.value)))
+      reprov          <- Gen.oneOf(true, false)
+    } yield VersionCompatibilityConfig(cliVersion, renkuDevVersion, schemaVersion, reprov)
 }
