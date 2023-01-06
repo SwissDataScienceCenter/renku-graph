@@ -76,8 +76,7 @@ project contains deployment descriptions for all environments.
 **renku-graph project:**
 - create a branch off the `origin/release` branch, name it
   `prep-<version>`
-- either cherry-pick from development to here or do a `git rebase
-  origin/development`
+- merge development into it (`git merge origin/development`)
 - make a PR for this branch to be merged into origin/release
   ([example](https://github.com/SwissDataScienceCenter/renku-graph/pull/1095))
 - list some points in the description for what has been changed
