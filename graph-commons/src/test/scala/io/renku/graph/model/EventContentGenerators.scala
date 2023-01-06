@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -36,7 +36,7 @@ object EventContentGenerators {
 
   def eventInfos(
       projectPathGen: Gen[projects.Path] = projectPaths,
-      projectIdGen:   Gen[projects.Id] = projectIds
+      projectIdGen:   Gen[projects.GitLabId] = projectIds
   ): Gen[EventInfo] = for {
     id            <- eventIds
     projectPath   <- projectPathGen

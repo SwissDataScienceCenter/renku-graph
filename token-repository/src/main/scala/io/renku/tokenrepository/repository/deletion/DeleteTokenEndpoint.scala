@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.deletion
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait DeleteTokenEndpoint[F[_]] {
-  def deleteToken(projectId: Id): F[Response[F]]
+  def deleteToken(projectId: GitLabId): F[Response[F]]
 }
 
 class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
@@ -41,16 +41,17 @@ class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
 ) extends Http4sDsl[F]
     with DeleteTokenEndpoint[F] {
 
-  override def deleteToken(projectId: Id): F[Response[F]] =
+  override def deleteToken(projectId: GitLabId): F[Response[F]] =
     tokenRemover
       .delete(projectId)
       .flatMap(_ => NoContent())
       .recoverWith(httpResult(projectId))
 
-  private def httpResult(projectId: Id): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-    Logger[F].error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+  private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
+      Logger[F].error(exception)(errorMessage.value)
+      InternalServerError(errorMessage)
   }
 }
 

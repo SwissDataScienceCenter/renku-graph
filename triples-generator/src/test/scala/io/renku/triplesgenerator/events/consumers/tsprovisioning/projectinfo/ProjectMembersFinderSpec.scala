@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -179,8 +179,8 @@ class ProjectMembersFinderSpec
     }
 
     val mapResponse =
-      captureMapping(finder, gitLabClient)(
-        _.findProjectMembers(projectPath)(maybeAccessToken).value.unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        finder.findProjectMembers(projectPath)(maybeAccessToken).value.unsafeRunSync(),
         Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int])),
         expectedNumberOfCalls = 2
       )

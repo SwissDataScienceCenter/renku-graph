@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -101,7 +101,7 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
       .asJson,
     model.Project
       .NotActivated(
-        projects.Id(1),
+        projects.GitLabId(1),
         projects.Name("name"),
         projects.Path("group/subgroup/name"),
         projects.Visibility.Public,

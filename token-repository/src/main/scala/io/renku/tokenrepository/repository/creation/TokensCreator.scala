@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait TokensCreator[F[_]] {
-  def create(projectId: projects.Id, token: AccessToken): F[Unit]
+  def create(projectId: projects.GitLabId, token: AccessToken): F[Unit]
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
@@ -66,7 +66,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   import tokensPersister._
   import tokensRevoker._
 
-  override def create(projectId: projects.Id, userToken: AccessToken): F[Unit] =
+  override def create(projectId: projects.GitLabId, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
       .flatMapF(decrypt >=> validate >=> checkIfDue(projectId))
       .semiflatMap(replacePathIfChanged(projectId))
@@ -83,12 +83,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case _           => Option.empty[ProjectAccessToken].pure[F]
   }
 
-  private def checkIfDue(projectId: projects.Id): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
+  private def checkIfDue(projectId: projects.GitLabId): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
     case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
     case _           => Option.empty[ProjectAccessToken].pure[F]
   }
 
-  private def replacePathIfChanged(projectId: projects.Id)(token: ProjectAccessToken): F[Unit] =
+  private def replacePathIfChanged(projectId: projects.GitLabId)(token: ProjectAccessToken): F[Unit] =
     projectPathFinder
       .findProjectPath(projectId, token)
       .semiflatMap(actualPath =>
@@ -99,12 +99,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       )
       .getOrElseF(tokenRemover.delete(projectId))
 
-  private def createOrDelete(projectId: projects.Id, userToken: AccessToken) =
+  private def createOrDelete(projectId: projects.GitLabId, userToken: AccessToken) =
     (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
       .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
       .getOrElseF(tokenRemover.delete(projectId))
 
-  private def findProjectPath(projectId: projects.Id, userToken: AccessToken): OptionT[F, Project] =
+  private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
     projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
@@ -139,7 +139,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       verifyTokenIntegrity(storingInfo.project.id, newToken)
         .recoverWith(retry(storingInfo, newToken, numberOfRetries))
 
-  private def verifyTokenIntegrity(projectId: projects.Id, token: ProjectAccessToken) =
+  private def verifyTokenIntegrity(projectId: projects.GitLabId, token: ProjectAccessToken) =
     findStoredToken(projectId)
       .cataF(
         new Exception(show"Token associator - just saved token cannot be found for project: $projectId")

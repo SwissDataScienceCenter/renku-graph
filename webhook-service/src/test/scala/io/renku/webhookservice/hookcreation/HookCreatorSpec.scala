@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -49,12 +49,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -69,7 +69,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(IO.unit)
 
       (accessTokenAssociator
-        .associate(_: Id, _: AccessToken))
+        .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 
@@ -85,12 +85,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "return HookExisted if hook was already created for that project" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookExists.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -107,7 +107,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       val exception = exceptions.generateOne
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(exception.raiseError[IO, HookValidator.HookValidationResult])
 
@@ -121,13 +121,13 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "log an error if project info fetching fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       val exception = exceptions.generateOne
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(exception.raiseError[IO, ProjectInfo])
 
@@ -141,12 +141,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "log an error if hook token encryption fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -166,12 +166,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "log an error if hook creation fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -196,12 +196,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "log an error if associating projectId with accessToken fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -217,7 +217,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       val exception = exceptions.generateOne
       (accessTokenAssociator
-        .associate(_: Id, _: AccessToken))
+        .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(exception.raiseError[IO, Unit])
 
@@ -231,12 +231,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "fail return either HookExisted/HookCreated if loading all events fails" in new TestCase {
 
       (projectHookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .findProjectInfo(_: GitLabId)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -251,7 +251,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(IO.unit)
 
       (accessTokenAssociator
-        .associate(_: Id, _: AccessToken))
+        .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 

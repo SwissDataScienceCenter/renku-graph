@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,7 +32,8 @@ private object TestDataTools {
     project.maybeDescription,
     project.keywords,
     findAgent(project),
-    project.maybeCreator.map(_.resourceId)
+    project.maybeCreator.map(_.resourceId),
+    project.images.map(_.resourceId)
   )
 
   def findParent(project: entities.Project) = project match {

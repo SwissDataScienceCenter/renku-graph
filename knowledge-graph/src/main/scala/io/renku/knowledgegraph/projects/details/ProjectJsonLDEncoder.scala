@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -46,7 +46,8 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
       schema / "dateModified"     -> project.updatedAt.asJsonLD,
       schema / "keywords"         -> project.keywords.asJsonLD,
       schema / "schemaVersion"    -> project.maybeVersion.asJsonLD,
-      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD
+      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD,
+      schema / "image"            -> project.images.asJsonLD
     )
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
@@ -30,8 +30,8 @@ import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import skunk.implicits._
 
 private[repository] trait PersistedTokensFinder[F[_]] {
-  def findStoredToken(projectId:   Id):   OptionT[F, EncryptedAccessToken]
-  def findStoredToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
+  def findStoredToken(projectId:   GitLabId): OptionT[F, EncryptedAccessToken]
+  def findStoredToken(projectPath: Path):     OptionT[F, EncryptedAccessToken]
 }
 
 private[repository] object PersistedTokensFinder {
@@ -44,10 +44,10 @@ private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource:
     with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {
 
-  override def findStoredToken(projectId: Id): OptionT[F, EncryptedAccessToken] = run {
+  override def findStoredToken(projectId: GitLabId): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement
       .named("find token - id")
-      .select[Id, EncryptedAccessToken](
+      .select[GitLabId, EncryptedAccessToken](
         sql"""select token from projects_tokens where project_id = $projectIdEncoder"""
           .query(encryptedAccessTokenDecoder)
       )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -253,7 +253,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def insertNonMigrated(project: Project, encryptedToken: EncryptedAccessToken) = execute[Unit] {
       Kleisli[IO, Session[IO], Unit] { session =>
-        val command: Command[projects.Id ~ projects.Path ~ EncryptedAccessToken] =
+        val command: Command[projects.GitLabId ~ projects.Path ~ EncryptedAccessToken] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
           VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
@@ -304,7 +304,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         .expects(token)
         .returning(returning)
 
-    def givenProjectTokenCreator(projectId:       projects.Id,
+    def givenProjectTokenCreator(projectId:       projects.GitLabId,
                                  userAccessToken: AccessToken,
                                  returning:       OptionT[IO, TokenCreationInfo]
     ) = (tokensCreator.createPersonalAccessToken _)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -114,8 +114,8 @@ class GitLabAuthenticatorSpec
     val authenticator = new GitLabAuthenticatorImpl[IO]
 
     lazy val mapResponse =
-      captureMapping(authenticator, gitLabClient)(
-        _.authenticate(accessToken).unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        authenticator.authenticate(accessToken).unsafeRunSync(),
         Gen.const(Right(AuthUser(personGitLabIds.generateOne, accessToken)))
       )
   }

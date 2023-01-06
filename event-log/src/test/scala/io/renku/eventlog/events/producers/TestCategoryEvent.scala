@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,7 +33,7 @@ private object TestCategoryEvent {
   implicit lazy val show: Show[TestCategoryEvent] = Show.fromToString
 }
 
-private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.Id) {
+private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.GitLabId) {
   lazy val compoundEventId: CompoundEventId = CompoundEventId(eventId, projectId)
 }
 

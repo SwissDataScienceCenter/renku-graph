@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.db.DbSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.init.DbMigrations
@@ -51,7 +51,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     }
   }
 
-  protected def insert(projectId:      Id,
+  protected def insert(projectId:      GitLabId,
                        projectPath:    Path,
                        encryptedToken: EncryptedAccessToken,
                        expiryDate:     ExpiryDate = localDates(min = LocalDate.now().plusDays(1)).generateAs(ExpiryDate)
@@ -77,7 +77,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     case c                    => fail(s"insertion problem: $c")
   }
 
-  protected def deleteToken(projectId: Id): Unit = execute {
+  protected def deleteToken(projectId: GitLabId): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Int] =
         sql"""DELETE FROM projects_tokens
@@ -103,7 +103,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     }
     .unsafeRunSync()
 
-  protected def findToken(projectId: Id): Option[String] = sessionResource
+  protected def findToken(projectId: GitLabId): Option[String] = sessionResource
     .useK {
       val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
         .query(varchar)

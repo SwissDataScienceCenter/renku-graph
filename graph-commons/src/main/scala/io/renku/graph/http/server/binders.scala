@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,8 +25,8 @@ import scala.util.Try
 object binders {
 
   object ProjectId {
-    def unapply(value: String): Option[projects.Id] = Try {
-      projects.Id(value.toInt)
+    def unapply(value: String): Option[projects.GitLabId] = Try {
+      projects.GitLabId(value.toInt)
     }.toOption
   }
 

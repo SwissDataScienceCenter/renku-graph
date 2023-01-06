@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -68,7 +68,8 @@ private object ProjectsGenerators {
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
-    maybeVersion = kgProject.maybeVersion
+    maybeVersion = kgProject.maybeVersion,
+    images = kgProject.images
   )
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,6 +23,7 @@ import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{Async, IO, Resource}
 import cats.syntax.all._
+import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
@@ -102,15 +103,9 @@ private class MicroserviceRoutes[F[_]: Async](
 
   // format: off
   private lazy val `GET /entities/*`: AuthedRoutes[Option[AuthUser], F] = {
-    import entities.Endpoint.Criteria._
-    import Filters.CreatorName.creatorNames
-    import Filters.EntityType.entityTypes
-    import Filters.Namespace.namespaces
-    import Filters.Query.query
-    import Filters.Since.since
-    import Filters.Until.until
-    import Filters.Visibility.visibilities
+    import io.renku.entities.search.Criteria._
     import Sorting.sort
+    import entities.QueryParamDecoders._
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
@@ -126,10 +121,10 @@ private class MicroserviceRoutes[F[_]: Async](
 
   private lazy val `GET /users/*` : AuthedRoutes[Option[AuthUser], F] = {
     import users.binders._
+    import users.projects.Endpoint.Criteria.Filters
+    import users.projects.Endpoint.Criteria.Filters.ActivationState._
+    import users.projects.Endpoint.Criteria.Filters._
     import users.projects.Endpoint._
-    import Criteria.Filters
-    import Criteria.Filters.ActivationState._
-    import Criteria.Filters._
     import usersProjectsEndpoint._
 
     AuthedRoutes.of {
@@ -179,23 +174,22 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def searchForEntities(
-      maybeQuery:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Query]],
-      types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
+      maybeQuery:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Query]],
+      types:        ValidatedNel[ParseFailure, List[EntitiesSearchCriteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
-      maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
-      maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
-      maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
+      maybeSince:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Since]],
+      maybeUntil:   Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Filters.Until]],
+      maybeSort:    Option[ValidatedNel[ParseFailure, EntitiesSearchCriteria.Sorting.By]],
       maybePage:    Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]],
       maybeUser:    Option[AuthUser],
       request:      Request[F]
   ): F[Response[F]] = {
-    import entities.Endpoint.Criteria
-    import entities.Endpoint.Criteria.Filters._
-    import entities.Endpoint.Criteria.Sorting._
-    import entities.Endpoint.Criteria.{Filters, Sorting}
+    import EntitiesSearchCriteria.Filters._
+    import EntitiesSearchCriteria.Sorting._
+    import EntitiesSearchCriteria.{Filters, Sorting}
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
@@ -216,10 +210,10 @@ private class MicroserviceRoutes[F[_]: Async](
         .getOrElse(().validNel[ParseFailure])
     ).mapN { case (maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil, sorting, paging, _) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil),
-                 sorting,
-                 paging,
-                 maybeUser
+        EntitiesSearchCriteria(Filters(maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil),
+                               sorting,
+                               paging,
+                               maybeUser
         ),
         request
       )

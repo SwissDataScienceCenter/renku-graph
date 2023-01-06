@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,7 @@
 package io.renku.webhookservice
 
 import cats.MonadThrow
-import cats.effect.{Async, Clock, Resource}
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
@@ -30,7 +30,6 @@ import io.renku.http.server.version
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.webhookservice.crypto.HookTokenCrypto
-import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
@@ -41,23 +40,22 @@ import org.http4s.server.AuthMiddleware
 import org.typelevel.log4cats.Logger
 
 private class MicroserviceRoutes[F[_]: MonadThrow](
-    hookEventEndpoint:        HookEventEndpoint[F],
-    hookCreationEndpoint:     HookCreationEndpoint[F],
-    hookValidationEndpoint:   HookValidationEndpoint[F],
-    hookDeletionEndpoint:     HookDeletionEndpoint[F],
-    processingStatusEndpoint: ProcessingStatusEndpoint[F],
-    authMiddleware:           AuthMiddleware[F, AuthUser],
-    routesMetrics:            RoutesMetrics[F],
-    versionRoutes:            version.Routes[F]
-)(implicit clock:             Clock[F])
-    extends Http4sDsl[F] {
+    webhookEventsEndpoint:  webhookevents.Endpoint[F],
+    hookCreationEndpoint:   HookCreationEndpoint[F],
+    hookValidationEndpoint: HookValidationEndpoint[F],
+    hookDeletionEndpoint:   HookDeletionEndpoint[F],
+    eventStatusEndpoint:    eventstatus.Endpoint[F],
+    authMiddleware:         AuthMiddleware[F, AuthUser],
+    routesMetrics:          RoutesMetrics[F],
+    versionRoutes:          version.Routes[F]
+) extends Http4sDsl[F] {
 
   import hookCreationEndpoint._
   import hookDeletionEndpoint._
-  import hookEventEndpoint._
+  import webhookEventsEndpoint._
   import hookValidationEndpoint._
   import org.http4s.HttpRoutes
-  import processingStatusEndpoint._
+  import eventStatusEndpoint._
   import routesMetrics._
 
   // format: off
@@ -82,22 +80,22 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[MicroserviceRoutes[F]] = for {
-    projectHookUrl           <- ProjectHookUrl.fromConfig[F]()
-    hookTokenCrypto          <- HookTokenCrypto[F]()
-    hookEventEndpoint        <- HookEventEndpoint(hookTokenCrypto)
-    hookCreatorEndpoint      <- HookCreationEndpoint(projectHookUrl, hookTokenCrypto)
-    processingStatusEndpoint <- eventprocessing.ProcessingStatusEndpoint(projectHookUrl)
-    hookValidationEndpoint   <- HookValidationEndpoint(projectHookUrl)
-    hookDeletionEndpoint     <- HookDeletionEndpoint(projectHookUrl)
-    authenticator            <- GitLabAuthenticator[F]
-    authMiddleware           <- Authentication.middleware(authenticator)
-    versionRoutes            <- version.Routes[F]
+    projectHookUrl         <- ProjectHookUrl.fromConfig[F]()
+    hookTokenCrypto        <- HookTokenCrypto[F]()
+    webhookEventsEndpoint  <- webhookevents.Endpoint(hookTokenCrypto)
+    hookCreatorEndpoint    <- HookCreationEndpoint(projectHookUrl, hookTokenCrypto)
+    eventStatusEndpoint    <- eventstatus.Endpoint(projectHookUrl)
+    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl)
+    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl)
+    authenticator          <- GitLabAuthenticator[F]
+    authMiddleware         <- Authentication.middleware(authenticator)
+    versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](
-    hookEventEndpoint,
+    webhookEventsEndpoint,
     hookCreatorEndpoint,
     hookValidationEndpoint,
     hookDeletionEndpoint,
-    processingStatusEndpoint,
+    eventStatusEndpoint,
     authMiddleware,
     new RoutesMetrics[F],
     versionRoutes

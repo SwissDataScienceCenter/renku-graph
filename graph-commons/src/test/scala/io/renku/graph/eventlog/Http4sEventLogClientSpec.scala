@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,25 +19,27 @@
 package io.renku.graph.eventlog
 
 import cats.effect._
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.eventlog.EventLogClient.{Result, SearchCriteria}
-import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
+import io.renku.graph.eventlog.Http4sEventLogClientSpec.JsonEncoders._
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
+import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
 import io.renku.http.client.UrlEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
 import org.http4s.Uri
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
 
 import java.time.temporal.ChronoUnit
-import io.renku.graph.eventlog.Http4sEventLogClientSpec.JsonEncoders._
 
 class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -46,15 +48,15 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
   val client = new Http4sEventLogClient[IO](Uri.unsafeFromString(externalServiceBaseUrl))
 
   "getEvents" should {
-    "apply search criteria in the query" in {
+
+    "apply search criteria in the query - case with status query param" in {
       val events    = EventContentGenerators.eventInfos().toGeneratorOfNonEmptyList().generateOne.toList
       val sinceDate = EventContentGenerators.eventDates.generateOne.value.truncatedTo(ChronoUnit.SECONDS)
 
       stubFor {
         get(
           s"/events?status=${EventStatus.TriplesStore.value}&since=${param(sinceDate.toString)}&page=1&per_page=35&sort=eventDate%3AASC"
-        )
-          .willReturn(ok(events))
+        ).willReturn(ok(events))
       }
 
       val criteria = SearchCriteria
@@ -64,8 +66,49 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
         .sortBy(SearchCriteria.Sort.EventDateAsc)
 
       val result = client.getEvents(criteria).unsafeRunSync()
-      val data   = result.toEither.fold(throw _, identity)
-      data shouldBe events
+      result.toEither.fold(throw _, identity) shouldBe events
+    }
+
+    "apply search criteria in the query - case with project path query param" in {
+      val events      = EventContentGenerators.eventInfos().toGeneratorOfNonEmptyList().generateOne.toList
+      val projectPath = projectPaths.generateOne
+      val sinceDate   = EventContentGenerators.eventDates.generateOne.value.truncatedTo(ChronoUnit.SECONDS)
+
+      stubFor {
+        get(
+          s"/events?since=${param(sinceDate.toString)}&project-path=${projectPath.show}&page=1&per_page=35&sort=eventDate%3AASC"
+        ).willReturn(ok(events))
+      }
+
+      val criteria = SearchCriteria
+        .forProject(projectPath)
+        .withSince(EventDate(sinceDate))
+        .withPerPage(35)
+        .sortBy(SearchCriteria.Sort.EventDateAsc)
+
+      val result = client.getEvents(criteria).unsafeRunSync()
+      result.toEither.fold(throw _, identity) shouldBe events
+    }
+
+    "apply search criteria in the query - case with project id query param" in {
+      val events    = EventContentGenerators.eventInfos().toGeneratorOfNonEmptyList().generateOne.toList
+      val projectId = projectIds.generateOne
+      val sinceDate = EventContentGenerators.eventDates.generateOne.value.truncatedTo(ChronoUnit.SECONDS)
+
+      stubFor {
+        get(
+          s"/events?since=${param(sinceDate.toString)}&project-id=${projectId.show}&page=1&per_page=35&sort=eventDate%3AASC"
+        ).willReturn(ok(events))
+      }
+
+      val criteria = SearchCriteria
+        .forProject(projectId)
+        .withSince(EventDate(sinceDate))
+        .withPerPage(35)
+        .sortBy(SearchCriteria.Sort.EventDateAsc)
+
+      val result = client.getEvents(criteria).unsafeRunSync()
+      result.toEither.fold(throw _, identity) shouldBe events
     }
 
     "return failure" in {
@@ -129,12 +172,11 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
     }
   }
 
-  def ok[A](value: A)(implicit enc: Encoder[A]): ResponseDefinitionBuilder =
+  private def ok[A](value: A)(implicit enc: Encoder[A]): ResponseDefinitionBuilder =
     okJson(enc.apply(value).spaces2)
 
-  def param: String => String =
+  private def param: String => String =
     UrlEncoder.urlEncode
-
 }
 
 object Http4sEventLogClientSpec {

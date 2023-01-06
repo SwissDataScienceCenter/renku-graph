@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -108,7 +108,7 @@ class LastSyncedDateUpdaterSpec
 
   private def getLastSyncedDate(project: Project): Option[LastSyncedDate] = execute {
     Kleisli { session =>
-      val query: Query[projects.Id ~ CategoryName, LastSyncedDate] =
+      val query: Query[projects.GitLabId ~ CategoryName, LastSyncedDate] =
         sql"""SELECT sync_time.last_synced FROM subscription_category_sync_time sync_time
                 WHERE sync_time.project_id = $projectIdEncoder 
                 AND sync_time.category_name = $categoryNameEncoder

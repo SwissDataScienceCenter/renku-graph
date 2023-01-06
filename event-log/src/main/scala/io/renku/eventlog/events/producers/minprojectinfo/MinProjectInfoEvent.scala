@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private case class MinProjectInfoEvent(projectId: projects.Id, projectPath: projects.Path)
+private case class MinProjectInfoEvent(projectId: projects.GitLabId, projectPath: projects.Path)
 
 private object MinProjectInfoEvent {
   implicit val show: Show[MinProjectInfoEvent] = Show.show { case MinProjectInfoEvent(id, path) =>

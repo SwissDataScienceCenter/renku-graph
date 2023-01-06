@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -45,7 +45,7 @@ private class EventHandler[F[_]: Concurrent: Logger](
   private def startForceCommitSync(request: EventRequestContent) = for {
     event @ (projectId, projectPath) <-
       fromEither[F](
-        request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
+        request.event.as[(projects.GitLabId, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
     result <- moveGlobalCommitSync(projectId, projectPath).toRightT
                 .map(_ => Accepted)
@@ -53,13 +53,13 @@ private class EventHandler[F[_]: Concurrent: Logger](
                 .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
-  private implicit lazy val eventInfoToString: Show[(projects.Id, projects.Path)] = Show.show {
+  private implicit lazy val eventInfoToString: Show[(projects.GitLabId, projects.Path)] = Show.show {
     case (projectId, projectPath) => show"projectId = $projectId, projectPath = $projectPath"
   }
 
-  private implicit val eventDecoder: Decoder[(projects.Id, projects.Path)] = { cursor =>
+  private implicit val eventDecoder: Decoder[(projects.GitLabId, projects.Path)] = { cursor =>
     for {
-      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
       projectPath <- cursor.downField("project").downField("path").as[projects.Path]
     } yield projectId -> projectPath
   }

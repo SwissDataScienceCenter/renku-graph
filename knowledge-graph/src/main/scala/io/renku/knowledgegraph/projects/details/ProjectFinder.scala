@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,7 +71,8 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
-    maybeVersion = kgProject.maybeVersion
+    maybeVersion = kgProject.maybeVersion,
+    images = kgProject.images
   )
 
   private implicit class ParentOps(maybeParent: Option[KGParent]) {

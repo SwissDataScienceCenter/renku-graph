@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -80,7 +80,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
@@ -106,7 +106,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
@@ -133,7 +133,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.setRunning _).expects(controller).returning(exception.raiseError[IO, Unit])
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
@@ -160,9 +160,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects(configuredRenkuVersionPairs.head)
+          .expects(compatibility.asVersionPair)
           .returning(exception.raiseError[IO, Unit])
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
@@ -188,7 +188,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(exception.raiseError[IO, Unit])
 
@@ -217,7 +217,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
 
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
+        (renkuVersionPairUpdater.update _).expects(compatibility.asVersionPair).returning(IO.unit)
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
@@ -253,16 +253,16 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val controller = microserviceBaseUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val configuredRenkuVersionPairs = renkuVersionPairs.generateNonEmptyList(2)
-    val reprovisionJudge            = mock[ReProvisionJudge[IO]]
-    val triplesRemover              = mock[TriplesRemover[IO]]
-    val eventSender                 = mock[EventSender[IO]]
-    val renkuVersionPairUpdater     = mock[RenkuVersionPairUpdater[IO]]
-    val microserviceUrlFinder       = mock[MicroserviceUrlFinder[IO]]
-    val reProvisioningStatus        = mock[ReProvisioningStatus[IO]]
-    val executionTimeRecorder       = TestExecutionTimeRecorder[IO]()
+    val compatibility           = compatibilityGen.generateOne
+    val reprovisionJudge        = mock[ReProvisionJudge[IO]]
+    val triplesRemover          = mock[TriplesRemover[IO]]
+    val eventSender             = mock[EventSender[IO]]
+    val renkuVersionPairUpdater = mock[RenkuVersionPairUpdater[IO]]
+    val microserviceUrlFinder   = mock[MicroserviceUrlFinder[IO]]
+    val reProvisioningStatus    = mock[ReProvisioningStatus[IO]]
+    val executionTimeRecorder   = TestExecutionTimeRecorder[IO]()
     val reProvisioning = new ReProvisioningImpl[IO](
-      configuredRenkuVersionPairs,
+      compatibility,
       reprovisionJudge,
       triplesRemover,
       eventSender,

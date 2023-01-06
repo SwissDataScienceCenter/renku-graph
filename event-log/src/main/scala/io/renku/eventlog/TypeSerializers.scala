@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,8 +42,8 @@ trait TypeSerializers {
   val commitIdDecoder: Decoder[CommitId] = varchar.map(CommitId.apply)
   val commitIdEncoder: Encoder[CommitId] = varchar.values.contramap(_.value)
 
-  val projectIdDecoder: Decoder[projects.Id] = int4.map(projects.Id.apply)
-  val projectIdEncoder: Encoder[projects.Id] = int4.values.contramap(_.value)
+  val projectIdDecoder: Decoder[projects.GitLabId] = int4.map(projects.GitLabId.apply)
+  val projectIdEncoder: Encoder[projects.GitLabId] = int4.values.contramap(_.value)
 
   val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
   val projectPathEncoder: Encoder[projects.Path] =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -69,16 +69,16 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               )
               LIMIT 1
       """.query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.Id) ~ (path: projects.Path) => MinProjectInfoEvent(id, path) }
+          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => MinProjectInfoEvent(id, path) }
       )
       .arguments(Void)
       .build(_.option)
   }
 
-  private def markTaken(projectId: projects.Id): Kleisli[F, Session[F], Boolean] = measureExecutionTime {
+  private def markTaken(projectId: projects.GitLabId): Kleisli[F, Session[F], Boolean] = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert last_synced")
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](sql"""
+      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)

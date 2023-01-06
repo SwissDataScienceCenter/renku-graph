@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -114,8 +114,8 @@ class ProjectHookFetcherSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val fetcher = new ProjectHookFetcherImpl[IO]
 
-    val mapResponse = captureMapping(fetcher, gitLabClient)(_.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
-                                                            Gen.const(List.empty[HookIdAndUrl])
+    val mapResponse = captureMapping(gitLabClient)(fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
+                                                   Gen.const(List.empty[HookIdAndUrl])
     )
   }
 

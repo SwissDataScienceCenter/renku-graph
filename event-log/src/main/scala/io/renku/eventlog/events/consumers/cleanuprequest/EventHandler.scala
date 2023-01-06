@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -53,7 +53,7 @@ private class EventHandler[F[_]: Concurrent: Logger](
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     _.downField("project").as[Json].map(_.hcursor) >>= { cursor =>
-      (cursor.downField("id").as[Option[projects.Id]], cursor.downField("path").as[projects.Path]).mapN {
+      (cursor.downField("id").as[Option[projects.GitLabId]], cursor.downField("path").as[projects.Path]).mapN {
         case (Some(id), path) => CleanUpRequestEvent(id, path)
         case (None, path)     => CleanUpRequestEvent(path)
       }

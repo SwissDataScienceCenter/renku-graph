@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -223,6 +223,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       starsCount = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
       statistics = gitLabProject.statistics,
-      maybeVersion = kgProject.maybeVersion
+      maybeVersion = kgProject.maybeVersion,
+      images = kgProject.images
     )
 }

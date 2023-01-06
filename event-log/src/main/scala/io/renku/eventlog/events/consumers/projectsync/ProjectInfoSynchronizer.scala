@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -61,7 +61,7 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (payload, eventCtx) => sendEvent(payload, eventCtx)
   }
 
-  private def commitSyncRequest(projectId: projects.Id, newPath: projects.Path) = {
+  private def commitSyncRequest(projectId: projects.GitLabId, newPath: projects.Path) = {
     val category = commitsyncrequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
       "categoryName": ${category.show},

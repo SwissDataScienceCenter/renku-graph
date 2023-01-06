@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,7 +29,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
 
 private trait ProjectRemover[F[_]] {
-  def removeProject(projectId: projects.Id): F[Unit]
+  def removeProject(projectId: projects.GitLabId): F[Unit]
 }
 
 private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
@@ -40,7 +40,7 @@ private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Querie
   import skunk.data.Completion
   import skunk.implicits._
 
-  override def removeProject(projectId: projects.Id): F[Unit] = SessionResource[F].useWithTransactionK[Unit] {
+  override def removeProject(projectId: projects.GitLabId): F[Unit] = SessionResource[F].useWithTransactionK[Unit] {
     Kleisli { case (tx, session) =>
       for {
         sp <- tx.savepoint
@@ -50,7 +50,7 @@ private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Querie
     }
   }
 
-  private def deleteAll(implicit id: projects.Id): Kleisli[F, Session[F], Unit] =
+  private def deleteAll(implicit id: projects.GitLabId): Kleisli[F, Session[F], Unit] =
     delete("payloads", sql"""DELETE FROM event_payload WHERE project_id = $projectIdEncoder""".command) >>
       delete("processing times",
              sql"""DELETE FROM status_processing_time WHERE project_id = $projectIdEncoder""".command
@@ -65,11 +65,11 @@ private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Querie
       ) >>
       delete("project", sql"""DELETE FROM project WHERE project_id = $projectIdEncoder""".command)
 
-  private def delete(matter: String, sql: Command[projects.Id])(implicit projectId: projects.Id) =
+  private def delete(matter: String, sql: Command[projects.GitLabId])(implicit projectId: projects.GitLabId) =
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.value.toLowerCase} - delete $matter")
-        .command[projects.Id](sql)
+        .command[projects.GitLabId](sql)
         .arguments(projectId)
         .build
         .flatMapResult {

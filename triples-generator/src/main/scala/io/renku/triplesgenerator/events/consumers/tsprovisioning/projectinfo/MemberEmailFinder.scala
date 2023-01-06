@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -114,4 +114,4 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
   }
 }
 
-private final case class Project(id: projects.Id, path: projects.Path)
+private final case class Project(id: projects.GitLabId, path: projects.Path)

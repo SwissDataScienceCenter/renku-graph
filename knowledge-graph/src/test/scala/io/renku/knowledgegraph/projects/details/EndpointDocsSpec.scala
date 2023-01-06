@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,10 +20,14 @@ package io.renku.knowledgegraph.projects.details
 
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
 class EndpointDocsSpec extends AnyWordSpec {
+
+  implicit val gitLabUrl: GitLabUrl = EntitiesGenerators.gitLabUrl
 
   "path" should {
     "return a valid Path object" in {

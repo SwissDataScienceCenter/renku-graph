@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.init
 
-import cats.data.NonEmptyList
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.triplesgenerator.generators.VersionGenerators._
@@ -31,25 +30,21 @@ import scala.util.{Failure, Success, Try}
 class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
-    "return Unit if the cli version matches the cli version from the first pair in compatibility matrix" in {
-      val cliVersion = cliVersions.generateOne
-      val versionPairs = renkuVersionPairs.generateNonEmptyList() match {
-        case NonEmptyList(head, tail) => NonEmptyList(head.copy(cliVersion = cliVersion), tail)
-      }
-      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, versionPairs)
+    "return Unit if the cli version matches the cli version from the compatibility config" in {
+      val cliVersion   = cliVersions.generateOne
+      val compatConfig = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
+      val checker      = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
 
       checker.run() shouldBe Success(())
     }
 
-    "fail if the cli version does not match the cli version from the first pair in compatibility matrix" in {
+    "fail if the cli version does not match the cli version from the compatibility config" in {
       val cliVersion         = cliVersions.generateOne
-      val versionPairs       = renkuVersionPairs.generateNonEmptyList()
-      val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, versionPairs)
+      val compatConfig       = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
+      val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
       val Failure(exception) = checker.run()
       exception shouldBe a[IllegalStateException]
-      exception.getMessage shouldBe s"Incompatible versions. cliVersion: $cliVersion versionPairs: ${versionPairs.head.cliVersion}"
+      exception.getMessage shouldBe s"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
     }
-
   }
-
 }

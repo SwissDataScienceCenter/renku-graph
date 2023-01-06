@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -120,7 +120,7 @@ class CommitHistoryChangesSpec
 
       sleep((1 second).toMillis)
 
-      `wait for events to be processed`(project.id)
+      `check no hook exists`(project.id)
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 
@@ -167,6 +167,7 @@ class CommitHistoryChangesSpec
       dateCreated = projectEntities.dateCreated,
       maybeCreator = projectEntities.maybeCreator,
       keywords = projectEntities.keywords,
-      members = projectEntities.members
+      members = projectEntities.members,
+      images = projectEntities.images
     )
 }

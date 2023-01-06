@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -53,15 +53,15 @@ class DuplicateProjectsRemoverSpec
     "de-duplicate rows with the same project_path but different ids" in new TestCase {
 
       val projectPath     = projectPaths.generateOne
-      val projectId1      = projects.Id(1)
+      val projectId1      = projects.GitLabId(1)
       val encryptedToken1 = encryptedAccessTokens.generateOne
       insert(projectId1, projectPath, encryptedToken1)
-      val projectId2      = projects.Id(2)
+      val projectId2      = projects.GitLabId(2)
       val encryptedToken2 = encryptedAccessTokens.generateOne
       insert(projectId2, projectPath, encryptedToken2)
       val projectPath3    = projectPaths.generateOne
       val encryptedToken3 = encryptedAccessTokens.generateOne
-      insert(projects.Id(3), projectPath3, encryptedToken3)
+      insert(projects.GitLabId(3), projectPath3, encryptedToken3)
 
       findToken(projectId1) shouldBe Some(encryptedToken1.value)
       findToken(projectId2) shouldBe Some(encryptedToken2.value)
@@ -82,7 +82,7 @@ class DuplicateProjectsRemoverSpec
     val deduplicator = new DuplicateProjectsRemover[IO]
   }
 
-  protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
+  protected def insert(projectId: GitLabId, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
     execute {
       Kleisli[IO, Session[IO], Unit] { session =>
         val query: Command[Int ~ String ~ String] =

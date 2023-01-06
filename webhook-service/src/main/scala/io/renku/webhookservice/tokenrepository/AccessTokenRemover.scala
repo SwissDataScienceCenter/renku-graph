@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,14 +21,14 @@ package io.renku.webhookservice.tokenrepository
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
 import io.renku.http.client.RestClient
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 
 trait AccessTokenRemover[F[_]] {
-  def removeAccessToken(projectId: Id): F[Unit]
+  def removeAccessToken(projectId: GitLabId): F[Unit]
 }
 
 object AccessTokenRemover {
@@ -46,7 +46,7 @@ class AccessTokenRemoverImpl[F[_]: Async: Logger](
   import org.http4s.Status.NoContent
   import org.http4s.{Request, Response}
 
-  override def removeAccessToken(projectId: Id): F[Unit] = for {
+  override def removeAccessToken(projectId: GitLabId): F[Unit] = for {
     uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
     _   <- send(request(DELETE, uri))(mapResponse)
   } yield ()

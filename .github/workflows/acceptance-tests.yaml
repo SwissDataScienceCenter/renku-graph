@@ -1,4 +1,4 @@
-name: Acceptance tests
+name: Renku acceptance tests
 
 on:
   pull_request:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -44,7 +44,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
   "findEvents" should {
 
-    "return the List of events of the project the given path" in new TestCase {
+    "return the List of events of the project the given path or id" in new TestCase {
       val projectId = projectIds.generateOne
       val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(max = 10)
 
@@ -70,13 +70,21 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
         projectPaths.generateOne
       )
 
-      val pagedResults = eventsFinder
+      val byPathResults = eventsFinder
         .findEvents(Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None)))
         .unsafeRunSync()
 
-      pagedResults.pagingInfo.total.value   shouldBe infos.size
-      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
-      pagedResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
+      byPathResults.pagingInfo.total.value   shouldBe infos.size
+      byPathResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      byPathResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
+
+      val byIdResults = eventsFinder
+        .findEvents(Criteria(Filters.ProjectEvents(projectId, maybeStatus = None, maybeDates = None)))
+        .unsafeRunSync()
+
+      byIdResults.pagingInfo.total.value   shouldBe infos.size
+      byIdResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      byIdResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
     }
 
     "return the List of events of the project with the given path and the given PagingRequest" in new TestCase {

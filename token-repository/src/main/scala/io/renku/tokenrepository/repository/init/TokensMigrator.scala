@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -98,7 +98,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
         WHERE expiry_date IS NULL
         LIMIT 1"""
           .query(projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder)
-          .map { case (id: projects.Id) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) =>
+          .map { case (id: projects.GitLabId) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) =>
             Project(id, path) -> token
           }
       )

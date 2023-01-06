@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -90,7 +90,7 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
   implicit val projectDecoder: Decoder[Project] = cursor =>
     for {
-      id   <- cursor.downField("id").as[projects.Id]
+      id   <- cursor.downField("id").as[projects.GitLabId]
       path <- cursor.downField("path").as[projects.Path]
     } yield Project(id, path)
 }

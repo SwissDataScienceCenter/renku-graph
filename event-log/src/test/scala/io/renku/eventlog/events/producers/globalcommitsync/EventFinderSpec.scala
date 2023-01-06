@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -244,7 +244,7 @@ class EventFinderSpec
   }
 
   private def genCommitIdAndDate(olderThanAWeek: Boolean = Random.nextBoolean(),
-                                 projectId:      projects.Id = projectIds.generateOne
+                                 projectId:      projects.GitLabId = projectIds.generateOne
   ) = {
     val eventDate =
       if (olderThanAWeek) relativeTimestamps(moreThanAgo = Duration.ofDays(8)).generateAs(EventDate)
@@ -252,7 +252,8 @@ class EventFinderSpec
     (genCompoundEventId(projectId), eventDate)
   }
 
-  private def genCompoundEventId(projectId: projects.Id) = compoundEventIds.generateOne.copy(projectId = projectId)
+  private def genCompoundEventId(projectId: projects.GitLabId) =
+    compoundEventIds.generateOne.copy(projectId = projectId)
 
   private def addEvent(
       eventId:     CompoundEventId,

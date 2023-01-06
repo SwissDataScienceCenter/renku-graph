@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -143,9 +143,9 @@ class TokensPersisterSpec
     val persister = new TokensPersisterImpl[IO]
   }
 
-  private def findTokenInfo(projectId: projects.Id): Option[TokenStoringInfo] = sessionResource
+  private def findTokenInfo(projectId: projects.GitLabId): Option[TokenStoringInfo] = sessionResource
     .useK {
-      val query: Query[projects.Id, TokenStoringInfo] = sql"""
+      val query: Query[projects.GitLabId, TokenStoringInfo] = sql"""
       SELECT project_id, project_path, token, created_at, expiry_date
       FROM projects_tokens
       WHERE project_id = $projectIdEncoder"""
@@ -153,7 +153,7 @@ class TokensPersisterSpec
           projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder ~ createdAtDecoder ~ expiryDateDecoder
         )
         .map {
-          case (id: projects.Id) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
+          case (id: projects.GitLabId) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
             TokenStoringInfo(Project(id, path), token, TokenDates(createdAt, expiryDate))
         }
       Kleisli(_.prepare(query).use(_.option(projectId)))

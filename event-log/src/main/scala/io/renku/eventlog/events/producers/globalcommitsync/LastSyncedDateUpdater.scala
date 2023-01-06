@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,7 @@ import skunk.implicits.{toIdOps, toStringOps}
 import skunk.{SqlState, ~}
 
 private trait LastSyncedDateUpdater[F[_]] {
-  def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion]
+  def run(projectId: projects.GitLabId, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion]
 }
 
 private object LastSyncedDateUpdater {
@@ -50,7 +50,7 @@ private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource: 
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {
 
-  override def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion] =
+  override def run(projectId: projects.GitLabId, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion] =
     SessionResource[F].useK {
       maybeLastSyncDate match {
         case Some(lastSyncedDate) => insert(projectId, lastSyncedDate)
@@ -58,9 +58,9 @@ private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource: 
       }
     }
 
-  private def insert(projectId: projects.Id, lastSyncedDate: LastSyncedDate) = measureExecutionTime {
+  private def insert(projectId: projects.GitLabId, lastSyncedDate: LastSyncedDate) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
+      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](
         sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
               VALUES ( $projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
               ON CONFLICT (project_id, category_name)
@@ -71,9 +71,9 @@ private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource: 
       .build
   } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(Completion.Insert(0)) }
 
-  private def deleteLastSyncDate(projectId: projects.Id) = measureExecutionTime {
+  private def deleteLastSyncDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-      .command[projects.Id ~ CategoryName](
+      .command[projects.GitLabId ~ CategoryName](
         sql"""DELETE FROM subscription_category_sync_time
               WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
             """.command

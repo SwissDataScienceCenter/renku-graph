@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,8 @@
 
 package io.renku.graph.acceptancetests
 
+import io.renku.graph.model.GitLabUrl
+
 package object knowledgegraph {
 
   import io.circe.literal._
@@ -31,7 +33,13 @@ package object knowledgegraph {
   import io.renku.http.rest.Links.{Href, Link, Rel, _links}
   import io.renku.json.JsonOps._
 
-  def fullJson(project: Project): Json = json"""{
+  def fullJson(project: Project)(implicit theGitLabUrl: GitLabUrl): Json = {
+    val imageEncoders = new ImageApiEncoders {
+      override def gitLabUrl: GitLabUrl = theGitLabUrl
+    }
+    import imageEncoders._
+
+    json"""{
     "identifier":  ${project.id.value}, 
     "path":        ${project.path.value}, 
     "name":        ${project.name.value},
@@ -43,6 +51,7 @@ package object knowledgegraph {
     "keywords":    ${project.entitiesProject.keywords.map(_.value).toList.sorted},
     "starsCount":  ${project.starsCount.value},
     "permissions": ${toJson(project.permissions)},
+    "images":      ${project.entitiesProject.images -> project.path},
     "statistics": {
       "commitsCount":     ${project.statistics.commitsCount.value},
       "storageSize":      ${project.statistics.storageSize.value},
@@ -52,13 +61,14 @@ package object knowledgegraph {
     },
     "version": ${project.entitiesProject.version.value}
   }"""
-    .deepMerge {
-      _links(
-        Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
-        Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
-      )
-    }
-    .addIfDefined("description" -> project.entitiesProject.maybeDescription)
+      .deepMerge {
+        _links(
+          Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
+          Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
+        )
+      }
+      .addIfDefined("description" -> project.entitiesProject.maybeDescription)
+  }
 
   private implicit class UrlsOps(urls: Urls) {
 

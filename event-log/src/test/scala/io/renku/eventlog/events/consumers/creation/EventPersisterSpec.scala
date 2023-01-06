@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -325,7 +325,7 @@ class EventPersisterSpec
       execute {
         Kleisli { session =>
           val query: Query[
-            EventId ~ projects.Id,
+            EventId ~ projects.GitLabId,
             (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
           ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
                   FROM event  
@@ -351,9 +351,9 @@ class EventPersisterSpec
       }
   }
 
-  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
+  private def storedProjects: List[(projects.GitLabId, projects.Path, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
+      val query: Query[Void, (projects.GitLabId, projects.Path, EventDate)] =
         sql"""SELECT project_id, project_path, latest_event_date
               FROM project"""
           .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -245,10 +245,10 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/entities" should {
-    import entities.Endpoint.Criteria.Sorting._
-    import entities.Endpoint.Criteria._
-    import entities.Endpoint._
-    import entities._
+    import io.renku.entities.search.Criteria
+    import io.renku.entities.search.Criteria.Sorting._
+    import io.renku.entities.search.Criteria._
+    import io.renku.entities.search.Generators._
 
     forAll {
       Table(
@@ -851,7 +851,7 @@ class MicroserviceRoutesSpec
     val projectPathAuthorizer      = mock[Authorizer[IO, model.projects.Path]]
     val datasetIdAuthorizer        = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics              = TestRoutesMetrics()
-    val versionRoutes              = mock[version.Routes[IO]]
+    private val versionRoutes      = mock[version.Routes[IO]]
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
       givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))

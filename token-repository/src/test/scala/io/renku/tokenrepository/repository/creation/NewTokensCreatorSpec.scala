@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -105,8 +105,8 @@ class NewTokensCreatorSpec
     val renkuTokenName  = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
     val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, renkuTokenName, currentDate)
 
-    lazy val mapResponse = captureMapping(tokensCreator, gitLabClient)(
-      findingMethod = _.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = tokensCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
       method = POST
     )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -150,7 +150,7 @@ class StatusChangerSpec
 
       override def onRollback(event: StatusChangeEvent): Kleisli[IO, Session[IO], Unit] = Kleisli {
         SqlStatement[IO](name = "onRollback dbUpdater query")
-          .command[EventId ~ projects.Id](
+          .command[EventId ~ projects.GitLabId](
             sql"""DELETE FROM event_delivery
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command

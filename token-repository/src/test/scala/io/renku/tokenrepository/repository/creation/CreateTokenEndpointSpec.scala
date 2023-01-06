@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -48,7 +48,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val accessToken: AccessToken = personalAccessTokens.generateOne
       (tokensCreator
-        .create(_: Id, _: AccessToken))
+        .create(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 
@@ -68,7 +68,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
       (tokensCreator
-        .create(_: Id, _: AccessToken))
+        .create(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 
@@ -104,7 +104,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val exception = exceptions.generateOne
       (tokensCreator
-        .create(_: Id, _: AccessToken))
+        .create(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(exception.raiseError[IO, Unit])
 

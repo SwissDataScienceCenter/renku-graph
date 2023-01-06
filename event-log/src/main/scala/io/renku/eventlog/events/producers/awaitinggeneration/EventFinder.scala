@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -115,8 +115,9 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           LIMIT $int4
           """
           .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-          .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
-            ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+          .map {
+            case (id: projects.GitLabId) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+              ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
       .arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
@@ -137,7 +138,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
     val executionDate = ExecutionDate(now())
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find latest")
-      .select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](sql"""
+      .select[projects.Path ~ projects.GitLabId ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](sql"""
         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
         FROM (
           SELECT project_id, max(event_date) AS max_event_date
@@ -177,7 +178,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
   private def updateStatus(commitEventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
-      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](sql"""
+      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](sql"""
         UPDATE event 
         SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder

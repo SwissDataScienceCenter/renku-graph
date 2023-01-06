@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -59,7 +59,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
       eventDeliveryId match {
         case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
           SqlStatement(name = "event delivery info - insert")
-            .command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
+            .command[EventId ~ projects.GitLabId ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
               INSERT INTO event_delivery (event_id, project_id, delivery_id)
               SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
               FROM subscriber
@@ -71,7 +71,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
             .build
         case eventId @ DeletingProjectDeliverId(projectId) =>
           SqlStatement(name = "event delivery info - insert")
-            .command[projects.Id ~ EventTypeId ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
+            .command[projects.GitLabId ~ EventTypeId ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
               INSERT INTO event_delivery (project_id, delivery_id, event_type_id)
               SELECT  $projectIdEncoder, delivery_id, $eventTypeIdEncoder
               FROM subscriber
@@ -88,7 +88,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
     eventDeliveryId match {
       case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
         SqlStatement(name = "event delivery info - remove")
-          .command[EventId ~ projects.Id](sql"""
+          .command[EventId ~ projects.GitLabId](sql"""
             DELETE FROM event_delivery
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command)
@@ -97,7 +97,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
           .void
       case eventId @ DeletingProjectDeliverId(projectId) =>
         SqlStatement(name = "event delivery info - remove")
-          .command[projects.Id ~ EventTypeId](sql"""
+          .command[projects.GitLabId ~ EventTypeId](sql"""
             DELETE FROM event_delivery
             WHERE event_id = NULL AND project_id = $projectIdEncoder AND event_type_id = $eventTypeIdEncoder
             """.command)

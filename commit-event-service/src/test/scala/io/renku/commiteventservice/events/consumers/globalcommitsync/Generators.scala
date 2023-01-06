@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,7 @@ private object Generators {
 
   lazy val commitsCounts: Gen[CommitsCount] = positiveLongs().map(_.value).toGeneratorOf(CommitsCount)
 
-  def globalCommitSyncEvents(projectIdGen: Gen[projects.Id] = projectIds): Gen[GlobalCommitSyncEvent] = for {
+  def globalCommitSyncEvents(projectIdGen: Gen[projects.GitLabId] = projectIds): Gen[GlobalCommitSyncEvent] = for {
     projectId   <- projectIdGen
     projectPath <- projectPaths
     commitsInfo <- commitsInfos

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -114,8 +114,8 @@ class ProjectPathFinderSpec
       "path_with_namespace": ${projectPath.value}
     }"""
 
-    lazy val mapResponse = captureMapping(pathFinder, gitLabClient)(
-      findingMethod = _.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      findingMethod = pathFinder.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
       resultGenerator = projectPaths.generateOption
     )
   }

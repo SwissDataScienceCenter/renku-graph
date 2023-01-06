@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,7 @@ package io.renku.graph.tokenrepository
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
@@ -57,8 +57,8 @@ object AccessTokenFinder {
 
   trait Implicits {
     import io.renku.http.client.UrlEncoder.urlEncode
-    implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
-    implicit val projectIdToPath:   Id => String   = _.toString
+    implicit val projectPathToPath: Path => String     = path => urlEncode(path.value)
+    implicit val projectIdToPath:   GitLabId => String = _.toString
   }
   object Implicits extends Implicits
 

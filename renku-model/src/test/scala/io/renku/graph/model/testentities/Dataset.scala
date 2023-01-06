@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.EntityFunctions
+import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId, ImageUri}
 import io.renku.graph.model.testentities.Dataset.Provenance._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -343,7 +344,7 @@ object Dataset {
         dataset.additionalInfo.keywords.sorted,
         dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
           val imagePosition = ImagePosition(idx)
-          entities.Dataset.Image(
+          Image(
             ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
             url,
             imagePosition

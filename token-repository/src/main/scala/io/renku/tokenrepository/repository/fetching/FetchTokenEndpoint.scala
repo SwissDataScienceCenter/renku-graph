@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -41,7 +41,7 @@ trait FetchTokenEndpoint[F[_]] {
       projectIdentifier: ID
   )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]]
 
-  implicit val findById:   projects.Id => OptionT[F, AccessToken]
+  implicit val findById:   projects.GitLabId => OptionT[F, AccessToken]
   implicit val findByPath: projects.Path => OptionT[F, AccessToken]
 }
 
@@ -71,8 +71,8 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
     InternalServerError(errorMessage)
   }
 
-  implicit val findById:   projects.Id => OptionT[F, AccessToken]   = tokenFinder.findToken
-  implicit val findByPath: projects.Path => OptionT[F, AccessToken] = tokenFinder.findToken
+  implicit val findById:   projects.GitLabId => OptionT[F, AccessToken] = tokenFinder.findToken
+  implicit val findByPath: projects.Path => OptionT[F, AccessToken]     = tokenFinder.findToken
 }
 
 object FetchTokenEndpoint {

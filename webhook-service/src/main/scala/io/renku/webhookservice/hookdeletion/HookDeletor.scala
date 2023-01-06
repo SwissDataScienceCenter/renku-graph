@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.webhookservice.hookdeletion
 
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
@@ -51,9 +51,10 @@ private class HookDeletorImpl[F[_]: Spawn: Logger](projectHookFetcher: ProjectHo
   private def findProjectHook(projectHook: HookIdentifier, gitlabHooks: List[HookIdAndUrl]): Option[HookIdAndUrl] =
     gitlabHooks.find(_.url == projectHook.projectHookUrl)
 
-  private def loggingError(projectId: Id): PartialFunction[Throwable, F[DeletionResult]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"Hook deletion failed for project with id $projectId") >>
-      exception.raiseError[F, DeletionResult]
+  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[DeletionResult]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(s"Hook deletion failed for project with id $projectId") >>
+        exception.raiseError[F, DeletionResult]
   }
 
 }

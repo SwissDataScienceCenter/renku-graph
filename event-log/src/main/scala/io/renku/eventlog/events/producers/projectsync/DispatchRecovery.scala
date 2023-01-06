@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -54,7 +54,7 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.value.toLowerCase} - dispatch recovery")
-        .command[projects.Id ~ CategoryName](sql"""
+        .command[projects.GitLabId ~ CategoryName](sql"""
           DELETE FROM subscription_category_sync_time
           WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)

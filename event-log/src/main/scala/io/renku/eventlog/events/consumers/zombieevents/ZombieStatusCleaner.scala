@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -58,7 +58,7 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: Q
 
   private def cleanEventualDeliveries(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement(name = "zombie_chasing - clean deliveries")
-      .command[EventId ~ projects.Id](
+      .command[EventId ~ projects.GitLabId](
         sql"""DELETE FROM event_delivery
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
@@ -70,7 +70,7 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: Q
   private def runUpdate(eventId: CompoundEventId, oldStatus: EventStatus, newStatus: EventStatus) =
     measureExecutionTime {
       SqlStatement(name = "zombie_chasing - update status")
-        .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](sql"""
+        .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](sql"""
           UPDATE event
           SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder

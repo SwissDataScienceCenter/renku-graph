@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -156,8 +156,8 @@ class ProjectEventsFinderSpec
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new ProjectEventsFinderImpl[IO]
 
-    val mapResponse = captureMapping(finder, gitLabClient)(
-      _.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
+    val mapResponse = captureMapping(gitLabClient)(
+      finder.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
       Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
     )
   }
@@ -176,7 +176,7 @@ class ProjectEventsFinderSpec
       }"""
   }
 
-  private case class GitLabPushEvent(projectId:       projects.Id,
+  private case class GitLabPushEvent(projectId:       projects.GitLabId,
                                      maybeCommitFrom: Option[CommitId],
                                      maybeCommitTo:   Option[CommitId],
                                      authorId:        persons.GitLabId,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,7 +42,7 @@ private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecution
 
   override def updateDB(event: ToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
     SqlStatement[F](name = "to_awaiting_deletion - status update")
-      .select[ExecutionDate ~ projects.Id ~ EventId, EventStatus](
+      .select[ExecutionDate ~ projects.GitLabId ~ EventId, EventStatus](
         sql"""UPDATE event evt
               SET status = '#${AwaitingDeletion.value}', execution_date = $executionDateEncoder
               FROM (

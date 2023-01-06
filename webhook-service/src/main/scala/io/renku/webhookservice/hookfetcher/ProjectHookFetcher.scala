@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,7 +31,7 @@ import org.typelevel.log4cats.Logger
 
 private[webhookservice] trait ProjectHookFetcher[F[_]] {
   def fetchProjectHooks(
-      projectId:   projects.Id,
+      projectId:   projects.GitLabId,
       accessToken: AccessToken
   ): F[List[HookIdAndUrl]]
 }
@@ -57,7 +57,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
-  override def fetchProjectHooks(projectId: projects.Id, accessToken: AccessToken): F[List[HookIdAndUrl]] =
+  override def fetchProjectHooks(projectId: projects.GitLabId, accessToken: AccessToken): F[List[HookIdAndUrl]] =
     GitLabClient[F].get(uri"projects" / projectId.show / "hooks", "project-hooks")(mapResponse)(accessToken.some)
 
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.jsonld.JsonLDDecoder
 import model.Project.DateUpdated
 import model._
@@ -45,7 +46,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
     cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
-        identifier   <- cursor.downField(schema / "identifier").as[projects.Id]
+        identifier   <- cursor.downField(schema / "identifier").as[projects.GitLabId]
         path         <- cursor.downField(renku / "projectPath").as[projects.Path]
         name         <- cursor.downField(schema / "name").as[projects.Name]
         maybeDesc    <- cursor.downField(schema / "description").as[Option[projects.Description]]
@@ -56,6 +57,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         maybeParent  <- cursor.downField(prov / "wasDerivedFrom").as[Option[ParentProject]]
         keywords     <- cursor.downField(schema / "keywords").as[List[projects.Keyword]]
         maybeVersion <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
+        images       <- cursor.downField(schema / "image").as[List[ImageUri]]
       } yield Project(
         resourceId,
         identifier,
@@ -71,7 +73,8 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         project.starsCount,
         project.permissions,
         project.statistics,
-        maybeVersion
+        maybeVersion,
+        images
       )
   }
 

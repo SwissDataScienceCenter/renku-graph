@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.Applicative
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -63,7 +63,7 @@ private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends 
 
 private object ProjectHookCreator {
   final case class ProjectHook(
-      projectId:           Id,
+      projectId:           GitLabId,
       projectHookUrl:      ProjectHookUrl,
       serializedHookToken: SerializedHookToken
   )

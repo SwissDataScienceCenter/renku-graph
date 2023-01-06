@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -43,7 +43,7 @@ private[gitlab] object GitLabAuth {
     final case class AuthedUser(userId: persons.GitLabId, accessToken: UserAccessToken) extends AuthedReq {
       type AT = UserAccessToken
     }
-    final case class AuthedProject(projectId: projects.Id, accessToken: ProjectAccessToken) extends AuthedReq {
+    final case class AuthedProject(projectId: projects.GitLabId, accessToken: ProjectAccessToken) extends AuthedReq {
       type AT = ProjectAccessToken
     }
   }

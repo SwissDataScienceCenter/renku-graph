@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Error, Json}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private trait EventBodyDeserializer[F[_]] {
@@ -36,7 +36,7 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
 
   private implicit val commitsDecoder: Decoder[CleanUpEvent] = cursor =>
     for {
-      projectId   <- cursor.downField("project").downField("id").as[Id]
+      projectId   <- cursor.downField("project").downField("id").as[GitLabId]
       projectPath <- cursor.downField("project").downField("path").as[Path]
     } yield CleanUpEvent(Project(projectId, projectPath))
 

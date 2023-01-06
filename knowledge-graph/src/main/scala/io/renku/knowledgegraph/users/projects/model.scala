@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -73,7 +73,7 @@ private object model {
     }
 
     final case class NotActivated(
-        id:           projects.Id,
+        id:           projects.GitLabId,
         name:         projects.Name,
         path:         projects.Path,
         visibility:   projects.Visibility,

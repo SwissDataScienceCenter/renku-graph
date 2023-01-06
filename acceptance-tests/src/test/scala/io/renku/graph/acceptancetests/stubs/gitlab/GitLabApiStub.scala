@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,10 +33,10 @@ import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
+import io.renku.graph.model
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.persons.{GitLabId, Name}
-import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s._
@@ -82,9 +82,9 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
   private def usersRoutes: HttpRoutes[F] =
     GitLabAuth.authOptF(stateRef) { maybeAuthedReq =>
       HttpRoutes.of {
-        case GET -> Root / GitLabIdVar(id) =>
+        case GET -> Root / UserGitLabId(id) =>
           query(findPersonById(id)).flatMap(OkOrNotFound(_))
-        case GET -> Root / GitLabIdVar(id) / "projects" =>
+        case GET -> Root / UserGitLabId(id) / "projects" =>
           maybeAuthedReq match {
             case Some(AuthedUser(userId, _)) =>
               if (id == userId) query(projectsFor(id.some)).flatMap(Ok(_))
@@ -205,20 +205,24 @@ object GitLabApiStub {
     apply(State.empty)
 
   final case class State(
-      users:               Map[GitLabId, UserAccessToken],
-      projectAccessTokens: Map[Id, ProjectAccessTokenInfo],
+      users:               Map[model.persons.GitLabId, UserAccessToken],
+      projectAccessTokens: Map[model.projects.GitLabId, ProjectAccessTokenInfo],
       persons:             List[Person],
       projects:            List[Project],
       webhooks:            List[Webhook],
-      commits:             Map[Id, NonEmptyList[CommitData]],
-      brokenProjects:      Set[Id]
+      commits:             Map[model.projects.GitLabId, NonEmptyList[CommitData]],
+      brokenProjects:      Set[model.projects.GitLabId]
   )
   object State {
     val empty: State = State(Map.empty, Map.empty, Nil, Nil, Nil, Map.empty, Set.empty)
   }
 
-  final case class Webhook(webhookId: Int, projectId: Id, url: Uri)
-  final case class PushEvent(projectId: Id, commitId: CommitId, authorId: GitLabId, authorName: Name)
+  final case class Webhook(webhookId: Int, projectId: projects.GitLabId, url: Uri)
+  final case class PushEvent(projectId:  projects.GitLabId,
+                             commitId:   CommitId,
+                             authorId:   persons.GitLabId,
+                             authorName: persons.Name
+  )
   final case class CommitData(
       commitId:  CommitId,
       author:    Person,

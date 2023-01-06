@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,10 +30,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
+import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -45,7 +47,12 @@ import projectinfo.ProjectInfoFinder
 import scala.language.reflectiveCalls
 import scala.util.{Failure, Success, Try}
 
-class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EntityBuilderSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with AdditionalMatchers
+    with DiffInstances {
 
   private implicit val graph: GraphClass = GraphClass.Default
 
@@ -72,7 +79,7 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
         )
         .value
 
-      results shouldBe project.to[entities.Project].asRight
+      results shouldMatchToRight project.to[entities.Project]
     }
 
     "successfully deserialize JsonLD to the model - case of a Non-Renku Project" in new TestCase {
@@ -90,7 +97,7 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
         )
         .value
 
-      results shouldBe project.to[entities.Project].asRight
+      results shouldMatchToRight project.to[entities.Project]
     }
 
     "fail if there's no project info found for the project" in new TestCase {
@@ -210,7 +217,7 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
           )
         }.value
 
-        results shouldBe project.to[entities.Project].asRight
+        results shouldMatchToRight project.to[entities.Project]
       }
 
     "fail if the payload is invalid" in new TestCase {
@@ -265,7 +272,8 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
       maybeParentPath = project match {
         case p: Project with Parent => p.parent.path.some
         case _ => None
-      }
+      },
+      project.images.headOption
     )
 
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
@@ -307,4 +315,5 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
       .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
       .buildProvenanceUnsafe()
   }
+
 }

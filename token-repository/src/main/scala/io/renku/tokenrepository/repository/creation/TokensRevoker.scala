@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait TokensRevoker[F[_]] {
-  def revokeToken(projectId: projects.Id, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
+  def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
 }
 
 private object TokensRevoker {
@@ -39,7 +39,7 @@ private class TokensRevokerImpl[F[_]: Async: GitLabClient] extends TokensRevoker
   import org.http4s.implicits._
   import org.http4s.{Request, Response, Status}
 
-  override def revokeToken(projectId: projects.Id, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit] =
+  override def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit] =
     GitLabClient[F]
       .delete(uri"projects" / projectId / "access_tokens" / tokenId, "revoke-project-access-token")(mapResponse)(
         accessToken.some

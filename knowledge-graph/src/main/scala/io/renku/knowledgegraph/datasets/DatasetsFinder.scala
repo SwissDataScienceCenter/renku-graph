@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,8 +28,9 @@ import io.circe.DecodingFailure
 import io.circe.literal._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, Keyword, Name, Title}
 import io.renku.graph.model.entities.Person
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,9 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import cats.data.{NonEmptyList => Nel}
+import io.renku.graph.model.images.ImageResourceId
 import io.renku.graph.model.{CliVersion, persons, projects}
 
-private final case class ProjectMutableData(
+private[projects] final case class ProjectMutableData(
     name:             projects.Name,
     dateCreated:      Nel[projects.DateCreated],
     maybeParentId:    Option[projects.ResourceId],
@@ -29,7 +30,8 @@ private final case class ProjectMutableData(
     maybeDescription: Option[projects.Description],
     keywords:         Set[projects.Keyword],
     maybeAgent:       Option[CliVersion],
-    maybeCreatorId:   Option[persons.ResourceId]
+    maybeCreatorId:   Option[persons.ResourceId],
+    images:           List[ImageResourceId]
 ) {
 
   lazy val earliestDateCreated: projects.DateCreated =

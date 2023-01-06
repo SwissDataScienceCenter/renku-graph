@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,8 +22,9 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.images.{ImageResourceId, ImageUri}
 import io.renku.graph.model.persons.{Affiliation, Email, Name, Username}
-import io.renku.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{FilePath, GitLabId, Path, ResourceId, Visibility}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 
@@ -96,7 +97,7 @@ object GraphModelGenerators {
       .map(_.mkString("https://orcid.org/", "-", ""))
       .toGeneratorOf(persons.OrcidId)
 
-  implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
+  implicit val projectIds:   Gen[GitLabId]      = Gen.uuid.map(_ => GitLabId(Random.nextInt(1000000) + 1))
   implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
@@ -122,6 +123,11 @@ object GraphModelGenerators {
   def projectResourceIds()(implicit renkuUrl: RenkuUrl): Gen[ResourceId] =
     projectPaths map (path => ResourceId.from(s"$renkuUrl/projects/$path").fold(throw _, identity))
 
+  def projectImageResourceIds(project: projects.ResourceId, max: Int = 5): Gen[List[ImageResourceId]] =
+    Gen
+      .chooseNum(0, max)
+      .map(n => (0 until n).map(i => ImageResourceId((project / "images" / i.toString).value)).toList)
+
   implicit val projectKeywords: Gen[projects.Keyword] =
     nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
 
@@ -139,7 +145,7 @@ object GraphModelGenerators {
   implicit val datasetTitles:       Gen[datasets.Title] = nonEmptyStrings(minLength = 4) map datasets.Title.apply
   implicit val datasetNames:        Gen[datasets.Name]  = nonEmptyStrings(minLength = 4) map datasets.Name.apply
   implicit val datasetDescriptions: Gen[Description]    = paragraphs() map (_.value) map Description.apply
-  implicit val datasetImageUris:    Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
+  implicit val imageUris:           Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
   def datasetInternalSameAsFrom(renkuUrlGen:  Gen[RenkuUrl] = renkuUrls,

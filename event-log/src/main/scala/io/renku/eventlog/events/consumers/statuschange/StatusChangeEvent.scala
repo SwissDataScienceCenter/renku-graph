@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -171,7 +171,7 @@ private object StatusChangeEvent {
     }
     implicit lazy val decoder: Decoder[ProjectEventsToNew] = cursor =>
       for {
-        id   <- cursor.downField("project").downField("id").as[projects.Id]
+        id   <- cursor.downField("project").downField("id").as[projects.GitLabId]
         path <- cursor.downField("project").downField("path").as[projects.Path]
       } yield ProjectEventsToNew(Project(id, path))
 

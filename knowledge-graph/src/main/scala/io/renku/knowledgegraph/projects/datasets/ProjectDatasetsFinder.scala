@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,8 @@ import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.MonadThrow
 import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.SparqlQuery.Prefixes

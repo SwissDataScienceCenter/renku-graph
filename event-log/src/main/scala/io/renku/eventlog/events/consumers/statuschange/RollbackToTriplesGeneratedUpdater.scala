@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,7 +42,7 @@ private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow: QueriesE
 
   override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[F] = measureExecutionTime {
     SqlStatement[F](name = "to_triples_generated rollback - status update")
-      .command[ExecutionDate ~ EventId ~ projects.Id](
+      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 

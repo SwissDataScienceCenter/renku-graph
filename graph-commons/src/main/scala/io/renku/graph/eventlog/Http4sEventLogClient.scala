@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,6 +51,7 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
         .withOptionQueryParam("status", criteria.status)
         .withOptionQueryParam("since", criteria.since)
         .withOptionQueryParam("until", criteria.until)
+        .withOptionQueryParam("project-id", criteria.projectId)
         .withOptionQueryParam("project-path", criteria.projectPath)
         .withQueryParam("page", criteria.page)
         .withOptionQueryParam("per_page", criteria.perPage)

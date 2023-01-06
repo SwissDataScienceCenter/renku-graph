@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,6 +27,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, datasets, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -81,14 +82,14 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
        datasets.Title("dataset"),
        datasets.Name("dataset"),
        datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
-       List(datasets.ImageUri("image.png"))
+       List(ImageUri("image.png"))
       ).asJson,
       (datasets.Identifier("123"),
        datasets.OriginalIdentifier("123"),
        datasets.Title("dataset"),
        datasets.Name("dataset"),
        datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
-       List(datasets.ImageUri("image.png"))
+       List(ImageUri("image.png"))
       ).asJson
     )
   }

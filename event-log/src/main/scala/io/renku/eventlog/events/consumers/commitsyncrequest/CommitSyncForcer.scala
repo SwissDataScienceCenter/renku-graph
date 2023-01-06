@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,7 +38,7 @@ import skunk.implicits._
 import java.time.Instant
 
 private trait CommitSyncForcer[F[_]] {
-  def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
+  def forceCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit]
 }
 
 private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
@@ -47,7 +47,7 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
-  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit] =
+  override def forceCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] =
     SessionResource[F].useK {
       deleteLastSyncedDate(projectId) flatMap {
         case true  => upsertProject(projectId, projectPath).void
@@ -55,9 +55,9 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
       }
     }
 
-  private def deleteLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+  private def deleteLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-      .command[projects.Id ~ CategoryName](sql"""
+      .command[projects.GitLabId ~ CategoryName](sql"""
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)
@@ -69,10 +69,10 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
       }
   }
 
-  private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
+  private def upsertProject(projectId: projects.GitLabId, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert project")
-      .command[projects.Id ~ projects.Path ~ EventDate](sql"""
+      .command[projects.GitLabId ~ projects.Path ~ EventDate](sql"""
         INSERT INTO project (project_id, project_path, latest_event_date)
         VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
         ON CONFLICT (project_id)

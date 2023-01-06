@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -66,7 +66,7 @@ class LatestCommitFinderSpec
 
       setGitLabClientExpectation(maybeAccessToken = None)
 
-      latestCommitFinder.findLatestCommit(projectId)(maybeAccessToken = None).unsafeRunSync() shouldBe
+      latestCommitFinder.findLatestCommit(projectId)(Option.empty[AccessToken]).unsafeRunSync() shouldBe
         Some(commitInfo)
     }
 
@@ -136,8 +136,8 @@ class LatestCommitFinderSpec
       )
       .returning(returning.pure[IO])
 
-    val mapResponse: ResponseMappingF[IO, Option[CommitInfo]] = captureMapping(latestCommitFinder, gitLabClient)(
-      _.findLatestCommit(projectId)(accessTokens.generateOption).unsafeRunSync(),
+    val mapResponse: ResponseMappingF[IO, Option[CommitInfo]] = captureMapping(gitLabClient)(
+      latestCommitFinder.findLatestCommit(projectId)(accessTokens.generateOption).unsafeRunSync(),
       commitInfos.toGeneratorOfOptions
     )
   }

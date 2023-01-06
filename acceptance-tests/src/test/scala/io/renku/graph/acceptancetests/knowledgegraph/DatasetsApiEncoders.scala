@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,14 +23,14 @@ import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
-import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import io.renku.graph.model.datasets.{DatePublished, Identifier, Title}
 import io.renku.graph.model.testentities.{Dataset, Person}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Rel, _links}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.scalatest.matchers.should
 
-trait DatasetsApiEncoders {
+trait DatasetsApiEncoders extends ImageApiEncoders {
   self: AcceptanceSpec with should.Matchers =>
 
   def gitLabUrl: GitLabUrl
@@ -119,26 +119,6 @@ trait DatasetsApiEncoders {
       "name": $name
     }""" addIfDefined ("email" -> maybeEmail)
   }
-
-  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
-      Json.arr(images.map {
-        case uri: ImageUri.Relative => json"""{
-            "_links": [{
-              "rel": "view",
-              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
-            }],
-            "location": $uri
-          }"""
-        case uri: ImageUri.Absolute => json"""{
-            "_links": [{
-              "rel": "view",
-              "href": $uri
-            }],
-            "location": $uri
-          }"""
-      }: _*)
-    }
 
   implicit class JsonsOps(jsons: List[Json]) {
 

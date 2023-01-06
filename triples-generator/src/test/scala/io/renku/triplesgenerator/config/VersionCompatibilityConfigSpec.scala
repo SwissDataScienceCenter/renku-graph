@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,19 +18,17 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
+import io.renku.triplesgenerator.generators.VersionGenerators.compatibilityGen
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Try}
 
 class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
@@ -39,72 +37,52 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
     "fail if there are not value set for the matrix" in new TestCase {
 
-      val config = ConfigFactory.parseMap(
-        Map("compatibility-matrix" -> List.empty[String].asJava).asJava
-      )
-      val Failure(exception) = readVersionPairs(config)
+      val config             = ConfigFactory.parseString("compatibility { }")
+      val Failure(exception) = readCompatibilityConfig(config)
 
       exception            shouldBe a[Exception]
-      exception.getMessage shouldBe "No compatibility matrix provided for schema version"
+      exception.getMessage shouldBe "String: 1: No configuration setting found for key 'cli-version'"
     }
 
-    "return a list of VersionSchemaPairs if the value is set for the matrix" in new TestCase {
-      val cliVersionNumbers    = cliVersions.generateNonEmptyList(2, 10)
-      val schemaVersionNumbers = projectSchemaVersions.generateNonEmptyList(2, 10)
+    "return a Compatibility config if the value is set" in new TestCase {
+      val c = compatibilityGen.generateOne.copy(renkuDevVersion = None)
 
-      val expected = cliVersionNumbers.toList
-        .zip(schemaVersionNumbers.toList)
-        .map { case (cliVersion, schemaVersion) => RenkuVersionPair(cliVersion, schemaVersion) }
+      val unparsedConfigElements =
+        s"""
+           |compatibility {
+           |  cli-version = "${c.cliVersion.value}"
+           |  schema-version = "${c.schemaVersion.value}"
+           |  re-provisioning-needed = ${c.reProvisioningNeeded}
+           |}
+           |""".stripMargin
 
-      val unparsedConfigElements = expected.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
-        s"${cliVersion.value} -> ${schemaVersion.value}"
-      }.asJava
+      val config = ConfigFactory.parseString(unparsedConfigElements)
 
-      val config = ConfigFactory.parseMap(
-        Map("compatibility-matrix" -> unparsedConfigElements).asJava
-      )
-
-      readVersionPairs(config) shouldBe NonEmptyList.fromListUnsafe(expected).pure[Try]
+      readCompatibilityConfig(config) shouldBe c.pure[Try]
     }
 
-    "return a list of RenkuVersionPairs with the first element of the RenkuDevVersion if it exists and log a warning" in new TestCase {
-      val cliVersionNumbers     = cliVersions.generateNonEmptyList(2, 10)
-      val renkuPythonDevVersion = renkuPythonDevVersions.generateOne
-      val schemaVersionNumbers  = projectSchemaVersions.generateNonEmptyList(2, 10)
+    "return a compatibility config with the RenkuDevVersion if it exists and log a warning" in new TestCase {
+      val compatConfig = compatibilityGen.suchThat(_.renkuDevVersion.isDefined).generateOne
 
-      val configVersions = cliVersionNumbers.toList
-        .zip(schemaVersionNumbers.toList)
-        .map { case (cliVersion, schemaVersion) => RenkuVersionPair(cliVersion, schemaVersion) }
+      val unparsedConfigElements =
+        s"""
+           |compatibility {
+           |  cli-version = "${compatConfig.configuredCliVersion.value}"
+           |  schema-version = "${compatConfig.schemaVersion.value}"
+           |  re-provisioning-needed = ${compatConfig.reProvisioningNeeded}
+           |}
+           |renku-python-dev-version = "${compatConfig.renkuDevVersion.get.version}"
+           |""".stripMargin
 
-      val unparsedConfigElements = configVersions.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
-        s"${cliVersion.value} -> ${schemaVersion.value}"
-      }.asJava
+      val config = ConfigFactory.parseString(unparsedConfigElements)
 
-      val config = ConfigFactory.parseMap(
-        Map("compatibility-matrix" -> unparsedConfigElements).asJava
-      )
-
-      val expected = renkuPythonDevVersion.toRenkuVersionPair(configVersions.head.schemaVersion) +: configVersions.tail
-
-      RenkuVersionPairsReader.readRenkuVersionPairs[Try](renkuPythonDevVersion.some, config) shouldBe
-        NonEmptyList.fromListUnsafe(expected).pure[Try]
+      VersionCompatibilityConfig.fromConfigF[Try](config) shouldBe Try(compatConfig)
 
       logger.loggedOnly(
         Warn(
-          s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${renkuPythonDevVersion.version}"
+          s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${compatConfig.renkuDevVersion.get.version}"
         )
       )
-    }
-
-    "fail if pair is malformed" in new TestCase {
-      val malformedPair = "1.2.3 -> 12 -> 3"
-      val config = ConfigFactory.parseMap(
-        Map("compatibility-matrix" -> List(malformedPair).asJava).asJava
-      )
-
-      val Failure(exception) = readVersionPairs(config)
-
-      exception.getMessage shouldBe s"Did not find exactly two elements: $malformedPair."
     }
   }
 
@@ -112,15 +90,10 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
-    def readVersionPairs(config: Config) =
-      RenkuVersionPairsReader.readRenkuVersionPairs[Try](maybeRenkuDevVersion = None, config)
+    def readCompatibilityConfig(config: Config): Try[VersionCompatibilityConfig] =
+      VersionCompatibilityConfig.fromConfigF[Try](config)
 
     implicit lazy val renkuPythonDevVersions: Gen[RenkuPythonDevVersion] =
       cliVersions map (v => RenkuPythonDevVersion(v.show))
-
-    implicit class RenkuPythonDevVersionOps(devVersion: RenkuPythonDevVersion) {
-      def toRenkuVersionPair(schemaVersion: SchemaVersion): RenkuVersionPair =
-        RenkuVersionPair(CliVersion(devVersion.version), schemaVersion)
-    }
   }
 }

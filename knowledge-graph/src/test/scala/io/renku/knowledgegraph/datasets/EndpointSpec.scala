@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,6 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.ErrorMessage
@@ -228,7 +229,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     exemplarProjectId <- projectResourceIds
     projectsCount     <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     keywords          <- datasetKeywords.toGeneratorOfList()
-    images            <- datasetImageUris.toGeneratorOfList()
+    images            <- imageUris.toGeneratorOfList()
   } yield DatasetSearchResult(
     id,
     title,

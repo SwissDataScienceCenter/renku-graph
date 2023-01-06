@@ -7,13 +7,12 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                        | Description                                                                |
 |--------|---------------------------------------------|----------------------------------------------------------------------------|
 | GET    | ```/events```                               | Returns info about events                                                  |
-| GET    | ```/events/:event-id/:project-path```         | Returns info about event with the given `id` and `project-path`              |
+| GET    | ```/events/:event-id/:project-path```       | Returns info about event with the given `id` and `project-path`            |
 | GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
 | POST   | ```/events```                               | Sends an event for processing                                              |
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
 | GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
 | GET    | ```/ping```                                 | Verifies service health                                                    |
-| GET    | ```/processing-status?project-id=:id```     | Finds processing status of events belonging to a project                   |
 | POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
 | GET    | ```/version```                              | Returns info about service version                                         |
 
@@ -23,19 +22,20 @@ All endpoints (except for `/ping` and `/metrics`) will return 503 while the data
 
 Returns information about the selected events.
 
-| Query Parameter | Mandatory | Default        | Description                                                                           |
-|-----------------|-----------|----------------|---------------------------------------------------------------------------------------|
-| project-path    | No        | -              | Url-encoded non-blank project path                                                    |
-| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                                |
+| Query Parameter | Mandatory | Default        | Description                                                                       |
+|-----------------|-----------|----------------|-----------------------------------------------------------------------------------|
+| project-id      | No        | -              | Project id                                                                        |
+| project-path    | No        | -              | Url-encoded non-blank project path                                                |
+| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                            |
 | since           | No        | -              | To find events after or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
-| until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ`|
-| page            | No        | 1              | Page number                                                                           |
-| per_page        | No        | 20             | Number of items per page                                                              |
-| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`                   |
+| until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
+| page            | No        | 1              | Page number                                                                       |
+| per_page        | No        | 20             | Number of items per page                                                          |
+| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`               |
 
 NOTES:
 
-* at least `project-path` or `status` query parameter has to be given.
+* at least `project-id`, `project-path` or `status` query parameter has to be given.
 * the returned events are sorted by the `event_date`.
 
 **Response**
@@ -517,42 +517,6 @@ Response body example:
 ```json
 {
   "isMigrating": false
-}
-```
-
-### GET /processing-status?project-id=:id
-
-Finds processing status of events belonging to the project with the given `id` from the latest batch.
-
-**Response**
-
-| Status                     | Description                                                                        |
-|----------------------------|------------------------------------------------------------------------------------|
-| OK (200)                   | If there are events for the project with the given `id`                            |
-| BAD_REQUEST (400)          | If the `project-id` parameter is not given or invalid                              |
-| NOT_FOUND (404)            | If no events can be found for the given project or no `project-id` parameter given |
-| INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
-| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
-
-Response body examples:
-
-- all events from the latest batch are processed
-
-```json
-{
-  "done":     20,
-  "total":    20,
-  "progress": 100.00
-}
-```
-
-- some events from the latest batch are being processed
-
-```json
-{
-  "done":     10,
-  "total":    20,
-  "progress": 50.00
 }
 ```
 

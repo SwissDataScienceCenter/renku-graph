@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,8 +35,6 @@ object EventLogUrl
 
   private implicit val urlReader: ConfigReader[EventLogUrl] = urlTinyTypeReader(EventLogUrl)
 
-  def apply[F[_]: MonadThrow](
-      config: Config = ConfigFactory.load
-  ): F[EventLogUrl] =
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[EventLogUrl] =
     find[F, EventLogUrl]("services.event-log.url", config)
 }

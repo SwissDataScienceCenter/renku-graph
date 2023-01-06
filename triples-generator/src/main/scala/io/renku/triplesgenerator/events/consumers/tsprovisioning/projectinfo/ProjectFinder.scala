@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -82,7 +83,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        id               <- cursor.downField("id").as[projects.Id]
+        id               <- cursor.downField("id").as[projects.GitLabId]
         path             <- cursor.downField("path_with_namespace").as[projects.Path]
         name             <- cursor.downField("name").as[projects.Name]
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
@@ -93,6 +94,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
+        avatarUrl <- cursor.downField("avatar_url").as[Option[ImageUri]]
       } yield GitLabProjectInfo(
         id,
         name,
@@ -103,7 +105,8 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         keywords,
         members = Set.empty,
         maybeVisibility getOrElse projects.Visibility.Public,
-        maybeParentPath
+        maybeParentPath,
+        avatarUrl
       ) -> maybeCreatorId
 
     jsonOf[F, ProjectAndCreator]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -171,7 +171,7 @@ class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
   }
 }
 
-class GitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PersonGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import persons.GitLabId
 

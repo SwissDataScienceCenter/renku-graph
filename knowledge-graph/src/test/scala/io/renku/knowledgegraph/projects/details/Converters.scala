@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,69 +26,23 @@ private object Converters extends Converters
 
 private trait Converters {
 
-  lazy val kgProjectConverter: Project => KGProject = {
-    case project: RenkuProject.WithParent =>
-      KGProject(
-        project.resourceId,
-        project.path,
-        project.name,
-        ProjectCreation(
-          project.dateCreated,
-          project.maybeCreator.map(_.to(projectCreatorConverter))
-        ),
-        project.visibility,
-        project.parent.to(kgParentConverter).some,
-        project.version.some,
-        project.maybeDescription,
-        project.keywords
-      )
-    case project: RenkuProject.WithoutParent =>
-      KGProject(
-        project.resourceId,
-        project.path,
-        project.name,
-        ProjectCreation(
-          project.dateCreated,
-          project.maybeCreator.map(_.to(projectCreatorConverter))
-        ),
-        project.visibility,
-        maybeParent = None,
-        project.version.some,
-        project.maybeDescription,
-        project.keywords
-      )
-    case project: NonRenkuProject.WithParent =>
-      KGProject(
-        project.resourceId,
-        project.path,
-        project.name,
-        ProjectCreation(
-          project.dateCreated,
-          project.maybeCreator.map(_.to(projectCreatorConverter))
-        ),
-        project.visibility,
-        project.parent.to(kgParentConverter).some,
-        maybeVersion = None,
-        project.maybeDescription,
-        project.keywords
-      )
-    case project: NonRenkuProject.WithoutParent =>
-      KGProject(
-        project.resourceId,
-        project.path,
-        project.name,
-        ProjectCreation(
-          project.dateCreated,
-          project.maybeCreator.map(_.to(projectCreatorConverter))
-        ),
-        project.visibility,
-        maybeParent = None,
-        maybeVersion = None,
-        project.maybeDescription,
-        project.keywords
-      )
-    case other => throw new IllegalArgumentException(s"Project of unsupported type $other")
-  }
+  lazy val kgProjectConverter: Project => KGProject = project =>
+    KGProject(
+      resourceId = project.resourceId,
+      path = project.path,
+      name = project.name,
+      created = ProjectCreation(
+        project.dateCreated,
+        project.maybeCreator.map(_.to(projectCreatorConverter))
+      ),
+      visibility = project.visibility,
+      maybeParent =
+        project.fold(_.parent.to(kgParentConverter).some, _ => None, _.parent.to(kgParentConverter).some, _ => None),
+      maybeVersion = project.fold(_.version.some, _.version.some, _ => None, _ => None),
+      maybeDescription = project.maybeDescription,
+      keywords = project.keywords,
+      images = project.images
+    )
 
   private lazy val kgParentConverter: Project => KGParent = parent =>
     KGParent(

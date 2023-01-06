@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,9 @@ package io.renku.knowledgegraph.projects.details
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.graph.model.{SchemaVersion, persons, projects}
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.{GitLabUrl, SchemaVersion, persons, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
@@ -37,11 +39,14 @@ import java.time.Instant
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] =
-    ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder))
+    GitLabUrlLoader[F]().flatMap(gitLabUrl =>
+      ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder)(gitLabUrl))
+    )
 }
 
-private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)
-    extends docs.EndpointDocs {
+private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)(
+    implicit gitLabUrl:                            GitLabUrl
+) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",
@@ -82,7 +87,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
 
   private val example = Project(
     projects.ResourceId("http://renkulab.io/projects/namespace/name"),
-    projects.Id(123),
+    projects.GitLabId(123),
     projects.Path("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,
@@ -122,6 +127,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
     StarsCount(1),
     Permissions(GroupAccessLevel(AccessLevel.Owner)),
     Statistics(CommitsCount(1), StorageSize(1024), RepositorySize(1024), LsfObjectsSize(1024), JobArtifactsSize(0)),
-    SchemaVersion("9").some
+    SchemaVersion("9").some,
+    List(ImageUri("image.png"))
   )
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
@@ -54,7 +54,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
     }
   }
 
-  protected def findToken(projectId: Id): Option[String] = sessionResource
+  protected def findToken(projectId: GitLabId): Option[String] = sessionResource
     .useK {
       val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
         .query(varchar)
@@ -70,7 +70,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
     }
     .unsafeRunSync()
 
-  protected def findExpiryDate(projectId: Id): Option[ExpiryDate] = sessionResource
+  protected def findExpiryDate(projectId: GitLabId): Option[ExpiryDate] = sessionResource
     .useK {
       val query: Query[Int, ExpiryDate] = sql"SELECT expiry_date FROM projects_tokens WHERE project_id = $int4"
         .query(date)

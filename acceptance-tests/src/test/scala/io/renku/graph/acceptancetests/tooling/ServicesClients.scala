@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,10 +31,12 @@ import io.renku.control.Throttler
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.implicits._
 import org.http4s.{Header, Headers, Method, Request, Response, Status, Uri}
 import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should
@@ -62,6 +64,9 @@ object WebhookServiceClient {
         response           <- send(request(Method.POST, uri) withHeaders tokenHeader withEntity payload)(mapResponse)
       } yield response
     }.unsafeRunSync()
+
+    def fetchProcessingStatus(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): ClientResponse =
+      GET((uri"projects" / projectId / "events" / "status").renderString)
   }
 }
 
@@ -137,9 +142,6 @@ object EventLogClient {
   class EventLogClient(implicit logger: Logger[IO]) extends ServiceClient {
 
     override val baseUrl: String Refined Url = "http://localhost:9005"
-
-    def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): ClientResponse =
-      GET(s"processing-status?project-id=$projectId")
 
     def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =
       Monad[IO].whileM_(isRunning)(Temporal[IO] sleep (100 millis))

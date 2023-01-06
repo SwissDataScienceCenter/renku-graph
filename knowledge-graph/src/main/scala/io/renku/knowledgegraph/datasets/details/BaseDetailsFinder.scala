@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,8 +26,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
+import io.renku.graph.model.datasets.{Identifier, Keyword}
 import io.renku.graph.model.entities.Person
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.{GraphClass, projects, publicationEvents}
 import io.renku.http.server.security.model.AuthUser

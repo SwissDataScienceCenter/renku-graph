@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -72,7 +72,7 @@ private class ProjectEventsFinderImpl[F[_]: Async: GitLabClient: Logger](
 
     implicit val events: Decoder[Option[PushEvent]] = cursor =>
       for {
-        projectId  <- cursor.downField("project_id").as[projects.Id]
+        projectId  <- cursor.downField("project_id").as[projects.GitLabId]
         commitFrom <- cursor.downField("push_data").downField("commit_from").as[Option[CommitId]]
         commitTo   <- cursor.downField("push_data").downField("commit_to").as[Option[CommitId]]
         authorId   <- cursor.downField("author").downField("id").as[persons.GitLabId]
@@ -88,7 +88,7 @@ private object ProjectEventsFinder {
     new ProjectEventsFinderImpl[F].pure[F].widen[ProjectEventsFinder[F]]
 }
 
-private case class PushEvent(projectId:  projects.Id,
+private case class PushEvent(projectId:  projects.GitLabId,
                              commitId:   CommitId,
                              authorId:   persons.GitLabId,
                              authorName: persons.Name

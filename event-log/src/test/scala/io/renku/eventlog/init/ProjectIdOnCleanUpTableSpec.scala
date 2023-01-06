@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -92,20 +92,21 @@ class ProjectIdOnCleanUpTableSpec
        """.command
   }
 
-  private def insertToProject(path: projects.Path, id: projects.Id): Unit = executeCommand {
+  private def insertToProject(path: projects.Path, id: projects.GitLabId): Unit = executeCommand {
     sql"""INSERT INTO project(project_id, project_path, latest_event_date)
           VALUES (#${id.show}, '#${path.show}', now())
        """.command
   }
 
-  private def findQueueRows: List[(projects.Path, projects.Id)] = execute[List[(projects.Path, projects.Id)]] {
-    Kleisli { session =>
-      val query: Query[Void, projects.Path ~ projects.Id] = sql"""
+  private def findQueueRows: List[(projects.Path, projects.GitLabId)] =
+    execute[List[(projects.Path, projects.GitLabId)]] {
+      Kleisli { session =>
+        val query: Query[Void, projects.Path ~ projects.GitLabId] = sql"""
           SELECT project_path, project_id 
           FROM clean_up_events_queue"""
-        .query(projectPathDecoder ~ projectIdDecoder)
-        .map { case (path: projects.Path, id: projects.Id) => path -> id }
-      session.execute(query)
+          .query(projectPathDecoder ~ projectIdDecoder)
+          .map { case (path: projects.Path, id: projects.GitLabId) => path -> id }
+        session.execute(query)
+      }
     }
-  }
 }

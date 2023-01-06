@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -30,10 +30,15 @@ import java.time.Instant
 
 object projects {
 
-  final class Id private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt[Id] with TinyTypeJsonLDOps[Id]
+  sealed trait Identifier extends Any
 
-  final class Path private (val value: String) extends AnyVal with RelativePathTinyType
+  final class GitLabId private (val value: Int) extends AnyVal with IntTinyType with Identifier
+  implicit object GitLabId
+      extends TinyTypeFactory[GitLabId](new GitLabId(_))
+      with NonNegativeInt[GitLabId]
+      with TinyTypeJsonLDOps[GitLabId]
+
+  final class Path private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
   implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath[Path] with TinyTypeJsonLDOps[Path] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
@@ -57,11 +62,12 @@ object projects {
       with NonBlank[Namespace]
       with TinyTypeJsonLDOps[Namespace]
 
-  final class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  final class ResourceId private (val value: String) extends AnyVal with UrlTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with AnyResourceRenderer[ResourceId]
+      with UrlResourceRenderer[ResourceId]
+      with UrlOps[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
     private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"

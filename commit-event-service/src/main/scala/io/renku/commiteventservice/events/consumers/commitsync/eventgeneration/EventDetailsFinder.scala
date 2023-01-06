@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,7 @@ import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
 private trait EventDetailsFinder[F[_]] {
-  def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]]
+  def getEventDetails(projectId: projects.GitLabId, commitId: CommitId): F[Option[CommitWithParents]]
 }
 
 private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
@@ -45,7 +45,7 @@ private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
 
   import org.http4s.Method.GET
 
-  override def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]] =
+  override def getEventDetails(projectId: projects.GitLabId, commitId: CommitId): F[Option[CommitWithParents]] =
     validateUri(s"$eventLogUrl/events/$commitId/$projectId") >>=
       (uri => send(request(GET, uri))(mapResponseCommitDetails))
 
@@ -60,7 +60,7 @@ private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
     implicit val commitDecoder: Decoder[CommitWithParents] = cursor =>
       for {
         id         <- cursor.downField("id").as[CommitId]
-        projectId  <- cursor.downField("project").downField("id").as[projects.Id]
+        projectId  <- cursor.downField("project").downField("id").as[projects.GitLabId]
         bodyString <- cursor.downField("body").as[String]
         parents = parse(bodyString)
                     .map(eventBodyJson =>

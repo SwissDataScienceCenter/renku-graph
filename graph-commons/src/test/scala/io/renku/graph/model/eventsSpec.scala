@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,7 @@
 
 package io.renku.graph.model
 
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -26,6 +27,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.tinytypes.constraints.{DurationNotNegative, NonBlank}
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -104,6 +106,37 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
   "ProcessingStatus" should {
     "group all EventStatuses that are of the ProcessingStatus type" in {
       ProcessingStatus.all shouldBe EventStatus.all.collect { case s: ProcessingStatus => s }
+    }
+  }
+}
+
+class EventStatusProgressSpec extends AnyWordSpec with TableDrivenPropertyChecks with should.Matchers {
+
+  import EventStatusProgress._
+  "apply" should {
+
+    forAll {
+      Table(
+        ("status", "stage", "completion"),
+        (New, Stage.Initial, 20f),
+        (Skipped, Stage.Final, 100f),
+        (GeneratingTriples, Stage.Generating, 40f),
+        (GenerationRecoverableFailure, Stage.Generating, 40f),
+        (GenerationNonRecoverableFailure, Stage.Final, 100f),
+        (TriplesGenerated, Stage.Generated, 60f),
+        (TransformingTriples, Stage.Transforming, 80f),
+        (TransformationRecoverableFailure, Stage.Transforming, 80f),
+        (TransformationNonRecoverableFailure, Stage.Final, 100f),
+        (TriplesStore, Stage.Final, 100f),
+        (AwaitingDeletion, Stage.Removing, 0f),
+        (Deleting, Stage.Removing, 0f)
+      )
+    } { (status, stage, completion) =>
+      show"return ProcessingProgress with stage '$stage', progress '$completion' for '$status' status" in {
+        val progress = EventStatusProgress(status)
+        progress.stage            shouldBe stage
+        progress.completion.value shouldBe completion
+      }
     }
   }
 }

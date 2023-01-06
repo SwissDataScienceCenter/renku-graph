@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -127,7 +127,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""
+      .command[LastSyncedDate ~ projects.GitLabId ~ CategoryName](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
@@ -138,7 +138,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](sql"""
+      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
@@ -149,7 +149,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
   }
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
-    lazy val projectId: projects.Id = commitSyncEvent match {
+    lazy val projectId: projects.GitLabId = commitSyncEvent match {
       case FullCommitSyncEvent(eventId, _, _) => eventId.projectId
       case MinimalCommitSyncEvent(project)    => project.id
     }

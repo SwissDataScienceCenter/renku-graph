@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,7 +28,7 @@ import java.time.LocalDate.now
 import java.time.Period
 
 private trait RevokeCandidatesFinder[F[_]] {
-  def findTokensToRemove(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]]
+  def findTokensToRemove(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]]
 }
 
 private object RevokeCandidatesFinder {
@@ -49,7 +49,7 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeri
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def findTokensToRemove(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]] =
+  override def findTokensToRemove(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]] =
     GitLabClient[F]
       .get(uri"projects" / projectId.value / "access_tokens", "project-access-tokens")(mapResponse)(accessToken.some)
       .map(_.filter(renkuTokens).filter(dueToRefresh).map(_._1))

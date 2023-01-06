@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,7 @@ import io.renku.http.rest.paging.model.Page
 import java.time.Instant
 
 private[globalcommitsync] final case class CommitWithParents(id:        CommitId,
-                                                             projectId: projects.Id,
+                                                             projectId: projects.GitLabId,
                                                              parents:   List[CommitId]
 )
 

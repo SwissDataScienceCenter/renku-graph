@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -149,7 +149,7 @@ private object ProjectPrioritisation {
   def apply[F[_]: MonadThrow: UrlAndIdSubscribers]: F[ProjectPrioritisation[F]] =
     MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F])
 
-  final case class ProjectInfo(id:               projects.Id,
+  final case class ProjectInfo(id:               projects.GitLabId,
                                path:             projects.Path,
                                latestEventDate:  EventDate,
                                currentOccupancy: Int Refined NonNegative

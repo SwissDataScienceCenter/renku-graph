@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,7 +32,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -331,7 +331,7 @@ class StatsFinderSpec
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
     case (projectPath, eventId, status, eventDate) =>
       storeEvent(
-        CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
+        CompoundEventId(eventId, GitLabId(Math.abs(projectPath.value.hashCode))),
         status,
         executionDates.generateOne,
         eventDate,

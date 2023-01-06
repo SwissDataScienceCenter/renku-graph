@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -121,14 +121,14 @@ class GitLabCommitStatFetcherSpec
     val uri = uri"projects" / projectId.show withQueryParams Map("statistics" -> true)
     val endpointName: String Refined NonEmpty = "single-project"
 
-    lazy val mapResponse = captureMapping(gitLabCommitStatFetcher, gitLabClient)(
-      _.fetchCommitStats(projectId).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync(),
       commitsCounts.generateOption
     )
 
     def givenLatestCommitFetcher(returning: IO[Option[CommitId]]) =
       (gitLabCommitFetcher
-        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .fetchLatestGitLabCommit(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
         .returning(returning)
   }

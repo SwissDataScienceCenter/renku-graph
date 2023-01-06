@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,8 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{Identifier, ImageUri, Name, OriginalIdentifier, Title}
+import io.renku.graph.model.datasets.{Identifier, Name, OriginalIdentifier, Title}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Path
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -191,6 +192,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-    images                  <- listOf(datasetImageUris)
+    images                  <- listOf(imageUris)
   } yield (id, originalIdentifier, title, name, sameAsEitherDerivedFrom, images)
 }

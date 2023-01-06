@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,7 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
@@ -50,7 +50,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return OK when the hook exists for the project with the given id" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
         .returning(HookExists.pure[IO])
 
@@ -64,7 +64,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return NOT_FOUND the hook does not exist" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
         .returning(HookMissing.pure[IO])
 
@@ -80,7 +80,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
       val errorMessage      = ErrorMessage("some error")
       private val exception = new Exception(errorMessage.toString())
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
         .returning(IO.raiseError(exception))
 
@@ -98,7 +98,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook validation" in new TestCase {
 
       (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
+        .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
         .returning(IO.raiseError(UnauthorizedException))
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -148,8 +148,8 @@ class ProjectInfoFinderSpec
         }""".noSpaces
     }
 
-    lazy val mapResponse = captureMapping(projectInfoFinder, gitLabClient)(
-      _.findProjectInfo(projectId).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      projectInfoFinder.findProjectInfo(projectId).unsafeRunSync(),
       Gen.const(projectInfo)
     )
   }

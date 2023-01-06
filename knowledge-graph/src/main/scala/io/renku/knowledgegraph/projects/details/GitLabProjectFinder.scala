@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Id, Visibility}
+import io.renku.graph.model.projects.{GitLabId, Visibility}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import model.Forking.ForksCount
 import model.Project.{DateUpdated, StarsCount}
@@ -103,7 +103,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
 
     implicit val decoder: Decoder[GitLabProject] = cursor =>
       for {
-        id             <- cursor.downField("id").as[Id]
+        id             <- cursor.downField("id").as[GitLabId]
         sshUrl         <- cursor.downField("ssh_url_to_repo").as[SshUrl]
         httpUrl        <- cursor.downField("http_url_to_repo").as[HttpUrl]
         webUrl         <- cursor.downField("web_url").as[WebUrl]
@@ -131,7 +131,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
 
 private object GitLabProjectFinder {
 
-  final case class GitLabProject(id:          Id,
+  final case class GitLabProject(id:          GitLabId,
                                  visibility:  Visibility,
                                  urls:        Urls,
                                  forksCount:  ForksCount,

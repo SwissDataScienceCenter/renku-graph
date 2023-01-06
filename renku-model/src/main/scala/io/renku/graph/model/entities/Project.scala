@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,6 +26,7 @@ import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
+import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology._
@@ -42,6 +43,7 @@ sealed trait Project extends Product with Serializable {
   val visibility:       Visibility
   val keywords:         Set[Keyword]
   val members:          Set[Person]
+  val images:           List[Image]
 
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
@@ -70,7 +72,8 @@ object NonRenkuProject {
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
-                                 members:          Set[Person]
+                                 members:          Set[Person],
+                                 images:           List[Image]
   ) extends NonRenkuProject
 
   final case class WithParent(resourceId:       ResourceId,
@@ -82,7 +85,8 @@ object NonRenkuProject {
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
                               members:          Set[Person],
-                              parentResourceId: ResourceId
+                              parentResourceId: ResourceId,
+                              images:           List[Image]
   ) extends NonRenkuProject
       with Parent
 }
@@ -93,6 +97,7 @@ sealed trait RenkuProject extends Project with Product with Serializable {
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
   val plans:      List[Plan]
+  val images:     List[Image]
 }
 
 object RenkuProject {
@@ -109,7 +114,8 @@ object RenkuProject {
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
                                  datasets:         List[Dataset[Dataset.Provenance]],
-                                 plans:            List[Plan]
+                                 plans:            List[Plan],
+                                 images:           List[Image]
   ) extends RenkuProject
 
   object WithoutParent extends ProjectFactory {
@@ -127,7 +133,8 @@ object RenkuProject {
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
-             plans:            List[Plan]
+             plans:            List[Plan],
+             images:           List[Image]
     ): ValidatedNel[String, RenkuProject.WithoutParent] = (
       validateDates(dateCreated, activities, datasets, plans),
       validatePlansDates(plans),
@@ -136,20 +143,22 @@ object RenkuProject {
     ).mapN { (_, _, _, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
-      RenkuProject.WithoutParent(resourceId,
-                                 path,
-                                 name,
-                                 maybeDescription,
-                                 agent,
-                                 dateCreated,
-                                 maybeCreator,
-                                 visibility,
-                                 keywords,
-                                 members,
-                                 version,
-                                 syncedActivities,
-                                 syncedDatasets,
-                                 syncedPlans
+      RenkuProject.WithoutParent(
+        resourceId,
+        path,
+        name,
+        maybeDescription,
+        agent,
+        dateCreated,
+        maybeCreator,
+        visibility,
+        keywords,
+        members,
+        version,
+        syncedActivities,
+        syncedDatasets,
+        syncedPlans,
+        images
       )
     }
 
@@ -208,7 +217,8 @@ object RenkuProject {
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
                               plans:            List[Plan],
-                              parentResourceId: ResourceId
+                              parentResourceId: ResourceId,
+                              images:           List[Image]
   ) extends RenkuProject
       with Parent
 
@@ -228,7 +238,8 @@ object RenkuProject {
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
              plans:            List[Plan],
-             parentResourceId: ResourceId
+             parentResourceId: ResourceId,
+             images:           List[Image]
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
       validatePlansDates(plans),
@@ -252,7 +263,8 @@ object RenkuProject {
         syncedActivities,
         syncedDatasets,
         syncedPlans,
-        parentResourceId
+        parentResourceId,
+        images
       )
     }
   }
@@ -533,7 +545,8 @@ object Project {
           renku / "hasActivity"       -> project.activities.asJsonLD,
           renku / "hasPlan"           -> project.plans.asJsonLD,
           renku / "hasDataset"        -> project.datasets.asJsonLD,
-          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
+          schema / "image"            -> project.images.asJsonLD
         ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
       )
 
@@ -556,7 +569,8 @@ object Project {
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
           schema / "member"           -> project.members.toList.asJsonLD,
-          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD,
+          schema / "image"            -> project.images.asJsonLD
         )
       }
   }
@@ -575,7 +589,8 @@ object Project {
         ObjectProperty(renku / "hasActivity", Activity.ontology),
         ObjectProperty(renku / "hasPlan", Plan.ontology),
         ObjectProperty(renku / "hasDataset", Dataset.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", projectClass)
+        ObjectProperty(prov / "wasDerivedFrom", projectClass),
+        ObjectProperty(schema / "image", Image.ontology)
       ),
       DataProperties(
         DataProperty(schema / "name", xsd / "string"),
@@ -593,7 +608,7 @@ object Project {
     )
   }
 
-  final case class GitLabProjectInfo(id:               Id,
+  final case class GitLabProjectInfo(id:               GitLabId,
                                      name:             Name,
                                      path:             Path,
                                      dateCreated:      DateCreated,
@@ -602,7 +617,8 @@ object Project {
                                      keywords:         Set[Keyword],
                                      members:          Set[ProjectMember],
                                      visibility:       Visibility,
-                                     maybeParentPath:  Option[Path]
+                                     maybeParentPath:  Option[Path],
+                                     avatarUrl:        Option[ImageUri]
   )
 
   sealed trait ProjectMember {

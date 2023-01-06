@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,18 +18,23 @@
 
 package io.renku.knowledgegraph.entities
 
-import Endpoint._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.entities.search.Criteria.Filters
+import io.renku.entities.search.Generators.modelEntities
+import io.renku.entities.search.{Criteria, EntitiesFinder, model}
+import io.renku.entities.search.model.Entity.Workflow.WorkflowType
+import io.renku.entities.search.model.MatchingScore
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links
@@ -38,10 +43,6 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.knowledgegraph.entities.finder.EntitiesFinder
-import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
-import io.renku.knowledgegraph.entities.model.MatchingScore
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -102,20 +103,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  "EntityType" should {
-
-    Endpoint.Criteria.Filters.EntityType.all.map {
-      case t @ Endpoint.Criteria.Filters.EntityType.Project  => "project"  -> t
-      case t @ Endpoint.Criteria.Filters.EntityType.Dataset  => "dataset"  -> t
-      case t @ Endpoint.Criteria.Filters.EntityType.Workflow => "workflow" -> t
-      case t @ Endpoint.Criteria.Filters.EntityType.Person   => "person"   -> t
-    } foreach { case (name, t) =>
-      s"be instantiatable from '$name'" in {
-        Endpoint.Criteria.Filters.EntityType.from(name) shouldBe t.asRight
-      }
-    }
-  }
-
   private lazy val renkuUrl    = renkuUrls.generateOne
   private lazy val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
@@ -132,7 +119,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private lazy val criterias: Gen[Criteria] = for {
     maybeQuery    <- nonEmptyStrings().toGeneratorOf(Filters.Query).toGeneratorOfOptions
-    sortingBy     <- sortBys(Endpoint.Criteria.Sorting)
+    sortingBy     <- sortBys(Criteria.Sorting)
     paging        <- pagingRequests
     maybeAuthUser <- authUsers.toGeneratorOfOptions
   } yield Criteria(Filters(maybeQuery), sortingBy, paging, maybeAuthUser)
@@ -146,16 +133,16 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   )(implicit gitLabUrl: GitLabUrl): Decoder[model.Entity] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    def imagesDecoder(projectPath: projects.Path): Decoder[datasets.ImageUri] = Decoder.instance { cursor =>
-      cursor.downField("location").as[datasets.ImageUri] >>= {
-        case uri: datasets.ImageUri.Relative =>
+    def imagesDecoder(projectPath: projects.Path): Decoder[ImageUri] = Decoder.instance { cursor =>
+      cursor.downField("location").as[ImageUri] >>= {
+        case uri: ImageUri.Relative =>
           cursor._links >>= {
             _.get(Rel("view")) match {
               case Some(link) if link.href.value == s"$gitLabUrl/$projectPath/raw/master/$uri" => uri.asRight
               case maybeLink => DecodingFailure(s"'$maybeLink' is not expected absolute DS image view link", Nil).asLeft
             }
           }
-        case uri: datasets.ImageUri.Absolute =>
+        case uri: ImageUri.Absolute =>
           cursor._links >>= {
             _.get(Rel("view")) match {
               case Some(link) if link.href.value == uri.show => uri.asRight
@@ -180,8 +167,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       }
       .map { case (rel, namespaces) => rel -> projects.Namespace(namespaces.map(_.show).mkString("/")) }
 
-    cursor.downField("type").as[Endpoint.Criteria.Filters.EntityType] >>= {
-      case Endpoint.Criteria.Filters.EntityType.Project =>
+    cursor.downField("type").as[Criteria.Filters.EntityType] >>= {
+      case Criteria.Filters.EntityType.Project =>
         for {
           score        <- cursor.downField("matchingScore").as[MatchingScore]
           name         <- cursor.downField("name").as[projects.Name]
@@ -193,6 +180,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
           keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
           maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
+          images       <- cursor.downField("images").as(decodeList(imagesDecoder(path)))
           _ <- Either.cond(path.show startsWith namespace.show,
                            (),
                            DecodingFailure(show"'$path' does not start with '$namespace'", Nil)
@@ -207,8 +195,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                    val expected = renkuApiUrl / "projects" / path
                    Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
                  }
-        } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc)
-      case Endpoint.Criteria.Filters.EntityType.Dataset =>
+        } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc, images)
+      case Criteria.Filters.EntityType.Dataset =>
         for {
           score      <- cursor.downField("matchingScore").as[MatchingScore]
           name       <- cursor.downField("name").as[datasets.Name]
@@ -252,7 +240,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                                      images,
                                      projectPath
         )
-      case Endpoint.Criteria.Filters.EntityType.Workflow =>
+      case Criteria.Filters.EntityType.Workflow =>
         for {
           score        <- cursor.downField("matchingScore").as[MatchingScore]
           name         <- cursor.downField("name").as[plans.Name]
@@ -262,7 +250,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           maybeDesc    <- cursor.downField("description").as[Option[plans.Description]]
           workflowType <- cursor.downField("workflowType").as[WorkflowType]
         } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc, workflowType)
-      case Endpoint.Criteria.Filters.EntityType.Person =>
+      case Criteria.Filters.EntityType.Person =>
         for {
           score <- cursor.downField("matchingScore").as[MatchingScore]
           name  <- cursor.downField("name").as[persons.Name]

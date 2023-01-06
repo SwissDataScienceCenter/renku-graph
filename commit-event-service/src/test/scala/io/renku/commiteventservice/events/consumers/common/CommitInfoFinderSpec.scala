@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -209,13 +209,13 @@ class CommitInfoFinderSpec
         )
         .returning(returning.pure[IO])
 
-    val mapToCommitOrThrow = captureMapping(finder, gitLabClient)(
-      findingMethod = _.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
+    val mapToCommitOrThrow = captureMapping(gitLabClient)(
+      findingMethod = finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
       resultGenerator = commitInfos.generateOne
     )
 
-    val mapToMaybeCommit = captureMapping(finder, gitLabClient)(
-      findingMethod = _.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
+    val mapToMaybeCommit = captureMapping(gitLabClient)(
+      findingMethod = finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
       resultGenerator = commitInfos.generateSome
     )
   }

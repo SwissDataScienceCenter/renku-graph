@@ -42,38 +42,41 @@ Verifies service health.
 
 #### GET /projects/:id/events/status
 
-Fetches information about processing progress of project events.
+Returns information about activation and processing progress of project events.
 
 **Response**
 
-| Status                     | Description                                          |
-|----------------------------|------------------------------------------------------|
-| OK (200)                   | When there is Graph Services hook for the project    |
-| NOT_FOUND (404)            | When there is no Graph Services hook for the project |
-| INTERNAL SERVER ERROR (500)| When there are problems with finding the status      |
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| OK (200)                    | When there is a hook for the project                   |
+| NOT_FOUND (404)             | When project (or a valid access token) cannot be found |
+| INTERNAL SERVER ERROR (500) | When there are problems with finding the status        |
 
-Examples of valid responses:
-- all events from the latest batch are processed
+Response examples:
+- project not activated
 ```
 {
-  "done": 20,
-  "total": 20,
-  "progress": 100.00
+  "activated": false,
+  "progress": {
+    "done":       0,
+    "total":      5,
+    "percentage": 0.00
+  }
 }
 ```
-- some events from the latest batch are being processed
+- project activated but some events are still under processing
 ```
 {
-  "done": 10,
-  "total": 20,
-  "progress": 50.00
-}
-```
-- no events in the Event Log
-```
-{
-  "done": 0,
-  "total": 0
+  "activated": true,
+  "progress": {
+    "done":       2,
+    "total":      5,
+    "percentage": 40.00
+  },
+  "details": {
+    "status":  "in-progress|success|failure",
+    "message": "generating triples"
+  }
 }
 ```
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,6 +20,7 @@ package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
 import io.circe.Json
+import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
@@ -32,7 +33,6 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{datasetEntities, renkuProjectEntities, visibilityPublic}
 import io.renku.http.client.UrlEncoder._
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import org.http4s.Status.Ok
 
 class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {

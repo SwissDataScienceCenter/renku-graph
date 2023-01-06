@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.webhookservice.hookcreation
 
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait HookCreator[F[_]] {
-  def createHook(projectId: Id, accessToken: AccessToken): F[CreationResult]
+  def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult]
 }
 
 private class HookCreatorImpl[F[_]: Spawn: Logger](
@@ -58,7 +58,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
   import projectHookValidator._
   import projectInfoFinder._
 
-  override def createHook(projectId: Id, accessToken: AccessToken): F[CreationResult] = {
+  override def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult] = {
     def sendCommitSyncReq(projectInfo: ProjectInfo) =
       sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject), "HookCreation")
 
@@ -82,9 +82,10 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
     } yield result).recoverWith(loggingError(projectId))
   }
 
-  private def loggingError(projectId: Id): PartialFunction[Throwable, F[CreationResult]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
-    exception.raiseError[F, CreationResult]
+  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[CreationResult]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
+      exception.raiseError[F, CreationResult]
   }
 }
 
@@ -96,7 +97,7 @@ private object HookCreator {
     final case object HookExisted extends CreationResult
   }
 
-  case class HookAlreadyCreated(projectId: Id, projectHookUrl: ProjectHookUrl)
+  case class HookAlreadyCreated(projectId: GitLabId, projectHookUrl: ProjectHookUrl)
 
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl,
                                                                 hookTokenCrypto: HookTokenCrypto[F]

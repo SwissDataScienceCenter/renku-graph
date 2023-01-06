@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectPathFinder[F[_]] {
-  def findProjectPath(projectId: projects.Id, accessToken: AccessToken): OptionT[F, projects.Path]
+  def findProjectPath(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, projects.Path]
 }
 
 private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectPathFinder[F] {
@@ -40,7 +40,7 @@ private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   import org.http4s._
   import org.http4s.implicits._
 
-  def findProjectPath(projectId: projects.Id, accessToken: AccessToken): OptionT[F, projects.Path] = OptionT {
+  def findProjectPath(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, projects.Path] = OptionT {
     GitLabClient[F].get(uri"projects" / projectId.value, "single-project")(mapResponse)(accessToken.some)
   }
 

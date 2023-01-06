@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -116,8 +116,9 @@ class EventStatusRenamerSpec
     upsertProject(event.compoundEventId, event.project.path, event.date)
     execute[Unit] {
       Kleisli { session =>
-        val query
-            : Command[EventId ~ projects.Id ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate] =
+        val query: Command[
+          EventId ~ projects.GitLabId ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate
+        ] =
           sql"""INSERT INTO 
               event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
               values (

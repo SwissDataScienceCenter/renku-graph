@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,7 +60,7 @@ private class ToFailureUpdater[F[_]: Async: Logger: QueriesExecutionTimes](
   ): Kleisli[F, Session[F], DBUpdateResults.ForProjects] = measureExecutionTime {
     SqlStatement
       .named(s"to_${event.newStatus.value.toLowerCase} - status update")
-      .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ ProcessingStatus](
+      .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.GitLabId ~ ProcessingStatus](
         sql"""UPDATE event
               SET status = $eventFailureStatusEncoder,
                 execution_date = $executionDateEncoder,
@@ -113,7 +113,7 @@ private class ToFailureUpdater[F[_]: Async: Logger: QueriesExecutionTimes](
     measureExecutionTime {
       SqlStatement
         .named(s"to_${event.newStatus.value.toLowerCase} - ancestors update")
-        .select[EventStatus ~ ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId](
+        .select[EventStatus ~ ExecutionDate ~ projects.GitLabId ~ projects.GitLabId ~ EventId ~ EventId, EventId](
           sql"""UPDATE event evt
                 SET status = $eventStatusEncoder, 
                     execution_date = $executionDateEncoder, 

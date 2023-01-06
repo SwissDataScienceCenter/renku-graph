@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,17 +23,17 @@ import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
 object model {
-  final case class HookToken(projectId: Id)
+  final case class HookToken(projectId: GitLabId)
 
   final case class CommitSyncRequest(project: Project)
 
-  final case class Project(id: projects.Id, path: projects.Path)
+  final case class Project(id: projects.GitLabId, path: projects.Path)
   object Project {
     implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
       s"projectId = $id, projectPath = $path"
@@ -64,5 +64,5 @@ object model {
       find[F, SelfUrl]("services.self.url", config)
   }
 
-  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
+  final case class HookIdentifier(projectId: GitLabId, projectHookUrl: ProjectHookUrl)
 }

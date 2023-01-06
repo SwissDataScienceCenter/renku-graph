@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -125,8 +125,8 @@ class EventHandlerSpec
     val handler                = new EventHandler[IO](categoryName, globalCommitSyncForcer)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(projects.Id, projects.Path)] =
-    Encoder.instance[(projects.Id, projects.Path)] { case (id, path) =>
+  private implicit lazy val eventEncoder: Encoder[(projects.GitLabId, projects.Path)] =
+    Encoder.instance[(projects.GitLabId, projects.Path)] { case (id, path) =>
       json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
         "project": {

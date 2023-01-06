@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -142,8 +142,9 @@ class ProjectFinderSpec
       forAll { projectInfoRaw: GitLabProjectInfo =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = None, members = Set.empty)
 
-        mapTo(Status.Ok, Request(), Response().withEntity(projectInfo.asJson.noSpaces)).unsafeRunSync() shouldBe
-          (projectInfo.copy(maybeCreator = None, members = Set.empty), None).some
+        val result = mapTo(Status.Ok, Request(), Response().withEntity(projectInfo.asJson.noSpaces)).unsafeRunSync()
+        result shouldBe
+          (projectInfo.copy(maybeCreator = None, members = Set.empty, avatarUrl = projectInfo.avatarUrl), None).some
       }
     }
 
@@ -180,12 +181,11 @@ class ProjectFinderSpec
         .returning(returning)
     }
 
-    val mapTo =
-      captureMapping(finder, gitLabClient)(
-        _.findProject(projectPaths.generateOne)(maybeAccessToken).value.unsafeRunSync(),
+    val mapTo: ResponseMappingF[IO, Option[(GitLabProjectInfo, Option[persons.GitLabId])]] =
+      captureMapping(gitLabClient)(
+        finder.findProject(projectPaths.generateOne)(maybeAccessToken).value.unsafeRunSync(),
         Gen.const((gitLabProjectInfos.generateOne, Option.empty[persons.GitLabId]).some)
       )
-
   }
 
   private implicit lazy val projectInfoEncoder: Encoder[GitLabProjectInfo] = Encoder.instance { project =>
@@ -204,6 +204,7 @@ class ProjectFinderSpec
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))
       .addIfDefined("description" -> project.maybeDescription.map(_.value))
+      .addIfDefined("avatar_url" -> project.avatarUrl)
   }
 
   private implicit lazy val memberEncoder: Encoder[ProjectMemberNoEmail] = Encoder.instance { member =>

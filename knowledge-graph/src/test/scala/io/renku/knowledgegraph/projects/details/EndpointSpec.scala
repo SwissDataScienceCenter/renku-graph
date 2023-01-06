@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,9 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
+import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
@@ -49,6 +51,8 @@ class EndpointSpec
     with should.Matchers
     with IOSpec {
 
+  implicit val gitLabUrl: GitLabUrl = EntitiesGenerators.gitLabUrl
+
   "GET /projects/:path" should {
 
     forAll {
@@ -67,7 +71,7 @@ class EndpointSpec
             .returning(project.some.pure[IO])
 
           val json = jsons.generateOne
-          (projectJsonEncoder.encode _).expects(project).returns(json)
+          (projectJsonEncoder.encode(_: Project)(_: GitLabUrl)).expects(project, gitLabUrl).returns(json)
 
           val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
 
@@ -157,6 +161,12 @@ class EndpointSpec
     val projectJsonEncoder    = mock[ProjectJsonEncoder]
     val projectJsonLDEncoder  = mock[ProjectJsonLDEncoder]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](projectFinder, projectJsonEncoder, projectJsonLDEncoder, executionTimeRecorder)
+    val endpoint = new EndpointImpl[IO](
+      projectFinder,
+      projectJsonEncoder,
+      projectJsonLDEncoder,
+      executionTimeRecorder,
+      EntitiesGenerators.gitLabUrl
+    )
   }
 }

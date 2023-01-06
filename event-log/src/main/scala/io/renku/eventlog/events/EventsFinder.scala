@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -72,9 +72,14 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
         JOIN project prj ON evt.project_id = prj.project_id
       """
 
-      private val filterByProject: Fragment[projects.Path] = sql"""
-        AND prj.project_path = $projectPathEncoder 
-      """
+      private val filterByProject: projects.Identifier => AppliedFragment = {
+        case path: projects.Path =>
+          val fragment: Fragment[projects.Path] = sql"""AND prj.project_path = $projectPathEncoder"""
+          fragment(path)
+        case id: projects.GitLabId =>
+          val fragment: Fragment[projects.GitLabId] = sql"""AND prj.project_id = $projectIdEncoder"""
+          fragment(id)
+      }
 
       private val whereEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
         case Some(Criteria.Filters.EventsSince(since)) =>
@@ -140,10 +145,10 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
       """
 
       private def selectEventInfoQuery: EventsEndpoint.Criteria => AppliedFragment = {
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None, maybeDates), sorting, paging) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectId, None, maybeDates), sorting, paging) =>
           selectEventInfo(Void) |+|
             joinProject(Void) |+|
-            filterByProject(projectPath) |+|
+            filterByProject(projectId) |+|
             joinProcessingTime(Void) |+|
             whereEventDate(maybeDates) |+|
             groupBy(Void) |+|
@@ -233,14 +238,21 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
       }
 
       private def countEventQuery: EventsEndpoint.Criteria => AppliedFragment = {
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None, maybeDates), _, _) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath: projects.Path, None, maybeDates), _, _) =>
           val query: Fragment[projects.Path] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
            """
           query(projectPath) |+| whereEventDate(maybeDates)
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status), maybeDates), _, _) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, None, maybeDates), _, _) =>
+          val query: Fragment[projects.GitLabId] = sql"""
+             SELECT COUNT(DISTINCT evt.event_id)
+             FROM event evt
+             WHERE evt.project_id = $projectIdEncoder
+           """
+          query(projectId) |+| whereEventDate(maybeDates)
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath: projects.Path, Some(status), maybeDates), _, _) =>
           val query: Fragment[projects.Path ~ EventStatus] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
@@ -248,6 +260,13 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
              WHERE evt.status = $eventStatusEncoder
            """
           query(projectPath ~ status) |+| andEventDate(maybeDates)
+        case Criteria(Criteria.Filters.ProjectEvents(projectId: projects.GitLabId, Some(status), maybeDates), _, _) =>
+          val query: Fragment[projects.GitLabId ~ EventStatus] = sql"""
+             SELECT COUNT(DISTINCT evt.event_id)
+             FROM event evt
+             WHERE evt.project_id = $projectIdEncoder AND evt.status = $eventStatusEncoder
+           """
+          query(projectId ~ status) |+| andEventDate(maybeDates)
         case Criteria(Criteria.Filters.EventsWithStatus(status, maybeDates), _, _) =>
           val query: Fragment[EventStatus] = sql"""
              SELECT COUNT(DISTINCT(evt.event_id, evt.project_id)) 

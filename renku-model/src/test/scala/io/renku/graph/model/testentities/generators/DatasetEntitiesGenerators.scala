@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartIds, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
@@ -217,7 +217,7 @@ trait DatasetEntitiesGenerators {
   val datasetAdditionalInfos: Gen[Dataset.AdditionalInfo] = for {
     maybeDescription <- datasetDescriptions.toGeneratorOfOptions
     keywords         <- datasetKeywords.toGeneratorOfList()
-    images           <- datasetImageUris.toGeneratorOfList()
+    images           <- imageUris.toGeneratorOfList()
     maybeLicense     <- datasetLicenses.toGeneratorOfOptions
     maybeVersion     <- datasetVersions.toGeneratorOfOptions
   } yield Dataset.AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)

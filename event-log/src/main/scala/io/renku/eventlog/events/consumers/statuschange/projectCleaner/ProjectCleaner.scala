@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,7 +71,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def removeCleanUpEvents(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - clean_up_events_queue removal")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM clean_up_events_queue 
         WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
       .arguments(project.id ~ project.path)
@@ -81,7 +81,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM subscription_category_sync_time 
         WHERE project_id IN (
           SELECT st.project_id
@@ -97,7 +97,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
-      .command[projects.Id ~ projects.Path](sql"""
+      .command[projects.GitLabId ~ projects.Path](sql"""
         DELETE FROM project 
         WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
       .arguments(project.id ~ project.path)

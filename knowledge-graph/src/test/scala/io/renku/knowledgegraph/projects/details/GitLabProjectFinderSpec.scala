@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -110,8 +110,8 @@ class GitLabProjectFinderSpec
     implicit val accessToken: AccessToken             = accessTokens.generateOne
 
     val mapResponse: ResponseMappingF[IO, Option[GitLabProject]] =
-      captureMapping(projectFinder, gitLabClient)(_.findProject(projectPaths.generateOne).unsafeRunSync(),
-                                                  gitLabProjects.toGeneratorOfOptions
+      captureMapping(gitLabClient)(projectFinder.findProject(projectPaths.generateOne).unsafeRunSync(),
+                                   gitLabProjects.toGeneratorOfOptions
       )
   }
 

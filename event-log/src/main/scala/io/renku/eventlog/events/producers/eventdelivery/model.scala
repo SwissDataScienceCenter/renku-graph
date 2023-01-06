@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,18 +31,18 @@ case object DeletingProjectTypeId extends EventTypeId {
 }
 
 sealed trait EventDeliveryId {
-  def projectId: projects.Id
+  def projectId: projects.GitLabId
 }
 
 final case class CompoundEventDeliveryId(compoundEventId: events.CompoundEventId) extends EventDeliveryId {
-  def projectId: projects.Id = compoundEventId.projectId
+  def projectId: projects.GitLabId = compoundEventId.projectId
 }
 
 object CompoundEventDeliveryId {
   implicit lazy val show: Show[CompoundEventDeliveryId] = eventId => eventId.compoundEventId.show
 }
 
-final case class DeletingProjectDeliverId(projectId: projects.Id) extends EventDeliveryId {
+final case class DeletingProjectDeliverId(projectId: projects.GitLabId) extends EventDeliveryId {
   def eventTypeId:            EventTypeId = DeletingProjectTypeId
   override lazy val toString: String      = s"deleting project delivery event, projectId = $projectId"
 }

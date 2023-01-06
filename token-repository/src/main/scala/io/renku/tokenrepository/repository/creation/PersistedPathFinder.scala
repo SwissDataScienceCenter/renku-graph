@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,7 +27,7 @@ import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 
 private trait PersistedPathFinder[F[_]] {
-  def findPersistedProjectPath(projectId: projects.Id): F[projects.Path]
+  def findPersistedProjectPath(projectId: projects.GitLabId): F[projects.Path]
 }
 
 private object PersistedPathFinder {
@@ -43,13 +43,13 @@ private class PersistedPathFinderImpl[F[_]: MonadCancelThrow: SessionResource: Q
   import io.renku.db.SqlStatement
   import skunk.implicits._
 
-  override def findPersistedProjectPath(projectId: projects.Id): F[projects.Path] =
+  override def findPersistedProjectPath(projectId: projects.GitLabId): F[projects.Path] =
     SessionResource[F].useK(measureExecutionTime(query(projectId)))
 
-  private def query(projectId: projects.Id) =
+  private def query(projectId: projects.GitLabId) =
     SqlStatement
       .named("find path for token")
-      .select[projects.Id, projects.Path](
+      .select[projects.GitLabId, projects.Path](
         sql"""SELECT project_path
               FROM projects_tokens
               WHERE project_id = $projectIdEncoder"""

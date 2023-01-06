@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,7 +57,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
       .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
-              (projects.Id, Option[LastSyncedDate], MemberSyncEvent)
+              (projects.GitLabId, Option[LastSyncedDate], MemberSyncEvent)
       ](
         sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
               FROM project proj
@@ -79,16 +79,16 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
       .build(_.option)
   }
 
-  private def setSyncDate(projectId:       projects.Id,
+  private def setSyncDate(projectId:       projects.GitLabId,
                           maybeSyncedDate: Option[LastSyncedDate]
   ): Kleisli[F, Session[F], Boolean] = {
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
   } recoverWith falseForForeignKeyViolation
 
-  private def updateLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+  private def updateLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""
+      .command[LastSyncedDate ~ projects.GitLabId ~ CategoryName](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
@@ -104,9 +104,9 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
       }
   }
 
-  private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+  private def insertLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](sql"""
+      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)

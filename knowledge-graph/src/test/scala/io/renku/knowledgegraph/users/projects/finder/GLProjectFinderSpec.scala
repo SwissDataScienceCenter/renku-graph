@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -194,8 +194,8 @@ class GLProjectFinderSpec
     val glCreatorFinder = mock[GLCreatorFinder[IO]]
     val finder          = new GLProjectFinderImpl[IO](glCreatorFinder)
 
-    lazy val mapResponse = captureMapping(finder, gitLabClient)(
-      finder => {
+    lazy val mapResponse = captureMapping(gitLabClient)(
+      {
         (glCreatorFinder
           .findCreatorName(_: persons.GitLabId)(_: Option[AccessToken]))
           .expects(*, *)

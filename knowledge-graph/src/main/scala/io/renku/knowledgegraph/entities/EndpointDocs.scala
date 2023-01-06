@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,20 +18,22 @@
 
 package io.renku.knowledgegraph.entities
 
+import ModelEncoders._
 import cats.MonadThrow
 import cats.implicits._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.entities.search.model.Entity._
+import io.renku.entities.search.model.MatchingScore
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
+import io.renku.graph.model.images.ImageUri
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.entities.model.Entity._
-import io.renku.knowledgegraph.entities.model.MatchingScore
 
 import java.time.Instant
 
@@ -147,7 +149,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       persons.Name("Jan Kowalski").some,
       List(projects.Keyword("key")),
-      projects.Description("Some project").some
+      projects.Description("Some project").some,
+      List(ImageUri("image.png"))
     ).asJson,
     Dataset(
       MatchingScore(1),
@@ -158,7 +161,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       List(persons.Name("Jan Kowalski")),
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,
-      List(datasets.ImageUri("image.png")),
+      List(ImageUri("image.png")),
       projects.Path("group/subgroup/name")
     ).asJson,
     Workflow(

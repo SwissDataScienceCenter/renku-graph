@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -42,7 +42,7 @@ private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesE
 
   override def updateDB(event: RollbackToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
     SqlStatement[F](name = "rollback_to_awaiting_deletion - status update")
-      .command[EventStatus ~ ExecutionDate ~ projects.Id ~ EventStatus](
+      .command[EventStatus ~ ExecutionDate ~ projects.GitLabId ~ EventStatus](
         sql"""UPDATE event evt
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
               WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder

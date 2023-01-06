@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -126,9 +126,9 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
     val tableCreator = new ProjectTableCreatorImpl[IO]
   }
 
-  private def fetchProjectData: List[(Id, Path, EventDate)] = execute {
+  private def fetchProjectData: List[(GitLabId, Path, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (Id, Path, EventDate)] =
+      val query: Query[Void, (GitLabId, Path, EventDate)] =
         sql"""select project_id, project_path, latest_event_date from project"""
           .query(projectIdDecoder ~ projectPathDecoder ~ eventDateTimestampDecoder)
           .map { case projectId ~ projectPath ~ eventDate =>
@@ -141,14 +141,14 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
   private val eventDateTimestampDecoder: Decoder[EventDate] =
     timestamp.map(timestamp => EventDate(timestamp.toInstant(ZoneOffset.UTC)))
 
-  private def createEvent(projectId:   Id = projectIds.generateOne,
+  private def createEvent(projectId:   GitLabId = projectIds.generateOne,
                           projectPath: Path = projectPaths.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
-  ): (Id, Path, EventDate) = {
+  ): (GitLabId, Path, EventDate) = {
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
-          EventId ~ Id ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+          EventId ~ GitLabId ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
         ] = sql"""
             insert into
             event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)

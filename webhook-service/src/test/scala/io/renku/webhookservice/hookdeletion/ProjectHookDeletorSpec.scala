@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -101,8 +101,8 @@ class ProjectHookDeletorSpec
     val hookDeletor = new ProjectHookDeletorImpl[IO]
 
     lazy val mapResponse =
-      captureMapping(hookDeletor, gitLabClient)(
-        _.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
+      captureMapping(gitLabClient)(
+        hookDeletor.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
         Gen.const(DeletionResult.HookDeleted),
         method = DELETE
       )

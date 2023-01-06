@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -109,10 +109,10 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
       commitInfosGen.generateOne.copy(id = commitId)
     }
 
-    def givenCommitInfosFound(projectId: projects.Id, commitInfos: List[CommitInfo]) =
+    def givenCommitInfosFound(projectId: projects.GitLabId, commitInfos: List[CommitInfo]) =
       commitInfos map { commitInfo =>
         (commitInfoFinder
-          .findCommitInfo(_: projects.Id, _: CommitId)(_: Option[AccessToken]))
+          .findCommitInfo(_: projects.GitLabId, _: CommitId)(_: Option[AccessToken]))
           .expects(projectId, commitInfo.id, maybeAccessToken)
           .returning(Success(commitInfo))
       }

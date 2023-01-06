@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,18 +38,18 @@ import org.typelevel.log4cats.Logger
 
 private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
 
-  def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
+  def fetchLatestGitLabCommit(projectId: projects.GitLabId)(implicit
       maybeAccessToken:                  Option[AccessToken]
   ): F[Option[CommitId]]
 
-  def fetchGitLabCommits(projectId: projects.Id, dateCondition: DateCondition, pageRequest: PagingRequest)(implicit
-      maybeAccessToken:             Option[AccessToken]
+  def fetchGitLabCommits(projectId: projects.GitLabId, dateCondition: DateCondition, pageRequest: PagingRequest)(
+      implicit maybeAccessToken:    Option[AccessToken]
   ): F[PageResult]
 }
 
 private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClient] extends GitLabCommitFetcher[F] {
 
-  override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
+  override def fetchLatestGitLabCommit(projectId: projects.GitLabId)(implicit
       maybeAccessToken:                           Option[AccessToken]
   ): F[Option[CommitId]] = GitLabClient[F].get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
@@ -57,7 +57,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClien
   )(mapLatestCommit(projectId))
 
   override def fetchGitLabCommits(
-      projectId:               projects.Id,
+      projectId:               projects.GitLabId,
       dateCondition:           DateCondition,
       pageRequest:             PagingRequest
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = GitLabClient[F].get(
@@ -68,7 +68,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClien
     "commits"
   )(mapCommitsPage(projectId, dateCondition, pageRequest))
 
-  private def mapCommitsPage(projectId:     projects.Id,
+  private def mapCommitsPage(projectId:     projects.GitLabId,
                              dateCondition: DateCondition,
                              pageRequest:   PagingRequest
   ): PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
@@ -79,7 +79,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClien
   }
 
   private def mapLatestCommit(
-      projectId: projects.Id
+      projectId: projects.GitLabId
   ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
     case (Ok, _, response)                      => response.as[List[CommitId]].map(_.headOption)
     case (NotFound | InternalServerError, _, _) => Option.empty[CommitId].pure[F]

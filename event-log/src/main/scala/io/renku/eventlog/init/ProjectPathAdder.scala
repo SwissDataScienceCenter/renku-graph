@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,7 @@ import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -68,38 +68,38 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
     } yield ()
   } recoverWith logging
 
-  private lazy val findDistinctProjects: Kleisli[F, Session[F], List[(Id, Path)]] = {
+  private lazy val findDistinctProjects: Kleisli[F, Session[F], List[(GitLabId, Path)]] = {
     val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(text)
     Kleisli(_.execute(query).flatMap(toListOfProjectIdAndPath))
   }
 
-  private def toListOfProjectIdAndPath(bodies: List[String]): F[List[(Id, Path)]] =
+  private def toListOfProjectIdAndPath(bodies: List[String]): F[List[(GitLabId, Path)]] =
     bodies.map(parseToProjectIdAndPath).sequence
 
-  private def parseToProjectIdAndPath(body: String): F[(Id, Path)] =
+  private def parseToProjectIdAndPath(body: String): F[(GitLabId, Path)] =
     MonadCancelThrow[F].fromEither {
       for {
         json  <- parse(body)
-        tuple <- json.as[(Id, Path)]
+        tuple <- json.as[(GitLabId, Path)]
       } yield tuple
     }
 
-  private implicit lazy val projectIdAndPathDecoder: Decoder[(Id, Path)] = (cursor: HCursor) =>
+  private implicit lazy val projectIdAndPathDecoder: Decoder[(GitLabId, Path)] = (cursor: HCursor) =>
     for {
-      id   <- cursor.downField("project").downField("id").as[Id]
+      id   <- cursor.downField("project").downField("id").as[GitLabId]
       path <- cursor.downField("project").downField("path").as[Path]
     } yield id -> path
 
   private def updatePaths(
-      projectIdsAndPaths: List[(Id, Path)]
+      projectIdsAndPaths: List[(GitLabId, Path)]
   ): Kleisli[F, Session[F], Unit] =
     projectIdsAndPaths
       .map(toSqlUpdate)
       .sequence
       .map(_ => ())
 
-  private lazy val toSqlUpdate: ((Id, Path)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectPath) =>
-    val query: Command[projects.Path ~ projects.Id] =
+  private lazy val toSqlUpdate: ((GitLabId, Path)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectPath) =>
+    val query: Command[projects.Path ~ projects.GitLabId] =
       sql"update event_log set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
     Kleisli(_.prepare(query).use(_.execute(projectPath ~ projectId)).void)
   }

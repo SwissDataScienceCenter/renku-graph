@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,24 +21,16 @@ package io.renku.knowledgegraph.entities
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.Decoder
 import io.renku.config.renku
+import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
-import io.renku.http.rest.SortBy.Direction
-import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
-import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.finder.EntitiesFinder
-import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
-import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
-import org.http4s.{EntityEncoder, Header, ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response, Status}
+import org.http4s.{EntityEncoder, Header, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
-import java.time.LocalDate
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
@@ -46,152 +38,6 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
-
-  import Criteria._
-
-  final case class Criteria(filters:   Filters = Filters(),
-                            sorting:   Sorting.By = Sorting.default,
-                            paging:    PagingRequest = PagingRequest.default,
-                            maybeUser: Option[AuthUser] = None
-  )
-
-  object Criteria {
-
-    final case class Filters(maybeQuery:   Option[Filters.Query] = None,
-                             entityTypes:  Set[Filters.EntityType] = Set.empty,
-                             creators:     Set[persons.Name] = Set.empty,
-                             visibilities: Set[projects.Visibility] = Set.empty,
-                             namespaces:   Set[projects.Namespace] = Set.empty,
-                             maybeSince:   Option[Filters.Since] = None,
-                             maybeUntil:   Option[Filters.Until] = None
-    )
-
-    object Filters {
-
-      final class Query private (val value: String) extends AnyVal with StringTinyType
-      object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query] {
-        private implicit val queryParameterDecoder: QueryParamDecoder[Query] =
-          (value: QueryParameterValue) =>
-            Query.from(value.value).leftMap(_ => parsingFailure(query.parameterName)).toValidatedNel
-
-        object query extends OptionalValidatingQueryParamDecoderMatcher[Query]("query") {
-          val parameterName: String = "query"
-        }
-      }
-
-      sealed trait EntityType extends StringTinyType with Product with Serializable
-      object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
-
-        final case object Project  extends EntityType { override val value: String = "project" }
-        final case object Dataset  extends EntityType { override val value: String = "dataset" }
-        final case object Workflow extends EntityType { override val value: String = "workflow" }
-        final case object Person   extends EntityType { override val value: String = "person" }
-
-        val all: List[EntityType] = Project :: Dataset :: Workflow :: Person :: Nil
-
-        import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
-
-        implicit val decoder: Decoder[EntityType] = stringDecoder(EntityType)
-
-        private implicit val entityTypeParameterDecoder: QueryParamDecoder[EntityType] =
-          (value: QueryParameterValue) =>
-            EntityType.from(value.value).leftMap(_ => parsingFailure(entityTypes.parameterName)).toValidatedNel
-
-        object entityTypes extends OptionalMultiQueryParamDecoderMatcher[EntityType]("type") {
-          val parameterName: String = "type"
-        }
-      }
-
-      object CreatorName {
-        private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =
-          (value: QueryParameterValue) =>
-            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorNames.parameterName)).toValidatedNel
-
-        object creatorNames extends OptionalMultiQueryParamDecoderMatcher[persons.Name]("creator") {
-          val parameterName: String = "creator"
-        }
-      }
-
-      object Visibility {
-        private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
-          (value: QueryParameterValue) =>
-            projects.Visibility
-              .from(value.value)
-              .leftMap(_ => parsingFailure(visibilities.parameterName))
-              .toValidatedNel
-
-        object visibilities extends OptionalMultiQueryParamDecoderMatcher[projects.Visibility]("visibility") {
-          val parameterName: String = "visibility"
-        }
-      }
-
-      object Namespace {
-        private implicit val namespaceParameterDecoder: QueryParamDecoder[projects.Namespace] =
-          (value: QueryParameterValue) =>
-            projects.Namespace
-              .from(value.value)
-              .leftMap(_ => parsingFailure(namespaces.parameterName))
-              .toValidatedNel
-
-        object namespaces extends OptionalMultiQueryParamDecoderMatcher[projects.Namespace]("namespace") {
-          val parameterName: String = "namespace"
-        }
-      }
-
-      private object EntityTypeApply extends (String => EntityType) {
-        override def apply(value: String): EntityType = EntityType.all.find(_.value == value).getOrElse {
-          throw new IllegalArgumentException(s"'$value' unknown EntityType")
-        }
-      }
-
-      final class Since private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Since extends TinyTypeFactory[Since](new Since(_)) with LocalDateNotInTheFuture[Since] {
-        private implicit val dateParameterDecoder: QueryParamDecoder[Since] =
-          (value: QueryParameterValue) =>
-            Either
-              .catchNonFatal(LocalDate.parse(value.value))
-              .flatMap(Since.from)
-              .leftMap(_ => parsingFailure(since.parameterName))
-              .toValidatedNel
-
-        object since extends OptionalValidatingQueryParamDecoderMatcher[Since]("since") {
-          val parameterName: String = "since"
-        }
-      }
-
-      final class Until private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Until extends TinyTypeFactory[Until](new Until(_)) with LocalDateNotInTheFuture[Until] {
-        private implicit val dateParameterDecoder: QueryParamDecoder[Until] =
-          (value: QueryParameterValue) =>
-            Either
-              .catchNonFatal(LocalDate.parse(value.value))
-              .flatMap(Until.from)
-              .leftMap(_ => parsingFailure(until.parameterName))
-              .toValidatedNel
-
-        object until extends OptionalValidatingQueryParamDecoderMatcher[Until]("until") {
-          val parameterName: String = "until"
-        }
-      }
-    }
-
-    object Sorting extends io.renku.http.rest.SortBy {
-
-      type PropertyType = SortProperty
-
-      sealed trait SortProperty extends Property
-
-      final case object ByName          extends Property("name") with SortProperty
-      final case object ByMatchingScore extends Property("matchingScore") with SortProperty
-      final case object ByDate          extends Property("date") with SortProperty
-
-      lazy val default: Sorting.By = Sorting.By(ByName, Direction.Asc)
-
-      override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate)
-    }
-  }
-
-  private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     entitiesFinder <- EntitiesFinder[F]
@@ -225,8 +71,10 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
   }
 
   private implicit def modelEncoder: Encoder[model.Entity] = {
+    import ModelEncoders._
     implicit val apiUrl: renku.ApiUrl = renkuApiUrl
     implicit val glUrl:  GitLabUrl    = gitLabUrl
+
     Encoder.instance {
       case project:  model.Entity.Project  => project.asJson
       case ds:       model.Entity.Dataset  => ds.asJson

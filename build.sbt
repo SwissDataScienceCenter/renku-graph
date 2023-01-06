@@ -24,6 +24,7 @@ lazy val root = Project(
   tokenRepository,
   webhookService,
   commitEventService,
+  entitiesSearch,
   triplesGenerator,
   knowledgeGraph
 )
@@ -111,6 +112,18 @@ lazy val commitEventService = Project(
   AutomateHeaderPlugin
 )
 
+lazy val entitiesSearch = Project(
+  id = "entities-search",
+  base = file("entities-search")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
 lazy val triplesGenerator = Project(
   id = "triples-generator",
   base = file("triples-generator")
@@ -118,7 +131,8 @@ lazy val triplesGenerator = Project(
   commonSettings
 ).dependsOn(
   graphCommons % "compile->compile",
-  graphCommons % "test->test"
+  graphCommons % "test->test",
+  entitiesSearch
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
@@ -143,8 +157,10 @@ lazy val knowledgeGraph = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
+  graphCommons   % "compile->compile",
+  graphCommons   % "test->test",
+  entitiesSearch % "compile->compile",
+  entitiesSearch % "test->test"
 ).enablePlugins(
   JavaAppPackaging,
   AutomateHeaderPlugin
@@ -202,6 +218,8 @@ lazy val commonSettings = Seq(
     "-Ycache-macro-class-loader:last-modified", // and macro definitions. This can lead to performance improvements.
     "-Ywarn-value-discard" // Emit warning and location for usages of deprecated APIs.
   ),
+  Compile / console / scalacOptions := (Compile / scalacOptions).value.filterNot(_ == "-Xfatal-warnings"),
+  Test / console / scalacOptions := (Compile / console / scalacOptions).value,
   // Format: on
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

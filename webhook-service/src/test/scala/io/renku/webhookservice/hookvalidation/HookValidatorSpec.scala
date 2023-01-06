@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.projects.Id
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -49,7 +49,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(projectId, projectIdToPath)
         .returning(error)
 
@@ -61,7 +61,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     "fail if finding stored access token return NOT_FOUND when no access token given" in new TestCase {
 
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(projectId, projectIdToPath)
         .returning(Option.empty[AccessToken].pure[Try])
 
@@ -75,7 +75,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     "fail if finding stored access token fails with UnauthorizedException" in new TestCase {
 
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(projectId, projectIdToPath)
         .returning(UnauthorizedException.raiseError[Try, Option[AccessToken]])
 
@@ -97,7 +97,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .returning(true.pure[Try])
 
       (accessTokenAssociator
-        .associate(_: Id, _: AccessToken))
+        .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, givenAccessToken)
         .returning(().pure[Try])
 
@@ -114,7 +114,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .returning(false.pure[Try])
 
       (accessTokenRemover
-        .removeAccessToken(_: Id))
+        .removeAccessToken(_: GitLabId))
         .expects(projectId)
         .returning(().pure[Try])
 
@@ -146,7 +146,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenAssociator
-        .associate(_: Id, _: AccessToken))
+        .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, givenAccessToken)
         .returning(error)
 
@@ -164,7 +164,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenRemover
-        .removeAccessToken(_: Id))
+        .removeAccessToken(_: GitLabId))
         .expects(projectId)
         .returning(error)
 
@@ -199,7 +199,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .returning(false.pure[Try])
 
       (accessTokenRemover
-        .removeAccessToken(_: Id))
+        .removeAccessToken(_: GitLabId))
         .expects(projectId)
         .returning(().pure[Try])
 
@@ -236,7 +236,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val exception: Exception    = exceptions.generateOne
       val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
       (accessTokenRemover
-        .removeAccessToken(_: Id))
+        .removeAccessToken(_: GitLabId))
         .expects(projectId)
         .returning(error)
 
@@ -269,7 +269,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     def assumeGivenAccessTokenInvalid(): AccessToken = {
       val storedAccessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
+        .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(projectId, projectIdToPath)
         .returning(Some(storedAccessToken).pure[Try])
       storedAccessToken

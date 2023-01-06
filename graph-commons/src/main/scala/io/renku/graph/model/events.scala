@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,6 +32,7 @@ import io.renku.tinytypes.contenttypes.ZippedContent
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 import java.time.{Clock, Duration, Instant}
+import scala.math.BigDecimal.RoundingMode
 
 object events {
 
@@ -39,7 +40,7 @@ object events {
 
   object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture[CreatedDate]
 
-  final case class CompoundEventId(id: EventId, projectId: projects.Id) {
+  final case class CompoundEventId(id: EventId, projectId: projects.GitLabId) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
@@ -47,7 +48,7 @@ object events {
     implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
   }
 
-  final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
+  final case class EventDetails(id: EventId, projectId: projects.GitLabId, eventBody: EventBody) {
     override lazy val toString: String          = s"id = $id, projectId = $projectId"
     lazy val compoundEventId:   CompoundEventId = CompoundEventId(id, projectId)
   }
@@ -248,6 +249,59 @@ object events {
     }
   }
 
+  final case class EventStatusProgress(status: EventStatus) {
+    lazy val stage:      EventStatusProgress.Stage      = EventStatusProgress.Stage(status)
+    lazy val completion: EventStatusProgress.Completion = EventStatusProgress.Completion(stage)
+  }
+
+  object EventStatusProgress {
+    import EventStatus._
+
+    trait Stage extends IntTinyType with Product with Serializable
+    object Stage {
+      def apply(s: EventStatus): Stage = s match {
+        case New                                                    => Initial
+        case Skipped                                                => Final
+        case GeneratingTriples | GenerationRecoverableFailure       => Generating
+        case GenerationNonRecoverableFailure                        => Final
+        case TriplesGenerated                                       => Generated
+        case TransformingTriples | TransformationRecoverableFailure => Transforming
+        case TransformationNonRecoverableFailure                    => Final
+        case TriplesStore                                           => Final
+        case AwaitingDeletion | Deleting                            => Removing
+      }
+
+      final case object Initial      extends Stage { override val value: Int = 1 }
+      final case object Generating   extends Stage { override val value: Int = 2 }
+      final case object Generated    extends Stage { override val value: Int = 3 }
+      final case object Transforming extends Stage { override val value: Int = 4 }
+      final case object Final        extends Stage { override val value: Int = 5 }
+      final case object Removing     extends Stage { override val value: Int = -1 }
+
+      implicit def show[S <: Stage]: Show[Stage] = Show.show {
+        case Initial      => "Initial"
+        case Generating   => "Generating"
+        case Generated    => "Generated"
+        case Transforming => "Transforming"
+        case Final        => "Final"
+        case Removing     => "Removing"
+      }
+    }
+
+    final class Completion(val value: Float) extends AnyVal with FloatTinyType
+    object Completion {
+      def apply(stage: Stage): Completion = new Completion(
+        stage match {
+          case Stage.Removing => 0f
+          case st =>
+            BigDecimal((st.value.toDouble / Stage.Final.value.toDouble) * 100)
+              .setScale(2, RoundingMode.HALF_DOWN)
+              .toFloat
+        }
+      )
+    }
+  }
+
   final case class EventInfo(eventId:         EventId,
                              project:         ProjectIds,
                              status:          EventStatus,
@@ -269,7 +323,7 @@ object events {
   }
 
   object EventInfo {
-    final case class ProjectIds(id: projects.Id, path: projects.Path)
+    final case class ProjectIds(id: projects.GitLabId, path: projects.Path)
     object ProjectIds {
       implicit val jsonDecoder: Decoder[ProjectIds] =
         io.circe.generic.semiauto.deriveDecoder[ProjectIds]
