@@ -19,27 +19,25 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import CommandsCalculator.calculateCommands
-import cats.MonadThrow
+import Generators._
 import cats.syntax.all._
-import io.renku.graph.model.entities.Project
+import io.renku.entities.searchgraphs.SearchInfoLens
+import SearchInfoLens._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
+import org.scalacheck.Gen
 
-private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
-  def toUpdateCommands(project: Project, searchInfos: List[SearchInfo]): F[List[UpdateCommand]]
-}
+private object CalculatorInfoSetGenerators {
 
-private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F])
-    extends UpdateCommandsProducer[F] {
+  lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
+    project <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
+    modelInfo <-
+      searchInfoObjects.map(i =>
+        searchInfoLinks.modify(
+          replaceLinks(linkProject.set(project.resourceId)(linkObjects(i.topmostSameAs).generateOne))
+        )(i)
+      )
+  } yield CalculatorInfoSet(project, maybeModelInfo = modelInfo.some, maybeTSInfo = modelInfo.some)
 
-  import searchInfoFetcher._
-
-  def toUpdateCommands(project: Project, searchInfos: List[SearchInfo]): F[List[UpdateCommand]] =
-    searchInfos
-      .map { modelInfo =>
-        fetchStoreSearchInfo(modelInfo.topmostSameAs)
-          .map(maybeTSInfo => CalculatorInfoSet(project, modelInfo.some, maybeTSInfo))
-          .map(calculateCommands)
-      }
-      .sequence
-      .map(_.flatten)
 }

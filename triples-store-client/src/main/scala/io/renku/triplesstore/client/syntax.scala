@@ -23,7 +23,7 @@ import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder}
 
 object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances {
 
-  final implicit class ModelOps[T](private val obj: T) extends AnyVal {
+  final implicit class TSClientObjectOps[T](private val obj: T) extends AnyVal {
 
     def asQuads(implicit enc: QuadsEncoder[T]): Set[Quad] = enc(obj)
 

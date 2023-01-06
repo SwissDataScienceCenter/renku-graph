@@ -17,13 +17,24 @@
  */
 
 package io.renku.entities.searchgraphs
-package commands
 
-import io.renku.triplesstore.client.model.Quad
+import cats.data.NonEmptyList
+import io.renku.graph.model.projects
+import monocle.Lens
 
-private[searchgraphs] trait UpdateCommand
-private[searchgraphs] object UpdateCommand {
+// For the time being it's just the on the tests side as there's no need for Lens on the prod sources, yet
+private object SearchInfoLens {
 
-  final case class Insert(quad: Quad) extends UpdateCommand
-  final case class Delete(quad: Quad) extends UpdateCommand
+  val searchInfoLinks: Lens[SearchInfo, NonEmptyList[Link]] = Lens[SearchInfo, NonEmptyList[Link]](_.links) {
+    links => info => info.copy(links = links)
+  }
+
+  def replaceLinks(link: Link): NonEmptyList[Link] => NonEmptyList[Link] = _ => NonEmptyList.one(link)
+
+  val linkProject: Lens[Link, projects.ResourceId] = Lens[Link, projects.ResourceId](_.project) { projectId =>
+    {
+      case link: Link.OriginalDataset => link.copy(project = projectId)
+      case link: Link.ImportedDataset => link.copy(project = projectId)
+    }
+  }
 }

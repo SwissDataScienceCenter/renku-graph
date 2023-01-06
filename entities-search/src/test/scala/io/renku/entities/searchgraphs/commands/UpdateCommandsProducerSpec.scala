@@ -19,10 +19,12 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import CommandCalculator.calculateCommand
+import CommandsCalculator.calculateCommands
 import Generators.searchInfoObjects
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
+import io.renku.graph.model.testentities._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -43,11 +45,17 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
         givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
       }
 
-      commandsProducer.toUpdateCommands(searchInfos.map(_._1)) shouldBe (searchInfos flatMap calculateCommand).pure[Try]
+      commandsProducer.toUpdateCommands(project, searchInfos.map(_._1)) shouldBe searchInfos
+        .map { case (modelInfo, maybeTsInfo) => CalculatorInfoSet(project, modelInfo.some, maybeTsInfo) }
+        .flatMap(calculateCommands)
+        .pure[Try]
     }
   }
 
   private trait TestCase {
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+
     private val searchInfoFetcher = mock[SearchInfoFetcher[Try]]
     val commandsProducer          = new UpdateCommandsProducerImpl[Try](searchInfoFetcher)
 

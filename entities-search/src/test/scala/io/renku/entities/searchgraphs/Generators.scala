@@ -19,15 +19,16 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
+import SearchInfoLens._
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{Date, TopmostSameAs}
-import io.renku.graph.model.{datasets, entities}
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{datasets, entities, projects}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -54,6 +55,14 @@ private object Generators {
                      images,
                      links
   )
+
+  def searchInfoObjects(withLinkFor: projects.ResourceId): Gen[SearchInfo] =
+    searchInfoObjects
+      .map(i =>
+        searchInfoLinks.modify(
+          replaceLinks(linkProject.set(withLinkFor)(linkObjects(i.topmostSameAs).generateOne))
+        )(i)
+      )
 
   lazy val personInfos: Gen[PersonInfo] =
     personEntities.map(_.to[entities.Person]).map(toPersonInfo)
