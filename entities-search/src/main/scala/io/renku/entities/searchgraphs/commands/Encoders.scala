@@ -19,8 +19,8 @@
 package io.renku.entities.searchgraphs
 package commands
 
+import Link.{ImportedDataset, OriginalDataset}
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.{Link, PersonInfo}
 import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Person
@@ -48,12 +48,20 @@ private object Encoders {
     )
   }
 
-  implicit val linkEncoder: QuadsEncoder[Link] = QuadsEncoder.instance { case Link(resourceId, dataset, project) =>
-    Set(
-      DatasetsQuad(resourceId, rdf / "type", renku / "DatasetProjectLink"),
-      DatasetsQuad(resourceId, renku / "project", project.asEntityId),
-      DatasetsQuad(resourceId, renku / "dataset", dataset.asEntityId)
-    )
+  implicit val linkEncoder: QuadsEncoder[Link] = QuadsEncoder.instance { link =>
+    val typeQuads = link match {
+      case _: OriginalDataset =>
+        Set(DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
+            DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink")
+        )
+      case _: ImportedDataset =>
+        Set(DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"))
+    }
+    typeQuads ++
+      Set(
+        DatasetsQuad(link.resourceId, renku / "project", link.project.asEntityId),
+        DatasetsQuad(link.resourceId, renku / "dataset", link.dataset.asEntityId)
+      )
   }
 
   implicit val searchInfoEncoder: QuadsEncoder[SearchInfo] = QuadsEncoder.instance { info =>

@@ -74,9 +74,21 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   "linkEncoder" should {
 
-    "turn a Link object into a Set of relevant Quads" in {
+    "turn a OriginalDataset object into a Set of relevant Quads" in {
 
-      val link = linkObjects(datasetTopmostSameAs.generateOne).generateOne
+      val link = originalDatasetLinkObjects(datasetTopmostSameAs.generateOne).generateOne
+
+      link.asQuads shouldBe Set(
+        DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
+        DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink"),
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.project.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.dataset.asEntityId)
+      )
+    }
+
+    "turn a ImportedDataset object into a Set of relevant Quads" in {
+
+      val link = importedDatasetLinkObjects(datasetTopmostSameAs.generateOne).generateOne
 
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),

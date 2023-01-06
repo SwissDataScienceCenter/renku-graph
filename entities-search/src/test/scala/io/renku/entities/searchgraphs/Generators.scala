@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{Date, TopmostSameAs}
-import io.renku.graph.model.entities
+import io.renku.graph.model.{datasets, entities}
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
 import org.scalacheck.Gen
@@ -62,6 +62,13 @@ private object Generators {
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))
 
   def linkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
+    Gen.oneOf(originalDatasetLinkObjects(topmostSameAs), importedDatasetLinkObjects(topmostSameAs))
+
+  def originalDatasetLinkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
+    (projectResourceIds, projectPaths)
+      .mapN(Link(topmostSameAs, datasets.ResourceId(topmostSameAs.value), _, _))
+
+  def importedDatasetLinkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
     (datasetResourceIds, projectResourceIds, projectPaths)
       .mapN(Link(topmostSameAs, _, _, _))
 }
