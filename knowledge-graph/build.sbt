@@ -26,7 +26,7 @@ libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.19.0"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.9"
+libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.10"
 
 libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.4.1"
 libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
