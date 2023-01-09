@@ -20,21 +20,25 @@ package io.renku.entities.searchgraphs
 
 import cats.data.NonEmptyList
 import io.renku.graph.model.projects
-import monocle.Lens
+import monocle.{Lens, Traversal}
 
-// For the time being it's just the on the tests side as there's no need for Lens on the prod sources, yet
 private object SearchInfoLens {
 
   val searchInfoLinks: Lens[SearchInfo, NonEmptyList[Link]] = Lens[SearchInfo, NonEmptyList[Link]](_.links) {
     links => info => info.copy(links = links)
   }
 
+  private val linksTraversal = Traversal.fromTraverse[NonEmptyList, Link]
+
   def replaceLinks(link: Link): NonEmptyList[Link] => NonEmptyList[Link] = _ => NonEmptyList.one(link)
 
-  val linkProject: Lens[Link, projects.ResourceId] = Lens[Link, projects.ResourceId](_.project) { projectId =>
+  val linkProject: Lens[Link, projects.ResourceId] = Lens[Link, projects.ResourceId](_.projectId) { projectId =>
     {
-      case link: Link.OriginalDataset => link.copy(project = projectId)
-      case link: Link.ImportedDataset => link.copy(project = projectId)
+      case link: Link.OriginalDataset => link.copy(projectId = projectId)
+      case link: Link.ImportedDataset => link.copy(projectId = projectId)
     }
   }
+
+  def findLink(projectId: projects.ResourceId): SearchInfo => Option[Link] =
+    searchInfoLinks.composeTraversal(linksTraversal).find(_.projectId == projectId)
 }

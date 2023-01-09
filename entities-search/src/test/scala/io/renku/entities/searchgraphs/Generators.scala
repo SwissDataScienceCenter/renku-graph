@@ -20,6 +20,7 @@ package io.renku.entities.searchgraphs
 
 import PersonInfo._
 import SearchInfoLens._
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
@@ -33,7 +34,7 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  lazy val searchInfoObjects: Gen[SearchInfo] = for {
+  lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
     topmostSameAs     <- datasetTopmostSameAs
     name              <- datasetNames
     visibility        <- projectVisibilities
@@ -43,7 +44,7 @@ private object Generators {
     keywords          <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc         <- datasetDescriptions.toGeneratorOfOptions
     images            <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
-    links             <- linkObjects(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
+    links             <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
   } yield SearchInfo(topmostSameAs,
                      name,
                      visibility,
@@ -56,13 +57,14 @@ private object Generators {
                      links
   )
 
-  def searchInfoObjects(withLinkFor: projects.ResourceId): Gen[SearchInfo] =
-    searchInfoObjects
-      .map(i =>
-        searchInfoLinks.modify(
-          replaceLinks(linkProject.set(withLinkFor)(linkObjects(i.topmostSameAs).generateOne))
-        )(i)
-      )
+  def searchInfoObjectsGen(withLinkFor: projects.ResourceId, and: projects.ResourceId*): Gen[SearchInfo] =
+    searchInfoObjectsGen.map { i =>
+      searchInfoLinks
+        .modify { _ =>
+          val linkedProjects = NonEmptyList.of(withLinkFor, and: _*)
+          linkedProjects.map(linkProject.set(_)(linkObjectsGen(i.topmostSameAs).generateOne))
+        }(i)
+    }
 
   lazy val personInfos: Gen[PersonInfo] =
     personEntities.map(_.to[entities.Person]).map(toPersonInfo)
@@ -70,14 +72,14 @@ private object Generators {
   def modifiedDates(notYoungerThan: Date): Gen[DateModified] =
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))
 
-  def linkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
-    Gen.oneOf(originalDatasetLinkObjects(topmostSameAs), importedDatasetLinkObjects(topmostSameAs))
+  def linkObjectsGen(topmostSameAs: TopmostSameAs): Gen[Link] =
+    Gen.oneOf(originalDatasetLinkObjectsGen(topmostSameAs), importedDatasetLinkObjectsGen(topmostSameAs))
 
-  def originalDatasetLinkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
+  def originalDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs): Gen[Link] =
     (projectResourceIds, projectPaths)
       .mapN(Link(topmostSameAs, datasets.ResourceId(topmostSameAs.value), _, _))
 
-  def importedDatasetLinkObjects(topmostSameAs: TopmostSameAs): Gen[Link] =
+  def importedDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs): Gen[Link] =
     (datasetResourceIds, projectResourceIds, projectPaths)
       .mapN(Link(topmostSameAs, _, _, _))
 }

@@ -76,24 +76,24 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
     "turn a OriginalDataset object into a Set of relevant Quads" in {
 
-      val link = originalDatasetLinkObjects(datasetTopmostSameAs.generateOne).generateOne
+      val link = originalDatasetLinkObjectsGen(datasetTopmostSameAs.generateOne).generateOne
 
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink"),
-        DatasetsQuad(link.resourceId, LinkOntology.project, link.project.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.dataset.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.datasetId.asEntityId)
       )
     }
 
     "turn a ImportedDataset object into a Set of relevant Quads" in {
 
-      val link = importedDatasetLinkObjects(datasetTopmostSameAs.generateOne).generateOne
+      val link = importedDatasetLinkObjectsGen(datasetTopmostSameAs.generateOne).generateOne
 
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
-        DatasetsQuad(link.resourceId, LinkOntology.project, link.project.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.dataset.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.datasetId.asEntityId)
       )
     }
   }
@@ -102,7 +102,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
     "turn a SearchInfo object into a Set of relevant Quads" in {
 
-      val searchInfo = searchInfoObjects.generateOne
+      val searchInfo = searchInfoObjectsGen.generateOne
 
       searchInfo.asQuads shouldBe Set(
         DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
@@ -139,7 +139,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def creatorsToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.creators
       .map(pi =>
-        pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.creator, pi.resourceId.asEntityId)
+        pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
       )
       .toList
       .toSet
@@ -159,13 +159,13 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   private def imagesToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.images
-      .map(i => i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.image, i.resourceId.asEntityId))
+      .map(i => i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.imageProperty, i.resourceId.asEntityId))
       .toSet
       .flatten
 
   private def linksToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.links
-      .map(l => l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.link, l.resourceId.asEntityId))
+      .map(l => l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.linkProperty, l.resourceId.asEntityId))
       .toList
       .toSet
       .flatten

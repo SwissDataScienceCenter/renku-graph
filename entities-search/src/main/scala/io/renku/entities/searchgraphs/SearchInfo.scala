@@ -57,8 +57,8 @@ private object SearchInfo {
 
 private sealed trait Link {
   val resourceId: links.ResourceId
-  val dataset:    ResourceId
-  val project:    projects.ResourceId
+  val datasetId:  ResourceId
+  val projectId:  projects.ResourceId
 }
 private object Link {
   def apply(topmostSameAs: TopmostSameAs,
@@ -71,9 +71,9 @@ private object Link {
     else
       ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
 
-  final case class OriginalDataset(resourceId: links.ResourceId, dataset: ResourceId, project: projects.ResourceId)
+  final case class OriginalDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
       extends Link
-  final case class ImportedDataset(resourceId: links.ResourceId, dataset: ResourceId, project: projects.ResourceId)
+  final case class ImportedDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
       extends Link
 }
 

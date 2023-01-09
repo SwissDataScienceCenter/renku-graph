@@ -33,16 +33,16 @@ object SearchInfoOntology {
   val dateModifiedProperty:  DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
   val keywordsProperty:      DataProperty.Def = Dataset.Ontology.keywordsProperty
   val descriptionProperty:   DataProperty.Def = Dataset.Ontology.descriptionProperty
-  val creator:               Property         = Dataset.Ontology.creator
-  val image:                 Property         = Dataset.Ontology.image
-  val link:                  Property         = renku / "datasetProjectLink"
+  val creatorProperty:       Property         = Dataset.Ontology.creator
+  val imageProperty:         Property         = Dataset.Ontology.image
+  val linkProperty:          Property         = renku / "datasetProjectLink"
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableDataset"),
     ObjectProperties(
-      ObjectProperty(creator, PersonInfoOntology.typeDef),
-      ObjectProperty(image, Image.Ontology.typeDef),
-      ObjectProperty(link, LinkOntology.typeDef)
+      ObjectProperty(creatorProperty, PersonInfoOntology.typeDef),
+      ObjectProperty(imageProperty, Image.Ontology.typeDef),
+      ObjectProperty(linkProperty, LinkOntology.typeDef)
     ),
     DataProperties(
       nameProperty,

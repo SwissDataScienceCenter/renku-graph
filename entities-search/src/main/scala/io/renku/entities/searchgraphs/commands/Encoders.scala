@@ -59,8 +59,8 @@ private object Encoders {
     }
     typeQuads ++
       Set(
-        DatasetsQuad(link.resourceId, renku / "project", link.project.asEntityId),
-        DatasetsQuad(link.resourceId, renku / "dataset", link.dataset.asEntityId)
+        DatasetsQuad(link.resourceId, renku / "project", link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, renku / "dataset", link.datasetId.asEntityId)
       )
   }
 
@@ -85,7 +85,7 @@ private object Encoders {
 
     val creatorsQuads = info.creators.toList.toSet.flatMap { (pi: PersonInfo) =>
       pi.asQuads +
-        searchInfoQuad(SearchInfoOntology.creator, pi.resourceId.asEntityId)
+        searchInfoQuad(SearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
     }
 
     val keywordsQuads = info.keywords.toSet.map { (k: datasets.Keyword) =>
@@ -94,12 +94,12 @@ private object Encoders {
 
     val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
       i.asQuads +
-        searchInfoQuad(SearchInfoOntology.image, i.resourceId.asEntityId)
+        searchInfoQuad(SearchInfoOntology.imageProperty, i.resourceId.asEntityId)
     }
 
     val linksQuads = info.links.toList.toSet.flatMap { (l: Link) =>
       l.asQuads +
-        searchInfoQuad(SearchInfoOntology.link, l.resourceId.asEntityId)
+        searchInfoQuad(SearchInfoOntology.linkProperty, l.resourceId.asEntityId)
     }
 
     Set(

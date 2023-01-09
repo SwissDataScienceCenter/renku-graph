@@ -20,7 +20,7 @@ package io.renku.entities.searchgraphs
 package commands
 
 import CommandsCalculator.calculateCommands
-import Generators.searchInfoObjects
+import Generators.searchInfoObjectsGen
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
@@ -37,9 +37,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
 
     "fetch the current state of the DS from the TS" in new TestCase {
 
-      val searchInfos = searchInfoObjects
+      val searchInfos = searchInfoObjectsGen
         .generateList()
-        .map(info => info -> searchInfoObjects.generateOption.map(_.copy(topmostSameAs = info.topmostSameAs)))
+        .map(info => info -> searchInfoObjectsGen.generateOption.map(_.copy(topmostSameAs = info.topmostSameAs)))
 
       searchInfos foreach { case (info, maybeStoreInfo) =>
         givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
