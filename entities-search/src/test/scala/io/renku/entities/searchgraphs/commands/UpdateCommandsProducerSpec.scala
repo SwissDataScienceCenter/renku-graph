@@ -28,34 +28,75 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   private val calculateCommands: CalculatorInfoSet => Try[List[UpdateCommand]] =
     CommandsCalculator.calculateCommands[Try]
 
-  "toCommands" should {
+  "toUpdateCommands" should {
 
-    "fetch the current state of the DS from the TS" in new TestCase {
+    "fetch Datasets currently associated with the given Project in the TS, " +
+      "zip them with the datasets found on the Project and " +
+      "generate update commands for them - " +
+      "case when all model infos have counterparts in the TS" in new TestCase {
 
-      val searchInfos = searchInfoObjectsGen(withLinkFor = project.resourceId)
-        .generateList()
-        .map { modelInfo =>
-          modelInfo -> searchInfoObjectsGen(withLinkFor = project.resourceId).generateOption
-            .map(_.copy(topmostSameAs = modelInfo.topmostSameAs))
-        }
+        val modelInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateList()
+        val tsInfos = modelInfos
+          .map { modelInfo =>
+            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
+              .copy(topmostSameAs = modelInfo.topmostSameAs)
+          }
 
-      searchInfos foreach { case (info, maybeStoreInfo) =>
-        givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
+        givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+
+        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe (modelInfos zip tsInfos)
+          .map { case (modelInfo, tsInfo) => CalculatorInfoSet(project, modelInfo.some, tsInfo.some) }
+          .map(calculateCommands(_))
+          .sequence
+          .map(_.flatten.toSet)
       }
 
-      commandsProducer.toUpdateCommands(project, searchInfos.map(_._1)) shouldBe searchInfos
-        .map { case (modelInfo, maybeTsInfo) => CalculatorInfoSet(project, modelInfo.some, maybeTsInfo) }
-        .map(calculateCommands(_))
-        .sequence
-        .map(_.flatten)
-    }
+    "produce commands - " +
+      "case when not all model infos have counterparts in the TS" in new TestCase {
+
+        val modelInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateNonEmptyList().toList
+        val tsInfos = modelInfos.tail
+          .map { modelInfo =>
+            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
+              .copy(topmostSameAs = modelInfo.topmostSameAs)
+          }
+
+        givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+
+        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe
+          (modelInfos.map(_.some) zip (None :: tsInfos.map(_.some)))
+            .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
+            .map(calculateCommands(_))
+            .sequence
+            .map(_.flatten.toSet)
+      }
+
+    "produce commands - " +
+      "case when not all TS infos have counterparts in the model" in new TestCase {
+
+        val tsInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateNonEmptyList().toList
+        val modelInfos = tsInfos.tail
+          .map { modelInfo =>
+            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
+              .copy(topmostSameAs = modelInfo.topmostSameAs)
+          }
+
+        givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
+
+        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe
+          ((None :: modelInfos.map(_.some)) zip tsInfos.map(_.some))
+            .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
+            .map(calculateCommands(_))
+            .sequence
+            .map(_.flatten.toSet)
+      }
   }
 
   private trait TestCase {
@@ -65,9 +106,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     private val searchInfoFetcher = mock[SearchInfoFetcher[Try]]
     val commandsProducer          = new UpdateCommandsProducerImpl[Try](searchInfoFetcher)
 
-    def givenSearchInfoFetcher(searchInfo: SearchInfo, returning: Try[Option[SearchInfo]]) =
-      (searchInfoFetcher.fetchStoreSearchInfo _)
-        .expects(searchInfo.topmostSameAs)
+    def givenSearchInfoFetcher(project: entities.Project, returning: Try[List[SearchInfo]]) =
+      (searchInfoFetcher.fetchStoreSearchInfos _)
+        .expects(project.resourceId)
         .returning(returning)
   }
 }

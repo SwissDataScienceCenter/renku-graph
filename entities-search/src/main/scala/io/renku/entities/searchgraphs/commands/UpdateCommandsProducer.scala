@@ -33,13 +33,21 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
 
   import searchInfoFetcher._
 
-  def toUpdateCommands(project: Project, searchInfos: List[SearchInfo]): F[List[UpdateCommand]] =
-    searchInfos
-      .map { modelInfo =>
-        fetchStoreSearchInfo(modelInfo.topmostSameAs)
-          .map(maybeTSInfo => CalculatorInfoSet(project, modelInfo.some, maybeTSInfo))
-          .flatMap(calculateCommands)
-      }
-      .sequence
-      .map(_.flatten)
+  def toUpdateCommands(project: Project, modelInfos: List[SearchInfo]): F[List[UpdateCommand]] =
+    fetchStoreSearchInfos(project.resourceId).flatMap { tsInfos =>
+      val matchedInfos = matchInfosBySameAs(modelInfos, tsInfos)
+      matchedInfos
+        .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
+        .toList
+        .map(calculateCommands)
+        .sequence
+        .map(_.flatten)
+    }
+
+  private def matchInfosBySameAs(modelInfos: List[SearchInfo], tsInfos: List[SearchInfo]) = {
+    val distinctDatasets = modelInfos.map(_.topmostSameAs).toSet ++ tsInfos.map(_.topmostSameAs)
+    distinctDatasets.map(topSameAs =>
+      modelInfos.find(_.topmostSameAs == topSameAs) -> tsInfos.find(_.topmostSameAs == topSameAs)
+    )
+  }
 }
