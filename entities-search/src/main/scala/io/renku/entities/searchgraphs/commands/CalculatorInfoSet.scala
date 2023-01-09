@@ -19,9 +19,28 @@
 package io.renku.entities.searchgraphs
 package commands
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.graph.model.entities.Project
 
 private final case class CalculatorInfoSet(project:        Project,
                                            maybeModelInfo: Option[SearchInfo],
                                            maybeTSInfo:    Option[SearchInfo]
 )
+
+private object CalculatorInfoSet {
+
+  implicit val show: Show[CalculatorInfoSet] = Show.show {
+    case CalculatorInfoSet(project, maybeModelInfo, maybeTSInfo) =>
+      def toString(info: SearchInfo) = List(
+        show"topmostSameAs = ${info.topmostSameAs}",
+        show"name = ${info.name}",
+        show"visibility = ${info.visibility}",
+        show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
+      ).mkString(", ")
+
+      show"projectId = ${project.resourceId}, projectPath = ${project.path}" +
+        maybeModelInfo.map(i => show", modelInfo = [${toString(i)}]").getOrElse("") +
+        maybeTSInfo.map(i => show", tsInfo = [${toString(i)}]").getOrElse("")
+  }
+}

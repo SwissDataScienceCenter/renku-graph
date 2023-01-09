@@ -31,11 +31,29 @@ import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.util.{Failure, Try}
+
 class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
-  import CommandsCalculator._
+  private val calculateCommands = CommandsCalculator.calculateCommands[Try]
 
   "calculateCommands" should {
+
+    "return no commands " +
+      "when DS exists on both TS and the Project" in {
+
+        val someInfoSet = calculatorInfoSets.generateOne
+
+        val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateSome
+
+        val tsInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId,
+                                          and = projectResourceIds.generateList(): _*
+        ).generateSome
+
+        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo, maybeTSInfo = tsInfo)
+
+        calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
 
     "create Inserts for the Project found DS " +
       "when it does not exist the TS" in {
@@ -46,7 +64,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = None)
 
-        calculateCommands(infoSet) shouldBe modelInfo.asQuads(searchInfoEncoder).map(Insert).toList
+        calculateCommands(infoSet) shouldBe modelInfo.asQuads(searchInfoEncoder).map(Insert).toList.pure[Try]
       }
 
     "create Deletes for the DS found in the TS " +
@@ -58,7 +76,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val infoSet = someInfoSet.copy(maybeModelInfo = None, maybeTSInfo = tsInfo.some)
 
-        calculateCommands(infoSet) shouldBe tsInfo.asQuads.map(Delete).toList
+        calculateCommands(infoSet) shouldBe tsInfo.asQuads.map(Delete).toList.pure[Try]
       }
 
     "create Deletes for the Project-DS association only " +
@@ -76,11 +94,26 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
           .find(_.projectId == someInfoSet.project.resourceId)
           .getOrElse(fail("There supposed to be a link to delete"))
 
-        calculateCommands(infoSet).toSet shouldBe (expectedLinkToDelete.asQuads + DatasetsQuad(
+        calculateCommands(infoSet).map(_.toSet) shouldBe (expectedLinkToDelete.asQuads + DatasetsQuad(
           tsInfo.topmostSameAs,
           SearchInfoOntology.linkProperty,
           expectedLinkToDelete.resourceId.asEntityId
-        )).map(Delete)
+        )).map(Delete).pure[Try]
       }
+
+    "fail for when input data in illegal state" in {
+
+      val someInfoSet = calculatorInfoSets.generateOne
+
+      val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateSome
+
+      val tsInfo = searchInfoObjectsGen(withLinkFor = projectResourceIds.generateOne).generateSome
+
+      val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo, maybeTSInfo = tsInfo)
+
+      val Failure(exception) = calculateCommands(infoSet).map(_.toSet)
+
+      exception.getMessage shouldBe show"Cannot calculate update commands for $infoSet"
+    }
   }
 }

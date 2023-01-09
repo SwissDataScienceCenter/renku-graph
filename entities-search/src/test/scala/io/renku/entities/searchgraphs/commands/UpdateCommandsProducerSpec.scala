@@ -19,7 +19,6 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import CommandsCalculator.calculateCommands
 import Generators.searchInfoObjectsGen
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
@@ -33,13 +32,19 @@ import scala.util.Try
 
 class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
+  private val calculateCommands: CalculatorInfoSet => Try[List[UpdateCommand]] =
+    CommandsCalculator.calculateCommands[Try]
+
   "toCommands" should {
 
     "fetch the current state of the DS from the TS" in new TestCase {
 
-      val searchInfos = searchInfoObjectsGen
+      val searchInfos = searchInfoObjectsGen(withLinkFor = project.resourceId)
         .generateList()
-        .map(info => info -> searchInfoObjectsGen.generateOption.map(_.copy(topmostSameAs = info.topmostSameAs)))
+        .map { modelInfo =>
+          modelInfo -> searchInfoObjectsGen(withLinkFor = project.resourceId).generateOption
+            .map(_.copy(topmostSameAs = modelInfo.topmostSameAs))
+        }
 
       searchInfos foreach { case (info, maybeStoreInfo) =>
         givenSearchInfoFetcher(info, returning = maybeStoreInfo.pure[Try])
@@ -47,8 +52,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
 
       commandsProducer.toUpdateCommands(project, searchInfos.map(_._1)) shouldBe searchInfos
         .map { case (modelInfo, maybeTsInfo) => CalculatorInfoSet(project, modelInfo.some, maybeTsInfo) }
-        .flatMap(calculateCommands)
-        .pure[Try]
+        .map(calculateCommands(_))
+        .sequence
+        .map(_.flatten)
     }
   }
 

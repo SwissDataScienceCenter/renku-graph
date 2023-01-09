@@ -22,6 +22,8 @@ package commands
 import Encoders._
 import SearchInfoLens._
 import UpdateCommand._
+import cats.MonadThrow
+import cats.syntax.all._
 import io.renku.entities.searchgraphs.SearchInfoOntology.linkProperty
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
@@ -30,31 +32,41 @@ import io.renku.triplesstore.client.syntax._
 
 private object CommandsCalculator {
 
-  def calculateCommands: CalculatorInfoSet => List[UpdateCommand] = {
-    case `new dataset not present in TS`(info) =>
-      info.asQuads.map(Insert).toList
-    case `removed single used dataset`(info) =>
-      info.asQuads.map(Delete).toList
-    case `removed multi used dataset`(info, link) =>
-      (link.asQuads + quad(info, linkProperty, link.resourceId.asEntityId)).map(Delete).toList
-    case _ => List()
+  def calculateCommands[F[_]: MonadThrow]: CalculatorInfoSet => F[List[UpdateCommand]] = {
+    case `DS present on Project & TS`()                      => List.empty[UpdateCommand].pure[F]
+    case `DS present on Project only`(info)                  => info.asQuads.map(Insert).toList.pure[F].widen
+    case `DS present on TS only on the single project`(info) => info.asQuads.map(Delete).toList.pure[F].widen
+    case `DS present on TS only on many projects`(info, link) =>
+      (link.asQuads + quad(info, linkProperty, link.resourceId.asEntityId)).map(Delete).toList.pure[F].widen
+    case infoSet =>
+      new IllegalStateException(show"Cannot calculate update commands for $infoSet").raiseError[F, List[UpdateCommand]]
   }
 
-  private object `new dataset not present in TS` {
+  private object `DS present on Project & TS` {
+    def unapply(infoSet: CalculatorInfoSet): Boolean = infoSet match {
+      case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
+        (findLink(infoSet.project.resourceId)(modelInfo) -> findLink(infoSet.project.resourceId)(tsInfo))
+          .mapN((_, _) => true)
+          .getOrElse(false)
+      case _ => false
+    }
+  }
+  private object `DS present on Project only` {
     def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
       case CalculatorInfoSet(_, someModelInfo @ Some(_), None) => someModelInfo
       case _                                                   => None
     }
   }
-  private object `removed single used dataset` {
+  private object `DS present on TS only on the single project` {
     def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
-      case CalculatorInfoSet(_, None, someTSInfo @ Some(tsInfo)) if tsInfo.links.size == 1 => someTSInfo
-      case _                                                                               => None
+      case CalculatorInfoSet(_, None, Some(tsInfo)) if tsInfo.links.size == 1 =>
+        findLink(infoSet.project.resourceId)(tsInfo).map(_ => tsInfo)
+      case _ => None
     }
   }
-  private object `removed multi used dataset` {
+  private object `DS present on TS only on many projects` {
     def unapply(infoSet: CalculatorInfoSet): Option[(SearchInfo, Link)] = infoSet match {
-      case CalculatorInfoSet(_, None, Some(tsInfo)) if tsInfo.links.size > 1 =>
+      case CalculatorInfoSet(_, None, Some(tsInfo)) =>
         findLink(infoSet.project.resourceId)(tsInfo).map(tsInfo -> _)
       case _ => None
     }

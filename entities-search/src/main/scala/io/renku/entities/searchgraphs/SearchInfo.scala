@@ -19,7 +19,9 @@
 package io.renku.entities.searchgraphs
 
 import SearchInfo.DateModified
+import cats.Show
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
@@ -53,6 +55,41 @@ private object SearchInfo {
 
     def apply(date: datasets.DateCreated): DateModified = DateModified(date.instant)
   }
+
+  implicit val show: Show[SearchInfo] = Show.show {
+    case SearchInfo(topSameAs,
+                    name,
+                    visibility,
+                    dateOriginal,
+                    maybeDateModified,
+                    creators,
+                    keywords,
+                    maybeDescription,
+                    images,
+                    links
+        ) =>
+      List(
+        show"topmostSameAs = $topSameAs".some,
+        show"name = $name".some,
+        show"visibility = $visibility".some,
+        dateOriginal match {
+          case d: datasets.DateCreated   => show"dateCreated = $d".some
+          case d: datasets.DatePublished => show"datePublished = $d".some
+        },
+        maybeDateModified.map(d => show"dateModified = $d"),
+        show"creators = [${creators.map(_.show).intercalate("; ")}}]".some,
+        keywords match {
+          case Nil => None
+          case k   => show"keywords = [${k.mkString(", ")}]".some
+        },
+        maybeDescription.map(d => show"description = $d"),
+        images match {
+          case Nil => None
+          case i   => show"images = [${i.sortBy(_.position).map(i => show"${i.uri.value}").mkString(", ")}]".some
+        },
+        show"links = [${links.map(_.show).intercalate("; ")}}]".some
+      ).flatten.mkString(", ")
+  }
 }
 
 private sealed trait Link {
@@ -75,6 +112,10 @@ private object Link {
       extends Link
   final case class ImportedDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
       extends Link
+
+  implicit lazy val show: Show[Link] = Show.show { link =>
+    show"id = ${link.resourceId}, projectId = ${link.projectId}, datasetId = ${link.datasetId}"
+  }
 }
 
 private object links {
@@ -98,4 +139,7 @@ private final case class PersonInfo(resourceId: persons.ResourceId, name: person
 
 private object PersonInfo {
   lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
+  implicit lazy val show: Show[PersonInfo] = Show.show { case PersonInfo(resourceId, name) =>
+    show"id = $resourceId, name = $name"
+  }
 }

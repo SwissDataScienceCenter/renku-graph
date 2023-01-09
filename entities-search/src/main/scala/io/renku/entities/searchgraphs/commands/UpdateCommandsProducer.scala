@@ -38,7 +38,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
       .map { modelInfo =>
         fetchStoreSearchInfo(modelInfo.topmostSameAs)
           .map(maybeTSInfo => CalculatorInfoSet(project, modelInfo.some, maybeTSInfo))
-          .map(calculateCommands)
+          .flatMap(calculateCommands)
       }
       .sequence
       .map(_.flatten)

@@ -18,16 +18,62 @@
 
 package io.renku.entities.searchgraphs
 
-import io.renku.entities.searchgraphs.Link.{ImportedDataset, OriginalDataset}
+import Generators._
+import cats.syntax.all._
+import io.renku.entities.searchgraphs.Link.{ImportedDataset, OriginalDataset, show}
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetExternalSameAs, datasetResourceIds, projectPaths, projectResourceIds}
+import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds}
 import io.renku.graph.model.datasets
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SearchInfoSpec extends AnyWordSpec with should.Matchers {
+class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+
+  "show" should {
+
+    "return String representation of the Info" in {
+      forAll(searchInfoObjectsGen) {
+        case info @ SearchInfo(topSameAs,
+                               name,
+                               visibility,
+                               dateOriginal,
+                               maybeDateModified,
+                               creators,
+                               keywords,
+                               maybeDescription,
+                               images,
+                               links
+            ) =>
+          info.show shouldBe List(
+            show"topmostSameAs = $topSameAs".some,
+            show"name = $name".some,
+            show"visibility = $visibility".some,
+            dateOriginal match {
+              case d: datasets.DateCreated   => show"dateCreated = $d".some
+              case d: datasets.DatePublished => show"datePublished = $d".some
+            },
+            maybeDateModified.map(d => show"dateModified = $d"),
+            show"creators = [${creators.map(_.show).intercalate("; ")}}]".some,
+            keywords match {
+              case Nil => None
+              case k   => show"keywords = [${k.mkString(", ")}]".some
+            },
+            maybeDescription.map(d => show"description = $d"),
+            images match {
+              case Nil => None
+              case i   => show"images = [${i.sortBy(_.position).map(i => show"${i.uri.value}").mkString(", ")}]".some
+            },
+            show"links = [${links.map(_.show).intercalate("; ")}}]".some
+          ).flatten.mkString(", ")
+      }
+    }
+  }
+}
+
+class DateModifiedSpec extends AnyWordSpec with should.Matchers {
 
   "DateModified.apply(DateCreated)" should {
 
@@ -38,7 +84,7 @@ class SearchInfoSpec extends AnyWordSpec with should.Matchers {
   }
 }
 
-class LinkSpec extends AnyWordSpec with should.Matchers {
+class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "apply" should {
 
@@ -65,7 +111,26 @@ class LinkSpec extends AnyWordSpec with should.Matchers {
       link            shouldBe a[ImportedDataset]
       link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
     }
+  }
 
-    // link sparql encoder
+  "show" should {
+
+    "returns String representation" in {
+      forAll(linkObjectsGen(datasetTopmostSameAs.generateOne)) { link =>
+        link.show shouldBe show"id = ${link.resourceId}, projectId = ${link.projectId}, datasetId = ${link.datasetId}"
+      }
+    }
+  }
+}
+
+class PersonLinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+
+  "show" should {
+
+    "returns String representation" in {
+      forAll(personInfos) { case info @ PersonInfo(id, name) =>
+        info.show shouldBe show"id = $id, name = $name"
+      }
+    }
   }
 }

@@ -34,7 +34,7 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
+  implicit lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
     topmostSameAs     <- datasetTopmostSameAs
     name              <- datasetNames
     visibility        <- projectVisibilities
