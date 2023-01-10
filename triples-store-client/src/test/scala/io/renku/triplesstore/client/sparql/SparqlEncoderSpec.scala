@@ -83,7 +83,7 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
     "be able to encode a Triple as Fragment" in {
       forAll { (triple: Triple) =>
         triple.asSparql.sparql shouldBe
-          s"<${URIref.encode(triple.subject.show)}> <${URIref.encode(triple.predicate.show)}> ${triple.obj.asSparql.sparql}"
+          s"<${URIref.encode(triple.subject.show)}> <${URIref.encode(triple.predicate.show)}> ${triple.obj.asSparql.sparql}."
       }
     }
 
