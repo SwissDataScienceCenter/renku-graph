@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.model.entities.Project
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
-  def toUpdateCommands(project: Project, searchInfos: List[SearchInfo]): F[List[UpdateCommand]]
+  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]]
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F])
@@ -33,7 +33,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
 
   import searchInfoFetcher._
 
-  def toUpdateCommands(project: Project, modelInfos: List[SearchInfo]): F[List[UpdateCommand]] =
+  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]] =
     fetchTSSearchInfos(project.resourceId).flatMap { tsInfos =>
       val matchedInfos = matchInfosBySameAs(modelInfos, tsInfos)
       matchedInfos

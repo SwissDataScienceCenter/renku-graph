@@ -19,25 +19,28 @@
 package io.renku.entities.searchgraphs
 
 import DatasetsCollector._
+import Generators.updateCommands
 import SearchInfoExtractor._
 import cats.syntax.all._
+import commands.{UpdateCommand, UpdateCommandsProducer}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.positiveInts
+import io.renku.generators.Generators.{exceptions, positiveInts}
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "provisionDatasetsGraph" should {
 
     "collect all the Datasets that are the latest modifications and not invalidations, " +
-      "extract the Datasets graph relevant data and " +
-      "push the data into the TS" in new TestCase {
+      "extract the Datasets graph relevant data " +
+      "produce TS update commands and " +
+      "push the commands into the TS" in new TestCase {
 
         val project = anyRenkuProjectEntities
           .withDatasets(
@@ -46,21 +49,63 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
           .generateOne
           .to[entities.Project]
 
-        givenUploadingDSFrom(project, returning = ().pure[Try])
+        val Success(searchInfos) = givenSearchInfoExtraction(project)
+
+        val updates = updateCommands.generateList()
+        givenUpdatesProducing(project, searchInfos, returning = updates.pure[Try])
+
+        givenUploading(updates, returning = ().pure[Try])
 
         provisioner.provisionDatasetsGraph(project) shouldBe ().pure[Try]
       }
+
+    "fail if updates producing step fails" in new TestCase {
+
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      val Success(searchInfos) = givenSearchInfoExtraction(project)
+
+      val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
+      givenUpdatesProducing(project, searchInfos, returning = failure)
+
+      provisioner.provisionDatasetsGraph(project) shouldBe failure
+    }
+
+    "fail if updates uploading fails" in new TestCase {
+
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      val Success(searchInfos) = givenSearchInfoExtraction(project)
+
+      val updates = updateCommands.generateList()
+      givenUpdatesProducing(project, searchInfos, returning = updates.pure[Try])
+
+      val failure = exceptions.generateOne.raiseError[Try, Unit]
+      givenUploading(updates, returning = failure)
+
+      provisioner.provisionDatasetsGraph(project) shouldBe failure
+    }
   }
 
   private trait TestCase {
     private val searchInfoUploader = mock[SearchInfoUploader[Try]]
-    val provisioner                = new DatasetsGraphProvisionerImpl[Try](searchInfoUploader)
+    private val updatesProducer    = mock[UpdateCommandsProducer[Try]]
+    val provisioner                = new DatasetsGraphProvisionerImpl[Try](updatesProducer, searchInfoUploader)
 
-    def givenUploadingDSFrom(project: entities.Project, returning: Try[Unit]) =
-      (collectLastVersions >>> extractSearchInfo[Try](project))(project) foreach { searchInfos =>
-        (searchInfoUploader.upload _)
-          .expects(searchInfos)
-          .returning(returning)
-      }
+    def givenSearchInfoExtraction(project: entities.Project): Try[List[SearchInfo]] =
+      (collectLastVersions >>> extractSearchInfo[Try](project))(project)
+
+    def givenUpdatesProducing(project:     entities.Project,
+                              searchInfos: List[SearchInfo],
+                              returning:   Try[List[UpdateCommand]]
+    ) = (updatesProducer
+      .toUpdateCommands(_: entities.Project)(_: List[SearchInfo]))
+      .expects(project, searchInfos)
+      .returning(returning)
+
+    def givenUploading(commands: List[UpdateCommand], returning: Try[Unit]) =
+      (searchInfoUploader.upload _)
+        .expects(commands)
+        .returning(returning)
   }
 }

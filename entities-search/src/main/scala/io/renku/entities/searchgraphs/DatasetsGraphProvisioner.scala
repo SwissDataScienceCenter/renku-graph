@@ -20,18 +20,24 @@ package io.renku.entities.searchgraphs
 
 import cats.MonadThrow
 import cats.syntax.all._
+import commands.UpdateCommandsProducer
 import io.renku.graph.model.entities.Project
 
 trait DatasetsGraphProvisioner[F[_]] {
   def provisionDatasetsGraph(project: Project): F[Unit]
 }
 
-private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](searchInfoUploader: SearchInfoUploader[F])
-    extends DatasetsGraphProvisioner[F] {
+private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],
+                                                             searchInfoUploader: SearchInfoUploader[F]
+) extends DatasetsGraphProvisioner[F] {
 
   import DatasetsCollector.collectLastVersions
   import SearchInfoExtractor.extractSearchInfo
+  import updatesProducer.toUpdateCommands
 
   override def provisionDatasetsGraph(project: Project): F[Unit] =
-    collectLastVersions.andThen(extractSearchInfo[F](project))(project) >>= searchInfoUploader.upload
+    collectLastVersions
+      .andThen(extractSearchInfo[F](project))
+      .andThenF(toUpdateCommands(project))(project)
+      .flatMap(searchInfoUploader.upload)
 }

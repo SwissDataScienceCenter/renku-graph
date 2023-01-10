@@ -18,6 +18,8 @@
 
 package io.renku.entities.searchgraphs
 
+import commands.UpdateCommand
+
 private trait SearchInfoUploader[F[_]] {
-  def upload(infos: List[SearchInfo]): F[Unit]
+  def upload(commands: List[UpdateCommand]): F[Unit]
 }
