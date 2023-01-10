@@ -26,8 +26,10 @@ import UpdateCommand._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
+import io.renku.graph.model.projects
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.syntax._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,19 +42,65 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
   "calculateCommands" should {
 
     "return no commands " +
-      "when DS exists on both TS and the Project" in {
+      "when DS exists on both infos with the same visibility" in {
 
         val someInfoSet = calculatorInfoSets.generateOne
 
-        val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateSome
+        val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateOne
 
-        val tsInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId,
-                                          and = projectResourceIds.generateList(): _*
-        ).generateSome
+        val tsInfo = modelInfo.copy(visibility = modelInfo.visibility,
+                                    links = modelInfo.links append linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        )
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo, maybeTSInfo = tsInfo)
+        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
 
         calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
+
+    "return no commands " +
+      "when DS exists on both infos " +
+      "but TS visibility is broader" in {
+
+        val someInfoSet = calculatorInfoSets.generateOne
+
+        val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateOne
+          .copy(visibility = Gen.oneOf(projects.Visibility.all - projects.Visibility.Public).generateOne)
+
+        val tsInfo = modelInfo.copy(
+          visibility = Gen.oneOf(projects.Visibility.allOrdered.takeWhile(_ != modelInfo.visibility)).generateOne,
+          links = modelInfo.links append linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        )
+
+        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+
+        calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
+
+    "create Delete and Insert for the visibility " +
+      "when DS exists on both infos " +
+      "but TS visibility is narrower" in {
+
+        val someInfoSet = calculatorInfoSets.generateOne
+
+        val modelInfo = searchInfoObjectsGen(withLinkFor = someInfoSet.project.resourceId).generateOne
+          .copy(visibility = Gen.oneOf(projects.Visibility.all - projects.Visibility.Private).generateOne)
+
+        val tsInfo = modelInfo.copy(
+          visibility =
+            Gen.oneOf(projects.Visibility.allOrdered.reverse.takeWhile(_ != modelInfo.visibility)).generateOne,
+          links = modelInfo.links append linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        )
+
+        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+
+        calculateCommands(infoSet) shouldBe List(
+          Insert(
+            DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, modelInfo.visibility.asObject)
+          ),
+          Delete(
+            DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, tsInfo.visibility.asObject)
+          )
+        ).pure[Try]
       }
 
     "create Inserts for the Project found DS " +

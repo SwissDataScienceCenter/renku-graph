@@ -32,16 +32,16 @@ class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDriven
 
     forAll {
       Table(
-        "type"    -> "value generator",
-        "Boolean" -> booleanTripleObjects,
-        "Int"     -> intTripleObjects,
-        "Long"    -> longTripleObjects,
-        "Float"   -> floatTripleObjects,
-        "Double"  -> doubleTripleObjects,
-        "String"  -> stringTripleObjects,
-        "Instant" -> instantTripleObjects,
+        "type"      -> "value generator",
+        "Boolean"   -> booleanTripleObjects,
+        "Int"       -> intTripleObjects,
+        "Long"      -> longTripleObjects,
+        "Float"     -> floatTripleObjects,
+        "Double"    -> doubleTripleObjects,
+        "String"    -> stringTripleObjects,
+        "Instant"   -> instantTripleObjects,
         "LocalDate" -> localDateTripleObjects,
-        "Iri"     -> iriTripleObjects
+        "Iri"       -> iriTripleObjects
       )
     } { (objectType, valueGenerator) =>
       s"return string representation of $objectType type" in {

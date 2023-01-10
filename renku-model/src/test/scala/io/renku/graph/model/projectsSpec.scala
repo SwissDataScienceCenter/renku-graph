@@ -30,6 +30,7 @@ import org.apache.jena.util.URIref
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -123,7 +124,7 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
   }
 }
 
-class VisibilitySpec extends AnyWordSpec with should.Matchers {
+class VisibilitySpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
 
   "Visibility" should {
 
@@ -147,6 +148,29 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers {
           Nil
         )
       )
+    }
+  }
+
+  "ordering" should {
+
+    forAll {
+      Table(
+        ("in", "out", "result"),
+        (Visibility.Public, Visibility.Public, 0),
+        (Visibility.Public, Visibility.Internal, 1),
+        (Visibility.Public, Visibility.Private, 2),
+        (Visibility.Internal, Visibility.Public, -1),
+        (Visibility.Internal, Visibility.Internal, 0),
+        (Visibility.Internal, Visibility.Private, 1),
+        (Visibility.Private, Visibility.Public, -2),
+        (Visibility.Private, Visibility.Internal, -1),
+        (Visibility.Private, Visibility.Private, 0)
+      )
+    } { (in, out, result) =>
+      show"return $result for $in compare to $out" in {
+        in.compareTo(out)                                 shouldBe result
+        implicitly[Ordering[Visibility]].compare(in, out) shouldBe result
+      }
     }
   }
 }

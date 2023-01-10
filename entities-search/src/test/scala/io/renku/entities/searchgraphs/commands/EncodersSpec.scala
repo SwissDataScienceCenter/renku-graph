@@ -139,7 +139,10 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def creatorsToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.creators
       .map(pi =>
-        pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
+        pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs,
+                                  SearchInfoOntology.creatorProperty,
+                                  pi.resourceId.asEntityId
+        )
       )
       .toList
       .toSet
@@ -159,13 +162,17 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   private def imagesToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.images
-      .map(i => i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.imageProperty, i.resourceId.asEntityId))
+      .map(i =>
+        i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+      )
       .toSet
       .flatten
 
   private def linksToQuads(searchInfo: SearchInfo): Set[Quad] =
     searchInfo.links
-      .map(l => l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.linkProperty, l.resourceId.asEntityId))
+      .map(l =>
+        l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.linkProperty, l.resourceId.asEntityId)
+      )
       .toList
       .toSet
       .flatten

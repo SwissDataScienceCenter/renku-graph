@@ -21,10 +21,10 @@ package commands
 
 import Encoders._
 import SearchInfoLens._
+import SearchInfoOntology.{linkProperty, visibilityProperty}
 import UpdateCommand._
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoOntology.linkProperty
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, TripleObject}
@@ -33,7 +33,7 @@ import io.renku.triplesstore.client.syntax._
 private object CommandsCalculator {
 
   def calculateCommands[F[_]: MonadThrow]: CalculatorInfoSet => F[List[UpdateCommand]] = {
-    case `DS present on Project & TS`()                      => List.empty[UpdateCommand].pure[F]
+    case `DS present on Project & TS`(modelInfo, tsInfo)     => toVisibilityUpdates(modelInfo -> tsInfo).pure[F]
     case `DS present on Project only`(info)                  => info.asQuads.map(Insert).toList.pure[F].widen
     case `DS present on TS only on the single project`(info) => info.asQuads.map(Delete).toList.pure[F].widen
     case `DS present on TS only on many projects`(info, link) =>
@@ -43,12 +43,11 @@ private object CommandsCalculator {
   }
 
   private object `DS present on Project & TS` {
-    def unapply(infoSet: CalculatorInfoSet): Boolean = infoSet match {
+    def unapply(infoSet: CalculatorInfoSet): Option[(SearchInfo, SearchInfo)] = infoSet match {
       case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
         (findLink(infoSet.project.resourceId)(modelInfo) -> findLink(infoSet.project.resourceId)(tsInfo))
-          .mapN((_, _) => true)
-          .getOrElse(false)
-      case _ => false
+          .mapN((_, _) => modelInfo -> tsInfo)
+      case _ => None
     }
   }
   private object `DS present on Project only` {
@@ -70,6 +69,14 @@ private object CommandsCalculator {
         findLink(infoSet.project.resourceId)(tsInfo).map(tsInfo -> _)
       case _ => None
     }
+  }
+
+  private lazy val toVisibilityUpdates: ((SearchInfo, SearchInfo)) => List[UpdateCommand] = {
+    case (modelInfo, tsInfo) if modelInfo.visibility > tsInfo.visibility =>
+      List(Insert(quad(modelInfo, visibilityProperty.id, modelInfo.visibility.asObject)),
+           Delete(quad(modelInfo, visibilityProperty.id, tsInfo.visibility.asObject))
+      )
+    case (_, _) => List.empty
   }
 
   private def quad(info: SearchInfo, property: Property, obj: TripleObject): Quad =
