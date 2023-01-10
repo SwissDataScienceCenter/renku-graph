@@ -4,11 +4,12 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.{InvalidationTime, RenkuUrl}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Identification
 import io.renku.graph.model.entities.Person
-import io.renku.jsonld.{EntityTypes, JsonLDDecoder}
+import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Property, Reverse}
 
 /** Raw data as returned by the CLI.
  */
@@ -18,8 +19,7 @@ final case class CliDatasetProvenance(
     createdAt:          Option[DateCreated],
     publishedAt:        Option[DatePublished],
     modifiedAt:         Option[DateModified],
-    internalSameAs:     Option[InternalSameAs],
-    externalSameAs:     Option[ExternalSameAs],
+    sameAs:             Option[CliDatasetSameAs],
     derivedFrom:        Option[DerivedFrom],
     originalIdentifier: Option[OriginalIdentifier],
     invalidationTime:   Option[InvalidationTime]
@@ -35,6 +35,25 @@ final case class CliDatasetProvenance(
 object CliDatasetProvenance {
 
   val entityTypes: EntityTypes = EntityTypes.of(schema / "Dataset", prov / "Entity")
+
+  def toJsonLDProperties(cliProv: CliDatasetProvenance)(implicit gitLabApiUrl: GitLabApiUrl): Map[Property, JsonLD] = {
+    implicit val personEncoder: JsonLDEncoder[Person] = Person.encoder(gitLabApiUrl, GraphClass.Persons)
+    List(
+      Some(schema / "creator" -> cliProv.creators.asJsonLD),
+      cliProv.createdAt.map(d => schema / "dateCreated" -> d.asJsonLD),
+      cliProv.publishedAt.map(d => schema / "datePublished" -> d.asJsonLD),
+      cliProv.modifiedAt.map(d => schema / "dateModified" -> d.asJsonLD),
+      cliProv.sameAs.map(e => schema / "sameAs" -> e.asJsonLD),
+      cliProv.derivedFrom.map(e => prov / "wasDerivedFrom" -> e.asJsonLD),
+      cliProv.originalIdentifier.map(e => renku / "originalIdentifier" -> e.asJsonLD),
+      cliProv.invalidationTime.map(e => prov / "invalidatedAtTime" -> e.asJsonLD)
+    ).flatten.toMap
+  }
+
+  implicit def jsonLDEncoder(implicit gitLabUrl: GitLabApiUrl): JsonLDEncoder[CliDatasetProvenance] =
+    JsonLDEncoder.instance { data =>
+      JsonLD.entity(data.id.resourceId.asEntityId, entityTypes, Reverse.empty, toJsonLDProperties(data))
+    }
 
   def decoder(
       identification:  Identification
@@ -52,16 +71,11 @@ object CliDatasetProvenance {
         maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
         maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
         maybeDateModified  <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
-        maybeInternalSameAs <- cursor
-                                 .downField(schema / "sameAs")
-                                 .as[InternalSameAs]
-                                 .map(Option.apply)
-                                 .leftFlatMap(_ => Option.empty[InternalSameAs].asRight)
-        maybeExternalSameAs <- cursor
-                                 .downField(schema / "sameAs")
-                                 .as[ExternalSameAs]
-                                 .map(Option.apply)
-                                 .leftFlatMap(_ => Option.empty[ExternalSameAs].asRight)
+        maybeSameAs <- cursor
+                         .downField(schema / "sameAs")
+                         .as[CliDatasetSameAs]
+                         .map(Option.apply)
+                         .leftFlatMap(_ => Option.empty[CliDatasetSameAs].asRight)
         maybeDerivedFrom <-
           cursor
             .downField(prov / "wasDerivedFrom")
@@ -74,8 +88,7 @@ object CliDatasetProvenance {
                    maybeDateCreated,
                    maybeDatePublished,
                    maybeDateModified,
-                   maybeInternalSameAs,
-                   maybeExternalSameAs,
+                   maybeSameAs,
                    maybeDerivedFrom,
                    maybeOriginalIdentifier,
                    maybeInvalidationTime

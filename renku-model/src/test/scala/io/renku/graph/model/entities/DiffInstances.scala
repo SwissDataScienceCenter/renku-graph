@@ -20,6 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import com.softwaremill.diffx._
+import io.renku.graph.model.cli.CliDatasetProvenance
 import io.renku.graph.model.entities.Dataset.Provenance.ImportedInternalAncestorExternal
 import io.renku.graph.model.entities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.images.{Image, ImageUri}
@@ -179,6 +180,9 @@ trait DiffInstances {
 
   implicit val identificationDiff: Diff[Identification] =
     Diff.derived[Identification]
+
+  implicit val cliProvenanceDiff: Diff[CliDatasetProvenance] =
+    Diff.derived[CliDatasetProvenance]
 
   implicit val additionalInfoDiff: Diff[AdditionalInfo] =
     Diff.derived[AdditionalInfo]

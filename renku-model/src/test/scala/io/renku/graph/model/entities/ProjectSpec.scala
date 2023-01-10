@@ -29,6 +29,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
+import io.renku.graph.model.cli.{CliDatasetProvenance, CliDatasetProvenanceConv}
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
@@ -1243,6 +1244,15 @@ class ProjectSpec
         if (Random.nextBoolean()) blankStrings().generateOne.asJsonLD
         else maybeDescription.asJsonLD
     }
+
+    // we must use here the encoder that creates the CLI data and not the data we store in our jena
+    val datasetCliEncoder: JsonLDEncoder[entities.Dataset[entities.Dataset.Provenance]] = { ds =>
+      val provProps: entities.Dataset.Provenance => Map[Property, JsonLD] =
+        prov => CliDatasetProvenance.toJsonLDProperties(CliDatasetProvenanceConv.from(ds.identification, prov))
+
+      entities.Dataset.encoder[entities.Dataset.Provenance](renkuUrl, gitLabApiUrl, graph, provProps).apply(ds)
+    }
+
     JsonLD
       .arr(
         JsonLD.entity(
@@ -1255,7 +1265,7 @@ class ProjectSpec
           schema / "creator"       -> maybeCreator.asJsonLD,
           schema / "dateCreated"   -> dateCreated.asJsonLD,
           renku / "hasActivity"    -> activities.asJsonLD,
-          renku / "hasDataset"     -> datasets.asJsonLD,
+          renku / "hasDataset"     -> datasets.map(datasetCliEncoder.apply).asJsonLD,
           renku / "hasPlan"        -> plans.asJsonLD
         ) :: datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
       )
