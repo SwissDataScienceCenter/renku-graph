@@ -10,8 +10,6 @@ import io.renku.graph.model.entities.Dataset.Identification
 import io.renku.graph.model.entities.Person
 import io.renku.jsonld.{EntityTypes, JsonLDDecoder}
 
-import java.time.ZoneOffset
-
 /** Raw data as returned by the CLI.
  */
 final case class CliDatasetProvenance(
@@ -19,6 +17,7 @@ final case class CliDatasetProvenance(
     creators:           NonEmptyList[Person],
     createdAt:          Option[DateCreated],
     publishedAt:        Option[DatePublished],
+    modifiedAt:         Option[DateModified],
     internalSameAs:     Option[InternalSameAs],
     externalSameAs:     Option[ExternalSameAs],
     derivedFrom:        Option[DerivedFrom],
@@ -53,10 +52,6 @@ object CliDatasetProvenance {
         maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
         maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
         maybeDateModified  <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
-        published = maybeDateModified
-                      .map(m => DatePublished(m.value.atOffset(ZoneOffset.UTC).toLocalDate))
-                      .orElse(maybeDatePublished)
-        created = maybeDateModified.map(m => DateCreated(m.value)).orElse(maybeDateCreated)
         maybeInternalSameAs <- cursor
                                  .downField(schema / "sameAs")
                                  .as[InternalSameAs]
@@ -76,8 +71,9 @@ object CliDatasetProvenance {
         result = CliDatasetProvenance(
                    identification,
                    creators,
-                   created,
-                   published,
+                   maybeDateCreated,
+                   maybeDatePublished,
+                   maybeDateModified,
                    maybeInternalSameAs,
                    maybeExternalSameAs,
                    maybeDerivedFrom,
@@ -86,5 +82,4 @@ object CliDatasetProvenance {
                  )
       } yield result
     }
-
 }

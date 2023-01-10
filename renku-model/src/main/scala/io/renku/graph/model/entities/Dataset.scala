@@ -157,7 +157,7 @@ object Dataset {
       object FromCli {
         def unapply(cli: CliDatasetProvenance): Option[Internal] =
           cli match {
-            case CliDatasetProvenance(id, creators, Some(dateCreated), None, None, None, None, _, None) =>
+            case CliDatasetProvenance(id, creators, Some(dateCreated), None, None, None, None, None, _, None) =>
               Some(Internal(id.resourceId, id.identifier, dateCreated, creators.sortBy(_.name)))
             case _ => None
           }
@@ -179,7 +179,7 @@ object Dataset {
       object FromCli {
         def unapply(cliData: CliDatasetProvenance): Option[ImportedExternal] =
           cliData match {
-            case CliDatasetProvenance(id, creators, None, Some(datePublished), None, Some(sameAs), None, _, None)
+            case CliDatasetProvenance(id, creators, None, Some(datePublished), None, None, Some(sameAs), None, _, None)
                 if cliData.originalIdEqualCurrentId =>
               ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators.sortBy(_.name)).some
             case _ =>
@@ -223,6 +223,7 @@ object Dataset {
                   creators,
                   None,
                   Some(datePublished),
+                  None,
                   Some(sameAs),
                   None,
                   None,
@@ -263,6 +264,7 @@ object Dataset {
                   creators,
                   Some(dateCreated),
                   None,
+                  None,
                   Some(sameAs),
                   None,
                   None,
@@ -300,8 +302,9 @@ object Dataset {
             case CliDatasetProvenance(
                   id,
                   creators,
-                  Some(dateCreated),
+                  _,
                   None,
+                  Some(dateModified),
                   None,
                   None,
                   Some(derivedFrom),
@@ -312,7 +315,7 @@ object Dataset {
                        derivedFrom,
                        TopmostDerivedFrom(derivedFrom),
                        originalId,
-                       dateCreated,
+                       DateCreated(dateModified.value),
                        creators,
                        maybeInvalidationTime
               ).some
@@ -512,6 +515,7 @@ object Dataset {
             s"identifier: ${cliData.id.identifier}, " +
             s"dateCreated: ${cliData.createdAt}, " +
             s"datePublished: ${cliData.publishedAt}, " +
+            s"dateModified: ${cliData.modifiedAt}, " +
             s"internalSameAs: ${cliData.internalSameAs}, " +
             s"externalSameAs: ${cliData.externalSameAs}, " +
             s"derivedFrom: ${cliData.derivedFrom}, " +
