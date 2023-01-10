@@ -18,10 +18,23 @@
 
 package io.renku.triplesstore.client.sparql
 
-import cats.Show
+import cats.{Monoid, Show}
 
 final case class Fragment(sparql: String)
 
 object Fragment {
+
+  val empty: Fragment = Fragment("")
+
   implicit val show: Show[Fragment] = Show.show(_.sparql)
+  implicit val monoid: Monoid[Fragment] = {
+
+    val cmb: (Fragment, Fragment) => Fragment = {
+      case (Fragment.empty, r) => r
+      case (l, Fragment.empty) => l
+      case (l, r)              => Fragment(s"${l.sparql}\n${r.sparql}")
+    }
+
+    Monoid.instance(empty, cmb)
+  }
 }

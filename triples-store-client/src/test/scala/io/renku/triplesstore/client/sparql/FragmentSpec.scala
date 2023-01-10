@@ -20,6 +20,7 @@ package io.renku.triplesstore.client
 package sparql
 
 import TriplesStoreGenerators.{quads, triples}
+import cats.Monoid
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.triplesstore.client.syntax._
@@ -28,6 +29,27 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class FragmentSpec extends AnyWordSpec with should.Matchers {
+
+  "empty" should {
+
+    "be a Fragment with an empty sparql" in {
+      Fragment.empty.sparql shouldBe ""
+    }
+  }
+
+  "monoid" should {
+
+    "define empty as the Fragment.empty" in {
+      Monoid[Fragment].empty shouldBe Fragment.empty
+    }
+
+    "define the combine method that puts sparqls from both Fragments into a single Fragment" in {
+      val quad1 = quads.generateOne.asSparql
+      val quad2 = quads.generateOne.asSparql
+
+      List(quad1, quad2).combineAll shouldBe Fragment(s"${quad1.sparql}\n${quad2.sparql}")
+    }
+  }
 
   "show" should {
 
