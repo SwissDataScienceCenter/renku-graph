@@ -222,14 +222,23 @@ sealed trait NamedGraphDataset {
   def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(from)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("delete quad", show"DELETE DATA { ${quad.asSparql} }")
+        SparqlQuery.of("delete quad", show"DELETE DATA { ${quad.asSparql.sparql} }")
       })
       .unsafeRunSync()
 
   def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(to)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql} }")
+        SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
+      })
+      .unsafeRunSync()
+
+  def insert(to: DatasetName, quads: Set[Quad])(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(to)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("insert quads",
+                       show"INSERT DATA { ${quads.map(_.asSparql.sparql).mkString("\n\t", ".\n\t", "\n\t")} }"
+        )
       })
       .unsafeRunSync()
 }

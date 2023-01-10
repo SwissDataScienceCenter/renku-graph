@@ -108,6 +108,12 @@ private object Link {
     else
       ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
 
+  def apply(linkId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId): Link =
+    if (linkId.value startsWith datasetId.value)
+      OriginalDataset(linkId, datasetId, projectId)
+    else
+      ImportedDataset(linkId, datasetId, projectId)
+
   final case class OriginalDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
       extends Link
   final case class ImportedDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)

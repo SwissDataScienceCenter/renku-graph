@@ -59,8 +59,8 @@ private object Encoders {
     }
     typeQuads ++
       Set(
-        DatasetsQuad(link.resourceId, renku / "project", link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, renku / "dataset", link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
       )
   }
 

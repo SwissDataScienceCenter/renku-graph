@@ -34,7 +34,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
   import searchInfoFetcher._
 
   def toUpdateCommands(project: Project, modelInfos: List[SearchInfo]): F[List[UpdateCommand]] =
-    fetchStoreSearchInfos(project.resourceId).flatMap { tsInfos =>
+    fetchTSSearchInfos(project.resourceId).flatMap { tsInfos =>
       val matchedInfos = matchInfosBySameAs(modelInfos, tsInfos)
       matchedInfos
         .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }

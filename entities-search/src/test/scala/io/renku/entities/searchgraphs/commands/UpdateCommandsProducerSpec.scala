@@ -107,7 +107,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     val commandsProducer          = new UpdateCommandsProducerImpl[Try](searchInfoFetcher)
 
     def givenSearchInfoFetcher(project: entities.Project, returning: Try[List[SearchInfo]]) =
-      (searchInfoFetcher.fetchStoreSearchInfos _)
+      (searchInfoFetcher.fetchTSSearchInfos _)
         .expects(project.resourceId)
         .returning(returning)
   }

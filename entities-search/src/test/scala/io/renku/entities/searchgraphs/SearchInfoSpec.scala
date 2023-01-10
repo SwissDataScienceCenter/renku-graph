@@ -100,6 +100,20 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
     }
 
+    "return OriginalDataset if linkId starts with datasetId" in {
+      val datasetId   = datasetResourceIds.generateOne
+      val projectId   = projectResourceIds.generateOne
+      val projectPath = projectPaths.generateOne
+      val linkId      = links.ResourceId.from(datasets.TopmostSameAs(datasetId.asEntityId), projectPath)
+
+      val link = Link(linkId, datasetId, projectId)
+
+      link            shouldBe a[OriginalDataset]
+      link.resourceId shouldBe linkId
+      link.projectId  shouldBe projectId
+      link.datasetId  shouldBe datasetId
+    }
+
     "return ImportedDataset if the topmostSameAs and datasetId are not equal" in {
       val datasetId     = datasetResourceIds.generateOne
       val topmostSameAs = datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_))
@@ -110,6 +124,20 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
       link            shouldBe a[ImportedDataset]
       link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
+    }
+
+    "return ImportedDataset if linkId does not starts with datasetId" in {
+      val datasetId   = datasetResourceIds.generateOne
+      val projectId   = projectResourceIds.generateOne
+      val projectPath = projectPaths.generateOne
+      val linkId      = links.ResourceId.from(datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_)), projectPath)
+
+      val link = Link(linkId, datasetId, projectId)
+
+      link            shouldBe a[ImportedDataset]
+      link.resourceId shouldBe linkId
+      link.projectId  shouldBe projectId
+      link.datasetId  shouldBe datasetId
     }
   }
 

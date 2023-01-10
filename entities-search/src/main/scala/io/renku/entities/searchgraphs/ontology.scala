@@ -69,14 +69,14 @@ object PersonInfoOntology {
 
 object LinkOntology {
 
-  val project: Property = renku / "project"
-  val dataset: Property = renku / "dataset"
+  val projectId: Property = renku / "projectId"
+  val datasetId: Property = renku / "datasetId"
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DatasetProjectLink"),
     ObjectProperties(
-      ObjectProperty(project, Project.Ontology.typeDef),
-      ObjectProperty(dataset, Dataset.Ontology.typeDef)
+      ObjectProperty(projectId, Project.Ontology.typeDef),
+      ObjectProperty(datasetId, Dataset.Ontology.typeDef)
     ),
     DataProperties()
   )
