@@ -28,7 +28,7 @@ trait DatasetsGraphProvisioner[F[_]] {
 }
 
 private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],
-                                                             searchInfoUploader: SearchInfoUploader[F]
+                                                             searchInfoUploader: UpdateCommandsUploader[F]
 ) extends DatasetsGraphProvisioner[F] {
 
   import DatasetsCollector.collectLastVersions

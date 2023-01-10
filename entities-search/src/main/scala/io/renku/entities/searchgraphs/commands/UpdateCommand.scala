@@ -21,7 +21,9 @@ package commands
 
 import io.renku.triplesstore.client.model.Quad
 
-private[searchgraphs] trait UpdateCommand extends Product with Serializable
+private[searchgraphs] trait UpdateCommand extends Product with Serializable {
+  val quad: Quad
+}
 private[searchgraphs] object UpdateCommand {
 
   final case class Insert(quad: Quad) extends UpdateCommand

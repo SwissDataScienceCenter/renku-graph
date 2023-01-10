@@ -39,7 +39,7 @@ private trait KGProjectFinder[F[_]] {
 
 private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)(
     implicit renkuUrl: RenkuUrl
-) extends TSClient(storeConfig)
+) extends TSClientImpl(storeConfig)
     with KGProjectFinder[F] {
 
   import cats.syntax.all._

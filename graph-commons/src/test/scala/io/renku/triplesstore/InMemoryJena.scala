@@ -156,7 +156,7 @@ trait InMemoryJena {
 
   private def queryRunner(connectionInfo: DatasetConnectionConfig) =
     TestSparqlQueryTimeRecorder[IO].map { implicit qtr =>
-      new TSClient[IO](connectionInfo) {
+      new TSClientImpl[IO](connectionInfo) {
 
         import io.circe.Decoder._
 
@@ -237,7 +237,7 @@ sealed trait NamedGraphDataset {
     queryRunnerFor(to)
       .flatMap(_.runUpdate {
         SparqlQuery.of("insert quads",
-                       show"INSERT DATA { ${quads.map(_.asSparql.sparql).mkString("\n\t", ".\n\t", "\n\t")} }"
+                       show"INSERT DATA { ${quads.map(_.asSparql.sparql).mkString("\n\t", "\n\t", "\n\t")} }"
         )
       })
       .unsafeRunSync()

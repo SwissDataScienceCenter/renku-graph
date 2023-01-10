@@ -36,7 +36,10 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig:    ProjectsConnectionConfig,
     idleTimeout:    Duration = 11 minutes,
     requestTimeout: Duration = 10 minutes
-) extends TSClient(storeConfig, idleTimeoutOverride = idleTimeout.some, requestTimeoutOverride = requestTimeout.some)
+) extends TSClientImpl(storeConfig,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
+    )
     with TriplesRemover[F] {
 
   import eu.timepit.refined.auto._

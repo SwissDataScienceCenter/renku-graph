@@ -88,9 +88,9 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
   }
 
   private trait TestCase {
-    private val searchInfoUploader = mock[SearchInfoUploader[Try]]
-    private val updatesProducer    = mock[UpdateCommandsProducer[Try]]
-    val provisioner                = new DatasetsGraphProvisionerImpl[Try](updatesProducer, searchInfoUploader)
+    private val commandsProducer = mock[UpdateCommandsProducer[Try]]
+    private val commandsUploader = mock[UpdateCommandsUploader[Try]]
+    val provisioner              = new DatasetsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
 
     def givenSearchInfoExtraction(project: entities.Project): Try[List[SearchInfo]] =
       (collectLastVersions >>> extractSearchInfo[Try](project))(project)
@@ -98,13 +98,13 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
     def givenUpdatesProducing(project:     entities.Project,
                               searchInfos: List[SearchInfo],
                               returning:   Try[List[UpdateCommand]]
-    ) = (updatesProducer
+    ) = (commandsProducer
       .toUpdateCommands(_: entities.Project)(_: List[SearchInfo]))
       .expects(project, searchInfos)
       .returning(returning)
 
     def givenUploading(commands: List[UpdateCommand], returning: Try[Unit]) =
-      (searchInfoUploader.upload _)
+      (commandsUploader.upload _)
         .expects(commands)
         .returning(returning)
   }

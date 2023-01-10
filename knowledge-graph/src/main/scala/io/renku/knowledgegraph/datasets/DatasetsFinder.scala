@@ -61,7 +61,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
     storeConfig:     ProjectsConnectionConfig,
     creatorsFinder:  CreatorsFinder[F]
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClient[F](storeConfig)
+    extends TSClientImpl[F](storeConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

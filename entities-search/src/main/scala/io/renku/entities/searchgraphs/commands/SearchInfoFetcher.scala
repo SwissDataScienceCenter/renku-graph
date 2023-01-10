@@ -24,7 +24,7 @@ import cats.effect.Async
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, projects}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait SearchInfoFetcher[F[_]] {
@@ -34,7 +34,7 @@ private trait SearchInfoFetcher[F[_]] {
 private object SearchInfoFetcher {}
 
 private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
-    extends TSClient(storeConfig)
+    extends TSClientImpl(storeConfig)
     with SearchInfoFetcher[F] {
 
   import cats.syntax.all._

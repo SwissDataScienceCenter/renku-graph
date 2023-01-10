@@ -35,22 +35,18 @@ private[membersync] object KGSynchronizer {
       kgPersonFinder         <- KGPersonFinder[F]
       updatesCreator         <- UpdatesCreator[F]
       connectionConfig       <- ProjectsConnectionConfig[F]()
-      querySender <- MonadThrow[F].catchNonFatal(
-                       new TSClient(connectionConfig,
-                                    idleTimeoutOverride = (11 minutes).some,
-                                    requestTimeoutOverride = (10 minutes).some
-                       ) with QuerySender[F] {
-                         override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
-                       }
-                     )
-    } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, querySender)
+      tsClient <- TSClient[F](connectionConfig,
+                              idleTimeoutOverride = (11 minutes).some,
+                              requestTimeoutOverride = (10 minutes).some
+                  ).pure[F]
+    } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, tsClient)
 
 }
 
 private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMembersFinder[F],
                                                    kgPersonFinder: KGPersonFinder[F],
                                                    updatesCreator: UpdatesCreator,
-                                                   querySender:    QuerySender[F]
+                                                   tsClient:       TSClient[F]
 ) extends KGSynchronizer[F] {
   import KGSynchronizerFunctions._
 
@@ -61,6 +57,6 @@ private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMem
     insertionUpdates = updatesCreator.insertion(path, membersToAddWithIds)
     membersToRemove  = findMembersToRemove(membersInGL, membersInKG)
     removalUpdates   = updatesCreator.removal(path, membersToRemove)
-    _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
+    _ <- (insertionUpdates ::: removalUpdates).map(tsClient.updateWithNoResult).sequence
   } yield SyncSummary(membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
 }
