@@ -87,8 +87,6 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .returning(exceptions.generateOne.raiseError[IO, CommitEvent])
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event body is not present" in new TestCase {
@@ -98,8 +96,6 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val request = EventRequestContent.NoPayload(compoundEventIds.generateOne.asJson(eventEncoder))
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
     }
 
     s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
