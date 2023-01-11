@@ -15,7 +15,10 @@ trait CliGenerators {
   val datasetSameAsGen: Gen[CliDatasetSameAs] =
     GraphModelGenerators.datasetSameAs.map(e => CliDatasetSameAs(e.value))
 
-  val datasetProvenanceGen: Gen[CliDatasetProvenance] =
+  def datasetModifiedGen(min: Instant = Instant.EPOCH): Gen[DateModified] =
+    GraphModelGenerators.datasetCreatedDates(min).map(d => DateModified(d.value))
+
+  val datasetGen: Gen[CliDataset] =
     for {
       resourceId <- GraphModelGenerators.datasetResourceIds
       identifier <- GraphModelGenerators.datasetIdentifiers
@@ -23,24 +26,20 @@ trait CliGenerators {
       name       <- GraphModelGenerators.datasetNames
       creator    <- EntitiesGenerators.personEntities
       created    <- GraphModelGenerators.datasetCreatedDates().toGeneratorOfOptions
-      published  <- GraphModelGenerators.datasetPublishedDates().toGeneratorOfOptions
+      published  <- GraphModelGenerators.datasetPublishedDates()
       createdOrPublished =
         created
           .map(_.value)
-          .orElse(published.map(_.value.atStartOfDay(ZoneOffset.UTC).toInstant))
-          .getOrElse(Instant.EPOCH)
-      modified <- GraphModelGenerators
-                    .datasetModifiedDates(min = createdOrPublished)
-                    .toGeneratorOfOptions
+          .getOrElse(published.value.atStartOfDay(ZoneOffset.UTC).toInstant)
+      modified      <- datasetModifiedGen(min = createdOrPublished).toGeneratorOfOptions
       sameAs        <- datasetSameAsGen.toGeneratorOfOptions
       derivedFrom   <- GraphModelGenerators.datasetDerivedFroms.toGeneratorOfOptions
       originalIdent <- GraphModelGenerators.datasetOriginalIdentifiers.toGeneratorOfOptions
       invalidTime   <- GraphModelGenerators.datasetCreatedDates(min = createdOrPublished).toGeneratorOfOptions
-    } yield CliDatasetProvenance(
+    } yield CliDataset(
       id = Identification(resourceId, identifier, title, name),
       creators = NonEmptyList.one(creator.to[entities.Person]),
-      createdAt = created,
-      publishedAt = if (created.isDefined) published else None,
+      createdOrPublished = created.getOrElse(published),
       modifiedAt = modified,
       sameAs = sameAs,
       derivedFrom = derivedFrom,

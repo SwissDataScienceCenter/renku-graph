@@ -170,9 +170,6 @@ object GraphModelGenerators {
   def datasetCreatedDates(min: Instant = Instant.EPOCH): Gen[DateCreated] =
     timestamps(min, max = Instant.now()) map DateCreated.apply
 
-  def datasetModifiedDates(min: Instant = Instant.EPOCH): Gen[DateModified] =
-    timestamps(min, max = Instant.now()).map(DateModified.apply)
-
   lazy val datasetDates: Gen[Date] =
     Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(DatePublished(LocalDate.EPOCH)))
 

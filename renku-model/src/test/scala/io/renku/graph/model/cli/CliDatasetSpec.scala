@@ -10,7 +10,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CliDatasetProvenanceSpec
+class CliDatasetSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
@@ -23,8 +23,8 @@ class CliDatasetProvenanceSpec
   "decode/encode" should {
     "be compatible" in {
       forAll(generators.datasetProvenanceGen) { prov =>
-        implicit val decoder: JsonLDDecoder[CliDatasetProvenance] =
-          CliDatasetProvenance.decoder(prov.id)(generators.renkuUrl)
+        implicit val decoder: JsonLDDecoder[CliDataset] =
+          CliDataset.jsonLDDecoder
 
         val jsonLD = prov.asJsonLD
         val back = jsonLD.cursor

@@ -1,103 +1,54 @@
 package io.renku.graph.model.cli
 
 import cats.syntax.option._
-import io.renku.graph.model.datasets.{DateModified, OriginalIdentifier}
 import io.renku.graph.model.entities
-import io.renku.graph.model.entities.Dataset.Identification
 
 trait CliDatasetProvenanceConv {
 
-  def from(id: Identification, prov: entities.Dataset.Provenance): CliDatasetProvenance =
-    prov match {
-      case entities.Dataset.Provenance.Internal(resourceId, identifier, created, creators) =>
-        CliDatasetProvenance(
-          id = Identification(resourceId, identifier, id.title, id.name),
-          creators = creators,
-          createdAt = created.some,
-          publishedAt = None,
-          modifiedAt = None,
-          sameAs = None,
-          derivedFrom = None,
-          originalIdentifier = OriginalIdentifier(identifier).some,
-          invalidationTime = None
-        )
-
-      case entities.Dataset.Provenance.ImportedExternal(resourceId, identifier, sameAs, published, creators) =>
-        CliDatasetProvenance(
-          id = Identification(resourceId, identifier, id.title, id.name),
-          creators = creators,
-          createdAt = None,
-          publishedAt = published.some,
-          modifiedAt = None,
-          sameAs = CliDatasetSameAs(sameAs.value).some,
-          derivedFrom = None,
-          originalIdentifier = OriginalIdentifier(identifier.value).some,
-          invalidationTime = None
-        )
-
-      case entities.Dataset.Provenance.ImportedInternalAncestorExternal(
-            resourceId,
-            identifier,
-            sameAs,
-            _,
-            originalIdentifier,
-            published,
-            creators
-          ) =>
-        CliDatasetProvenance(
-          id = Identification(resourceId, identifier, id.title, id.name),
-          creators = creators,
-          createdAt = None,
-          publishedAt = published.some,
-          modifiedAt = None,
-          sameAs = CliDatasetSameAs(sameAs.value).some,
-          derivedFrom = None,
-          originalIdentifier = originalIdentifier.some,
-          invalidationTime = None
-        )
-
-      case entities.Dataset.Provenance.ImportedInternalAncestorInternal(
-            resourceId,
-            identifier,
-            sameAs,
-            _,
-            originalIdentifier,
-            created,
-            creators
-          ) =>
-        CliDatasetProvenance(
-          id = Identification(resourceId, identifier, id.title, id.name),
-          creators = creators,
-          createdAt = created.some,
-          publishedAt = None,
-          modifiedAt = None,
-          sameAs = CliDatasetSameAs(sameAs.value).some,
-          derivedFrom = None,
-          originalIdentifier = originalIdentifier.some,
-          invalidationTime = None
-        )
-
-      case entities.Dataset.Provenance.Modified(
-            resourceId,
-            derivedFrom,
-            _,
-            originalIdentifier,
-            created,
-            creators,
-            maybeInvalidationTime
-          ) =>
-        CliDatasetProvenance(
-          id = Identification(resourceId, id.identifier, id.title, id.name),
-          creators = creators,
-          createdAt = None,
-          publishedAt = None,
-          modifiedAt = DateModified(created.value).some,
-          sameAs = None,
-          derivedFrom = derivedFrom.some,
-          originalIdentifier = originalIdentifier.some,
-          invalidationTime = maybeInvalidationTime
-        )
-    }
+  def fromX(dataset: entities.Dataset[entities.Dataset.Provenance]): CliDataset =
+    CliDataset(
+      resourceId = dataset.identification.resourceId,
+      identifier = dataset.identification.identifier,
+      title = dataset.identification.title,
+      name = dataset.identification.name,
+      createdOrPublished = dataset.provenance.date,
+      creators =
+        dataset.provenance.creators.map(p => CliPerson(p.resourceId, p.name, p.maybeEmail, p.maybeAffiliation)),
+      description = dataset.additionalInfo.maybeDescription,
+      keywords = dataset.additionalInfo.keywords,
+      images = dataset.additionalInfo.images,
+      license = dataset.additionalInfo.maybeLicense,
+      version = dataset.additionalInfo.maybeVersion,
+      datasetFiles = dataset.parts.map(p =>
+        CliDatasetFile(p.resourceId, p.external, p.entity, p.dateCreated, p.maybeSource, p.maybeInvalidationTime)
+      ),
+      dateModified = dataset.provenance match {
+        case m: entities.Dataset.Provenance.Modified =>
+          DateModified(m.date.value).some
+        case _ => None
+      },
+      sameAs = dataset.provenance match {
+        case p: entities.Dataset.Provenance.ImportedExternal =>
+          CliDatasetSameAs(p.sameAs.value).some
+        case p: entities.Dataset.Provenance.ImportedInternal =>
+          CliDatasetSameAs(p.sameAs.value).some
+        case _: entities.Dataset.Provenance.Internal =>
+          None
+        case _: entities.Dataset.Provenance.Modified =>
+          None
+      },
+      derivedFrom = dataset.provenance match {
+        case m: entities.Dataset.Provenance.Modified =>
+          m.derivedFrom.some
+        case _ => None
+      },
+      originalIdentifier = dataset.provenance.originalIdentifier.some,
+      invalidationTime = dataset.provenance match {
+        case m: entities.Dataset.Provenance.Modified =>
+          m.maybeInvalidationTime
+        case _ => None
+      }
+    )
 }
 
 object CliDatasetProvenanceConv extends CliDatasetProvenanceConv

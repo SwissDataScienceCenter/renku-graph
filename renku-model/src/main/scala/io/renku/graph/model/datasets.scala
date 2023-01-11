@@ -255,7 +255,6 @@ object datasets {
     implicit val encoder: Encoder[Date] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson
-      case d: DateModified  => d.asJson
     }
   }
 
@@ -274,14 +273,6 @@ object datasets {
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture[DatePublished]
       with TinyTypeJsonLDOps[DatePublished]
-
-  final class DateModified private (val value: Instant) extends Date with InstantTinyType {
-    override def instant: Instant = value
-  }
-  object DateModified
-      extends TinyTypeFactory[DateModified](new DateModified(_))
-      with InstantNotInTheFuture[DateModified]
-      with TinyTypeJsonLDOps[DateModified]
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]

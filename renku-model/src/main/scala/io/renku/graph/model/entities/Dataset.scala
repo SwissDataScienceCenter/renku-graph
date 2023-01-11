@@ -22,7 +22,7 @@ import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model._
-import io.renku.graph.model.cli.CliDatasetProvenance
+import io.renku.graph.model.cli.{CliDataset, CliDatasetProvenance}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
@@ -133,15 +133,8 @@ object Dataset {
         )
     }
 
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[Identification] = JsonLDDecoder.entity(entityTypes) {
-      cursor =>
-        for {
-          resourceId <- cursor.downEntityId.as[ResourceId]
-          identifier <- cursor.downField(schema / "identifier").as[Identifier]
-          title      <- cursor.downField(schema / "name").as[Title]
-          name       <- cursor.downField(renku / "slug").as[Name]
-        } yield Identification(resourceId, identifier, title, name)
-    }
+    def fromCli(dataset: CliDataset): Identification =
+      Identification(dataset.resourceId, dataset.identifier, dataset.title, dataset.name)
   }
 
   sealed trait Provenance extends Product with Serializable {
@@ -157,10 +150,10 @@ object Dataset {
 
     object Internal {
       object FromCli {
-        def unapply(cli: CliDatasetProvenance): Option[Internal] =
-          cli match {
-            case CliDatasetProvenance(id, creators, Some(dateCreated), None, None, None, None, _, None) =>
-              Some(Internal(id.resourceId, id.identifier, dateCreated, creators.sortBy(_.name)))
+        def unapply(cli: CliDataset): Option[NonEmptyList[Person] => Internal] =
+          cli.provenance match {
+            case CliDatasetProvenance(dateCreated: DateCreated, None, None, None, _, None) =>
+              Some(creators => Internal(cli.resourceId, cli.identifier, dateCreated, creators.sortBy(_.name)))
             case _ => None
           }
       }
@@ -179,16 +172,18 @@ object Dataset {
 
     object ImportedExternal {
       object FromCli {
-        def unapply(cliData: CliDatasetProvenance): Option[ImportedExternal] =
-          cliData match {
-            case CliDatasetProvenance(id, creators, None, Some(datePublished), None, Some(sameAs), None, _, None)
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedExternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs), None, _, None)
                 if cliData.originalIdEqualCurrentId =>
-              ImportedExternal(id.resourceId,
-                               id.identifier,
-                               sameAs.toExternalSameAs,
-                               datePublished,
-                               creators.sortBy(_.name)
-              ).some
+              Some(creators =>
+                ImportedExternal(cliData.resourceId,
+                                 cliData.identifier,
+                                 sameAs.toExternalSameAs,
+                                 datePublished,
+                                 creators.sortBy(_.name)
+                )
+              )
             case _ =>
               None
           }
@@ -223,31 +218,22 @@ object Dataset {
 
     object ImportedInternalAncestorExternal {
       object FromCli {
-        def unapply(cliData: CliDatasetProvenance): Option[ImportedInternalAncestorExternal] =
-          cliData match {
-            case CliDatasetProvenance(
-                  id,
-                  creators,
-                  None,
-                  Some(datePublished),
-                  None,
-                  Some(sameAs),
-                  None,
-                  maybeOriginalId,
-                  None
-                ) =>
-              ImportedInternalAncestorExternal(
-                id.resourceId,
-                id.identifier,
-                sameAs.toInternalSameAs,
-                TopmostSameAs(sameAs.toInternalSameAs),
-                maybeOriginalId getOrElse OriginalIdentifier(id.identifier),
-                datePublished,
-                creators.sortBy(_.name)
-              ).some
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorExternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs), None, maybeOriginalId, None) =>
+              Some(creators =>
+                ImportedInternalAncestorExternal(
+                  cliData.resourceId,
+                  cliData.identifier,
+                  sameAs.toInternalSameAs,
+                  TopmostSameAs(sameAs.toInternalSameAs),
+                  maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
+                  datePublished,
+                  creators.sortBy(_.name)
+                )
+              )
             case _ => None
           }
-
       }
     }
     final case class ImportedInternalAncestorExternal(resourceId:         ResourceId,
@@ -263,28 +249,20 @@ object Dataset {
 
     object ImportedInternalAncestorInternal {
       object FromCli {
-        def unapply(cliData: CliDatasetProvenance): Option[ImportedInternalAncestorInternal] =
-          cliData match {
-            case CliDatasetProvenance(
-                  id,
-                  creators,
-                  Some(dateCreated),
-                  None,
-                  None,
-                  Some(sameAs),
-                  None,
-                  maybeOriginalId,
-                  None
-                ) =>
-              ImportedInternalAncestorInternal(
-                id.resourceId,
-                id.identifier,
-                sameAs.toInternalSameAs,
-                TopmostSameAs(sameAs.toInternalSameAs),
-                maybeOriginalId getOrElse OriginalIdentifier(id.identifier),
-                dateCreated,
-                creators.sortBy(_.name)
-              ).some
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorInternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(dateCreated: DateCreated, None, Some(sameAs), None, maybeOriginalId, None) =>
+              Some(creators =>
+                ImportedInternalAncestorInternal(
+                  cliData.resourceId,
+                  cliData.identifier,
+                  sameAs.toInternalSameAs,
+                  TopmostSameAs(sameAs.toInternalSameAs),
+                  maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
+                  dateCreated,
+                  creators.sortBy(_.name)
+                )
+              )
             case _ => None
           }
       }
@@ -302,27 +280,25 @@ object Dataset {
 
     object Modified {
       object FromCli {
-        def unapply(cliData: CliDatasetProvenance): Option[Modified] =
-          cliData match {
-            case CliDatasetProvenance(
-                  id,
-                  creators,
-                  _,
-                  None,
-                  Some(dateModified),
-                  None,
-                  Some(derivedFrom),
-                  Some(originalId),
-                  maybeInvalidationTime
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => Modified] =
+          cliData.provenance match {
+            case CliDatasetProvenance(_,
+                                      Some(dateModified),
+                                      None,
+                                      Some(derivedFrom),
+                                      Some(originalId),
+                                      maybeInvalidationTime
                 ) =>
-              Modified(id.resourceId,
-                       derivedFrom,
-                       TopmostDerivedFrom(derivedFrom),
-                       originalId,
-                       DateCreated(dateModified.value),
-                       creators,
-                       maybeInvalidationTime
-              ).some
+              Some(creators =>
+                Modified(cliData.resourceId,
+                         derivedFrom,
+                         TopmostDerivedFrom(derivedFrom),
+                         originalId,
+                         DateCreated(dateModified.value),
+                         creators,
+                         maybeInvalidationTime
+                )
+              )
             case _ => None
           }
       }
@@ -425,17 +401,14 @@ object Dataset {
         )
     }
 
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[AdditionalInfo] = JsonLDDecoder.entity(entityTypes) {
-      cursor =>
-        import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-        for {
-          maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-          keywords     <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten).map(_.sorted)
-          images       <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
-          maybeLicense <- cursor.downField(schema / "license").as[Option[License]]
-          maybeVersion <- cursor.downField(schema / "version").as[Option[Version]]
-        } yield AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
-    }
+    def fromCli(dataset: CliDataset): AdditionalInfo =
+      AdditionalInfo(
+        dataset.description,
+        dataset.keywords,
+        dataset.images,
+        dataset.license,
+        dataset.version
+      )
   }
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
@@ -479,11 +452,14 @@ object Dataset {
       }
 
       for {
-        identification              <- cursor.as[Identification]
-        cliProvenance               <- cursor.as(CliDatasetProvenance.decoder(identification))
-        provenanceAndFixableFailure <- createProvenance(cliProvenance)
-        additionalInfo              <- cursor.as[AdditionalInfo]
-        parts                       <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+        cliDataset <- cursor.as[CliDataset]
+        identification = Identification.fromCli(cliDataset)
+        additionalInfo = AdditionalInfo.fromCli(cliDataset)
+        parts <- cliDataset.datasetFiles
+                   .traverse(DatasetPart.fromCli)
+                   .toEither
+                   .leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
+        provenanceAndFixableFailure <- createProvenance(cliDataset)
         publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
         dataset <-
           Dataset
@@ -498,29 +474,29 @@ object Dataset {
       } yield dataset
     }
 
-  private def createProvenance(cliData: CliDatasetProvenance): Result[(Provenance, Option[FixableFailure])] =
+  private def createProvenance(cliData: CliDataset): Result[(Provenance, Option[FixableFailure])] = {
+    val creators: Result[NonEmptyList[Person]] =
+      cliData.creators.traverse(Person.fromCli).toEither.leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
+
     cliData match {
       case Internal.FromCli(p) =>
-        // format: off
-        if (cliData.originalIdNotEqualCurrentId) (p -> FixableFailure.MissingDerivedFrom.some).asRight
-        else (p -> None).asRight
-        // format: on
+        if (cliData.originalIdNotEqualCurrentId) creators.map(p).map(_ -> FixableFailure.MissingDerivedFrom.some)
+        else creators.map(p).map(_ -> None)
 
-      case ImportedExternal.FromCli(p) => (p -> None).asRight
+      case ImportedExternal.FromCli(p) => creators.map(p).map(_ -> None)
 
-      case ImportedInternalAncestorInternal.FromCli(p) => (p -> None).asRight
+      case ImportedInternalAncestorInternal.FromCli(p) => creators.map(p).map(_ -> None)
 
-      case ImportedInternalAncestorExternal.FromCli(p) => (p -> None).asRight
+      case ImportedInternalAncestorExternal.FromCli(p) => creators.map(p).map(_ -> None)
 
-      case Modified.FromCli(p) => (p -> None).asRight
+      case Modified.FromCli(p) => creators.map(p).map(_ -> None)
 
       case _ =>
         DecodingFailure(
           "Invalid dataset data: " +
-            s"identifier: ${cliData.id.identifier}, " +
-            s"dateCreated: ${cliData.createdAt}, " +
-            s"datePublished: ${cliData.publishedAt}, " +
-            s"dateModified: ${cliData.modifiedAt}, " +
+            s"identifier: ${cliData.identifier}, " +
+            s"createdOrPublished: ${cliData.createdOrPublished}, " +
+            s"dateModified: ${cliData.dateModified}, " +
             s"sameAs: ${cliData.sameAs}, " +
             s"derivedFrom: ${cliData.derivedFrom}, " +
             s"originalIdentifier: ${cliData.originalIdentifier}, " +
@@ -528,6 +504,7 @@ object Dataset {
           Nil
         ).asLeft
     }
+  }
 
   val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
   lazy val ontology: Type =

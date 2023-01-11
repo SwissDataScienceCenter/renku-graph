@@ -20,10 +20,9 @@ package io.renku.graph.model.entities
 
 import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.graph.model.cli.CliPerson
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
-import io.renku.jsonld.JsonLDDecoder.{Result, decodeList}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 
@@ -188,53 +187,11 @@ object Person {
   }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-
-      def decodeSameAs[T](use: JsonLDDecoder[T], onMultiple: String): Either[DecodingFailure, Option[T]] =
-        cursor
-          .downField(schema / "sameAs")
-          .as(decodeList(use))
-          .leftFlatMap(_ => List.empty.asRight)
-          .flatMap(failIfMoreThanOne[T](onMultiple))
-
-      def failIfMoreThanOne[T](error: String): List[T] => Either[DecodingFailure, Option[T]] =
-        _.distinct match {
-          case Nil           => None.asRight
-          case single :: Nil => single.some.asRight
-          case list          => DecodingFailure(error + s" $list", Nil).asLeft
-        }
-
-      for {
-        maybeOrcidAsId   <- cursor.downEntityId.as[OrcidId].map(_.some).leftFlatMap(_ => None.asRight)
-        resourceId       <- maybeOrcidAsId.map(ResourceId(_).asRight).getOrElse(cursor.downEntityId.as[ResourceId])
-        names            <- cursor.downField(schema / "name").as[List[Name]]
-        maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
-        maybeAffiliation <- cursor.downField(schema / "affiliation").as[List[Affiliation]].map(_.reverse.headOption)
-        maybeGitLabId    <- decodeSameAs(use = gitLabIdDecoder, onMultiple = "multiple GitLabId sameAs")
-        maybeOrcidId     <- decodeSameAs(use = orcidIdDecoder, onMultiple = "multiple OrcidId sameAs")
-        name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
-                else names.reverse.head.asRight
-        person <-
-          Person
-            .from(resourceId, name, maybeEmail, maybeGitLabId, maybeOrcidId orElse maybeOrcidAsId, maybeAffiliation)
-            .toEither
-            .leftMap(errs => DecodingFailure(errs.nonEmptyIntercalate("; "), Nil))
-      } yield person
-    }
-
-  private lazy val gitLabIdDecoder: JsonLDDecoder[GitLabId] =
-    JsonLDDecoder.entity(sameAsTypes, and(additionalType = gitLabSameAsAdditionalType)) {
-      _.downField(schema / "identifier").as[GitLabId]
-    }
-
-  private lazy val orcidIdDecoder: JsonLDDecoder[OrcidId] =
-    JsonLDDecoder.entity(sameAsTypes, and(additionalType = orcidSameAsAdditionalType)) {
-      _.downEntityId.as[OrcidId]
-    }
-
-  private def and(additionalType: String): Cursor => Result[Boolean] =
-    _.downField(schema / "additionalType").as[String].map(_ == additionalType)
+    CliPerson.jsonLDDecoder.emap(cliPerson => fromCli(cliPerson).toEither.leftMap(_.intercalate("; ")))
+  def fromCli(cli: CliPerson): ValidatedNel[String, Person] = {
+    val maybeOrcidId = OrcidId.from(cli.resourceId.value).toOption
+    Person.from(cli.resourceId, cli.name, cli.email, None, maybeOrcidId, cli.affiliation)
+  }
 
   lazy val ontology: Type = {
     val sameAsType = Type.Def(

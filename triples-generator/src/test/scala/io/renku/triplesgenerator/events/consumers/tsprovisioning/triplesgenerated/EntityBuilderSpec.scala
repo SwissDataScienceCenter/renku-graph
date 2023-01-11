@@ -67,7 +67,7 @@ class EntityBuilderSpec
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
-      val Success(results) = entityBuilder
+      val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, project.path),
@@ -77,7 +77,13 @@ class EntityBuilderSpec
               .fold(throw _, identity)
           )
         )
-        .value
+        .value match {
+        // cli class -- JSONLD cli
+        //
+        //
+        //
+
+      }
 
       results shouldMatchToRight project.to[entities.Project]
     }
