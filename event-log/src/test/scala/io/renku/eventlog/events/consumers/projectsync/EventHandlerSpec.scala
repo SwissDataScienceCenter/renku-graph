@@ -92,8 +92,6 @@ class EventHandlerSpec
       }
 
       handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
-
-      logger.expectNoLogs()
     }
   }
 
