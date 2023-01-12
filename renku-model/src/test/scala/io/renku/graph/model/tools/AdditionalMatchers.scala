@@ -20,13 +20,18 @@ package io.renku.graph.model.tools
 
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
-import org.scalatest.Assertions
+import org.scalatest.{Assertion, Assertions}
 
 trait AdditionalMatchers extends DiffShouldMatcher {
 
   final implicit class EitherDiffMatcher[A, B: Diff](self: Either[A, B]) {
-    def shouldMatchToRight(other: B) =
-      self.fold(a => Assertions.fail(s"Unexpected left value: $a"), b => b shouldMatchTo other)
+    def shouldMatchToRight(other: B): Assertion =
+      self.fold(
+        {
+          case ex: Throwable => throw ex
+          case a => Assertions.fail(s"Unexpected left value: $a")
+        },
+        b => b shouldMatchTo other
+      )
   }
-
 }

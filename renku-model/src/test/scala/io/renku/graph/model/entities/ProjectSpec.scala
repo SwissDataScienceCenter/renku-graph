@@ -29,7 +29,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.cli.{CliDatasetProvenance, CliDatasetProvenanceConv}
+import io.renku.graph.model.cli.CliConv
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
@@ -1246,12 +1246,8 @@ class ProjectSpec
     }
 
     // we must use here the encoder that creates the CLI data and not the data we store in our jena
-    val datasetCliEncoder: JsonLDEncoder[entities.Dataset[entities.Dataset.Provenance]] = { ds =>
-      val provProps: entities.Dataset.Provenance => Map[Property, JsonLD] =
-        prov => CliDatasetProvenance.toJsonLDProperties(CliDatasetProvenanceConv.from(ds.identification, prov))
-
-      entities.Dataset.encoder[entities.Dataset.Provenance](renkuUrl, gitLabApiUrl, graph, provProps).apply(ds)
-    }
+    val datasetCliEncoder: JsonLDEncoder[entities.Dataset[entities.Dataset.Provenance]] = ds =>
+      CliConv.from(ds).asJsonLD
 
     JsonLD
       .arr(

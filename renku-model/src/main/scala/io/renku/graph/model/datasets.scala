@@ -19,6 +19,7 @@
 package io.renku.graph.model
 
 import Schemas._
+import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
@@ -256,6 +257,12 @@ object datasets {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson
     }
+
+    implicit val show: Show[Date] =
+      Show.show {
+        case d: DateCreated   => d.show
+        case d: DatePublished => d.show
+      }
   }
 
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
@@ -264,7 +271,10 @@ object datasets {
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
       with InstantNotInTheFuture[DateCreated]
-      with TinyTypeJsonLDOps[DateCreated]
+      with TinyTypeJsonLDOps[DateCreated] {
+    implicit override lazy val show: Show[DateCreated] =
+      Show.show(d => s"DateCreated(${d.value})")
+  }
 
   final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
     override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
@@ -272,7 +282,10 @@ object datasets {
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture[DatePublished]
-      with TinyTypeJsonLDOps[DatePublished]
+      with TinyTypeJsonLDOps[DatePublished] {
+    implicit override lazy val show: Show[DatePublished] =
+      Show.show(d => s"DatePublished(${d.value})")
+  }
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]

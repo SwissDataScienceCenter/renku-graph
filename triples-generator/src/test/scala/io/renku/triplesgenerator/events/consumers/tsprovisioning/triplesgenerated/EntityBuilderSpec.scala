@@ -77,13 +77,8 @@ class EntityBuilderSpec
               .fold(throw _, identity)
           )
         )
-        .value match {
-        // cli class -- JSONLD cli
-        //
-        //
-        //
-
-      }
+        .value
+        .fold(throw _, identity)
 
       results shouldMatchToRight project.to[entities.Project]
     }

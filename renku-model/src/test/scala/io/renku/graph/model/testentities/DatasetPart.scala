@@ -19,7 +19,8 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
-import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource}
+import io.renku.graph.model.cli.CliDatasetFile
+import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartId, PartResourceId, PartSource}
 import io.renku.graph.model.{datasets, entities}
 
 case class DatasetPart(
@@ -55,6 +56,26 @@ object DatasetPart {
         datasetPart.maybeSource,
         None
       )
+  }
+
+  implicit val toCliPart: DatasetPart => CliDatasetFile = part => {
+    val invalidationTime =
+      part match {
+        case part: DatasetPart with HavingInvalidationTime =>
+          part.invalidationTime.some
+
+        case _ =>
+          None
+      }
+
+    CliDatasetFile(
+      PartResourceId(part.asEntityId.show),
+      part.external,
+      part.entity.to[entities.Entity],
+      part.dateCreated,
+      part.maybeSource,
+      invalidationTime
+    )
   }
 
   implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[DatasetPart] =

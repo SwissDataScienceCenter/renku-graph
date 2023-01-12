@@ -495,7 +495,7 @@ object Dataset {
         DecodingFailure(
           "Invalid dataset data: " +
             s"identifier: ${cliData.identifier}, " +
-            s"createdOrPublished: ${cliData.createdOrPublished}, " +
+            show"createdOrPublished: ${cliData.createdOrPublished}, " +
             s"dateModified: ${cliData.dateModified}, " +
             s"sameAs: ${cliData.sameAs}, " +
             s"derivedFrom: ${cliData.derivedFrom}, " +

@@ -3,9 +3,10 @@ package io.renku.graph.model.cli
 import cats.syntax.option._
 import io.renku.graph.model.entities
 
-trait CliDatasetProvenanceConv {
+/** Conversion functions for production model entities into cli entities. */
+trait CliConv {
 
-  def fromX(dataset: entities.Dataset[entities.Dataset.Provenance]): CliDataset =
+  def from(dataset: entities.Dataset[entities.Dataset.Provenance]): CliDataset =
     CliDataset(
       resourceId = dataset.identification.resourceId,
       identifier = dataset.identification.identifier,
@@ -51,4 +52,4 @@ trait CliDatasetProvenanceConv {
     )
 }
 
-object CliDatasetProvenanceConv extends CliDatasetProvenanceConv
+object CliConv extends CliConv

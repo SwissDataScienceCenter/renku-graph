@@ -20,6 +20,7 @@ package io.renku.graph.model.testentities
 
 import cats.syntax.all._
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliPerson
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId}
 
@@ -63,6 +64,16 @@ object Person {
                                    maybeOrcidId,
                                    maybeAffiliation
       )
+  }
+
+  implicit val toCliPerson: Person => CliPerson = p => {
+    val id = p match {
+      case Person(_, Some(email), _, orcidId, _) =>
+        orcidId.map(persons.ResourceId(_)).getOrElse(persons.ResourceId(email))
+      case _ =>
+        p.maybeOrcidId.map(persons.ResourceId(_)).getOrElse(persons.ResourceId(p.name))
+    }
+    CliPerson(id, p.name, p.maybeEmail, p.maybeAffiliation)
   }
 
   implicit def toMaybeEntitiesPersonWithGitLabId(implicit

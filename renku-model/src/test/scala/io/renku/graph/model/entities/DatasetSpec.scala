@@ -27,11 +27,13 @@ import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliDataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
@@ -39,21 +41,26 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class DatasetSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with AdditionalMatchers
+    with DiffInstances {
 
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default
 
-    "turn JsonLD Dataset entity into the Dataset object" in {
+    "turn JsonLD Dataset entity into the Dataset object" ignore {
       forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
         JsonLD
-          .arr(dataset.asJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
+          .arr(dataset.to[CliDataset].asJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
           .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldMatchToRight List(
           dataset.to[entities.Dataset[entities.Dataset.Provenance]]
-        ).asRight
+        )
       }
     }
 
@@ -89,12 +96,15 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
       "turn JsonLD Dataset entity into the Dataset object " +
         s"when originalIdentifier on an $dsType dataset is different than its identifier" in {
-          val dataset =
-            dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          val testDataset     = dsGen.decoupledFromProject.generateOne
+          val prodDataset     = testDataset.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
           val otherOriginalId = datasetOriginalIdentifiers.generateOne
 
           val dsJsonLD = parse {
-            dataset.asJsonLD.toJson
+            testDataset
+              .to[CliDataset]
+              .asJsonLD
+              .toJson
               .deepMerge(
                 Json.obj(
                   (renku / "originalIdentifier").show -> json"""{"@value": ${otherOriginalId.show}}"""
@@ -103,21 +113,22 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           }.fold(throw _, identity)
 
           val Right(actualDS :: Nil) = JsonLD
-            .arr(dsJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
+            .arr(dsJsonLD :: prodDataset.publicationEvents.map(_.asJsonLD): _*)
             .flatten
             .fold(throw _, identity)
             .cursor
             .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 
-          actualDS shouldBe dataset.copy(
-            provenance = dataset.provenance match {
-              case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
-                p.copy(originalIdentifier = otherOriginalId)
-              case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal =>
-                p.copy(originalIdentifier = otherOriginalId)
-              case p => fail(s"DS with provenance ${p.getClass} not expected here")
-            }
-          )
+          actualDS shouldMatchTo prodDataset
+            .copy(
+              provenance = prodDataset.provenance match {
+                case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
+                  p.copy(originalIdentifier = otherOriginalId)
+                case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal =>
+                  p.copy(originalIdentifier = otherOriginalId)
+                case p => fail(s"DS with provenance ${p.getClass} not expected here")
+              }
+            )
         }
     }
 

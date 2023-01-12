@@ -30,7 +30,7 @@ final case class CliDataset(
     invalidationTime:   Option[InvalidationTime]
 ) {
 
-  val provenance =
+  val provenance: CliDatasetProvenance =
     CliDatasetProvenance(createdOrPublished, dateModified, sameAs, derivedFrom, originalIdentifier, invalidationTime)
 
   def originalIdEqualCurrentId: Boolean =
@@ -114,7 +114,7 @@ object CliDataset {
         List(
           Some(schema / "identifier" -> ds.identifier.asJsonLD),
           Some(schema / "name"       -> ds.title.asJsonLD),
-          Some(schema / "slug"       -> ds.name.asJsonLD),
+          Some(renku / "slug"        -> ds.name.asJsonLD),
           Some(schema / "creator"    -> ds.creators.asJsonLD),
           ds.createdOrPublished match {
             case d: DateCreated   => (schema / "dateCreated"   -> d.asJsonLD).some

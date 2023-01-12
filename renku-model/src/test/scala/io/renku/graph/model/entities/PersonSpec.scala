@@ -146,12 +146,13 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     "fail if person's ResourceId does not match the GitLabId based ResourceId if GitLabId given" in {
       forAll(Gen.oneOf(personEmailResourceId, personNameResourceId).widen[persons.ResourceId],
              personGitLabIds,
-             personEmails.toGeneratorOfOptions
-      ) { (invalidResourceId, gitLabId, maybeEmail) =>
+             personEmails.toGeneratorOfOptions,
+             personNames
+      ) { (invalidResourceId, gitLabId, maybeEmail, name) =>
         val jsonLDPerson = JsonLD.entity(
           invalidResourceId.asEntityId,
           entityTypes,
-          schema / "name"   -> personNames.generateOne.asJsonLD,
+          schema / "name"   -> name.asJsonLD,
           schema / "email"  -> maybeEmail.asJsonLD,
           schema / "sameAs" -> gitLabId.asJsonLD(gitLabIdEncoder)
         )
@@ -160,62 +161,66 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe
-          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${gitLabId.some}, " +
-          show"orcidId = ${Option.empty[persons.OrcidId]}, email = $maybeEmail"
+          show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${gitLabId.some}, " +
+          show"orcidId = ${Option.empty[persons.OrcidId]}, email = $maybeEmail, affiliation = None"
       }
     }
 
     "fail if person's ResourceId does not match the OrcidId based ResourceId if OrcidId given" in {
-      forAll(personOrcidResourceId.widen[persons.ResourceId], personOrcidIds) { (invalidResourceId, orcidId) =>
-        val jsonLDPerson = JsonLD.entity(
-          invalidResourceId.asEntityId,
-          entityTypes,
-          schema / "name"   -> personNames.generateOne.asJsonLD,
-          schema / "sameAs" -> orcidId.asJsonLD(orcidIdEncoder)
-        )
-
-        val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
-
-        failure shouldBe a[DecodingFailure]
-        failure.message shouldBe
-          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
-          show"orcidId = ${orcidId.some}, email = ${Option.empty[persons.Email]}"
-      }
-    }
-
-    "fail if person's ResourceId does not match the Email or Orcid based ResourceId if no GitLabId but Email given" in {
-      forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId], personEmails) {
-        (invalidResourceId, email) =>
+      forAll(personOrcidResourceId.widen[persons.ResourceId], personOrcidIds, personNames) {
+        (invalidResourceId, orcidId, name) =>
           val jsonLDPerson = JsonLD.entity(
             invalidResourceId.asEntityId,
             entityTypes,
-            schema / "name"  -> personNames.generateOne.asJsonLD,
-            schema / "email" -> email.asJsonLD
+            schema / "name"   -> name.asJsonLD,
+            schema / "sameAs" -> orcidId.asJsonLD(orcidIdEncoder)
           )
 
           val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
 
           failure shouldBe a[DecodingFailure]
           failure.message shouldBe
-            show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
-            show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}"
+            show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+            show"orcidId = ${orcidId.some}, email = ${Option.empty[persons.Email]}, affiliation = None"
       }
     }
 
-    "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in {
-      forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId]) { invalidResourceId =>
+    "fail if person's ResourceId does not match the Email or Orcid based ResourceId if no GitLabId but Email given" in {
+      forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId],
+             personEmails,
+             personNames
+      ) { (invalidResourceId, email, name) =>
         val jsonLDPerson = JsonLD.entity(
           invalidResourceId.asEntityId,
           entityTypes,
-          schema / "name" -> personNames.generateOne.asJsonLD
+          schema / "name"  -> name.asJsonLD,
+          schema / "email" -> email.asJsonLD
         )
 
         val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
 
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe
-          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
-          show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}"
+          show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+          show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}, affiliation = None"
+      }
+    }
+
+    "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in {
+      forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId], personNames) {
+        (invalidResourceId, name) =>
+          val jsonLDPerson = JsonLD.entity(
+            invalidResourceId.asEntityId,
+            entityTypes,
+            schema / "name" -> name.asJsonLD
+          )
+
+          val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+
+          failure shouldBe a[DecodingFailure]
+          failure.message shouldBe
+            show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+            show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}, affiliation = None"
       }
     }
   }

@@ -20,11 +20,11 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import com.softwaremill.diffx._
-import io.renku.graph.model.cli.CliDatasetProvenance
+import io.renku.graph.model.cli.{CliDataset, CliDatasetFile, CliDatasetProvenance, CliPerson}
 import io.renku.graph.model.entities.Dataset.Provenance.ImportedInternalAncestorExternal
 import io.renku.graph.model.entities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.images.{Image, ImageUri}
-import io.renku.graph.model.{commandParameters, projects}
+import io.renku.graph.model.{commandParameters, datasets, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.tinytypes.{BooleanTinyType, InstantTinyType, IntTinyType, LocalDateTinyType, RelativePathTinyType, StringTinyType, UrlTinyType}
 
@@ -172,6 +172,9 @@ trait DiffInstances {
   implicit val activityDiff: Diff[Activity] =
     Diff.derived[Activity]
 
+  implicit val datasetDateDiff: Diff[datasets.Date] =
+    Diff.diffForString.contramap(_.value.toString)
+
   implicit val importedInternalAncestorExternalDiff: Diff[ImportedInternalAncestorExternal] =
     Diff.derived[ImportedInternalAncestorExternal]
 
@@ -183,6 +186,15 @@ trait DiffInstances {
 
   implicit val cliProvenanceDiff: Diff[CliDatasetProvenance] =
     Diff.derived[CliDatasetProvenance]
+
+  implicit val cliPersonDiff: Diff[CliPerson] =
+    Diff.derived[CliPerson]
+
+  implicit val cliDatasetFileDiff: Diff[CliDatasetFile] =
+    Diff.derived[CliDatasetFile]
+
+  implicit val cliDatasetDiff: Diff[CliDataset] =
+    Diff.derived[CliDataset]
 
   implicit val additionalInfoDiff: Diff[AdditionalInfo] =
     Diff.derived[AdditionalInfo]
