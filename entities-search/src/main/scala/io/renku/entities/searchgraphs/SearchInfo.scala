@@ -35,7 +35,6 @@ import java.time.Instant
 
 private final case class SearchInfo(topmostSameAs:     TopmostSameAs,
                                     name:              Name,
-                                    visibility:        Visibility,
                                     dateOriginal:      Date,
                                     maybeDateModified: Option[DateModified],
                                     creators:          NonEmptyList[PersonInfo],
@@ -43,7 +42,9 @@ private final case class SearchInfo(topmostSameAs:     TopmostSameAs,
                                     maybeDescription:  Option[Description],
                                     images:            List[Image],
                                     links:             NonEmptyList[Link]
-)
+) {
+  lazy val visibility: Visibility = links.map(_.visibility).toList.max
+}
 
 private object SearchInfo {
 
@@ -57,21 +58,20 @@ private object SearchInfo {
   }
 
   implicit val show: Show[SearchInfo] = Show.show {
-    case SearchInfo(topSameAs,
-                    name,
-                    visibility,
-                    dateOriginal,
-                    maybeDateModified,
-                    creators,
-                    keywords,
-                    maybeDescription,
-                    images,
-                    links
+    case info @ SearchInfo(topSameAs,
+                           name,
+                           dateOriginal,
+                           maybeDateModified,
+                           creators,
+                           keywords,
+                           maybeDescription,
+                           images,
+                           links
         ) =>
       List(
         show"topmostSameAs = $topSameAs".some,
         show"name = $name".some,
-        show"visibility = $visibility".some,
+        show"visibility = ${info.visibility}".some,
         dateOriginal match {
           case d: datasets.DateCreated   => show"dateCreated = $d".some
           case d: datasets.DatePublished => show"datePublished = $d".some
@@ -96,28 +96,40 @@ private sealed trait Link {
   val resourceId: links.ResourceId
   val datasetId:  ResourceId
   val projectId:  projects.ResourceId
+  val visibility: projects.Visibility
 }
 private object Link {
   def apply(topmostSameAs: TopmostSameAs,
             datasetId:     ResourceId,
             projectId:     projects.ResourceId,
-            projectPath:   projects.Path
+            projectPath:   projects.Path,
+            visibility:    projects.Visibility
   ): Link =
     if (topmostSameAs.value == datasetId.value)
-      OriginalDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
+      OriginalDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId, visibility)
     else
-      ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
+      ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId, visibility)
 
-  def apply(linkId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId): Link =
+  def apply(linkId:     links.ResourceId,
+            datasetId:  ResourceId,
+            projectId:  projects.ResourceId,
+            visibility: projects.Visibility
+  ): Link =
     if (linkId.value startsWith datasetId.value)
-      OriginalDataset(linkId, datasetId, projectId)
+      OriginalDataset(linkId, datasetId, projectId, visibility)
     else
-      ImportedDataset(linkId, datasetId, projectId)
+      ImportedDataset(linkId, datasetId, projectId, visibility)
 
-  final case class OriginalDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
-      extends Link
-  final case class ImportedDataset(resourceId: links.ResourceId, datasetId: ResourceId, projectId: projects.ResourceId)
-      extends Link
+  final case class OriginalDataset(resourceId: links.ResourceId,
+                                   datasetId:  ResourceId,
+                                   projectId:  projects.ResourceId,
+                                   visibility: projects.Visibility
+  ) extends Link
+  final case class ImportedDataset(resourceId: links.ResourceId,
+                                   datasetId:  ResourceId,
+                                   projectId:  projects.ResourceId,
+                                   visibility: projects.Visibility
+  ) extends Link
 
   implicit lazy val show: Show[Link] = Show.show { link =>
     show"id = ${link.resourceId}, projectId = ${link.projectId}, datasetId = ${link.datasetId}"

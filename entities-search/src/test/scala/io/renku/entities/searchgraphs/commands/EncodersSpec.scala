@@ -82,7 +82,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink"),
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
       )
     }
 
@@ -93,7 +94,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
       )
     }
   }

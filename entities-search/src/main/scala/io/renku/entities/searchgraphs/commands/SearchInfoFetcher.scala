@@ -70,8 +70,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |    }
         |  } {
         |    GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
-        |      ?topSameAs schema:name ?name;
-        |                 renku:projectVisibility ?visibility.
+        |      ?topSameAs schema:name ?name.
         |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
         |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
         |      OPTIONAL { ?topSameAs schema:datePublished ?maybeDatePublished }
@@ -91,8 +90,9 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |      {
         |        ?topSameAs renku:datasetProjectLink ?linkId.
         |        ?linkId renku:projectId ?linkProjectId;
-        |                renku:datasetId ?linkDatasetId.
-        |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId)) AS ?link)
+        |                renku:datasetId ?linkDatasetId;
+        |                renku:projectVisibility ?visibility.
+        |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId), STR(';;'), STR(?visibility)) AS ?link)
         |      }
         |    }
         |  }
@@ -171,7 +171,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
           .getOrElse(List.empty.asRight[DecodingFailure])
 
       val toLink: String => Decoder.Result[Link] = {
-        case s"$id;;$projectId;;$datasetId" =>
+        case s"$id;;$projectId;;$datasetId;;$visibility" =>
           (links.ResourceId
              .from(id)
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
@@ -180,8 +180,11 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
            projects.ResourceId
              .from(projectId)
+             .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
+           projects.Visibility
+             .from(visibility)
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur))
-          ).mapN(Link(_, _, _))
+          ).mapN(Link(_, _, _, _))
         case other =>
           DecodingFailure(DecodingFailure.Reason.CustomReason(s"'$other' not a valid link record"), cur).asLeft[Link]
       }
@@ -203,7 +206,6 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       for {
         implicit0(topSameAs: datasets.TopmostSameAs) <- extract[datasets.TopmostSameAs]("topSameAs")
         name                                         <- extract[datasets.Name]("name")
-        visibility                                   <- extract[projects.Visibility]("visibility")
         maybeDescription                             <- extract[Option[datasets.Description]]("maybeDescription")
         maybeDateCreated                             <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
         maybeDatePublished                           <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
@@ -215,7 +217,6 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         links                                        <- extract[String]("links") >>= toListOfLinks
       } yield SearchInfo(topSameAs,
                          name,
-                         visibility,
                          dateOriginal,
                          maybeDateModified,
                          creators,

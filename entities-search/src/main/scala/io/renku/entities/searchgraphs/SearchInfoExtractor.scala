@@ -63,7 +63,6 @@ private object SearchInfoExtractor {
   ) = SearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
-    project.visibility,
     dateOriginal,
     maybeDateModified,
     ds.provenance.creators.map(toPersonInfo),
@@ -71,7 +70,12 @@ private object SearchInfoExtractor {
     ds.additionalInfo.maybeDescription,
     ds.additionalInfo.images,
     NonEmptyList.one(
-      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
+      Link(ds.provenance.topmostSameAs,
+           ds.identification.resourceId,
+           project.resourceId,
+           project.path,
+           project.visibility
+      )
     )
   )
 }

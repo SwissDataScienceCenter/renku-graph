@@ -42,16 +42,16 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
       "generate update commands for them - " +
       "case when all model infos have counterparts in the TS" in new TestCase {
 
-        val modelInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateList()
+        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList()
         val tsInfos = modelInfos
           .map { modelInfo =>
-            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
+            searchInfoObjectsGen(withLinkTo = project).generateOne
               .copy(topmostSameAs = modelInfo.topmostSameAs)
           }
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
 
-        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe (modelInfos zip tsInfos)
+        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe (modelInfos zip tsInfos)
           .map { case (modelInfo, tsInfo) => CalculatorInfoSet(project, modelInfo.some, tsInfo.some) }
           .map(calculateCommands(_))
           .sequence
@@ -61,16 +61,12 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     "produce commands - " +
       "case when not all model infos have counterparts in the TS" in new TestCase {
 
-        val modelInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateNonEmptyList().toList
-        val tsInfos = modelInfos.tail
-          .map { modelInfo =>
-            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
-              .copy(topmostSameAs = modelInfo.topmostSameAs)
-          }
+        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList(min = 1)
+        val tsInfos    = modelInfos.tail
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
 
-        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe
+        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe
           (modelInfos.map(_.some) zip (None :: tsInfos.map(_.some)))
             .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
             .map(calculateCommands(_))
@@ -81,16 +77,12 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     "produce commands - " +
       "case when not all TS infos have counterparts in the model" in new TestCase {
 
-        val tsInfos = searchInfoObjectsGen(withLinkFor = project.resourceId).generateNonEmptyList().toList
+        val tsInfos    = searchInfoObjectsGen(withLinkTo = project).generateList(min = 1)
         val modelInfos = tsInfos.tail
-          .map { modelInfo =>
-            searchInfoObjectsGen(withLinkFor = project.resourceId).generateOne
-              .copy(topmostSameAs = modelInfo.topmostSameAs)
-          }
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
 
-        commandsProducer.toUpdateCommands(project, modelInfos).map(_.toSet) shouldBe
+        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe
           ((None :: modelInfos.map(_.some)) zip tsInfos.map(_.some))
             .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
             .map(calculateCommands(_))

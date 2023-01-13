@@ -30,14 +30,18 @@ private object SearchInfoLens {
 
   private val linksTraversal = Traversal.fromTraverse[NonEmptyList, Link]
 
-  def replaceLinks(link: Link): NonEmptyList[Link] => NonEmptyList[Link] = _ => NonEmptyList.one(link)
-
-  val linkProject: Lens[Link, projects.ResourceId] = Lens[Link, projects.ResourceId](_.projectId) { projectId =>
-    {
-      case link: Link.OriginalDataset => link.copy(projectId = projectId)
-      case link: Link.ImportedDataset => link.copy(projectId = projectId)
+  val linkProjectAndVisibility: Lens[Link, (projects.ResourceId, projects.Visibility)] =
+    Lens[Link, (projects.ResourceId, projects.Visibility)](l => l.projectId -> l.visibility) {
+      case (projectId, visibility) => {
+        case link: Link.OriginalDataset => link.copy(projectId = projectId, visibility = visibility)
+        case link: Link.ImportedDataset => link.copy(projectId = projectId, visibility = visibility)
+      }
     }
-  }
+
+  val linkVisibility: Lens[Link, projects.Visibility] = Lens[Link, projects.Visibility](_.visibility)(v => {
+    case link: Link.OriginalDataset => link.copy(visibility = v)
+    case link: Link.ImportedDataset => link.copy(visibility = v)
+  })
 
   def findLink(projectId: projects.ResourceId): SearchInfo => Option[Link] =
     searchInfoLinks.composeTraversal(linksTraversal).find(_.projectId == projectId)

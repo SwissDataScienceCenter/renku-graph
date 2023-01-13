@@ -21,9 +21,6 @@ package commands
 
 import Generators._
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoLens
-import SearchInfoLens._
-import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalacheck.Gen
@@ -31,13 +28,8 @@ import org.scalacheck.Gen
 private object CalculatorInfoSetGenerators {
 
   lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
-    project <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
-    modelInfo <-
-      searchInfoObjectsGen.map(i =>
-        searchInfoLinks.modify(
-          replaceLinks(linkProject.set(project.resourceId)(linkObjectsGen(i.topmostSameAs).generateOne))
-        )(i)
-      )
+    project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
+    modelInfo <- searchInfoObjectsGen(project.resourceId -> project.visibility)
   } yield CalculatorInfoSet(project, maybeModelInfo = modelInfo.some, maybeTSInfo = modelInfo.some)
 
 }

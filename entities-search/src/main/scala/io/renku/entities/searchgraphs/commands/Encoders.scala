@@ -60,7 +60,8 @@ private object Encoders {
     typeQuads ++
       Set(
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
       )
   }
 

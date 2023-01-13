@@ -49,14 +49,15 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           SearchInfo(
             ds.provenance.topmostSameAs,
             ds.identification.name,
-            project.visibility,
             ds.provenance.date,
             maybeDateModified = None,
             ds.provenance.creators.map(toPersonInfo),
             ds.additionalInfo.keywords,
             ds.additionalInfo.maybeDescription,
             ds.additionalInfo.images,
-            NonEmptyList.one(Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path))
+            NonEmptyList.one(
+              Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path, project.visibility)
+            )
           )
         }
         .pure[Try]
@@ -65,9 +66,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
     "convert the given modified Datasets to SearchInfo objects" in {
 
       val project = anyRenkuProjectEntities
-        .addDatasetAndModifications(datasetEntities(provenanceNonModified),
-                                    level = 2
-        ) // ints(min = 1, max = 2).generateOne)
+        .addDatasetAndModifications(datasetEntities(provenanceNonModified), level = 2)
         .generateOne
         .to[entities.Project]
 
@@ -78,7 +77,6 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         SearchInfo(
           lastModification.provenance.topmostSameAs,
           lastModification.identification.name,
-          project.visibility,
           originalDataset.provenance.date,
           DateModified(lastModification.provenance.date.instant).some,
           lastModification.provenance.creators.map(toPersonInfo),
@@ -89,7 +87,8 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             Link(lastModification.provenance.topmostSameAs,
                  lastModification.resourceId,
                  project.resourceId,
-                 project.path
+                 project.path,
+                 project.visibility
             )
           )
         )

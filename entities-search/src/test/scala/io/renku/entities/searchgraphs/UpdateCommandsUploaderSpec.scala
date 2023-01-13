@@ -24,6 +24,7 @@ import commands.UpdateCommand
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.triplesstore.client.TriplesStoreGenerators.quads
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, TSClient}
 import org.scalamock.scalatest.MockFactory
@@ -38,7 +39,7 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
 
     "succeeds if uploading updates to the TS succeeds" in new TestCase {
 
-      val commands = updateCommands.generateList()
+      val commands = updateCommands.generateList(min = 1)
 
       toSparqlQueries(commands) foreach { query =>
         givenTSUpdating(query, returning = ().pure[Try])
@@ -49,7 +50,7 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
 
     "fail if uploading updates to the TS fails" in new TestCase {
 
-      val commands = updateCommands.generateList()
+      val commands = allSortsOfCommands.generateList(max = 2).flatten
 
       val query1 :: query2 :: Nil = toSparqlQueries(commands)
       givenTSUpdating(query1, returning = ().pure[Try])
@@ -84,4 +85,8 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
         .expects(query)
         .returning(returning)
   }
+
+  private lazy val allSortsOfCommands =
+    (quads.map(UpdateCommand.Insert) -> quads.map(UpdateCommand.Delete))
+      .mapN(_ :: _ :: Nil)
 }
