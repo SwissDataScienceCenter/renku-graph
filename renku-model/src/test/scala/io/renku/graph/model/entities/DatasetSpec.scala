@@ -27,7 +27,7 @@ import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
-import io.renku.graph.model.cli.CliDataset
+import io.renku.graph.model.cli.{CliDataset, CliGenerators}
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
@@ -51,20 +51,21 @@ class DatasetSpec
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default
 
-    "turn JsonLD Dataset entity into the Dataset object" ignore {
-      forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
+    "turn JsonLD Dataset entity into the Dataset object" in {
+      forAll(CliGenerators.datasetGen()) { dataset =>
         JsonLD
-          .arr(dataset.to[CliDataset].asJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
+          .arr(dataset.asJsonLD :: Nil: _*)
           .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldMatchToRight List(
-          dataset.to[entities.Dataset[entities.Dataset.Provenance]]
+          .as[List[CliDataset]] shouldMatchToRight List(
+          dataset
         )
       }
     }
 
     "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
+
       val dataset = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
