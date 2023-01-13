@@ -19,9 +19,9 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import io.renku.tinytypes._
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.tinytypes.constraints.{BoundedInstant, Url}
-import views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 import java.time.Instant
 

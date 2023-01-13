@@ -25,9 +25,9 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphModelGenerators, entities}
+import io.renku.graph.model.testentities.RenkuProject
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.{postDataQueriesOnly, preDataQueriesOnly}
@@ -38,7 +38,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers with EntitiesGenerators {
 
   "createTransformationStep" should {
 
@@ -137,7 +137,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     visibility     <- projectVisibilities
     maybeDesc      <- projectDescriptions.toGeneratorOfOptions
     keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
-    maybeAgent     <- cliVersions.toGeneratorOfOptions
+    maybeAgent     <- GraphModelGenerators.cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
     projId         <- projectResourceIds
     images         <- projectImageResourceIds(projId)

@@ -24,9 +24,9 @@ import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{Dataset, Person, RenkuProject}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
@@ -47,6 +47,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class DatasetsFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks
@@ -149,7 +150,7 @@ class DatasetsFinderSpec
 
           val dataset              = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
           val (dataset1, project1) = publicProjectEntities.importDataset(dataset).generateOne
-          val (dataset2, project2 ::~ project2Fork) =
+          val (dataset2, project2 -> project2Fork) =
             publicProjectEntities.importDataset(dataset).forkOnce().generateOne
 
           upload(to = projectsDataset, project1, project2, project2Fork)
@@ -191,7 +192,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case more than one level of modification" in new TestCase {
 
-          val (_ ::~ modification1, project) =
+          val (_ -> modification1, project) =
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
           val (modification2, projectWithAllDatasets) = project.addDataset(modification1.createModification())
 
@@ -208,7 +209,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case if there are modified and non-modified datasets" in new TestCase {
 
-          val (_ ::~ dataset1Modification, project1) =
+          val (_ -> dataset1Modification, project1) =
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
           val (dataset2, project2) =
             publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
@@ -250,7 +251,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with forks on renku created datasets" in new TestCase {
 
-          val (dataset, project ::~ fork) = publicProjectEntities
+          val (dataset, project -> fork) = publicProjectEntities
             .addDataset(datasetEntities(provenanceInternal))
             .forkOnce()
             .generateOne
@@ -270,7 +271,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks on the 1st level" in new TestCase {
 
-          val (dataset, project ::~ fork) =
+          val (dataset, project -> fork) =
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val (datasetModified, projectUpdated) = project.addDataset(dataset.createModification())
 
@@ -291,7 +292,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks not on the 1st level" in new TestCase {
 
-          val (_ ::~ datasetModification, project ::~ fork) =
+          val (_ -> datasetModification, project -> fork) =
             publicProjectEntities
               .addDatasetAndModification(datasetEntities(provenanceImportedExternal))
               .forkOnce()
@@ -331,7 +332,7 @@ class DatasetsFinderSpec
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
 
-          val (dataset, project ::~ fork) =
+          val (dataset, project -> fork) =
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val forkUpdated = fork.addDatasets(dataset.invalidateNow)
 
@@ -347,7 +348,7 @@ class DatasetsFinderSpec
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
 
-          val (dataset, project ::~ fork) =
+          val (dataset, project -> fork) =
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val afterForkingUpdated = project.addDatasets(dataset.invalidateNow)
 
@@ -363,7 +364,7 @@ class DatasetsFinderSpec
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
 
-          val (_ ::~ datasetModified, project) =
+          val (_ -> datasetModified, project) =
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
           val projectUpdated = project.addDatasets(datasetModified.invalidateNow)
 
@@ -500,11 +501,11 @@ class DatasetsFinderSpec
     "return datasets matching the criteria excluding datasets which were modified on forks and does not match anymore" in new TestCase {
 
       val phrase = phrases.generateOne
-      val (dataset, project ::~ fork) = publicProjectEntities
+      val (dataset, project -> fork) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .forkOnce()
         .generateOne
-      val _ ::~ forkUpdated = fork.addDataset(dataset.createModification())
+      val _ -> forkUpdated = fork.addDataset(dataset.createModification())
 
       upload(to = projectsDataset, project, forkUpdated)
 
@@ -517,7 +518,7 @@ class DatasetsFinderSpec
     "return datasets matching the criteria after modification of the fork" in new TestCase {
 
       val phrase = phrases.generateOne
-      val (dataset, project ::~ fork) =
+      val (dataset, project -> fork) =
         publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
       val (datasetModified, forkUpdated) =
         fork.addDataset(dataset.createModification(_.makeKeywordsContaining(phrase.value)))
@@ -641,11 +642,11 @@ class DatasetsFinderSpec
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
       val phrase = phrases.generateOne
 
-      val (dataset1, project1 ::~ project1Fork) = publicProjectEntities
+      val (dataset1, project1 -> project1Fork) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
         .forkOnce()
         .generateOne
-      val (dataset2, project2 ::~ project2Forks) = publicProjectEntities
+      val (dataset2, project2 -> project2Forks) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
         .generateOne
         .map(_.fork(2))
@@ -916,7 +917,7 @@ class DatasetsFinderSpec
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, userAccessTokens.generateOne)
   }
 
-  private implicit class DatasetAndProjectOps(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {
+  private implicit class DatasetAndProjectOps2(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {
 
     private lazy val (dataset, project) = datasetAndProject
 

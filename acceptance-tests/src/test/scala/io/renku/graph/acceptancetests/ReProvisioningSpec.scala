@@ -29,7 +29,8 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GraphClass, SchemaVersion, testentities}
+import io.renku.graph.model.versions.SchemaVersion
+import io.renku.graph.model.{GraphClass, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok

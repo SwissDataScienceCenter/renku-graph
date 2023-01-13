@@ -23,9 +23,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.datasets.SameAs
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.ModelOps
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
@@ -40,6 +41,8 @@ import org.scalatest.wordspec.AnyWordSpec
 class KGDatasetInfoFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
+    with ModelOps
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
@@ -103,7 +106,7 @@ class KGDatasetInfoFinderSpec
     }
 
     "return topmostSameAs of the Dataset on the oldest Project using it" in new TestCase {
-      val (dataset, parentProject ::~ project) = anyRenkuProjectEntities
+      val (dataset, parentProject -> project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceInternal))
         .forkOnce()
         .generateOne
@@ -304,7 +307,7 @@ class KGDatasetInfoFinderSpec
   "findWhereNotInvalidated" should {
 
     "return project resourceIds where DS with the given id is not invalidated" in new TestCase {
-      val (ds, project ::~ fork1) =
+      val (ds, project -> fork1) =
         anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()

@@ -21,7 +21,6 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -29,7 +28,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Failure, Try}
 
-class ResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ResourceIdSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with RenkuTinyTypeGenerators {
+
+  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
 
   "toIdentifier converted" should {
 

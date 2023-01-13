@@ -32,10 +32,9 @@ import io.renku.config.renku.ResourceUrl
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphModelGenerators, projects}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -126,7 +125,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  private lazy val gitLabUrl = gitLabUrls.generateOne
+  private lazy val gitLabUrl = GraphModelGenerators.gitLabUrls.generateOne
 
   private trait TestCase {
     import io.renku.json.JsonOps._

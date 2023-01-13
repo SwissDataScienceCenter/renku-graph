@@ -31,6 +31,7 @@ import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
@@ -39,7 +40,12 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class DatasetSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with EntitiesGenerators
+    with ModelOps {
 
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default

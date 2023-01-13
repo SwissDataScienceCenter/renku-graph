@@ -20,7 +20,8 @@ package io.renku.graph.model.testentities
 
 import cats.syntax.all._
 import io.renku.graph.model.agents.Name
-import io.renku.graph.model.{CliVersion, agents, entities}
+import io.renku.graph.model.versions.CliVersion
+import io.renku.graph.model.{agents, entities}
 
 final case class Agent(cliVersion: CliVersion)
 

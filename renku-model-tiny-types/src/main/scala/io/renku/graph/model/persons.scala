@@ -22,8 +22,8 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.views.{EntityIdJsonLDOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
-import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
+import io.renku.tinytypes._
 import org.apache.jena.util.URIref
 
 object persons {

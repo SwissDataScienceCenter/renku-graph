@@ -27,6 +27,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQuery.Prefixes

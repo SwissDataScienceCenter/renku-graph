@@ -18,7 +18,7 @@
 
 package io.renku.graph.model
 
-import GraphModelGenerators._
+import RenkuTinyTypeGenerators._
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.circe.Json
@@ -38,8 +38,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with Schemas {
-
-  import SameAs._
 
   "ResourceId" should {
     "be renderable as a URI encoded RDF resource" in {

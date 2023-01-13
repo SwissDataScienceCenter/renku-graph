@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.init
 
 import cats.MonadError
-import io.renku.graph.model.CliVersion
+import io.renku.graph.model.versions.CliVersion
 import pureconfig.ConfigReader
 
 private[init] object CliVersionLoader {

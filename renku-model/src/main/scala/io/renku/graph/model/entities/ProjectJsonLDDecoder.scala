@@ -28,6 +28,7 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld.{Cursor, JsonLDDecoder}

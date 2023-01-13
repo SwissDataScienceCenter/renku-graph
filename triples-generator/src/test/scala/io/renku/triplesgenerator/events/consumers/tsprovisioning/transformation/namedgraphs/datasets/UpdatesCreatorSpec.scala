@@ -23,11 +23,12 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{Dataset, ModelOps}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.views.RdfResource
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, NamedGraph}
@@ -45,6 +46,8 @@ class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with EntitiesGenerators
+    with ModelOps
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks {
@@ -778,7 +781,7 @@ class UpdatesCreatorSpec
   "deleteOtherDerivedFrom" should {
 
     "prepare queries that removes other wasDerivedFrom from the given DS" in {
-      val (_ ::~ modification, project) = anyRenkuProjectEntities
+      val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])
@@ -819,7 +822,7 @@ class UpdatesCreatorSpec
   "deleteOtherTopmostDerivedFrom" should {
 
     "prepare queries that removes other topmostDerivedFrom from the given DS" in {
-      val (_ ::~ modification, project) = anyRenkuProjectEntities
+      val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])

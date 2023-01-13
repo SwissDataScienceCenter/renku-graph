@@ -24,6 +24,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import Schemas.renku
 import eu.timepit.refined.auto._
+import io.renku.graph.model.versions.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec

@@ -20,7 +20,8 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.data.{NonEmptyList => Nel}
 import io.renku.graph.model.images.ImageResourceId
-import io.renku.graph.model.{CliVersion, persons, projects}
+import io.renku.graph.model.versions.CliVersion
+import io.renku.graph.model.{persons, projects}
 
 private[projects] final case class ProjectMutableData(
     name:             projects.Name,

@@ -20,8 +20,7 @@ package io.renku.graph.http.server.security
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -32,6 +31,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class ProjectPathRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with should.Matchers {

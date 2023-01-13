@@ -21,8 +21,8 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.graph.model.entityModel.Location.FileOrFolder.from
 import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
-import io.renku.jsonld.JsonLDDecoder._
-import io.renku.jsonld.JsonLDEncoder._
+import io.renku.jsonld.JsonLDDecoder.decodeString
+import io.renku.jsonld.JsonLDEncoder.encodeString
 import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes.constraints.{NonBlank, RelativePath, Url}
 import io.renku.tinytypes.{RelativePathTinyType, StringTinyType, TinyTypeFactory}

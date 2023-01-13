@@ -42,14 +42,15 @@ import scala.util.Try
 
 object EventLog extends TypeSerializers {
 
-  def findEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute { session =>
-    val query: Query[projects.GitLabId, (EventId, EventStatus)] =
-      sql"""SELECT event_id, status
+  def findEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute {
+    session =>
+      val query: Query[projects.GitLabId, (EventId, EventStatus)] =
+        sql"""SELECT event_id, status
             FROM event
             WHERE project_id = $projectIdEncoder"""
-        .query(eventIdDecoder ~ eventStatusDecoder)
-        .map { case id ~ status => (id, status) }
-    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+          .query(eventIdDecoder ~ eventStatusDecoder)
+          .map { case id ~ status => (id, status) }
+      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   def findEvents(projectId: GitLabId, status: EventStatus*)(implicit ioRuntime: IORuntime): List[CommitId] = execute {
@@ -74,7 +75,7 @@ object EventLog extends TypeSerializers {
   }
 
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
-                                                                                             ioRuntime:                                 IORuntime
+      ioRuntime:                                 IORuntime
   ): Unit = execute { session =>
     val query: Command[projects.GitLabId ~ String] = sql"""
       DELETE FROM subscription_category_sync_time 

@@ -500,12 +500,19 @@ object Dataset {
     }
 
   val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
+
+  private val urlToDatasetReference =
+    Type.Def(
+      Class(schema / "URL"),
+      ObjectProperty(schema / "url", Dataset.ontologyClass)
+    )
+
   lazy val ontology: Type =
     Type.Def(
       ontologyClass,
       ObjectProperties(
-        ObjectProperty(schema / "sameAs", SameAs.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", DerivedFrom.ontology),
+        ObjectProperty(schema / "sameAs", urlToDatasetReference),
+        ObjectProperty(prov / "wasDerivedFrom", urlToDatasetReference),
         ObjectProperty(schema / "creator", Person.ontology),
         ObjectProperty(renku / "topmostSameAs", ontologyClass),
         ObjectProperty(renku / "topmostDerivedFrom", ontologyClass),

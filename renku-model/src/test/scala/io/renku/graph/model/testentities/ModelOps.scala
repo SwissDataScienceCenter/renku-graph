@@ -26,7 +26,6 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
 import io.renku.graph.model.images.{Image, ImageUri}
