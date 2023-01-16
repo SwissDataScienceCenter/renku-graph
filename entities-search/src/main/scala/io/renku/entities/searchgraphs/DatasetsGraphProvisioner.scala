@@ -19,12 +19,22 @@
 package io.renku.entities.searchgraphs
 
 import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import commands.UpdateCommandsProducer
 import io.renku.graph.model.entities.Project
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 
 trait DatasetsGraphProvisioner[F[_]] {
   def provisionDatasetsGraph(project: Project): F[Unit]
+}
+
+object DatasetsGraphProvisioner {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsGraphProvisioner[F]] = for {
+    updatesProducer    <- UpdateCommandsProducer[F]
+    searchInfoUploader <- UpdateCommandsUploader[F]
+  } yield new DatasetsGraphProvisionerImpl[F](updatesProducer, searchInfoUploader)
 }
 
 private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],

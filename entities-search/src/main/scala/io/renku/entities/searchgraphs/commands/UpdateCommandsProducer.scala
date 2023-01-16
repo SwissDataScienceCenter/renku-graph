@@ -20,12 +20,22 @@ package io.renku.entities.searchgraphs
 package commands
 
 import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.projects
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
   def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]]
+}
+
+private[searchgraphs] object UpdateCommandsProducer {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsProducer[F]] = for {
+    searchInfoFetcher <- SearchInfoFetcher[F]
+    visibilityFinder  <- VisibilityFinder[F]
+  } yield new UpdateCommandsProducerImpl[F](searchInfoFetcher, visibilityFinder, CommandsCalculator[F]())
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],

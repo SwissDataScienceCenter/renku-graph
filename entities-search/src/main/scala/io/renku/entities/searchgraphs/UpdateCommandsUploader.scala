@@ -30,9 +30,8 @@ private trait UpdateCommandsUploader[F[_]] {
 }
 
 private object UpdateCommandsUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](): F[UpdateCommandsUploader[F]] =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsUploader[F]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new UpdateCommandsUploaderImpl[F](_))
-
 }
 
 private class UpdateCommandsUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends UpdateCommandsUploader[F] {

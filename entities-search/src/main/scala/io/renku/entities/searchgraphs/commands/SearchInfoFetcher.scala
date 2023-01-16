@@ -21,6 +21,7 @@ package commands
 
 import cats.data.NonEmptyList
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, projects}
@@ -31,7 +32,10 @@ private trait SearchInfoFetcher[F[_]] {
   def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[SearchInfo]]
 }
 
-private object SearchInfoFetcher {}
+private object SearchInfoFetcher {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
+    ProjectsConnectionConfig[F]().map(new SearchInfoFetcherImpl[F](_))
+}
 
 private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
     extends TSClientImpl(storeConfig)

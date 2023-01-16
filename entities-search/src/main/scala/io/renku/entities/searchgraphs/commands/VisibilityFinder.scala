@@ -19,12 +19,18 @@
 package io.renku.entities.searchgraphs.commands
 
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait VisibilityFinder[F[_]] {
   def findVisibility(projectId: projects.ResourceId): F[Option[projects.Visibility]]
+}
+
+private object VisibilityFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[VisibilityFinder[F]] =
+    ProjectsConnectionConfig[F]().map(new VisibilityFinderImpl[F](_))
 }
 
 private class VisibilityFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
