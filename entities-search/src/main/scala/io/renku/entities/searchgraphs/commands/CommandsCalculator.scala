@@ -20,212 +20,153 @@ package io.renku.entities.searchgraphs
 package commands
 
 import Encoders._
-import SearchInfoLens.findLink
 import SearchInfoOntology.{linkProperty, visibilityProperty}
 import UpdateCommand._
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.graph.model.entities.Project
 import io.renku.graph.model.{datasets, projects}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.{Quad, TripleObject}
 import io.renku.triplesstore.client.syntax._
 
-private object CommandsCalculator {
+private trait CommandsCalculator[F[_]] {
+  def calculateCommands: CalculatorInfoSet => F[List[UpdateCommand]]
+}
 
-  def calculateCommands[F[_]: MonadThrow]: CalculatorInfoSet => F[List[UpdateCommand]] = {
-    case `DS exists on Project & TS without any other projects`() => noUpdates
-    case `DS exists on Project & TS along other Projects`()       => noUpdates
-    case `DS exists on Project only`(info)                        => info.asQuads.map(Insert).toList.pure[F].widen
-    case `DS exists on Project & DS from TS linked only to other narrower visibility Projects`(topSameAs,
-                                                                                               oldVisibility,
-                                                                                               newVisibility,
-                                                                                               newLink
+private object CommandsCalculator {
+  def apply[F[_]: MonadThrow](): CommandsCalculator[F] = new CommandsCalculatorImpl[F]
+}
+
+private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculator[F] {
+
+  def calculateCommands: CalculatorInfoSet => F[List[UpdateCommand]] = {
+    case `DS exists on Project only`(info)                     => info.asQuads.map(Insert).toList.pure[F].widen
+    case `DS exists on Project & TS - no visibility changes`() => noUpdates
+    case `DS exists on Project & TS but on other narrower visibility Projects`(topSameAs,
+                                                                               oldVisibility,
+                                                                               newVisibility,
+                                                                               newLink
         ) =>
       (deleteInfoVisibility(topSameAs, oldVisibility) ::
         insertInfoVisibility(topSameAs, newVisibility) ::
         insertLink(topSameAs, newLink)).pure[F]
-    case `DS exists on Project & DS from TS linked only to other broader or same visibility Projects`(topSameAs,
-                                                                                                      newLink
-        ) =>
+    case `DS exists on Project & TS but on other broader or same visibility Projects`(topSameAs, newLink) =>
       insertLink(topSameAs, newLink).pure[F].widen
-    case `DS exists on Project & TS - the updated visibility does not change TS info visibility`(
-          linkId,
-          oldVisibility,
-          newVisibility
-        ) =>
-      (deleteLinkVisibility(linkId, oldVisibility) :: insertLinkVisibility(linkId, newVisibility) :: Nil).pure[F]
-    case `DS exists on Project & TS - the updated visibility does change TS info visibility`(
-          topSameAs,
-          linkId,
-          oldVisibility,
-          newVisibility
+    case `DS exists on Project & TS - visibility change affects TS`(topSameAs, oldVisibility, newVisibility) =>
+      (deleteInfoVisibility(topSameAs, oldVisibility) ::
+        insertInfoVisibility(topSameAs, newVisibility) :: Nil).pure[F]
+    case `DS exists on TS only on the single project`(info) => info.asQuads.map(Delete).toList.pure[F].widen
+    case `DS exists on TS only along other projects - no info visibility change`(topSameAs, link) =>
+      deleteLink(topSameAs, link).pure[F].widen
+    case `DS exists on TS only along other projects - info visibility change`(topSameAs,
+                                                                              oldVisibility,
+                                                                              newVisibility,
+                                                                              link
         ) =>
       (deleteInfoVisibility(topSameAs, oldVisibility) ::
-        insertInfoVisibility(topSameAs, newVisibility) ::
-        deleteLinkVisibility(linkId, oldVisibility) ::
-        insertLinkVisibility(linkId, newVisibility) :: Nil).pure[F]
-    case `DS exists on TS only on the single project`(info) => info.asQuads.map(Delete).toList.pure[F].widen
-    case `DS present on TS only on many projects all with broader or same visibility`(topSameAs, link) =>
-      deleteLink(topSameAs, link).pure[F].widen
-    case `DS present on TS only on many projects all with narrower visibility`(topSameAs, link, newVisibility) =>
-      (deleteInfoVisibility(topSameAs, link.visibility) ::
         insertInfoVisibility(topSameAs, newVisibility) ::
         deleteLink(topSameAs, link)).pure[F].widen
     case infoSet =>
       new IllegalStateException(show"Cannot calculate update commands for $infoSet").raiseError[F, List[UpdateCommand]]
   }
 
-  private object `DS exists on Project & TS without any other projects` {
-    def unapply(infoSet: CalculatorInfoSet): Boolean = infoSet match {
-      case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) => modelInfo == tsInfo
-      case _                                                   => false
+  private object `DS exists on Project only` {
+    def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
+      case CalculatorInfoSet.ModelInfoOnly(_, modelInfo) => modelInfo.some
+      case _                                             => None
     }
   }
 
-  private object `DS exists on Project & TS along other Projects` {
+  private object `DS exists on Project & TS - no visibility changes` {
     def unapply(infoSet: CalculatorInfoSet): Boolean = infoSet match {
-      case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
-        tsInfo.links.size > 1 &&
-        (findProjectLink(infoSet.project)(modelInfo) -> findProjectLink(infoSet.project)(tsInfo))
-          .mapN(_ == _)
-          .getOrElse(false)
+      case CalculatorInfoSet.AllInfos(proj, modelInfo, tsInfo, tsVisibilities) =>
+        tsInfo.findLink(proj.resourceId).nonEmpty &&
+        maxVisibilityNow(tsVisibilities) == maxVisibilityAfter(tsVisibilities, modelInfo)
       case _ => false
     }
   }
 
-  private object `DS exists on Project only` {
-    def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
-      case CalculatorInfoSet(_, someModelInfo @ Some(_), None) => someModelInfo
-      case _                                                   => None
-    }
-  }
-
-  private object `DS exists on Project & DS from TS linked only to other narrower visibility Projects` {
+  private object `DS exists on Project & TS but on other narrower visibility Projects` {
     def unapply(
         infoSet: CalculatorInfoSet
     ): Option[(datasets.TopmostSameAs, projects.Visibility, projects.Visibility, Link)] =
       infoSet match {
-        case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
-          findProjectLink(infoSet.project)(tsInfo) match {
-            case None if tsInfo.visibility < modelInfo.visibility =>
-              Some(tsInfo.topmostSameAs, tsInfo.visibility, modelInfo.visibility, modelInfo.links.head)
-            case _ => None
-          }
+        case CalculatorInfoSet.AllInfos(proj, modelInfo, tsInfo, tsVisibilities)
+            if tsInfo.findLink(proj.resourceId).isEmpty &&
+              (findMax(tsVisibilities) < modelInfo.visibility) =>
+          (modelInfo.topmostSameAs, tsInfo.visibility, modelInfo.visibility, modelInfo.links.head).some
         case _ => None
       }
   }
 
-  object `DS exists on Project & DS from TS linked only to other broader or same visibility Projects` {
-    def unapply(
-        infoSet: CalculatorInfoSet
-    ): Option[(datasets.TopmostSameAs, Link)] =
-      infoSet match {
-        case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
-          findProjectLink(infoSet.project)(tsInfo) match {
-            case None if tsInfo.visibility >= modelInfo.visibility => Some(tsInfo.topmostSameAs, modelInfo.links.head)
-            case _                                                 => None
-          }
-        case _ => None
-      }
+  private object `DS exists on Project & TS but on other broader or same visibility Projects` {
+    def unapply(infoSet: CalculatorInfoSet): Option[(datasets.TopmostSameAs, Link)] = infoSet match {
+      case CalculatorInfoSet.AllInfos(proj, modelInfo, tsInfo, tsVisibilities)
+          if tsInfo.findLink(proj.resourceId).isEmpty &&
+            (findMax(tsVisibilities) >= modelInfo.visibility) =>
+        (modelInfo.topmostSameAs, modelInfo.links.head).some
+      case _ => None
+    }
   }
 
-  object `DS exists on Project & TS - the updated visibility does not change TS info visibility` {
+  object `DS exists on Project & TS - visibility change affects TS` {
     def unapply(
         infoSet: CalculatorInfoSet
-    ): Option[(links.ResourceId, projects.Visibility, projects.Visibility)] =
-      infoSet match {
-        case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
-          (findProjectLink(infoSet.project)(modelInfo) -> findProjectLink(infoSet.project)(tsInfo)).flatMapN {
-            case (modelLink, tsLink) if modelLink.visibility == tsLink.visibility => None
-            case (modelLink, tsLink) =>
-              findOtherProjectLinks(infoSet.project)(tsInfo) match {
-                case Nil =>
-                  None
-                case otherProjectsLinks if maxVisibility(otherProjectsLinks) >= modelInfo.visibility =>
-                  (tsLink.resourceId, tsLink.visibility, modelLink.visibility).some
-                case _ => None
-              }
-            case _ => None
-          }
-        case _ => None
-      }
-  }
-
-  object `DS exists on Project & TS - the updated visibility does change TS info visibility` {
-    def unapply(
-        infoSet: CalculatorInfoSet
-    ): Option[(datasets.TopmostSameAs, links.ResourceId, projects.Visibility, projects.Visibility)] =
-      infoSet match {
-        case CalculatorInfoSet(_, Some(modelInfo), Some(tsInfo)) =>
-          (findProjectLink(infoSet.project)(modelInfo) -> findProjectLink(infoSet.project)(tsInfo)).flatMapN {
-            case (modelLink, tsLink) if modelLink.visibility == tsLink.visibility => None
-            case (modelLink, tsLink) =>
-              findOtherProjectLinks(infoSet.project)(tsInfo) match {
-                case Nil =>
-                  (tsInfo.topmostSameAs, tsLink.resourceId, tsLink.visibility, modelLink.visibility).some
-                case otherProjectsLinks if maxVisibility(otherProjectsLinks) < modelInfo.visibility =>
-                  (tsInfo.topmostSameAs, tsLink.resourceId, tsLink.visibility, modelLink.visibility).some
-                case _ => None
-              }
-            case _ => None
-          }
-        case _ => None
-      }
+    ): Option[(datasets.TopmostSameAs, projects.Visibility, projects.Visibility)] = infoSet match {
+      case CalculatorInfoSet.AllInfos(proj, modelInfo, tsInfo, tsVisibilities)
+          if tsInfo.findLink(proj.resourceId).nonEmpty &&
+            maxVisibilityNow(tsVisibilities) != maxVisibilityAfter(tsVisibilities, modelInfo) =>
+        (modelInfo.topmostSameAs, tsInfo.visibility, modelInfo.visibility).some
+      case _ => None
+    }
   }
 
   private object `DS exists on TS only on the single project` {
     def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
-      case CalculatorInfoSet(_, None, Some(tsInfo))
-          if tsInfo.links.size == 1 && findProjectLink(infoSet.project)(tsInfo).nonEmpty =>
-        findLink(infoSet.project.resourceId)(tsInfo).map(_ => tsInfo)
+      case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, _)
+          if tsInfo.findLink(proj.resourceId).nonEmpty && tsInfo.links.size == 1 =>
+        tsInfo.some
       case _ => None
     }
   }
 
-  private object `DS present on TS only on many projects all with broader or same visibility` {
+  private object `DS exists on TS only along other projects - no info visibility change` {
     def unapply(infoSet: CalculatorInfoSet): Option[(datasets.TopmostSameAs, Link)] = infoSet match {
-      case CalculatorInfoSet(_, None, Some(tsInfo)) =>
-        findOtherProjectLinks(infoSet.project)(tsInfo) match {
-          case Nil => None
-          case otherProjLinks =>
-            findProjectLink(infoSet.project)(tsInfo).flatMap(projLink =>
-              if (maxVisibility(otherProjLinks) >= projLink.visibility) (tsInfo.topmostSameAs -> projLink).some
-              else None
-            )
-        }
+      case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, tsVisibilities)
+          if tsInfo.findLink(proj.resourceId).nonEmpty &&
+            tsInfo.links.size > 1 &&
+            maxVisibilityNow(tsVisibilities) == findMax(tsVisibilities - proj.resourceId) =>
+        tsInfo.findLink(proj.resourceId).map(tsInfo.topmostSameAs -> _)
       case _ => None
     }
   }
 
-  private object `DS present on TS only on many projects all with narrower visibility` {
-    def unapply(infoSet: CalculatorInfoSet): Option[(datasets.TopmostSameAs, Link, projects.Visibility)] =
-      infoSet match {
-        case CalculatorInfoSet(_, None, Some(tsInfo)) =>
-          findOtherProjectLinks(infoSet.project)(tsInfo) match {
-            case Nil => None
-            case otherProjLinks =>
-              findProjectLink(infoSet.project)(tsInfo).flatMap { projLink =>
-                val newInfoVisibility = maxVisibility(otherProjLinks)
-                if (newInfoVisibility < projLink.visibility)
-                  (tsInfo.topmostSameAs, projLink, newInfoVisibility).some
-                else None
-              }
-          }
-        case _ => None
-      }
+  private object `DS exists on TS only along other projects - info visibility change` {
+    def unapply(
+        infoSet: CalculatorInfoSet
+    ): Option[(datasets.TopmostSameAs, projects.Visibility, projects.Visibility, Link)] = infoSet match {
+      case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, tsVisibilities)
+          if tsInfo.findLink(proj.resourceId).nonEmpty &&
+            tsInfo.links.size > 1 &&
+            maxVisibilityNow(tsVisibilities) != findMax(tsVisibilities - proj.resourceId) =>
+        tsInfo
+          .findLink(proj.resourceId)
+          .map(link => (tsInfo.topmostSameAs, tsInfo.visibility, findMax(tsVisibilities - proj.resourceId), link))
+      case _ => None
+    }
   }
 
-  private def findProjectLink(project: Project): SearchInfo => Option[Link] =
-    findLink(project.resourceId)
+  private def maxVisibilityNow(tsVisibilities: Map[projects.ResourceId, projects.Visibility]) =
+    findMax(tsVisibilities)
 
-  private def findOtherProjectLinks(project: Project): SearchInfo => List[Link] =
-    _.links.filterNot(_.projectId == project.resourceId)
+  private def maxVisibilityAfter(tsVisibilities: Map[projects.ResourceId, projects.Visibility], modelInfo: SearchInfo) =
+    findMax(tsVisibilities + (modelInfo.links.head.projectId -> modelInfo.visibility))
 
-  private lazy val maxVisibility: List[Link] => projects.Visibility = _.map(_.visibility).max
+  private def findMax(visibilities: Map[projects.ResourceId, projects.Visibility]): projects.Visibility =
+    visibilities.maxBy(_._2)._2
 
-  private def noUpdates[F[_]: MonadThrow] = List.empty[UpdateCommand].pure[F]
+  private def noUpdates = List.empty[UpdateCommand].pure[F]
 
   private def deleteInfoVisibility(topSameAs: datasets.TopmostSameAs, visibility: projects.Visibility) =
     Delete(visibilityQuad(topSameAs, visibility))
@@ -241,15 +182,6 @@ private object CommandsCalculator {
 
   private def infoLinkEdge(topSameAs: datasets.TopmostSameAs, linkId: links.ResourceId) =
     quad(topSameAs, linkProperty, linkId.asEntityId)
-
-  private def insertLinkVisibility(linkId: links.ResourceId, visibility: projects.Visibility) =
-    Insert(linkVisibilityQuad(linkId, visibility))
-
-  private def deleteLinkVisibility(linkId: links.ResourceId, visibility: projects.Visibility) =
-    Delete(linkVisibilityQuad(linkId, visibility))
-
-  private def linkVisibilityQuad(linkId: links.ResourceId, visibility: projects.Visibility) =
-    DatasetsQuad(linkId, visibilityProperty.id, visibility.asObject)
 
   private def visibilityQuad(topSameAs: datasets.TopmostSameAs, visibility: projects.Visibility) =
     quad(topSameAs, visibilityProperty.id, visibility.asObject)

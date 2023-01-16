@@ -56,26 +56,22 @@ private object SearchInfoExtractor {
       )
       .widen
 
-  private def createSearchInfo(ds:                Dataset[Dataset.Provenance],
-                               dateOriginal:      datasets.Date,
-                               maybeDateModified: Option[DateModified],
-                               project:           Project
+  private def createSearchInfo(ds:                 Dataset[Dataset.Provenance],
+                               createdOrPublished: datasets.Date,
+                               maybeDateModified:  Option[DateModified],
+                               project:            Project
   ) = SearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
-    dateOriginal,
+    project.visibility,
+    createdOrPublished,
     maybeDateModified,
     ds.provenance.creators.map(toPersonInfo),
     ds.additionalInfo.keywords,
     ds.additionalInfo.maybeDescription,
     ds.additionalInfo.images,
     NonEmptyList.one(
-      Link(ds.provenance.topmostSameAs,
-           ds.identification.resourceId,
-           project.resourceId,
-           project.path,
-           project.visibility
-      )
+      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
     )
   )
 }

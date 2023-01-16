@@ -19,17 +19,16 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import CalculatorInfoSetGenerators._
 import Encoders._
 import Generators._
 import UpdateCommand._
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoLens.linkVisibility
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
-import io.renku.graph.model.projects
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
@@ -41,57 +40,22 @@ import scala.util.{Failure, Try}
 
 class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
-  private val calculateCommands = CommandsCalculator.calculateCommands[Try]
+  private val calculateCommands = CommandsCalculator[Try]().calculateCommands
 
   "calculateCommands" should {
 
     "return no commands " +
-      "when DS from model is associated in TS with the single project and has the same visibility" in {
+      "when DS from the model and TS are the same" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = someInfoSet.project.resourceId -> anyVisibility).generateOne
+        val info = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = modelInfo.some)
-
-        calculateCommands(infoSet) shouldBe Nil.pure[Try]
-      }
-
-    "return no commands " +
-      "when DS from model is associated in TS with the model project along with other projects all having the same visibility" in {
-
-        val someInfoSet = calculatorInfoSets.generateOne
-
-        val modelInfo = searchInfoObjectsGen(withLinkTo = someInfoSet.project.resourceId -> anyVisibility).generateOne
-
-        val tsInfo = modelInfo.copy(links =
-          modelInfo.links :::
-            linkObjectsGen(modelInfo.topmostSameAs, fixed(modelInfo.visibility)).generateNonEmptyList()
+        val infoSet = CalculatorInfoSet.AllInfos(project,
+                                                 info,
+                                                 tsInfo = info,
+                                                 tsVisibilities = Map(project.resourceId -> project.visibility)
         )
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
-
-        calculateCommands(infoSet) shouldBe Nil.pure[Try]
-      }
-
-    "return no commands " +
-      "when DS from model is associated in TS with the model project along with other projects having narrower visibility" in {
-
-        val someInfoSet = calculatorInfoSets.generateOne
-
-        val modelInfo = searchInfoObjectsGen(withLinkTo =
-          someInfoSet.project.resourceId -> visibilities(minus = projects.Visibility.Private).generateOne
-        ).generateOne
-
-        val tsInfo = modelInfo.copy(
-          links = modelInfo.links :+
-            linkObjectsGen(modelInfo.topmostSameAs, visibilitiesNarrower(modelInfo.visibility)).generateOne
-        )
-
-        assume(modelInfo.visibility == tsInfo.visibility)
-        tsInfo.links.forall(_.visibility <= modelInfo.visibility)
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
 
         calculateCommands(infoSet) shouldBe Nil.pure[Try]
       }
@@ -99,63 +63,96 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
     "create Inserts for the info from the model " +
       "when it does not exist the TS" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = someInfoSet.project.resourceId -> anyVisibility).generateOne
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = None)
+        val infoSet = CalculatorInfoSet.ModelInfoOnly(project, modelInfo)
 
         calculateCommands(infoSet) should produce(modelInfo.asQuads(searchInfoEncoder).map(Insert).toList)
       }
 
     "return no commands " +
-      "when DS from model is associated in TS with the model project along with other projects having broader visibility" in {
+      "when DS from model is associated in TS with the model project along with other projects all having the same visibility" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo =
-          someInfoSet.project.resourceId -> visibilities(minus = projects.Visibility.Public).generateOne
-        ).generateOne
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfo = modelInfo.copy(
-          links = modelInfo.links :+
-            linkObjectsGen(modelInfo.topmostSameAs, visibilitiesBroader(modelInfo.visibility)).generateOne
+        val tsInfo =
+          modelInfo.copy(links = modelInfo.links ::: linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList())
+
+        val infoSet =
+          CalculatorInfoSet.AllInfos(project,
+                                     modelInfo,
+                                     tsInfo,
+                                     tsInfo.links.map(_.projectId).map(_ -> modelInfo.visibility).toList.toMap
+          )
+
+        calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
+
+    "return no commands " +
+      "when DS from model is associated in TS with the model project along with other projects having narrower visibility" in {
+
+        val project = newProject(visibilities(minus = projects.Visibility.Private).generateOne)
+
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+
+        val otherTsLinks = linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList()
+        val tsInfo       = modelInfo.copy(links = modelInfo.links ::: otherTsLinks)
+        val otherTsLinksVisibilities =
+          otherTsLinks.map(_.projectId).map(_ -> visibilitiesNarrower(modelInfo.visibility).generateOne).toList.toMap
+
+        val infoSet = CalculatorInfoSet.AllInfos(
+          project,
+          modelInfo,
+          tsInfo,
+          otherTsLinksVisibilities + (project.resourceId -> modelInfo.visibility)
         )
 
-        assume(modelInfo.visibility < tsInfo.visibility)
-        tsInfo.links.forall(_.visibility >= modelInfo.visibility)
+        calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+    "return no commands " +
+      "when DS from model is associated in TS with the model project along with other projects having broader visibility" in {
 
-        assume(modelInfo.visibility < tsInfo.visibility)
+        val project = newProject(visibilities(minus = projects.Visibility.Public).generateOne)
+
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+
+        val otherTsLinks = linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList()
+        val tsInfo       = modelInfo.copy(links = modelInfo.links ::: otherTsLinks)
+        val otherTsLinksVisibilities =
+          otherTsLinks.map(_.projectId).map(_ -> visibilitiesBroader(modelInfo.visibility).generateOne).toList.toMap
+
+        val infoSet = CalculatorInfoSet.AllInfos(
+          project,
+          modelInfo,
+          tsInfo,
+          otherTsLinksVisibilities + (project.resourceId -> modelInfo.visibility)
+        )
 
         calculateCommands(infoSet) shouldBe Nil.pure[Try]
       }
 
     "return Delete & Insert commands changing the info's visibility and adding the new Link " +
-      "when DS from model is associated in TS only with other projects having narrower visibility" in {
+      "when DS from the model is associated in TS only with other projects having narrower visibility" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject(visibilities(minus = projects.Visibility.Private).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> visibilities(minus = projects.Visibility.Private).generateOne
-        ).generateOne
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfo = modelInfo.copy(links =
-          linkObjectsGen(modelInfo.topmostSameAs, visibilitiesNarrower(modelInfo.visibility)).generateNonEmptyList()
-        )
+        val tsInfoVisibility = visibilitiesNarrower(modelInfo.visibility).generateOne
+        val tsInfoLink       = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfo           = modelInfo.copy(links = NonEmptyList.one(tsInfoLink), visibility = tsInfoVisibility)
 
-        assume(modelInfo.visibility >= tsInfo.visibility)
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+        val infoSet =
+          CalculatorInfoSet.AllInfos(project, modelInfo, tsInfo, Map(tsInfoLink.projectId -> tsInfoVisibility))
 
         calculateCommands(infoSet) should produce(
-          Insert(
-            DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, modelInfo.visibility.asObject)
-          ) ::
-            Delete(
-              DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, tsInfo.visibility.asObject)
-            ) ::
+          Insert(visibilityQuad(tsInfo, modelInfo.visibility)) ::
+            Delete(visibilityQuad(tsInfo, tsInfo.visibility)) ::
             modelInfo.links.toList.flatMap(l => (l.asQuads + linkEdge(modelInfo, l)).map(Insert))
         )
       }
@@ -163,208 +160,216 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
     "return Insert commands adding the new link " +
       "when DS from model is associated in TS only with other projects having broader or the same visibility" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject(visibilities(minus = projects.Visibility.Public).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> visibilities(minus = projects.Visibility.Public).generateOne
-        ).generateOne
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfo = modelInfo.copy(links =
-          linkObjectsGen(modelInfo.topmostSameAs, visibilitiesBroader(modelInfo.visibility)).generateNonEmptyList()
+        val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
+        val tsInfoLink1      = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfoLink2      = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfo = modelInfo.copy(links = NonEmptyList.of(tsInfoLink1, tsInfoLink2), visibility = tsInfoVisibility)
+
+        val infoSet = CalculatorInfoSet.AllInfos(project,
+                                                 modelInfo,
+                                                 tsInfo,
+                                                 Map(tsInfoLink1.projectId -> modelInfo.visibility,
+                                                     tsInfoLink2.projectId -> tsInfoVisibility
+                                                 )
         )
-
-        assume(modelInfo.visibility <= tsInfo.visibility)
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
 
         calculateCommands(infoSet) should produce(
           modelInfo.links.toList.flatMap(l => (l.asQuads + linkEdge(modelInfo, l)).map(Insert))
         )
       }
 
-    "return Delete & Insert commands updating visibility on the project link only " +
+    "return no commands " +
       "when DS from model is already associated in TS but its visibility became narrower although not changing TS info's visibility" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject(projects.Visibility.Private)
 
-        val modelInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> projects.Visibility.Private
-        ).generateOne
-        val modelInfoLink = modelInfo.links.head
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfoLink = linkVisibility.set(projects.Visibility.Public)(modelInfoLink)
-        val tsInfo = modelInfo.copy(links =
-          NonEmptyList.of(tsInfoLink, linkObjectsGen(modelInfo.topmostSameAs, projects.Visibility.Public).generateOne)
+        val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
+        val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfo           = modelInfo.copy(links = modelInfo.links :+ otherTsInfoLink, visibility = tsInfoVisibility)
+
+        val infoSet = CalculatorInfoSet.AllInfos(project,
+                                                 modelInfo,
+                                                 tsInfo,
+                                                 Map(project.resourceId        -> tsInfoVisibility,
+                                                     otherTsInfoLink.projectId -> tsInfoVisibility
+                                                 )
         )
 
-        assume(modelInfo.visibility < tsInfo.visibility)
+        calculateCommands(infoSet) shouldBe Nil.pure[Try]
+      }
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+    "return Delete & Insert commands changing the info's visibility " +
+      "when DS from model is already associated in TS but its visibility became narrower causing TS info's visibility change" in {
+
+        val project = newProject(projects.Visibility.Private)
+
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+
+        val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
+        val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfo           = modelInfo.copy(links = modelInfo.links :+ otherTsInfoLink, visibility = tsInfoVisibility)
+
+        val infoSet = CalculatorInfoSet.AllInfos(project,
+                                                 modelInfo,
+                                                 tsInfo,
+                                                 Map(project.resourceId        -> tsInfoVisibility,
+                                                     otherTsInfoLink.projectId -> modelInfo.visibility
+                                                 )
+        )
 
         calculateCommands(infoSet) should produce(
-          Insert(
-            DatasetsQuad(modelInfoLink.resourceId, LinkOntology.visibilityProperty.id, modelInfo.visibility.asObject)
-          ) ::
-            Delete(
-              DatasetsQuad(tsInfoLink.resourceId, LinkOntology.visibilityProperty.id, tsInfoLink.visibility.asObject)
-            ) :: Nil
+          Insert(visibilityQuad(tsInfo, modelInfo.visibility)) ::
+            Delete(visibilityQuad(tsInfo, tsInfo.visibility)) :: Nil
         )
       }
 
-    "return Delete & Insert commands updating visibility on the project link and info " +
-      "when DS from model is already associated in TS but its visibility became narrower causing changing TS info's visibility" in {
+    "return Delete & Insert commands changing the info's visibility " +
+      "when DS from model is already associated in TS but its visibility became broader causing TS info's visibility change" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject(projects.Visibility.Public)
 
-        val modelInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> projects.Visibility.Private
-        ).generateOne
-        val modelInfoLink = modelInfo.links.head
+        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfoLink = linkVisibility.set(visibilitiesBroader(modelInfoLink.visibility).generateOne)(modelInfoLink)
-        val tsInfo     = modelInfo.copy(links = NonEmptyList.of(tsInfoLink))
+        val tsInfoVisibility = visibilitiesNarrower(modelInfo.visibility).generateOne
+        val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
+        val tsInfo           = modelInfo.copy(links = modelInfo.links :+ otherTsInfoLink, visibility = tsInfoVisibility)
 
-        assume(modelInfo.visibility < tsInfo.visibility)
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
+        val infoSet = CalculatorInfoSet.AllInfos(project,
+                                                 modelInfo,
+                                                 tsInfo,
+                                                 Map(project.resourceId        -> tsInfoVisibility,
+                                                     otherTsInfoLink.projectId -> tsInfoVisibility
+                                                 )
+        )
 
         calculateCommands(infoSet) should produce(
-          Insert(
-            DatasetsQuad(modelInfoLink.resourceId, LinkOntology.visibilityProperty.id, modelInfo.visibility.asObject)
-          ) ::
-            Delete(
-              DatasetsQuad(tsInfoLink.resourceId, LinkOntology.visibilityProperty.id, tsInfoLink.visibility.asObject)
-            ) ::
-            Insert(
-              DatasetsQuad(tsInfo.topmostSameAs,
-                           SearchInfoOntology.visibilityProperty.id,
-                           modelInfo.visibility.asObject
-              )
-            ) ::
-            Delete(
-              DatasetsQuad(tsInfo.topmostSameAs,
-                           SearchInfoOntology.visibilityProperty.id,
-                           tsInfoLink.visibility.asObject
-              )
-            ) :: Nil
+          Insert(visibilityQuad(tsInfo, modelInfo.visibility)) ::
+            Delete(visibilityQuad(tsInfo, tsInfo.visibility)) :: Nil
         )
       }
 
-    "return Delete & Insert commands updating visibility on the info and on the project link " +
-      "when DS from model is already associated in TS but its visibility became broader than other projects" in {
+    "create Deletes for the info and the link " +
+      "when it does not exist on this Project and any other" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> projects.Visibility.Public
-        ).generateOne
-        val modelInfoLink = modelInfo.links.head
+        val tsInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
 
-        val tsInfoLink = linkVisibility.set(projects.Visibility.Private)(modelInfoLink)
-        val tsInfo = modelInfo.copy(links =
-          NonEmptyList.of(tsInfoLink,
-                          linkObjectsGen(modelInfo.topmostSameAs,
-                                         visibilitiesNarrower(modelInfo.visibility)
-                          ).generateOne
-          )
-        )
-
-        assume(modelInfo.visibility > tsInfo.visibility)
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = modelInfo.some, maybeTSInfo = tsInfo.some)
-
-        calculateCommands(infoSet) should produce(
-          Insert(
-            DatasetsQuad(modelInfo.topmostSameAs,
-                         SearchInfoOntology.visibilityProperty.id,
-                         modelInfo.visibility.asObject
-            )
-          ) ::
-            Delete(
-              DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, tsInfo.visibility.asObject)
-            ) ::
-            Insert(
-              DatasetsQuad(modelInfoLink.resourceId, LinkOntology.visibilityProperty.id, modelInfo.visibility.asObject)
-            ) ::
-            Delete(
-              DatasetsQuad(tsInfoLink.resourceId, LinkOntology.visibilityProperty.id, tsInfoLink.visibility.asObject)
-            ) :: Nil
-        )
-      }
-
-    "create Deletes for the info with association to the project only found in the TS " +
-      "when it does not exist on the Project" in {
-
-        val someInfoSet = calculatorInfoSets.generateOne
-
-        val tsInfo = searchInfoObjectsGen(withLinkTo = someInfoSet.project.resourceId -> anyVisibility).generateOne
-
-        val infoSet = someInfoSet.copy(maybeModelInfo = None, maybeTSInfo = tsInfo.some)
+        val infoSet = CalculatorInfoSet.TSInfoOnly(project, tsInfo, Map(project.resourceId -> tsInfo.visibility))
 
         calculateCommands(infoSet) should produce(tsInfo.asQuads.map(Delete).toList)
       }
 
-    "create Deletes for the project link found on the info in TS " +
-      "when the info found in the TS is associated with other projects - other projects' visibilities are broader" in {
+    "create Deletes for the link only " +
+      "when the info found in the TS is associated also with other projects - the other projects' visibilities are broader or same" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val tsInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> projects.Visibility.Private,
-          and = projectResourceIds.generateOne        -> visibilitiesBroader(projects.Visibility.Private).generateOne
-        ).generateOne
+        val otherTsProject1Id = projectResourceIds.generateOne
+        val otherTsProject2Id = projectResourceIds.generateOne
+        val tsInfoVisibility  = visibilitiesBroader(projects.Visibility.Private).generateOne
+        val tsInfo =
+          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProject1Id, otherTsProject2Id).generateOne
+            .copy(visibility = tsInfoVisibility)
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = None, maybeTSInfo = tsInfo.some)
+        val infoSet = CalculatorInfoSet.TSInfoOnly(
+          project,
+          tsInfo,
+          Map(project.resourceId -> projects.Visibility.Private,
+              otherTsProject1Id  -> projects.Visibility.Private,
+              otherTsProject2Id  -> tsInfoVisibility
+          )
+        )
 
-        val expectedLinkToDelete = tsInfo.links
-          .find(_.projectId == someInfoSet.project.resourceId)
+        val expectedLinkToDelete = tsInfo
+          .findLink(project.resourceId)
           .getOrElse(fail("There supposed to be a link to delete"))
 
         calculateCommands(infoSet) should produce(
-          (expectedLinkToDelete.asQuads +
-            DatasetsQuad(tsInfo.topmostSameAs,
-                         SearchInfoOntology.linkProperty,
-                         expectedLinkToDelete.resourceId.asEntityId
-            )).map(Delete).toList
+          (expectedLinkToDelete.asQuads + linkEdge(tsInfo, expectedLinkToDelete)).map(Delete).toList
         )
       }
 
-    "create Deletes for the project link found on the info in TS and Delete & Insert for the info visibility " +
-      "when the info found in the TS is associated with other projects - other projects' visibilities are narrower" in {
+    "create Deletes for the project link and Delete & Insert for the info visibility " +
+      "when the info found in the TS is associated also with other projects - the other projects' visibilities are narrower" in {
 
-        val someInfoSet = calculatorInfoSets.generateOne
+        val project = newProject()
 
-        val tsInfo = searchInfoObjectsGen(
-          withLinkTo = someInfoSet.project.resourceId -> projects.Visibility.Public,
-          and = projectResourceIds.generateOne        -> visibilitiesNarrower(projects.Visibility.Public).generateOne
-        ).generateOne
+        val otherTsProjectId         = projectResourceIds.generateOne
+        val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
+        val tsInfo =
+          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
+            .copy(visibility = projects.Visibility.Public)
 
-        val infoSet = someInfoSet.copy(maybeModelInfo = None, maybeTSInfo = tsInfo.some)
+        val infoSet = CalculatorInfoSet.TSInfoOnly(
+          project,
+          tsInfo,
+          Map(project.resourceId -> projects.Visibility.Public, otherTsProjectId -> otherTsProjectVisibility)
+        )
 
-        val expectedLinkToDelete = tsInfo.links
-          .find(_.projectId == someInfoSet.project.resourceId)
+        val expectedLinkToDelete = tsInfo
+          .findLink(project.resourceId)
           .getOrElse(fail("There supposed to be a link to delete"))
-        val newVisibility =
-          tsInfo.links.filterNot(_.projectId == someInfoSet.project.resourceId).map(_.visibility).max
+
+        calculateCommands(infoSet) should produce(
+          (expectedLinkToDelete.asQuads + linkEdge(tsInfo, expectedLinkToDelete)).map(Delete).toList :::
+            Insert(visibilityQuad(tsInfo, otherTsProjectVisibility)) ::
+            Delete(visibilityQuad(tsInfo, tsInfo.visibility)) :: Nil
+        )
+      }
+
+    "return no commands " +
+      "when the info found in the TS only but for other projects" in {
+
+        val project = newProject()
+
+        val otherTsProjectId         = projectResourceIds.generateOne
+        val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
+        val tsInfo =
+          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
+            .copy(visibility = projects.Visibility.Public)
+
+        val infoSet = CalculatorInfoSet.TSInfoOnly(
+          project,
+          tsInfo,
+          Map(project.resourceId -> projects.Visibility.Public, otherTsProjectId -> otherTsProjectVisibility)
+        )
+
+        val expectedLinkToDelete = tsInfo
+          .findLink(project.resourceId)
+          .getOrElse(fail("There supposed to be a link to delete"))
 
         calculateCommands(infoSet) should produce(
           (expectedLinkToDelete.asQuads +
             DatasetsQuad(tsInfo.topmostSameAs,
                          SearchInfoOntology.linkProperty,
                          expectedLinkToDelete.resourceId.asEntityId
-            )).map(Delete).toList :+
-            Insert(
-              DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, newVisibility.asObject)
-            ) :+
-            Delete(
-              DatasetsQuad(tsInfo.topmostSameAs, SearchInfoOntology.visibilityProperty.id, tsInfo.visibility.asObject)
-            )
+            )).map(Delete).toList :::
+            Insert(visibilityQuad(tsInfo, otherTsProjectVisibility)) ::
+            Delete(visibilityQuad(tsInfo, tsInfo.visibility)) :: Nil
         )
       }
 
     "fail for when input data in illegal state" in {
 
-      val infoSet = calculatorInfoSets.generateOne.copy(maybeModelInfo = None, maybeTSInfo = None)
+      val project = newProject()
+
+      val otherTsProjectId         = projectResourceIds.generateOne
+      val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
+      val tsInfo = searchInfoObjectsGen(withLinkTo = otherTsProjectId).generateOne
+        .copy(visibility = otherTsProjectVisibility)
+
+      val infoSet = CalculatorInfoSet.TSInfoOnly(
+        project,
+        tsInfo,
+        Map(otherTsProjectId -> otherTsProjectVisibility)
+      )
 
       val Failure(exception) = calculateCommands(infoSet).map(_.toSet)
 
@@ -387,10 +392,16 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
   private def linkEdge(info: SearchInfo, link: Link): Quad =
     DatasetsQuad(info.topmostSameAs, SearchInfoOntology.linkProperty, link.resourceId.asEntityId)
 
+  private def visibilityQuad(info: SearchInfo, visibility: projects.Visibility): Quad =
+    DatasetsQuad(info.topmostSameAs, SearchInfoOntology.visibilityProperty.id, visibility.asObject)
+
   private def produce(expected: List[UpdateCommand]) = new Matcher[Try[List[UpdateCommand]]] {
     def apply(actual: Try[List[UpdateCommand]]): MatchResult = {
       val matching = actual.map(_.toSet == expected.toSet).fold(fail(_), identity)
       MatchResult(matching, s"\nExpected: $expected\nActual: $actual", s"\nExpected: $expected\nActual: $actual")
     }
   }
+
+  private def newProject(visibility: projects.Visibility = anyVisibility): entities.Project =
+    anyRenkuProjectEntities(fixed(visibility)).map(_.to[entities.Project]).generateOne
 }

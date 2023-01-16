@@ -22,25 +22,78 @@ package commands
 import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
+import io.renku.graph.model.projects
 
-private final case class CalculatorInfoSet(project:        Project,
-                                           maybeModelInfo: Option[SearchInfo],
-                                           maybeTSInfo:    Option[SearchInfo]
-)
+private sealed trait CalculatorInfoSet {
+  val project: Project
+}
 
 private object CalculatorInfoSet {
 
-  implicit val show: Show[CalculatorInfoSet] = Show.show {
-    case CalculatorInfoSet(project, maybeModelInfo, maybeTSInfo) =>
-      def toString(info: SearchInfo) = List(
-        show"topmostSameAs = ${info.topmostSameAs}",
-        show"name = ${info.name}",
-        show"visibility = ${info.visibility}",
-        show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
-      ).mkString(", ")
+  final case class ModelInfoOnly(project: Project, modelInfo: SearchInfo) extends CalculatorInfoSet
 
-      show"projectId = ${project.resourceId}, projectPath = ${project.path}" +
-        maybeModelInfo.map(i => show", modelInfo = [${toString(i)}]").getOrElse("") +
-        maybeTSInfo.map(i => show", tsInfo = [${toString(i)}]").getOrElse("")
+  final case class TSInfoOnly(project:        Project,
+                              tsInfo:         SearchInfo,
+                              tsVisibilities: Map[projects.ResourceId, projects.Visibility]
+  ) extends CalculatorInfoSet
+
+  final case class AllInfos(project:        Project,
+                            modelInfo:      SearchInfo,
+                            tsInfo:         SearchInfo,
+                            tsVisibilities: Map[projects.ResourceId, projects.Visibility]
+  ) extends CalculatorInfoSet
+
+  def from(project:        Project,
+           maybeModelInfo: Option[SearchInfo],
+           maybeTSInfo:    Option[SearchInfo],
+           tsVisibilities: Map[projects.ResourceId, projects.Visibility]
+  ): Either[Exception, CalculatorInfoSet] =
+    validate(project, maybeModelInfo, maybeTSInfo) >>= { _ =>
+      instantiate(project, maybeModelInfo, maybeTSInfo, tsVisibilities)
+    }
+
+  private def validate(project:        Project,
+                       maybeModelInfo: Option[SearchInfo],
+                       maybeTSInfo:    Option[SearchInfo]
+  ): Either[Exception, Unit] =
+    (maybeModelInfo, maybeTSInfo) match {
+      case (Some(modelInfo), _) if modelInfo.links.size > 1 =>
+        new Exception(show"CalculatorInfoSet for ${project.resourceId} is linked to many projects").asLeft
+      case (Some(modelInfo), _) if modelInfo.links.head.projectId != project.resourceId =>
+        new Exception(
+          show"CalculatorInfoSet for ${project.resourceId} has model linked to ${modelInfo.links.head.projectId}"
+        ).asLeft
+      case _ => ().asRight
+    }
+
+  private lazy val instantiate: (Project,
+                                 Option[SearchInfo],
+                                 Option[SearchInfo],
+                                 Map[projects.ResourceId, projects.Visibility]
+  ) => Either[Exception, CalculatorInfoSet] = {
+    case (project, Some(modelInfo), None, _)             => ModelInfoOnly(project, modelInfo).asRight
+    case (project, None, Some(tsInfo), tsVisibilities)   => TSInfoOnly(project, tsInfo, tsVisibilities).asRight
+    case (project, Some(modelInfo), Some(tsInfo), tsVis) => AllInfos(project, modelInfo, tsInfo, tsVis).asRight
+    case (project, None, None, _) =>
+      new Exception(show"CalculatorInfoSet for ${project.resourceId} has no infos").asLeft
   }
+
+  implicit val show: Show[CalculatorInfoSet] = Show.show {
+    case CalculatorInfoSet.ModelInfoOnly(project, modelInfo) =>
+      show"projectId = ${project.resourceId}, projectPath = ${project.path}, modelInfo = [${toString(modelInfo)}]"
+    case CalculatorInfoSet.TSInfoOnly(project, tsInfo, _) =>
+      show"projectId = ${project.resourceId}, projectPath = ${project.path}, tsInfo = [${toString(tsInfo)}]"
+    case CalculatorInfoSet.AllInfos(project, modelInfo, tsInfo, _) =>
+      show"projectId = ${project.resourceId}, projectPath = ${project.path}" +
+        show", modelInfo = [${toString(modelInfo)}]" +
+        show", tsInfo = [${toString(tsInfo)}]"
+  }
+
+  private def toString(info: SearchInfo) = List(
+    show"topmostSameAs = ${info.topmostSameAs}",
+    show"name = ${info.name}",
+    show"visibility = ${info.visibility}",
+    show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
+  ).mkString(", ")
+
 }

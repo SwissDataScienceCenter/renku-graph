@@ -22,10 +22,8 @@ import SearchInfo.DateModified
 import cats.Show
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.graph.model.datasets.{Date, Description, Keyword, Name, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.tinytypes.constraints.InstantNotInTheFuture
@@ -33,17 +31,19 @@ import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 
 import java.time.Instant
 
-private final case class SearchInfo(topmostSameAs:     TopmostSameAs,
-                                    name:              Name,
-                                    dateOriginal:      Date,
-                                    maybeDateModified: Option[DateModified],
-                                    creators:          NonEmptyList[PersonInfo],
-                                    keywords:          List[Keyword],
-                                    maybeDescription:  Option[Description],
-                                    images:            List[Image],
-                                    links:             NonEmptyList[Link]
+private final case class SearchInfo(topmostSameAs:      datasets.TopmostSameAs,
+                                    name:               datasets.Name,
+                                    visibility:         projects.Visibility,
+                                    createdOrPublished: datasets.Date,
+                                    maybeDateModified:  Option[DateModified],
+                                    creators:           NonEmptyList[PersonInfo],
+                                    keywords:           List[datasets.Keyword],
+                                    maybeDescription:   Option[datasets.Description],
+                                    images:             List[Image],
+                                    links:              NonEmptyList[Link]
 ) {
-  lazy val visibility: Visibility = links.map(_.visibility).toList.max
+  def findLink(projectId: projects.ResourceId): Option[Link] =
+    links.find(_.projectId == projectId)
 }
 
 private object SearchInfo {
@@ -58,21 +58,22 @@ private object SearchInfo {
   }
 
   implicit val show: Show[SearchInfo] = Show.show {
-    case info @ SearchInfo(topSameAs,
-                           name,
-                           dateOriginal,
-                           maybeDateModified,
-                           creators,
-                           keywords,
-                           maybeDescription,
-                           images,
-                           links
+    case SearchInfo(topSameAs,
+                    name,
+                    visibility,
+                    createdOrPublished,
+                    maybeDateModified,
+                    creators,
+                    keywords,
+                    maybeDescription,
+                    images,
+                    links
         ) =>
       List(
         show"topmostSameAs = $topSameAs".some,
         show"name = $name".some,
-        show"visibility = ${info.visibility}".some,
-        dateOriginal match {
+        show"visibility = $visibility".some,
+        createdOrPublished match {
           case d: datasets.DateCreated   => show"dateCreated = $d".some
           case d: datasets.DatePublished => show"datePublished = $d".some
         },
@@ -94,41 +95,33 @@ private object SearchInfo {
 
 private sealed trait Link {
   val resourceId: links.ResourceId
-  val datasetId:  ResourceId
+  val datasetId:  datasets.ResourceId
   val projectId:  projects.ResourceId
-  val visibility: projects.Visibility
 }
 private object Link {
-  def apply(topmostSameAs: TopmostSameAs,
-            datasetId:     ResourceId,
+  def apply(topmostSameAs: datasets.TopmostSameAs,
+            datasetId:     datasets.ResourceId,
             projectId:     projects.ResourceId,
-            projectPath:   projects.Path,
-            visibility:    projects.Visibility
+            projectPath:   projects.Path
   ): Link =
     if (topmostSameAs.value == datasetId.value)
-      OriginalDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId, visibility)
+      OriginalDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
     else
-      ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId, visibility)
+      ImportedDataset(links.ResourceId.from(topmostSameAs, projectPath), datasetId, projectId)
 
-  def apply(linkId:     links.ResourceId,
-            datasetId:  ResourceId,
-            projectId:  projects.ResourceId,
-            visibility: projects.Visibility
-  ): Link =
+  def apply(linkId: links.ResourceId, datasetId: datasets.ResourceId, projectId: projects.ResourceId): Link =
     if (linkId.value startsWith datasetId.value)
-      OriginalDataset(linkId, datasetId, projectId, visibility)
+      OriginalDataset(linkId, datasetId, projectId)
     else
-      ImportedDataset(linkId, datasetId, projectId, visibility)
+      ImportedDataset(linkId, datasetId, projectId)
 
   final case class OriginalDataset(resourceId: links.ResourceId,
-                                   datasetId:  ResourceId,
-                                   projectId:  projects.ResourceId,
-                                   visibility: projects.Visibility
+                                   datasetId:  datasets.ResourceId,
+                                   projectId:  projects.ResourceId
   ) extends Link
   final case class ImportedDataset(resourceId: links.ResourceId,
-                                   datasetId:  ResourceId,
-                                   projectId:  projects.ResourceId,
-                                   visibility: projects.Visibility
+                                   datasetId:  datasets.ResourceId,
+                                   projectId:  projects.ResourceId
   ) extends Link
 
   implicit lazy val show: Show[Link] = Show.show { link =>
@@ -147,7 +140,7 @@ private object links {
       with UrlConstraint[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
-    def from(topmostSameAs: TopmostSameAs, projectPath: projects.Path): ResourceId = ResourceId(
+    def from(topmostSameAs: datasets.TopmostSameAs, projectPath: projects.Path): ResourceId = ResourceId(
       (topmostSameAs / projectPath).value
     )
   }

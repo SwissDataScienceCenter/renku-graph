@@ -24,31 +24,31 @@ import cats.syntax.all._
 import io.renku.entities.searchgraphs.Link.{ImportedDataset, OriginalDataset, show}
 import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds, projectVisibilities}
-import io.renku.graph.model.{datasets, projects}
+import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds}
+import io.renku.graph.model.datasets
 import io.renku.jsonld.syntax._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "visibility" should {
+  "findLink" should {
 
-    "return max visibility from all the links" in {
-      searchInfoObjectsGen
-        .map(info =>
-          info.copy(links =
-            NonEmptyList.of(
-              linkObjectsGen(info.topmostSameAs, fixed(projects.Visibility.Internal)).generateOne,
-              linkObjectsGen(info.topmostSameAs, fixed(projects.Visibility.Private)).generateOne,
-              linkObjectsGen(info.topmostSameAs, fixed(projects.Visibility.Public)).generateOne
-            )
-          )
-        )
-        .generateOne
-        .visibility shouldBe projects.Visibility.Public
+    "return the relevant link if there's a link for the given projectId" in {
+
+      val info         = searchInfoObjectsGen.generateOne
+      val project1Link = linkObjectsGen(info.topmostSameAs).generateOne
+      val project2Link = linkObjectsGen(info.topmostSameAs).generateOne
+      val someLink     = Gen.oneOf(project1Link, project2Link).generateOne
+
+      info.copy(links = NonEmptyList.of(project1Link, project2Link)).findLink(someLink.projectId) shouldBe
+        someLink.some
+    }
+
+    "return None if there's no link for the given projectId" in {
+      searchInfoObjectsGen.generateOne.findLink(projectResourceIds.generateOne) shouldBe None
     }
   }
 
@@ -58,7 +58,8 @@ class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
       forAll(searchInfoObjectsGen) {
         case info @ SearchInfo(topSameAs,
                                name,
-                               dateOriginal,
+                               visibility,
+                               createdOrPublished,
                                maybeDateModified,
                                creators,
                                keywords,
@@ -69,8 +70,8 @@ class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
           info.show shouldBe List(
             show"topmostSameAs = $topSameAs".some,
             show"name = $name".some,
-            show"visibility = ${info.visibility}".some,
-            dateOriginal match {
+            show"visibility = $visibility".some,
+            createdOrPublished match {
               case d: datasets.DateCreated   => show"dateCreated = $d".some
               case d: datasets.DatePublished => show"datePublished = $d".some
             },
@@ -112,9 +113,8 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val topmostSameAs = datasets.TopmostSameAs(datasetId.asEntityId)
       val projectId     = projectResourceIds.generateOne
       val projectPath   = projectPaths.generateOne
-      val visibility    = projectVisibilities.generateOne
 
-      val link = Link(topmostSameAs, datasetId, projectId, projectPath, visibility)
+      val link = Link(topmostSameAs, datasetId, projectId, projectPath)
 
       link            shouldBe a[OriginalDataset]
       link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
@@ -124,16 +124,14 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val datasetId   = datasetResourceIds.generateOne
       val projectId   = projectResourceIds.generateOne
       val projectPath = projectPaths.generateOne
-      val visibility  = projectVisibilities.generateOne
       val linkId      = links.ResourceId.from(datasets.TopmostSameAs(datasetId.asEntityId), projectPath)
 
-      val link = Link(linkId, datasetId, projectId, visibility)
+      val link = Link(linkId, datasetId, projectId)
 
       link            shouldBe a[OriginalDataset]
       link.resourceId shouldBe linkId
       link.projectId  shouldBe projectId
       link.datasetId  shouldBe datasetId
-      link.visibility shouldBe visibility
     }
 
     "return ImportedDataset if the topmostSameAs and datasetId are not equal" in {
@@ -141,9 +139,8 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val topmostSameAs = datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_))
       val projectId     = projectResourceIds.generateOne
       val projectPath   = projectPaths.generateOne
-      val visibility    = projectVisibilities.generateOne
 
-      val link = Link(topmostSameAs, datasetId, projectId, projectPath, visibility)
+      val link = Link(topmostSameAs, datasetId, projectId, projectPath)
 
       link            shouldBe a[ImportedDataset]
       link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
@@ -154,15 +151,13 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val projectId   = projectResourceIds.generateOne
       val projectPath = projectPaths.generateOne
       val linkId      = links.ResourceId.from(datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_)), projectPath)
-      val visibility  = projectVisibilities.generateOne
 
-      val link = Link(linkId, datasetId, projectId, visibility)
+      val link = Link(linkId, datasetId, projectId)
 
       link            shouldBe a[ImportedDataset]
       link.resourceId shouldBe linkId
       link.projectId  shouldBe projectId
       link.datasetId  shouldBe datasetId
-      link.visibility shouldBe visibility
     }
   }
 

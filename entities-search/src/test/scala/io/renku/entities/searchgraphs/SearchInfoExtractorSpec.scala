@@ -49,6 +49,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           SearchInfo(
             ds.provenance.topmostSameAs,
             ds.identification.name,
+            project.visibility,
             ds.provenance.date,
             maybeDateModified = None,
             ds.provenance.creators.map(toPersonInfo),
@@ -56,7 +57,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             ds.additionalInfo.maybeDescription,
             ds.additionalInfo.images,
             NonEmptyList.one(
-              Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path, project.visibility)
+              Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path)
             )
           )
         }
@@ -77,6 +78,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         SearchInfo(
           lastModification.provenance.topmostSameAs,
           lastModification.identification.name,
+          project.visibility,
           originalDataset.provenance.date,
           DateModified(lastModification.provenance.date.instant).some,
           lastModification.provenance.creators.map(toPersonInfo),
@@ -87,8 +89,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             Link(lastModification.provenance.topmostSameAs,
                  lastModification.resourceId,
                  project.resourceId,
-                 project.path,
-                 project.visibility
+                 project.path
             )
           )
         )

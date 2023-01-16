@@ -23,7 +23,7 @@ import Encoders._
 import Generators._
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
+import io.renku.graph.model.GraphModelGenerators.projectResourceIds
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -43,7 +43,7 @@ class SearchInfoFetcherSpec
 
     "find info about all Datasets that are linked to the Project" in new TestCase {
 
-      val infos = searchInfoObjectsGen(withLinkTo = projectId -> projectVisibilities.generateOne).generateList(min = 1)
+      val infos = searchInfoObjectsGen(withLinkTo = projectId).generateList(min = 1)
 
       insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 

@@ -60,8 +60,7 @@ private object Encoders {
     typeQuads ++
       Set(
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
       )
   }
 
@@ -69,7 +68,7 @@ private object Encoders {
     def searchInfoQuad(predicate: Property, obj: TripleObject): Quad =
       DatasetsQuad(info.topmostSameAs, predicate, obj)
 
-    val dateOriginalQuad = info.dateOriginal match {
+    val createdOrPublishedQuad = info.createdOrPublished match {
       case d: datasets.DateCreated =>
         searchInfoQuad(SearchInfoOntology.dateCreatedProperty.id, d.asObject)
       case d: datasets.DatePublished =>
@@ -107,7 +106,7 @@ private object Encoders {
       searchInfoQuad(rdf / "type", SearchInfoOntology.typeDef.clazz.id).some,
       searchInfoQuad(SearchInfoOntology.nameProperty.id, info.name.asObject).some,
       searchInfoQuad(SearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
-      dateOriginalQuad.some,
+      createdOrPublishedQuad.some,
       maybeDateModifiedQuad,
       maybeDescriptionQuad
     ).flatten ++ creatorsQuads ++ keywordsQuads ++ imagesQuads ++ linksQuads

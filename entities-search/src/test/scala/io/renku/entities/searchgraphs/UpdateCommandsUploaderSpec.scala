@@ -50,7 +50,7 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
 
     "fail if uploading updates to the TS fails" in new TestCase {
 
-      val commands = allSortsOfCommands.generateList(max = 2).flatten
+      val commands = allSortsOfCommands.generateList(min = 1, max = 2).flatten
 
       val query1 :: query2 :: Nil = toSparqlQueries(commands)
       givenTSUpdating(query1, returning = ().pure[Try])

@@ -37,28 +37,39 @@ import org.scalacheck.Gen
 private object Generators {
 
   implicit lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
-    topmostSameAs     <- datasetTopmostSameAs
-    name              <- datasetNames
-    date              <- datasetDates
-    maybeDateModified <- modifiedDates(notYoungerThan = date).toGeneratorOfOptions
-    creators          <- personInfos.toGeneratorOfNonEmptyList(max = 2)
-    keywords          <- datasetKeywords.toGeneratorOfList(max = 2)
-    maybeDesc         <- datasetDescriptions.toGeneratorOfOptions
-    images            <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
-    links             <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
-  } yield SearchInfo(topmostSameAs, name, date, maybeDateModified, creators, keywords, maybeDesc, images, links)
+    topmostSameAs      <- datasetTopmostSameAs
+    name               <- datasetNames
+    createdOrPublished <- datasetDates
+    visibility         <- projectVisibilities
+    maybeDateModified  <- modifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
+    creators           <- personInfos.toGeneratorOfNonEmptyList(max = 2)
+    keywords           <- datasetKeywords.toGeneratorOfList(max = 2)
+    maybeDesc          <- datasetDescriptions.toGeneratorOfOptions
+    images             <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
+    links              <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
+  } yield SearchInfo(topmostSameAs,
+                     name,
+                     visibility,
+                     createdOrPublished,
+                     maybeDateModified,
+                     creators,
+                     keywords,
+                     maybeDesc,
+                     images,
+                     links
+  )
 
-  type ProjectAndVisibility = (projects.ResourceId, projects.Visibility)
-  def searchInfoObjectsGen(withLinkTo: ProjectAndVisibility, and: ProjectAndVisibility*): Gen[SearchInfo] =
+  def searchInfoObjectsGen(withLinkTo: entities.Project): Gen[SearchInfo] =
+    searchInfoObjectsGen(withLinkTo.resourceId).map(_.copy(visibility = withLinkTo.visibility))
+
+  def searchInfoObjectsGen(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[SearchInfo] =
     searchInfoObjectsGen.map { i =>
       searchInfoLinks
         .modify { _ =>
           val linkedProjects = NonEmptyList.of(withLinkTo, and: _*)
-          linkedProjects.map(linkProjectAndVisibility.set(_)(linkObjectsGen(i.topmostSameAs).generateOne))
+          linkedProjects.map(linkProjectId.set(_)(linkObjectsGen(i.topmostSameAs).generateOne))
         }(i)
     }
-  def searchInfoObjectsGen(withLinkTo: entities.Project): Gen[SearchInfo] =
-    searchInfoObjectsGen(withLinkTo.resourceId -> withLinkTo.visibility)
 
   lazy val personInfos: Gen[PersonInfo] =
     personEntities.map(_.to[entities.Person]).map(toPersonInfo)
@@ -66,27 +77,21 @@ private object Generators {
   def modifiedDates(notYoungerThan: Date): Gen[DateModified] =
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))
 
-  def linkObjectsGen(topmostSameAs: TopmostSameAs, visibilityGen: Gen[projects.Visibility]): Gen[Link] =
-    linkObjectsGen(topmostSameAs, projectResourceIds, visibilityGen)
-
   def linkObjectsGen(topmostSameAs: TopmostSameAs,
-                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds,
-                     visibilityGen: Gen[projects.Visibility] = projectVisibilities
-  ): Gen[Link] = Gen.oneOf(originalDatasetLinkObjectsGen(topmostSameAs, projectIdGen, visibilityGen),
-                           importedDatasetLinkObjectsGen(topmostSameAs, projectIdGen, visibilityGen)
+                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
+  ): Gen[Link] = Gen.oneOf(originalDatasetLinkObjectsGen(topmostSameAs, projectIdGen),
+                           importedDatasetLinkObjectsGen(topmostSameAs, projectIdGen)
   )
 
   def originalDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs,
-                                    projectIdGen:  Gen[projects.ResourceId] = projectResourceIds,
-                                    visibilityGen: Gen[projects.Visibility] = projectVisibilities
-  ): Gen[Link] = (projectIdGen, projectPaths, visibilityGen)
-    .mapN(Link(topmostSameAs, datasets.ResourceId(topmostSameAs.value), _, _, _))
+                                    projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
+  ): Gen[Link] = (projectIdGen, projectPaths)
+    .mapN(Link(topmostSameAs, datasets.ResourceId(topmostSameAs.value), _, _))
 
   def importedDatasetLinkObjectsGen(topmostSameAs: TopmostSameAs,
-                                    projectIdGen:  Gen[projects.ResourceId] = projectResourceIds,
-                                    visibilityGen: Gen[projects.Visibility] = projectVisibilities
-  ): Gen[Link] = (datasetResourceIds, projectIdGen, projectPaths, visibilityGen)
-    .mapN(Link(topmostSameAs, _, _, _, _))
+                                    projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
+  ): Gen[Link] = (datasetResourceIds, projectIdGen, projectPaths)
+    .mapN(Link(topmostSameAs, _, _, _))
 
   val updateCommands: Gen[UpdateCommand] =
     quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))

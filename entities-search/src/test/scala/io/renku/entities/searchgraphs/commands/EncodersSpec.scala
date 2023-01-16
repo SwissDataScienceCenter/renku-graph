@@ -82,8 +82,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink"),
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
       )
     }
 
@@ -94,8 +93,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.visibilityProperty.id, link.visibility.asObject)
+        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
       )
     }
   }
@@ -113,7 +111,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
                      SearchInfoOntology.visibilityProperty.id,
                      searchInfo.visibility.asObject
         ),
-        dateOriginalToQuad(searchInfo.topmostSameAs)(searchInfo.dateOriginal)
+        createdOrPublishedToQuad(searchInfo.topmostSameAs)(searchInfo.createdOrPublished)
       ) ++
         maybeDateModifiedToQuad(searchInfo.topmostSameAs)(searchInfo.maybeDateModified) ++
         creatorsToQuads(searchInfo) ++
@@ -124,7 +122,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  private def dateOriginalToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.Date => Quad = {
+  private def createdOrPublishedToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.Date => Quad = {
     case d: datasets.DateCreated =>
       DatasetsQuad(topmostSameAs, SearchInfoOntology.dateCreatedProperty.id, d.asObject)
     case d: datasets.DatePublished =>

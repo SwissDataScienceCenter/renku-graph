@@ -19,30 +19,48 @@
 package io.renku.entities.searchgraphs
 package commands
 
-import CommandsCalculator.calculateCommands
 import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
+import io.renku.graph.model.projects
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
   def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]]
 }
 
-private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F])
-    extends UpdateCommandsProducer[F] {
+private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],
+                                                           visibilityFinder:   VisibilityFinder[F],
+                                                           commandsCalculator: CommandsCalculator[F]
+) extends UpdateCommandsProducer[F] {
 
+  import commandsCalculator._
   import searchInfoFetcher._
 
-  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]] =
-    fetchTSSearchInfos(project.resourceId).flatMap { tsInfos =>
-      val matchedInfos = matchInfosBySameAs(modelInfos, tsInfos)
-      matchedInfos
-        .map { case (maybeModelInfo, maybeTsInfo) => CalculatorInfoSet(project, maybeModelInfo, maybeTsInfo) }
-        .toList
-        .map(calculateCommands)
-        .sequence
-        .map(_.flatten)
-    }
+  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]] = for {
+    tsInfos      <- fetchTSSearchInfos(project.resourceId)
+    visibilities <- findVisibilities(findDistinctProjects(tsInfos))
+    infoSets     <- toInfoSets(project, modelInfos, tsInfos, visibilities)
+    updates      <- calculateAllCommands(infoSets)
+  } yield updates
+
+  private lazy val findDistinctProjects: List[SearchInfo] => Set[projects.ResourceId] =
+    _.flatMap(_.links.map(_.projectId).toList).toSet
+
+  private lazy val findVisibilities: Set[projects.ResourceId] => F[Map[projects.ResourceId, projects.Visibility]] =
+    _.toList.map(id => visibilityFinder.findVisibility(id).map(_.map(id -> _))).sequence.map(_.flatten.toMap)
+
+  private def toInfoSets(project:        Project,
+                         modelInfos:     List[SearchInfo],
+                         tsInfos:        List[SearchInfo],
+                         tsVisibilities: Map[projects.ResourceId, projects.Visibility]
+  ) = MonadThrow[F].fromEither {
+    matchInfosBySameAs(modelInfos, tsInfos)
+      .map { case (maybeModelInfo, maybeTsInfo) =>
+        CalculatorInfoSet.from(project, maybeModelInfo, maybeTsInfo, tsVisibilities)
+      }
+      .toList
+      .sequence
+  }
 
   private def matchInfosBySameAs(modelInfos: List[SearchInfo], tsInfos: List[SearchInfo]) = {
     val distinctDatasets = modelInfos.map(_.topmostSameAs).toSet ++ tsInfos.map(_.topmostSameAs)
@@ -50,4 +68,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
       modelInfos.find(_.topmostSameAs == topSameAs) -> tsInfos.find(_.topmostSameAs == topSameAs)
     )
   }
+
+  private lazy val calculateAllCommands: List[CalculatorInfoSet] => F[List[UpdateCommand]] =
+    _.map(calculateCommands).sequence.map(_.flatten)
 }

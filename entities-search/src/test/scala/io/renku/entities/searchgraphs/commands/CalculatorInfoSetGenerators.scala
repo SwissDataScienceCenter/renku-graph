@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs
 package commands
 
 import Generators._
-import cats.syntax.all._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalacheck.Gen
@@ -29,7 +28,10 @@ private object CalculatorInfoSetGenerators {
 
   lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
     project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
-    modelInfo <- searchInfoObjectsGen(project.resourceId -> project.visibility)
-  } yield CalculatorInfoSet(project, maybeModelInfo = modelInfo.some, maybeTSInfo = modelInfo.some)
-
+    modelInfo <- searchInfoObjectsGen(project.resourceId).map(_.copy(visibility = project.visibility))
+  } yield CalculatorInfoSet.AllInfos(project,
+                                     modelInfo = modelInfo,
+                                     tsInfo = modelInfo,
+                                     tsVisibilities = Map(project.resourceId -> project.visibility)
+  )
 }

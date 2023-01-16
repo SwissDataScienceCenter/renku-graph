@@ -70,7 +70,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |    }
         |  } {
         |    GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
-        |      ?topSameAs schema:name ?name.
+        |      ?topSameAs schema:name ?name;
+        |                 renku:projectVisibility ?visibility.
         |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
         |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
         |      OPTIONAL { ?topSameAs schema:datePublished ?maybeDatePublished }
@@ -90,9 +91,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |      {
         |        ?topSameAs renku:datasetProjectLink ?linkId.
         |        ?linkId renku:projectId ?linkProjectId;
-        |                renku:datasetId ?linkDatasetId;
-        |                renku:projectVisibility ?visibility.
-        |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId), STR(';;'), STR(?visibility)) AS ?link)
+        |                renku:datasetId ?linkDatasetId.
+        |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId)) AS ?link)
         |      }
         |    }
         |  }
@@ -171,7 +171,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
           .getOrElse(List.empty.asRight[DecodingFailure])
 
       val toLink: String => Decoder.Result[Link] = {
-        case s"$id;;$projectId;;$datasetId;;$visibility" =>
+        case s"$id;;$projectId;;$datasetId" =>
           (links.ResourceId
              .from(id)
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
@@ -180,11 +180,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
            projects.ResourceId
              .from(projectId)
-             .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur)),
-           projects.Visibility
-             .from(visibility)
              .leftMap(ex => DecodingFailure(DecodingFailure.Reason.CustomReason(ex.getMessage), cur))
-          ).mapN(Link(_, _, _, _))
+          ).mapN(Link(_, _, _))
         case other =>
           DecodingFailure(DecodingFailure.Reason.CustomReason(s"'$other' not a valid link record"), cur).asLeft[Link]
       }
@@ -193,9 +190,9 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         decode[Link](map = toLink, sort = _.sortBy(_.projectId))(_)
           .flatMap(toNonEmptyList(s"No links found for $topmostSameAs"))
 
-      def toDateOriginal(maybeDateCreated:   Option[datasets.DateCreated],
-                         maybeDatePublished: Option[datasets.DatePublished]
-      )(implicit topSameAs:                  TopmostSameAs): Either[DecodingFailure, datasets.Date] = Either.fromOption(
+      def toCreatedOrPublished(maybeDateCreated:   Option[datasets.DateCreated],
+                               maybeDatePublished: Option[datasets.DatePublished]
+      )(implicit topSameAs: TopmostSameAs): Either[DecodingFailure, datasets.Date] = Either.fromOption(
         maybeDateCreated orElse maybeDatePublished,
         ifNone = DecodingFailure(
           DecodingFailure.Reason.CustomReason(s"neither dateCreated nor datePublished for $topSameAs"),
@@ -206,10 +203,11 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       for {
         implicit0(topSameAs: datasets.TopmostSameAs) <- extract[datasets.TopmostSameAs]("topSameAs")
         name                                         <- extract[datasets.Name]("name")
+        visibility                                   <- extract[projects.Visibility]("visibility")
         maybeDescription                             <- extract[Option[datasets.Description]]("maybeDescription")
         maybeDateCreated                             <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
         maybeDatePublished                           <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
-        dateOriginal                                 <- toDateOriginal(maybeDateCreated, maybeDatePublished)
+        createdOrPublished                           <- toCreatedOrPublished(maybeDateCreated, maybeDatePublished)
         maybeDateModified                            <- extract[Option[DateModified]]("maybeDateModified")
         creators                                     <- extract[String]("creators") >>= toListOfCreators
         keywords                                     <- extract[Option[String]]("keywords") >>= toListOfKeywords
@@ -217,7 +215,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         links                                        <- extract[String]("links") >>= toListOfLinks
       } yield SearchInfo(topSameAs,
                          name,
-                         dateOriginal,
+                         visibility,
+                         createdOrPublished,
                          maybeDateModified,
                          creators,
                          keywords,
