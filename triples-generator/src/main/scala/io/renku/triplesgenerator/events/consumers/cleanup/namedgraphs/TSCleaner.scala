@@ -70,7 +70,7 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   override def removeTriples(path: projects.Path): F[Unit] =
     relinkSameAsHierarchy(path) >> relinkProjectHierarchy(path) >>
-      findGraphId(path) >>= removeProjectGraph
+      findGraphId(path) >>= removeProjectGraph()
 
   private def relinkProjectHierarchy(projectPath: projects.Path) = updateWithNoResult {
     SparqlQuery.of(
@@ -101,7 +101,7 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     queryExpecting[Option[EntityId]] {
       SparqlQuery.of(
         name = "find project graphId",
-        Prefixes of (renku -> "renku", prov -> "prov"),
+        Prefixes of renku -> "renku",
         s"""
         SELECT ?graphId
         WHERE {
@@ -114,7 +114,7 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     }
   }
 
-  private def removeProjectGraph: Option[EntityId] => F[Unit] = {
+  private def removeProjectGraph(): Option[EntityId] => F[Unit] = {
     case None => ().pure[F]
     case Some(graphId) =>
       updateWithNoResult {
