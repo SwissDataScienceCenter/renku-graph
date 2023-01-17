@@ -18,7 +18,7 @@
 
 package io.renku.graph.model
 
-import Schemas.{renku, schema}
+import Schemas.schema
 import cats.Show
 import io.renku.jsonld.EntityId
 
@@ -44,7 +44,7 @@ object GraphClass {
   type Persons = Persons.type
 
   case object Datasets extends GraphClass {
-    lazy val id: EntityId = EntityId of renku / "Datasets"
+    lazy val id: EntityId = EntityId of schema / "Dataset"
   }
   type Datasets = Datasets.type
 
