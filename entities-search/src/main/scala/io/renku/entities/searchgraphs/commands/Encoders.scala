@@ -59,8 +59,8 @@ private object Encoders {
     }
     typeQuads ++
       Set(
-        DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.datasetId.asEntityId)
       )
   }
 
@@ -104,7 +104,7 @@ private object Encoders {
 
     Set(
       searchInfoQuad(rdf / "type", SearchInfoOntology.typeDef.clazz.id).some,
-      searchInfoQuad(SearchInfoOntology.nameProperty.id, info.name.asObject).some,
+      searchInfoQuad(SearchInfoOntology.slugProperty.id, info.name.asObject).some,
       searchInfoQuad(SearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       createdOrPublishedQuad.some,
       maybeDateModifiedQuad,

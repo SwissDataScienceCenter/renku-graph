@@ -81,8 +81,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetOriginalProjectLink"),
-        DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.datasetId.asEntityId)
       )
     }
 
@@ -92,8 +92,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
       link.asQuads shouldBe Set(
         DatasetsQuad(link.resourceId, rdf / "type", renku / "DatasetProjectLink"),
-        DatasetsQuad(link.resourceId, LinkOntology.projectId, link.projectId.asEntityId),
-        DatasetsQuad(link.resourceId, LinkOntology.datasetId, link.datasetId.asEntityId)
+        DatasetsQuad(link.resourceId, LinkOntology.project, link.projectId.asEntityId),
+        DatasetsQuad(link.resourceId, LinkOntology.dataset, link.datasetId.asEntityId)
       )
     }
   }
@@ -106,7 +106,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
       searchInfo.asQuads shouldBe Set(
         DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
-        DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.nameProperty.id, searchInfo.name.asObject),
+        DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.slugProperty.id, searchInfo.name.asObject),
         DatasetsQuad(searchInfo.topmostSameAs,
                      SearchInfoOntology.visibilityProperty.id,
                      searchInfo.visibility.asObject

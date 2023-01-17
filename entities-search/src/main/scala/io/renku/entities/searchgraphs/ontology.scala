@@ -26,7 +26,7 @@ import io.renku.jsonld.ontology._
 
 object SearchInfoOntology {
 
-  val nameProperty:          DataProperty.Def = Dataset.Ontology.nameProperty
+  val slugProperty:          DataProperty.Def = Dataset.Ontology.slugProperty
   val visibilityProperty:    DataProperty.Def = Project.Ontology.visibilityProperty
   val dateCreatedProperty:   DataProperty.Def = Dataset.Ontology.dateCreatedProperty
   val datePublishedProperty: DataProperty.Def = Dataset.Ontology.datePublishedProperty
@@ -45,7 +45,7 @@ object SearchInfoOntology {
       ObjectProperty(linkProperty, LinkOntology.typeDef)
     ),
     DataProperties(
-      nameProperty,
+      slugProperty,
       visibilityProperty,
       dateCreatedProperty,
       datePublishedProperty,
@@ -69,14 +69,14 @@ object PersonInfoOntology {
 
 object LinkOntology {
 
-  val projectId: Property = renku / "projectId"
-  val datasetId: Property = renku / "datasetId"
+  val project: Property = renku / "project"
+  val dataset: Property = renku / "dataset"
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DatasetProjectLink"),
     ObjectProperties(
-      ObjectProperty(projectId, Project.Ontology.typeDef),
-      ObjectProperty(datasetId, Dataset.Ontology.typeDef)
+      ObjectProperty(project, Project.Ontology.typeDef),
+      ObjectProperty(dataset, Dataset.Ontology.typeDef)
     ),
     DataProperties()
   )

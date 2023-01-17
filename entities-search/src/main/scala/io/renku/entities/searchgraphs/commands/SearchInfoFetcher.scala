@@ -68,13 +68,13 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |    WHERE {
         |      GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
         |        ?linkId a renku:DatasetProjectLink;
-        |                renku:projectId ${resourceId.asEntityId.asSparql.sparql}.
+        |                renku:project ${resourceId.asEntityId.asSparql.sparql}.
         |        ?topSameAs renku:datasetProjectLink ?linkId
         |      }
         |    }
         |  } {
         |    GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
-        |      ?topSameAs schema:name ?name;
+        |      ?topSameAs renku:slug ?name;
         |                 renku:projectVisibility ?visibility.
         |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
         |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
@@ -94,8 +94,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |      }
         |      {
         |        ?topSameAs renku:datasetProjectLink ?linkId.
-        |        ?linkId renku:projectId ?linkProjectId;
-        |                renku:datasetId ?linkDatasetId.
+        |        ?linkId renku:project ?linkProjectId;
+        |                renku:dataset ?linkDatasetId.
         |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId)) AS ?link)
         |      }
         |    }
