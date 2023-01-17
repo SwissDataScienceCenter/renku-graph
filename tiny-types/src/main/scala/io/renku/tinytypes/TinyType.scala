@@ -60,7 +60,7 @@ object StringTinyType {
 }
 
 object RelativePathTinyType {
-  implicit val relativePathTinyTypeConverter: RelativePathTinyType => List[PathSegment] =
+  implicit def relativePathTinyTypeConverter[TT <: RelativePathTinyType]: TT => List[PathSegment] =
     tinyType => tinyType.value.split("\\/").toList.map(PathSegment.apply)
 }
 
