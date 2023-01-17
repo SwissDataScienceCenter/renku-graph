@@ -71,11 +71,6 @@ trait EntitiesGenerators
   implicit val gitLabUrl:    GitLabUrl    = Instances.gitLabUrl
   implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl
 
-  def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
-
-  def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
-    timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
-
   lazy val withGitLabId:    Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfSomes
   lazy val withoutGitLabId: Gen[Option[GitLabId]] = fixed(Option.empty[GitLabId])
   lazy val withEmail:       Gen[Option[Email]]    = personEmails.toGeneratorOfSomes

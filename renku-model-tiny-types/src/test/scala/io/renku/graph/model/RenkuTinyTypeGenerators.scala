@@ -32,6 +32,10 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
+  def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
+
+  def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
+    Generators.timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
 
   implicit val cliVersions: Gen[CliVersion] = for {
     version       <- Generators.semanticVersions
@@ -219,6 +223,8 @@ trait RenkuTinyTypeGenerators {
   def planDatesCreated(after: InstantTinyType): Gen[plans.DateCreated] =
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
 
+  val entityResourceIds: Gen[entityModel.ResourceId] =
+    Generators.noDashUuid.map(entityModel.ResourceId)
   val entityFileLocations: Gen[entityModel.Location.File] =
     Generators.relativePaths() map entityModel.Location.File.apply
   val entityFolderLocations: Gen[entityModel.Location.Folder] =

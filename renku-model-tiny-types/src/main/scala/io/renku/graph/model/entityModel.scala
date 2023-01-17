@@ -52,16 +52,22 @@ object entityModel {
     implicit lazy val jsonLDEncoder: JsonLDEncoder[LocationLike] = encodeString.contramap(_.value)
   }
 
-  sealed trait Location extends Any with LocationLike
+  sealed trait Location extends Any with LocationLike {
+    def fold[A](ifFolder: Location.Folder => A, ifFile: Location.File => A): A
+  }
 
   object Location {
 
-    final class File private (val value: String) extends Location
+    final class File private (val value: String) extends Location {
+      def fold[A](ifFolder: Location.Folder => A, ifFile: Location.File => A): A = ifFile(this)
+    }
     object File extends TinyTypeFactory[File](new File(_)) with RelativePath[File] with TinyTypeJsonLDOps[File] {
       def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
     }
 
-    final class Folder private (val value: String) extends Location
+    final class Folder private (val value: String) extends Location {
+      def fold[A](ifFolder: Location.Folder => A, ifFile: Location.File => A): A = ifFolder(this)
+    }
     object Folder
         extends TinyTypeFactory[Folder](new Folder(_))
         with RelativePath[Folder]
