@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
-import io.renku.graph.model.CliVersion
+import io.renku.graph.model.versions.CliVersion
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
 import org.typelevel.log4cats.Logger

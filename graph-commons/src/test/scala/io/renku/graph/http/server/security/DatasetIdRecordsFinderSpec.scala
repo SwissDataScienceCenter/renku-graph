@@ -22,7 +22,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -33,6 +33,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class DatasetIdRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with should.Matchers {
@@ -65,7 +66,7 @@ class DatasetIdRecordsFinderSpec
     }
 
     "return SecurityRecords with projects visibilities, paths and members" in new TestCase {
-      val (dataset, parentProject ::~ project) =
+      val (dataset, (parentProject, project)) =
         renkuProjectEntities(anyVisibility)
           .map(_.copy(members = Set.empty))
           .addDataset(datasetEntities(provenanceNonModified))
@@ -85,7 +86,7 @@ class DatasetIdRecordsFinderSpec
     }
   }
 
-  private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
+  implicit lazy val newGitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()

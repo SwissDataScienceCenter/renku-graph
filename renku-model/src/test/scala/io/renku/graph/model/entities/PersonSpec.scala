@@ -21,11 +21,11 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder, orcidIdEncoder}
-import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities, persons}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, persons}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, JsonLDEncoder}
 import org.scalacheck.Gen
@@ -33,7 +33,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EntitiesGenerators {
 
   GraphClass.all - GraphClass.Project foreach { implicit graph =>
     show"encode as an Entity for the $graph Graph" should {
@@ -236,7 +236,7 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
       val person = personEntities.generateOne.to[entities.Person]
 
-      implicit val graph: GraphClass = graphClasses.generateOne
+      implicit val graph: GraphClass = GraphModelGenerators.graphClasses.generateOne
       val functionsEncoder = EntityFunctions[entities.Person].encoder(graph)
 
       person.asJsonLD(functionsEncoder) shouldBe person.asJsonLD

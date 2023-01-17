@@ -24,6 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.jsonld.JsonLDDecoder
 import model.Project.DateUpdated
 import model._

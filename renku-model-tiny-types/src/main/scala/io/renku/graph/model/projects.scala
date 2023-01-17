@@ -23,8 +23,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
-import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
+import io.renku.tinytypes._
 
 import java.time.Instant
 

@@ -23,8 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -37,6 +36,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class KGProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks

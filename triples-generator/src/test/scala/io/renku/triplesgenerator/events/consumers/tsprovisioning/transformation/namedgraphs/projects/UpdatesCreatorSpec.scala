@@ -26,10 +26,10 @@ import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.projects.DateCreated
-import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities, projects}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -49,6 +49,7 @@ class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with EntitiesGenerators
     with DiffShouldMatcher
     with MoreDiffInstances
     with InMemoryJenaForSpec
@@ -287,7 +288,8 @@ class UpdatesCreatorSpec
 
     "generate queries which deletes the project agent when changed" in {
       forAll(anyRenkuProjectEntities.map(_.to[entities.RenkuProject])) { project =>
-        val kgProjectInfo = toProjectMutableData(project).copy(maybeAgent = cliVersions.generateSome)
+        val kgProjectInfo =
+          toProjectMutableData(project).copy(maybeAgent = GraphModelGenerators.cliVersions.generateSome)
 
         upload(to = projectsDataset, project)
 

@@ -20,10 +20,10 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
-import io.renku.jsonld.syntax.JsonEncoderOps
 import io.renku.jsonld.{EntityId, EntityIdEncoder}
+import io.renku.jsonld.syntax._
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, NonNegativeInt, Url}
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints._
 
 import java.time.Instant
 

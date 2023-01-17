@@ -27,15 +27,13 @@ import io.renku.events.consumers
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.ModelOps
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,8 +43,12 @@ import projects._
 import scala.language.reflectiveCalls
 import scala.util.{Failure, Try}
 
-class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
-  implicit val renkuUrl: RenkuUrl = EntitiesGenerators.renkuUrl
+class EntityBuilderSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with EntitiesGenerators
+    with ModelOps {
 
   "buildEntity" should {
 
@@ -97,31 +99,6 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
           .returning(result)
     }
   }
-
-  private lazy val gitLabProjectInfos: Gen[GitLabProjectInfo] = for {
-    id              <- projectIds
-    name            <- projectNames
-    path            <- projectPaths
-    dateCreated     <- projectCreatedDates()
-    maybeDesc       <- projectDescriptions.toGeneratorOfOptions
-    maybeCreator    <- projectMembers.toGeneratorOfOptions
-    keywords        <- projectKeywords.toGeneratorOfSet()
-    members         <- projectMembers.toGeneratorOfSet()
-    visibility      <- projectVisibilities
-    maybeParentPath <- projectPaths.toGeneratorOfOptions
-    avatarUri       <- imageUris.toGeneratorOfOptions
-  } yield GitLabProjectInfo(id,
-                            name,
-                            path,
-                            dateCreated,
-                            maybeDesc,
-                            maybeCreator,
-                            keywords,
-                            members,
-                            visibility,
-                            maybeParentPath,
-                            avatarUri
-  )
 
   private implicit class ProjectInfoOps(projectInfo: GitLabProjectInfo) {
     def to[T](implicit convert: GitLabProjectInfo => T): T = convert(projectInfo)

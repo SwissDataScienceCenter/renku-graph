@@ -21,7 +21,6 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.{Email, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.tinytypes.constraints.NonBlank
@@ -32,7 +31,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with RenkuTinyTypeGenerators {
 
   "Email" should {
 
@@ -94,7 +93,11 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   }
 }
 
-class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PersonResourceIdSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with RenkuTinyTypeGenerators {
   private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
   "apply(GitLabId)" should {
@@ -178,7 +181,7 @@ class PersonGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
   "parse" should {
 
     "return a GitLabId for valid id in String" in {
-      forAll(personGitLabIds) { gitLabId =>
+      forAll(RenkuTinyTypeGenerators.personGitLabIds) { gitLabId =>
         GitLabId.parse(gitLabId.toString) shouldBe Right(gitLabId)
       }
     }

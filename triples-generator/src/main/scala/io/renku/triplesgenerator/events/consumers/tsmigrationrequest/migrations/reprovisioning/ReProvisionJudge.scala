@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import io.renku.graph.model._
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
