@@ -47,6 +47,9 @@ trait Project extends Product with Serializable {
       f3: NonRenkuProject.WithParent => A,
       f4: NonRenkuProject.WithoutParent => A
   ): A
+
+  def identification(implicit renkuUrl: RenkuUrl): entities.ProjectIdentification =
+    this.to[entities.ProjectIdentification]
 }
 
 trait Parent {

@@ -22,17 +22,18 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.circe.Decoder
+import io.renku.entities.searchgraphs.DatasetsGraphCleaner
+import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import io.renku.jsonld.EntityId
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
 private[cleanup] trait TSCleaner[F[_]] {
-  def removeTriples(path: projects.Path): F[Unit]
+  def removeTriples(projectPath: projects.Path): F[Unit]
 }
 
 private[cleanup] object TSCleaner {
@@ -41,17 +42,27 @@ private[cleanup] object TSCleaner {
       maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
       idleTimeout:    Duration = 16 minutes,
       requestTimeout: Duration = 15 minutes
-  ): F[TSCleaner[F]] = ProjectsConnectionConfig[F]().map(
-    new TSCleanerImpl[F](_, retryInterval, maxRetries, idleTimeout, requestTimeout)
-  )
+  ): F[TSCleaner[F]] = (DatasetsGraphCleaner[F], ProjectsConnectionConfig[F]())
+    .mapN((datasetsGraphCleaner, connectionConfig) =>
+      new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
+                           datasetsGraphCleaner,
+                           connectionConfig,
+                           retryInterval,
+                           maxRetries,
+                           idleTimeout,
+                           requestTimeout
+      )
+    )
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    connectionConfig: ProjectsConnectionConfig,
-    retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:      Duration = 16 minutes,
-    requestTimeout:   Duration = 15 minutes
+    projectIdFinder:      ProjectIdFinder[F],
+    datasetsGraphCleaner: DatasetsGraphCleaner[F],
+    connectionConfig:     ProjectsConnectionConfig,
+    retryInterval:        FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:           Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:          Duration = 16 minutes,
+    requestTimeout:       Duration = 15 minutes
 ) extends TSClientImpl(connectionConfig,
                        retryInterval = retryInterval,
                        maxRetries = maxRetries,
@@ -60,65 +71,29 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     )
     with TSCleaner[F] {
 
+  import ProjectHierarchyFixer._
   import SameAsHierarchyFixer._
+  import datasetsGraphCleaner._
   import eu.timepit.refined.auto._
-  import io.renku.graph.model.Schemas._
-  import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
   import io.renku.triplesstore.SparqlQuery
-  import io.renku.triplesstore.SparqlQuery.Prefixes
+  import projectIdFinder._
   private implicit val tsConnection: ProjectsConnectionConfig = connectionConfig
 
-  override def removeTriples(path: projects.Path): F[Unit] =
-    relinkSameAsHierarchy(path) >> relinkProjectHierarchy(path) >>
-      findGraphId(path) >>= removeProjectGraph()
-
-  private def relinkProjectHierarchy(projectPath: projects.Path) = updateWithNoResult {
-    SparqlQuery.of(
-      name = "project re-linking hierarchy",
-      Prefixes of (renku -> "renku", prov -> "prov"),
-      s"""
-      DELETE { GRAPH ?childId { ?childId prov:wasDerivedFrom ?projectId } }
-      INSERT { GRAPH ?childId { ?childId prov:wasDerivedFrom ?parentId } }
-      WHERE {
-        GRAPH ?projectGraphId {
-          ?projectId renku:projectPath '${sparqlEncode(projectPath.show)}'
-        }
-        OPTIONAL { GRAPH ?projectId { ?projectId prov:wasDerivedFrom ?parentId } }
-        GRAPH ?childGraphId {
-          ?childId prov:wasDerivedFrom ?projectId
-        }
-      } 
-       """
-    )
-  }
-
-  private def findGraphId(projectPath: projects.Path): F[Option[EntityId]] = {
-    implicit val enc: Decoder[Option[EntityId]] = ResultsDecoder[Option, EntityId] { implicit cur =>
-      import io.renku.tinytypes.json.TinyTypeDecoders._
-      extract[projects.ResourceId]("graphId").map(GraphClass.Project.id)
+  override def removeTriples(projectPath: projects.Path): F[Unit] =
+    findProjectId(projectPath) >>= {
+      case Some(project) =>
+        relinkSameAsHierarchy(project.path) >>
+          relinkProjectHierarchy(project.path) >>
+          removeProjectGraph(project) >>
+          cleanDatasetsGraph(project)
+      case None => ().pure[F]
     }
 
-    queryExpecting[Option[EntityId]] {
+  private def removeProjectGraph(project: ProjectIdentification): F[Unit] =
+    updateWithNoResult {
       SparqlQuery.of(
-        name = "find project graphId",
-        Prefixes of renku -> "renku",
-        s"""
-        SELECT ?graphId
-        WHERE {
-          GRAPH ?graphId {
-            ?projectId renku:projectPath '${sparqlEncode(projectPath.show)}'
-          }
-        } 
-       """
+        name = "project graph removal",
+        s"""DROP GRAPH ${GraphClass.Project.id(project.resourceId).asSparql.sparql}"""
       )
     }
-  }
-
-  private def removeProjectGraph(): Option[EntityId] => F[Unit] = {
-    case None => ().pure[F]
-    case Some(graphId) =>
-      updateWithNoResult {
-        SparqlQuery.of(name = "project graph removal", s"""DROP GRAPH <$graphId>""")
-      }
-  }
 }
