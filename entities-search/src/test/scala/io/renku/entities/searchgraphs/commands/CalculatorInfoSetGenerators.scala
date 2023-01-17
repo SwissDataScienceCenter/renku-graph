@@ -29,7 +29,7 @@ private object CalculatorInfoSetGenerators {
   lazy val calculatorInfoSets: Gen[CalculatorInfoSet] = for {
     project   <- anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project])
     modelInfo <- searchInfoObjectsGen(project.resourceId).map(_.copy(visibility = project.visibility))
-  } yield CalculatorInfoSet.AllInfos(project,
+  } yield CalculatorInfoSet.AllInfos(project.identification,
                                      modelInfo = modelInfo,
                                      tsInfo = modelInfo,
                                      tsVisibilities = Map(project.resourceId -> project.visibility)

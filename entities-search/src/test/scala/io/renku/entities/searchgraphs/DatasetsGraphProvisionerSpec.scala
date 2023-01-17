@@ -52,7 +52,7 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
         val Success(searchInfos) = givenSearchInfoExtraction(project)
 
         val updates = updateCommands.generateList()
-        givenUpdatesProducing(project, searchInfos, returning = updates.pure[Try])
+        givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])
 
         givenUploading(updates, returning = ().pure[Try])
 
@@ -66,7 +66,7 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
       val Success(searchInfos) = givenSearchInfoExtraction(project)
 
       val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
-      givenUpdatesProducing(project, searchInfos, returning = failure)
+      givenUpdatesProducing(project.identification, searchInfos, returning = failure)
 
       provisioner.provisionDatasetsGraph(project) shouldBe failure
     }
@@ -78,7 +78,7 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
       val Success(searchInfos) = givenSearchInfoExtraction(project)
 
       val updates = updateCommands.generateList()
-      givenUpdatesProducing(project, searchInfos, returning = updates.pure[Try])
+      givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])
 
       val failure = exceptions.generateOne.raiseError[Try, Unit]
       givenUploading(updates, returning = failure)
@@ -95,11 +95,11 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
     def givenSearchInfoExtraction(project: entities.Project): Try[List[SearchInfo]] =
       (collectLastVersions >>> extractSearchInfo[Try](project))(project)
 
-    def givenUpdatesProducing(project:     entities.Project,
+    def givenUpdatesProducing(project:     entities.ProjectIdentification,
                               searchInfos: List[SearchInfo],
                               returning:   Try[List[UpdateCommand]]
     ) = (commandsProducer
-      .toUpdateCommands(_: entities.Project)(_: List[SearchInfo]))
+      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[SearchInfo]))
       .expects(project, searchInfos)
       .returning(returning)
 

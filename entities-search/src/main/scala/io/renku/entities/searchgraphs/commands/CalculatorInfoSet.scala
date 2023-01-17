@@ -21,29 +21,29 @@ package commands
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.entities.Project
+import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.projects
 
 private sealed trait CalculatorInfoSet {
-  val project: Project
+  val project: ProjectIdentification
 }
 
 private object CalculatorInfoSet {
 
-  final case class ModelInfoOnly(project: Project, modelInfo: SearchInfo) extends CalculatorInfoSet
+  final case class ModelInfoOnly(project: ProjectIdentification, modelInfo: SearchInfo) extends CalculatorInfoSet
 
-  final case class TSInfoOnly(project:        Project,
+  final case class TSInfoOnly(project:        ProjectIdentification,
                               tsInfo:         SearchInfo,
                               tsVisibilities: Map[projects.ResourceId, projects.Visibility]
   ) extends CalculatorInfoSet
 
-  final case class AllInfos(project:        Project,
+  final case class AllInfos(project:        ProjectIdentification,
                             modelInfo:      SearchInfo,
                             tsInfo:         SearchInfo,
                             tsVisibilities: Map[projects.ResourceId, projects.Visibility]
   ) extends CalculatorInfoSet
 
-  def from(project:        Project,
+  def from(project:        ProjectIdentification,
            maybeModelInfo: Option[SearchInfo],
            maybeTSInfo:    Option[SearchInfo],
            tsVisibilities: Map[projects.ResourceId, projects.Visibility]
@@ -52,7 +52,7 @@ private object CalculatorInfoSet {
       instantiate(project, maybeModelInfo, maybeTSInfo, tsVisibilities)
     }
 
-  private def validate(project:        Project,
+  private def validate(project:        ProjectIdentification,
                        maybeModelInfo: Option[SearchInfo],
                        maybeTSInfo:    Option[SearchInfo]
   ): Either[Exception, Unit] =
@@ -66,7 +66,7 @@ private object CalculatorInfoSet {
       case _ => ().asRight
     }
 
-  private lazy val instantiate: (Project,
+  private lazy val instantiate: (ProjectIdentification,
                                  Option[SearchInfo],
                                  Option[SearchInfo],
                                  Map[projects.ResourceId, projects.Visibility]
@@ -80,13 +80,11 @@ private object CalculatorInfoSet {
 
   implicit val show: Show[CalculatorInfoSet] = Show.show {
     case CalculatorInfoSet.ModelInfoOnly(project, modelInfo) =>
-      show"projectId = ${project.resourceId}, projectPath = ${project.path}, modelInfo = [${toString(modelInfo)}]"
+      show"$project, modelInfo = [${toString(modelInfo)}]"
     case CalculatorInfoSet.TSInfoOnly(project, tsInfo, _) =>
-      show"projectId = ${project.resourceId}, projectPath = ${project.path}, tsInfo = [${toString(tsInfo)}]"
+      show"$project, tsInfo = [${toString(tsInfo)}]"
     case CalculatorInfoSet.AllInfos(project, modelInfo, tsInfo, _) =>
-      show"projectId = ${project.resourceId}, projectPath = ${project.path}" +
-        show", modelInfo = [${toString(modelInfo)}]" +
-        show", tsInfo = [${toString(tsInfo)}]"
+      show"$project, modelInfo = [${toString(modelInfo)}], tsInfo = [${toString(tsInfo)}]"
   }
 
   private def toString(info: SearchInfo) = List(

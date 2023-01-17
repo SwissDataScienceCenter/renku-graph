@@ -18,10 +18,17 @@
 
 package io.renku.graph.model.entities
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.graph.model.projects.{Path, ResourceId}
 
 final case class ProjectIdentification(resourceId: ResourceId, path: Path)
 
 object ProjectIdentification {
+
   def apply(project: Project): ProjectIdentification = ProjectIdentification(project.resourceId, project.path)
+
+  implicit val show: Show[ProjectIdentification] = Show.show { case ProjectIdentification(resourceId, path) =>
+    show"projectId = $resourceId, projectPath = $path"
+  }
 }

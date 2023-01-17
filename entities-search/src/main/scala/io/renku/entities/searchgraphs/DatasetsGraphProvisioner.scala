@@ -48,6 +48,6 @@ private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: Up
   override def provisionDatasetsGraph(project: Project): F[Unit] =
     collectLastVersions
       .andThen(extractSearchInfo[F](project))
-      .andThenF(toUpdateCommands(project))(project)
+      .andThenF(toUpdateCommands(project.identification))(project)
       .flatMap(searchInfoUploader.upload)
 }

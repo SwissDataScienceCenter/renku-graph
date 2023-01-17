@@ -22,13 +22,13 @@ package commands
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.entities.Project
+import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
-  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]]
+  def toUpdateCommands(project: ProjectIdentification)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]]
 }
 
 private[searchgraphs] object UpdateCommandsProducer {
@@ -46,7 +46,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
   import commandsCalculator._
   import searchInfoFetcher._
 
-  def toUpdateCommands(project: Project)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]] = for {
+  def toUpdateCommands(project: ProjectIdentification)(modelInfos: List[SearchInfo]): F[List[UpdateCommand]] = for {
     tsInfos      <- fetchTSSearchInfos(project.resourceId)
     visibilities <- findVisibilities(findDistinctProjects(tsInfos))
     infoSets     <- toInfoSets(project, modelInfos, tsInfos, visibilities)
@@ -59,7 +59,7 @@ private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: Se
   private lazy val findVisibilities: Set[projects.ResourceId] => F[Map[projects.ResourceId, projects.Visibility]] =
     _.toList.map(id => visibilityFinder.findVisibility(id).map(_.map(id -> _))).sequence.map(_.flatten.toMap)
 
-  private def toInfoSets(project:        Project,
+  private def toInfoSets(project:        ProjectIdentification,
                          modelInfos:     List[SearchInfo],
                          tsInfos:        List[SearchInfo],
                          tsVisibilities: Map[projects.ResourceId, projects.Visibility]

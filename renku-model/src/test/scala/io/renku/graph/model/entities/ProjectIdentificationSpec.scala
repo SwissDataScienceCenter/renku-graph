@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -33,6 +34,16 @@ class ProjectIdentificationSpec extends AnyWordSpec with should.Matchers {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       ProjectIdentification(project) shouldBe ProjectIdentification(project.resourceId, project.path)
+    }
+  }
+
+  "show" should {
+
+    "return String containing info about id and path" in {
+
+      val identification = projectIdentifications.generateOne
+
+      identification.show shouldBe show"projectId = ${identification.resourceId}, projectPath = ${identification.path}"
     }
   }
 }

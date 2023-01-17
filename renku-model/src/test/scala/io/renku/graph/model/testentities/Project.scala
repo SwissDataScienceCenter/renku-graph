@@ -70,6 +70,9 @@ object Project {
       toEntitiesNonRenkuProjectWithoutParent(renkuUrl)
     )
 
+  implicit def toProjectIdentification(implicit renkuUrl: RenkuUrl): Project => entities.ProjectIdentification =
+    project => entities.ProjectIdentification(projects.ResourceId(project.asEntityId), project.path)
+
   implicit def encoder[P <: Project](implicit
       renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl,

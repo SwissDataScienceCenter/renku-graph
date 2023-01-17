@@ -53,7 +53,8 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
             .sequence
             .map(_.flatten)
 
-        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe expectedCommands.map(_.toSet)
+        commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet) shouldBe
+          expectedCommands.map(_.toSet)
       }
 
     "fetch Datasets currently associated with the given Project in the TS, " +
@@ -89,13 +90,14 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
             .sequence
             .map(_.flatten)
 
-        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe expectedCommands.map(_.toSet)
+        commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet) shouldBe expectedCommands
+          .map(_.toSet)
       }
 
     "produce commands - " +
       "case when not all model infos have counterparts in the TS" in new TestCase {
 
-        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList(min = 1)
+        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList(min = 2)
         val tsInfos    = modelInfos.tail
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
@@ -108,7 +110,8 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
             .sequence
             .map(_.flatten)
 
-        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe expectedCommands.map(_.toSet)
+        commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet) shouldBe
+          expectedCommands.map(_.toSet)
       }
 
     "produce commands - " +
@@ -127,7 +130,8 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
             .sequence
             .map(_.flatten)
 
-        commandsProducer.toUpdateCommands(project)(modelInfos).map(_.toSet) shouldBe expectedCommands.map(_.toSet)
+        commandsProducer.toUpdateCommands(project.identification)(modelInfos).map(_.toSet) shouldBe expectedCommands
+          .map(_.toSet)
       }
   }
 
@@ -167,7 +171,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     ): Seq[CalculatorInfoSet] =
       (modelInfos zip tsInfos)
         .map { case (maybeModelInfo, maybeTsInfo) =>
-          CalculatorInfoSet.from(project, maybeModelInfo, maybeTsInfo, tsVisibilities).fold(throw _, identity)
+          CalculatorInfoSet
+            .from(project.identification, maybeModelInfo, maybeTsInfo, tsVisibilities)
+            .fold(throw _, identity)
         }
   }
 }

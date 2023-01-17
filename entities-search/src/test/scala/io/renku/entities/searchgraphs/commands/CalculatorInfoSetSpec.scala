@@ -36,7 +36,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
 
     "create CalculatorInfoSet if there's no TS Search Info" in {
 
-      val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
+      val project        = projectIdentifications.generateOne
       val modelInfo      = searchInfoObjectsGen(project.resourceId).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
@@ -51,9 +51,9 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
       val tsInfo         = searchInfoObjectsGen(project.resourceId).generateOne
       val tsVisibilities = Map(project.resourceId -> project.visibility)
 
-      val Right(infoSet) = CalculatorInfoSet.from(project, None, tsInfo.some, tsVisibilities)
+      val Right(infoSet) = CalculatorInfoSet.from(project.identification, None, tsInfo.some, tsVisibilities)
 
-      infoSet shouldBe CalculatorInfoSet.TSInfoOnly(project, tsInfo, tsVisibilities)
+      infoSet shouldBe CalculatorInfoSet.TSInfoOnly(project.identification, tsInfo, tsVisibilities)
     }
 
     "create CalculatorInfoSet if there are both Search Infos" in {
@@ -63,14 +63,14 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
       val tsInfo         = searchInfoObjectsGen(project.resourceId).generateOne
       val tsVisibilities = Map(project.resourceId -> project.visibility)
 
-      val Right(infoSet) = CalculatorInfoSet.from(project, modelInfo.some, tsInfo.some, tsVisibilities)
+      val Right(infoSet) = CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some, tsVisibilities)
 
-      infoSet shouldBe CalculatorInfoSet.AllInfos(project, modelInfo, tsInfo, tsVisibilities)
+      infoSet shouldBe CalculatorInfoSet.AllInfos(project.identification, modelInfo, tsInfo, tsVisibilities)
     }
 
     "fail if there's model Search Info with multiple Links" in {
 
-      val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
+      val project        = projectIdentifications.generateOne
       val modelInfo      = searchInfoObjectsGen(project.resourceId, projectResourceIds.generateOne).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
@@ -83,7 +83,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
 
     "fail if there's model Search Info pointing to some other Project" in {
 
-      val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
+      val project        = projectIdentifications.generateOne
       val modelInfo      = searchInfoObjectsGen(projectResourceIds.generateOne).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
@@ -96,7 +96,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
 
     "fail if there is neither model nor ts info" in {
 
-      val project = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
+      val project = projectIdentifications.generateOne
 
       val result = CalculatorInfoSet.from(project, None, None, Map.empty)
 
@@ -119,11 +119,12 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
         val tsVisibilities = maybeTSInfo.map(_ => Map(project.resourceId -> project.visibility)).getOrElse(Map.empty)
 
         val infoSet =
-          CalculatorInfoSet.from(project, maybeModelInfo, maybeTSInfo, tsVisibilities).fold(throw _, identity)
+          CalculatorInfoSet
+            .from(project.identification, maybeModelInfo, maybeTSInfo, tsVisibilities)
+            .fold(throw _, identity)
 
         infoSet.show shouldBe List(
-          show"projectId = ${infoSet.project.resourceId}".some,
-          show"projectPath = ${infoSet.project.path}".some,
+          project.identification.show.some,
           maybeModelInfo.map(mi => show"modelInfo = [${searchIntoToString(mi)}]"),
           maybeTSInfo.map(tsi => show"tsInfo = [${searchIntoToString(tsi)}]")
         ).flatten.mkString(", ")

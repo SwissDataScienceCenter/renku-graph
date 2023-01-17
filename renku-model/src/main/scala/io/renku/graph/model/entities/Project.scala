@@ -47,7 +47,8 @@ sealed trait Project extends Product with Serializable {
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
   val plans:      List[Plan]
-  lazy val namespaces: List[Namespace] = path.toNamespaces
+  lazy val namespaces:     List[Namespace]       = path.toNamespaces
+  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
 }
 
 sealed trait NonRenkuProject extends Project with Product with Serializable {
