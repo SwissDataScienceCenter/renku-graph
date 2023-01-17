@@ -21,7 +21,6 @@ package generators
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.images.ImageUri

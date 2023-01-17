@@ -114,7 +114,8 @@ class ZombieEventDetectionSpec
       project:        data.Project,
       eventDate:      EventDate
   )(implicit session: Session[IO]) = {
-    val query: Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
+    val query
+        : Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
           VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder,

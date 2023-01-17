@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.RenkuVersionPair
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.interpreters.TestLogger
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}

@@ -20,8 +20,8 @@ package io.renku.graph.model.views
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.syntax._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 
 trait EntityIdJsonLDOps[TT <: TinyType { type V = String }] {

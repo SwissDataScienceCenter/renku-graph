@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}

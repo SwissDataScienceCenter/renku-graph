@@ -30,7 +30,8 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
 import io.renku.graph.model.testentities.RenkuProject
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
-import io.renku.graph.model.{GraphClass, SchemaVersion, testentities}
+import io.renku.graph.model.versions.SchemaVersion
+import io.renku.graph.model.{GraphClass, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._

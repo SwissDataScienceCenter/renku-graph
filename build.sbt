@@ -37,6 +37,7 @@ lazy val root = Project(
   generators,
   triplesStoreClient,
   tinyTypes,
+  renkuModelTinyTypes,
   renkuModel,
   graphCommons,
   eventLog,
@@ -80,14 +81,22 @@ lazy val tinyTypes = Project(
   AutomateHeaderPlugin
 )
 
+lazy val renkuModelTinyTypes = project.
+  in(file("renku-model-tiny-types")).
+  withId("renku-model-tiny-types").
+  enablePlugins(AutomateHeaderPlugin).
+  settings(commonSettings).
+  dependsOn(tinyTypes % "compile->compile; test->test")
+
 lazy val renkuModel = Project(
   id = "renku-model",
   base = file("renku-model")
 ).settings(
   commonSettings
 ).dependsOn(
-  tinyTypes % "compile->compile",
-  tinyTypes % "test->test"
+  tinyTypes           % "compile->compile",
+  tinyTypes           % "test->test",
+  renkuModelTinyTypes % "compile->compile; test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )

@@ -23,9 +23,8 @@ import EntityConverters._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.rest.SortBy
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
@@ -35,6 +34,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class DatasetsEntitiesFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
@@ -43,11 +43,11 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a shared datasets" should {
 
     "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
-      val originalDSAndProject @ originalDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+      val originalDSAndProject @ originalDS -> originalDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
 
-      val _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+      val _ -> importedDSProject = renkuProjectEntities(visibilityPublic)
         .importDataset(originalDS)
         .generateOne
 
@@ -62,15 +62,15 @@ class DatasetsEntitiesFinderSpec
     "de-duplicate datasets having equal sameAs - case of an Exported DS" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val importedDSAndProject1 @ importedDS1 ::~ project1WithImportedDS = renkuProjectEntities(visibilityPublic)
+      val importedDSAndProject1 @ importedDS1 -> project1WithImportedDS = renkuProjectEntities(visibilityPublic)
         .importDataset(externalDS)
         .generateOne
 
-      val importedDSAndProject2 @ _ ::~ project2WithImportedDS = renkuProjectEntities(visibilityPublic)
+      val importedDSAndProject2 @ _ -> project2WithImportedDS = renkuProjectEntities(visibilityPublic)
         .importDataset(externalDS)
         .generateOne
 
-      val importedDSAndProject3 @ _ ::~ projectWithDSImportedFromProject = renkuProjectEntities(visibilityPublic)
+      val importedDSAndProject3 @ _ -> projectWithDSImportedFromProject = renkuProjectEntities(visibilityPublic)
         .importDataset(importedDS1)
         .generateOne
 
@@ -92,11 +92,11 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a modified datasets" should {
 
     "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
-      val originalDS ::~ modifiedDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+      val ((originalDS, modifiedDS), originalDSProject) = renkuProjectEntities(visibilityPublic)
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
-      val importedDSAndProject @ _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+      val importedDSAndProject @ _ -> importedDSProject = renkuProjectEntities(visibilityPublic)
         .importDataset(originalDS)
         .generateOne
 
@@ -119,11 +119,11 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a invalidated datasets" should {
 
     "not return invalidated DS" in new TestCase {
-      val originalDS ::~ _ ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+      val ((originalDS, _), originalDSProject) = renkuProjectEntities(visibilityPublic)
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .generateOne
 
-      val importedDSAndProject @ _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+      val importedDSAndProject @ _ -> importedDSProject = renkuProjectEntities(visibilityPublic)
         .importDataset(originalDS)
         .generateOne
 
@@ -139,11 +139,11 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a forks with datasets" should {
 
     "de-duplicate datasets when on forked projects" in new TestCase {
-      val _ ::~ modifiedDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+      val ((_, modifiedDS), originalDSProject) = renkuProjectEntities(visibilityPublic)
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
-      val original ::~ fork = originalDSProject.forkOnce()
+      val original -> fork = originalDSProject.forkOnce()
 
       upload(to = projectsDataset, original, fork)
 
@@ -164,13 +164,13 @@ class DatasetsEntitiesFinderSpec
     "favour dataset on public projects if exist" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val dsAndPublicProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+      val dsAndPublicProject @ _ -> publicProject = renkuProjectEntities(visibilityPublic)
         .importDataset(externalDS)
         .generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val original ::~ fork = {
-        val original ::~ fork = publicProject.forkOnce()
+      val original -> fork = {
+        val original -> fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
 
@@ -188,13 +188,13 @@ class DatasetsEntitiesFinderSpec
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val dsAndInternalProject @ _ ::~ internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
+      val dsAndInternalProject @ _ -> internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
         .generateOne
 
-      val original ::~ fork = {
-        val original ::~ fork = internalProject.forkOnce()
+      val original -> fork = {
+        val original -> fork = internalProject.forkOnce()
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
 
@@ -212,7 +212,7 @@ class DatasetsEntitiesFinderSpec
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val dsAndProject @ _ ::~ privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+      val dsAndProject @ _ -> privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
         .generateOne

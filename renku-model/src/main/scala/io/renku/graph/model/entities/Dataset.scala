@@ -503,6 +503,12 @@ object Dataset {
 
     val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
 
+    private val urlToDatasetReference =
+      Type.Def(
+        Class(schema / "URL"),
+        ObjectProperty(schema / "url", ontologyClass)
+      )
+
     val sameAs:             Property = schema / "sameAs"
     val wasDerivedFrom:     Property = prov / "wasDerivedFrom"
     val creator:            Property = schema / "creator"
@@ -527,8 +533,8 @@ object Dataset {
       Type.Def(
         ontologyClass,
         ObjectProperties(
-          ObjectProperty(sameAs, SameAs.ontology),
-          ObjectProperty(wasDerivedFrom, DerivedFrom.ontology),
+          ObjectProperty(sameAs, urlToDatasetReference),
+          ObjectProperty(wasDerivedFrom, urlToDatasetReference),
           ObjectProperty(creator, Person.Ontology.typeDef),
           ObjectProperty(topmostSameAs, ontologyClass),
           ObjectProperty(topmostDerivedFrom, ontologyClass),

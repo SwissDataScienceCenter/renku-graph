@@ -24,12 +24,10 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.circe._
 import io.circe.syntax._
-import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.views._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
-import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
@@ -123,11 +121,6 @@ object datasets {
     implicit lazy val jsonLDDecoder: JsonLDDecoder[DerivedFrom] = JsonLDDecoder.entity(entityTypes) {
       _.downField(schema / "url").downEntityId.as[EntityId].map(DerivedFrom(_))
     }
-
-    val ontology: Type = Type.Def(
-      Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.Ontology.ontologyClass)
-    )
   }
 
   final class TopmostDerivedFrom private[datasets] (val value: String) extends AnyVal with UrlTinyType
@@ -222,11 +215,6 @@ object datasets {
         .as[String]
         .flatMap(url => SameAs.external(Refined.unsafeApply(url)).leftMap(err => DecodingFailure(err.getMessage, Nil)))
     }
-
-    val ontology: Type = Type.Def(
-      Class(schema / "URL"),
-      ObjectProperty(schema / "url", Dataset.Ontology.ontologyClass)
-    )
   }
 
   final class TopmostSameAs private[datasets] (val value: String) extends AnyVal with UrlTinyType

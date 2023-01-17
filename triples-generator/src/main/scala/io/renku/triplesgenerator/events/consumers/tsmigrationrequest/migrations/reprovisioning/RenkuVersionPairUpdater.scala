@@ -22,7 +22,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._

@@ -22,7 +22,8 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, SchemaVersion, persons, projects}
+import io.renku.graph.model.versions.SchemaVersion
+import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs

@@ -78,8 +78,6 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val request = EventRequestContent.NoPayload((event.compoundEventId, event.project).asJson)
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
     }
 
     s"return $BadRequest if event payload is malformed" in new TestCase {
@@ -89,11 +87,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val request =
         EventRequestContent.WithPayload((event.compoundEventId, event.project).asJson, jsons.generateOne.noSpaces)
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-        BadRequest
-      )
-
-      logger.expectNoLogs()
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe
+        BadRequest.asLeft
     }
 
     s"return $Accepted and release the processing flag when event processor fails processing the event" in new TestCase {

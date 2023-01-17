@@ -24,7 +24,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, imageUris, personEmails, personGitLabIds, personNames, projectCreatedDates, projectDescriptions, projectIds, projectKeywords, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, usernames}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}

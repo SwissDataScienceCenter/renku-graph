@@ -27,6 +27,7 @@ import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, DatasetGenFactory, ProjectBasedGenFactory}
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 
 sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
   val path:                 Path

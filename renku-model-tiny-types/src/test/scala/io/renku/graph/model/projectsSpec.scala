@@ -22,7 +22,6 @@ import cats.syntax.all._
 import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.views.RdfResource
 import io.renku.tinytypes.constraints.{RelativePath, Url}
@@ -54,7 +53,7 @@ class ProjectGitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   }
 }
 
-class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with RenkuTinyTypeGenerators {
 
   "Path" should {
     "be a RelativePath" in {
@@ -175,7 +174,11 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers with TableDrivenPr
   }
 }
 
-class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ProjectResourceIdSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with RenkuTinyTypeGenerators {
 
   "ResourceId" should {
 

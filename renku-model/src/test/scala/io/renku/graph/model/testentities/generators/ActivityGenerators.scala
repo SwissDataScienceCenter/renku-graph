@@ -25,62 +25,23 @@ import StepPlan.CommandParameters.CommandParameterFactory
 import cats.data.{Kleisli, NonEmptyList}
 import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, PlanGenFactory, ProjectBasedGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
+import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, positiveInts}
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
-import io.renku.graph.model.entityModel.{Checksum, Location}
 import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.plans.Command
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
 
-import java.nio.charset.StandardCharsets._
-
 object ActivityGenerators extends ActivityGenerators
 
-trait ActivityGenerators {
+trait ActivityGenerators extends RenkuTinyTypeGenerators {
 
-  val activityIds:        Gen[Activity.Id]          = noDashUuid.toGeneratorOf(Activity.Id)
-  val activityStartTimes: Gen[activities.StartTime] = timestampsNotInTheFuture.map(activities.StartTime.apply)
-  def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
-    timestampsNotInTheFuture(after.value).toGeneratorOf(activities.StartTime)
-
-  val entityFileLocations:   Gen[Location.File]   = relativePaths() map Location.File.apply
-  val entityFolderLocations: Gen[Location.Folder] = relativePaths() map Location.Folder.apply
-  val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
-  val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
-
-  implicit val planIdentifiers: Gen[plans.Identifier] = noDashUuid.toGeneratorOf(plans.Identifier)
-  def planResourceIds(implicit renkuUrl: RenkuUrl): Gen[plans.ResourceId] = planIdentifiers.map(plans.ResourceId(_))
-  implicit val planNames:    Gen[plans.Name]    = nonBlankStrings(minLength = 5).map(_.value).toGeneratorOf[plans.Name]
-  implicit val planKeywords: Gen[plans.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map plans.Keyword.apply
-  implicit val planDescriptions: Gen[plans.Description] = sentences().map(_.value).toGeneratorOf[plans.Description]
-  implicit val planCommands:     Gen[plans.Command]     = nonBlankStrings().map(_.value).toGeneratorOf[plans.Command]
-  implicit val planProgrammingLanguages: Gen[plans.ProgrammingLanguage] =
-    nonBlankStrings().map(_.value).toGeneratorOf[plans.ProgrammingLanguage]
-  implicit val planSuccessCodes: Gen[plans.SuccessCode] =
-    positiveInts().map(_.value).toGeneratorOf[plans.SuccessCode]
-
-  def planDatesCreated(after: InstantTinyType): Gen[plans.DateCreated] =
-    timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
+  val activityIds: Gen[Activity.Id] = noDashUuid.toGeneratorOf(Activity.Id)
 
   def planDatesCreatedK: Kleisli[Gen, InstantTinyType, plans.DateCreated] =
     Kleisli(planDatesCreated)
-
-  implicit val commandParameterNames: Gen[commandParameters.Name] =
-    nonBlankStrings().map(_.value).toGeneratorOf[commandParameters.Name]
-
-  implicit val commandParameterEncodingFormats: Gen[commandParameters.EncodingFormat] =
-    Gen
-      .oneOf(UTF_8.name(), US_ASCII.name(), ISO_8859_1.name, UTF_16.name(), nonEmptyStrings().generateOne)
-      .map(commandParameters.EncodingFormat(_))
-  implicit val commandParameterFolderCreation: Gen[commandParameters.FolderCreation] =
-    Gen.oneOf(commandParameters.FolderCreation.yes, commandParameters.FolderCreation.no)
-
-  val commandParameterDescription: Gen[commandParameters.Description] =
-    sentences().map(s => commandParameters.Description(s.value))
 
   lazy val generationIds: Gen[Generation.Id] = noDashUuid.toGeneratorOf(Generation.Id)
 

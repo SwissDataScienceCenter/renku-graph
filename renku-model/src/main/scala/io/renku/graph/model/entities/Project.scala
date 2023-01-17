@@ -18,15 +18,16 @@
 
 package io.renku.graph.model.entities
 
+import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
-import PlanLens.{getPlanDerivation, planDateCreated, setPlanDerivation}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
@@ -334,7 +335,8 @@ object RenkuProject {
           findMinActivityDate(p.resourceId) match {
             case None                                                                                => p
             case Some(minActivityDate) if (p.dateCreated.value compareTo minActivityDate.value) <= 0 => p
-            case Some(minActivityDate) => planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
+            case Some(minActivityDate) =>
+              PlanLens.planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
           }
         )
     }

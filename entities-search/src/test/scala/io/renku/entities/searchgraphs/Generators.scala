@@ -26,7 +26,6 @@ import cats.syntax.all._
 import commands.UpdateCommand
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{Date, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._

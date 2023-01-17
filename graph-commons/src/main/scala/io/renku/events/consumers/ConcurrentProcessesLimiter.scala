@@ -25,6 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, Busy, SchedulingError}
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -34,11 +35,11 @@ trait ConcurrentProcessesLimiter[F[_]] {
 
 object ConcurrentProcessesLimiter {
 
-  def apply[F[_]: Concurrent](processesCount: Int Refined Positive): F[ConcurrentProcessesLimiter[F]] = for {
+  def apply[F[_]: Concurrent: Logger](processesCount: Int Refined Positive): F[ConcurrentProcessesLimiter[F]] = for {
     semaphore <- Semaphore(processesCount.value)
   } yield new ConcurrentProcessesLimiterImpl[F](processesCount, semaphore)
 
-  def withoutLimit[F[_]: Concurrent]: ConcurrentProcessesLimiter[F] =
+  def withoutLimit[F[_]: Concurrent: Logger]: ConcurrentProcessesLimiter[F] =
     new ConcurrentProcessesLimiter[F] {
 
       override def tryExecuting(scheduledProcess: EventHandlingProcess[F]): F[EventSchedulingResult] =
@@ -56,12 +57,11 @@ object ConcurrentProcessesLimiter {
         maybeReleaseProcess
           .map(Concurrent[F].start(_).void)
           .getOrElse(().pure[F])
-          .recover { case NonFatal(_) => () }
-
+          .recoverWith(Logger[F].error(_)("Release process scheduling failed"))
     }
 }
 
-class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
+class ConcurrentProcessesLimiterImpl[F[_]: Concurrent: Logger](
     processesCount: Int Refined Positive,
     semaphore:      Semaphore[F]
 ) extends ConcurrentProcessesLimiter[F] {
@@ -89,11 +89,13 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
   private lazy val releaseOnLeft
       : PartialFunction[EventSchedulingResult, EitherT[F, EventSchedulingResult, Accepted]] = {
     case eventSchedulingResult =>
-      EitherT.left(semaphore.release.map(_ => eventSchedulingResult))
+      EitherT.right[EventSchedulingResult](Logger[F].error(s"Process scheduling failed: $eventSchedulingResult")) >>
+        EitherT.left[Accepted](semaphore.release.map(_ => eventSchedulingResult))
   }
 
-  private lazy val releaseOnError: PartialFunction[Throwable, F[EventSchedulingResult]] = { case NonFatal(error) =>
-    semaphore.release.map(_ => SchedulingError(error))
+  private lazy val releaseOnError: PartialFunction[Throwable, F[EventSchedulingResult]] = { error =>
+    Logger[F].error(error)(s"Process scheduling failed") >>
+      semaphore.release.map(_ => SchedulingError(error)).widen[EventSchedulingResult]
   }
 
   private def releaseAndNotify(scheduledProcess: EventHandlingProcess[F]): F[Unit] = for {
@@ -101,10 +103,10 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
     _ <- scheduledProcess.maybeReleaseProcess
            .map(Spawn[F].start(_).void)
            .getOrElse(().pure[F])
-           .recover { case NonFatal(_) => () }
+           .recoverWith(Logger[F].error(_)("Release process scheduling failed"))
   } yield ()
 
-  private def releasingSemaphore[O]: PartialFunction[Throwable, F[O]] = { case NonFatal(exception) =>
+  private def releasingSemaphore[O]: PartialFunction[Throwable, F[O]] = { exception =>
     semaphore.available >>= {
       case available if available == processesCount.value => exception.raiseError[F, O]
       case _ => semaphore.release flatMap { _ => exception.raiseError[F, O] }

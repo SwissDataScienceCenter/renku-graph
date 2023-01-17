@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.generators
 
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.RenkuVersionPair
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.triplesgenerator.config.{RenkuPythonDevVersion, VersionCompatibilityConfig}
 import org.scalacheck.Gen
 
