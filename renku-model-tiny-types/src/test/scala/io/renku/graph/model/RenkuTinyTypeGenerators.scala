@@ -224,7 +224,7 @@ trait RenkuTinyTypeGenerators {
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
 
   val entityResourceIds: Gen[entityModel.ResourceId] =
-    Generators.noDashUuid.map(entityModel.ResourceId)
+    Generators.validatedUrls.map(_.value).map(entityModel.ResourceId)
   val entityFileLocations: Gen[entityModel.Location.File] =
     Generators.relativePaths() map entityModel.Location.File.apply
   val entityFolderLocations: Gen[entityModel.Location.Folder] =

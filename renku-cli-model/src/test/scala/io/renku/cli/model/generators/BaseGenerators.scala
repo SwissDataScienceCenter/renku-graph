@@ -19,10 +19,10 @@ trait BaseGenerators {
     RenkuTinyTypeGenerators.datasetSameAs.map(v => CliDatasetSameAs(v.value))
 
   val generationsResourceIdGen: Gen[generations.ResourceId] =
-    Generators.noDashUuid.map(generations.ResourceId)
+    Generators.validatedUrls.map(_.value).map(generations.ResourceId)
 
   val partResourceIdGen: Gen[datasets.PartResourceId] =
-    Generators.noDashUuid.map(id => PartResourceId(id))
+    Generators.validatedUrls.map(id => PartResourceId(id.value))
 }
 
 object BaseGenerators extends BaseGenerators

@@ -38,7 +38,7 @@ trait DatasetGenerators {
       createdOrPublished = date,
       creators = NonEmptyList.fromListUnsafe(creators),
       description = descr,
-      keywords = keywords,
+      keywords = keywords.sorted,
       images = images,
       license = license,
       version = version,
