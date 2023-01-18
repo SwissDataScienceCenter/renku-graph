@@ -2,8 +2,9 @@ package io.renku.cli.model.diffx
 
 import com.softwaremill.diffx.Diff
 import io.renku.cli.model._
+import io.renku.graph.model.diffx.ModelTinyTypesDiffInstances
 
-trait CliDiffInstances {
+trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val cliPersonDiff: Diff[CliPerson] = Diff.derived[CliPerson]
 

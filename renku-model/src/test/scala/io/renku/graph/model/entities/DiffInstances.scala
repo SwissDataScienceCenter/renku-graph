@@ -18,40 +18,12 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.NonEmptyList
 import com.softwaremill.diffx._
+import io.renku.graph.model.diffx.ModelTinyTypesDiffInstances
 import io.renku.graph.model.entities.Dataset.Provenance.ImportedInternalAncestorExternal
 import io.renku.graph.model.entities.Dataset.{AdditionalInfo, Identification, Provenance}
-import io.renku.graph.model.images.{Image, ImageUri}
-import io.renku.graph.model.{commandParameters, projects}
-import io.renku.graph.model.projects.Visibility
-import io.renku.tinytypes.{BooleanTinyType, InstantTinyType, IntTinyType, LocalDateTinyType, RelativePathTinyType, StringTinyType, UrlTinyType}
 
-trait DiffInstances {
-
-  implicit def stringTinyTypeDiff[A <: StringTinyType]: Diff[A] =
-    Diff.diffForString.contramap(_.value)
-
-  implicit def urlTinyTypeDiff[A <: UrlTinyType]: Diff[A] =
-    Diff.diffForString.contramap(_.value)
-
-  implicit def instantTinyTypeDiff[A <: InstantTinyType]: Diff[A] =
-    Diff.diffForString.contramap(_.value.toString)
-
-  implicit def localDateTinyTypeDiff[A <: LocalDateTinyType]: Diff[A] =
-    Diff.diffForString.contramap(_.value.toString)
-
-  implicit def intTinyTypeDiff[A <: IntTinyType]: Diff[A] =
-    Diff.diffForNumeric[Int].contramap(_.value)
-
-  implicit def boolTinyTypeDiff[A <: BooleanTinyType]: Diff[A] =
-    Diff.diffForBoolean.contramap(_.value)
-
-  implicit def relativePathTinyType[A <: RelativePathTinyType]: Diff[A] =
-    Diff.diffForString.contramap(_.value)
-
-  implicit def nonEmptyListDiff[A: Diff]: Diff[NonEmptyList[A]] =
-    Diff.diffForSeq[List, A].contramap(_.toList)
+trait DiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val personWithGitlabIdDiff: Diff[Person.WithGitLabId] = Diff.derived[Person.WithGitLabId]
   implicit val personWithEmailDiff:    Diff[Person.WithEmail]    = Diff.derived[Person.WithEmail]
@@ -78,23 +50,6 @@ trait DiffInstances {
 
   implicit lazy val mappedCommandOutputDiff: Diff[StepPlanCommandParameter.MappedCommandOutput] =
     Diff.derived[StepPlanCommandParameter.MappedCommandOutput]
-
-  implicit lazy val outputDefaultValueDiff: Diff[commandParameters.OutputDefaultValue] =
-    Diff.diffForString.contramap(_.value.value)
-
-  implicit val inputDefaultValueDiff: Diff[commandParameters.InputDefaultValue] =
-    Diff.diffForString.contramap(_.value.value)
-
-  implicit val ioStreamInDiff: Diff[commandParameters.IOStream.In] = Diff.derived[commandParameters.IOStream.In]
-
-  implicit val ioStreamOutDiff: Diff[commandParameters.IOStream.Out] = Diff.derived[commandParameters.IOStream.Out]
-
-  implicit val ioStreamStdInDiff: Diff[commandParameters.IOStream.StdIn] =
-    Diff.derived[commandParameters.IOStream.StdIn]
-  implicit val ioStreamStdOutDiff: Diff[commandParameters.IOStream.StdOut] =
-    Diff.derived[commandParameters.IOStream.StdOut]
-  implicit val ioStreamErrOutDiff: Diff[commandParameters.IOStream.StdErr] =
-    Diff.derived[commandParameters.IOStream.StdErr]
 
   implicit val implicitCommandInputDiff: Diff[StepPlanCommandParameter.ImplicitCommandInput] =
     Diff.derived[StepPlanCommandParameter.ImplicitCommandInput]
@@ -135,20 +90,8 @@ trait DiffInstances {
 
   implicit val planDiff: Diff[Plan] = Diff.derived[Plan]
 
-  implicit val visibilityDiff: Diff[Visibility] =
-    Diff.derived[Visibility]
-
-  implicit val imageUriDiff: Diff[ImageUri] =
-    Diff.diffForString.contramap(_.value)
-
-  implicit val imageDiff: Diff[Image] =
-    Diff.derived[Image]
-
   implicit val agentDiff: Diff[Agent] =
     Diff.derived[Agent]
-
-  implicit val projectPathDiff: Diff[projects.Path] =
-    Diff.diffForString.contramap(_.value)
 
   implicit val inputEntityDiff: Diff[Entity.InputEntity] =
     Diff.derived[Entity.InputEntity]

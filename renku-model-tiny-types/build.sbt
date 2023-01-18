@@ -19,4 +19,4 @@
 organization := "io.renku"
 name := "renku-model-tiny-types"
 
-//libraryDependencies += "com.softwaremill.diffx"     %% "diffx-scalatest-should" % "0.8.2" % Test
+libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
