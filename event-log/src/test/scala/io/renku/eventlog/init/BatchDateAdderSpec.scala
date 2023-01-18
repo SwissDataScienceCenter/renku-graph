@@ -137,7 +137,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       """.command
       session
         .prepare(query)
-        .use(
+        .flatMap(
           _.execute(
             event.id ~ event.project.id ~ event.project.path ~ eventStatuses.generateOne ~ createdDate ~ executionDates.generateOne ~ event.date ~ toJsonBody(
               event

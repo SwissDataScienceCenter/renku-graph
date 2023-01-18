@@ -44,7 +44,7 @@ trait CleanUpEventsProvisioning {
           VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
         session
           .prepare(query)
-          .use(_.execute(date ~ projectId ~ projectPath))
+          .flatMap(_.execute(date ~ projectId ~ projectPath))
           .void
       }
     }
@@ -56,7 +56,7 @@ trait CleanUpEventsProvisioning {
         FROM clean_up_events_queue
         ORDER BY date DESC"""
         .query(projectIdDecoder ~ projectPathDecoder)
-      session.prepare(query).use(_.stream(Void, 32).compile.toList)
+      session.prepare(query).flatMap(_.stream(Void, 32).compile.toList)
     }
   }
 }

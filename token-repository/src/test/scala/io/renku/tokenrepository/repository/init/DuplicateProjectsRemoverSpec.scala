@@ -92,7 +92,7 @@ class DuplicateProjectsRemoverSpec
          """.command
         session
           .prepare(query)
-          .use(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
+          .flatMap(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
           .map(assureInserted)
       }
     }

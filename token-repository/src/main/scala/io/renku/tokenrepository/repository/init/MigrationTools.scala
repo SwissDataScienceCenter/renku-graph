@@ -41,7 +41,7 @@ private object MigrationTools {
         )""".query(bool)
       session
         .prepare(query)
-        .use(_.unique(table ~ column))
+        .flatMap(_.unique(table ~ column))
         .recover { case _ => false }
     }
 
@@ -59,7 +59,7 @@ private object MigrationTools {
         }
       session
         .prepare(query)
-        .use(_.unique(table ~ column))
+        .flatMap(_.unique(table ~ column))
         .recover { case _ => false }
     }
 

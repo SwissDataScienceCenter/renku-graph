@@ -156,7 +156,7 @@ class TokensPersisterSpec
           case (id: projects.GitLabId) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
             TokenStoringInfo(Project(id, path), token, TokenDates(createdAt, expiryDate))
         }
-      Kleisli(_.prepare(query).use(_.option(projectId)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectId)))
     }
     .unsafeRunSync()
 }
