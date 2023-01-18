@@ -123,7 +123,7 @@ class ProjectPathAdderSpec
 
       session
         .prepare(query)
-        .use(
+        .flatMap(
           _.execute(
             event.id ~ event.project.id ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDates.generateOne ~ toJson(
               event

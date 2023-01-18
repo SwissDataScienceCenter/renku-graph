@@ -120,7 +120,7 @@ trait EventLogDataProvisioning {
         """.command
           session
             .prepare(query)
-            .use(
+            .flatMap(
               _.execute(
                 compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ batchDate ~ eventBody
               )
@@ -136,7 +136,7 @@ trait EventLogDataProvisioning {
                """.command
           session
             .prepare(query)
-            .use(
+            .flatMap(
               _.execute(
                 compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ batchDate ~ eventBody ~ message
               )
@@ -160,7 +160,7 @@ trait EventLogDataProvisioning {
               ON CONFLICT (project_id)
               DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-      session.prepare(query).use(_.execute(projectId ~ projectPath ~ eventDate)).void
+      session.prepare(query).flatMap(_.execute(projectId ~ projectPath ~ eventDate)).void
     }
   }
 
@@ -181,7 +181,7 @@ trait EventLogDataProvisioning {
               """.command
               session
                 .prepare(query)
-                .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload))
+                .flatMap(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload))
                 .void
             }
           }
@@ -204,7 +204,7 @@ trait EventLogDataProvisioning {
         """.command
       session
         .prepare(query)
-        .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ processingTime))
+        .flatMap(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ processingTime))
         .void
     }
   }
@@ -232,7 +232,7 @@ trait EventLogDataProvisioning {
               DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
         """.command
 
-      session.prepare(query).use(_.execute(deliveryId ~ deliveryUrl ~ sourceUrl ~ deliveryId)).void
+      session.prepare(query).flatMap(_.execute(deliveryId ~ deliveryUrl ~ sourceUrl ~ deliveryId)).void
     }
   }
 
@@ -246,7 +246,7 @@ trait EventLogDataProvisioning {
               ON CONFLICT (event_id, project_id)
               DO NOTHING
         """.command
-      session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ deliveryId)).void
+      session.prepare(query).flatMap(_.execute(eventId.id ~ eventId.projectId ~ deliveryId)).void
     }
   }
 
@@ -286,7 +286,7 @@ trait EventLogDataProvisioning {
               VALUES ($timestamptz, $varchar, $text)""".command
       session
         .prepare(query)
-        .use(_.execute(OffsetDateTime.now() ~ eventType ~ payload.noSpaces))
+        .flatMap(_.execute(OffsetDateTime.now() ~ eventType ~ payload.noSpaces))
         .void
     }
   }

@@ -41,7 +41,7 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET  last_synced = excluded.last_synced
       """.command
-      session.prepare(query).use(_.execute(projectId ~ categoryName ~ lastSynced)).void
+      session.prepare(query).flatMap(_.execute(projectId ~ categoryName ~ lastSynced)).void
     }
   }
 
@@ -53,7 +53,7 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
         FROM subscription_category_sync_time
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
       """.query(lastSyncedDateDecoder)
-        session.prepare(query).use(_.option(projectId ~ categoryName))
+        session.prepare(query).flatMap(_.option(projectId ~ categoryName))
       }
     }
 
@@ -66,7 +66,7 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
               WHERE project_id = $projectIdEncoder"""
             .query(varchar ~ lastSyncedDateDecoder)
             .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
-        session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
       }
     }
 }

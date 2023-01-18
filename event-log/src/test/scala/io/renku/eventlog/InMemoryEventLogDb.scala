@@ -47,7 +47,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
          table_name = $varchar AND column_name = $varchar;""".query(varchar)
       session
         .prepare(query)
-        .use(_.unique(table ~ column))
+        .flatMap(_.unique(table ~ column))
         .map(dataType => dataType == hasType)
         .recover { case _ => false }
     }
@@ -63,7 +63,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
               )""".query(bool)
       session
         .prepare(query)
-        .use(_.unique(table ~ column))
+        .flatMap(_.unique(table ~ column))
         .recover { case _ => false }
     }
   }
@@ -78,7 +78,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
                )""".query(bool)
       session
         .prepare(query)
-        .use(_.unique(table ~ constraintName))
+        .flatMap(_.unique(table ~ constraintName))
         .recover { case _ => false }
     }
   }
@@ -93,7 +93,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
                )""".query(bool)
       session
         .prepare(query)
-        .use(_.unique(table ~ indexName))
+        .flatMap(_.unique(table ~ indexName))
         .recover { case _ => false }
     }
   }
@@ -102,7 +102,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
     Kleisli { session =>
       val query: Query[String, Boolean] =
         sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
-      session.prepare(query).use(_.unique(tableName)).recover { case _ => false }
+      session.prepare(query).flatMap(_.unique(tableName)).recover { case _ => false }
     }
   }
 

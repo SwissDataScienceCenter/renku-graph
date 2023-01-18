@@ -41,7 +41,7 @@ class SessionResource[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Se
 
 object SessionPoolResource {
 
-  def apply[F[_]: Concurrent: Trace: Network: Console, TargetDB](
+  def apply[F[_]: Temporal: Trace: Network: Console, TargetDB](
       dbConfig: DBConfig[TargetDB]
   ): Resource[F, SessionResource[F, TargetDB]] =
     Session

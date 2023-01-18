@@ -92,7 +92,7 @@ private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRe
     val query: Command[EventStatus] =
       sql"UPDATE event_log set status=$eventStatusEncoder where status='TRIPLES_STORE_FAILURE'".command
     Kleisli[F, Session[F], Unit] {
-      _.prepare(query).use(_.execute(GenerationRecoverableFailure).void)
+      _.prepare(query).flatMap(_.execute(GenerationRecoverableFailure).void)
     }
   }
 }
