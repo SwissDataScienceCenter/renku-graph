@@ -1,6 +1,6 @@
 package io.renku.cli.model
 
-import io.renku.graph.model.Schemas.schema
+import io.renku.cli.model.Ontologies.Schema
 import io.renku.graph.model.datasets.{ExternalSameAs, InternalSameAs}
 import io.renku.jsonld.syntax.JsonEncoderOps
 import io.renku.jsonld.{EntityId, EntityIdEncoder, EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
@@ -29,13 +29,13 @@ object CliDatasetSameAs
   implicit lazy val jsonLdEncoder: JsonLDEncoder[CliDatasetSameAs] = JsonLDEncoder.instance { sameAs =>
     JsonLD.entity(
       sameAs.asEntityId,
-      EntityTypes.of(schema / "URL"),
-      schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+      EntityTypes.of(Schema.URL),
+      Schema.url -> EntityId.of(sameAs.value).asJsonLD
     )
   }
 
   implicit val jsonLdDecoder: JsonLDDecoder[CliDatasetSameAs] =
-    JsonLDDecoder.entity(EntityTypes.of(schema / "URL")) {
-      _.downField(schema / "url").downEntityId.as[EntityId].map(CliDatasetSameAs(_))
+    JsonLDDecoder.entity(EntityTypes.of(Schema.URL)) {
+      _.downField(Schema.url).downEntityId.as[EntityId].map(CliDatasetSameAs(_))
     }
 }

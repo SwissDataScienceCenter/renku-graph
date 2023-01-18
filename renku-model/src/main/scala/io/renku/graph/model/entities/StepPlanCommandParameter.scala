@@ -357,7 +357,7 @@ object StepPlanCommandParameter {
           schema / "name"           -> name.asJsonLD,
           renku / "prefix"          -> maybePrefix.asJsonLD,
           schema / "defaultValue"   -> defaultValue.asJsonLD,
-          renku / "createFolder"    -> folderCreation.asJsonLD,
+          renku / "createFolder" -> folderCreation.asJsonLD,
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
     }

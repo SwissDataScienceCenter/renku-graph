@@ -6,3 +6,7 @@ object all
     with EntityGenerators
     with DatasetFileGenerators
     with DatasetGenerators
+    with AgentGenerators
+    with ParameterValueGenerators
+    with CommandParameterGenerators
+    with PlanGenerators

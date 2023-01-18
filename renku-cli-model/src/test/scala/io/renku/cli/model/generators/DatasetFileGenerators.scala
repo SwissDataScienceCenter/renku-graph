@@ -9,7 +9,7 @@ import java.time.Instant
 trait DatasetFileGenerators {
   def datasetFileGen(minCreated: Instant): Gen[CliDatasetFile] =
     for {
-      id          <- BaseGenerators.partResourceIdGen
+      id          <- RenkuTinyTypeGenerators.partResourceIdGen
       external    <- RenkuTinyTypeGenerators.datasetPartExternals
       entity      <- EntityGenerators.entityGen()
       created     <- RenkuTinyTypeGenerators.datasetCreatedDates(minCreated)

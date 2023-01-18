@@ -1,7 +1,7 @@
 package io.renku.cli.model
 
+import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
-import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
@@ -16,17 +16,17 @@ final case class CliDatasetFile(
 )
 
 object CliDatasetFile {
-  private val entityTypes: EntityTypes = EntityTypes.of(prov / "Entity", schema / "DigitalDocument")
+  private val entityTypes: EntityTypes = EntityTypes.of(Prov.Entity, Schema.DigitalDocument)
 
   implicit def jsonLDDecoder: JsonLDDecoder[CliDatasetFile] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
         resourceId            <- cursor.downEntityId.as[PartResourceId]
-        external              <- cursor.downField(renku / "external").as[PartExternal]
-        entity                <- cursor.downField(prov / "entity").as[CliEntity]
-        dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        maybeSource           <- cursor.downField(renku / "source").as[Option[PartSource]]
-        maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
+        external              <- cursor.downField(Renku.external).as[PartExternal]
+        entity                <- cursor.downField(Prov.entity).as[CliEntity]
+        dateCreated           <- cursor.downField(Schema.dateCreated).as[DateCreated]
+        maybeSource           <- cursor.downField(Renku.source).as[Option[PartSource]]
+        maybeInvalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         part = CliDatasetFile(resourceId, external, entity, dateCreated, maybeSource, maybeInvalidationTime)
       } yield part
     }
@@ -37,11 +37,11 @@ object CliDatasetFile {
         file.resourceId.asEntityId,
         entityTypes,
         List(
-          Some(renku / "external"     -> file.external.asJsonLD),
-          Some(prov / "entity"        -> file.entity.asJsonLD),
-          Some(schema / "dateCreated" -> file.dateCreated.asJsonLD),
-          file.source.map(s => renku / "source" -> s.asJsonLD),
-          file.invalidationTime.map(t => prov / "invalidatedAtTime" -> t.asJsonLD)
+          Some(Renku.external     -> file.external.asJsonLD),
+          Some(Prov.entity        -> file.entity.asJsonLD),
+          Some(Schema.dateCreated -> file.dateCreated.asJsonLD),
+          file.source.map(s => Renku.source -> s.asJsonLD),
+          file.invalidationTime.map(t => Prov.invalidatedAtTime -> t.asJsonLD)
         ).flatten.toMap
       )
     }

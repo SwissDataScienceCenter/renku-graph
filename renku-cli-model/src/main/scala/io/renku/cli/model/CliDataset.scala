@@ -3,8 +3,8 @@ package io.renku.cli.model
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
-import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.Image
 import io.renku.jsonld.syntax._
@@ -42,7 +42,7 @@ final case class CliDataset(
 
 object CliDataset {
 
-  private val entityTypes: EntityTypes = EntityTypes.of(schema / "Dataset", prov / "Entity")
+  private val entityTypes: EntityTypes = EntityTypes.of(Schema.Dataset, Prov.Entity)
 
   implicit def jsonLDDecoder(implicit
       fileDecoder:   JsonLDDecoder[CliDatasetFile],
@@ -50,38 +50,35 @@ object CliDataset {
   ): JsonLDDecoder[CliDataset] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        identifier <- cursor.downField(schema / "identifier").as[Identifier]
-        title      <- cursor.downField(schema / "name").as[Title]
-        name       <- cursor.downField(renku / "slug").as[Name]
-
-        creators           <- cursor.downField(schema / "creator").as[NonEmptyList[CliPerson]]
-        maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
-        maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
+        resourceId         <- cursor.downEntityId.as[ResourceId]
+        identifier         <- cursor.downField(Schema.identifier).as[Identifier]
+        title              <- cursor.downField(Schema.name).as[Title]
+        name               <- cursor.downField(Renku.slug).as[Name]
+        creators           <- cursor.downField(Schema.creator).as[NonEmptyList[CliPerson]]
+        maybeDateCreated   <- cursor.downField(Schema.dateCreated).as[Option[DateCreated]]
+        maybeDatePublished <- cursor.downField(Schema.datePublished).as[Option[DatePublished]]
         date <- maybeDateCreated
                   .orElse(maybeDatePublished)
                   .toRight(DecodingFailure("No dateCreated or datePublished found on dataset", Nil))
-        maybeDateModified <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
+        maybeDateModified <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
         maybeSameAs <- cursor
-                         .downField(schema / "sameAs")
+                         .downField(Schema.sameAs)
                          .as[CliDatasetSameAs]
                          .map(Option.apply)
                          .leftFlatMap(_ => Option.empty[CliDatasetSameAs].asRight)
         maybeDerivedFrom <-
           cursor
-            .downField(prov / "wasDerivedFrom")
+            .downField(Prov.wasDerivedFrom)
             .as[Option[DerivedFrom]](JsonLDDecoder.decodeOption(DerivedFrom.jsonLDDecoder))
-        maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[OriginalIdentifier]]
-        maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
+        maybeOriginalIdentifier <- cursor.downField(Renku.originalIdentifier).as[Option[OriginalIdentifier]]
+        maybeInvalidationTime   <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
 
-        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-        keywords         <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten).map(_.sorted)
-        images           <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
-        maybeLicense     <- cursor.downField(schema / "license").as[Option[License]]
-        maybeVersion     <- cursor.downField(schema / "version").as[Option[Version]]
-
-        parts <- cursor.downField(schema / "hasPart").as[List[CliDatasetFile]]
-
+        maybeDescription <- cursor.downField(Schema.description).as[Option[Description]]
+        keywords         <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten).map(_.sorted)
+        images           <- cursor.downField(Schema.image).as[List[Image]].map(_.sortBy(_.position))
+        maybeLicense     <- cursor.downField(Schema.license).as[Option[License]]
+        maybeVersion     <- cursor.downField(Schema.version).as[Option[Version]]
+        parts            <- cursor.downField(Schema.hasPart).as[List[CliDatasetFile]]
       } yield CliDataset(
         resourceId,
         identifier,
@@ -112,25 +109,25 @@ object CliDataset {
         ds.resourceId.asEntityId,
         entityTypes,
         List(
-          Some(schema / "identifier" -> ds.identifier.asJsonLD),
-          Some(schema / "name"       -> ds.title.asJsonLD),
-          Some(renku / "slug"        -> ds.name.asJsonLD),
-          Some(schema / "creator"    -> ds.creators.asJsonLD),
+          Some(Schema.identifier -> ds.identifier.asJsonLD),
+          Some(Schema.name       -> ds.title.asJsonLD),
+          Some(Renku.slug        -> ds.name.asJsonLD),
+          Some(Schema.creator    -> ds.creators.asJsonLD),
           ds.createdOrPublished match {
-            case d: DateCreated   => (schema / "dateCreated"   -> d.asJsonLD).some
-            case d: DatePublished => (schema / "datePublished" -> d.asJsonLD).some
+            case d: DateCreated   => (Schema.dateCreated   -> d.asJsonLD).some
+            case d: DatePublished => (Schema.datePublished -> d.asJsonLD).some
           },
-          ds.dateModified.map(m => schema / "dateModified" -> m.asJsonLD),
-          ds.sameAs.map(e => schema / "sameAs" -> e.asJsonLD),
-          ds.derivedFrom.map(e => prov / "wasDerivedFrom" -> e.asJsonLD),
-          ds.originalIdentifier.map(e => renku / "originalIdentifier" -> e.asJsonLD),
-          ds.invalidationTime.map(e => prov / "invalidatedAtTime" -> e.asJsonLD),
-          ds.description.map(d => schema / "description" -> d.asJsonLD),
-          Some(schema / "keywords" -> ds.keywords.asJsonLD),
-          Some(schema / "image"    -> ds.images.asJsonLD),
-          ds.license.map(e => schema / "license" -> e.asJsonLD),
-          ds.version.map(e => schema / "version" -> e.asJsonLD),
-          Some(schema / "hasPart" -> ds.datasetFiles.asJsonLD)
+          ds.dateModified.map(m => Schema.dateModified -> m.asJsonLD),
+          ds.sameAs.map(e => Schema.sameAs -> e.asJsonLD),
+          ds.derivedFrom.map(e => Prov.wasDerivedFrom -> e.asJsonLD),
+          ds.originalIdentifier.map(e => Renku.originalIdentifier -> e.asJsonLD),
+          ds.invalidationTime.map(e => Prov.invalidatedAtTime -> e.asJsonLD),
+          ds.description.map(d => Schema.description -> d.asJsonLD),
+          Some(Schema.keywords -> ds.keywords.asJsonLD),
+          Some(Schema.image    -> ds.images.asJsonLD),
+          ds.license.map(e => Schema.license -> e.asJsonLD),
+          ds.version.map(e => Schema.version -> e.asJsonLD),
+          Some(Schema.hasPart -> ds.datasetFiles.asJsonLD)
         ).flatten.toMap
       )
     }

@@ -11,7 +11,7 @@ trait EntityGenerators {
       id          <- RenkuTinyTypeGenerators.entityResourceIds
       location    <- RenkuTinyTypeGenerators.entityLocations
       checksum    <- RenkuTinyTypeGenerators.entityChecksums
-      generations <- Gen.choose(0, 5).flatMap(Gen.listOfN(_, BaseGenerators.generationsResourceIdGen))
+      generations <- Gen.choose(0, 5).flatMap(Gen.listOfN(_, RenkuTinyTypeGenerators.generationsResourceIdGen))
     } yield CliEntity(id, location, checksum, generations)
 }
 

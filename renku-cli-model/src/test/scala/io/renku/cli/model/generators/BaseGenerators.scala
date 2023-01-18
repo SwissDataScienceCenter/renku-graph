@@ -1,9 +1,7 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.{CliDatasetSameAs, DateModified}
-import io.renku.generators.Generators
-import io.renku.graph.model.datasets.PartResourceId
-import io.renku.graph.model.{RenkuTinyTypeGenerators, datasets, generations}
+import io.renku.graph.model.RenkuTinyTypeGenerators
 import org.scalacheck.Gen
 
 import java.time.Instant
@@ -17,12 +15,6 @@ trait BaseGenerators {
 
   val datasetSameAs: Gen[CliDatasetSameAs] =
     RenkuTinyTypeGenerators.datasetSameAs.map(v => CliDatasetSameAs(v.value))
-
-  val generationsResourceIdGen: Gen[generations.ResourceId] =
-    Generators.validatedUrls.map(_.value).map(generations.ResourceId)
-
-  val partResourceIdGen: Gen[datasets.PartResourceId] =
-    Generators.validatedUrls.map(id => PartResourceId(id.value))
 }
 
 object BaseGenerators extends BaseGenerators
