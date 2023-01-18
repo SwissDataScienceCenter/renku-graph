@@ -46,8 +46,18 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     with SubscriptionTypeSerializers
     with TypeSerializers {
 
-  override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useK {
-    (findEventAndMarkTaken flatTap updateMetrics).map(_.map(_._1))
+  override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useWithTransactionK {
+    Kleisli { case (transaction, session) =>
+      liftF(transaction.savepoint)
+        .flatMap { savepoint =>
+          findEventAndMarkTaken
+            .flatTap(commit(transaction))
+            .onError(rollback(transaction)(savepoint))
+            .flatTap(updateMetrics)
+            .map(_.map(_._1))
+        }
+        .run(session)
+    }
   }
 
   private def findEventAndMarkTaken =
@@ -141,6 +151,18 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
           EventStatusGauges[F].underDeletion.update((projectPath, updatedRows))
       }
     case None => Kleisli.pure[F, Session[F], Unit](())
+  }
+
+  private def commit(transaction: Transaction[F]): Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = _ =>
+    Kleisli.liftF(transaction.commit.void)
+
+  private def rollback(transaction: Transaction[F])(
+      savepoint:                    transaction.Savepoint
+  ): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case err =>
+    Kleisli.liftF {
+      (transaction rollback savepoint).void >>
+        Logger[F].error(err)(show"$categoryName: problems with DB update; rollback")
+    }
   }
 }
 
