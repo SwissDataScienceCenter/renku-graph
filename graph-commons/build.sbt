@@ -28,7 +28,7 @@ libraryDependencies += "eu.timepit"       %% "refined-pureconfig" % "0.10.1"
 libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.12.0"
 libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % "9.4.2"
 
-val http4sVersion           = "0.23.17"
+val http4sVersion           = "0.23.18"
 val http4sBlazeVersion      = "0.23.13"
 val http4sPrometheusVersion = "0.24.3"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sBlazeVersion
