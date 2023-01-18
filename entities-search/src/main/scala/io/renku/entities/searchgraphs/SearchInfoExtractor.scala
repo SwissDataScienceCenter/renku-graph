@@ -22,7 +22,6 @@ import PersonInfo._
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.{Dataset, Project}
 
@@ -38,7 +37,7 @@ private object SearchInfoExtractor {
   private def toSearchInfo[F[_]: MonadThrow](project: Project)(ds: Dataset[Dataset.Provenance]) = ds.provenance match {
     case prov: Dataset.Provenance.Modified =>
       findDateOriginal(prov, project)
-        .map(createSearchInfo(ds, _, DateModified(prov.date.instant).some, project))
+        .map(createSearchInfo(ds, _, datasets.DateModified(prov.date).some, project))
     case prov =>
       createSearchInfo(ds, prov.date, maybeDateModified = None, project).pure[F]
   }
@@ -58,7 +57,7 @@ private object SearchInfoExtractor {
 
   private def createSearchInfo(ds:                 Dataset[Dataset.Provenance],
                                createdOrPublished: datasets.Date,
-                               maybeDateModified:  Option[DateModified],
+                               maybeDateModified:  Option[datasets.DateModified],
                                project:            Project
   ) = SearchInfo(
     ds.provenance.topmostSameAs,

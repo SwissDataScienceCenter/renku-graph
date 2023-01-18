@@ -18,24 +18,18 @@
 
 package io.renku.entities.searchgraphs
 
-import SearchInfo.DateModified
 import cats.Show
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.{datasets, persons, projects}
-import io.renku.tinytypes.constraints.InstantNotInTheFuture
-import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
-
-import java.time.Instant
 
 private final case class SearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                     name:               datasets.Name,
                                     visibility:         projects.Visibility,
                                     createdOrPublished: datasets.Date,
-                                    maybeDateModified:  Option[DateModified],
+                                    maybeDateModified:  Option[datasets.DateModified],
                                     creators:           NonEmptyList[PersonInfo],
                                     keywords:           List[datasets.Keyword],
                                     maybeDescription:   Option[datasets.Description],
@@ -47,15 +41,6 @@ private final case class SearchInfo(topmostSameAs:      datasets.TopmostSameAs,
 }
 
 private object SearchInfo {
-
-  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateModified
-      extends TinyTypeFactory[DateModified](new DateModified(_))
-      with InstantNotInTheFuture[DateModified]
-      with TinyTypeJsonLDOps[DateModified] {
-
-    def apply(date: datasets.DateCreated): DateModified = DateModified(date.instant)
-  }
 
   implicit val show: Show[SearchInfo] = Show.show {
     case SearchInfo(topSameAs,

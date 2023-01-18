@@ -21,6 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.images.{ImageResourceId, ImageUri}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.tinytypes.InstantTinyType
@@ -181,6 +182,9 @@ trait RenkuTinyTypeGenerators {
 
   lazy val datasetDates: Gen[datasets.Date] =
     Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(datasets.DatePublished(LocalDate.EPOCH)))
+
+  def datasetModifiedDates(notYoungerThan: datasets.Date): Gen[datasets.DateModified] =
+    timestampsNotInTheFuture(notYoungerThan.instant).generateAs(datasets.DateModified(_))
 
   implicit val datasetKeywords: Gen[datasets.Keyword] =
     Generators.nonBlankStrings(minLength = 5) map (_.value) map datasets.Keyword.apply

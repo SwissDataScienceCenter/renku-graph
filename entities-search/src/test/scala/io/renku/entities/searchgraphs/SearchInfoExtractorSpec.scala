@@ -21,11 +21,10 @@ package io.renku.entities.searchgraphs
 import PersonInfo._
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{datasets, entities}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -80,7 +79,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
           lastModification.identification.name,
           project.visibility,
           originalDataset.provenance.date,
-          DateModified(lastModification.provenance.date.instant).some,
+          datasets.DateModified(lastModification.provenance.date).some,
           lastModification.provenance.creators.map(toPersonInfo),
           lastModification.additionalInfo.keywords,
           lastModification.additionalInfo.maybeDescription,

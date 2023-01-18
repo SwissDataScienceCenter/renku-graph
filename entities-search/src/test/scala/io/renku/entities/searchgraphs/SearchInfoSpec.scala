@@ -22,9 +22,8 @@ import Generators._
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.Link.{ImportedDataset, OriginalDataset, show}
-import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds}
+import io.renku.graph.model.GraphModelGenerators.{datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds}
 import io.renku.graph.model.datasets
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
@@ -89,17 +88,6 @@ class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
             show"links = [${links.map(_.show).intercalate("; ")}}]".some
           ).flatten.mkString(", ")
       }
-    }
-  }
-}
-
-class DateModifiedSpec extends AnyWordSpec with should.Matchers {
-
-  "DateModified.apply(DateCreated)" should {
-
-    "instantiate DateModified from a Dataset DateCreated" in {
-      val created = datasetCreatedDates().generateOne
-      DateModified(created).value shouldBe created.instant
     }
   }
 }

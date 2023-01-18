@@ -263,6 +263,15 @@ object datasets {
       with LocalDateNotInTheFuture[DatePublished]
       with TinyTypeJsonLDOps[DatePublished]
 
+  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateModified
+      extends TinyTypeFactory[DateModified](new DateModified(_))
+      with InstantNotInTheFuture[DateModified]
+      with TinyTypeJsonLDOps[DateModified] {
+
+    def apply(date: datasets.Date): DateModified = DateModified(date.instant)
+  }
+
   final class PartId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]
 

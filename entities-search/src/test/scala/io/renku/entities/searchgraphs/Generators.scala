@@ -19,14 +19,12 @@
 package io.renku.entities.searchgraphs
 
 import PersonInfo._
-import SearchInfo.DateModified
 import SearchInfoLens._
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import commands.UpdateCommand
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.datasets.{Date, TopmostSameAs}
+import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{datasets, entities, projects}
@@ -40,7 +38,7 @@ private object Generators {
     name               <- datasetNames
     createdOrPublished <- datasetDates
     visibility         <- projectVisibilities
-    maybeDateModified  <- modifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
+    maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
     creators           <- personInfos.toGeneratorOfNonEmptyList(max = 2)
     keywords           <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc          <- datasetDescriptions.toGeneratorOfOptions
@@ -72,9 +70,6 @@ private object Generators {
 
   lazy val personInfos: Gen[PersonInfo] =
     personEntities.map(_.to[entities.Person]).map(toPersonInfo)
-
-  def modifiedDates(notYoungerThan: Date): Gen[DateModified] =
-    timestampsNotInTheFuture(notYoungerThan.instant).generateAs(DateModified(_))
 
   def linkObjectsGen(topmostSameAs: TopmostSameAs,
                      projectIdGen:  Gen[projects.ResourceId] = projectResourceIds

@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs
 package commands
 
 import Generators._
-import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds
@@ -129,11 +128,11 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       DatasetsQuad(topmostSameAs, SearchInfoOntology.datePublishedProperty.id, d.asObject)
   }
 
-  private def maybeDateModifiedToQuad(topmostSameAs: datasets.TopmostSameAs): Option[DateModified] => Set[Quad] = {
-    case Some(d) =>
-      Set(DatasetsQuad(topmostSameAs, SearchInfoOntology.dateModifiedProperty.id, d.asObject))
-    case None =>
-      Set.empty
+  private def maybeDateModifiedToQuad(
+      topmostSameAs: datasets.TopmostSameAs
+  ): Option[datasets.DateModified] => Set[Quad] = {
+    case Some(d) => Set(DatasetsQuad(topmostSameAs, SearchInfoOntology.dateModifiedProperty.id, d.asObject))
+    case None    => Set.empty
   }
 
   private def creatorsToQuads(searchInfo: SearchInfo): Set[Quad] =

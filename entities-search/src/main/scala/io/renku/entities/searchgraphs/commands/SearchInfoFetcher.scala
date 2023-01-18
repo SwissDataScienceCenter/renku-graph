@@ -22,7 +22,6 @@ package commands
 import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfo.DateModified
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
@@ -212,7 +211,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         maybeDateCreated                             <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
         maybeDatePublished                           <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
         createdOrPublished                           <- toCreatedOrPublished(maybeDateCreated, maybeDatePublished)
-        maybeDateModified                            <- extract[Option[DateModified]]("maybeDateModified")
+        maybeDateModified                            <- extract[Option[datasets.DateModified]]("maybeDateModified")
         creators                                     <- extract[String]("creators") >>= toListOfCreators
         keywords                                     <- extract[Option[String]]("keywords") >>= toListOfKeywords
         images                                       <- extract[Option[String]]("images") >>= toListOfImages
