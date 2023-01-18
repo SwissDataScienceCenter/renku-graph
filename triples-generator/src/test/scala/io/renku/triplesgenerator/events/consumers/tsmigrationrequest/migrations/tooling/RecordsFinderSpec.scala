@@ -30,6 +30,8 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -47,7 +49,7 @@ class RecordsFinderSpec
       val graphId  = entityIds.generateOne
       val entityId = entityIds.generateOne
       val name     = nonEmptyStrings().generateOne
-      insert(to = projectsDataset, Quad(graphId, entityId, schema / "name", name))
+      insert(to = projectsDataset, Quad(graphId, entityId, schema / "name", name.asTripleObject))
 
       implicit val decoder: Decoder[List[String]] =
         ResultsDecoder[List, String](implicit cur => extract[String]("name"))

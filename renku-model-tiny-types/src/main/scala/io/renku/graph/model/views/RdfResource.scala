@@ -19,20 +19,23 @@
 package io.renku.graph.model.views
 
 import cats.syntax.all._
+import io.renku.jsonld.EntityId
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.Url
-import org.apache.jena.util.URIref
+import io.renku.triplesstore.client.syntax.entityIdSparqlEncoder
 
 trait RdfResource
 
 trait UrlResourceRenderer[T <: UrlTinyType] {
   self: TinyTypeFactory[T] with Url[T] =>
 
-  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<${URIref.encode(url.show)}>"
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url =>
+    entityIdSparqlEncoder(EntityId.of(url.show)).sparql
 }
 
 trait AnyResourceRenderer[T <: StringTinyType] {
   self: TinyTypeFactory[T] with Url[T] =>
 
-  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<${URIref.encode(url.show)}>"
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url =>
+    entityIdSparqlEncoder(EntityId.of(url.show)).sparql
 }

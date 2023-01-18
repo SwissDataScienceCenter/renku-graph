@@ -37,7 +37,22 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+trait TSClient[F[_]] {
+  def updateWithNoResult(updateQuery: SparqlQuery): F[Unit]
+}
+
+object TSClient {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      triplesStoreConfig:     DatasetConnectionConfig,
+      retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
+      maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+      idleTimeoutOverride:    Option[Duration] = None,
+      requestTimeoutOverride: Option[Duration] = None
+  ): TSClient[F] =
+    new TSClientImpl[F](triplesStoreConfig, retryInterval, maxRetries, idleTimeoutOverride, requestTimeoutOverride)
+}
+
+class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     triplesStoreConfig:     DatasetConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
@@ -51,11 +66,12 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                      idleTimeoutOverride,
                      requestTimeoutOverride
     )
+    with TSClient[F]
     with ResultsDecoder
     with RdfMediaTypes {
 
   private val applicative: Applicative[F] = Applicative[F]
-  import TSClient._
+  import TSClientImpl._
   import applicative.whenA
   import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
@@ -67,7 +83,7 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
 
-  protected def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
+  def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
     updateWitMapping[Unit](updateQuery, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
@@ -175,7 +191,7 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     }
 }
 
-object TSClient {
+object TSClientImpl {
 
   private trait SparqlQueryType
   private final implicit case object SparqlSelect extends SparqlQueryType

@@ -25,10 +25,10 @@ import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes._
 
 trait ImageUri extends Any with TinyType {
-  type V = String
+  override type V = String
 }
 
-object ImageUri extends From[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
+object ImageUri extends From[ImageUri] with TinyTypeConversions[ImageUri] with TinyTypeJsonLDOps[ImageUri] {
 
   def apply(value: String): ImageUri = from(value).fold(throw _, identity)
 

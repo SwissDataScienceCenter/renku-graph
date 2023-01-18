@@ -42,7 +42,7 @@ private trait EdgesFinder[F[_]] {
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig,
     renkuUrl:         RenkuUrl
-) extends TSClient(connectionConfig)
+) extends TSClientImpl(connectionConfig)
     with EdgesFinder[F] {
 
   private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])

@@ -42,7 +42,10 @@ private[migrations] object RecordsFinder {
 
 private class RecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: DatasetConnectionConfig
-) extends TSClient[F](storeConfig, idleTimeoutOverride = (16 minutes).some, requestTimeoutOverride = (15 minutes).some)
+) extends TSClientImpl[F](storeConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
+    )
     with RecordsFinder[F] {
 
   override def findRecords[OUT](query: SparqlQuery)(implicit decoder: Decoder[List[OUT]]): F[List[OUT]] =

@@ -26,6 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.triplesstore.TSClient
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -68,8 +69,8 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
         .expects(projectPath, membersToRemove)
         .returning(removalQueries)
 
-      (removalQueries ::: insertionQueries).foreach { query =>
-        (querySender.send _)
+      (removalQueries ::: insertionQueries) foreach { query =>
+        (tsClient.updateWithNoResult _)
           .expects(query)
           .returning(().pure[Try])
       }
@@ -96,8 +97,8 @@ class KGSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matche
     val kgProjectMembersFinder = mock[KGProjectMembersFinder[Try]]
     val kgPersonFinder         = mock[KGPersonFinder[Try]]
     val updatesCreator         = mock[UpdatesCreator]
-    val querySender            = mock[QuerySender[Try]]
+    val tsClient               = mock[TSClient[Try]]
 
-    val synchronizer = new KGSynchronizerImpl[Try](kgProjectMembersFinder, kgPersonFinder, updatesCreator, querySender)
+    val synchronizer = new KGSynchronizerImpl[Try](kgProjectMembersFinder, kgPersonFinder, updatesCreator, tsClient)
   }
 }

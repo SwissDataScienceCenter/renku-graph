@@ -32,6 +32,7 @@ import io.renku.graph.model.{RenkuUrl, projects}
 import org.scalacheck.Gen
 
 import java.time.Instant
+import scala.annotation.tailrec
 
 trait RenkuProjectEntitiesGenerators {
   self: EntitiesGenerators =>
@@ -188,6 +189,24 @@ trait RenkuProjectEntitiesGenerators {
       originalDs <- factory(project.dateCreated)
       modifiedDs <- originalDs.createModification()(project.dateCreated)
     } yield (originalDs -> modifiedDs) -> project.addDatasets(originalDs, modifiedDs)
+
+    def addDatasetAndModifications(factory: DatasetGenFactory[Dataset.Provenance], level: Int): Gen[RenkuProject] = {
+
+      @tailrec
+      def createModifications(datasets: List[Dataset[Dataset.Provenance]], left: Int = level)(
+          projectDateCreated:           projects.DateCreated
+      ): List[Dataset[Dataset.Provenance]] =
+        if (left == 0) datasets
+        else
+          createModifications(datasets.head.createModification()(projectDateCreated).generateOne :: datasets, left - 1)(
+            projectDateCreated
+          )
+
+      projectGen.modify { p =>
+        val datasets = createModifications(List(factory(p.dateCreated).generateOne))(p.dateCreated)
+        p.addDatasets(datasets.reverse: _*)
+      }
+    }
 
     def addDatasetAndInvalidation[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]

@@ -236,20 +236,26 @@ object Person {
   private def and(additionalType: String): Cursor => Result[Boolean] =
     _.downField(schema / "additionalType").as[String].map(_ == additionalType)
 
-  lazy val ontology: Type = {
-    val sameAsType = Type.Def(
-      Class(schema / "URL"),
-      DataProperty(schema / "identifier", xsd / "string", xsd / "int"),
-      DataProperty(schema / "additionalType", DataPropertyRange("Orcid", "GitLab"))
-    )
+  object Ontology {
 
-    Type.Def(
-      Class(schema / "Person"),
-      ObjectProperties(ObjectProperty(schema / "sameAs", sameAsType)),
-      DataProperties(DataProperty(schema / "email", xsd / "string"),
-                     DataProperty(schema / "name", xsd / "string"),
-                     DataProperty(schema / "affiliation", xsd / "string")
+    val typeClass:           Class            = Class(schema / "Person")
+    val sameAs:              Property         = schema / "sameAs"
+    val nameProperty:        DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val emailProperty:       DataProperty.Def = DataProperty(schema / "email", xsd / "string")
+    val affiliationProperty: DataProperty.Def = DataProperty(schema / "affiliation", xsd / "string")
+
+    lazy val typeDef: Type = {
+      val sameAsType = Type.Def(
+        Class(schema / "URL"),
+        DataProperty(schema / "identifier", xsd / "string", xsd / "int"),
+        DataProperty(schema / "additionalType", DataPropertyRange("Orcid", "GitLab"))
       )
-    )
+
+      Type.Def(
+        typeClass,
+        ObjectProperties(ObjectProperty(sameAs, sameAsType)),
+        DataProperties(emailProperty, nameProperty, affiliationProperty)
+      )
+    }
   }
 }

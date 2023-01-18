@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{plans, projects}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
@@ -34,7 +34,7 @@ private object KGInfoFinder {
 }
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
-    extends TSClient(storeConfig)
+    extends TSClientImpl(storeConfig)
     with KGInfoFinder[F] {
 
   import eu.timepit.refined.auto._

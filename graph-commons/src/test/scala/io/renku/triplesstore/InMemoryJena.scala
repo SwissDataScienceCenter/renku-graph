@@ -34,6 +34,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.triplesstore.client.model.{Quad, Triple}
+import io.renku.triplesstore.client.syntax._
 import org.testcontainers.containers
 import org.testcontainers.containers.wait.strategy.Wait
 
@@ -154,7 +156,7 @@ trait InMemoryJena {
 
   private def queryRunner(connectionInfo: DatasetConnectionConfig) =
     TestSparqlQueryTimeRecorder[IO].map { implicit qtr =>
-      new TSClient[IO](connectionInfo) {
+      new TSClientImpl[IO](connectionInfo) {
 
         import io.circe.Decoder._
 
@@ -202,14 +204,14 @@ sealed trait DefaultGraphDataset {
   def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(to)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
+        SparqlQuery.of("insert triple", show"INSERT DATA { ${triple.asSparql} }")
       })
       .unsafeRunSync()
 
   def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(from)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
+        SparqlQuery.of("delete triple", show"DELETE DATA { ${triple.asSparql} }")
       })
       .unsafeRunSync()
 }
@@ -220,14 +222,23 @@ sealed trait NamedGraphDataset {
   def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(from)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
+        SparqlQuery.of("delete quad", show"DELETE DATA { ${quad.asSparql.sparql} }")
       })
       .unsafeRunSync()
 
   def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(to)
       .flatMap(_.runUpdate {
-        SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
+        SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
+      })
+      .unsafeRunSync()
+
+  def insert(to: DatasetName, quads: Set[Quad])(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(to)
+      .flatMap(_.runUpdate {
+        SparqlQuery.of("insert quads",
+                       show"INSERT DATA { ${quads.map(_.asSparql.sparql).mkString("\n\t", "\n\t", "\n\t")} }"
+        )
       })
       .unsafeRunSync()
 }

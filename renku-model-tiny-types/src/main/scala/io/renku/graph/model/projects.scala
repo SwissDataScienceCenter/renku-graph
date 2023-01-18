@@ -111,10 +111,14 @@ object projects {
       with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
-  sealed trait Visibility extends StringTinyType with Product with Serializable
+  sealed trait Visibility extends StringTinyType with Product with Serializable {
+    def compareTo(other: Visibility): Int =
+      Visibility.allOrdered.indexOf(other) - Visibility.allOrdered.indexOf(this)
+  }
   object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {
 
-    val all: Set[Visibility] = Set(Public, Private, Internal)
+    val allOrdered: List[Visibility] = List(Public, Internal, Private)
+    val all:        Set[Visibility]  = allOrdered.toSet
 
     final case object Public extends Visibility {
       override val value: String = "public"
@@ -127,6 +131,9 @@ object projects {
     final case object Internal extends Visibility {
       override val value: String = "internal"
     }
+
+    implicit override def ordering(implicit valueOrdering: Ordering[String]): Ordering[Visibility] =
+      (x: Visibility, y: Visibility) => x compareTo y
 
     import io.circe.Decoder
 

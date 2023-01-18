@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.testentities
+package io.renku.entities.searchgraphs.commands
 
-import cats.Monad
-import org.scalacheck.Gen
+import io.renku.graph.model.GraphClass
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityIdEncoder, Property}
+import io.renku.triplesstore.client.model
+import io.renku.triplesstore.client.model.{Quad, TripleObject}
 
-package object generators {
-  implicit val genMonad: Monad[Gen] = new Monad[Gen] {
-    override def pure[A](x:        A): Gen[A] = Gen.const(x)
-    override def flatMap[A, B](fa: Gen[A])(f: A => Gen[B]):            Gen[B] = fa.flatMap(f)
-    override def tailRecM[A, B](a: A)(f:      A => Gen[Either[A, B]]): Gen[B] = Gen.tailRecM(a)(f)
-  }
+private object DatasetsQuad {
+  def apply[ID](subject: ID, predicate: Property, obj: TripleObject)(implicit subjectEnc: EntityIdEncoder[ID]): Quad =
+    model.Quad(GraphClass.Datasets.id, subject.asEntityId, predicate, obj)
 }

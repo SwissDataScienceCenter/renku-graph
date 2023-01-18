@@ -19,7 +19,10 @@
 package io.renku.graph.model.testentities
 package generators
 
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{persons, projects}
@@ -28,6 +31,9 @@ import org.scalacheck.Gen
 
 trait ProjectEntitiesGenerators {
   self: EntitiesGenerators with RenkuProjectEntitiesGenerators with NonRenkuProjectEntitiesGenerators =>
+
+  lazy val projectIdentifications: Gen[ProjectIdentification] =
+    (projectResourceIds -> projectPaths).mapN(ProjectIdentification(_, _))
 
   lazy val anyProjectEntities: Gen[Project] = projectEntities(anyVisibility)
 

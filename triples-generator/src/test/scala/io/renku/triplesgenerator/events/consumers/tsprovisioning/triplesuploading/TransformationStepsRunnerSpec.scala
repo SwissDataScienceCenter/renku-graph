@@ -77,6 +77,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         step2Queries.postDataUploadQueries.foreach { query =>
           (resultsUploader.execute _).expects(query).returning(rightT(()))
         }
+
+        givenSearchGraphProvisioning(step2Project, returning = rightT(()))
       }
 
       stepsRunner.run(
@@ -279,10 +281,68 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
                                        nonRecoverableError
       ).pure[Try]
     }
+
+    s"return $RecoverableFailure if Search Graphs provisioning fails with RecoverableFailure" in new TestCase {
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+
+      val step1Queries = Queries.empty
+      step1Transformation
+        .expects(project)
+        .returning(rightT[Try, ProcessingRecoverableError]((project, step1Queries)))
+
+      (resultsUploader.upload _)
+        .expects(project)
+        .returning(rightT(()))
+
+      val recoverableError = processingRecoverableErrors.generateOne
+      givenSearchGraphProvisioning(project, returning = EitherT.leftT(recoverableError))
+
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                      project
+      ) shouldBe RecoverableFailure(recoverableError).pure[Try]
+    }
+
+    s"return $NonRecoverableFailure if Search Graphs provisioning fails with NonRecoverableFailure" in new TestCase {
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      val step1Transformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
+
+      val step1Queries = Queries.empty
+      step1Transformation
+        .expects(project)
+        .returning(rightT[Try, ProcessingRecoverableError]((project, step1Queries)))
+
+      (resultsUploader.upload _)
+        .expects(project)
+        .returning(rightT(()))
+
+      val nonRecoverableError = exceptions.generateOne
+      givenSearchGraphProvisioning(
+        project,
+        returning = EitherT(nonRecoverableError.raiseError[Try, Either[ProcessingRecoverableError, Unit]])
+      )
+
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
+                      project
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $nonRecoverableError",
+                                       nonRecoverableError
+      ).pure[Try]
+    }
   }
 
   private trait TestCase {
-    val resultsUploader = mock[TransformationResultsUploader[Try]]
-    val stepsRunner     = new TransformationStepsRunnerImpl[Try](resultsUploader)
+    val resultsUploader                 = mock[TransformationResultsUploader[Try]]
+    private val searchGraphsProvisioner = mock[SearchGraphsProvisioner[Try]]
+    val stepsRunner = new TransformationStepsRunnerImpl[Try](resultsUploader, searchGraphsProvisioner)
+
+    def givenSearchGraphProvisioning(project:   entities.Project,
+                                     returning: EitherT[Try, ProcessingRecoverableError, Unit]
+    ) = (searchGraphsProvisioner.provisionSearchGraphs _)
+      .expects(project)
+      .returning(returning)
   }
 }

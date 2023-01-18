@@ -19,7 +19,7 @@
 package io.renku.graph.model.testentities
 package generators
 
-import cats.data.NonEmptyList
+import cats.data.{Kleisli, NonEmptyList}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -123,7 +123,7 @@ trait DatasetEntitiesGenerators {
     implicit renkuUrl =>
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
-        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+        creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
       } yield Dataset.Provenance.Internal(Dataset.entityId(identifier),
                                           OriginalIdentifier(identifier),
                                           date,
@@ -140,7 +140,7 @@ trait DatasetEntitiesGenerators {
       for {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
-        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+        creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
       } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
                                                   sameAs,
                                                   OriginalIdentifier(identifier),
@@ -155,7 +155,7 @@ trait DatasetEntitiesGenerators {
           date       <- datasetPublishedDates()
           sameAs     <- datasetInternalSameAs
           originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
-          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
@@ -173,7 +173,7 @@ trait DatasetEntitiesGenerators {
           date       <- datasetCreatedDates(projectDateCreated.value)
           sameAs     <- sameAsGen
           originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
-          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
@@ -190,7 +190,7 @@ trait DatasetEntitiesGenerators {
       implicit renkuUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
-          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          creators <- personEntities.toGeneratorOfNonEmptyList(max = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     topmostSameAs,
@@ -253,6 +253,9 @@ trait DatasetEntitiesGenerators {
     def multiple: List[DatasetGenFactory[P]] = List.fill(positiveInts(5).generateOne)(factory)
 
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
+
+    def createModification: DatasetGenFactory[Dataset.Provenance.Modified] =
+      dateCreated => Kleisli(factory).flatMap(ds => Kleisli(ds.createModification())).run(dateCreated)
 
     def toGeneratorFor(project: RenkuProject): Gen[Dataset[P]] = factory(project.dateCreated)
 

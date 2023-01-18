@@ -23,6 +23,8 @@ import io.circe.DecodingFailure
 import io.renku.graph.model.views.{EntityIdJsonLDOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
+import io.renku.triplesstore.client.sparql.SparqlEncoder
+import io.renku.triplesstore.client.syntax._
 import io.renku.tinytypes._
 import org.apache.jena.util.URIref
 
@@ -117,6 +119,9 @@ object persons {
       case id: EmailBased    => EmailBased.rdfRenderer.render(id)
       case id: NameBased     => NameBased.rdfRenderer.render(id)
     }
+
+    implicit lazy val sparqlEncoder: SparqlEncoder[ResourceId] =
+      SparqlEncoder[EntityId].contramap(id => entityIdEncoder(id))
 
     implicit def entityIdEncoder[ID <: ResourceId]: EntityIdEncoder[ID] = EntityIdEncoder.instance[ID] {
       case id: GitLabIdBased => EntityId.of(id.value)

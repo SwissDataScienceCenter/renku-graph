@@ -83,7 +83,7 @@ object Plan {
       // This prov/Plan can be a renku/Plan or renku/CompositePlan
       Class(prov / "Plan"),
       ObjectProperties(
-        ObjectProperty(schema / "creator", Person.ontology)
+        ObjectProperty(schema / "creator", Person.Ontology.typeDef)
       ),
       DataProperties(
         DataProperty(schema / "name", xsd / "string"),
@@ -341,7 +341,7 @@ object StepPlan {
         ObjectProperty(renku / "hasArguments", StepPlanCommandParameter.CommandParameter.ontology),
         ObjectProperty(renku / "hasInputs", StepPlanCommandParameter.CommandInput.ontology),
         ObjectProperty(renku / "hasOutputs", StepPlanCommandParameter.CommandOutput.ontology),
-        ObjectProperty(schema / "creator", Person.ontology),
+        ObjectProperty(schema / "creator", Person.Ontology.typeDef),
         ObjectProperty(prov / "wasDerivedFrom", planClass),
         ObjectProperty(renku / "topmostDerivedFrom", planClass)
       ),
@@ -416,7 +416,7 @@ object CompositePlan {
       Type.Def(
         compositePlanType,
         ObjectProperties(
-          ObjectProperty(creators, Person.ontology),
+          ObjectProperty(creators, Person.Ontology.typeDef),
           ObjectProperty(wasDerivedFrom, compositePlanType),
           ObjectProperty(topmostDerivedFrom, compositePlanType),
           ObjectProperty(hasSubprocess, Plan.ontology),

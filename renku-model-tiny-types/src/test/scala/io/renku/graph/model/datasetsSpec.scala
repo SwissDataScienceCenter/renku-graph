@@ -245,4 +245,12 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       date.asInstanceOf[Date].asJson shouldBe date.value.asJson
     }
   }
+
+  "DateModified.apply(DateCreated)" should {
+
+    "instantiate DateModified from a Dataset Date" in {
+      val created = datasetDates.generateOne
+      DateModified(created).value shouldBe created.instant
+    }
+  }
 }

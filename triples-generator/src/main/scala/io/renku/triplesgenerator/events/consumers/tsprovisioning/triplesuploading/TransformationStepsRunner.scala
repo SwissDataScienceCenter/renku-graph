@@ -37,7 +37,8 @@ private[tsprovisioning] trait TransformationStepsRunner[F[_]] {
 }
 
 private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
-    resultsUploader: TransformationResultsUploader[F]
+    resultsUploader:         TransformationResultsUploader[F],
+    searchGraphsProvisioner: SearchGraphsProvisioner[F]
 ) extends TransformationStepsRunner[F] {
 
   import TriplesUploadResult._
@@ -46,7 +47,8 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     runAll(steps)(project) >>=
       executeAllPreDataUploadQueries >>=
       encodeAndSendProject >>=
-      executeAllPostDataUploadQueries
+      executeAllPostDataUploadQueries >>=
+      provisionSearchGraphs
   }
     .leftMap(RecoverableFailure)
     .map(_ => DeliverySuccess)
@@ -78,6 +80,11 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       execute(postQueries) map (_ => projectAndQueries)
   }
 
+  private def provisionSearchGraphs: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (project, _) =>
+      searchGraphsProvisioner.provisionSearchGraphs(project).map(_ => projectAndQueries)
+  }
+
   private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
       previousResult >> resultsUploader.execute(query)
@@ -94,8 +101,9 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 private[tsprovisioning] object TransformationStepsRunner {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunner[F]] = for {
-    resultsUploader <- TransformationResultsUploader[F]
-  } yield new TransformationStepsRunnerImpl[F](resultsUploader)
+    resultsUploader         <- TransformationResultsUploader[F]
+    searchGraphsProvisioner <- SearchGraphsProvisioner[F]
+  } yield new TransformationStepsRunnerImpl[F](resultsUploader, searchGraphsProvisioner)
 }
 
 private[tsprovisioning] sealed trait TriplesUploadResult extends Product with Serializable {

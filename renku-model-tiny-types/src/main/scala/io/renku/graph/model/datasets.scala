@@ -30,7 +30,7 @@ import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -221,6 +221,7 @@ object datasets {
   implicit object TopmostSameAs
       extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
       with constraints.Url[TopmostSameAs]
+      with UrlOps[TopmostSameAs]
       with UrlResourceRenderer[TopmostSameAs]
       with EntityIdJsonLDOps[TopmostSameAs] {
 
@@ -261,6 +262,15 @@ object datasets {
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture[DatePublished]
       with TinyTypeJsonLDOps[DatePublished]
+
+  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateModified
+      extends TinyTypeFactory[DateModified](new DateModified(_))
+      with InstantNotInTheFuture[DateModified]
+      with TinyTypeJsonLDOps[DateModified] {
+
+    def apply(date: datasets.Date): DateModified = DateModified(date.instant)
+  }
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]
