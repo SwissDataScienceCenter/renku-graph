@@ -38,7 +38,6 @@ trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
   implicit val visibilityDiff: Diff[projects.Visibility] =
     Diff.derived[projects.Visibility]
 
-
 }
 
 object ModelTinyTypesDiffInstances extends ModelTinyTypesDiffInstances

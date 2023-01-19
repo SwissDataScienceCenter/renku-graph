@@ -74,17 +74,17 @@ object CliCompositePlan {
   implicit def jsonLDDecoder: JsonLDDecoder[CliCompositePlan] =
     JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
       for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        name <- cursor.downField(Schema.name).as[Name]
-        description <- cursor.downField(Schema.description).as[Option[Description]]
-        creators <- cursor.downField(Schema.creator).as[List[CliPerson]]
-        dateCreated <- cursor.downField(Schema.dateCreated).as[DateCreated]
-        keywords <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
-        derivedFrom <- cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        name             <- cursor.downField(Schema.name).as[Name]
+        description      <- cursor.downField(Schema.description).as[Option[Description]]
+        creators         <- cursor.downField(Schema.creator).as[List[CliPerson]]
+        dateCreated      <- cursor.downField(Schema.dateCreated).as[DateCreated]
+        keywords         <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
+        derivedFrom      <- cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
-        links <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
-        mappings <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[ChildPlan]]
+        links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
+        mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
+        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[ChildPlan]]
       } yield CliCompositePlan(
         resourceId,
         name,
@@ -105,16 +105,16 @@ object CliCompositePlan {
       JsonLD.entity(
         plan.id.asEntityId,
         entityTypes,
-        Schema.name -> plan.name.asJsonLD,
-        Schema.description -> plan.description.asJsonLD,
-        Schema.creator -> plan.creators.asJsonLD,
-        Schema.dateCreated -> plan.dateCreated.asJsonLD,
-        Schema.keywords -> plan.keywords.asJsonLD,
-        Prov.wasDerivedFrom -> plan.derivedFrom.asJsonLD,
+        Schema.name            -> plan.name.asJsonLD,
+        Schema.description     -> plan.description.asJsonLD,
+        Schema.creator         -> plan.creators.asJsonLD,
+        Schema.dateCreated     -> plan.dateCreated.asJsonLD,
+        Schema.keywords        -> plan.keywords.asJsonLD,
+        Prov.wasDerivedFrom    -> plan.derivedFrom.asJsonLD,
         Prov.invalidatedAtTime -> plan.invalidationTime.asJsonLD,
-        Renku.workflowLink -> plan.links.asJsonLD,
-        Renku.hasMappings -> plan.mappings.asJsonLD,
-        Renku.hasSubprocess -> plan.plans.asJsonLD
+        Renku.workflowLink     -> plan.links.asJsonLD,
+        Renku.hasMappings      -> plan.mappings.asJsonLD,
+        Renku.hasSubprocess    -> plan.plans.asJsonLD
       )
     }
 }

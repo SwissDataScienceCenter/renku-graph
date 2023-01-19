@@ -109,7 +109,7 @@ trait PlanGenerators {
     )
 
   def workflowFileCompositePlanGen(
-      minCreated:      Instant
+      minCreated: Instant
   )(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileCompositePlan] =
     for {
       id               <- RenkuTinyTypeGenerators.planResourceIds
