@@ -39,9 +39,16 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import tooling.{RecordsFinder, RecoverableErrorsRecovery}
+import tooling._
 
 class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+
+  "MigrationToV10" should {
+
+    "be the RegisteredMigration" in new TestCase {
+      migration.getClass.getSuperclass shouldBe classOf[RegisteredMigration[IO]]
+    }
+  }
 
   "query" should {
 
@@ -57,7 +64,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
       allProjects map toCleanUpRequestEvent foreach givenEventIsSent
 
-      migration.run().value.unsafeRunSync() shouldBe ().asRight
+      migration.migrate().value.unsafeRunSync() shouldBe ().asRight
     }
 
     "return a Recoverable Error if in case of an exception while finding projects " +
@@ -69,7 +76,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .expects(1)
           .returning(exception.raiseError[IO, List[projects.Path]])
 
-        migration.run().value.unsafeRunSync() shouldBe recoverableError.asLeft
+        migration.migrate().value.unsafeRunSync() shouldBe recoverableError.asLeft
       }
   }
 
@@ -77,15 +84,17 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     val chunkSize = positiveInts(max = 100).generateOne.value
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
-    val projectsFinder            = mock[ProjectsFinder[IO]]
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val projectsFinder            = mock[PagedProjectsFinder[IO]]
     private val eventSender       = mock[EventSender[IO]]
+    private val executionRegister = mock[MigrationExecutionRegister[IO]]
     val recoverableError          = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new MigrationToV10[IO](projectsFinder, eventSender, recoveryStrategy)
+    val migration = new MigrationToV10[IO](projectsFinder, eventSender, executionRegister, recoveryStrategy)
 
     def givenProjectsChunkReturned: ((List[projects.Path], Int)) => Unit = { case (chunk, idx) =>
       (projectsFinder.findProjects _)
@@ -147,6 +156,6 @@ class ProjectsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new ProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo))
+    val finder = new PagedProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo))
   }
 }

@@ -33,22 +33,21 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-import tooling.{RecordsFinder, RecoverableErrorsRecovery}
+import tooling._
 
-private class MigrationToV10[F[_]: Async](
-    projectsFinder:   ProjectsFinder[F],
-    eventsSender:     EventSender[F],
-    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends Migration[F] {
+private class MigrationToV10[F[_]: Async: Logger](
+    projectsFinder:    PagedProjectsFinder[F],
+    eventsSender:      EventSender[F],
+    executionRegister: MigrationExecutionRegister[F],
+    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+) extends RegisteredMigration[F](MigrationToV10.name, executionRegister, recoveryStrategy) {
 
   import eventsSender._
   import fs2._
   import projectsFinder._
   import recoveryStrategy._
 
-  override lazy val name: Migration.Name = MigrationToV10.name
-
-  override def run(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+  protected[migrations] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     Stream
       .iterate(1)(_ + 1)
       .evalMap(findProjects)
@@ -79,22 +78,25 @@ private object MigrationToV10 {
   val name: Migration.Name = Migration.Name("Migration to V10")
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder] = for {
-    projectsFinder <- ProjectsFinder[F]
-    eventsSender   <- EventSender[F]
-  } yield new MigrationToV10(projectsFinder, eventsSender)
+    projectsFinder    <- PagedProjectsFinder[F]
+    eventsSender      <- EventSender[F]
+    executionRegister <- MigrationExecutionRegister[F]
+  } yield new MigrationToV10(projectsFinder, eventsSender, executionRegister)
 }
 
-private trait ProjectsFinder[F[_]] {
+private trait PagedProjectsFinder[F[_]] {
   def findProjects(page: Int): F[List[projects.Path]]
 }
 
-private object ProjectsFinder {
+private object PagedProjectsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)).map(new ProjectsFinderImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
+    ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)).map(new PagedProjectsFinderImpl(_))
 }
 
-private class ProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[F]) extends ProjectsFinder[F] with Schemas {
+private class PagedProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[F])
+    extends PagedProjectsFinder[F]
+    with Schemas {
 
   import ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
