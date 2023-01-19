@@ -34,7 +34,7 @@ import org.typelevel.log4cats.Logger
 
 private trait CommitAuthorFinder[F[_]] {
   def findCommitAuthor(projectPath: projects.Path, commitId: CommitId)(implicit
-      maybeAccessToken:             Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]]
 }
 
@@ -49,7 +49,7 @@ private class CommitAuthorFinderImpl[F[_]: Async: GitLabClient: Logger](
   import org.http4s.Status.{NotFound, Ok}
 
   override def findCommitAuthor(path: projects.Path, commitId: CommitId)(implicit
-      maybeAccessToken:               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
     GitLabClient[F]
       .get(uri"projects" / path.value / "repository" / "commits" / commitId.show, "single-commit")(

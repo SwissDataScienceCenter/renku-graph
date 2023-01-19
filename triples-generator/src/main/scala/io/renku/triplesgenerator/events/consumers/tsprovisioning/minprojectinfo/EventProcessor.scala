@@ -68,7 +68,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private def transformAndUpload(
-      event:                   MinProjectInfoEvent
+      event: MinProjectInfoEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)

@@ -45,7 +45,7 @@ trait DatasetEntitiesGenerators {
       provenanceGen:     ProvenanceGen[P],
       identificationGen: Gen[Identification] = datasetIdentifications,
       additionalInfoGen: Gen[AdditionalInfo] = datasetAdditionalInfos
-  )(implicit renkuUrl:   RenkuUrl): DatasetGenFactory[P] = projectDateCreated =>
+  )(implicit renkuUrl: RenkuUrl): DatasetGenFactory[P] = projectDateCreated =>
     for {
       identification <- identificationGen
       provenance     <- provenanceGen(identification.identifier, projectDateCreated)(renkuUrl)
@@ -71,7 +71,7 @@ trait DatasetEntitiesGenerators {
   def datasetAndModificationEntities[P <: Dataset.Provenance](
       provenance:         ProvenanceGen[P],
       projectDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  )(implicit renkuUrl:    RenkuUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
+  )(implicit renkuUrl: RenkuUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
     original <- datasetEntities(provenance)(renkuUrl)(projectDateCreated)
     modified <- modifiedDatasetEntities(original, projectDateCreated)
   } yield original -> modified
@@ -79,7 +79,7 @@ trait DatasetEntitiesGenerators {
   def modifiedDatasetEntities(
       original:           Dataset[Provenance],
       projectDateCreated: projects.DateCreated
-  )(implicit renkuUrl:    RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
+  )(implicit renkuUrl: RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
     identifier <- datasetIdentifiers
     title      <- datasetTitles
     date <- datasetCreatedDates(
@@ -242,7 +242,7 @@ trait DatasetEntitiesGenerators {
     publicationEventFactories(ds.provenance.date.instant).map(_.apply(ds)).generateOne
 
   implicit class DatasetGenFactoryOps[P <: Dataset.Provenance](factory: DatasetGenFactory[P])(implicit
-      renkuUrl:                                                         RenkuUrl
+      renkuUrl: RenkuUrl
   ) {
 
     lazy val decoupledFromProject: Gen[Dataset[P]] = factory(projectCreatedDates().generateOne)
@@ -262,7 +262,7 @@ trait DatasetEntitiesGenerators {
     def withDateAfter(projectDate: projects.DateCreated): Gen[Dataset[P]] = factory(projectDate)
 
     def withDateBefore(
-        max:           InstantTinyType
+        max: InstantTinyType
     )(implicit dsDate: Lens[P, InstantTinyType]): Gen[Dataset[P]] =
       factory(projects.DateCreated(max.value))
         .map(ds => ds.copy(provenance = dsDate.modify(_ => max)(ds.provenance)))

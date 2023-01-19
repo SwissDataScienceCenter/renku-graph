@@ -472,7 +472,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
 
         givenProjectIdFindingSucceeds(middleProject)
-      givenDatasetsGraphCleaningSucceeds(middleProject)
+        givenDatasetsGraphCleaningSucceeds(middleProject)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
 

@@ -34,7 +34,7 @@ trait RenkuVersionPairFinder[F[_]] {
 }
 
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     MigrationsConnectionConfig
+    storeConfig: MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl[F](storeConfig)
     with RenkuVersionPairFinder[F] {
@@ -62,7 +62,7 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object RenkuVersionPairFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      storeConfig:     MigrationsConnectionConfig
+      storeConfig: MigrationsConnectionConfig
   )(implicit renkuUrl: RenkuUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
     new RenkuVersionPairFinderImpl[F](storeConfig)
   }

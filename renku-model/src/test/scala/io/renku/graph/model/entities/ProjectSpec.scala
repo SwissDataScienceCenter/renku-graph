@@ -1238,7 +1238,7 @@ class ProjectSpec
                             activities:       List[entities.Activity] = Nil,
                             datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
                             plans:            List[entities.Plan] = Nil
-  )(implicit graph:                           GraphClass): JsonLD = {
+  )(implicit graph: GraphClass): JsonLD = {
 
     val descriptionJsonLD = maybeDescription match {
       case Some(desc) => desc.asJsonLD

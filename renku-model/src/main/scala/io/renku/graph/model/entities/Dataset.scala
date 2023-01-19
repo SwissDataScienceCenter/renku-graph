@@ -289,7 +289,7 @@ object Dataset {
     }
 
     private[Dataset] def decoder(
-        identification:  Identification
+        identification: Identification
     )(implicit renkuUrl: RenkuUrl): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
@@ -565,7 +565,7 @@ trait DatasetOps[+P <: Provenance] {
   val resourceId: ResourceId = identification.resourceId
 
   def update(
-      topmostSameAs:   TopmostSameAs
+      topmostSameAs: TopmostSameAs
   )(implicit evidence: P <:< ImportedInternal, factoryEvidence: TopmostSameAs.type): Dataset[P] =
     provenance match {
       case p: ImportedInternalAncestorInternal =>
@@ -576,7 +576,7 @@ trait DatasetOps[+P <: Provenance] {
 
   def update(
       topmostDerivedFrom: TopmostDerivedFrom
-  )(implicit evidence:    P <:< Modified, factoryEvidence: TopmostDerivedFrom.type): Dataset[P] =
+  )(implicit evidence: P <:< Modified, factoryEvidence: TopmostDerivedFrom.type): Dataset[P] =
     provenance match {
       case p: Modified => copy(provenance = p.copy(topmostDerivedFrom = topmostDerivedFrom)).asInstanceOf[Dataset[P]]
     }

@@ -133,7 +133,7 @@ object CompositePlanProvision {
 
     def create[F[_]: Logger: Sync](
         getEventPayload: EventInfo => F[Option[EventPayload]]
-    )(ev:                EventInfo): F[Option[Context]] =
+    )(ev: EventInfo): F[Option[Context]] =
       OptionT
         .pure(ev)
         .filter(event => eligibleEventStatus.contains(event.status))

@@ -227,8 +227,8 @@ private class MicroserviceRoutes[F[_]: Async](
       .merge
 
   private def routeToProjectsEndpoints(
-      path:           Path,
-      maybeAuthUser:  Option[AuthUser]
+      path:          Path,
+      maybeAuthUser: Option[AuthUser]
   )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" :+ datasets.DatasetName(dsName) :+ "tags" =>
       import projects.datasets.tags.Endpoint._

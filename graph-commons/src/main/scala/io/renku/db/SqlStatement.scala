@@ -33,7 +33,7 @@ final case class SqlStatement[F[_], ResultType](
     name:           Name
 ) {
   def flatMapResult[O](f: ResultType => F[O])(implicit
-      monad:              Monad[F]
+      monad: Monad[F]
   ): SqlStatement[F, O] =
     copy(queryExecution = queryExecution.flatMapF(f))
 

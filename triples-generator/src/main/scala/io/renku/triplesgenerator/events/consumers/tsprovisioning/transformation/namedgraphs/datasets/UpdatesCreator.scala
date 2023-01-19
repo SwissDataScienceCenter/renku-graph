@@ -33,16 +33,16 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 private trait UpdatesCreator {
 
   def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal])(implicit
-      ev:                                    Dataset.Provenance.Internal.type
+      ev: Dataset.Provenance.Internal.type
   ): List[SparqlQuery]
 
   def prepareUpdatesWhenInvalidated(projectId: projects.ResourceId,
                                     dataset:   Dataset[Dataset.Provenance.ImportedExternal]
-  )(implicit ev:                               Dataset.Provenance.ImportedExternal.type): List[SparqlQuery]
+  )(implicit ev: Dataset.Provenance.ImportedExternal.type): List[SparqlQuery]
 
   def prepareUpdatesWhenInvalidated(projectId: projects.ResourceId,
                                     dataset:   Dataset[Dataset.Provenance.ImportedInternal]
-  )(implicit ev:                               Dataset.Provenance.ImportedInternal.type): List[SparqlQuery]
+  )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery]
 
   def prepareUpdates(dataset:                Dataset[Dataset.Provenance.ImportedInternal],
                      maybeKGTopmostSameAses: Set[TopmostSameAs]
@@ -90,7 +90,7 @@ private trait UpdatesCreator {
 private object UpdatesCreator extends UpdatesCreator {
 
   override def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal])(implicit
-      ev:                                             Dataset.Provenance.Internal.type
+      ev: Dataset.Provenance.Internal.type
   ): List[SparqlQuery] =
     List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
 

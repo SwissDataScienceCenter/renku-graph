@@ -57,7 +57,7 @@ private object Commands {
     import java.net.URL
 
     override def findRepositoryUrl(projectPath: projects.Path)(implicit
-        maybeAccessToken:                       Option[AccessToken]
+        maybeAccessToken: Option[AccessToken]
     ): F[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
@@ -116,9 +116,9 @@ private object Commands {
     def `add -A`(implicit repositoryDirectory:       RepositoryPath): F[Unit]
     def commit(message:                              String)(implicit repositoryDirectory:   RepositoryPath): F[Unit]
     def clone(
-        repositoryUrl:                       ServiceUrl,
-        workDirectory:                       Path
-    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit]
+        repositoryUrl: ServiceUrl,
+        workDirectory: Path
+    )(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit]
     def rm(fileName:                         Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def status(implicit repositoryDirectory: RepositoryPath): F[String]
   }
@@ -173,8 +173,8 @@ private object Commands {
     }.void
 
     override def clone(
-        repositoryUrl:               ServiceUrl,
-        workDirectory:               Path
+        repositoryUrl: ServiceUrl,
+        workDirectory: Path
     )(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit] =
       EitherT[F, ProcessingRecoverableError, Unit] {
         MonadThrow[F]

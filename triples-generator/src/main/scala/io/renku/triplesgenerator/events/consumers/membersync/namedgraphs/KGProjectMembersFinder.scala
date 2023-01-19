@@ -38,7 +38,7 @@ private trait KGProjectMembersFinder[F[_]] {
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-)(implicit renkuUrl:  RenkuUrl)
+)(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl(connectionConfig)
     with KGProjectMembersFinder[F] {
 

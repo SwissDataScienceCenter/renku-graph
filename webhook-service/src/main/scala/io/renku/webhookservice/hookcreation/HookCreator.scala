@@ -99,7 +99,7 @@ private object HookCreator {
 
   case class HookAlreadyCreated(projectId: GitLabId, projectHookUrl: ProjectHookUrl)
 
-  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl,
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl:  ProjectHookUrl,
                                                                 hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] = for {
     commitSyncRequestSender <- CommitSyncRequestSender[F]

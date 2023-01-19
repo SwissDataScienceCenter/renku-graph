@@ -33,7 +33,7 @@ import scala.util.control.NonFatal
 
 private[eventgeneration] trait CommitEventDeleter[F[_]] {
   def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken:      Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[SynchronizationSummary]
 }
 private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
@@ -43,7 +43,7 @@ private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
   import commitEventsRemover._
 
   override def deleteCommits(project: Project, commitsToDelete: List[CommitId])(implicit
-      maybeAccessToken:               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[SynchronizationSummary] = commitsToDelete.foldLeftM(SynchronizationSummary()) { (summary, commit) =>
     removeDeletedEvent(project, commit)
       .map(summary.incrementCount)

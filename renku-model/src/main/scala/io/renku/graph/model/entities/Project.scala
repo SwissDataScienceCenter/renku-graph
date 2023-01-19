@@ -189,8 +189,8 @@ object RenkuProject {
       entities.map(p => ("Plan", p.resourceId, p.dateCreated))
 
     private def validateDates[R](
-        projectDate:   DateCreated,
-        toValidate:    List[DatedEntity[R]]
+        projectDate: DateCreated,
+        toValidate:  List[DatedEntity[R]]
     )(implicit idShow: Show[R]) = {
       implicit lazy val show: Show[InstantTinyType] = Show.show(_.toString)
 
@@ -391,13 +391,13 @@ object RenkuProject {
       }
 
     private def validateSubprocessPlan(projectPlans: Set[plans.ResourceId])(
-        id:                                          plans.ResourceId
+        id: plans.ResourceId
     ): ValidatedNel[String, Unit] =
       Validated.condNel(projectPlans.contains(id), (), show"The subprocess plan $id is missing in the project.")
 
     private def validateParameterMapping(
         relevantIds: Set[commandParameters.ResourceId]
-    )(pm:            ParameterMapping): ValidatedNel[String, Unit] =
+    )(pm: ParameterMapping): ValidatedNel[String, Unit] =
       pm.mappedParameter.traverse_ { id =>
         Validated.condNel(
           relevantIds.contains(id),

@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 
 private[awaitinggeneration] trait TriplesGenerator[F[_]] {
   def generateTriples(commit: CommitEvent)(implicit
-      maybeAccessToken:       Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, JsonLD]
 }
 

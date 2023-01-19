@@ -43,20 +43,20 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait GitLabClient[F[_]] {
 
-  def get[ResultType](path:    Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMappingF[F, ResultType]
+  def get[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
-  def head[ResultType](path:   Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMappingF[F, ResultType]
+  def head[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
-  def post[ResultType](path:   Uri, endpointName: String Refined NonEmpty, payload: Json)(
-      mapResponse:             ResponseMappingF[F, ResultType]
+  def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
   def delete[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMappingF[F, ResultType]
+      mapResponse: ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 }
 
@@ -77,32 +77,32 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     with GitLabClient[F] {
 
   override def get[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:                   ResponseMapping[ResultType]
-  )(implicit maybeAccessToken:       Option[AccessToken]): F[ResultType] = for {
+      mapResponse: ResponseMapping[ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(GET, uri, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
 
   override def head[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:                    ResponseMapping[ResultType]
-  )(implicit maybeAccessToken:        Option[AccessToken]): F[ResultType] = for {
+      mapResponse: ResponseMapping[ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(HEAD, uri, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
 
   override def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
-      mapResponse:                    ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken:        Option[AccessToken]): F[ResultType] = for {
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(uri, endpointName, payload)
     result  <- super.send(request)(mapResponse)
   } yield result
 
   override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
-      mapResponse:                      ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken:          Option[AccessToken]): F[ResultType] = for {
+      mapResponse: ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(DELETE, uri, endpointName)
     result  <- super.send(request)(mapResponse)
@@ -111,14 +111,14 @@ final class GitLabClientImpl[F[_]: Async: Logger](
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
-      maybeAccessToken:                  Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] = HttpRequest(
     super.secureRequest(method, uri),
     endpointName
   ).pure[F]
 
   private def secureNamedRequest(uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(implicit
-      maybeAccessToken:               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[NamedRequest[F]] =
     secureNamedRequest(POST, uri, endpointName)
       .map(originalRequest => originalRequest.copy(request = originalRequest.request.withEntity(payload)))

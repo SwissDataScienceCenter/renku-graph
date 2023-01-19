@@ -51,7 +51,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
     }
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
-      implicit dbUpdater:                                   DBUpdater[F, E]
+      implicit dbUpdater: DBUpdater[F, E]
   ): PartialFunction[Throwable, UpdateResult[F]] = { case err =>
     Kleisli.liftF {
       for {

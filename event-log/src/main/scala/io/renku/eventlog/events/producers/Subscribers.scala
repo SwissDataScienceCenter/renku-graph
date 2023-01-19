@@ -75,7 +75,7 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] 
 private object Subscribers {
 
   def apply[F[_]: Async: Logger, SI <: SubscriptionInfo, ST <: SubscriberTracker[F, SI]](
-      categoryName:             CategoryName
+      categoryName: CategoryName
   )(implicit subscriberTracker: ST, show: Show[SI]): F[Subscribers[F, SI]] = for {
     subscribersRegistry <- SubscribersRegistry(categoryName)
     subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl[F, SI](categoryName, subscribersRegistry))

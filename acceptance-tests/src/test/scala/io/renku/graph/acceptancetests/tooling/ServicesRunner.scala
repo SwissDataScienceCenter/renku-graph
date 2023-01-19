@@ -41,7 +41,7 @@ object ServicesState {
 }
 
 class ServicesRunner(semaphore: Semaphore[IO])(implicit
-    logger:                     Logger[IO]
+    logger: Logger[IO]
 ) {
 
   import ServiceClient.ServiceReadiness._
