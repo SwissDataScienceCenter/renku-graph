@@ -4,7 +4,7 @@ import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder}
 
 final case class CliDatasetFile(
     resourceId:       PartResourceId,
@@ -31,8 +31,8 @@ object CliDatasetFile {
       } yield part
     }
 
-  implicit def jsonLDEncoder: JsonLDEncoder[CliDatasetFile] =
-    JsonLDEncoder.instance { file =>
+  implicit def jsonLDEncoder: FlatJsonLDEncoder[CliDatasetFile] =
+    FlatJsonLDEncoder.unsafe { file =>
       JsonLD.entity(
         file.resourceId.asEntityId,
         entityTypes,

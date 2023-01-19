@@ -9,7 +9,7 @@ import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 final case class CliParameterValue(
     id:        ResourceId,
     parameter: commandParameters.ResourceId,
-    value:     String
+    value:     ValueOverride
 )
 
 object CliParameterValue {
@@ -20,7 +20,7 @@ object CliParameterValue {
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         valueReferenceId <- cursor.downField(Schema.valueReference).downEntityId.as[commandParameters.ResourceId]
-        parameterValue   <- cursor.downField(Schema.value).as[String]
+        parameterValue   <- cursor.downField(Schema.value).as[ValueOverride]
       } yield CliParameterValue(resourceId, valueReferenceId, parameterValue)
     }
 

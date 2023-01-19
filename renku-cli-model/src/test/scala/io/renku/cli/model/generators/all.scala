@@ -10,3 +10,6 @@ object all
     with ParameterValueGenerators
     with CommandParameterGenerators
     with PlanGenerators
+    with UsageGenerators
+    with GenerationGenerators
+    with ActivityGenerators

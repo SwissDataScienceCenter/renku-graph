@@ -64,8 +64,8 @@ object CliParameterLink {
       } yield CliParameterLink(id, source, sinks)
     }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliParameterLink] =
-    JsonLDEncoder.instance { link =>
+  implicit val jsonLDEncoder: FlatJsonLDEncoder[CliParameterLink] =
+    FlatJsonLDEncoder.unsafe { link =>
       JsonLD.entity(
         link.id.asEntityId,
         entityTypes,

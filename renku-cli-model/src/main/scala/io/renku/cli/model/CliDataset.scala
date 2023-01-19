@@ -5,7 +5,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
-import io.renku.graph.model.datasets._
+import io.renku.graph.model.datasets.{DateModified => _, _}
 import io.renku.graph.model.images.Image
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
@@ -103,8 +103,8 @@ object CliDataset {
   implicit def jsonLDEncoder(implicit
       fileEncoder:   JsonLDEncoder[CliDatasetFile],
       personEncoder: JsonLDEncoder[CliPerson]
-  ): JsonLDEncoder[CliDataset] =
-    JsonLDEncoder.instance { ds =>
+  ): FlatJsonLDEncoder[CliDataset] =
+    FlatJsonLDEncoder.unsafe { ds =>
       JsonLD.entity(
         ds.resourceId.asEntityId,
         entityTypes,

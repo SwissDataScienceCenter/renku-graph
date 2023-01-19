@@ -100,8 +100,8 @@ object CliCompositePlan {
       )
     }
 
-  implicit def jsonLDEncoder: JsonLDEncoder[CliCompositePlan] =
-    JsonLDEncoder.instance { plan =>
+  implicit def jsonLDEncoder: FlatJsonLDEncoder[CliCompositePlan] =
+    FlatJsonLDEncoder.unsafe { plan =>
       JsonLD.entity(
         plan.id.asEntityId,
         entityTypes,

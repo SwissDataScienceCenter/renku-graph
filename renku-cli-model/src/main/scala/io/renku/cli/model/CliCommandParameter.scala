@@ -3,7 +3,7 @@ package io.renku.cli.model
 import io.renku.cli.model.Ontologies.{Renku, Schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder}
 
 final case class CliCommandParameter(
     resourceId:   ResourceId,
@@ -31,8 +31,8 @@ object CliCommandParameter {
     } yield CliCommandParameter(resourceId, name, maybeDescription, maybePrefix, position, defaultValue)
   }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliCommandParameter] =
-    JsonLDEncoder.instance { param =>
+  implicit val jsonLDEncoder: FlatJsonLDEncoder[CliCommandParameter] =
+    FlatJsonLDEncoder.unsafe { param =>
       JsonLD.entity(
         param.resourceId.asEntityId,
         entityTypes,

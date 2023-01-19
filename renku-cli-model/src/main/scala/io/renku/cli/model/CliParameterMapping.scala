@@ -14,7 +14,7 @@ final case class CliParameterMapping(
     description:  Option[Description],
     prefix:       Option[Prefix],
     position:     Option[Position],
-    defaultValue: ParameterDefaultValue,
+    defaultValue: Option[ParameterDefaultValue],
     mapsTo:       MappedParam
 )
 
@@ -74,13 +74,13 @@ object CliParameterMapping {
         name             <- cursor.downField(Schema.name).as[Name]
         maybeDescription <- cursor.downField(Schema.description).as[Option[Description]]
         maybePrefix      <- cursor.downField(Renku.prefix).as[Option[Prefix]]
-        defaultValue     <- cursor.downField(Schema.defaultValue).as[ParameterDefaultValue]
+        defaultValue     <- cursor.downField(Schema.defaultValue).as[Option[ParameterDefaultValue]]
         mapsTo           <- cursor.downField(Renku.mapsTo).as[MappedParam]
       } yield CliParameterMapping(resourceId, name, maybeDescription, maybePrefix, position, defaultValue, mapsTo)
     }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliParameterMapping] =
-    JsonLDEncoder.instance { param =>
+  implicit val jsonLDEncoder: FlatJsonLDEncoder[CliParameterMapping] =
+    FlatJsonLDEncoder.unsafe { param =>
       JsonLD.entity(
         param.resourceId.asEntityId,
         entityTypes,

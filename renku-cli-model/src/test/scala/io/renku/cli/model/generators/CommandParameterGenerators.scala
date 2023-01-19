@@ -62,7 +62,7 @@ trait CommandParameterGenerators {
       descr  <- Gen.option(RenkuTinyTypeGenerators.commandParameterDescription)
       prefix <- Gen.option(RenkuTinyTypeGenerators.commandParameterPrefixGen)
       pos    <- Gen.option(RenkuTinyTypeGenerators.commandParameterPositionGen)
-      defVal <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
+      defVal <- Gen.option(RenkuTinyTypeGenerators.commandParameterDefaultValueGen)
       mapsTo <- mappedParamGen
     } yield CliParameterMapping(id, name, descr, prefix, pos, defVal, mapsTo)
 

@@ -18,6 +18,9 @@ object CliPerson {
 
   private val entityTypes: EntityTypes = EntityTypes.of(Schema.Person, Prov.Person)
 
+  private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
+    entityTypes == this.entityTypes
+
   implicit def jsonLDDecoder: JsonLDDecoder[CliPerson] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {

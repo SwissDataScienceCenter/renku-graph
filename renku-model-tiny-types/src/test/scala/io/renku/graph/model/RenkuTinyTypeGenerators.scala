@@ -32,6 +32,9 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
+  def associationResourceIdGen: Gen[associations.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(associations.ResourceId)
+
   def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
 
   def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
@@ -235,8 +238,13 @@ trait RenkuTinyTypeGenerators {
   val entityChecksums: Gen[entityModel.Checksum] =
     Generators.nonBlankStrings(40, 40).map(_.value).map(entityModel.Checksum.apply)
 
+  val activityResourceIdGen: Gen[activities.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(activities.ResourceId)
+
   val activityStartTimes: Gen[activities.StartTime] =
     Generators.timestampsNotInTheFuture.map(activities.StartTime.apply)
+  val activityEndTimeGen: Gen[activities.EndTime] =
+    Generators.timestampsNotInTheFuture.map(activities.EndTime.apply)
 
   def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(activities.StartTime)
@@ -292,6 +300,9 @@ trait RenkuTinyTypeGenerators {
 
   val parameterLinkResourceIdGen: Gen[parameterLinks.ResourceId] =
     Generators.validatedUrls.map(_.value).map(parameterLinks.ResourceId)
+
+  val usageResourceIdGen: Gen[usages.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(usages.ResourceId)
 }
 
 object RenkuTinyTypeGenerators extends RenkuTinyTypeGenerators

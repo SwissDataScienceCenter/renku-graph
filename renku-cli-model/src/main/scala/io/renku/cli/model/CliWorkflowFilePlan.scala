@@ -4,7 +4,7 @@ import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder}
 
 case class CliWorkflowFilePlan(
     id:               ResourceId,
@@ -67,8 +67,8 @@ object CliWorkflowFilePlan {
       )
     }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliWorkflowFilePlan] =
-    JsonLDEncoder.instance { plan =>
+  implicit val jsonLDEncoder: FlatJsonLDEncoder[CliWorkflowFilePlan] =
+    FlatJsonLDEncoder.unsafe { plan =>
       JsonLD.entity(
         plan.id.asEntityId,
         entityTypes,

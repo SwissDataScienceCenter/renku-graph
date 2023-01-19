@@ -36,17 +36,30 @@ private[cli] object Ontologies {
   }
 
   object Prov {
+    val Activity      = prov / "Activity"
     val Entity        = prov / "Entity"
     val Plan          = prov / "Plan"
     val SoftwareAgent = prov / "SoftwareAgent"
     val Collection    = prov / "Collection"
     val Person        = prov / "Person"
+    val Association   = prov / "Association"
+    val Usage         = prov / "Usage"
+    val Generation    = prov / "Generation"
 
-    val wasDerivedFrom      = prov / "wasDerivedFrom"
-    val invalidatedAtTime   = prov / "invalidatedAtTime"
-    val entity              = prov / "entity"
-    val atLocation          = prov / "atLocation"
-    val qualifiedGeneration = prov / "qualifiedGeneration"
+    val hadMember            = prov / "hadMember"
+    val activity             = prov / "activity"
+    val agent                = prov / "agent"
+    val hadPlan              = prov / "hadPlan"
+    val wasDerivedFrom       = prov / "wasDerivedFrom"
+    val invalidatedAtTime    = prov / "invalidatedAtTime"
+    val entity               = prov / "entity"
+    val atLocation           = prov / "atLocation"
+    val qualifiedGeneration  = prov / "qualifiedGeneration"
+    val qualifiedAssociation = prov / "qualifiedAssociation"
+    val endedAtTime          = prov / "endedAtTime"
+    val startedAtTime        = prov / "startedAtTime"
+    val wasAssociatedWith    = prov / "wasAssociatedWith"
+    val qualifiedUsage       = prov / "qualifiedUsage"
   }
 
   object Renku {
@@ -84,5 +97,6 @@ private[cli] object Ontologies {
     val originalIdentifier = renku / "originalIdentifier"
     val external           = renku / "external"
     val source             = renku / "source"
+    val parameter          = renku / "parameter"
   }
 }

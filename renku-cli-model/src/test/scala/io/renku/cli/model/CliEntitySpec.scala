@@ -18,14 +18,28 @@ class CliEntitySpec
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
 
-  val entityGen = EntityGenerators.entityGen()
+  val entityGen     = EntityGenerators.entityGen
+  val collectionGen = EntityGenerators.collectionGen
 
-  "decode/encode" should {
+  "entity decode/encode" should {
     "be compatible" in {
       forAll(entityGen) { cliEntity =>
         val jsonLD = cliEntity.asJsonLD
         val back = jsonLD.cursor
           .as[CliEntity]
+          .fold(throw _, identity)
+
+        back shouldMatchTo cliEntity
+      }
+    }
+  }
+
+  "collection decode/encode" should {
+    "be compatible" in {
+      forAll(collectionGen) { cliEntity =>
+        val jsonLD = cliEntity.asJsonLD
+        val back = jsonLD.cursor
+          .as[CliCollection]
           .fold(throw _, identity)
 
         back shouldMatchTo cliEntity
