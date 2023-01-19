@@ -33,7 +33,7 @@ package object details {
 
   private[details] def internalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.Internal],
                                              project: RenkuProject
-  )(implicit renkuUrl:                                RenkuUrl): NonModifiedDataset = NonModifiedDataset(
+  )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
@@ -53,7 +53,7 @@ package object details {
 
   private[details] def importedExternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedExternal],
                                                      project: RenkuProject
-  )(implicit renkuUrl:                                        RenkuUrl): NonModifiedDataset = NonModifiedDataset(
+  )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
@@ -73,7 +73,7 @@ package object details {
 
   private[details] def importedInternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedInternal],
                                                      project: RenkuProject
-  )(implicit renkuUrl:                                        RenkuUrl): NonModifiedDataset = NonModifiedDataset(
+  )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
@@ -93,7 +93,7 @@ package object details {
 
   private[details] def modifiedToModified(dataset: ModelDataset[ModelDataset.Provenance.Modified],
                                           project: RenkuProject
-  )(implicit renkuUrl:                             RenkuUrl): ModifiedDataset = ModifiedDataset(
+  )(implicit renkuUrl: RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identifier,
     dataset.identification.title,

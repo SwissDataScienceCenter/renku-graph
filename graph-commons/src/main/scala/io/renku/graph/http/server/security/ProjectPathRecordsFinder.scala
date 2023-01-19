@@ -41,7 +41,7 @@ object ProjectPathRecordsFinder {
 }
 
 private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     ProjectsConnectionConfig
+    storeConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl(storeConfig)
     with SecurityRecordFinder[F, projects.Path] {

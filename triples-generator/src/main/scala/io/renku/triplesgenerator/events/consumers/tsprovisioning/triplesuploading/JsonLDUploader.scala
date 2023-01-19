@@ -68,7 +68,7 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object JsonLDUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig:   ProjectsConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,

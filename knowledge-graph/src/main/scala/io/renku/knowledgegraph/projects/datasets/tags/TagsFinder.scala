@@ -42,7 +42,7 @@ private object TagsFinder {
 
 private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-)(implicit renkuUrl:  RenkuUrl)
+)(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl[F](connectionConfig)
     with TagsFinder[F]
     with Paging[model.Tag] {

@@ -55,7 +55,7 @@ object VersionCompatibilityConfig {
     }
 
   def fromConfigF[F[_]](
-      config:   Config
+      config: Config
   )(implicit F: MonadError[F, Throwable], L: Logger[F]): F[VersionCompatibilityConfig] =
     ApplicativeError[F, Throwable]
       .fromEither(fromConfig(config))

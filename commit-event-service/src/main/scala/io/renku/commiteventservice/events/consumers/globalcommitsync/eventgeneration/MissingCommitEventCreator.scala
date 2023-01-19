@@ -30,7 +30,7 @@ import org.typelevel.log4cats.Logger
 
 private[eventgeneration] trait MissingCommitEventCreator[F[_]] {
   def createCommits(project: Project, commitsToCreate: List[CommitId])(implicit
-      maybeAccessToken:      Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[SynchronizationSummary]
 }
 
@@ -43,7 +43,7 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[F[_]: MonadThrow](
   import commitInfoFinder._
 
   override def createCommits(project: Project, commitsToCreate: List[CommitId])(implicit
-      maybeAccessToken:               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[SynchronizationSummary] = for {
     commitInfos <- commitsToCreate.map(findCommitInfo(project.id, _)).sequence
     results     <- commitInfos.map(commitToEventLog.storeCommitInEventLog(project, _, BatchDate(clock))).sequence

@@ -108,7 +108,7 @@ object ProjectJsonLDDecoder {
                          datasets:         List[Dataset[Dataset.Provenance]],
                          plans:            List[Plan],
                          images:           List[Image]
-  )(implicit renkuUrl:                     RenkuUrl): Either[DecodingFailure, Project] = {
+  )(implicit renkuUrl: RenkuUrl): Either[DecodingFailure, Project] = {
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
@@ -197,7 +197,7 @@ object ProjectJsonLDDecoder {
 
   private def maybeCreator(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Option[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Option[Person] =
     gitLabInfo.maybeCreator.map { creator =>
       allJsonLdPersons
         .find(byEmailOrUsername(creator))
@@ -207,7 +207,7 @@ object ProjectJsonLDDecoder {
 
   private def members(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
         .find(byEmailOrUsername(member))

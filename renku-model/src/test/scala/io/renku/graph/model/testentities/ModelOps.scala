@@ -49,11 +49,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class ProjectOps(project: Project)(implicit
-      renkuUrl:                      RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractProjectOps[Project](project)
 
   abstract class AbstractProjectOps[P <: Project](project: P)(implicit
-      renkuUrl:                                            RenkuUrl
+      renkuUrl: RenkuUrl
   ) {
     lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
@@ -61,19 +61,19 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class RenkuProjectWithParentOps(project: RenkuProject.WithParent)(implicit
-      renkuUrl:                                     RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject.WithParent](project)
 
   implicit class RenkuProjectWithoutParentOps(project: RenkuProject.WithoutParent)(implicit
-      renkuUrl:                                        RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject.WithoutParent](project)
 
   implicit class RenkuProjectOps(project: RenkuProject)(implicit
-      renkuUrl:                           RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject](project)
 
   abstract class AbstractRenkuProjectOps[P <: RenkuProject](project: P)(implicit
-      renkuUrl:                                                      RenkuUrl
+      renkuUrl: RenkuUrl
   ) {
 
     lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
@@ -121,7 +121,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
     def importDataset[PIN <: Dataset.Provenance, POUT <: Dataset.Provenance](
-        dataset:              Dataset[PIN]
+        dataset: Dataset[PIN]
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): (Dataset[POUT], RenkuProject) = {
       val newIdentifier = datasetIdentifiers.generateOne
       val importedDS = dataset.copy(
@@ -180,19 +180,19 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class NonRenkuProjectWithParentOps(project: NonRenkuProject.WithParent)(implicit
-      renkuUrl:                                        RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithParent](project)
 
   implicit class NonRenkuProjectWithoutParentOps(project: NonRenkuProject.WithoutParent)(implicit
-      renkuUrl:                                           RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithoutParent](project)
 
   implicit class NonRenkuProjectOps(project: NonRenkuProject)(implicit
-      renkuUrl:                              RenkuUrl
+      renkuUrl: RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject](project)
 
   abstract class AbstractNonRenkuProjectOps[P <: NonRenkuProject](project: P)(implicit
-      renkuUrl:                                                            RenkuUrl
+      renkuUrl: RenkuUrl
   ) {
 
     def to[T](implicit convert: P => T): T = convert(project)
@@ -350,7 +350,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       replaceDSDesc(to = sentenceContaining(Refined.unsafeApply(phrase)).map(Description.apply).generateSome)(dataset)
 
     def replacePublicationEvents(eventFactories: List[Dataset[Provenance] => PublicationEvent])(implicit
-        ev:                                      P <:< Provenance.NonImported
+        ev: P <:< Provenance.NonImported
     ): Dataset[P] = dataset.copy(publicationEventFactories = eventFactories)
   }
 

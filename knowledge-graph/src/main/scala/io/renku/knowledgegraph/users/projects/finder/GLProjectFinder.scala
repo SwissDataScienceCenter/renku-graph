@@ -58,7 +58,7 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
     findProjectsAndCreators(criteria) >>= addCreators(criteria)
 
   private def addCreators(
-      criteria:          Criteria
+      criteria: Criteria
   )(projectsAndCreators: List[ProjectAndCreator]): F[List[Project.NotActivated]] =
     findDistinctCreatorIds(projectsAndCreators)
       .map(fetchCreatorName(criteria))

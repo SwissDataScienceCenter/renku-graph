@@ -31,7 +31,7 @@ private[init] object CliVersionLoader {
   def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): F[CliVersion] = apply(findRenkuVersion)
 
   private[init] def apply[F[_]](renkuVersionFinder: F[CliVersion])(implicit
-      ME:                                           MonadError[F, Throwable]
+      ME: MonadError[F, Throwable]
   ): F[CliVersion] = renkuVersionFinder
 
   private def findRenkuVersion[F[_]](implicit ME: MonadError[F, Throwable]): F[CliVersion] = {

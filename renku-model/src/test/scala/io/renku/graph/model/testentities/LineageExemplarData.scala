@@ -64,7 +64,7 @@ object LineageExemplarData {
   )
 
   def apply(
-      project:         RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
+      project: RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
   )(implicit renkuUrl: RenkuUrl): ExemplarData = {
 
     val zhbikesFolder = Location.Folder("data/zhbikes")

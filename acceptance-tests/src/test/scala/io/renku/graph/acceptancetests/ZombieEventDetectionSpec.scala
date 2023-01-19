@@ -110,9 +110,9 @@ class ZombieEventDetectionSpec
   }
 
   private def insertEventToDB(
-      commitId:       CommitId,
-      project:        data.Project,
-      eventDate:      EventDate
+      commitId:  CommitId,
+      project:   data.Project,
+      eventDate: EventDate
   )(implicit session: Session[IO]) = {
     val query
         : Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
