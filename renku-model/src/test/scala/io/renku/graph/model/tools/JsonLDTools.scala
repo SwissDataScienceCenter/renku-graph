@@ -19,12 +19,15 @@
 package io.renku.graph.model.tools
 
 import io.renku.graph.model.tools.JsonLDTools.JsonLDElementView.{Filter, Update}
-import io.renku.jsonld.{EntityType, EntityTypes, JsonLD, JsonLDEncoder, Property}
+import io.renku.jsonld._
 
 object JsonLDTools {
 
   def flattenedJsonLD[A: JsonLDEncoder](value: A): JsonLD =
     JsonLDEncoder[A].apply(value).flatten.fold(throw _, identity)
+
+  def flattenedJsonLDFrom(value: JsonLD, other: JsonLD*): JsonLD =
+    JsonLD.arr(value :: other.toList: _*).flatten.fold(throw _, identity)
 
   /** Create a view of the value as JsonLD in order to create a modified version. */
   def view[A: JsonLDEncoder](value: A): JsonLDElementView =

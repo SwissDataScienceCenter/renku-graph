@@ -34,10 +34,11 @@ import io.renku.graph.model.entities.PlanLens.{planDateCreated, planInvalidation
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.graph.model.tools.JsonLDTools
+import io.renku.graph.model.tools.JsonLDTools._
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
+import io.renku.jsonld._
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -186,45 +187,15 @@ class PlanSpec
       }
     }
 
-    "pick up the correct decoder" in {
-      val cp = compositePlanGen().generateOne
-        .to[entities.CompositePlan]
-
+    "decode any Plan entity subtypes" in {
+      val cp = compositePlanGen().generateOne.to[entities.CompositePlan]
       val sp = plans.generateOne.to[entities.StepPlan]
 
-      val spDecoded = flattenedJsonLD(sp).cursor.as[List[entities.Plan]]
-      val cpDecoded = flattenedJsonLD(cp).cursor.as[List[entities.Plan]]
+      val jsonLD = flattenedJsonLDFrom(cp.asJsonLD, sp.asJsonLD)
 
-      spDecoded shouldBe Right(List(sp))
-      cpDecoded shouldBe Right(List(cp))
-    }
+      val decoded = jsonLD.cursor.as[List[entities.Plan]]
 
-    "fail decode if not strictly matching entity types (composite plan)" in {
-      val cp = compositePlanGen().generateOne
-        .to[entities.CompositePlan]
-
-      val newJson =
-        JsonLDTools
-          .view(cp)
-          .selectByTypes(entities.CompositePlan.Ontology.entityTypes)
-          .addType(renku / "WorkflowCompositePlan")
-          .value
-
-      newJson.cursor.as[List[entities.CompositePlan]] shouldBe Right(Nil)
-    }
-
-    "fail decode if not strictly matching entity types (step plan)" in {
-      val sp = stepPlanEntities().generateOne
-        .to[entities.StepPlan]
-
-      val newJson =
-        JsonLDTools
-          .view(sp)
-          .selectByTypes(entities.StepPlan.entityTypes)
-          .addType(renku / "WorkflowPlan")
-          .value
-
-      newJson.cursor.as[List[entities.StepPlan]] shouldBe Right(Nil)
+      decoded.fold(err => fail(err.message), identity) should contain theSameElementsAs List(sp, cp)
     }
 
     "fail decode if a parameter maps to itself" in {
