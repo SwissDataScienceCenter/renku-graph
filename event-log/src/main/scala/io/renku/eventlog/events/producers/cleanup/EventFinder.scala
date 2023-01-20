@@ -157,7 +157,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     Kleisli.liftF(transaction.commit.void)
 
   private def rollback(transaction: Transaction[F])(
-      savepoint:                    transaction.Savepoint
+      savepoint: transaction.Savepoint
   ): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case err =>
     Kleisli.liftF {
       (transaction rollback savepoint).void >>
