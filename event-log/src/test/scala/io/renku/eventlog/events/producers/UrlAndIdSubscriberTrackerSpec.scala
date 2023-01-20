@@ -163,7 +163,7 @@ class UrlAndIdSubscriberTrackerSpec
           .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
             (subscriberId, subscriberUrl, microserviceBaseUrl)
           }
-      session.prepare(query).use(_.option(subscriberUrl ~ sourceUrl))
+      session.prepare(query).flatMap(_.option(subscriberUrl ~ sourceUrl))
     }
   }
 
@@ -176,7 +176,7 @@ class UrlAndIdSubscriberTrackerSpec
           """.command
         session
           .prepare(query)
-          .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
+          .flatMap(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
           .void
       }
     }

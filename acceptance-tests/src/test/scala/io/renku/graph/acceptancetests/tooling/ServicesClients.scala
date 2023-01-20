@@ -193,7 +193,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
     } yield response
   }.unsafeRunSync()
 
-  def POST(url:  String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
+  def POST(url: String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
       ioRuntime: IORuntime
   ): Status = {
     validateUri(s"$baseUrl/$url") >>=
@@ -204,7 +204,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
       )
   }.unsafeRunSync()
 
-  def PUT(url:   String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
+  def PUT(url: String, payload: Json, maybeAccessToken: Option[AccessToken])(implicit
       ioRuntime: IORuntime
   ): Status = {
     for {

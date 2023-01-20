@@ -56,7 +56,7 @@ private object EntityConverters {
 
   private[search] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance, +P <: testentities.Project](
       datasetAndProject: (testentities.Dataset[PROV], P)
-  )(implicit renkuUrl:   RenkuUrl) {
+  )(implicit renkuUrl: RenkuUrl) {
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 

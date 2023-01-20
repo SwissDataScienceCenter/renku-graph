@@ -111,14 +111,12 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |
         |        GRAPH ?projectId {
-        |          ?projectId renku:projectVisibility ?visibility;
-        |                     renku:projectNamespace ?namespace;
+        |          ?projectId renku:projectNamespace ?namespace;
         |                     renku:projectPath ?projectPath.
         |          ?dsId schema:identifier ?identifier;
         |                renku:slug ?name.
+        |          ${criteria.maybeOnAccessRightsAndVisibility("?projectId", "?visibility")}
         |          BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
-        |          ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |          ${filters.maybeOnVisibility("?visibility")}
         |          ${filters.maybeOnNamespace("?namespace")}
         |          OPTIONAL { 
         |            ?dsId schema:creator ?creatorId.

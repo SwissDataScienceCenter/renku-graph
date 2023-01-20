@@ -33,12 +33,12 @@ import org.typelevel.log4cats.Logger
 private[consumers] trait CommitInfoFinder[F[_]] {
 
   def findCommitInfo(
-      projectId:               GitLabId,
-      commitId:                CommitId
+      projectId: GitLabId,
+      commitId:  CommitId
   )(implicit maybeAccessToken: Option[AccessToken]): F[CommitInfo]
 
   def getMaybeCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
-      maybeAccessToken:             Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[CommitInfo]]
 }
 
@@ -49,12 +49,12 @@ private[consumers] class CommitInfoFinderImpl[F[_]: Async: GitLabClient: Logger]
   import org.http4s.{Request, Response}
 
   def findCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
-      maybeAccessToken:         Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[CommitInfo] =
     fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow(projectId, commitId))
 
   def getMaybeCommitInfo(projectId: GitLabId, commitId: CommitId)(implicit
-      maybeAccessToken:             Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[CommitInfo]] =
     fetchCommitInfo(projectId, commitId)(mapToMaybeCommit(projectId, commitId))
 

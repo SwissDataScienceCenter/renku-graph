@@ -26,7 +26,7 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait TagsFinder[F[_]] {
@@ -42,8 +42,8 @@ private object TagsFinder {
 
 private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-)(implicit renkuUrl:  RenkuUrl)
-    extends TSClient[F](connectionConfig)
+)(implicit renkuUrl: RenkuUrl)
+    extends TSClientImpl[F](connectionConfig)
     with TagsFinder[F]
     with Paging[model.Tag] {
 

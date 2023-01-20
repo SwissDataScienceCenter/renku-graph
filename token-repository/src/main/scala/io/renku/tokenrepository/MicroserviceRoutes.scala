@@ -46,7 +46,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     routesMetrics:          RoutesMetrics[F],
     versionRoutes:          version.Routes[F],
     dbReady:                Ref[F, Boolean]
-)(implicit clock:           Clock[F])
+)(implicit clock: Clock[F])
     extends Http4sDsl[F]
     with MicroserviceRoutes[F] {
 

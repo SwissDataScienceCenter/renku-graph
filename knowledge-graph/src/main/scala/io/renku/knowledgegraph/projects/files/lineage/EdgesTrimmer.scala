@@ -87,9 +87,9 @@ private class EdgesTrimmerImpl[F[_]: MonadThrow]() extends EdgesTrimmer[F] {
 
   @scala.annotation.tailrec
   private def findEdgesConnected[T <: TraversalDirection](
-      to:                       Set[Location],
-      edgesToCheck:             EdgeMap,
-      foundEdges:               EdgeMap = Map.empty
+      to:           Set[Location],
+      edgesToCheck: EdgeMap,
+      foundEdges:   EdgeMap = Map.empty
   )(implicit traversalStrategy: TraversalStrategy[T]): EdgeMap = {
     import traversalStrategy._
 
@@ -114,7 +114,7 @@ private class EdgesTrimmerImpl[F[_]: MonadThrow]() extends EdgesTrimmer[F] {
   }
 
   private def reAdd[T <: TraversalDirection](edgeMap: EdgeMap, whenEdgeContains: Option[Location], without: Location)(
-      implicit traversalStrategy:                     TraversalStrategy[T]
+      implicit traversalStrategy: TraversalStrategy[T]
   ): EdgeMap = {
     import traversalStrategy._
 

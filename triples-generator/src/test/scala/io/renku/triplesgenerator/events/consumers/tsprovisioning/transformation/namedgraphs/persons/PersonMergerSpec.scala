@@ -20,16 +20,15 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Failure, Try}
 
-class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EntitiesGenerators {
 
   import PersonMerger._
 

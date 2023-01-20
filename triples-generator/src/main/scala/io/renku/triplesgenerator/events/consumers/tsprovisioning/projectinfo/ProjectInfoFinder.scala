@@ -31,7 +31,7 @@ import org.typelevel.log4cats.Logger
 
 private[tsprovisioning] trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(path: projects.Path)(implicit
-      maybeAccessToken:     Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]]
 }
 
@@ -54,7 +54,7 @@ private class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
   import projectFinder._
 
   override def findProjectInfo(
-      path:                    projects.Path
+      path: projects.Path
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] =
     findProject(path) >>= {
       case None          => EitherT.rightT[F, ProcessingRecoverableError](Option.empty[GitLabProjectInfo])

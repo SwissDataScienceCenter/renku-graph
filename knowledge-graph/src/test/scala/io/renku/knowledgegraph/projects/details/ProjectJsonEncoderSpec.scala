@@ -25,10 +25,11 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{GitLabUrl, SchemaVersion}
+import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._

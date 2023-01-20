@@ -55,7 +55,7 @@ object EntitiesGenerators extends EntitiesGenerators {
 }
 
 private object Instances {
-  implicit val renkuUrl:     RenkuUrl     = renkuUrls.generateOne
+  implicit val renkuUrl:     RenkuUrl     = RenkuTinyTypeGenerators.renkuUrls.generateOne
   implicit val gitLabUrl:    GitLabUrl    = gitLabUrls.generateOne
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 }

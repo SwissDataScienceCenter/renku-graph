@@ -260,7 +260,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         """.command
         session
           .prepare(command)
-          .use(_.execute(project.id ~ project.path ~ encryptedToken))
+          .flatMap(_.execute(project.id ~ project.path ~ encryptedToken))
           .void
       }
     }

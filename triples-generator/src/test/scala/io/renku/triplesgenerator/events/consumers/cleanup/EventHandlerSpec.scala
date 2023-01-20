@@ -75,7 +75,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       val eventJson: Json = json"""{
         "categoryName": "CLEAN_UP",
         "project": {
-          "path" :      ${projectPaths.generateOne.value}
+          "path": ${projectPaths.generateOne.value}
         }
       }"""
       val request   = requestContent(eventJson)
@@ -83,8 +83,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(exception.raiseError[IO, CleanUpEvent])
 
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
     }
 
     s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {

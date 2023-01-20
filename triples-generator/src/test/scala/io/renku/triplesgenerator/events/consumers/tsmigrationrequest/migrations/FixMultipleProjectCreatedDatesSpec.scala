@@ -20,18 +20,21 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.graph.model.{GraphClass, entities, projects}
-import io.renku.graph.model.testentities._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore._
 import io.renku.tinytypes.syntax.all._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
-import eu.timepit.refined.auto._
-import io.renku.triplesstore.SparqlQuery.Prefixes
 
 import java.time.Instant
 import scala.concurrent.duration._
@@ -59,7 +62,7 @@ class FixMultipleProjectCreatedDatesSpec
         .flatMap(n => data.map(_._2).map(project => (project.resourceId, project.dateCreated - n.days)))
         .foreach { case (id, date) =>
           val graphId = GraphClass.Project.id(id)
-          insert(to = projectsDataset, Quad(graphId, id, schema / "dateCreated", date))
+          insert(to = projectsDataset, Quad(graphId, id.asEntityId, schema / "dateCreated", date.asObject))
         }
 
       val datesBefore = findProjectDateCreated

@@ -38,7 +38,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
   import io.renku.json.JsonOps._
 
   def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
-      encoder:           Encoder[(Dataset[Dataset.Provenance], projects.Path)]
+      encoder: Encoder[(Dataset[Dataset.Provenance], projects.Path)]
   ): Json = encoder(dataset -> projectPath)
 
   implicit def datasetEncoder[P <: Dataset.Provenance](implicit

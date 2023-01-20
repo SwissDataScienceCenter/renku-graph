@@ -22,6 +22,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, Order, Show}
 import io.circe.{Encoder, Json}
 import io.renku.tinytypes.constraints.PathSegment
+import io.renku.triplesstore.client.model.{TripleObject, TripleObjectEncoder}
 
 import java.time.{Duration, Instant, LocalDate}
 
@@ -59,7 +60,7 @@ object StringTinyType {
 }
 
 object RelativePathTinyType {
-  implicit val relativePathTinyTypeConverter: RelativePathTinyType => List[PathSegment] =
+  implicit def relativePathTinyTypeConverter[TT <: RelativePathTinyType]: TT => List[PathSegment] =
     tinyType => tinyType.value.split("\\/").toList.map(PathSegment.apply)
 }
 
@@ -76,6 +77,7 @@ trait Sensitive extends Any {
 abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     extends (TT#V => TT)
     with From[TT]
+    with TinyTypeConversions[TT]
     with Constraints[TT]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]
@@ -106,17 +108,6 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     case exception => new IllegalArgumentException(exception)
   }
 
-  implicit class TinyTypeConverters(tinyType: TT) {
-
-    def as[F[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): F[OUT] =
-      MonadThrow[F].fromEither(converter(tinyType))
-
-    def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
-      convert(tinyType).fold(throw _, identity)
-
-    def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
-  }
-
   implicit lazy val show: Show[TT] = Show.show(_.toString)
 }
 
@@ -128,6 +119,23 @@ trait Renderer[View, -T] {
 
 trait From[TT <: TinyType] {
   def from(value: TT#V): Either[IllegalArgumentException, TT]
+}
+
+trait TinyTypeConversions[TT <: TinyType] {
+
+  implicit class TinyTypeConverters(tinyType: TT) {
+
+    def as[F[_]: MonadThrow, OUT](implicit converter: TinyTypeConverter[TT, OUT]): F[OUT] =
+      MonadThrow[F].fromEither(converter(tinyType))
+
+    def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
+      convert(tinyType).fold(throw _, identity)
+
+    def showAs[View](implicit renderer: Renderer[View, TT]): String = renderer.render(tinyType)
+
+    def asObject(implicit valueEncoder: TripleObjectEncoder[TT#V]): TripleObject =
+      valueEncoder(tinyType.value)
+  }
 }
 
 trait TinyTypeOrdering[TT <: TinyType] {

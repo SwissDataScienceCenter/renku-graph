@@ -50,16 +50,16 @@ trait TSProvisioning
   self: ApplicationServices with IOSpec =>
 
   def `data in the Triples Store`(
-      project:          data.Project,
-      commitId:         CommitId = commitIds.generateOne,
-      accessToken:      AccessToken
+      project:     data.Project,
+      commitId:    CommitId = commitIds.generateOne,
+      accessToken: AccessToken
   )(implicit ioRuntime: IORuntime): Assertion =
     `data in the Triples Store`(project, NonEmptyList(commitId, Nil), accessToken)
 
   def `data in the Triples Store`(
-      project:          data.Project,
-      commitIds:        NonEmptyList[CommitId],
-      accessToken:      AccessToken
+      project:     data.Project,
+      commitIds:   NonEmptyList[CommitId],
+      accessToken: AccessToken
   )(implicit ioRuntime: IORuntime): Assertion = {
 
     givenAccessTokenPresentFor(project, accessToken)

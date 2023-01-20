@@ -37,7 +37,7 @@ object DatasetIdRecordsFinder {
 
 private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
-) extends TSClient(storeConfig)
+) extends TSClientImpl(storeConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =

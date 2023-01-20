@@ -44,7 +44,7 @@ private class GLCreatorFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLC
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
   override def findCreatorName(id: persons.GitLabId)(implicit
-      maybeAccessToken:            Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[persons.Name]] = GitLabClient[F].get(uri"users" / id, "single-user")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[persons.Name]]] = {

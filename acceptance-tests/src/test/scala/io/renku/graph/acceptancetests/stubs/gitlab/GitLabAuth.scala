@@ -114,7 +114,7 @@ private[gitlab] object GitLabAuth {
     bearerToken(ProjectAccessTokenDefaultPrefix.exists, ProjectAccessToken(_: String))
 
   private def bearerToken[T <: AccessToken](predicate: String => Boolean,
-                                                    factory:   String => T
+                                            factory:   String => T
   ): Header[T, Header.Single] = {
     val h: Header[Authorization, Header.Single] = Header[Authorization]
     Header.create(

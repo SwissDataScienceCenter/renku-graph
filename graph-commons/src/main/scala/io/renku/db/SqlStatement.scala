@@ -33,7 +33,7 @@ final case class SqlStatement[F[_], ResultType](
     name:           Name
 ) {
   def flatMapResult[O](f: ResultType => F[O])(implicit
-      monad:              Monad[F]
+      monad: Monad[F]
   ): SqlStatement[F, O] =
     copy(queryExecution = queryExecution.flatMapF(f))
 
@@ -74,13 +74,13 @@ object SqlStatement {
     def build[FF[_]](
         queryExecution: PreparedQuery[F, In, Out] => In => F[FF[Out]]
     ): SqlStatement[F, FF[Out]] = SqlStatement[F, FF[Out]](
-      Kleisli(session => session.prepare(query).use(queryExecution(_)(args))),
+      Kleisli(session => session.prepare(query).flatMap(queryExecution(_)(args))),
       name
     )
 
     def buildCursorResource(f: Cursor[F, Out] => F[Unit]): SqlStatement[F, Unit] =
       SqlStatement[F, Unit](
-        Kleisli(session => session.prepare(query).use(_.cursor(args).use(f))),
+        Kleisli(session => session.prepare(query).flatMap(_.cursor(args).use(f))),
         name
       )
   }
@@ -91,6 +91,6 @@ object SqlStatement {
       args:    In
   ) {
     def build: SqlStatement[F, Completion] =
-      SqlStatement[F, Completion](Kleisli(session => session.prepare(command).use(_.execute(args))), name)
+      SqlStatement[F, Completion](Kleisli(session => session.prepare(command).flatMap(_.execute(args))), name)
   }
 }

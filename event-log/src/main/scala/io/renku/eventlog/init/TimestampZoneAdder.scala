@@ -73,7 +73,7 @@ private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionReso
       .query(varchar)
     Kleisli {
       _.prepare(query)
-        .use(_.unique(table -> column))
+        .flatMap(_.unique(table -> column))
     }
   }
 

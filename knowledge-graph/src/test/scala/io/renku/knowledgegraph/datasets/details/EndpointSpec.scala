@@ -35,8 +35,8 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.testentities.{Dataset => _, _}
-import io.renku.graph.model.{RenkuUrl, projects, publicationEvents}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{projects, publicationEvents}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
@@ -58,7 +58,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
+class EndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with EntitiesGenerators
+    with should.Matchers
+    with IOSpec {
 
   "getDataset" should {
 
@@ -70,7 +76,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
             .map((importedExternalToNonModified _).tupled),
           anyRenkuProjectEntities
             .addDatasetAndModification(datasetEntities(provenanceInternal))
-            .map { case (_ ::~ modified, project) => modified -> project }
+            .map { case (_ -> modified, project) => modified -> project }
             .map((modifiedToModified _).tupled)
         )
       ) { dataset =>
@@ -173,8 +179,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
     }
   }
-
-  private implicit lazy val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
   private trait TestCase {
     val gitLabUrl = gitLabUrls.generateOne

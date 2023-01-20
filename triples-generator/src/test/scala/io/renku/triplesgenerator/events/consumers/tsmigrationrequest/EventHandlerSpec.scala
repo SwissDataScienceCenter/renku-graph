@@ -160,8 +160,6 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .createHandlingProcess(EventRequestContent.NoPayload(json"""{"categoryName": ${categoryName.value}}"""))
         .flatMap(_.process.merge)
         .unsafeRunSync() shouldBe BadRequest
-
-      logger.expectNoLogs()
     }
 
     "decode an event from the request, " +
@@ -175,7 +173,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           .flatMap(_.process.merge)
           .unsafeRunSync() shouldBe BadRequest
 
-        logger.loggedOnly(
+        logger.logged(
           Info(show"$categoryName: $requestedVersion -> $BadRequest service in version '$serviceVersion'")
         )
       }

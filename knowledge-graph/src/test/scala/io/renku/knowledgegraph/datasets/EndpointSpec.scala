@@ -23,7 +23,6 @@ import Endpoint.Query.{Phrase, query}
 import Endpoint.Sort
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -32,10 +31,9 @@ import io.renku.config.renku.ResourceUrl
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphModelGenerators, projects}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -126,7 +124,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  private lazy val gitLabUrl = gitLabUrls.generateOne
+  private lazy val gitLabUrl = GraphModelGenerators.gitLabUrls.generateOne
 
   private trait TestCase {
     import io.renku.json.JsonOps._
@@ -224,7 +222,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     title             <- datasetTitles
     name              <- datasetNames
     maybeDescription  <- datasetDescriptions.toGeneratorOfOptions
-    creators          <- personEntities.toGeneratorOfNonEmptyList(maxElements = 4)
+    creators          <- personEntities.toGeneratorOfNonEmptyList(max = 4)
     dates             <- datasetDates
     exemplarProjectId <- projectResourceIds
     projectsCount     <- nonNegativeInts() map (_.value) map ProjectsCount.apply

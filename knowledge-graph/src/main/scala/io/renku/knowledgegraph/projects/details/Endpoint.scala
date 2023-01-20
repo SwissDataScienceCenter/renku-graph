@@ -43,7 +43,7 @@ import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
   def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
-      request:                    Request[F]
+      request: Request[F]
   ): F[Response[F]]
 }
 
@@ -65,7 +65,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private implicit lazy val glUrl: GitLabUrl = gitLabUrl
 
   def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
-      request:                    Request[F]
+      request: Request[F]
   ): F[Response[F]] = measureExecutionTime {
     projectFinder
       .findProject(path, maybeAuthUser)
@@ -88,7 +88,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   }
 
   private def httpResult(path: projects.Path)(implicit
-      request:                 Request[F]
+      request: Request[F]
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val message = ErrorMessage(s"Finding '$path' project failed")
     Logger[F].error(exception)(message.value) >> whenAccept(

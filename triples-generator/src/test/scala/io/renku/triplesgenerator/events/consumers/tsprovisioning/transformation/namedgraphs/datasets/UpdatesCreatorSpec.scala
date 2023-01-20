@@ -23,17 +23,20 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{Dataset, ModelOps}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.views.RdfResource
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, NamedGraph}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -45,6 +48,8 @@ class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with EntitiesGenerators
+    with ModelOps
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks {
@@ -325,10 +330,10 @@ class UpdatesCreatorSpec
 
         val otherTopmostSameAs = datasetTopmostSameAs.generateOne
         insert(to = projectsDataset,
-               Quad.edge(GraphClass.Project.id(ds2Project.resourceId),
-                         ds2.resourceId,
-                         renku / "topmostSameAs",
-                         otherTopmostSameAs
+               Quad(GraphClass.Project.id(ds2Project.resourceId),
+                    ds2.resourceId.asEntityId,
+                    renku / "topmostSameAs",
+                    otherTopmostSameAs.asEntityId
                )
         )
 
@@ -378,10 +383,10 @@ class UpdatesCreatorSpec
       // simulate DS having two topmostSameAs
       val parentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       ds.resourceId,
-                       renku / "topmostSameAs",
-                       parentTopmostSameAs
+             Quad(GraphClass.Project.id(project.resourceId),
+                  ds.resourceId.asEntityId,
+                  renku / "topmostSameAs",
+                  parentTopmostSameAs.asEntityId
              )
       )
 
@@ -490,17 +495,17 @@ class UpdatesCreatorSpec
       val existingOriginalId1 = datasetOriginalIdentifiers.generateOne
       insert(to = projectsDataset,
              Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId,
+                  ds.resourceId.asEntityId,
                   renku / "originalIdentifier",
-                  existingOriginalId1
+                  existingOriginalId1.asObject
              )
       )
       val existingOriginalId2 = datasetOriginalIdentifiers.generateOne
       insert(to = projectsDataset,
              Quad(GraphClass.Project.id(project.resourceId),
-                  ds.resourceId,
+                  ds.resourceId.asEntityId,
                   renku / "originalIdentifier",
-                  existingOriginalId2
+                  existingOriginalId2.asObject
              )
       )
 
@@ -555,12 +560,20 @@ class UpdatesCreatorSpec
       val existingDateCreated1 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
       insert(
         to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "dateCreated", existingDateCreated1)
+        Quad(GraphClass.Project.id(project.resourceId),
+             ds.resourceId.asEntityId,
+             schema / "dateCreated",
+             existingDateCreated1.asObject
+        )
       )
       val existingDateCreated2 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
       insert(
         to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "dateCreated", existingDateCreated2)
+        Quad(GraphClass.Project.id(project.resourceId),
+             ds.resourceId.asEntityId,
+             schema / "dateCreated",
+             existingDateCreated2.asObject
+        )
       )
 
       findDateCreated(project.resourceId, ds.identification.identifier) shouldBe Set(ds.provenance.date,
@@ -617,11 +630,19 @@ class UpdatesCreatorSpec
 
       val description2 = datasetDescriptions.generateOne
       insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "description", description2)
+             Quad(GraphClass.Project.id(project.resourceId),
+                  ds.resourceId.asEntityId,
+                  schema / "description",
+                  description2.asObject
+             )
       )
       val description3 = datasetDescriptions.generateOne
       insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "description", description3)
+             Quad(GraphClass.Project.id(project.resourceId),
+                  ds.resourceId.asEntityId,
+                  schema / "description",
+                  description3.asObject
+             )
       )
 
       findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set(description1,
@@ -647,7 +668,11 @@ class UpdatesCreatorSpec
 
       val description = datasetDescriptions.generateOne
       insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "description", description)
+             Quad(GraphClass.Project.id(project.resourceId),
+                  ds.resourceId.asEntityId,
+                  schema / "description",
+                  description.asObject
+             )
       )
 
       findDescriptions(project.resourceId, ds.identification.identifier) shouldBe Set(description)
@@ -706,10 +731,10 @@ class UpdatesCreatorSpec
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(importedDSProject.resourceId),
-                       importedDS.resourceId,
-                       schema / "sameAs",
-                       otherSameAs
+             Quad(GraphClass.Project.id(importedDSProject.resourceId),
+                  importedDS.resourceId.asEntityId,
+                  schema / "sameAs",
+                  otherSameAs
              )
       )
 
@@ -737,7 +762,7 @@ class UpdatesCreatorSpec
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId), ds.resourceId, schema / "sameAs", otherSameAs)
+             Quad(GraphClass.Project.id(project.resourceId), ds.resourceId.asEntityId, schema / "sameAs", otherSameAs)
       )
 
       findSameAs(project.resourceId, ds.identification.identifier).map(_.show) shouldBe
@@ -778,7 +803,7 @@ class UpdatesCreatorSpec
   "deleteOtherDerivedFrom" should {
 
     "prepare queries that removes other wasDerivedFrom from the given DS" in {
-      val (_ ::~ modification, project) = anyRenkuProjectEntities
+      val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])
@@ -793,10 +818,10 @@ class UpdatesCreatorSpec
 
       val derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       modification.resourceId,
-                       prov / "wasDerivedFrom",
-                       derivedFromId
+             Quad(GraphClass.Project.id(project.resourceId),
+                  modification.resourceId.asEntityId,
+                  prov / "wasDerivedFrom",
+                  derivedFromId
              )
       )
 
@@ -819,7 +844,7 @@ class UpdatesCreatorSpec
   "deleteOtherTopmostDerivedFrom" should {
 
     "prepare queries that removes other topmostDerivedFrom from the given DS" in {
-      val (_ ::~ modification, project) = anyRenkuProjectEntities
+      val (_ -> modification, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceNonModified))
         .generateOne
         .bimap(_.bimap(identity, _.to[entities.Dataset[entities.Dataset.Provenance.Modified]]), _.to[entities.Project])
@@ -827,12 +852,13 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, project)
 
       val otherTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-      insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       modification.resourceId,
-                       renku / "topmostDerivedFrom",
-                       otherTopmostDerivedFrom
-             )
+      insert(
+        to = projectsDataset,
+        Quad(GraphClass.Project.id(project.resourceId),
+             modification.resourceId.asEntityId,
+             renku / "topmostDerivedFrom",
+             otherTopmostDerivedFrom.asEntityId
+        )
       )
 
       findTopmostDerivedFrom(project.resourceId, modification.identification.identifier) shouldBe Set(

@@ -25,10 +25,10 @@ libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfig
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 libraryDependencies += "eu.timepit"       %% "refined-pureconfig" % "0.10.1"
-libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.11.0"
+libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.12.1"
 libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % "9.4.2"
 
-val http4sVersion           = "0.23.17"
+val http4sVersion           = "0.23.18"
 val http4sBlazeVersion      = "0.23.13"
 val http4sPrometheusVersion = "0.24.3"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sBlazeVersion
@@ -38,8 +38,8 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sPrometheusVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
-libraryDependencies += "org.tpolecat"  %% "skunk-core"    % "0.3.2"
-libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.4"
+libraryDependencies += "org.tpolecat"  %% "skunk-core"    % "0.5.1"
+libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.5"
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
 
 // Test dependencies

@@ -63,7 +63,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
          """.command
       session
         .prepare(query)
-        .use(
+        .flatMap(
           _.execute(
             projectId.value ~ projectPath.value ~ encryptedToken.value ~ OffsetDateTime.now() ~ expiryDate.value
           )
@@ -85,7 +85,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
          """.command
       session
         .prepare(query)
-        .use(_.execute(projectId.value))
+        .flatMap(_.execute(projectId.value))
         .map(assureDeleted)
     }
   }
@@ -99,7 +99,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     .useK {
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
-      Kleisli(_.prepare(query).use(_.option(projectPath.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectPath.value)))
     }
     .unsafeRunSync()
 
@@ -107,7 +107,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     .useK {
       val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
         .query(varchar)
-      Kleisli(_.prepare(query).use(_.option(projectId.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectId.value)))
     }
     .unsafeRunSync()
 }

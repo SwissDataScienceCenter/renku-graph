@@ -38,7 +38,7 @@ private object LoggingDispatchRecovery {
 
   def apply[F[_]: MonadThrow: Logger, CategoryEvent](
       categoryName: CategoryName
-  )(implicit show:  Show[CategoryEvent]): F[DispatchRecovery[F, CategoryEvent]] = MonadThrow[F].catchNonFatal {
+  )(implicit show: Show[CategoryEvent]): F[DispatchRecovery[F, CategoryEvent]] = MonadThrow[F].catchNonFatal {
     new DispatchRecovery[F, CategoryEvent] {
 
       override def returnToQueue(event: CategoryEvent, reason: SendingResult): F[Unit] = ().pure[F]

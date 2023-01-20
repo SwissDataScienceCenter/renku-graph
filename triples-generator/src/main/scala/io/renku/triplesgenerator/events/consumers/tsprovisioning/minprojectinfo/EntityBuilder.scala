@@ -37,7 +37,7 @@ import projectinfo.ProjectInfoFinder
 
 private trait EntityBuilder[F[_]] {
   def buildEntity(event: MinProjectInfoEvent)(implicit
-      maybeAccessToken:  Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Project]
 }
 
@@ -48,11 +48,11 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
   private implicit val renkuUrlImplicit: RenkuUrl = renkuUrl
 
   override def buildEntity(event: MinProjectInfoEvent)(implicit
-      maybeAccessToken:           Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Project] = findValidProjectInfo(event).map(toProject)
 
   private def findValidProjectInfo(event: MinProjectInfoEvent)(implicit
-      maybeAccessToken:                   Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ) = findProjectInfo(event.project.path) semiflatMap {
     case Some(projectInfo) => projectInfo.pure[F]
     case None =>

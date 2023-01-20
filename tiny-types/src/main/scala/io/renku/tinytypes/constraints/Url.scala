@@ -82,7 +82,7 @@ trait UrlOps[T <: UrlTinyType] {
       }
 
     def &&[Value](
-        keyAndValue:    (String, Option[Value])
+        keyAndValue: (String, Option[Value])
     )(implicit convert: Value => QueryParamValue): UrlWithQueryParam =
       keyAndValue match {
         case (_, None)          => url

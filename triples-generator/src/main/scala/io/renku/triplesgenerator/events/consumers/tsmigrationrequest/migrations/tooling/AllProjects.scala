@@ -27,7 +27,7 @@ import io.renku.graph.model.Schemas
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{DatasetConnectionConfig, ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{DatasetConnectionConfig, ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 trait AllProjects[F[_]] {
@@ -43,7 +43,7 @@ object AllProjects {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       tsConfig: DatasetConnectionConfig
   ): AllProjects[F] =
-    new TSClient[F](tsConfig) with AllProjects[F] {
+    new TSClientImpl[F](tsConfig) with AllProjects[F] {
       def findAll(chunkSize: Int): Stream[F, AllProjects.ProjectMetadata] =
         findFrom(0, chunkSize)
 

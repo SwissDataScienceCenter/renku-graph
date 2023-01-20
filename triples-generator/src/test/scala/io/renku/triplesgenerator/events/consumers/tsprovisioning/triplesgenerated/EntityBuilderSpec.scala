@@ -28,12 +28,12 @@ import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.client.AccessToken
@@ -50,6 +50,7 @@ import scala.util.{Failure, Success, Try}
 class EntityBuilderSpec
     extends AnyWordSpec
     with MockFactory
+    with EntitiesGenerators
     with should.Matchers
     with AdditionalMatchers
     with DiffInstances {

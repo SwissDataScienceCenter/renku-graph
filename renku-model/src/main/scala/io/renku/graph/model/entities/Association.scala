@@ -99,7 +99,7 @@ object Association {
   }
 
   private def tryAsPersonAgent(cursor: Cursor, resourceId: ResourceId, planId: plans.ResourceId)(implicit
-      renkuUrl:                        RenkuUrl
+      renkuUrl: RenkuUrl
   ) = cursor.downField(prov / "agent").as[Option[Person]] >>= {
     case Some(agent) => Association.WithPersonAgent(resourceId, agent, planId).asRight
     case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft

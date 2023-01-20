@@ -38,8 +38,8 @@ object ConfigLoader {
   }
 
   def find[F[_]: MonadThrow, T](
-      key:           String,
-      config:        Config
+      key:    String,
+      config: Config
   )(implicit reader: ConfigReader[T]): F[T] = fromEither {
     ConfigSource.fromConfig(config).at(key).load[T]
   }

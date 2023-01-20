@@ -35,7 +35,7 @@ private trait StatsFinder[F[_]] {
 }
 
 private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
-    extends TSClient[F](storeConfig)
+    extends TSClientImpl[F](storeConfig)
     with StatsFinder[F] {
 
   import EntityCount._

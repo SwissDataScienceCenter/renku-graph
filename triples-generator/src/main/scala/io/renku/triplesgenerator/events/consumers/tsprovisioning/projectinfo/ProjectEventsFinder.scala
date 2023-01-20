@@ -37,7 +37,7 @@ import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectEventsFinder[F[_]] {
-  def find(project:     Project, page: Int)(implicit
+  def find(project: Project, page: Int)(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)]
 }
@@ -47,7 +47,7 @@ private class ProjectEventsFinderImpl[F[_]: Async: GitLabClient: Logger](
 ) extends ProjectEventsFinder[F] {
 
   override def find(project: Project, page: Int)(implicit
-      maybeAccessToken:      Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] = EitherT {
     GitLabClient[F]
       .get(

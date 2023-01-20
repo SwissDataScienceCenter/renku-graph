@@ -32,6 +32,7 @@ import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput,
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.graph.model.testentities.ExecutionPlanner.ActivityData
 import io.renku.graph.model.testentities.ParameterValue.{CommandParameterValue, LocationParameterValue}
+import io.renku.graph.model.versions.CliVersion
 
 final case class ExecutionPlanner(plan:                     StepPlan,
                                   activityData:             ActivityData,

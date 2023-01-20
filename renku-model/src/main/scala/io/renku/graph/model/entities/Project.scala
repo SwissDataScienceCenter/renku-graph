@@ -18,18 +18,18 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens.planDateCreated
+import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder
-import io.renku.jsonld.ontology._
+import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
@@ -48,7 +48,8 @@ sealed trait Project extends Product with Serializable {
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
   val plans:      List[Plan]
-  lazy val namespaces: List[Namespace] = path.toNamespaces
+  lazy val namespaces:     List[Namespace]       = path.toNamespaces
+  lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
 }
 
 sealed trait NonRenkuProject extends Project with Product with Serializable {
@@ -188,8 +189,8 @@ object RenkuProject {
       entities.map(p => ("Plan", p.resourceId, p.dateCreated))
 
     private def validateDates[R](
-        projectDate:   DateCreated,
-        toValidate:    List[DatedEntity[R]]
+        projectDate: DateCreated,
+        toValidate:  List[DatedEntity[R]]
     )(implicit idShow: Show[R]) = {
       implicit lazy val show: Show[InstantTinyType] = Show.show(_.toString)
 
@@ -334,7 +335,8 @@ object RenkuProject {
           findMinActivityDate(p.resourceId) match {
             case None                                                                                => p
             case Some(minActivityDate) if (p.dateCreated.value compareTo minActivityDate.value) <= 0 => p
-            case Some(minActivityDate) => planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
+            case Some(minActivityDate) =>
+              PlanLens.planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
           }
         )
     }
@@ -389,13 +391,13 @@ object RenkuProject {
       }
 
     private def validateSubprocessPlan(projectPlans: Set[plans.ResourceId])(
-        id:                                          plans.ResourceId
+        id: plans.ResourceId
     ): ValidatedNel[String, Unit] =
       Validated.condNel(projectPlans.contains(id), (), show"The subprocess plan $id is missing in the project.")
 
     private def validateParameterMapping(
         relevantIds: Set[commandParameters.ResourceId]
-    )(pm:            ParameterMapping): ValidatedNel[String, Unit] =
+    )(pm: ParameterMapping): ValidatedNel[String, Unit] =
       pm.mappedParameter.traverse_ { id =>
         Validated.condNel(
           relevantIds.contains(id),
@@ -578,34 +580,40 @@ object Project {
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
 
-  lazy val ontology: Type = {
-    val projectClass = Class(schema / "Project")
-    Type.Def(
-      projectClass,
-      ObjectProperties(
-        ObjectProperty(schema / "agent", Agent.ontology),
-        ObjectProperty(schema / "creator", Person.ontology),
-        ObjectProperty(schema / "member", Person.ontology),
-        ObjectProperty(renku / "hasActivity", Activity.ontology),
-        ObjectProperty(renku / "hasPlan", Plan.ontology),
-        ObjectProperty(renku / "hasDataset", Dataset.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", projectClass),
-        ObjectProperty(schema / "image", Image.ontology)
-      ),
-      DataProperties(
-        DataProperty(schema / "name", xsd / "string"),
-        DataProperty(renku / "projectPath", xsd / "string"),
-        DataProperty(renku / "projectNamespace", xsd / "string"),
-        DataProperty(renku / "projectNamespaces", xsd / "string"),
-        DataProperty(schema / "description", xsd / "string"),
-        DataProperty(schema / "dateCreated", xsd / "dateTime"),
-        DataProperty.top(renku / "projectVisibility",
-                         DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
-        ),
-        DataProperty(schema / "keywords", xsd / "string"),
-        DataProperty(schema / "schemaVersion", xsd / "string")
-      )
+  object Ontology {
+
+    val projectClass: Class = Class(schema / "Project")
+
+    val visibilityProperty = DataProperty.top(
+      renku / "projectVisibility",
+      DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
     )
+
+    lazy val typeDef: Type =
+      Type.Def(
+        projectClass,
+        ObjectProperties(
+          ObjectProperty(schema / "agent", Agent.ontology),
+          ObjectProperty(schema / "creator", Person.Ontology.typeDef),
+          ObjectProperty(schema / "member", Person.Ontology.typeDef),
+          ObjectProperty(renku / "hasActivity", Activity.ontology),
+          ObjectProperty(renku / "hasPlan", Plan.ontology),
+          ObjectProperty(renku / "hasDataset", Dataset.Ontology.typeDef),
+          ObjectProperty(prov / "wasDerivedFrom", projectClass),
+          ObjectProperty(schema / "image", Image.Ontology.typeDef)
+        ),
+        DataProperties(
+          DataProperty(schema / "name", xsd / "string"),
+          DataProperty(renku / "projectPath", xsd / "string"),
+          DataProperty(renku / "projectNamespace", xsd / "string"),
+          DataProperty(renku / "projectNamespaces", xsd / "string"),
+          DataProperty(schema / "description", xsd / "string"),
+          DataProperty(schema / "dateCreated", xsd / "dateTime"),
+          visibilityProperty,
+          DataProperty(schema / "keywords", xsd / "string"),
+          DataProperty(schema / "schemaVersion", xsd / "string")
+        )
+      )
   }
 
   final case class GitLabProjectInfo(id:               GitLabId,

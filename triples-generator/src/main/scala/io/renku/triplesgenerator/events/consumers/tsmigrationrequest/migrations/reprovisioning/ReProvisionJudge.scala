@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import io.renku.graph.model._
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
@@ -34,11 +35,11 @@ private trait ReProvisionJudge[F[_]] {
 }
 
 private object ReProvisionJudge {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: MigrationsConnectionConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig:           MigrationsConnectionConfig,
                                                           reProvisioningStatus:  ReProvisioningStatus[F],
                                                           microserviceUrlFinder: MicroserviceUrlFinder[F],
                                                           compatibility:         VersionCompatibilityConfig
-  )(implicit renkuUrl:                                                           RenkuUrl) = for {
+  )(implicit renkuUrl: RenkuUrl) = for {
     renkuVersionPairFinder <- RenkuVersionPairFinder(storeConfig)
     serviceHealthChecker   <- ServiceHealthChecker[F]
   } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,

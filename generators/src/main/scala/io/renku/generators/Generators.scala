@@ -20,7 +20,7 @@ package io.renku.generators
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import cats.{Applicative, Functor, Semigroupal}
+import cats.{Functor, Monad, Semigroupal}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -372,14 +372,12 @@ object Generators {
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
       def toGeneratorOfOptions: Gen[Option[T]] = frequency(3 -> const(None), 7 -> some(generator))
-      def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
-                                    maxElements: Int Refined Positive = 5
-      ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
+      def toGeneratorOfNonEmptyList(min: Int = 1, max: Int = 5): Gen[NonEmptyList[T]] =
+        nonEmptyList(generator, min, max)
 
       def toGeneratorOfList(min: Int = 0, max: Int = 5): Gen[List[T]] = listOf(generator, min, max)
 
-      def toGeneratorOfSet(min: Int = 1, max: Int = 5): Gen[Set[T]] =
-        setOf(generator, min, max)
+      def toGeneratorOfSet(min: Int = 1, max: Int = 5): Gen[Set[T]] = setOf(generator, min, max)
 
       def toGeneratorOf[TT](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
 
@@ -405,9 +403,14 @@ object Generators {
       } yield a -> b
     }
 
-    implicit val genApplicative: Applicative[Gen] = new Applicative[Gen] {
-      override def pure[A](x:   A) = Gen.const(x)
-      override def ap[A, B](ff: Gen[A => B])(fa: Gen[A]): Gen[B] = ff.flatMap(f => fa.map(f))
+    implicit val genMonad: Monad[Gen] = new Monad[Gen] {
+      override def pure[A](x:        A) = Gen.const(x)
+      override def ap[A, B](ff:      Gen[A => B])(fa: Gen[A]):      Gen[B] = ff.flatMap(f => fa.map(f))
+      override def flatMap[A, B](fa: Gen[A])(f:       A => Gen[B]): Gen[B] = fa.flatMap(f)
+      override def tailRecM[A, B](a: A)(f: A => Gen[Either[A, B]]): Gen[B] = f(a).flatMap {
+        case Left(aValue)  => tailRecM[A, B](aValue)(f)
+        case Right(bValue) => fixed(bValue)
+      }
     }
 
     implicit val functorGen: Functor[Gen] = new Functor[Gen] {
