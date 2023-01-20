@@ -198,6 +198,33 @@ class PlanSpec
       decoded.fold(err => fail(err.message), identity) should contain theSameElementsAs List(sp, cp)
     }
 
+    "decode a Composite Plan that has additional types" in {
+      val plan = compositePlanGen().generateOne
+        .to[entities.CompositePlan]
+
+      val newJson =
+        JsonLDTools
+          .view(plan)
+          .selectByTypes(entities.CompositePlan.Ontology.entityTypes)
+          .addType(renku / "WorkflowCompositePlan")
+          .value
+
+      newJson.cursor.as[List[entities.CompositePlan]] shouldBe List(plan).asRight
+    }
+
+    "decode a Step Plan that has additional types" in {
+      val plan = plans.generateOne.to[entities.StepPlan]
+
+      val newJson =
+        JsonLDTools
+          .view(plan)
+          .selectByTypes(entities.StepPlan.entityTypes)
+          .addType(renku / "WorkflowPlan")
+          .value
+
+      newJson.cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
+    }
+
     "fail decode if a parameter maps to itself" in {
       val plan = compositePlanNonEmptyMappings.generateOne
       val pm_  = plan.mappings.head
