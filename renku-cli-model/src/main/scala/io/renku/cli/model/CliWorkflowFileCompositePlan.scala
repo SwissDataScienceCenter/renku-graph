@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.cli.model
 
 import cats.data.NonEmptyList
@@ -5,7 +23,7 @@ import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.{InvalidationTime, entityModel}
 import io.renku.graph.model.plans._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 
 final case class CliWorkflowFileCompositePlan(
     id:               ResourceId,
@@ -20,7 +38,7 @@ final case class CliWorkflowFileCompositePlan(
     links:            List[CliParameterLink],
     mappings:         List[CliParameterMapping],
     path:             entityModel.Location.FileOrFolder // TODO clarify what this property really is
-)
+) extends CliModel
 
 object CliWorkflowFileCompositePlan {
 
@@ -31,7 +49,7 @@ object CliWorkflowFileCompositePlan {
     entityTypes == this.entityTypes
 
   implicit def jsonLDDecoder: JsonLDDecoder[CliWorkflowFileCompositePlan] =
-    JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
+    JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         name             <- cursor.downField(Schema.name).as[Name]
@@ -61,8 +79,8 @@ object CliWorkflowFileCompositePlan {
       )
     }
 
-  implicit def jsonLDEncoder: FlatJsonLDEncoder[CliWorkflowFileCompositePlan] =
-    FlatJsonLDEncoder.unsafe { plan =>
+  implicit def jsonLDEncoder: JsonLDEncoder[CliWorkflowFileCompositePlan] =
+    JsonLDEncoder.instance { plan =>
       JsonLD.entity(
         plan.id.asEntityId,
         entityTypes,

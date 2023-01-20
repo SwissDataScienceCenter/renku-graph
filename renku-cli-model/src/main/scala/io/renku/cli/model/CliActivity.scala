@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.cli.model
 
 import cats.syntax.all._
@@ -17,7 +35,7 @@ final case class CliActivity(
     usages:      List[CliUsage],
     generations: List[CliGeneration],
     parameters:  List[CliParameterValue]
-)
+) extends CliModel
 
 object CliActivity {
   sealed trait Agent {
@@ -58,9 +76,15 @@ object CliActivity {
   implicit def jsonLDDecoder: JsonLDDecoder[CliActivity] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
-        resourceId    <- cursor.downEntityId.as[ResourceId]
-        generations   <- cursor.focusTop.as[List[CliGeneration]]
-        agent         <- cursor.downField(Prov.wasAssociatedWith).as[Agent]
+        resourceId  <- cursor.downEntityId.as[ResourceId]
+        generations <- cursor.focusTop.as[List[CliGeneration]]
+        agents      <- cursor.downField(Prov.wasAssociatedWith).as[List[Agent]]
+        agent <- agents.headOption.toRight(
+                   DecodingFailure(
+                     s"No agent found in activity $resourceId",
+                     Nil
+                   )
+                 )
         association   <- cursor.downField(Prov.qualifiedAssociation).as[CliAssociation]
         usages        <- cursor.downField(Prov.qualifiedUsage).as[List[CliUsage]]
         startedAtTime <- cursor.downField(Prov.startedAtTime).as[StartTime]
@@ -69,8 +93,8 @@ object CliActivity {
       } yield CliActivity(resourceId, startedAtTime, endedAtTime, agent, association, usages, generations, parameters)
     }
 
-  implicit val jsonLDEncoder: FlatJsonLDEncoder[CliActivity] =
-    FlatJsonLDEncoder.unsafe { activity =>
+  implicit val jsonLDEncoder: JsonLDEncoder[CliActivity] =
+    JsonLDEncoder.instance { activity =>
       JsonLD.entity(
         activity.resourceId.asEntityId,
         entityTypes,

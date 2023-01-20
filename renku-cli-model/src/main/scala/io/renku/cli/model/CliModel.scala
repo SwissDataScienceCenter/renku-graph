@@ -18,26 +18,24 @@
 
 package io.renku.cli.model
 
-import io.renku.cli.model.diffx.CliDiffInstances
-import io.renku.cli.model.generators.CommandParameterGenerators
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 
-class CliCommandInputSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with ScalaCheckPropertyChecks
-    with CliDiffInstances
-    with JsonLDCodecMatchers {
+/** Marker trait to annotate a class that models an entity from the cli schema. */
+trait CliModel
 
-  val commandInputGen = CommandParameterGenerators.commandInputGen
+object CliModel {
 
-  "decode/encode" should {
-    "be compatible" in {
-      forAll(commandInputGen) { cliParam =>
-        assertCompatibleCodec(cliParam)
-      }
-    }
+  final implicit class CliModelOps[A <: CliModel](self: A) {
+
+    /**
+     * Creates a JSON-LD representation of the value that is flattened into an array.
+     * It is generally safe to flatten a jsonld value that was generated from a cli model class.
+     */
+    def asFlattenedJsonLD(implicit encoder: JsonLDEncoder[A]): JsonLD =
+      encoder(self).flatten.fold(throw _, identity)
+
+    /** Creates a nested JSON-LD representation of the value. */
+    def asNestedJsonLD(implicit encoder: JsonLDEncoder[A]): JsonLD =
+      encoder(self)
   }
 }

@@ -1,28 +1,53 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.cli.model
 
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity}
-import io.renku.jsonld.JsonLDDecoder.Result
-import io.renku.jsonld.{Cursor, EntityId, JsonLD, JsonLDDecoder, Property}
+import io.renku.jsonld.{JsonLD, Property, Reverse}
 
-trait JsonDecoderSupport {
+private[model] trait JsonDecoderSupport {
 
-  final implicit class CursorOps(self: Cursor) {
-    def findEntity(id: EntityId): Option[JsonLD] =
-      self.focusTop.jsonLD match {
-        case array: JsonLDArray =>
-          array.jsons.find {
-            case entity: JsonLDEntity => entity.id == id
-            case _ => false
-          }
+  def spliceArrays(jsonld: JsonLD): JsonLD =
+    jsonld match {
+      case a: JsonLD.JsonLDArray  => spliceArrays(a)
+      case a: JsonLD.JsonLDEntity => spliceArrays(a)
+      case a => a
+    }
 
-        case _ => None
+  def spliceArrays(entity: JsonLD.JsonLDEntity): JsonLD.JsonLDEntity = {
+    def spliceProperties(in: Map[Property, JsonLD]): Map[Property, JsonLD] =
+      in.map { case (key, value) =>
+        (key, spliceArrays(value))
       }
 
-    def decodeLinked[A: JsonLDDecoder](prop: Property)(idf: A => EntityId): Result[List[A]] = for {
-      id    <- self.downField(prop).as[EntityId]
-      other <- self.focusTop.as[List[A]].map(_.filter(e => idf(e) == id))
-    } yield other
+    JsonLD.JsonLDEntity(
+      entity.id,
+      entity.types,
+      spliceProperties(entity.properties),
+      Reverse(spliceProperties(entity.reverse.properties))
+    )
   }
+
+  def spliceArrays(array: JsonLD.JsonLDArray): JsonLD.JsonLDArray =
+    JsonLD.JsonLDArray(array.jsons.flatMap {
+      case JsonLD.JsonLDArray(children) => children.map(spliceArrays)
+      case el                           => List(spliceArrays(el))
+    })
 }
 
-object JsonDecoderSupport extends JsonDecoderSupport
+private[model] object JsonDecoderSupport extends JsonDecoderSupport

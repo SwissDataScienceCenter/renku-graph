@@ -1,10 +1,26 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.cli.model
 
-import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.PlanGenerators
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -16,7 +32,7 @@ class CliPlanSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
-    with DiffShouldMatcher {
+    with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
   val planGen                      = PlanGenerators.planGen(Instant.now)
@@ -27,12 +43,7 @@ class CliPlanSpec
   "plan decode/encode" should {
     "be compatible" in {
       forAll(planGen) { cliPlan =>
-        val jsonLD = cliPlan.asJsonLD
-        val back = jsonLD.cursor
-          .as[CliPlan]
-          .fold(throw _, identity)
-
-        back shouldMatchTo cliPlan
+        assertCompatibleCodec(cliPlan)
       }
     }
   }
@@ -40,12 +51,10 @@ class CliPlanSpec
   "composite plan decode/encode" should {
     "be compatible" in {
       forAll(compositePlanGen) { cliPlan =>
-        val jsonLD = cliPlan.asJsonLD
-        val back = jsonLD.cursor
-          .as[CliCompositePlan]
-          .fold(throw _, identity)
+        def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
+          in :: in.plans.collect { case CliCompositePlan.ChildPlan.Composite(p) => p }.flatMap(allCompositePlans)
 
-        back shouldMatchTo cliPlan
+        assertCompatibleCodec(cliPlan, allCompositePlans(cliPlan))
       }
     }
   }
@@ -53,12 +62,7 @@ class CliPlanSpec
   "workflow file plan decode/encode" should {
     "be compatible" in {
       forAll(workflowFilePlanGen) { cliPlan =>
-        val jsonLD = cliPlan.asJsonLD
-        val back = jsonLD.cursor
-          .as[CliWorkflowFilePlan]
-          .fold(throw _, identity)
-
-        back shouldMatchTo cliPlan
+        assertCompatibleCodec(cliPlan)
       }
     }
   }
@@ -66,12 +70,7 @@ class CliPlanSpec
   "workflow file composite plan decode/encode" should {
     "be compatible" in {
       forAll(workflowFileCompositePlanGen) { cliPlan =>
-        val jsonLD = cliPlan.asJsonLD
-        val back = jsonLD.cursor
-          .as[CliWorkflowFileCompositePlan]
-          .fold(throw _, identity)
-
-        back shouldMatchTo cliPlan
+        assertCompatibleCodec(cliPlan)
       }
     }
   }

@@ -275,10 +275,7 @@ trait RenkuTinyTypeGenerators {
     Generators.positiveInts(max = 5).map(_.value).map(commandParameters.Position.apply)
 
   val commandParameterDefaultValueGen: Gen[commandParameters.ParameterDefaultValue] =
-    Generators
-      .nonBlankStrings(charsGenerator = Gen.asciiPrintableChar)
-      .map(_.value)
-      .map(commandParameters.ParameterDefaultValue)
+    Generators.nonBlankStrings().map(v => commandParameters.ParameterDefaultValue(v.value))
 
   val commandParameterPrefixGen: Gen[commandParameters.Prefix] =
     Generators.nonBlankStrings(maxLength = 2).map(s => commandParameters.Prefix(s"-$s"))

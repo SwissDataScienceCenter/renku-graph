@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.cli.model
 
 import cats.data.NonEmptyList
@@ -22,7 +40,7 @@ final case class CliCompositePlan(
     plans:            NonEmptyList[ChildPlan],
     links:            List[CliParameterLink],
     mappings:         List[CliParameterMapping]
-)
+) extends CliModel
 
 object CliCompositePlan {
 
@@ -41,11 +59,17 @@ object CliCompositePlan {
     def apply(value: CliPlan):          ChildPlan = Step(value)
     def apply(value: CliCompositePlan): ChildPlan = Composite(value)
 
+    private val entityTypes: EntityTypes =
+      EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
+
+    private def selectCandidates(ets: EntityTypes): Boolean =
+      CliPlan.matchingEntityTypes(ets) || CliCompositePlan.matchingEntityTypes(ets)
+
     implicit def jsonLDDecoder: JsonLDDecoder[ChildPlan] = {
       val plan = CliPlan.jsonLDDecoder.emap(plan => ChildPlan(plan).asRight)
       val cp   = CliCompositePlan.jsonLDDecoder.emap(plan => ChildPlan(plan).asRight)
 
-      JsonLDDecoder.instance { cursor =>
+      JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentEntityTypes = cursor.getEntityTypes
         (currentEntityTypes.map(CliPlan.matchingEntityTypes),
          currentEntityTypes.map(CliCompositePlan.matchingEntityTypes)
@@ -100,8 +124,8 @@ object CliCompositePlan {
       )
     }
 
-  implicit def jsonLDEncoder: FlatJsonLDEncoder[CliCompositePlan] =
-    FlatJsonLDEncoder.unsafe { plan =>
+  implicit def jsonLDEncoder: JsonLDEncoder[CliCompositePlan] =
+    JsonLDEncoder.instance { plan =>
       JsonLD.entity(
         plan.id.asEntityId,
         entityTypes,
