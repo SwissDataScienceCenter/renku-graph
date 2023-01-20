@@ -121,6 +121,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
           |    (${Visibility.Internal.asObject.asSparql.sparql})
           |  }
           |} UNION {
+          |  ?maybeParentResourceId renku:projectVisibility ${Visibility.Private.asObject.asSparql.sparql} .
           |  ?maybeParentResourceId schema:member ?memberId.
           |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
           |    ?memberId schema:sameAs ?memberSameAs.
