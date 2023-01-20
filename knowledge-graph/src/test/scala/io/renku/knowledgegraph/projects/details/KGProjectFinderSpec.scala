@@ -23,6 +23,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.testentities.Project
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -94,7 +96,7 @@ class KGProjectFinderSpec
           )
           .generateOne
 
-        val parent = replaceMembers(Set.empty)(project.parent)
+        val parent = (replaceVisibility[Project](to = Visibility.Private) andThen removeMembers())(project.parent)
 
         upload(to = projectsDataset, project, parent)
 

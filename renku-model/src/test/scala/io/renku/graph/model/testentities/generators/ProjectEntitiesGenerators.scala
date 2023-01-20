@@ -73,6 +73,10 @@ trait ProjectEntitiesGenerators {
     _.fold(_.copy(maybeCreator = to), _.copy(maybeCreator = to), _.copy(maybeCreator = to), _.copy(maybeCreator = to))
       .asInstanceOf[P]
 
+  def replaceVisibility[P <: Project](to: Visibility): P => P =
+    _.fold(_.copy(visibility = to), _.copy(visibility = to), _.copy(visibility = to), _.copy(visibility = to))
+      .asInstanceOf[P]
+
   def removeMembers[P <: Project](): P => P = membersLens.modify(_ => Set.empty)
 
   def replaceMembers[P <: Project](to: Set[Person]): P => P =
