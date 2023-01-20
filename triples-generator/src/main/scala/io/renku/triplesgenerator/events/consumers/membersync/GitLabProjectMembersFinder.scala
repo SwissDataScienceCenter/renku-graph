@@ -42,17 +42,17 @@ private trait GitLabProjectMembersFinder[F[_]] {
 private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectMembersFinder[F] {
 
   override def findProjectMembers(
-      path:                    Path
+      path: Path
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     users   <- fetch(uri"projects" / path.show / "users", "project-users")
     members <- fetch(uri"projects" / path.show / "members", "project-members")
   } yield users ++ members
 
   private def fetch(
-      uri:                     Uri,
-      endpointName:            NonEmptyString,
-      maybePage:               Option[Int] = None,
-      allUsers:                Set[GitLabProjectMember] = Set.empty
+      uri:          Uri,
+      endpointName: NonEmptyString,
+      maybePage:    Option[Int] = None,
+      allUsers:     Set[GitLabProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(uri, maybePage).pure[F]
     fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse(uri, endpointName))
@@ -65,7 +65,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
   }
 
   private def mapResponse(uri: Uri, endpointName: NonEmptyString)(implicit
-      maybeAccessToken:        Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       response
@@ -85,7 +85,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
       endpointName:                 NonEmptyString,
       allUsers:                     Set[GitLabProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
-  )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[GitLabProjectMember]] =
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(uri, endpointName, maybeNextPage, allUsers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[F]

@@ -43,7 +43,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
     file:             Commands.File[F],
     git:              Commands.Git[F],
     randomLong:       () => Long
-)(implicit renkuUrl:  RenkuUrl)
+)(implicit renkuUrl: RenkuUrl)
     extends TriplesGenerator[F] {
 
   import ammonite.ops.{Path, root}
@@ -56,7 +56,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   private val gitAttributeFileName      = ".gitattributes"
 
   override def generateTriples(
-      commitEvent:             CommitEvent
+      commitEvent: CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
     createRepositoryDirectory(commitEvent.project.path)
       .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
@@ -64,8 +64,8 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   }
 
   private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
-      maybeAccessToken:                          Option[AccessToken],
-      repoDirectory:                             RepositoryPath
+      maybeAccessToken: Option[AccessToken],
+      repoDirectory:    RepositoryPath
   ): F[Either[ProcessingRecoverableError, JsonLD]] = {
     for {
       _ <- prepareRepository(commitEvent)
@@ -77,8 +77,8 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   }.value
 
   private def prepareRepository(commitEvent: CommitEvent)(implicit
-      maybeAccessToken:                      Option[AccessToken],
-      repoDirectory:                         RepositoryPath
+      maybeAccessToken: Option[AccessToken],
+      repoDirectory:    RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
     repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.path))
     _             <- git clone (repositoryUrl, workDirectory)
@@ -108,7 +108,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   }
 
   private def migrateAndLog(
-      commitEvent:          CommitEvent
+      commitEvent: CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] = for {
     _       <- liftF(renku migrate commitEvent)
     triples <- renku.graphExport

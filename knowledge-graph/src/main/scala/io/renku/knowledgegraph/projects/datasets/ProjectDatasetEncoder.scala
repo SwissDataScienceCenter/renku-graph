@@ -39,7 +39,7 @@ private object ProjectDatasetEncoder extends ImagesEncoder {
   }
 
   def encoder(
-      projectPath:      projects.Path
+      projectPath: projects.Path
   )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[ProjectDataset] =
     Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
       json"""{

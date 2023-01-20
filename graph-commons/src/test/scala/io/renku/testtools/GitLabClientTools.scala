@@ -36,11 +36,11 @@ trait GitLabClientTools[F[_]] {
   self: MockFactory =>
 
   def captureMapping[ResultType](gitLabClient: GitLabClient[F])(
-      findingMethod:                           => Any,
-      resultGenerator:                         Gen[ResultType],
-      method:                                  Method = GET,
-      expectedNumberOfCalls:                   Int = 1
-  )(implicit applicative:                      Applicative[F]): ResponseMappingF[F, ResultType] = {
+      findingMethod:         => Any,
+      resultGenerator:       Gen[ResultType],
+      method:                Method = GET,
+      expectedNumberOfCalls: Int = 1
+  )(implicit applicative: Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
     method match {

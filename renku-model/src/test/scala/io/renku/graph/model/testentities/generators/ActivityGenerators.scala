@@ -67,7 +67,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     Kleisli(executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe()))
 
   def planEntities(
-      parameterFactories:     CommandParameterFactory*
+      parameterFactories: CommandParameterFactory*
   )(implicit planCommandsGen: Gen[Command]): PlanGenFactory =
     Kleisli { dateCreated =>
       Gen.recursive[Plan] { recurse =>
@@ -82,12 +82,12 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     }
 
   def planEntitiesList(min: Int = 3, max: Int = 6, parameterFactories: List[CommandParameterFactory])(implicit
-      planCommandsGen:      Gen[Command]
+      planCommandsGen: Gen[Command]
   ): ProjectBasedGenFactory[List[Plan]] =
     planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
 
   def stepPlanEntities(
-      parameterFactories:     CommandParameterFactory*
+      parameterFactories: CommandParameterFactory*
   )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory = Kleisli(projectDateCreated =>
     for {
       name         <- planNames

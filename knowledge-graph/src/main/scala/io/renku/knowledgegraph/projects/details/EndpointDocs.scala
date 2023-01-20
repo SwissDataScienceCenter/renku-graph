@@ -46,7 +46,7 @@ object EndpointDocs {
 }
 
 private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)(
-    implicit gitLabUrl:                            GitLabUrl
+    implicit gitLabUrl: GitLabUrl
 ) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(

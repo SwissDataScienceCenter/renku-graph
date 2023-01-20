@@ -116,7 +116,7 @@ trait InMemoryJena {
       .void
       .unsafeRunSync()
 
-  def upload[T](to:    DatasetName, objects: T*)(implicit
+  def upload[T](to: DatasetName, objects: T*)(implicit
       entityFunctions: EntityFunctions[T],
       graphsProducer:  GraphsProducer[T],
       ioRuntime:       IORuntime

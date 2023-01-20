@@ -42,8 +42,8 @@ trait RemoteTriplesGenerator {
   import RemoteTriplesGeneratorWiremockInstance._
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
-      project:             data.Project,
-      commitId:            CommitId
+      project:  data.Project,
+      commitId: CommitId
   )(implicit gitLabApiUrl: GitLabApiUrl, renkuUrl: RenkuUrl): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,

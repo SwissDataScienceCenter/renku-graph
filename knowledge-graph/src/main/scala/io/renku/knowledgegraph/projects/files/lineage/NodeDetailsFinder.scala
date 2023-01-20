@@ -37,20 +37,20 @@ import org.typelevel.log4cats.Logger
 private trait NodeDetailsFinder[F[_]] {
 
   def findDetails[T](
-      location:     Set[T],
-      projectPath:  projects.Path
+      location:    Set[T],
+      projectPath: projects.Path
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]]
 }
 
 private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     ProjectsConnectionConfig
+    storeConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl[F](storeConfig)
     with NodeDetailsFinder[F] {
 
   override def findDetails[T](
-      ids:          Set[T],
-      projectPath:  projects.Path
+      ids:         Set[T],
+      projectPath: projects.Path
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>

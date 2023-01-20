@@ -61,7 +61,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
   import org.http4s.dsl.io._
 
   override def generateTriples(
-      commitEvent:             CommitEvent
+      commitEvent: CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT {
     {
       for {

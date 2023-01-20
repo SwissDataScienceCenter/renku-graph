@@ -35,7 +35,7 @@ import org.typelevel.log4cats.Logger
 
 private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {
   def fetchCommitStats(projectId: projects.GitLabId)(implicit
-      maybeAccessToken:           Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[ProjectCommitStats]]
 }
 
@@ -46,7 +46,7 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: GitLabC
   import gitLabCommitFetcher._
 
   override def fetchCommitStats(
-      projectId:               projects.GitLabId
+      projectId: projects.GitLabId
   )(implicit maybeAccessToken: Option[AccessToken]): F[Option[ProjectCommitStats]] = {
     for {
       maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))

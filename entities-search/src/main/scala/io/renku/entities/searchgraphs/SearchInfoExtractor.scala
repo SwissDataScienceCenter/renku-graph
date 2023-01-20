@@ -29,7 +29,7 @@ private object SearchInfoExtractor {
 
   def extractSearchInfo[F[_]: MonadThrow](
       project: Project
-  )(datasets:  List[Dataset[Dataset.Provenance]]): F[List[SearchInfo]] =
+  )(datasets: List[Dataset[Dataset.Provenance]]): F[List[SearchInfo]] =
     datasets
       .map(toSearchInfo[F](project))
       .sequence
@@ -42,7 +42,7 @@ private object SearchInfoExtractor {
       createSearchInfo(ds, prov.date, maybeDateModified = None, project).pure[F]
   }
 
-  private def findDateOriginal[F[_]: MonadThrow](prov: Dataset.Provenance.Modified,
+  private def findDateOriginal[F[_]: MonadThrow](prov:    Dataset.Provenance.Modified,
                                                  project: Project
   ): F[datasets.Date] =
     project.datasets

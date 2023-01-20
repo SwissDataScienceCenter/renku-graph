@@ -89,17 +89,17 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
   }
 
   private def createOrDeleteEvents(
-      event:                   GlobalCommitSyncEvent
+      event: GlobalCommitSyncEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[Unit] = measureExecutionTime {
     buildActionsList(event) >>= execute(event.project)
   } >>= logSummary(event.project)
 
   private def buildActionsList(
-      event:                   GlobalCommitSyncEvent,
-      maybeNextGLPage:         Option[Page] = Some(Page.first),
-      maybeNextELPage:         Option[Page] = Some(Page.first),
-      dateCondition:           DateCondition = DateCondition.Until(now()),
-      actions:                 Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
+      event:           GlobalCommitSyncEvent,
+      maybeNextGLPage: Option[Page] = Some(Page.first),
+      maybeNextELPage: Option[Page] = Some(Page.first),
+      dateCondition:   DateCondition = DateCondition.Until(now()),
+      actions:         Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
   )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] =
     (
       fetch(maybeNextGLPage, fetchGitLabCommits(event.project.id, dateCondition, _)),
@@ -136,7 +136,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
                           glCommitsPage: PageResult,
                           elCommitsPage: PageResult,
                           event:         GlobalCommitSyncEvent
-  )(implicit maybeAccessToken:           Option[AccessToken]) =
+  )(implicit maybeAccessToken: Option[AccessToken]) =
     (glCommitsPage.maybeNextPage, elCommitsPage.maybeNextPage, dateCondition) match {
       case (None, None, _: DateCondition.Since) => actions.pure[F]
       case (None, None, DateCondition.Until(time)) =>
@@ -146,7 +146,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
     }
 
   private def execute(project: Project)(actions: Map[Action, List[CommitId]])(implicit
-      maybeAccessToken:        Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[SynchronizationSummary] =
     actions
       .map {

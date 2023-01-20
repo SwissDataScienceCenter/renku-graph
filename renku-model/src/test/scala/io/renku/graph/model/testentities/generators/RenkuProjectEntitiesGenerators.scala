@@ -194,7 +194,7 @@ trait RenkuProjectEntitiesGenerators {
 
       @tailrec
       def createModifications(datasets: List[Dataset[Dataset.Provenance]], left: Int = level)(
-          projectDateCreated:           projects.DateCreated
+          projectDateCreated: projects.DateCreated
       ): List[Dataset[Dataset.Provenance]] =
         if (left == 0) datasets
         else
@@ -217,7 +217,7 @@ trait RenkuProjectEntitiesGenerators {
     } yield (originalDs -> invalidated) -> project.addDatasets(originalDs, invalidated)
 
     def importDataset[PIN <: Dataset.Provenance, POUT <: Dataset.Provenance](
-        dataset:              Dataset[PIN]
+        dataset: Dataset[PIN]
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): Gen[(Dataset[POUT], RenkuProject)] =
       projectGen.map(_.importDataset(dataset))
 
@@ -264,7 +264,7 @@ trait RenkuProjectEntitiesGenerators {
     } yield ((entities -> originalDs) -> invalidated) -> project.addDatasets(originalDs, invalidated)
 
     def importDataset[PIN <: Dataset.Provenance, POUT <: Dataset.Provenance](
-        dataset:              Dataset[PIN]
+        dataset: Dataset[PIN]
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): Gen[((T, Dataset[POUT]), RenkuProject)] =
       tupleGen map { case (entities, project) =>
         val (imported, updatedProject) = project.importDataset(dataset)

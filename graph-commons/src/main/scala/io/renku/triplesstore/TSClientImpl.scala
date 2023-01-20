@@ -92,7 +92,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   ): F[ResultType] = runQuery(updateQuery, mapResponse, SparqlUpdate)
 
   protected def queryExpecting[ResultType](
-      selectQuery:    SparqlQuery
+      selectQuery: SparqlQuery
   )(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(
       selectQuery,
@@ -164,7 +164,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   protected def pagedResultsFinder[ResultType](
       query:           SparqlQuery,
       maybeCountQuery: Option[SparqlQuery] = None
-  )(implicit decoder:  Decoder[ResultType]): PagedResultsFinder[F, ResultType] =
+  )(implicit decoder: Decoder[ResultType]): PagedResultsFinder[F, ResultType] =
     new PagedResultsFinder[F, ResultType] {
 
       import io.renku.http.rest.paging.model.Total

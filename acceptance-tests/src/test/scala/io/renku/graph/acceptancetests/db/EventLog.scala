@@ -75,7 +75,7 @@ object EventLog extends TypeSerializers {
   }
 
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
-      ioRuntime:                                 IORuntime
+      ioRuntime: IORuntime
   ): Unit = execute { session =>
     val query: Command[projects.GitLabId ~ String] = sql"""
       DELETE FROM subscription_category_sync_time 

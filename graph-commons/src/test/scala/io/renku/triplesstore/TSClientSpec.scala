@@ -419,8 +419,8 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
   }
 
   private class TestTSClientImpl(
-      val query:     SparqlQuery,
-      storeConfig:   DatasetConnectionConfig
+      val query:   SparqlQuery,
+      storeConfig: DatasetConnectionConfig
   )(implicit logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
       extends TSClientImpl[IO](storeConfig) {
 
@@ -434,8 +434,8 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
   }
 
   private class TestTSQueryClientImpl(val query: SparqlQuery, storeConfig: DatasetConnectionConfig)(implicit
-      logger:                                    Logger[IO],
-      timeRecorder:                              SparqlQueryTimeRecorder[IO]
+      logger:       Logger[IO],
+      timeRecorder: SparqlQueryTimeRecorder[IO]
   ) extends TSClientImpl[IO](storeConfig)
       with Paging[String] {
 

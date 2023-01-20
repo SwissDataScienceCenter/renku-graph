@@ -77,7 +77,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private def transformAndUpload(
-      event:      TriplesGeneratedEvent
+      event: TriplesGeneratedEvent
   )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toRecoverableError(event)

@@ -158,7 +158,7 @@ class EventHandlerSpec
 
     def stubUpdateStatuses[E <: StatusChangeEvent](
         updateResult: IO[Unit]
-    )(implicit show:  Show[E]): E => (E, Deferred[IO, Unit], String) =
+    )(implicit show: Show[E]): E => (E, Deferred[IO, Unit], String) =
       event => {
         val waitForUpdate = Deferred.unsafe[IO, Unit]
         (statusChanger

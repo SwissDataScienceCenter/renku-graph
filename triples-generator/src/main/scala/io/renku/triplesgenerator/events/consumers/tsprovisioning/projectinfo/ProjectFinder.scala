@@ -56,7 +56,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
   private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
 
   override def findProject(path: projects.Path)(implicit
-      maybeAccessToken:          Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
     {
       for {
@@ -113,7 +113,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
   }
 
   private def fetchCreator(
-      maybeCreatorId:          Option[persons.GitLabId]
+      maybeCreatorId: Option[persons.GitLabId]
   )(implicit maybeAccessToken: Option[AccessToken]): OptionT[F, Option[ProjectMember]] =
     maybeCreatorId match {
       case None => OptionT.some[F](Option.empty[ProjectMember])

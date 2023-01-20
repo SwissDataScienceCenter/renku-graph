@@ -39,27 +39,27 @@ import org.typelevel.log4cats.Logger
 private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
 
   def fetchLatestGitLabCommit(projectId: projects.GitLabId)(implicit
-      maybeAccessToken:                  Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[CommitId]]
 
   def fetchGitLabCommits(projectId: projects.GitLabId, dateCondition: DateCondition, pageRequest: PagingRequest)(
-      implicit maybeAccessToken:    Option[AccessToken]
+      implicit maybeAccessToken: Option[AccessToken]
   ): F[PageResult]
 }
 
 private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClient] extends GitLabCommitFetcher[F] {
 
   override def fetchLatestGitLabCommit(projectId: projects.GitLabId)(implicit
-      maybeAccessToken:                           Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Option[CommitId]] = GitLabClient[F].get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
     "latest-commit"
   )(mapLatestCommit(projectId))
 
   override def fetchGitLabCommits(
-      projectId:               projects.GitLabId,
-      dateCondition:           DateCondition,
-      pageRequest:             PagingRequest
+      projectId:     projects.GitLabId,
+      dateCondition: DateCondition,
+      pageRequest:   PagingRequest
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = GitLabClient[F].get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,

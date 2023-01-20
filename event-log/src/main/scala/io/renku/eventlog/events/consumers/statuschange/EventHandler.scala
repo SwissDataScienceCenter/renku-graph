@@ -75,9 +75,9 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutio
     ) { case (previousOptionResult, option) => previousOptionResult orElse option(request) }
 
   private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      updaterFactory:                                    EventUpdaterFactory[F, E],
-      show:                                              Show[E],
-      decoder:                                           EventRequestContent => Either[DecodingFailure, E]
+      updaterFactory: EventUpdaterFactory[F, E],
+      show:           Show[E],
+      decoder:        EventRequestContent => Either[DecodingFailure, E]
   ): EitherT[F, EventSchedulingResult, Accepted] = EitherT(
     decode[E](request)
       .map(startUpdate)
@@ -96,7 +96,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutio
       .flatTap(logAccepted(event))
 
   private def executeUpdate[E <: StatusChangeEvent](
-      event:                 E
+      event: E
   )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = {
     for {
       factory <- updaterFactory(eventsQueue, deliveryInfoRemover)
@@ -134,7 +134,7 @@ private object EventHandler {
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private def decode[E <: StatusChangeEvent](
-      request:        EventRequestContent
+      request: EventRequestContent
   )(implicit decoder: EventRequestContent => Either[DecodingFailure, E]) = decoder(request)
 
   private implicit lazy val eventTriplesGeneratedDecoder
