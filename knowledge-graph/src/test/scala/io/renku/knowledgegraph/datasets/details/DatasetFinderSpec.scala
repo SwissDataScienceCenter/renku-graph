@@ -24,10 +24,9 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.datasets.SameAs
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.details.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -42,6 +41,7 @@ import scala.util.Random
 class DatasetFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks
@@ -101,7 +101,7 @@ class DatasetFinderSpec
     "return details of the dataset with the given id " +
       "- a case where dataset is modified" in new TestCase {
         val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
-        val (_ ::~ dataset1Modified, project1) = anyRenkuProjectEntities(visibilityPublic)
+        val (_ -> dataset1Modified, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic)
@@ -165,7 +165,7 @@ class DatasetFinderSpec
 
     "return None if dataset was invalidated" in new TestCase {
 
-      val (original ::~ invalidation, project) =
+      val (original -> invalidation, project) =
         (renkuProjectEntities(visibilityPublic) addDatasetAndInvalidation datasetEntities(
           provenanceInternal
         )).generateOne
@@ -262,7 +262,7 @@ class DatasetFinderSpec
 
     "return details of the dataset with the given id " +
       "- a case where a Renku created dataset is defined on a project which has a fork" in new TestCase {
-        val (originalDataset, originalProject ::~ fork) = renkuProjectEntities(visibilityPublic)
+        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
@@ -289,7 +289,7 @@ class DatasetFinderSpec
         val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
-        val (dataset2, project2 ::~ project2Fork) = anyRenkuProjectEntities(visibilityPublic)
+        val (dataset2, project2 -> project2Fork) = anyRenkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .forkOnce()
           .generateOne
@@ -320,9 +320,9 @@ class DatasetFinderSpec
     "return details of the dataset with the given id " +
       "- a case where a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)) {
-          case dataset ::~ grandparent =>
-            val grandparentForked ::~ parent = grandparent.forkOnce()
-            val parentForked ::~ child       = parent.forkOnce()
+          case dataset -> grandparent =>
+            val grandparentForked -> parent = grandparent.forkOnce()
+            val parentForked -> child       = parent.forkOnce()
 
             upload(to = projectsDataset, grandparentForked, parentForked, child)
 
@@ -353,7 +353,7 @@ class DatasetFinderSpec
           anyRenkuProjectEntities(visibilityPublic)
             .addDatasetAndModification(datasetEntities(provenanceInternal))
             .forkOnce()
-        ) { case (original ::~ modified, project ::~ fork) =>
+        ) { case (original -> modified, project -> fork) =>
           upload(to = projectsDataset, project, fork)
 
           datasetFinder
@@ -374,7 +374,7 @@ class DatasetFinderSpec
 
     "return details of the modified dataset with the given id " +
       "- case where modification is followed by forking and some other modification" in new TestCase {
-        val (original ::~ modified, project ::~ fork) = anyRenkuProjectEntities(visibilityPublic)
+        val (original -> modified, project -> fork) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
@@ -401,7 +401,7 @@ class DatasetFinderSpec
     "return details of the dataset with the given id " +
       "- case where forking is followed by modification" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
-          case (original, project ::~ fork) =>
+          case (original, project -> fork) =>
             val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
 
             upload(to = projectsDataset, project, forkUpdated)
@@ -425,7 +425,7 @@ class DatasetFinderSpec
     "return details of the dataset with the given id " +
       "- case when a dataset on a fork is deleted" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
-          case (original, project ::~ fork) =>
+          case (original, project -> fork) =>
             val invalidation         = original.invalidateNow
             val forkWithInvalidation = fork.addDatasets(invalidation)
 
@@ -448,7 +448,7 @@ class DatasetFinderSpec
 
     "return details of a fork dataset with the given id " +
       "- case where the dataset on the parent is deleted" in new TestCase {
-        val (original, project ::~ fork) =
+        val (original, project -> fork) =
           anyRenkuProjectEntities(visibilityPublic)
             .addDataset(datasetEntities(provenanceInternal))
             .forkOnce()
@@ -470,7 +470,7 @@ class DatasetFinderSpec
 
     "return details of the dataset with the given id " +
       "- a case where the user has no access to the original project" in new TestCase {
-        val (originalDataset, originalProject ::~ fork) = renkuProjectEntities(visibilityPublic)
+        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
@@ -624,7 +624,7 @@ class DatasetFinderSpec
 
     "not return the details of a dataset" +
       "- case where the latest modification of the dataset has been invalidated" in new TestCase {
-        val (dataset ::~ datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
+        val (dataset -> datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .generateOne
         val datasetInvalidation = datasetModified.invalidateNow

@@ -199,7 +199,7 @@ class SubscriberTrackerSpec
           .map { case url ~ version ~ status ~ changeDate ~ maybeMessage =>
             (url, version, status, changeDate, maybeMessage)
           }
-      session.prepare(query).use(_.stream(url, 32).compile.toList)
+      session.prepare(query).flatMap(_.stream(url, 32).compile.toList)
     }
   }
 
@@ -212,7 +212,7 @@ class SubscriberTrackerSpec
           """.command
       session
         .prepare(query)
-        .use(_.execute(status ~ info.subscriberUrl ~ info.subscriberVersion))
+        .flatMap(_.execute(status ~ info.subscriberUrl ~ info.subscriberVersion))
         .void
     }
   }

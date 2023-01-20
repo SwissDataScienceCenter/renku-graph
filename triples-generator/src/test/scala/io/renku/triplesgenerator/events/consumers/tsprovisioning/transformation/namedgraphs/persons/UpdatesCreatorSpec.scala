@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.http.client.UrlEncoder
 import io.renku.testtools.IOSpec
@@ -36,6 +36,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
+    with EntitiesGenerators
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset {

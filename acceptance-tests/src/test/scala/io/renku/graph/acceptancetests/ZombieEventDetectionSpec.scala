@@ -101,7 +101,7 @@ class ZombieEventDetectionSpec
           ON CONFLICT (project_id)
           DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate)).flatMap {
+    session.prepare(query).flatMap(_.execute(project.id ~ project.path ~ eventDate)).flatMap {
       case Completion.Insert(n) => n.pure[IO]
       case completion =>
         new RuntimeException(s"insertProjectToDB failed with completion code $completion")
@@ -110,11 +110,12 @@ class ZombieEventDetectionSpec
   }
 
   private def insertEventToDB(
-      commitId:       CommitId,
-      project:        data.Project,
-      eventDate:      EventDate
+      commitId:  CommitId,
+      project:   data.Project,
+      eventDate: EventDate
   )(implicit session: Session[IO]) = {
-    val query: Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
+    val query
+        : Command[EventId ~ GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
           VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder,
@@ -125,7 +126,7 @@ class ZombieEventDetectionSpec
           """.command
     session
       .prepare(query)
-      .use(
+      .flatMap(
         _.execute(
           EventId(commitId.value) ~ project.id ~ GeneratingTriples ~ CreatedDate(eventDate.value) ~ ExecutionDate(
             Instant.now.minusSeconds(60 * 6)
@@ -146,7 +147,7 @@ class ZombieEventDetectionSpec
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
           VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)
           """.command
-    session.prepare(query).use(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
+    session.prepare(query).flatMap(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
   }
 
   private implicit lazy val eventDates: Gen[EventDate] = timestampsNotInTheFuture map EventDate.apply

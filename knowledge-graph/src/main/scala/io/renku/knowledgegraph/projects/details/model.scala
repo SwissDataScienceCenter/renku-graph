@@ -28,7 +28,8 @@ import io.circe.Decoder
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
-import io.renku.graph.model.{SchemaVersion, persons}
+import io.renku.graph.model.persons
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import model.Statistics._

@@ -29,8 +29,6 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 private trait TSReadinessForEventsChecker[F[_]] {
   def verifyTSReady: EitherT[F, EventSchedulingResult, Accepted]
 }
@@ -50,7 +48,7 @@ private class TSReadinessForEventsCheckerImpl[F[_]: MonadThrow](tsStateChecker: 
         case state @ (TSState.MissingDatasets | TSState.ReProvisioning) =>
           ServiceUnavailable(state.show).asLeft.leftWiden[EventSchedulingResult]
       }
-      .recover { case NonFatal(exception) =>
+      .recover { case exception =>
         SchedulingError(exception).asLeft[Accepted].leftWiden[EventSchedulingResult]
       }
   }

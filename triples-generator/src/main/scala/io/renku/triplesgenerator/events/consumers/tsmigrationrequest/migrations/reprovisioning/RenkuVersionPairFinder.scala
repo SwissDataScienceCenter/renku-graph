@@ -23,7 +23,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.renku
-import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -33,9 +34,9 @@ trait RenkuVersionPairFinder[F[_]] {
 }
 
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     MigrationsConnectionConfig
+    storeConfig: MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClient[F](storeConfig)
+    extends TSClientImpl[F](storeConfig)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
@@ -61,7 +62,7 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object RenkuVersionPairFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      storeConfig:     MigrationsConnectionConfig
+      storeConfig: MigrationsConnectionConfig
   )(implicit renkuUrl: RenkuUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
     new RenkuVersionPairFinderImpl[F](storeConfig)
   }

@@ -24,10 +24,9 @@ import cats.syntax.all._
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
@@ -37,6 +36,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class WorkflowsEntitiesFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
@@ -45,7 +45,7 @@ class WorkflowsEntitiesFinderSpec
   "findEntities - in case of a forks with workflows" should {
 
     "de-duplicate workflows when on forked projects" in new TestCase {
-      val original ::~ fork = renkuProjectEntities(visibilityPublic)
+      val original -> fork = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .forkOnce()
@@ -74,8 +74,8 @@ class WorkflowsEntitiesFinderSpec
         .generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val original ::~ fork = {
-        val original ::~ fork = publicProject.forkOnce()
+      val original -> fork = {
+        val original -> fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
       val plan :: Nil = publicProject.plans
@@ -100,8 +100,8 @@ class WorkflowsEntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
-      val original ::~ fork = {
-        val original ::~ fork = internalProject.forkOnce()
+      val original -> fork = {
+        val original -> fork = internalProject.forkOnce()
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
       val plan :: Nil = internalProject.plans

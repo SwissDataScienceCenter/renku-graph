@@ -402,7 +402,7 @@ class RestClientSpec
                                maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
                                idleTimeoutOverride:         Option[Duration] = None,
                                maybeRequestTimeoutOverride: Option[Duration] = None
-  )(implicit logger:                                        Logger[IO])
+  )(implicit logger: Logger[IO])
       extends RestClient(throttler,
                          maybeTimeRecorder,
                          retryInterval = 1 millisecond,

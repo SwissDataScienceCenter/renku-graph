@@ -18,7 +18,7 @@
 
 package io.renku.graph.acceptancetests.data
 
-import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import io.renku.graph.model.versions.{CliVersion, RenkuVersionPair, SchemaVersion}
 
 object TSData extends TSData
 

@@ -51,17 +51,17 @@ private trait DatasetsFinder[F[_]] {
 
 private object DatasetsFinder {
 
-  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig,
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](storeConfig:    ProjectsConnectionConfig,
                                                                     creatorsFinder: CreatorsFinder[F]
   ): F[DatasetsFinder[F]] =
     RenkuUrlLoader[F]().map(implicit renkuUrl => new DatasetsFinderImpl[F](storeConfig, creatorsFinder))
 }
 
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     ProjectsConnectionConfig,
-    creatorsFinder:  CreatorsFinder[F]
+    storeConfig:    ProjectsConnectionConfig,
+    creatorsFinder: CreatorsFinder[F]
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClient[F](storeConfig)
+    extends TSClientImpl[F](storeConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

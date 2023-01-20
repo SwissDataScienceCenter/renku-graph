@@ -20,9 +20,8 @@ package io.renku.knowledgegraph.users
 
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.rest.paging.PagingRequest
 import org.scalacheck.Gen
 import projects.Endpoint.Criteria

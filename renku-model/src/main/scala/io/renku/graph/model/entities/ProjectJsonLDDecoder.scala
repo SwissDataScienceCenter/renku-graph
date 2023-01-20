@@ -28,6 +28,7 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld.{Cursor, JsonLDDecoder}
@@ -107,7 +108,7 @@ object ProjectJsonLDDecoder {
                          datasets:         List[Dataset[Dataset.Provenance]],
                          plans:            List[Plan],
                          images:           List[Image]
-  )(implicit renkuUrl:                     RenkuUrl): Either[DecodingFailure, Project] = {
+  )(implicit renkuUrl: RenkuUrl): Either[DecodingFailure, Project] = {
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
@@ -196,7 +197,7 @@ object ProjectJsonLDDecoder {
 
   private def maybeCreator(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Option[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Option[Person] =
     gitLabInfo.maybeCreator.map { creator =>
       allJsonLdPersons
         .find(byEmailOrUsername(creator))
@@ -206,7 +207,7 @@ object ProjectJsonLDDecoder {
 
   private def members(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
+  )(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
         .find(byEmailOrUsername(member))

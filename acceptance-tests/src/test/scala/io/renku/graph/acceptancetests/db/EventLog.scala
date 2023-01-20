@@ -42,14 +42,15 @@ import scala.util.Try
 
 object EventLog extends TypeSerializers {
 
-  def findEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute { session =>
-    val query: Query[projects.GitLabId, (EventId, EventStatus)] =
-      sql"""SELECT event_id, status
+  def findEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[(EventId, EventStatus)] = execute {
+    session =>
+      val query: Query[projects.GitLabId, (EventId, EventStatus)] =
+        sql"""SELECT event_id, status
             FROM event
             WHERE project_id = $projectIdEncoder"""
-        .query(eventIdDecoder ~ eventStatusDecoder)
-        .map { case id ~ status => (id, status) }
-    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+          .query(eventIdDecoder ~ eventStatusDecoder)
+          .map { case id ~ status => (id, status) }
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
   }
 
   def findEvents(projectId: GitLabId, status: EventStatus*)(implicit ioRuntime: IORuntime): List[CommitId] = execute {
@@ -60,7 +61,7 @@ object EventLog extends TypeSerializers {
             WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
         .query(eventIdDecoder)
         .map(eventId => CommitId(eventId.value))
-      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
   }
 
   def findSyncEvents(projectId: GitLabId)(implicit ioRuntime: IORuntime): List[CategoryName] = execute { session =>
@@ -70,17 +71,17 @@ object EventLog extends TypeSerializers {
           WHERE project_id = $projectIdEncoder"""
       .query(varchar)
       .map(category => CategoryName(category))
-    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+    session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
   }
 
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
-                                                                                             ioRuntime:                                 IORuntime
+      ioRuntime: IORuntime
   ): Unit = execute { session =>
     val query: Command[projects.GitLabId ~ String] = sql"""
       DELETE FROM subscription_category_sync_time 
       WHERE project_id = $projectIdEncoder AND category_name = $varchar
       """.command
-    session.prepare(query).use(_.execute(projectId, categoryName.show)).void
+    session.prepare(query).flatMap(_.execute(projectId, categoryName.show)).void
   }
 
   private def `status IN`(status: List[EventStatus]) =
@@ -111,7 +112,7 @@ object EventLog extends TypeSerializers {
       DELETE FROM subscription_category_sync_time
       WHERE project_id = $projectIdEncoder 
         AND category_name = 'GLOBAL_COMMIT_SYNC' """.command
-    session.prepare(command).use(_.execute(projectId)).void
+    session.prepare(command).flatMap(_.execute(projectId)).void
   }
 
   def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {

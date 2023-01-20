@@ -28,10 +28,10 @@ import io.renku.entities.search
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{Dataset, StepPlan}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
@@ -47,6 +47,7 @@ import scala.util.Random
 class EntitiesFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
@@ -97,7 +98,7 @@ class EntitiesFinderSpec
         .modify(creatorLens.modify(_ => person.some))
         .generateOne
 
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name))
@@ -143,7 +144,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             replaceDSKeywords(to =
@@ -187,7 +188,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified)
             .modify(replaceDSDesc(to = sentenceContaining(query).generateAs(datasets.Description).some))
@@ -242,7 +243,7 @@ class EntitiesFinderSpec
         .generateOne
 
       val dsCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(creatorsLens.modify(_ => NonEmptyList.of(dsCreator, personEntities.generateOne)))
@@ -281,7 +282,7 @@ class EntitiesFinderSpec
     }
 
     "return only datasets when 'dataset' type given" in new TestCase {
-      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -351,7 +352,7 @@ class EntitiesFinderSpec
         .modify(creatorLens.modify(_ => creator.some))
         .generateOne
 
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
@@ -380,7 +381,7 @@ class EntitiesFinderSpec
         .modify(creatorLens.modify(_ => creator.some))
         .generateOne
 
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
@@ -410,7 +411,7 @@ class EntitiesFinderSpec
         .generateOne
 
       val dsCreator = personEntities.generateOne
-      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
@@ -434,7 +435,7 @@ class EntitiesFinderSpec
     }
 
     "return no entities when there's no match on creator" in new TestCase {
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val _ -> project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -486,7 +487,7 @@ class EntitiesFinderSpec
     }
 
     "return no entities when no match on visibility" in new TestCase {
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -530,7 +531,7 @@ class EntitiesFinderSpec
     }
 
     "return no namespace aware entities when no match on namespace" in new TestCase {
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -551,7 +552,7 @@ class EntitiesFinderSpec
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
       val projectDateCreated = timestamps(min = sinceAsInstant, max = Instant.now()).generateAs[projects.DateCreated]
-      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+      val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
@@ -592,7 +593,7 @@ class EntitiesFinderSpec
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
       val projectDateCreated = timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
@@ -641,7 +642,7 @@ class EntitiesFinderSpec
       val since          = sinceParams.generateOne
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
-      val matchingDS ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val matchingDS -> dsProject = renkuProjectEntities(visibilityPublic)
         .modify(
           replaceProjectDateCreated(to =
             timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
@@ -680,7 +681,7 @@ class EntitiesFinderSpec
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
       val projectDateCreated = timestamps(max = untilAsInstant).generateAs[projects.DateCreated]
-      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+      val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
@@ -722,7 +723,7 @@ class EntitiesFinderSpec
 
       val projectDateCreated = timestampsNotInTheFuture(butYoungerThan = untilAsInstant plus (1, DAYS))
         .generateAs(projects.DateCreated)
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
@@ -769,7 +770,7 @@ class EntitiesFinderSpec
       val until          = Until(untilParams.generateOne.value minusDays 2)
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
-      val matchingDS ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val matchingDS -> dsProject = renkuProjectEntities(visibilityPublic)
         .modify(
           replaceProjectDateCreated(to =
             timestampsNotInTheFuture(butYoungerThan = untilAsInstant plus (1, DAYS)).generateAs(projects.DateCreated)
@@ -814,7 +815,7 @@ class EntitiesFinderSpec
       val untilAsInstant = Instant.from(untilValue atStartOfDay ZoneOffset.UTC)
 
       val projectDateCreated = timestamps(min = sinceAsInstant, max = untilAsInstant).generateAs[projects.DateCreated]
-      val dsInternal ::~ dsExternal ::~ _ ::~ _ ::~ project = renkuProjectEntities(visibilityPublic)
+      val dsInternal -> dsExternal -> _ -> _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
@@ -935,7 +936,7 @@ class EntitiesFinderSpec
 
       val query = nonBlankStrings(minLength = 3).generateOne
 
-      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+      val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
         .withActivities(activityEntities(stepPlanEntities().map(_.replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(

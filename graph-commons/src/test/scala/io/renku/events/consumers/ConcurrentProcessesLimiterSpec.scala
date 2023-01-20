@@ -26,6 +26,7 @@ import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, positiveInts}
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -186,11 +187,12 @@ class ConcurrentProcessesLimiterSpec
 
   private trait TestCase {
 
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val processesCount = positiveInts().generateOne
     val semaphore      = mock[TestSemaphore]
 
-    val limiter      = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
-    val withoutLimit = ConcurrentProcessesLimiter.withoutLimit[IO]
+    private val limiter = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
+    val withoutLimit    = ConcurrentProcessesLimiter.withoutLimit[IO]
 
     def resultWithoutLimit(result: EitherT[IO, EventSchedulingResult, Accepted]): EventHandlingProcess[IO] =
       EventHandlingProcess[IO](result).unsafeRunSync()

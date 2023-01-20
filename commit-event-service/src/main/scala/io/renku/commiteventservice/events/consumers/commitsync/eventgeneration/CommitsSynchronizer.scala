@@ -73,7 +73,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   } recoverWith loggingError(event, "Synchronization failed")
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
-      maybeAccessToken:                               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[Unit] = (maybeLatestCommit, event) match {
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
@@ -86,7 +86,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   }
 
   private def processCommitsAndLogSummary(commitId: CommitId, event: CommitSyncEvent)(implicit
-      maybeAccessToken:                             Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ) = measureExecutionTime(
     processCommits(List(commitId), event.project, BatchDate(clock)).run(SynchronizationSummary())
   ) flatTap { case (_, summary) =>
@@ -115,7 +115,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
   private def processCommits(commitList: List[CommitId], project: Project, batchDate: BatchDate)(implicit
-      maybeToken:                        Option[AccessToken]
+      maybeToken: Option[AccessToken]
   ): SummaryState[F, SynchronizationSummary] = commitList match {
     case commitId :: commitIds =>
       StateT
@@ -163,7 +163,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
     }
 
   private def getInfoFromELandGL(commitId: CommitId, project: Project)(implicit
-      maybeAccessToken:                    Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): F[(Option[CommitWithParents], Option[CommitInfo])] = for {
     maybeEventDetailsFromEL <- getEventDetails(project.id, commitId)
     maybeInfoFromGL         <- getMaybeCommitInfo(project.id, commitId)

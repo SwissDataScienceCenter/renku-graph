@@ -47,6 +47,9 @@ trait Project extends Product with Serializable {
       f3: NonRenkuProject.WithParent => A,
       f4: NonRenkuProject.WithoutParent => A
   ): A
+
+  def identification(implicit renkuUrl: RenkuUrl): entities.ProjectIdentification =
+    this.to[entities.ProjectIdentification]
 }
 
 trait Parent {
@@ -69,6 +72,9 @@ object Project {
       toEntitiesNonRenkuProjectWithParent(renkuUrl),
       toEntitiesNonRenkuProjectWithoutParent(renkuUrl)
     )
+
+  implicit def toProjectIdentification(implicit renkuUrl: RenkuUrl): Project => entities.ProjectIdentification =
+    project => entities.ProjectIdentification(projects.ResourceId(project.asEntityId), project.path)
 
   implicit def encoder[P <: Project](implicit
       renkuUrl:     RenkuUrl,

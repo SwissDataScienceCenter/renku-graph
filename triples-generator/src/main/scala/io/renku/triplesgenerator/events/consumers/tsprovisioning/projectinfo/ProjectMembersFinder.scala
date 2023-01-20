@@ -40,7 +40,7 @@ import org.typelevel.log4cats.Logger
 
 private trait ProjectMembersFinder[F[_]] {
   def findProjectMembers(path: projects.Path)(implicit
-      maybeAccessToken:        Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]]
 }
 
@@ -56,7 +56,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def findProjectMembers(path: projects.Path)(implicit
-      maybeAccessToken:                 Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
     (
       fetch(uri"projects" / path.show / "members", "project-members"),
@@ -77,10 +77,10 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
   private def fetch(
-      uri:                     Uri,
-      endpointName:            String Refined NonEmpty,
-      maybePage:               Option[Int] = None,
-      allMembers:              Set[ProjectMember] = Set.empty
+      uri:          Uri,
+      endpointName: String Refined NonEmpty,
+      maybePage:    Option[Int] = None,
+      allMembers:   Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
     fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse)
@@ -105,7 +105,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
       endpointName:                 String Refined NonEmpty,
       allMembers:                   Set[ProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[ProjectMember], Option[Int])
-  )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[ProjectMember]] =
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) =>
         fetch(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)

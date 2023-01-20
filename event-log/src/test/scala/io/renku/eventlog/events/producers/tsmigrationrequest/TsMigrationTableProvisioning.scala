@@ -41,7 +41,7 @@ trait TsMigrationTableProvisioning {
         """.command
       session
         .prepare(query)
-        .use(_.execute(version ~ url ~ status ~ changeDate))
+        .flatMap(_.execute(version ~ url ~ status ~ changeDate))
         .void
     }
   }
@@ -55,7 +55,7 @@ trait TsMigrationTableProvisioning {
             WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
           .query(migrationStatusDecoder ~ changeDateDecoder)
           .map { case status ~ changeDate => status -> changeDate }
-        session.prepare(query).use(_.unique(url ~ version))
+        session.prepare(query).flatMap(_.unique(url ~ version))
       }
     }
 
@@ -67,7 +67,7 @@ trait TsMigrationTableProvisioning {
             WHERE subscriber_version = $serviceVersionEncoder"""
         .query(subscriberUrlDecoder ~ migrationStatusDecoder ~ changeDateDecoder)
         .map { case url ~ status ~ changeDate => (url, status, changeDate) }
-      session.prepare(query).use(_.stream(version, 32).compile.toList.map(_.toSet))
+      session.prepare(query).flatMap(_.stream(version, 32).compile.toList.map(_.toSet))
     }
   }
 
@@ -78,7 +78,7 @@ trait TsMigrationTableProvisioning {
         FROM ts_migration
         WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
         .query(migrationMessageDecoder.opt)
-      session.prepare(query).use(_.unique(url ~ version))
+      session.prepare(query).flatMap(_.unique(url ~ version))
     }
   }
 }

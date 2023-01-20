@@ -28,7 +28,7 @@ private trait EventEncoder[CategoryEvent] {
 
 private object EventEncoder {
   def apply[CategoryEvent](
-      eventEncoder:           CategoryEvent => Json
+      eventEncoder: CategoryEvent => Json
   )(implicit jsonPartEncoder: PartEncoder[Json]): EventEncoder[CategoryEvent] =
     new EventEncoder[CategoryEvent] {
       def encodeParts[F[_]](event: CategoryEvent): Vector[Part[F]] = Vector(

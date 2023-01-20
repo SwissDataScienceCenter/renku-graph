@@ -31,6 +31,7 @@ import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
 import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -86,12 +87,13 @@ class UpdatesCreatorSpec
           NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
         }
       )
-      insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       activity.resourceId,
-                       prov / "wasAssociatedWith",
-                       person.resourceId
-             )
+      insert(
+        to = projectsDataset,
+        Quad(GraphClass.Project.id(project.resourceId),
+             activity.resourceId.asEntityId,
+             prov / "wasAssociatedWith",
+             person.resourceId.asEntityId
+        )
       )
 
       findAuthors(project.resourceId, activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId,
@@ -180,12 +182,13 @@ class UpdatesCreatorSpec
           NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
         }
       )
-      insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       activity.association.resourceId,
-                       prov / "agent",
-                       person.resourceId
-             )
+      insert(
+        to = projectsDataset,
+        Quad(GraphClass.Project.id(project.resourceId),
+             activity.association.resourceId.asEntityId,
+             prov / "agent",
+             person.resourceId.asEntityId
+        )
       )
 
       findPersonAgents(project.resourceId, activity.association.resourceId) shouldBe

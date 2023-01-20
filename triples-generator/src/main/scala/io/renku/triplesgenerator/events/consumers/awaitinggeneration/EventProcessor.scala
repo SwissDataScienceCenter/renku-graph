@@ -68,7 +68,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private def generateAndUpdateStatus(
-      commit:                  CommitEvent
+      commit: CommitEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[TriplesGenerationResult] = EitherT {
     singleEventTimeRecorder
       .measureExecutionTime(generateTriples(commit).value)

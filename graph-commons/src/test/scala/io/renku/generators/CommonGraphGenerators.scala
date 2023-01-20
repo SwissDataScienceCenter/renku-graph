@@ -227,7 +227,7 @@ object CommonGraphGenerators {
 
   implicit lazy val certificates: Gen[Certificate] =
     nonBlankStrings()
-      .toGeneratorOfNonEmptyList(minElements = 2)
+      .toGeneratorOfNonEmptyList(min = 2)
       .map { lines =>
         Certificate {
           lines.toList.mkString("-----BEGIN CERTIFICATE-----\n", "\n", "\n-----END CERTIFICATE-----")

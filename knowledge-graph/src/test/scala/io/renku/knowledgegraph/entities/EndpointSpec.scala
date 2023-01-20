@@ -26,9 +26,9 @@ import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
-import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model.MatchingScore
+import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

@@ -36,7 +36,7 @@ import projectinfo.ProjectInfoFinder
 
 private trait EntityBuilder[F[_]] {
   def buildEntity(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken:  Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Project]
 }
 
@@ -52,14 +52,14 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
   import projectInfoFinder._
 
   override def buildEntity(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken:           Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Project] = for {
     projectInfo <- findValidProjectInfo(event)
     project     <- extractProject(projectInfo, event)
   } yield project
 
   private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit
-      maybeAccessToken:                   Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ) = findProjectInfo(event.project.path) semiflatMap {
     case Some(projectInfo) => projectInfo.pure[F]
     case None =>

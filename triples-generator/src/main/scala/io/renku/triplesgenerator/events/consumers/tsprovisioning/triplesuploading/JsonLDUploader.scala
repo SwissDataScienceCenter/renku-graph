@@ -44,11 +44,11 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:        Duration = 21 minutes,
     requestTimeout:     Duration = 20 minutes
-) extends TSClient(dsConnectionConfig,
-                   retryInterval = retryInterval,
-                   maxRetries = maxRetries,
-                   idleTimeoutOverride = idleTimeout.some,
-                   requestTimeoutOverride = requestTimeout.some
+) extends TSClientImpl(dsConnectionConfig,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
     )
     with JsonLDUploader[F] {
 
@@ -68,7 +68,7 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object JsonLDUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig:   ProjectsConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,

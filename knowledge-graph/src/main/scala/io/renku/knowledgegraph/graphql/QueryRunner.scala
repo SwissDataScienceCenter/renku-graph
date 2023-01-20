@@ -38,8 +38,8 @@ trait QueryRunner[F[_], T <: QueryContext[T]] {
 
 object QueryRunner {
   def apply[F[_]: Async, T <: QueryContext[T]](
-      schema:                  Schema[T, Unit],
-      repository:              T
+      schema:     Schema[T, Unit],
+      repository: T
   )(implicit executionContext: ExecutionContext): F[QueryRunner[F, T]] =
     MonadThrow[F].catchNonFatal(new QueryRunnerImpl(schema, repository))
 }

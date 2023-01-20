@@ -49,7 +49,7 @@ private object TransformationResultsUploader {
 
 private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
                                                                   updateQueryRunner: UpdateQueryRunner[F]
-)(implicit renkuUrl:                                                                 RenkuUrl, gitLabUrl: GitLabApiUrl)
+)(implicit renkuUrl: RenkuUrl, gitLabUrl: GitLabApiUrl)
     extends TransformationResultsUploader[F] {
 
   import Schemas.schema

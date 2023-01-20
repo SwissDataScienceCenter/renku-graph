@@ -55,7 +55,7 @@ class CertificateSpec extends AnyWordSpec with should.Matchers {
   private lazy val certificateBodies = for {
     lines <- nonBlankStrings(minLength = 64, maxLength = 64)
                .map(_.value)
-               .toGeneratorOfNonEmptyList(minElements = 20, maxElements = 25)
+               .toGeneratorOfNonEmptyList(min = 20, max = 25)
     lastLine <- nonBlankStrings(maxLength = 64).map(_.value)
   } yield ("-----BEGIN CERTIFICATE-----" +: lines.toList :+ lastLine :+ "-----END CERTIFICATE-----").mkString("\n")
 }

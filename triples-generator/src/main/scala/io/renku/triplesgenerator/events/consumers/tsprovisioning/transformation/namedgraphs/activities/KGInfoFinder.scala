@@ -43,7 +43,7 @@ private object KGInfoFinder {
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-) extends TSClient(connectionConfig)
+) extends TSClientImpl(connectionConfig)
     with KGInfoFinder[F] {
 
   override def findActivityAuthors(projectId:  projects.ResourceId,

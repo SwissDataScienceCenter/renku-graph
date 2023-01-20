@@ -21,9 +21,8 @@ package io.renku.knowledgegraph.projects.datasets
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
@@ -36,6 +35,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ProjectDatasetsFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ExternalServiceStubbing
@@ -45,7 +45,7 @@ class ProjectDatasetsFinderSpec
   "findProjectDatasets" should {
 
     "return the very last modification of a dataset for the given project" in new TestCase {
-      val (original ::~ modification1, project) =
+      val (original -> modification1, project) =
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
       val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
@@ -68,7 +68,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
-      val (dataset1 ::~ dataset2 ::~ modified2, project) = renkuProjectEntities(anyVisibility)
+      val (dataset1 -> dataset2 -> modified2, project) = renkuProjectEntities(anyVisibility)
         .addDataset(datasetEntities(provenanceImportedExternal))
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
@@ -96,7 +96,7 @@ class ProjectDatasetsFinderSpec
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
       val (original, originalProject) =
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
-      val (dataset1 ::~ dataset2, project) =
+      val (dataset1 -> dataset2, project) =
         anyRenkuProjectEntities.importDataset(original).importDataset(original).generateOne
 
       assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
@@ -127,7 +127,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      val (_ ::~ _ ::~ dataset2, project) = renkuProjectEntities(anyVisibility)
+      val (_ -> _ -> dataset2, project) = renkuProjectEntities(anyVisibility)
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
@@ -146,7 +146,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      val (_ ::~ modification, project) =
+      val (_ -> modification, project) =
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
       upload(to = projectsDataset, project.addDatasets(modification.invalidateNow))

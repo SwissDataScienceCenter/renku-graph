@@ -1,3 +1,3 @@
 # tiny-types
 
-This module tooling to define Tiny Types
+This module defines Tiny Types.

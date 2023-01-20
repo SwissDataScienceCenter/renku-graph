@@ -39,7 +39,10 @@ private object ProjectsFinder {
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     query:       SparqlQuery,
     storeConfig: ProjectsConnectionConfig
-) extends TSClient[F](storeConfig, idleTimeoutOverride = (16 minutes).some, requestTimeoutOverride = (15 minutes).some)
+) extends TSClientImpl[F](storeConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
+    )
     with ProjectsFinder[F] {
 
   override def findProjects: F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)

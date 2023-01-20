@@ -28,7 +28,7 @@ object GraphClass {
 
   import io.renku.jsonld.syntax._
 
-  lazy val all: Set[GraphClass] = Set(Default, Project, Persons)
+  lazy val all: Set[GraphClass] = Set(Default, Project, Persons, Datasets)
 
   case object Default extends GraphClass
   type Default = Default.type
@@ -42,6 +42,11 @@ object GraphClass {
     lazy val id: EntityId = EntityId of schema / "Person"
   }
   type Persons = Persons.type
+
+  case object Datasets extends GraphClass {
+    lazy val id: EntityId = EntityId of schema / "Dataset"
+  }
+  type Datasets = Datasets.type
 
   implicit val show: Show[GraphClass] = Show.show(_.productPrefix)
 }

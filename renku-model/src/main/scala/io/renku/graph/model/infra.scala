@@ -18,21 +18,10 @@
 
 package io.renku.graph.model
 
-import cats.Show
 import cats.syntax.all._
-import io.circe.Decoder
-import io.circe.Decoder.decodeList
-import io.renku.graph.model.views.{TinyTypeJsonLDOps, UrlResourceRenderer}
-import io.renku.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import io.renku.tinytypes.json.TinyTypeDecoders
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
-
-final class RenkuUrl private (val value: String) extends AnyVal with UrlTinyType
-object RenkuUrl
-    extends TinyTypeFactory[RenkuUrl](new RenkuUrl(_))
-    with Url[RenkuUrl]
-    with UrlOps[RenkuUrl]
-    with UrlResourceRenderer[RenkuUrl]
+import io.renku.graph.model.views.UrlResourceRenderer
+import io.renku.tinytypes.constraints.{Url, UrlOps}
+import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 
 final class GitLabUrl private (val value: String) extends AnyVal with UrlTinyType {
   def apiV4: GitLabApiUrl = GitLabApiUrl(this)
@@ -51,55 +40,4 @@ object GitLabApiUrl
     with UrlOps[GitLabApiUrl]
     with UrlResourceRenderer[GitLabApiUrl] {
   def apply(gitLabUrl: GitLabUrl): GitLabApiUrl = new GitLabApiUrl((gitLabUrl / "api" / "v4").value)
-}
-
-final class CliVersion private (val value: String) extends AnyVal with StringTinyType
-object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with TinyTypeJsonLDOps[CliVersion] {
-
-  private val validationRegex: String = raw"\d+\.\d+\.\d+.*"
-
-  addConstraint(
-    check = _ matches validationRegex,
-    message = (value: String) => s"'$value' is not a valid CLI version"
-  )
-
-  implicit class CliVersionAlg(cliVersion: CliVersion) {
-    val s"$major.$minor.$bugfix" = cliVersion.value
-  }
-
-  implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
-
-  implicit val ordering: Ordering[CliVersion] = (x: CliVersion, y: CliVersion) =>
-    if ((x.major compareTo y.major) != 0) x.major compareTo y.major
-    else if ((x.minor compareTo y.minor) != 0) x.minor compareTo y.minor
-    else if ((x.bugfix compareTo y.bugfix) != 0) x.bugfix compareTo y.bugfix
-    else x.value compareTo y.value
-}
-
-final case class RenkuVersionPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
-    extends Product
-    with Serializable
-
-object RenkuVersionPair {
-  implicit lazy val versionPairDecoder: Decoder[List[RenkuVersionPair]] = { topCursor =>
-    val renkuVersionPairs: Decoder[RenkuVersionPair] = { cursor =>
-      for {
-        cliVersion    <- cursor.downField("cliVersion").downField("value").as[CliVersion]
-        schemaVersion <- cursor.downField("schemaVersion").downField("value").as[SchemaVersion]
-      } yield RenkuVersionPair(cliVersion, schemaVersion)
-    }
-    topCursor.downField("results").downField("bindings").as(decodeList(renkuVersionPairs))
-  }
-
-  implicit lazy val show: Show[RenkuVersionPair] = Show.show { case RenkuVersionPair(cliVersion, schemaVersion) =>
-    show"cliVersion: $cliVersion, schemaVersion: $schemaVersion"
-  }
-}
-
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion
-    extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_))
-    with NonBlank[SchemaVersion]
-    with TinyTypeJsonLDOps[SchemaVersion] {
-  implicit val jsonDecoder: Decoder[SchemaVersion] = TinyTypeDecoders.stringDecoder(SchemaVersion)
 }

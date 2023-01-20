@@ -156,7 +156,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
       """.command
         session
           .prepare(query)
-          .use(
+          .flatMap(
             _.execute(
               eventIds.generateOne ~ projectId ~ projectPath ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDate ~ batchDates.generateOne ~ eventBodies.generateOne
             )

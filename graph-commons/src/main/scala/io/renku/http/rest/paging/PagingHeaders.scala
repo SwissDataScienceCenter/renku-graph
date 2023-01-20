@@ -37,8 +37,8 @@ object PagingHeaders {
   val Link:       CIString = ci"Link"
 
   def from[ResourceUrl <: UrlTinyType](response: PagingResponse[_])(implicit
-      resourceUrl:                               ResourceUrl,
-      resourceUrlOps:                            UrlOps[ResourceUrl]
+      resourceUrl:    ResourceUrl,
+      resourceUrlOps: UrlOps[ResourceUrl]
   ): Set[Header.Raw] = Set(
     Some(Header.Raw(Total, response.pagingInfo.total.toString)),
     Some(Header.Raw(TotalPages, totalPages(response.pagingInfo).toString)),
@@ -66,7 +66,7 @@ object PagingHeaders {
     else Some(Header.Raw(PrevPage, (pagingInfo.pagingRequest.page.value - 1).toString))
 
   private def prevLink[F[_], ResourceUrl <: UrlTinyType](
-      pagingInfo:         PagingInfo
+      pagingInfo: PagingInfo
   )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]): Option[Header.Raw] = {
     val page = pagingInfo.pagingRequest.page
     if (page == first || pagingInfo.total.value == 0) None
@@ -74,15 +74,15 @@ object PagingHeaders {
   }
 
   private def uriWithPageParam[F[_], ResourceUrl <: UrlTinyType](
-      paramName:          String,
-      value:              Int
+      paramName: String,
+      value:     Int
   )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]) = {
     import resourceUrlOps._
     resourceUrl ? (paramName -> value)
   }
 
   private def nextLink[F[_], ResourceUrl <: UrlTinyType](
-      pagingInfo:         PagingInfo
+      pagingInfo: PagingInfo
   )(implicit resourceUrl: ResourceUrl, resourceUrlOps: UrlOps[ResourceUrl]): Option[Header.Raw] = {
     val page = pagingInfo.pagingRequest.page
     if (page.value == totalPages(pagingInfo) || pagingInfo.total.value == 0) None
@@ -96,8 +96,8 @@ object PagingHeaders {
     Some(Header.Raw(Link, s"""<${uriWithPageParam(pageParamName, 1)}>; rel="first""""))
 
   private def lastLink[F[_], ResourceUrl <: UrlTinyType](pagingInfo: PagingInfo)(implicit
-      resourceUrl:                                                   ResourceUrl,
-      resourceUrlOps:                                                UrlOps[ResourceUrl]
+      resourceUrl:    ResourceUrl,
+      resourceUrlOps: UrlOps[ResourceUrl]
   ): Option[Header.Raw] = if (pagingInfo.total.value > 0) {
     Some(Header.Raw(Link, s"""<${uriWithPageParam(pageParamName, totalPages(pagingInfo))}>; rel="last""""))
   } else Some(Header.Raw(Link, s"""<${uriWithPageParam(pageParamName, 1)}>; rel="last""""))

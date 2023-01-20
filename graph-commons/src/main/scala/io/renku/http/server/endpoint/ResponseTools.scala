@@ -35,7 +35,7 @@ trait ResponseTools {
 
   def whenAccept[F[_]: Applicative](
       mapping: AcceptMapping[F]*
-  )(default:   => F[Response[F]])(implicit request: Request[F]): F[Response[F]] = {
+  )(default: => F[Response[F]])(implicit request: Request[F]): F[Response[F]] = {
     def notSupported(accept: Accept) = Response[F](Status.BadRequest)
       .withEntity(
         ErrorMessage(s"Accept: ${accept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported").value

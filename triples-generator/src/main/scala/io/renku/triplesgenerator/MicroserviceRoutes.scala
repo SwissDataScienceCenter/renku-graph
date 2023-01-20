@@ -36,7 +36,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     routesMetrics: RoutesMetrics[F],
     versionRoutes: version.Routes[F],
     config:        Option[Config] = None
-)(implicit clock:  Clock[F])
+)(implicit clock: Clock[F])
     extends Http4sDsl[F] {
 
   import eventEndpoint._
@@ -62,7 +62,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry](consumersRegistry: EventConsumersRegistry[F],
-                                                  config: Option[Config]
+                                                  config:            Option[Config]
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint <- EventEndpoint(consumersRegistry)
     versionRoutes <- version.Routes[F]

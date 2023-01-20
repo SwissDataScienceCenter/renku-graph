@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.config
 import cats.{ApplicativeError, MonadError, Show}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
+import io.renku.graph.model.versions.{CliVersion, RenkuVersionPair, SchemaVersion}
 import org.typelevel.log4cats.Logger
 
 final case class VersionCompatibilityConfig(
@@ -55,7 +55,7 @@ object VersionCompatibilityConfig {
     }
 
   def fromConfigF[F[_]](
-      config:   Config
+      config: Config
   )(implicit F: MonadError[F, Throwable], L: Logger[F]): F[VersionCompatibilityConfig] =
     ApplicativeError[F, Throwable]
       .fromEither(fromConfig(config))

@@ -42,7 +42,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
     updatesCreator:            UpdatesCreator,
     projectFunctions:          ProjectFunctions,
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
-)(implicit renkuUrl:           RenkuUrl, glApiUrl: GitLabApiUrl)
+)(implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl)
     extends PersonTransformer[F] {
 
   import personMerger._

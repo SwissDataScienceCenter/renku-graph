@@ -101,7 +101,7 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
   private lazy val toSqlUpdate: ((GitLabId, Path)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectPath) =>
     val query: Command[projects.Path ~ projects.GitLabId] =
       sql"update event_log set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
-    Kleisli(_.prepare(query).use(_.execute(projectPath ~ projectId)).void)
+    Kleisli(_.prepare(query).flatMap(_.execute(projectPath ~ projectId)).void)
   }
 
   private lazy val logging: PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case NonFatal(exception) =>

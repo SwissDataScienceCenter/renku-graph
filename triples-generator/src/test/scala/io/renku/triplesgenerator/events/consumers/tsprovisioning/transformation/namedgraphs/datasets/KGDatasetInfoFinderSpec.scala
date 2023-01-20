@@ -23,9 +23,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.datasets.SameAs
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.ModelOps
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
@@ -34,12 +35,16 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class KGDatasetInfoFinderSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
+    with ModelOps
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
@@ -67,10 +72,10 @@ class KGDatasetInfoFinderSpec
 
       val otherTopmostSameAs = datasetTopmostSameAs.generateOne
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(project.resourceId),
-                       dataset.resourceId,
-                       renku / "topmostSameAs",
-                       otherTopmostSameAs
+             Quad(GraphClass.Project.id(project.resourceId),
+                  dataset.resourceId.asEntityId,
+                  renku / "topmostSameAs",
+                  otherTopmostSameAs.asEntityId
              )
       )
 
@@ -103,7 +108,7 @@ class KGDatasetInfoFinderSpec
     }
 
     "return topmostSameAs of the Dataset on the oldest Project using it" in new TestCase {
-      val (dataset, parentProject ::~ project) = anyRenkuProjectEntities
+      val (dataset, parentProject -> project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceInternal))
         .forkOnce()
         .generateOne
@@ -115,12 +120,13 @@ class KGDatasetInfoFinderSpec
 
       removeTopmostSameAs(GraphClass.Project.id(parentProject.resourceId), dataset.resourceId.asEntityId)
       val oldestProjectTopmostSameAs = datasetTopmostSameAs.generateOne
-      insert(projectsDataset,
-             Quad.edge(GraphClass.Project.id(parentProject.resourceId),
-                       dataset.resourceId,
-                       renku / "topmostSameAs",
-                       oldestProjectTopmostSameAs
-             )
+      insert(
+        projectsDataset,
+        Quad(GraphClass.Project.id(parentProject.resourceId),
+             dataset.resourceId.asEntityId,
+             renku / "topmostSameAs",
+             oldestProjectTopmostSameAs.asEntityId
+        )
       )
 
       finder.findParentTopmostSameAs(SameAs(dataset.resourceId.asEntityId)).unsafeRunSync() shouldBe
@@ -180,9 +186,9 @@ class KGDatasetInfoFinderSpec
       val otherOriginalId = datasetOriginalIdentifiers.generateOne
       insert(to = projectsDataset,
              Quad(GraphClass.Project.id(project.resourceId),
-                  dataset.resourceId,
+                  dataset.resourceId.asEntityId,
                   renku / "originalIdentifier",
-                  otherOriginalId
+                  otherOriginalId.asObject
              )
       )
 
@@ -210,7 +216,11 @@ class KGDatasetInfoFinderSpec
       val otherDateCreated = datasetCreatedDates(min = dataset.provenance.date.instant).generateOne
       insert(
         to = projectsDataset,
-        Quad(GraphClass.Project.id(project.resourceId), dataset.resourceId, schema / "dateCreated", otherDateCreated)
+        Quad(GraphClass.Project.id(project.resourceId),
+             dataset.resourceId.asEntityId,
+             schema / "dateCreated",
+             otherDateCreated.asObject
+        )
       )
 
       finder.findDatasetDateCreated(project.resourceId, dataset.resourceId).unsafeRunSync() shouldBe
@@ -237,7 +247,11 @@ class KGDatasetInfoFinderSpec
 
       val description2 = datasetDescriptions.generateOne
       insert(to = projectsDataset,
-             Quad(GraphClass.Project.id(project.resourceId), dataset.resourceId, schema / "description", description2)
+             Quad(GraphClass.Project.id(project.resourceId),
+                  dataset.resourceId.asEntityId,
+                  schema / "description",
+                  description2.asObject
+             )
       )
 
       finder.findDatasetDescriptions(project.resourceId, dataset.resourceId).unsafeRunSync() shouldBe
@@ -283,10 +297,10 @@ class KGDatasetInfoFinderSpec
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = projectsDataset,
-             Quad.edge(GraphClass.Project.id(importedDSProject.resourceId),
-                       importedDS.resourceId,
-                       schema / "sameAs",
-                       otherSameAs
+             Quad(GraphClass.Project.id(importedDSProject.resourceId),
+                  importedDS.resourceId.asEntityId,
+                  schema / "sameAs",
+                  otherSameAs
              )
       )
 
@@ -304,7 +318,7 @@ class KGDatasetInfoFinderSpec
   "findWhereNotInvalidated" should {
 
     "return project resourceIds where DS with the given id is not invalidated" in new TestCase {
-      val (ds, project ::~ fork1) =
+      val (ds, project -> fork1) =
         anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()

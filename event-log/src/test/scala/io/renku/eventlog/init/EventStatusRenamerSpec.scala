@@ -133,7 +133,7 @@ class EventStatusRenamerSpec
       """.command
         session
           .prepare(query)
-          .use(
+          .flatMap(
             _.execute(
               event.id ~ event.project.id ~ withStatus ~ createdDates.generateOne ~ executionDates.generateOne ~ event.date ~ toJsonBody(
                 event
@@ -172,7 +172,7 @@ class EventStatusRenamerSpec
                 ORDER BY created_date asc"""
           .query(eventIdDecoder ~ projectIdDecoder)
           .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
-      session.prepare(query).use(_.stream(status, 32).compile.toList)
+      session.prepare(query).flatMap(_.stream(status, 32).compile.toList)
     }
   }
 }
