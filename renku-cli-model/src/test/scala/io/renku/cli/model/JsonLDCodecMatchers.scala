@@ -20,8 +20,7 @@ package io.renku.cli.model
 
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher._
-import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
-import org.scalatest.Assertion
+import io.renku.jsonld.{JsonLD, JsonLDDecoder, JsonLDEncoder}
 
 trait JsonLDCodecMatchers {
 
@@ -30,19 +29,38 @@ trait JsonLDCodecMatchers {
    * Note that this only works for structures that don't contain itself references to other As. The
    * assumption is that the given value produces as JSON-LD that contains only one value of type A.
    */
-  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](value: A): Assertion =
-    assertCompatibleCodec(value, List(value))
+  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](value: A, more: A*): Unit =
+    assertCompatibleCodec((v: A) => List(v))(value, more: _*)
 
   /** Asserts that encoding the given value and decoding the result yields the expected value. */
-  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](
-      value:    A,
-      expected: List[A]
-  ): Assertion = {
+  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](expected: A => List[A])(
+      value: A,
+      more:  A*
+  ): Unit = {
     val jsonLD = value.asFlattenedJsonLD
     val back = jsonLD.cursor
       .as[List[A]]
       .fold(throw _, identity)
 
-    back shouldMatchTo expected
+    back shouldMatchTo expected(value)
+
+    if (more.nonEmpty) {
+      val all       = value :: more.toList
+      val allJsonLD = combineArrays(all.map(_.asFlattenedJsonLD))
+      //println(allJsonLD.toJson.spaces2)
+      //println(List.fill(80)("-").mkString)
+      val allBack = allJsonLD.cursor.as[List[A]].fold(throw _, identity)
+
+      allBack.sortBy(_.toString) shouldMatchTo all.flatMap(expected).sortBy(_.toString)
+      ()
+    }
   }
+
+  private def combineArrays(jsonld: Seq[JsonLD]): JsonLD =
+    jsonld.foldLeft(JsonLD.JsonLDArray(Seq.empty)) { (result, element) =>
+      element match {
+        case JsonLD.JsonLDArray(inner) => result.copy(jsons = inner ++ result.jsons)
+        case _                         => result.copy(element +: result.jsons)
+      }
+    }
 }

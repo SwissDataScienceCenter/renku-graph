@@ -42,5 +42,11 @@ class CliPersonSpec
         assertCompatibleCodec(cliPerson)
       }
     }
+
+    "work on multiple items" in {
+      forAll(personGen, personGen) { (cliPerson1, cliPerson2) =>
+        assertCompatibleCodec(cliPerson1, cliPerson2)
+      }
+    }
   }
 }

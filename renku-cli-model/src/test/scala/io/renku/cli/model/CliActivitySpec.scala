@@ -44,5 +44,11 @@ class CliActivitySpec
         assertCompatibleCodec(cliActivity)
       }
     }
+
+    "work on multiple items" in {
+      forAll(activityGen, activityGen) { (act1, act2) =>
+        assertCompatibleCodec(act1, act2)
+      }
+    }
   }
 }

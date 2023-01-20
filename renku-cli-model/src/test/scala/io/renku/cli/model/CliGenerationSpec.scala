@@ -39,5 +39,11 @@ class CliGenerationSpec
         assertCompatibleCodec(cliGen)
       }
     }
+
+    "work on multiple items" in {
+      forAll(generationGen, generationGen) { (cliGen1, cliGen2) =>
+        assertCompatibleCodec(cliGen1, cliGen2)
+      }
+    }
   }
 }

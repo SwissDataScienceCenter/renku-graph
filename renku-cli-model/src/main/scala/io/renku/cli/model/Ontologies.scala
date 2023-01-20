@@ -31,8 +31,10 @@ private[cli] object Ontologies {
     val URL             = schema / "URL"
     val PropertyValue   = schema / "PropertyValue"
     val Person          = schema / "Person"
+    val Project         = schema / "Project"
 
     val affiliation    = schema / "affiliation"
+    val agent          = schema / "agent"
     val email          = schema / "email"
     val valueReference = schema / "valueReference"
     val value          = schema / "value"
@@ -47,10 +49,14 @@ private[cli] object Ontologies {
     val identifier     = schema / "identifier"
     val datePublished  = schema / "datePublished"
     val sameAs         = schema / "sameAs"
+    val schemaVersion  = schema / "schemaVersion"
     val image          = schema / "image"
     val license        = schema / "license"
     val version        = schema / "version"
     val hasPart        = schema / "hasPart"
+    val hasPlan        = schema / "hasPlan"
+    val hasActivity    = schema / "hasActivity"
+    val hasDataset     = schema / "hasDataset"
     val url            = schema / "url"
   }
 
@@ -64,6 +70,7 @@ private[cli] object Ontologies {
     val Association   = prov / "Association"
     val Usage         = prov / "Usage"
     val Generation    = prov / "Generation"
+    val Location      = prov / "Location"
 
     val hadMember            = prov / "hadMember"
     val activity             = prov / "activity"

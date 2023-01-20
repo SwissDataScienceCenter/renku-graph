@@ -39,5 +39,10 @@ class CliParameterLinkSpec
         assertCompatibleCodec(cliParam)
       }
     }
+    "work on multiple items" in {
+      forAll(parameterLinkGen, parameterLinkGen) { (cliParam1, cliParam2) =>
+        assertCompatibleCodec(cliParam1, cliParam2)
+      }
+    }
   }
 }

@@ -25,7 +25,7 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 
 /** It's actually exactly the same as the CliPlan. */
-case class CliWorkflowFilePlan(
+final case class CliWorkflowFilePlan(
     id:               ResourceId,
     name:             Name,
     description:      Option[Description],

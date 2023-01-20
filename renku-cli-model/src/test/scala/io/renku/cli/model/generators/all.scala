@@ -31,3 +31,5 @@ object all
     with UsageGenerators
     with GenerationGenerators
     with ActivityGenerators
+    with ProjectGenerators
+    with AssociationGenerators

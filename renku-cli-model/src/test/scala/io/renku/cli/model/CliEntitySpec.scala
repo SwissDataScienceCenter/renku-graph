@@ -43,12 +43,23 @@ class CliEntitySpec
         assertCompatibleCodec(cliEntity)
       }
     }
+
+    "work on multiple items" in {
+      forAll(entityGen, entityGen) { (cliEntity1, cliEntity2) =>
+        assertCompatibleCodec(cliEntity1, cliEntity2)
+      }
+    }
   }
 
   "collection decode/encode" should {
     "be compatible" in {
       forAll(collectionGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
+      }
+    }
+    "work on multiple items" in {
+      forAll(collectionGen, collectionGen) { (cliColl1, cliColl2) =>
+        assertCompatibleCodec(cliColl1, cliColl2)
       }
     }
   }

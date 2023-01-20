@@ -42,5 +42,11 @@ class CliAgentSpec
         assertCompatibleCodec(cliAgent)
       }
     }
+
+    "work on multiple items" in {
+      forAll(agentGen, agentGen) { (cliAgent1, cliAgent2) =>
+        assertCompatibleCodec(cliAgent1, cliAgent2)
+      }
+    }
   }
 }

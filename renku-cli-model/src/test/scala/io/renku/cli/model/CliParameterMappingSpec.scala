@@ -39,5 +39,11 @@ class CliParameterMappingSpec
         assertCompatibleCodec(cliParam)
       }
     }
+
+    "work on multiple items" in {
+      forAll(parameterMappingGen, parameterMappingGen) { (cliParam1, cliParam2) =>
+        assertCompatibleCodec(cliParam1, cliParam2)
+      }
+    }
   }
 }

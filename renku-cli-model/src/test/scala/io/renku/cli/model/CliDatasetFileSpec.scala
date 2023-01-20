@@ -44,5 +44,10 @@ class CliDatasetFileSpec
         assertCompatibleCodec(cliDatasetFile)
       }
     }
+    "work on multiple items" in {
+      forAll(datasetFileGen, datasetFileGen) { (cliFile1, cliFile2) =>
+        assertCompatibleCodec(cliFile1, cliFile2)
+      }
+    }
   }
 }

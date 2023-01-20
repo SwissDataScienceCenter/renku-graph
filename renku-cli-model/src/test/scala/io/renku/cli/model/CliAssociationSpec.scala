@@ -44,5 +44,10 @@ class CliAssociationSpec
         assertCompatibleCodec(cliAssoc)
       }
     }
+    "work on multiple items" in {
+      forAll(associationGen, associationGen) { (cliAssoc1, cliAssoc2) =>
+        assertCompatibleCodec(cliAssoc1, cliAssoc2)
+      }
+    }
   }
 }

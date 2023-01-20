@@ -39,5 +39,10 @@ class CliCommandOutputSpec
         assertCompatibleCodec(cliParam)
       }
     }
+    "work on multiple items" in {
+      forAll(commandOutputGen, commandOutputGen) { (cliParam1, cliParam2) =>
+        assertCompatibleCodec(cliParam1, cliParam2)
+      }
+    }
   }
 }

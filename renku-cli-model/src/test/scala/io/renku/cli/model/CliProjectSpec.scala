@@ -19,13 +19,15 @@
 package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
-import io.renku.cli.model.generators.DatasetGenerators
+import io.renku.cli.model.generators.ProjectGenerators
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CliDatasetSpec
+import java.time.Instant
+
+class CliProjectSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
@@ -34,18 +36,18 @@ class CliDatasetSpec
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
 
-  val datasetGen = DatasetGenerators.datasetGen
+  val projectGen = ProjectGenerators.projectGen(Instant.now)
 
   "decode/encode" should {
     "be compatible" in {
-      forAll(datasetGen) { cliDataset =>
-        assertCompatibleCodec(cliDataset)
+      forAll(projectGen) { cliProject =>
+        assertCompatibleCodec(cliProject)
       }
     }
 
     "work on multiple items" in {
-      forAll(datasetGen, datasetGen) { (cliDataset1, cliDataset2) =>
-        assertCompatibleCodec(cliDataset1, cliDataset2)
+      forAll(projectGen, projectGen) { (cliProject1, cliProject2) =>
+        assertCompatibleCodec(cliProject1, cliProject2)
       }
     }
   }

@@ -39,5 +39,11 @@ class CliParameterValueSpec
         assertCompatibleCodec(cliParameterValue)
       }
     }
+
+    "work on multiple items" in {
+      forAll(parameterValueGen, parameterValueGen) { (cliParam1, cliParam2) =>
+        assertCompatibleCodec(cliParam1, cliParam2)
+      }
+    }
   }
 }

@@ -46,15 +46,26 @@ class CliPlanSpec
         assertCompatibleCodec(cliPlan)
       }
     }
+
+    "work on multiple items" in {
+      forAll(planGen, planGen) { (cliPan1, cliPlan2) =>
+        assertCompatibleCodec(cliPan1, cliPlan2)
+      }
+    }
   }
+
+  def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
+    in :: in.plans.collect { case CliCompositePlan.ChildPlan.Composite(p) => p }.flatMap(allCompositePlans)
 
   "composite plan decode/encode" should {
     "be compatible" in {
       forAll(compositePlanGen) { cliPlan =>
-        def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
-          in :: in.plans.collect { case CliCompositePlan.ChildPlan.Composite(p) => p }.flatMap(allCompositePlans)
-
-        assertCompatibleCodec(cliPlan, allCompositePlans(cliPlan))
+        assertCompatibleCodec(allCompositePlans _)(cliPlan)
+      }
+    }
+    "work on multiple items" in {
+      forAll(compositePlanGen, compositePlanGen) { (cliPan1, cliPlan2) =>
+        assertCompatibleCodec(allCompositePlans _)(cliPan1, cliPlan2)
       }
     }
   }
@@ -65,12 +76,23 @@ class CliPlanSpec
         assertCompatibleCodec(cliPlan)
       }
     }
+
+    "work on multiple items" in {
+      forAll(workflowFilePlanGen, workflowFilePlanGen) { (cliPan1, cliPlan2) =>
+        assertCompatibleCodec(cliPan1, cliPlan2)
+      }
+    }
   }
 
   "workflow file composite plan decode/encode" should {
     "be compatible" in {
       forAll(workflowFileCompositePlanGen) { cliPlan =>
         assertCompatibleCodec(cliPlan)
+      }
+    }
+    "work on multiple items" in {
+      forAll(workflowFileCompositePlanGen, workflowFileCompositePlanGen) { (cliPan1, cliPlan2) =>
+        assertCompatibleCodec(cliPan1, cliPlan2)
       }
     }
   }

@@ -25,14 +25,14 @@ import org.scalacheck.Gen
 
 trait GenerationGenerators {
 
-  def generationEntityGen(generationId: ResourceId): Gen[CliGeneration.QualifiedGeneration] =
+  def generationEntityGen(generationId: ResourceId): Gen[CliGeneration.GenerationEntity] =
     Gen.oneOf(
       EntityGenerators.entityGen
         .map(_.copy(generationIds = List(generationId)))
-        .map(CliGeneration.QualifiedGeneration.apply),
+        .map(CliGeneration.GenerationEntity.apply),
       EntityGenerators.collectionGen
         .map(_.copy(generationIds = List(generationId)))
-        .map(CliGeneration.QualifiedGeneration.apply)
+        .map(CliGeneration.GenerationEntity.apply)
     )
 
   def generationGen: Gen[CliGeneration] =

@@ -76,12 +76,16 @@ trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val cliUsageDiff: Diff[CliUsage] = Diff.derived[CliUsage]
 
-  implicit val cliGenerationEntityDiff: Diff[CliGeneration.QualifiedGeneration] =
-    Diff.derived[CliGeneration.QualifiedGeneration]
+  implicit val cliGenerationEntityDiff: Diff[CliGeneration.GenerationEntity] =
+    Diff.derived[CliGeneration.GenerationEntity]
 
   implicit val cliGenerationDiff: Diff[CliGeneration] = Diff.derived[CliGeneration]
 
   implicit val cliActivityDiff: Diff[CliActivity] = Diff.derived[CliActivity]
+
+  implicit val cliProjectPlanDiff: Diff[CliProject.ProjectPlan] = Diff.derived[CliProject.ProjectPlan]
+
+  implicit val cliProjectDiff: Diff[CliProject] = Diff.derived[CliProject]
 }
 
 object CliDiffInstances extends CliDiffInstances
