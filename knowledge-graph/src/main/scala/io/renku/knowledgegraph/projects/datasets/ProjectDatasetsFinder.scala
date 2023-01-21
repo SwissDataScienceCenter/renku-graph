@@ -48,8 +48,8 @@ private object ProjectDatasetsFinder {
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-)(implicit renkuUrl:  RenkuUrl)
-    extends TSClient(connectionConfig)
+)(implicit renkuUrl: RenkuUrl)
+    extends TSClientImpl(connectionConfig)
     with ProjectDatasetsFinder[F] {
 
   import ProjectDatasetsFinderImpl._

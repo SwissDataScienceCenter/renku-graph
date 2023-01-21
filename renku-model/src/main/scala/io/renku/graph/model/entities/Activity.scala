@@ -169,7 +169,7 @@ object Activity {
   lazy val ontology: Type = Type.Def(
     ontologyClass,
     ObjectProperties(
-      ObjectProperty(prov / "wasAssociatedWith", Agent.ontology, Person.ontology),
+      ObjectProperty(prov / "wasAssociatedWith", Agent.ontology, Person.Ontology.typeDef),
       ObjectProperty(prov / "qualifiedAssociation", Association.ontology),
       ObjectProperty(prov / "qualifiedUsage", Usage.ontology),
       ObjectProperty(renku / "parameter", ParameterValue.ontology)

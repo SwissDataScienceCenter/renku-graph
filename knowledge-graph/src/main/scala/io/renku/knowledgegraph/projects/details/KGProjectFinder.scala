@@ -27,9 +27,8 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
-import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -39,13 +38,16 @@ private trait KGProjectFinder[F[_]] {
 
 private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)(
     implicit renkuUrl: RenkuUrl
-) extends TSClient(storeConfig)
+) extends TSClientImpl(storeConfig)
     with KGProjectFinder[F] {
 
   import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
+  import io.renku.jsonld.syntax._
+  import io.renku.triplesstore.SparqlQuery.Prefixes
+  import io.renku.triplesstore.client.syntax._
 
   override def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]] =
     queryExpecting[Option[KGProject]](query(ResourceId(path), maybeAuthUser))(recordsDecoder(path))
@@ -60,7 +62,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |       (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
+        |  BIND (${resourceId.asEntityId.asSparql.sparql} AS ?resourceId)
         |  GRAPH ?resourceId {
         |    ?resourceId a schema:Project;
         |                schema:name ?name;
@@ -71,7 +73,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |    OPTIONAL { ?resourceId schema:keywords ?keyword }
         |    OPTIONAL {
         |      ?resourceId schema:creator ?maybeCreatorResourceId.
-        |      GRAPH <${GraphClass.Persons.id}> {
+        |      GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
         |        ?maybeCreatorResourceId schema:name ?maybeCreatorName.
         |        OPTIONAL { ?maybeCreatorResourceId schema:email ?maybeCreatorEmail }
         |        OPTIONAL { ?maybeCreatorResourceId schema:affiliation ?maybeCreatorAffiliation }
@@ -92,7 +94,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |                               schema:dateCreated ?maybeParentDateCreated.
         |        OPTIONAL {
         |          ?maybeParentResourceId schema:creator ?maybeParentCreatorResourceId.
-        |          GRAPH <${GraphClass.Persons.id}> {
+        |          GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
         |            ?maybeParentCreatorResourceId schema:name ?maybeParentCreatorName.
         |            OPTIONAL { ?maybeParentCreatorResourceId schema:email ?maybeParentCreatorEmail }
         |            OPTIONAL { ?maybeParentCreatorResourceId schema:affiliation ?maybeParentCreatorAffiliation }
@@ -112,20 +114,24 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private lazy val parentMemberFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
-      s"""|?maybeParentResourceId renku:projectVisibility ?parentVisibility.
-          |OPTIONAL {
+      s"""|{
+          |  ?maybeParentResourceId renku:projectVisibility ?parentVisibility
+          |  VALUES (?parentVisibility) {
+          |    (${Visibility.Public.asObject.asSparql.sparql})
+          |    (${Visibility.Internal.asObject.asSparql.sparql})
+          |  }
+          |} UNION {
+          |  ?maybeParentResourceId renku:projectVisibility ${Visibility.Private.asObject.asSparql.sparql} .
           |  ?maybeParentResourceId schema:member ?memberId.
-          |  GRAPH <${GraphClass.Persons.id}> {
+          |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
           |    ?memberId schema:sameAs ?memberSameAs.
-          |    ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-          |                  schema:identifier ?userGitlabId
+          |    ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
+          |                  schema:identifier ${user.id.asObject.asSparql.sparql}
           |  }
           |}
-          |FILTER (?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value})
           |""".stripMargin
     case _ =>
-      s"""|?maybeParentResourceId renku:projectVisibility ?parentVisibility .
-          |FILTER (?parentVisibility = '${Visibility.Public.value}')
+      s"""|?maybeParentResourceId renku:projectVisibility ${Visibility.Public.asObject.asSparql.sparql} .
           |""".stripMargin
   }
 

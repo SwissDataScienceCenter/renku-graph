@@ -36,9 +36,10 @@ import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
-import io.renku.graph.model.testentities.generators.genMonad
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
@@ -54,6 +55,8 @@ import scala.util.Random
 class ProjectSpec
     extends AnyWordSpec
     with should.Matchers
+    with EntitiesGenerators
+    with ModelOps
     with ScalaCheckPropertyChecks
     with DiffShouldMatcher
     with DiffInstances {
@@ -135,7 +138,7 @@ class ProjectSpec
                   mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
             ) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
-            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
       }
     }
@@ -201,7 +204,7 @@ class ProjectSpec
             ) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
-            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -227,7 +230,7 @@ class ProjectSpec
             info.visibility,
             info.keywords,
             members.map(_.toPerson),
-            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -254,7 +257,7 @@ class ProjectSpec
             info.keywords,
             members.map(_.toPerson),
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
-            convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
         ).asRight
       }
@@ -1236,7 +1239,7 @@ class ProjectSpec
                             activities:       List[entities.Activity] = Nil,
                             datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
                             plans:            List[entities.Plan] = Nil
-  )(implicit graph:                           GraphClass): JsonLD = {
+  )(implicit graph: GraphClass): JsonLD = {
 
     val descriptionJsonLD = maybeDescription match {
       case Some(desc) => desc.asJsonLD

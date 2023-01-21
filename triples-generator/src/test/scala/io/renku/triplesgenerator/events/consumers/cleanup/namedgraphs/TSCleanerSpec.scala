@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.searchgraphs.DatasetsGraphCleaner
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.TopmostSameAs
@@ -33,6 +34,7 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -44,13 +46,17 @@ class TSCleanerSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
     with ScalaCheckPropertyChecks
-    with EntitiesGenerators {
+    with EntitiesGenerators
+    with MockFactory {
 
   "removeTriples" should {
 
     "remove all activities, datasets and their dependant entities of the project" in new TestCase {
       forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
         upload(to = projectsDataset, project)
+
+        givenProjectIdFindingSucceeds(project)
+        givenDatasetsGraphCleaningSucceeds(project)
 
         (cleaner removeTriples project.path).unsafeRunSync()
 
@@ -66,6 +72,9 @@ class TSCleanerSpec
         upload(to = projectsDataset, parent, child)
 
         findProjectParent(child.resourceId).unsafeRunSync() shouldBe parent.resourceId.some
+
+        givenProjectIdFindingSucceeds(parent)
+        givenDatasetsGraphCleaningSucceeds(parent)
 
         (cleaner removeTriples parent.path).unsafeRunSync()
 
@@ -85,6 +94,9 @@ class TSCleanerSpec
 
         findProjectParent(parent.resourceId).unsafeRunSync() shouldBe grandparent.resourceId.some
         findProjectParent(child.resourceId).unsafeRunSync()  shouldBe parent.resourceId.some
+
+        givenProjectIdFindingSucceeds(parent)
+        givenDatasetsGraphCleaningSucceeds(parent)
 
         (cleaner removeTriples parent.path).unsafeRunSync()
 
@@ -108,6 +120,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
         upload(to = projectsDataset, topProject, middleProject, bottomProject)
+
+        givenProjectIdFindingSucceeds(topProject)
+        givenDatasetsGraphCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -139,6 +154,9 @@ class TSCleanerSpec
 
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
 
+        givenProjectIdFindingSucceeds(topProject)
+        givenDatasetsGraphCleaningSucceeds(topProject)
+
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
@@ -167,6 +185,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
+
+        givenProjectIdFindingSucceeds(middleProject)
+        givenDatasetsGraphCleaningSucceeds(middleProject)
 
         (cleaner removeTriples middleProject.path).unsafeRunSync()
 
@@ -197,6 +218,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
+
+        givenProjectIdFindingSucceeds(bottomProject)
+        givenDatasetsGraphCleaningSucceeds(bottomProject)
 
         (cleaner removeTriples bottomProject.path).unsafeRunSync()
 
@@ -230,6 +254,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
 
         upload(to = projectsDataset, middleProject1, middleProject2, bottomProject, topProject)
+
+        givenProjectIdFindingSucceeds(topProject)
+        givenDatasetsGraphCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -288,6 +315,9 @@ class TSCleanerSpec
 
         upload(to = projectsDataset, topProject, middleProject1, middleProject2, bottomProject)
 
+        givenProjectIdFindingSucceeds(topProject)
+        givenDatasetsGraphCleaningSucceeds(topProject)
+
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync() shouldBe List.empty
@@ -328,6 +358,9 @@ class TSCleanerSpec
 
         upload(to = projectsDataset, bottomProject, topProject, topProjectFork)
 
+        givenProjectIdFindingSucceeds(topProject)
+        givenDatasetsGraphCleaningSucceeds(topProject)
+
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
         findProject(topProject.resourceId).unsafeRunSync()        shouldBe List.empty
@@ -358,6 +391,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject)
+
+        givenProjectIdFindingSucceeds(middleProject)
+        givenDatasetsGraphCleaningSucceeds(middleProject)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -394,6 +430,11 @@ class TSCleanerSpec
 
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
+        givenProjectIdFindingSucceeds(middleProject)
+        givenProjectIdFindingSucceeds(middleProjectFork)
+        givenDatasetsGraphCleaningSucceeds(middleProject)
+        givenDatasetsGraphCleaningSucceeds(middleProjectFork)
+
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
         cleaner.removeTriples(middleProjectFork.path).unsafeRunSync()
 
@@ -429,6 +470,9 @@ class TSCleanerSpec
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
+
+        givenProjectIdFindingSucceeds(middleProject)
+        givenDatasetsGraphCleaningSucceeds(middleProject)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -529,7 +573,19 @@ class TSCleanerSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val cleaner = new TSCleanerImpl[IO](projectsDSConnectionInfo)
+    private val projectIdFinder      = mock[ProjectIdFinder[IO]]
+    private val datasetsGraphCleaner = mock[DatasetsGraphCleaner[IO]]
+    val cleaner = new TSCleanerImpl[IO](projectIdFinder, datasetsGraphCleaner, projectsDSConnectionInfo)
+
+    def givenProjectIdFindingSucceeds(project: Project) =
+      (projectIdFinder.findProjectId _)
+        .expects(project.path)
+        .returning(project.identification.some.pure[IO])
+
+    def givenDatasetsGraphCleaningSucceeds(project: Project) =
+      (datasetsGraphCleaner.cleanDatasetsGraph _)
+        .expects(project.identification)
+        .returning(().pure[IO])
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

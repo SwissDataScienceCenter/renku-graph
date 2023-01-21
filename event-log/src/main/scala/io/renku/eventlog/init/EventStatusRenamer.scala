@@ -49,7 +49,7 @@ private class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionReso
 
   private def renameAllStatuses(from: String, to: String) = SessionResource[F].useK {
     val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
-    Kleisli(_.prepare(query).use(_.execute(to ~ from)).void)
+    Kleisli(_.prepare(query).flatMap(_.execute(to ~ from)).void)
   }
 
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>

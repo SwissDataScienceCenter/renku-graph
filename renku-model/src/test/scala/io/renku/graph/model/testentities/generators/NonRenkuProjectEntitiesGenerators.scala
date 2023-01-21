@@ -20,7 +20,6 @@ package io.renku.graph.model.testentities
 package generators
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{imageUris, projectCreatedDates, projectDescriptions, projectKeywords, projectPaths}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import org.scalacheck.Gen

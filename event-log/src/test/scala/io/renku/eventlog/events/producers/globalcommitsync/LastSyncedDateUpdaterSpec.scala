@@ -115,7 +115,7 @@ class LastSyncedDateUpdaterSpec
                 """
           .query(lastSyncedDateDecoder)
 
-      session.prepare(query).use(p => p.option(project.id ~ categoryName))
+      session.prepare(query).flatMap(p => p.option(project.id ~ categoryName))
     }
   }
 }

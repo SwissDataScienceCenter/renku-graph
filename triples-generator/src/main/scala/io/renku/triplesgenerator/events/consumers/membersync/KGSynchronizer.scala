@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.consumers.membersync
 
 import io.renku.graph.model.projects
-import io.renku.triplesstore.SparqlQuery
 
 private trait KGSynchronizer[F[_]] {
   def syncMembers(path: projects.Path, membersInGL: Set[GitLabProjectMember]): F[SyncSummary]
@@ -38,8 +37,4 @@ private object KGSynchronizerFunctions {
   ): Set[KGProjectMember] = membersInKG.collect {
     case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
   }
-}
-
-private trait QuerySender[F[_]] {
-  def send(update: SparqlQuery): F[Unit]
 }

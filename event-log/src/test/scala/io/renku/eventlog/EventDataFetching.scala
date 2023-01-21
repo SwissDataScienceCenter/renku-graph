@@ -41,7 +41,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ executionDate ~ batchDate =>
             (CompoundEventId(eventId, projectId), executionDate, batchDate)
           }
-        session.prepare(query).use(_.stream((status, Void), 32).compile.toList)
+        session.prepare(query).flatMap(_.stream((status, Void), 32).compile.toList)
       }
     }
 
@@ -54,7 +54,7 @@ trait EventDataFetching {
             ORDER BY event_date"""
         .query(eventIdDecoder ~ projectIdDecoder)
         .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
-      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+      session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
     }
   }
 
@@ -68,7 +68,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ eventPayload =>
             (CompoundEventId(eventId, projectId), eventPayload)
           }
-      session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
+      session.prepare(query).flatMap(_.option(eventId.id ~ eventId.projectId))
     }
   }
 
@@ -81,7 +81,7 @@ trait EventDataFetching {
               WHERE project_id = $projectIdEncoder"""
             .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
             .map { case eventId ~ projectId ~ eventPayload => (CompoundEventId(eventId, projectId), eventPayload) }
-        session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
       }
     }
 
@@ -115,7 +115,7 @@ trait EventDataFetching {
         """.query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt).map {
           case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
         }
-        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
+        session.prepare(query).flatMap(_.option(eventId.id ~ eventId.projectId))
       }
     }
 
@@ -131,7 +131,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ eventProcessingTime =>
             (CompoundEventId(eventId, projectId), eventProcessingTime)
           }
-        session.prepare(query).use(_.stream(eventId.id ~ eventId.projectId, 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(eventId.id ~ eventId.projectId, 32).compile.toList)
       }
     }
 
@@ -146,7 +146,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ eventProcessingTime =>
             (CompoundEventId(eventId, projectId), eventProcessingTime)
           }
-        session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(projectId, 32).compile.toList)
       }
     }
 

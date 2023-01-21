@@ -65,7 +65,7 @@ private object StatusChangeEvent {
                                                                           currentStatus:       C,
                                                                           newStatus:           N,
                                                                           maybeExecutionDelay: Option[Duration]
-  )(implicit evidence:                                                                         AllowedCombination[C, N])
+  )(implicit evidence: AllowedCombination[C, N])
       extends StatusChangeEvent {
     override val silent: Boolean = false
   }

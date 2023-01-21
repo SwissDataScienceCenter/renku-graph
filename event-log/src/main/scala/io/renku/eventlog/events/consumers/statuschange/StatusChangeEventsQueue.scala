@@ -38,13 +38,13 @@ import scala.util.control.NonFatal
 trait StatusChangeEventsQueue[F[_]] {
 
   def register[E <: StatusChangeEvent](
-      handler:        E => F[Unit]
+      handler: E => F[Unit]
   )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit]
 
   def offer[E <: StatusChangeEvent](event: E)(implicit
-      encoder:                             Encoder[E],
-      eventType:                           EventType[E],
-      show:                                Show[E]
+      encoder:   Encoder[E],
+      eventType: EventType[E],
+      show:      Show[E]
   ): Kleisli[F, Session[F], Unit]
 
   def run(): F[Unit]
@@ -81,14 +81,14 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
   private val handlers: Ref[F, List[HandlerDef[_ <: StatusChangeEvent]]] = Ref.unsafe(List.empty)
 
   override def register[E <: StatusChangeEvent](
-      handler:        E => F[Unit]
+      handler: E => F[Unit]
   )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit] =
     handlers.update(HandlerDef(eventType, decoder, handler) :: _)
 
   override def offer[E <: StatusChangeEvent](event: E)(implicit
-      encoder:                                      Encoder[E],
-      eventType:                                    EventType[E],
-      show:                                         Show[E]
+      encoder:   Encoder[E],
+      eventType: EventType[E],
+      show:      Show[E]
   ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
     SqlStatement[F](name = "status change event queue - offer")
       .command[OffsetDateTime ~ String ~ String](

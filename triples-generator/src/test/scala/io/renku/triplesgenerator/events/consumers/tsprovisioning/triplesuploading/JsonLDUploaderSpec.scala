@@ -52,7 +52,7 @@ class JsonLDUploaderSpec
 
   "uploadJsonLD" should {
 
-    s"succeeds if uploading triples to the Store was successful" in new TestCase {
+    "succeeds if uploading triples to the Store was successful" in new TestCase {
 
       givenUploader(returning = ok())
 

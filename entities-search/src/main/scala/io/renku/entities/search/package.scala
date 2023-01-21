@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.tinytypes._
+import io.renku.triplesstore.client.syntax._
 import search.Criteria.Filters
 
 import java.time.{Instant, ZoneOffset}
@@ -31,23 +32,48 @@ package object search {
 
   private[search] implicit class CriteriaOps(criteria: Criteria) {
 
-    def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String = criteria.maybeUser match {
-      case Some(user) =>
-        s"""|OPTIONAL {
-            |    $projectIdVariable schema:member ?memberId.
-            |    GRAPH <${GraphClass.Persons.id}> {
-            |      ?memberId schema:sameAs ?memberSameAs.
-            |      ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-            |                    schema:identifier ?userGitlabId
-            |    }
-            |}
-            |FILTER (
-            |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${user.id.value}
-            |)
-            |""".stripMargin
-      case _ =>
-        s"""FILTER ($visibilityVariable = '${projects.Visibility.Public.value}')"""
-    }
+    def maybeOnAccessRightsAndVisibility(projectIdVariable: String, visibilityVariable: String): String =
+      criteria.maybeUser match {
+        case Some(user) =>
+          val queriedVisibilities = criteria.filters.visibilities
+          val nonPrivateVisibilities =
+            if (queriedVisibilities.isEmpty)
+              projects.Visibility.all - projects.Visibility.Private
+            else (projects.Visibility.all - projects.Visibility.Private) intersect queriedVisibilities
+
+          val selectPrivateValue =
+            if (queriedVisibilities.isEmpty || queriedVisibilities.contains(projects.Visibility.Private))
+              projects.Visibility.Private.asObject.asSparql.sparql
+            else "''"
+          s"""|{
+              |  $projectIdVariable renku:projectVisibility $visibilityVariable .
+              |  {
+              |    VALUES ($visibilityVariable) {
+              |      ${nonPrivateVisibilities.map(v => s"(${v.asObject.asSparql.sparql})").mkString(" ")}
+              |    }
+              |  } UNION {
+              |    VALUES ($visibilityVariable) {
+              |      ($selectPrivateValue)
+              |    }
+              |    $projectIdVariable schema:member ?memberId.
+              |    GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
+              |      ?memberId schema:sameAs ?memberSameAs.
+              |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
+              |                    schema:identifier ${user.id.asObject.asSparql.sparql}
+              |    }
+              |  }
+              |}
+              |""".stripMargin
+        case _ =>
+          criteria.filters.visibilities match {
+            case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
+              s"""|$projectIdVariable renku:projectVisibility $visibilityVariable .
+                  |VALUES ($visibilityVariable) { (${projects.Visibility.Public.asObject.asSparql.sparql}) }""".stripMargin
+            case _ =>
+              s"""|$projectIdVariable renku:projectVisibility $visibilityVariable .
+                  |VALUES ($visibilityVariable) { ('') }""".stripMargin
+          }
+      }
   }
 
   private[search] implicit class FiltersOps(filters: Filters) {
@@ -94,16 +120,10 @@ package object search {
               .mkString(" || ")} , false))"""
       }
 
-    def maybeOnVisibility(variableName: String): String =
-      filters.visibilities match {
-        case set if set.isEmpty => ""
-        case set                => s"FILTER ($variableName IN ${set.map(_.asLiteral).mkString("(", ", ", ")")})"
-      }
-
     def maybeOnNamespace(variableName: String): String =
       filters.namespaces match {
         case set if set.isEmpty => ""
-        case set                => s"FILTER ($variableName IN ${set.map(_.asLiteral).mkString("(", ", ", ")")})"
+        case set => s"VALUES ($variableName) { ${set.map(v => s"(${v.asObject.asSparql.sparql})").mkString(" ")} }"
       }
 
     def maybeOnDateCreated(variableName: String): String =
@@ -171,7 +191,6 @@ package object search {
 
     private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
       lazy val asSparqlEncodedLiteral: String = s"'${sparqlEncode(v.show)}'"
-      lazy val asLiteral:              String = show"'$v'"
     }
 
     private implicit class StringValueOps[TT <: StringTinyType](v: TT)(implicit s: Show[TT]) {

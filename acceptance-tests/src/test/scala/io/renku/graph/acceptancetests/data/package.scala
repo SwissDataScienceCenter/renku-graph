@@ -27,6 +27,7 @@ import io.renku.graph.acceptancetests.data.Project.Urls._
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
+import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
 import java.time.Instant.now

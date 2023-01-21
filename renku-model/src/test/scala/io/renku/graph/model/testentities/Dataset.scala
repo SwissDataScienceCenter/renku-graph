@@ -25,7 +25,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.cli.{CliDataset, CliDatasetFile, CliDatasetSameAs, CliPerson, DateModified}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.EntityFunctions
-import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId, ImageUri}
+import io.renku.graph.model.images._
 import io.renku.graph.model.testentities.Dataset.Provenance._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -343,14 +343,7 @@ object Dataset {
       entities.Dataset.AdditionalInfo(
         dataset.additionalInfo.maybeDescription,
         dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
-          val imagePosition = ImagePosition(idx)
-          Image(
-            ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
-            url,
-            imagePosition
-          )
-        },
+        dataset.additionalInfo.images.toEntitiesImages(identification.resourceId),
         dataset.additionalInfo.maybeLicense,
         dataset.additionalInfo.maybeVersion
       ),
@@ -420,6 +413,18 @@ object Dataset {
   def entityId(identifier: DatasetIdentifier)(implicit renkuUrl: RenkuUrl): EntityId =
     EntityId of (renkuUrl / "datasets" / identifier)
 
-  def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
-    datasetEntityId.asUrlEntityId / "images" / position.toString
+  implicit class DatasetImagesOps(images: List[ImageUri]) {
+
+    def toEntitiesImages(dsResourceId: ResourceId) = images.zipWithIndex.map { case (url, idx) =>
+      val imagePosition = ImagePosition(idx)
+      Image(
+        ImageResourceId(imageEntityId(dsResourceId.asEntityId, imagePosition).show),
+        url,
+        imagePosition
+      )
+    }
+
+    private def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
+      datasetEntityId.asUrlEntityId / "images" / position.toString
+  }
 }

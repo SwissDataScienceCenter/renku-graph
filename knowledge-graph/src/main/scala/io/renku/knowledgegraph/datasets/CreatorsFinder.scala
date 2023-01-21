@@ -36,7 +36,7 @@ private trait CreatorsFinder[F[_]] {
 }
 
 private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
-    extends TSClient(storeConfig)
+    extends TSClientImpl(storeConfig)
     with CreatorsFinder[F] {
 
   import CreatorsFinder._

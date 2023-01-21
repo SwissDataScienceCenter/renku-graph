@@ -31,7 +31,10 @@ private[migrations] trait UpdateQueryRunner[F[_]] {
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
-) extends TSClient[F](storeConfig, idleTimeoutOverride = (16 minutes).some, requestTimeoutOverride = (15 minutes).some)
+) extends TSClientImpl[F](storeConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
+    )
     with UpdateQueryRunner[F] {
 
   def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)

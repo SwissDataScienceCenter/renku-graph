@@ -64,7 +64,7 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends
   private def query(expected: Int) = SqlStatement[IO, Int](Kleisli { session =>
                                                              val query: Query[Int, Int] =
                                                                sql"""select $int4;""".query(int4)
-                                                             session.prepare(query).use { pq =>
+                                                             session.prepare(query).flatMap { pq =>
                                                                pq.unique(expected)
                                                              }
                                                            },

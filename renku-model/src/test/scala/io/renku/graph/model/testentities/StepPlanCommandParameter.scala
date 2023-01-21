@@ -161,7 +161,7 @@ object StepPlanCommandParameter {
                                         defaultValue:        InputDefaultValue,
                                         maybeEncodingFormat: Option[EncodingFormat],
                                         planId:              plans.Identifier
-    )(implicit renkuUrl:                                     RenkuUrl)
+    )(implicit renkuUrl: RenkuUrl)
         extends CommandInput
         with ExplicitParameter {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuUrl / "iostreams" / StdIn.name).value))

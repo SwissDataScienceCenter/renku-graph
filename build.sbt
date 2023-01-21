@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 organization := "io.renku"
 name := "renku-graph"
 ThisBuild / scalaVersion := "2.13.10"
@@ -9,179 +27,172 @@ releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
 releaseTagName := (ThisBuild / version).value
 
-lazy val root = Project(
-  id = "renku-graph",
-  base = file(".")
-).settings(
-  publish / skip := true,
-  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
-).aggregate(
-  generators,
-  tinyTypes,
-  renkuModel,
-  graphCommons,
-  eventLog,
-  tokenRepository,
-  webhookService,
-  commitEventService,
-  entitiesSearch,
-  triplesGenerator,
-  knowledgeGraph
-)
+lazy val root = project
+  .in(file("."))
+  .withId("renku-graph")
+  .settings(
+    publish / skip := true,
+    publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+  )
+  .aggregate(
+    generators,
+    triplesStoreClient,
+    tinyTypes,
+    renkuModelTinyTypes,
+    renkuCliModel,
+    renkuModel,
+    graphCommons,
+    eventLog,
+    tokenRepository,
+    webhookService,
+    commitEventService,
+    entitiesSearch,
+    triplesGenerator,
+    knowledgeGraph
+  )
 
-lazy val generators = Project(
-  id = "generators",
-  base = file("generators")
-).settings(
-  commonSettings
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val generators = project
+  .in(file("generators"))
+  .withId("generators")
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val tinyTypes = Project(
-  id = "tiny-types",
-  base = file("tiny-types")
-).settings(
-  commonSettings
-).dependsOn(
-  generators % "test->test"
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val triplesStoreClient = project
+  .in(file("triples-store-client"))
+  .withId("triples-store-client")
+  .settings(commonSettings)
+  .dependsOn(generators % "test->test")
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val renkuModel = Project(
-  id = "renku-model",
-  base = file("renku-model")
-).settings(
-  commonSettings
-).dependsOn(
-  tinyTypes % "compile->compile",
-  tinyTypes % "test->test"
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val tinyTypes = project
+  .in(file("tiny-types"))
+  .withId("tiny-types")
+  .settings(commonSettings)
+  .dependsOn(triplesStoreClient % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val graphCommons = Project(
-  id = "graph-commons",
-  base = file("graph-commons")
-).settings(
-  commonSettings
-).dependsOn(
-  renkuModel % "compile->compile",
-  renkuModel % "test->test"
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val renkuModelTinyTypes = project
+  .in(file("renku-model-tiny-types"))
+  .withId("renku-model-tiny-types")
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(commonSettings)
+  .dependsOn(tinyTypes % "compile->compile; test->test")
 
-lazy val eventLog = Project(
-  id = "event-log",
-  base = file("event-log")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val renkuCliModel = project.
+  in(file("renku-cli-model")).
+  withId("renku-cli-model").
+  enablePlugins(AutomateHeaderPlugin).
+  settings(commonSettings).
+  dependsOn(
+    tinyTypes % "compile->compile; test->test",
+    renkuModelTinyTypes % "compile->compile; test->test"
+  )
 
-lazy val webhookService = Project(
-  id = "webhook-service",
-  base = file("webhook-service")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val renkuModel = project
+  .in(file("renku-model"))
+  .withId("renku-model")
+  .settings(commonSettings)
+  .dependsOn(
+    tinyTypes           % "compile->compile; test->test",
+    renkuModelTinyTypes % "compile->compile; test->test",
+    renkuCliModel       % "compile->compile; test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val commitEventService = Project(
-  id = "commit-event-service",
-  base = file("commit-event-service")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val graphCommons = project
+  .in(file("graph-commons"))
+  .withId("graph-commons")
+  .settings(commonSettings)
+  .dependsOn(renkuModel % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val entitiesSearch = Project(
-  id = "entities-search",
-  base = file("entities-search")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val eventLog = project
+  .in(file("event-log"))
+  .withId("event-log")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
 
-lazy val triplesGenerator = Project(
-  id = "triples-generator",
-  base = file("triples-generator")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test",
-  entitiesSearch
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val webhookService = project
+  .in(file("webhook-service"))
+  .withId("webhook-service")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
 
-lazy val tokenRepository = Project(
-  id = "token-repository",
-  base = file("token-repository")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons % "compile->compile",
-  graphCommons % "test->test"
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val commitEventService = project
+  .in(file("commit-event-service"))
+  .withId("commit-event-service")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
 
-lazy val knowledgeGraph = Project(
-  id = "knowledge-graph",
-  base = file("knowledge-graph")
-).settings(
-  commonSettings
-).dependsOn(
-  graphCommons   % "compile->compile",
-  graphCommons   % "test->test",
-  entitiesSearch % "compile->compile",
-  entitiesSearch % "test->test"
-).enablePlugins(
-  JavaAppPackaging,
-  AutomateHeaderPlugin
-)
+lazy val entitiesSearch = project
+  .in(file("entities-search"))
+  .withId("entities-search")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
 
-lazy val acceptanceTests = Project(
-  id = "acceptance-tests",
-  base = file("acceptance-tests")
-).settings(
-  commonSettings
-).dependsOn(
-  webhookService,
-  commitEventService,
-  triplesGenerator,
-  tokenRepository,
-  knowledgeGraph % "test->test",
-  graphCommons   % "test->test",
-  eventLog       % "test->test"
-).enablePlugins(
-  AutomateHeaderPlugin
-)
+lazy val triplesGenerator = project
+  .in(file("triples-generator"))
+  .withId("triples-generator")
+  .settings(commonSettings)
+  .dependsOn(
+    graphCommons % "compile->compile; test->test",
+    entitiesSearch
+  )
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
+
+lazy val tokenRepository = project
+  .in(file("token-repository"))
+  .withId("token-repository")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
+
+lazy val knowledgeGraph = project
+  .in(file("knowledge-graph"))
+  .withId("knowledge-graph")
+  .settings(commonSettings)
+  .dependsOn(
+    graphCommons   % "compile->compile; test->test",
+    entitiesSearch % "compile->compile; test->test"
+  )
+  .enablePlugins(
+    JavaAppPackaging,
+    AutomateHeaderPlugin
+  )
+
+lazy val acceptanceTests = project
+  .in(file("acceptance-tests"))
+  .withId("acceptance-tests")
+  .settings(commonSettings)
+  .dependsOn(
+    webhookService,
+    commitEventService,
+    triplesGenerator,
+    tokenRepository,
+    knowledgeGraph % "test->test",
+    graphCommons   % "test->test",
+    eventLog       % "test->test"
+  )
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val commonSettings = Seq(
   organization := "io.renku",

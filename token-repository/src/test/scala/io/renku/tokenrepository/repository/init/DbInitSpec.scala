@@ -58,7 +58,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
     .useK {
       val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
         .query(varchar)
-      Kleisli(_.prepare(query).use(_.option(projectId.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectId.value)))
     }
     .unsafeRunSync()
 
@@ -66,7 +66,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
     .useK {
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
-      Kleisli(_.prepare(query).use(_.option(projectPath.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectPath.value)))
     }
     .unsafeRunSync()
 
@@ -75,7 +75,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
       val query: Query[Int, ExpiryDate] = sql"SELECT expiry_date FROM projects_tokens WHERE project_id = $int4"
         .query(date)
         .map { case expiryDate: LocalDate => ExpiryDate(expiryDate) }
-      Kleisli(_.prepare(query).use(_.option(projectId.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectId.value)))
     }
     .unsafeRunSync()
 

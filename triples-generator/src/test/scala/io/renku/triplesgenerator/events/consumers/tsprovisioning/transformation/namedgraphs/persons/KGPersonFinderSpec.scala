@@ -32,6 +32,8 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery._
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -59,7 +61,9 @@ class KGPersonFinderSpec
 
       val duplicateNames = personNames.generateNonEmptyList().toList.toSet
       duplicateNames foreach { name =>
-        insert(to = projectsDataset, Quad(GraphClass.Persons.id, person.resourceId.asEntityId, schema / "name", name))
+        insert(to = projectsDataset,
+               Quad(GraphClass.Persons.id, person.resourceId.asEntityId, schema / "name", name.asObject)
+        )
       }
       findNames(person) shouldBe duplicateNames + person.name
 

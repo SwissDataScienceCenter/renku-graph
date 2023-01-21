@@ -39,10 +39,10 @@ private[migrations] trait MigrationExecutionRegister[F[_]] {
 }
 
 private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    serviceVersion:  ServiceVersion,
-    storeConfig:     MigrationsConnectionConfig
+    serviceVersion: ServiceVersion,
+    storeConfig:    MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClient(storeConfig)
+    extends TSClientImpl(storeConfig)
     with MigrationExecutionRegister[F] {
 
   import MigrationExecutionRegister._

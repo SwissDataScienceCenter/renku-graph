@@ -36,7 +36,7 @@ object SentryConfig {
 
   import io.renku.config.ConfigLoader._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load(),
+  def apply[F[_]: MonadThrow](config:             Config = ConfigFactory.load(),
                               maybeVersionConfig: Option[Config] = None
   ): F[Option[SentryConfig]] = find[F, Boolean]("services.sentry.enabled", config) >>= {
     case false => Option.empty[SentryConfig].pure[F]

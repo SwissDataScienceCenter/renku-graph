@@ -45,7 +45,7 @@ private class PayloadComposer[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,
 
 private object PayloadComposer {
 
-  def payloadsComposerFactory[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,
+  def payloadsComposerFactory[F[_]: MonadThrow](subscriberUrl:  SubscriberUrl,
                                                 serviceId:      MicroserviceIdentifier,
                                                 serviceVersion: ServiceVersion
   ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =

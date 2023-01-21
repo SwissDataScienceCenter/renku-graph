@@ -81,7 +81,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     }
 
   protected def secureRequest(method: Method, uri: Uri)(implicit
-      maybeAccessToken:               Option[AccessToken]
+      maybeAccessToken: Option[AccessToken]
   ): Request[F] = request(method, uri, maybeAccessToken)
 
   protected def request(method: Method, uri: Uri, basicAuth: BasicAuthCredentials): Request[F] =
@@ -104,7 +104,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     send(HttpRequest(request))(mapResponse)
 
   protected def send[ResultType](
-      request:   HttpRequest[F]
+      request: HttpRequest[F]
   )(mapResponse: ResponseMapping[ResultType]): F[ResultType] =
     httpClientBuilder.resource.use { httpClient =>
       for {
@@ -140,7 +140,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
   private def processResponse[ResultType](request: Request[F], mapResponse: ResponseMapping[ResultType])(
-      response:                                    Response[F]
+      response: Response[F]
   ): F[ResultType] =
     (mapResponse orElse raiseBadRequest orElse raiseUnexpectedResponse)((response.status, request, response))
       .recoverWith(mappingError(request, response))
@@ -237,12 +237,12 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
 
     class MultipartBuilder private[RequestOps] (request: Request[F], parts: Vector[Part[F]] = Vector.empty[Part[F]]) {
       def addPart[PartType](name: String, value: PartType)(implicit
-          encoder:                PartEncoder[PartType]
+          encoder: PartEncoder[PartType]
       ): MultipartBuilder =
         new MultipartBuilder(request, encoder.encode[F](name, value) +: parts)
 
       def maybeAddPart[PartType](name: String, maybeValue: Option[PartType])(implicit
-          encoder:                     PartEncoder[PartType]
+          encoder: PartEncoder[PartType]
       ): MultipartBuilder = maybeValue
         .map(addPart(name, _))
         .getOrElse(this)

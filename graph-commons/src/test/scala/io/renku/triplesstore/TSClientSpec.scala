@@ -49,7 +49,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
   "TSClientImpl" should {
     "be a RestClient" in new QueryClientTestCase {
-      type IOTSClientImpl = TSClient[IO]
+      type IOTSClientImpl = TSClientImpl[IO]
       client shouldBe a[IOTSClientImpl]
       client shouldBe a[RestClient[IO, _]]
     }
@@ -419,10 +419,10 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
   }
 
   private class TestTSClientImpl(
-      val query:     SparqlQuery,
-      storeConfig:   DatasetConnectionConfig
+      val query:   SparqlQuery,
+      storeConfig: DatasetConnectionConfig
   )(implicit logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
-      extends TSClient[IO](storeConfig) {
+      extends TSClientImpl[IO](storeConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -434,9 +434,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
   }
 
   private class TestTSQueryClientImpl(val query: SparqlQuery, storeConfig: DatasetConnectionConfig)(implicit
-      logger:                                    Logger[IO],
-      timeRecorder:                              SparqlQueryTimeRecorder[IO]
-  ) extends TSClient[IO](storeConfig)
+      logger:       Logger[IO],
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  ) extends TSClientImpl[IO](storeConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

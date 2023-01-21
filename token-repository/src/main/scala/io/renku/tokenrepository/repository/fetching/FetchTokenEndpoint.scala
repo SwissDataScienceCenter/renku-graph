@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 trait FetchTokenEndpoint[F[_]] {
   def fetchToken[ID](
       projectIdentifier: ID
-  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]]
+  )(implicit findToken: ID => OptionT[F, AccessToken]): F[Response[F]]
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken]
   implicit val findByPath: projects.Path => OptionT[F, AccessToken]
@@ -51,7 +51,7 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
 
   override def fetchToken[ID](
       projectIdentifier: ID
-  )(implicit findToken:  ID => OptionT[F, AccessToken]): F[Response[F]] =
+  )(implicit findToken: ID => OptionT[F, AccessToken]): F[Response[F]] =
     findToken(projectIdentifier).value
       .flatMap(toHttpResult(projectIdentifier))
       .recoverWith(httpResult(projectIdentifier))

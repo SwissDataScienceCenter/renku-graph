@@ -346,7 +346,7 @@ class EventPersisterSpec
                   maybeEventMessage
                 )
             }
-          session.prepare(query).use(_.unique(compoundEventId.id ~ compoundEventId.projectId))
+          session.prepare(query).flatMap(_.unique(compoundEventId.id ~ compoundEventId.projectId))
         }
       }
   }

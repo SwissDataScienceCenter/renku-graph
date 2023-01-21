@@ -32,15 +32,17 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
 
-  def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal]): List[SparqlQuery]
-
-  def prepareUpdatesWhenInvalidatedExt(projectId: projects.ResourceId,
-                                       dataset:   Dataset[Dataset.Provenance.ImportedExternal]
+  def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal])(implicit
+      ev: Dataset.Provenance.Internal.type
   ): List[SparqlQuery]
 
-  def prepareUpdatesWhenInvalidatedInt(projectId: projects.ResourceId,
-                                       dataset:   Dataset[Dataset.Provenance.ImportedInternal]
-  ): List[SparqlQuery]
+  def prepareUpdatesWhenInvalidated(projectId: projects.ResourceId,
+                                    dataset:   Dataset[Dataset.Provenance.ImportedExternal]
+  )(implicit ev: Dataset.Provenance.ImportedExternal.type): List[SparqlQuery]
+
+  def prepareUpdatesWhenInvalidated(projectId: projects.ResourceId,
+                                    dataset:   Dataset[Dataset.Provenance.ImportedInternal]
+  )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery]
 
   def prepareUpdates(dataset:                Dataset[Dataset.Provenance.ImportedInternal],
                      maybeKGTopmostSameAses: Set[TopmostSameAs]
@@ -87,7 +89,9 @@ private trait UpdatesCreator {
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  override def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal]): List[SparqlQuery] =
+  override def prepareUpdatesWhenInvalidated(dataset: Dataset[Dataset.Provenance.Internal])(implicit
+      ev: Dataset.Provenance.Internal.type
+  ): List[SparqlQuery] =
     List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
 
   override def prepareUpdatesWhenInvalidatedExt(

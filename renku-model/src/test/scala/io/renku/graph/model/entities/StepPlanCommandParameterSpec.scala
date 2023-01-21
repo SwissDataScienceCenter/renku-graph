@@ -31,7 +31,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StepPlanCommandParameterSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  GraphClass.all.foreach { implicit graphClass =>
+  (GraphClass.Default :: GraphClass.Project :: Nil) foreach { implicit graphClass =>
     show"StepPlanCommandParameter.decode graphClass=$graphClass" should {
 
       "turn JsonLD of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {

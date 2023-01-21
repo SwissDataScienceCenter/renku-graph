@@ -49,7 +49,7 @@ private trait EventStatusUpdater[F[_]] {
   def toTriplesStore(eventId: CompoundEventId, projectPath: projects.Path, processingTime: EventProcessingTime): F[Unit]
 
   def rollback[S <: EventStatus](eventId: CompoundEventId, projectPath: projects.Path)(implicit
-      rollbackStatus:                     () => S
+      rollbackStatus: () => S
   ): F[Unit]
 
   def toFailure(eventId:     CompoundEventId,
@@ -123,8 +123,8 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
   )
 
   override def rollback[S <: EventStatus](
-      eventId:               CompoundEventId,
-      projectPath:           projects.Path
+      eventId:     CompoundEventId,
+      projectPath: projects.Path
   )(implicit rollbackStatus: () => S): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",

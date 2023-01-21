@@ -44,7 +44,7 @@ trait EventSender[F[_]] {
   def sendEvent(eventContent: EventRequestContent.NoPayload, context: EventContext): F[Unit]
 
   def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], context: EventContext)(implicit
-      partEncoder:                         RestClient.PartEncoder[PayloadType]
+      partEncoder: RestClient.PartEncoder[PayloadType]
   ): F[Unit]
 }
 
@@ -74,7 +74,7 @@ class EventSenderImpl[F[_]: Async: Logger](
 
   override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType],
                                       context:      EventContext
-  )(implicit partEncoder:                           RestClient.PartEncoder[PayloadType]): F[Unit] = for {
+  )(implicit partEncoder: RestClient.PartEncoder[PayloadType]): F[Unit] = for {
     uri            <- validateUri(s"$eventLogUrl/events")
     request        <- createRequest(uri, eventContent)
     responseStatus <- sendWithRetry(request, context)
@@ -87,7 +87,7 @@ class EventSenderImpl[F[_]: Async: Logger](
       .build()
 
   private def createRequest[PayloadType](uri: Uri, eventRequestContent: EventRequestContent.WithPayload[PayloadType])(
-      implicit partEncoder:                   RestClient.PartEncoder[PayloadType]
+      implicit partEncoder: RestClient.PartEncoder[PayloadType]
   ) = request(POST, uri).withMultipartBuilder
     .addPart("event", eventRequestContent.event)
     .addPart("payload", eventRequestContent.payload)

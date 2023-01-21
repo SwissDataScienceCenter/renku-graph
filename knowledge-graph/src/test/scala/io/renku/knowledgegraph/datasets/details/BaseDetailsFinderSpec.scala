@@ -96,7 +96,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   private def nonModifiedToResultSet(project:     testentities.RenkuProject,
                                      dataset:     testentities.Dataset[testentities.Dataset.Provenance.NonModified],
                                      description: String
-  )(implicit renkuUrl:                            RenkuUrl) = {
+  )(implicit renkuUrl: RenkuUrl) = {
     val binding = json"""{
       "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":        {"value": ${dataset.identifier}},

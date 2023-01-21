@@ -37,14 +37,14 @@ private trait EventsDistributor[F[_]] {
 }
 
 private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, CategoryEvent](
-    categoryName:                 CategoryName,
-    subscribers:                  Subscribers[F, _],
-    eventsFinder:                 EventFinder[F, CategoryEvent],
-    eventsSender:                 EventsSender[F, CategoryEvent],
-    eventDelivery:                EventDelivery[F, CategoryEvent],
-    dispatchRecovery:             DispatchRecovery[F, CategoryEvent],
-    noEventSleep:                 FiniteDuration,
-    onErrorSleep:                 FiniteDuration
+    categoryName:     CategoryName,
+    subscribers:      Subscribers[F, _],
+    eventsFinder:     EventFinder[F, CategoryEvent],
+    eventsSender:     EventsSender[F, CategoryEvent],
+    eventDelivery:    EventDelivery[F, CategoryEvent],
+    dispatchRecovery: DispatchRecovery[F, CategoryEvent],
+    noEventSleep:     FiniteDuration,
+    onErrorSleep:     FiniteDuration
 )(implicit val showCategoryEvent: Show[CategoryEvent])
     extends EventsDistributor[F] {
 
@@ -113,12 +113,12 @@ private object EventsDistributor {
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply[F[_]: Async: Logger: MetricsRegistry, CategoryEvent](
-      categoryName:             CategoryName,
-      subscribers:              Subscribers[F, _],
-      eventsFinder:             EventFinder[F, CategoryEvent],
-      eventDelivery:            EventDelivery[F, CategoryEvent],
-      categoryEventEncoder:     EventEncoder[CategoryEvent],
-      dispatchRecovery:         DispatchRecovery[F, CategoryEvent]
+      categoryName:         CategoryName,
+      subscribers:          Subscribers[F, _],
+      eventsFinder:         EventFinder[F, CategoryEvent],
+      eventDelivery:        EventDelivery[F, CategoryEvent],
+      categoryEventEncoder: EventEncoder[CategoryEvent],
+      dispatchRecovery:     DispatchRecovery[F, CategoryEvent]
   )(implicit showCategoryEvent: Show[CategoryEvent]): F[EventsDistributor[F]] = for {
     eventsSender <- EventsSender[F, CategoryEvent](categoryName, categoryEventEncoder)
   } yield new EventsDistributorImpl(categoryName,
