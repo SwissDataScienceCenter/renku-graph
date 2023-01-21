@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,7 +16,22 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "renku-model-tiny-types"
+package io.renku.cli.model
 
-libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
+import io.renku.graph.model.commandParameters._
+
+trait CliCommandParameterBase {
+
+  def resourceId: ResourceId
+
+  def name: Name
+
+  def description: Option[Description]
+
+  def prefix: Option[Prefix]
+
+  def position: Option[Position]
+
+  def defaultValue: ParameterDefaultValue
+
+}

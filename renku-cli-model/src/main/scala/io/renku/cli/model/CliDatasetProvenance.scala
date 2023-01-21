@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,7 +16,18 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "renku-model-tiny-types"
+package io.renku.cli.model
 
-libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
+import io.renku.graph.model.InvalidationTime
+import io.renku.graph.model.datasets.{DateModified => _, _}
+
+/** View on the dataset focusing on provenance properties.
+ */
+final case class CliDatasetProvenance(
+    createdOrPublished: Date,
+    modifiedAt:         Option[DateModified],
+    sameAs:             Option[CliDatasetSameAs],
+    derivedFrom:        Option[DerivedFrom],
+    originalIdentifier: Option[OriginalIdentifier],
+    invalidationTime:   Option[InvalidationTime]
+)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,7 +16,19 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "renku-model-tiny-types"
+package io.renku.cli.model.generators
 
-libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
+import io.renku.cli.model.CliAgent
+import io.renku.graph.model.RenkuTinyTypeGenerators
+import org.scalacheck.Gen
+
+trait AgentGenerators {
+
+  def agentGen: Gen[CliAgent] =
+    for {
+      id   <- RenkuTinyTypeGenerators.agentResourceIdGen
+      name <- RenkuTinyTypeGenerators.agentNameGen
+    } yield CliAgent(id, name)
+}
+
+object AgentGenerators extends AgentGenerators

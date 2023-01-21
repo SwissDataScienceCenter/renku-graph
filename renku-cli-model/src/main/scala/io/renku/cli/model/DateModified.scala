@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,7 +16,17 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "renku-model-tiny-types"
+package io.renku.cli.model
 
-libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
+import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.tinytypes.constraints.InstantNotInTheFuture
+import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
+
+import java.time.Instant
+
+final class DateModified private (val value: Instant) extends InstantTinyType
+
+object DateModified
+    extends TinyTypeFactory[DateModified](new DateModified(_))
+    with InstantNotInTheFuture[DateModified]
+    with TinyTypeJsonLDOps[DateModified]

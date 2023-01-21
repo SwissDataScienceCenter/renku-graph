@@ -32,6 +32,13 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
+  def associationResourceIdGen: Gen[associations.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(associations.ResourceId)
+
+  def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
+
+  def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
+    Generators.timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
 
   implicit val cliVersions: Gen[CliVersion] = for {
     version       <- Generators.semanticVersions
@@ -215,10 +222,14 @@ trait RenkuTinyTypeGenerators {
     Generators.nonBlankStrings().map(_.value).toGeneratorOf[plans.ProgrammingLanguage]
   implicit val planSuccessCodes: Gen[plans.SuccessCode] =
     Generators.positiveInts().map(_.value).toGeneratorOf[plans.SuccessCode]
+  implicit val planDerivedFroms: Gen[plans.DerivedFrom] =
+    Generators.validatedUrls.map(_.value).map(plans.DerivedFrom.apply)
 
   def planDatesCreated(after: InstantTinyType): Gen[plans.DateCreated] =
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
 
+  val entityResourceIds: Gen[entityModel.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(entityModel.ResourceId)
   val entityFileLocations: Gen[entityModel.Location.File] =
     Generators.relativePaths() map entityModel.Location.File.apply
   val entityFolderLocations: Gen[entityModel.Location.Folder] =
@@ -227,8 +238,13 @@ trait RenkuTinyTypeGenerators {
   val entityChecksums: Gen[entityModel.Checksum] =
     Generators.nonBlankStrings(40, 40).map(_.value).map(entityModel.Checksum.apply)
 
+  val activityResourceIdGen: Gen[activities.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(activities.ResourceId)
+
   val activityStartTimes: Gen[activities.StartTime] =
     Generators.timestampsNotInTheFuture.map(activities.StartTime.apply)
+  val activityEndTimeGen: Gen[activities.EndTime] =
+    Generators.timestampsNotInTheFuture.map(activities.EndTime.apply)
 
   def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(activities.StartTime)
@@ -252,6 +268,38 @@ trait RenkuTinyTypeGenerators {
   val commandParameterDescription: Gen[commandParameters.Description] =
     Generators.sentences().map(s => commandParameters.Description(s.value))
 
+  val commandParameterResourceId: Gen[commandParameters.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(commandParameters.ResourceId)
+
+  val commandParameterPositionGen: Gen[commandParameters.Position] =
+    Generators.positiveInts(max = 5).map(_.value).map(commandParameters.Position.apply)
+
+  val commandParameterDefaultValueGen: Gen[commandParameters.ParameterDefaultValue] =
+    Generators.nonBlankStrings().map(v => commandParameters.ParameterDefaultValue(v.value))
+
+  val commandParameterPrefixGen: Gen[commandParameters.Prefix] =
+    Generators.nonBlankStrings(maxLength = 2).map(s => commandParameters.Prefix(s"-$s"))
+
+  val generationsResourceIdGen: Gen[generations.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(generations.ResourceId)
+
+  val partResourceIdGen: Gen[datasets.PartResourceId] =
+    Generators.validatedUrls.map(id => datasets.PartResourceId(id.value))
+
+  val agentResourceIdGen: Gen[agents.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(agents.ResourceId)
+
+  val agentNameGen: Gen[agents.Name] =
+    Generators.nonBlankStrings().map(_.value).map(agents.Name)
+
+  val parameterValueIdGen: Gen[parameterValues.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(parameterValues.ResourceId)
+
+  val parameterLinkResourceIdGen: Gen[parameterLinks.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(parameterLinks.ResourceId)
+
+  val usageResourceIdGen: Gen[usages.ResourceId] =
+    Generators.validatedUrls.map(_.value).map(usages.ResourceId)
 }
 
 object RenkuTinyTypeGenerators extends RenkuTinyTypeGenerators

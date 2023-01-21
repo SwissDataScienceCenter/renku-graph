@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,7 +16,20 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "renku-model-tiny-types"
+package io.renku.cli.model.generators
 
-libraryDependencies += "com.softwaremill.diffx" %% "diffx-scalatest-should" % "0.8.2" % Test
+object all
+    extends BaseGenerators
+    with PersonGenerators
+    with EntityGenerators
+    with DatasetFileGenerators
+    with DatasetGenerators
+    with AgentGenerators
+    with ParameterValueGenerators
+    with CommandParameterGenerators
+    with PlanGenerators
+    with UsageGenerators
+    with GenerationGenerators
+    with ActivityGenerators
+    with ProjectGenerators
+    with AssociationGenerators
