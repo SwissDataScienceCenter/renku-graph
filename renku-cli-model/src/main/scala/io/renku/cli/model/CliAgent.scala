@@ -18,10 +18,10 @@
 
 package io.renku.cli.model
 
+import Ontologies.{Prov, Schema}
 import io.renku.graph.model.agents._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
-import Ontologies.{Prov, Schema}
+import io.renku.jsonld._
 
 final case class CliAgent(
     resourceId: ResourceId,

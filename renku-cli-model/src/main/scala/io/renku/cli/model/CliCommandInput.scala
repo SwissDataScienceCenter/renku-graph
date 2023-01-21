@@ -18,10 +18,10 @@
 
 package io.renku.cli.model
 
+import Ontologies.{Renku, Schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
-import Ontologies.{Renku, Schema}
+import io.renku.jsonld._
 
 final case class CliCommandInput(
     resourceId:     ResourceId,

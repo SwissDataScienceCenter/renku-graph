@@ -20,10 +20,10 @@ package io.renku.cli.model
 
 import cats.data.NonEmptyList
 import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
-import io.renku.graph.model.{InvalidationTime, entityModel}
 import io.renku.graph.model.plans._
+import io.renku.graph.model.{InvalidationTime, entityModel}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class CliWorkflowFileCompositePlan(
     id:               ResourceId,

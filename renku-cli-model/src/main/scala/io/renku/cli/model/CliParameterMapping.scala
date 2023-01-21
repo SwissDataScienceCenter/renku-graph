@@ -24,7 +24,7 @@ import io.renku.cli.model.CliParameterMapping.MappedParam
 import io.renku.cli.model.Ontologies.{Renku, Schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class CliParameterMapping(
     resourceId:   ResourceId,

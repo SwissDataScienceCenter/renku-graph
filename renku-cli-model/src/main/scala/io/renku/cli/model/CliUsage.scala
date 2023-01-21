@@ -20,8 +20,8 @@ package io.renku.cli.model
 
 import io.renku.cli.model.Ontologies.Prov
 import io.renku.graph.model.usages._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.syntax._
+import io.renku.jsonld._
 
 final case class CliUsage(resourceId: ResourceId, entity: CliEntity) extends CliModel
 

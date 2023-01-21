@@ -18,7 +18,7 @@
 
 package io.renku.cli.model.generators
 
-import io.renku.cli.model.{CliCommandInput, CliCommandOutput, CliCommandParameter, CliMappedIOStream, CliParameterLink, CliParameterMapping}
+import io.renku.cli.model._
 import io.renku.generators.Generators
 import io.renku.graph.model.RenkuTinyTypeGenerators
 import org.scalacheck.Gen

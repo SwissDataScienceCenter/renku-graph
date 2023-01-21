@@ -23,7 +23,7 @@ import io.renku.graph.model.entityModel._
 import io.renku.graph.model.generations
 import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{Cursor, EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class CliEntity(
     resourceId:    ResourceId,

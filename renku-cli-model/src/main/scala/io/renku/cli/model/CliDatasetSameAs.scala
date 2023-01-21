@@ -21,7 +21,7 @@ package io.renku.cli.model
 import io.renku.cli.model.Ontologies.Schema
 import io.renku.graph.model.datasets.{ExternalSameAs, InternalSameAs}
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.jsonld.{EntityId, EntityIdEncoder, EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType, constraints}
 
 final class CliDatasetSameAs private (val value: String) extends AnyVal with UrlTinyType {

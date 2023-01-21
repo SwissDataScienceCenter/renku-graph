@@ -24,7 +24,7 @@ import io.renku.cli.model.CliActivity.Agent
 import io.renku.cli.model.Ontologies.{Prov, Renku}
 import io.renku.graph.model.activities._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class CliActivity(
     resourceId:  ResourceId,

@@ -26,7 +26,7 @@ import io.renku.cli.model.Ontologies.Renku
 import io.renku.graph.model.commandParameters
 import io.renku.graph.model.parameterLinks._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld._
 
 final case class CliParameterLink(
     id:     ResourceId,

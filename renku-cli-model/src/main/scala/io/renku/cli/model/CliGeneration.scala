@@ -24,8 +24,8 @@ import io.renku.cli.model.CliGeneration.GenerationEntity
 import io.renku.cli.model.Ontologies.Prov
 import io.renku.graph.model.generations._
 import io.renku.graph.model.{activities, entityModel}
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliGeneration(
     resourceId:         ResourceId,
@@ -98,9 +98,9 @@ object CliGeneration {
   implicit val jsonLDDecoder: JsonLDDecoder[CliGeneration] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        activityId <- cursor.downField(Prov.activity).downEntityId.as[activities.ResourceId]
-        allEntities  <- cursor.focusTop.as[List[GenerationEntity]]
+        resourceId  <- cursor.downEntityId.as[ResourceId]
+        activityId  <- cursor.downField(Prov.activity).downEntityId.as[activities.ResourceId]
+        allEntities <- cursor.focusTop.as[List[GenerationEntity]]
         entity <- allEntities
                     .find(_.generationIds.contains(resourceId))
                     .toRight(DecodingFailure(s"No related entity found for generation '$resourceId'", Nil))

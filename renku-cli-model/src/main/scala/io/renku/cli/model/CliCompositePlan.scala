@@ -18,15 +18,15 @@
 
 package io.renku.cli.model
 
+import Ontologies.{Prov, Renku, Schema}
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.cli.model.CliCompositePlan.ChildPlan
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
-import Ontologies.{Prov, Renku, Schema}
-import io.circe.DecodingFailure
+import io.renku.jsonld._
 
 final case class CliCompositePlan(
     id:               ResourceId,

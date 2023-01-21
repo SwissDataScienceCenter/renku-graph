@@ -18,9 +18,9 @@
 
 package io.renku.cli.model.generators
 
-import io.renku.cli.model.{CliCompositePlan, CliPlan, CliWorkflowFileCompositePlan, CliWorkflowFilePlan}
+import io.renku.cli.model._
 import io.renku.generators.Generators
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl, entityModel, plans}
+import io.renku.graph.model._
 import org.scalacheck.Gen
 
 import java.time.Instant

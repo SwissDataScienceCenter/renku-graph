@@ -19,8 +19,8 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.CliPerson
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import io.renku.graph.model.persons.ResourceId
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
 trait PersonGenerators {
