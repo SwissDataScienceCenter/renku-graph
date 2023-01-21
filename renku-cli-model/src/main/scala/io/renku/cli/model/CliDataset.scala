@@ -23,10 +23,10 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
-import io.renku.graph.model.datasets.{DateModified => _, _}
+import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.Image
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliDataset(
     resourceId:         ResourceId,

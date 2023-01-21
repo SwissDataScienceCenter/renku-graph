@@ -22,17 +22,18 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{DecodingFailure, Json}
+import io.renku.cli.model.CliDataset
+import io.renku.cli.model.diffx.CliDiffInstances.cliDatasetDiff
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
-import io.renku.graph.model.cli.{CliDataset, CliGenerators}
+import GraphModelGenerators.graphClasses
+import io.renku.graph.model.cli.CliGenerators
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.jsonld.parser._
@@ -55,13 +56,11 @@ class DatasetSpec
     "turn JsonLD Dataset entity into the Dataset object" in {
       forAll(CliGenerators.datasetGen()) { dataset =>
         JsonLD
-          .arr(dataset.asJsonLD :: Nil: _*)
+          .arr(dataset.asJsonLD)
           .flatten
           .fold(throw _, identity)
           .cursor
-          .as[List[CliDataset]] shouldMatchToRight List(
-          dataset
-        )
+          .as[List[CliDataset]] shouldMatchToRight List(dataset)
       }
     }
 

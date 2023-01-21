@@ -52,7 +52,7 @@ private object Generators {
                      creators,
                      keywords,
                      maybeDesc,
-                     images,
+                     images.toList,
                      links
   )
 

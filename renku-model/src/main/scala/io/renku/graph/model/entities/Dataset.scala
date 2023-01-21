@@ -22,7 +22,7 @@ import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model._
-import io.renku.graph.model.cli.{CliDataset, CliDatasetProvenance}
+import io.renku.cli.model.{CliDataset, CliDatasetProvenance}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
@@ -148,7 +148,7 @@ object Dataset {
 
   object Provenance {
 
-    object Internal {
+    implicit object Internal {
       object FromCli {
         def unapply(cli: CliDataset): Option[NonEmptyList[Person] => Internal] =
           cli.provenance match {
@@ -170,7 +170,7 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
-    object ImportedExternal {
+    implicit object ImportedExternal {
       object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedExternal] =
           cliData.provenance match {
@@ -202,8 +202,7 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
-    object ImportedInternal
-
+    implicit object ImportedInternal
     sealed trait ImportedInternal extends Provenance {
       val resourceId:         ResourceId
       val identifier:         Identifier

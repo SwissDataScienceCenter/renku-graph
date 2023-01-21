@@ -29,16 +29,16 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.cli.CliConv
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
-import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
+import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
@@ -410,9 +410,7 @@ class ProjectSpec
       val invalidPlanGen =
         for {
           cp <- compositePlanNonEmptyMappings
-                  .mapF(
-                    _.map(_.asInstanceOf[CompositePlan.NonModified])
-                  )
+                  .mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
           step <- stepPlanGenFactory
         } yield cp.copy(plans = NonEmptyList.one(step))
 
@@ -1250,7 +1248,7 @@ class ProjectSpec
 
     // we must use here the encoder that creates the CLI data and not the data we store in our jena
     val datasetCliEncoder: JsonLDEncoder[entities.Dataset[entities.Dataset.Provenance]] = ds =>
-      CliConv.from(ds).asJsonLD
+      CliConverters.from(ds).asJsonLD
 
     JsonLD
       .arr(

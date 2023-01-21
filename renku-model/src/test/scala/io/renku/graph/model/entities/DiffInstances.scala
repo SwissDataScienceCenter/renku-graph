@@ -60,14 +60,11 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val commandParamDiff: Diff[StepPlanCommandParameter.CommandParameter] =
     Diff.derived[StepPlanCommandParameter.CommandParameter]
 
-  implicit val planDerivationDiff: Diff[Plan.Derivation] =
-    Diff.derived[Plan.Derivation]
+  implicit val planDerivationDiff: Diff[Plan.Derivation] = Diff.derived[Plan.Derivation]
 
-  implicit val parameterMappingDiff: Diff[ParameterMapping] =
-    Diff.derived[ParameterMapping]
+  implicit val parameterMappingDiff: Diff[ParameterMapping] = Diff.derived[ParameterMapping]
 
-  implicit val parameterLinkDiff: Diff[ParameterLink] =
-    Diff.derived[ParameterLink]
+  implicit val parameterLinkDiff: Diff[ParameterLink] = Diff.derived[ParameterLink]
 
   implicit val commandParameterValueDiff: Diff[ParameterValue.CommandParameterValue] =
     Diff.derived[ParameterValue.CommandParameterValue]
@@ -81,8 +78,7 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val locationParameterValueDiff: Diff[ParameterValue.LocationParameterValue] =
     Diff.derived[ParameterValue.LocationParameterValue]
 
-  implicit val parameterValueDiff: Diff[ParameterValue] =
-    Diff.derived[ParameterValue]
+  implicit val parameterValueDiff: Diff[ParameterValue] = Diff.derived[ParameterValue]
 
   implicit val stepPlanDiff: Diff[StepPlan] = Diff.derived[StepPlan]
 
@@ -90,65 +86,36 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val planDiff: Diff[Plan] = Diff.derived[Plan]
 
-  implicit val agentDiff: Diff[Agent] =
-    Diff.derived[Agent]
+  implicit val agentDiff: Diff[Agent] = Diff.derived[Agent]
 
-  implicit val inputEntityDiff: Diff[Entity.InputEntity] =
-    Diff.derived[Entity.InputEntity]
+  implicit val inputEntityDiff: Diff[Entity.InputEntity] = Diff.derived[Entity.InputEntity]
 
-  implicit val outputEntityDiff: Diff[Entity.OutputEntity] =
-    Diff.derived[Entity.OutputEntity]
+  implicit val outputEntityDiff: Diff[Entity.OutputEntity] = Diff.derived[Entity.OutputEntity]
 
-  implicit val entityDiff: Diff[Entity] =
-    Diff.derived[Entity]
+  implicit val entityDiff: Diff[Entity] = Diff.derived[Entity]
 
-  implicit val associationDiff: Diff[Association] =
-    Diff.derived[Association]
+  implicit val associationDiff: Diff[Association] = Diff.derived[Association]
 
-  implicit val usagesDiff: Diff[Usage] =
-    Diff.derived[Usage]
+  implicit val usagesDiff: Diff[Usage] = Diff.derived[Usage]
 
-  implicit val generationDiff: Diff[Generation] =
-    Diff.derived[Generation]
+  implicit val generationDiff: Diff[Generation] = Diff.derived[Generation]
 
-  implicit val activityDiff: Diff[Activity] =
-    Diff.derived[Activity]
-
-  implicit val datasetDateDiff: Diff[datasets.Date] =
-    Diff.diffForString.contramap(_.value.toString)
+  implicit val activityDiff: Diff[Activity] = Diff.derived[Activity]
 
   implicit val importedInternalAncestorExternalDiff: Diff[ImportedInternalAncestorExternal] =
     Diff.derived[ImportedInternalAncestorExternal]
 
-  implicit val provenanceDiff: Diff[Provenance] =
-    Diff.derived[Provenance]
+  implicit val provenanceDiff: Diff[Provenance] = Diff.derived[Provenance]
 
-  implicit val identificationDiff: Diff[Identification] =
-    Diff.derived[Identification]
+  implicit val identificationDiff: Diff[Identification] = Diff.derived[Identification]
 
-  implicit val cliProvenanceDiff: Diff[CliDatasetProvenance] =
-    Diff.derived[CliDatasetProvenance]
+  implicit val additionalInfoDiff: Diff[AdditionalInfo] = Diff.derived[AdditionalInfo]
 
-  implicit val cliPersonDiff: Diff[CliPerson] =
-    Diff.derived[CliPerson]
+  implicit val datasetPartDiff: Diff[DatasetPart] = Diff.derived[DatasetPart]
 
-  implicit val cliDatasetFileDiff: Diff[CliDatasetFile] =
-    Diff.derived[CliDatasetFile]
+  implicit val publicationEventDiff: Diff[PublicationEvent] = Diff.derived[PublicationEvent]
 
-  implicit val cliDatasetDiff: Diff[CliDataset] =
-    Diff.derived[CliDataset]
-
-  implicit val additionalInfoDiff: Diff[AdditionalInfo] =
-    Diff.derived[AdditionalInfo]
-
-  implicit val datasetPartDiff: Diff[DatasetPart] =
-    Diff.derived[DatasetPart]
-
-  implicit val publicationEventDiff: Diff[PublicationEvent] =
-    Diff.derived[PublicationEvent]
-
-  implicit def datasetDiff: Diff[Dataset[Provenance]] =
-    Diff.derived[Dataset[Provenance]]
+  implicit def datasetDiff: Diff[Dataset[Provenance]] = Diff.derived[Dataset[Provenance]]
 
   implicit val renkuProjectWithParentDiff: Diff[RenkuProject.WithParent] =
     Diff.derived[RenkuProject.WithParent]
@@ -156,8 +123,7 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val renkuProjectWithoutParentDiff: Diff[RenkuProject.WithoutParent] =
     Diff.derived[RenkuProject.WithoutParent]
 
-  implicit val renkuProjectDiff: Diff[RenkuProject] =
-    Diff.derived[RenkuProject]
+  implicit val renkuProjectDiff: Diff[RenkuProject] = Diff.derived[RenkuProject]
 
   implicit val nonRenkuProjectWithoutParentDiff: Diff[NonRenkuProject.WithoutParent] =
     Diff.derived[NonRenkuProject.WithoutParent]
@@ -165,11 +131,9 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val nonRenkuProjectWithParentDiff: Diff[NonRenkuProject.WithParent] =
     Diff.derived[NonRenkuProject.WithParent]
 
-  implicit val nonRenkuProjectDiff: Diff[NonRenkuProject] =
-    Diff.derived[NonRenkuProject]
+  implicit val nonRenkuProjectDiff: Diff[NonRenkuProject] = Diff.derived[NonRenkuProject]
 
-  implicit val projectDiff: Diff[Project] =
-    Diff.derived[Project]
+  implicit val projectDiff: Diff[Project] = Diff.derived[Project]
 }
 
 object DiffInstances extends DiffInstances

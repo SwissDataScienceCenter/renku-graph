@@ -94,16 +94,16 @@ private object UpdatesCreator extends UpdatesCreator {
   ): List[SparqlQuery] =
     List(useTopmostSameAsFromTheOldestDeletedDSChildOnAncestors(dataset), deleteSameAs(dataset))
 
-  override def prepareUpdatesWhenInvalidatedExt(
+  override def prepareUpdatesWhenInvalidated(
       projectId: projects.ResourceId,
       dataset:   Dataset[Dataset.Provenance.ImportedExternal]
-  ): List[SparqlQuery] =
+  )(implicit ev: Dataset.Provenance.ImportedExternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(projectId, dataset))
 
-  override def prepareUpdatesWhenInvalidatedInt(
+  override def prepareUpdatesWhenInvalidated(
       projectId: projects.ResourceId,
       dataset:   Dataset[Dataset.Provenance.ImportedInternal]
-  ): List[SparqlQuery] =
+  )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(projectId, dataset))
 
   override def prepareUpdates(dataset:                Dataset[Provenance.ImportedInternal],

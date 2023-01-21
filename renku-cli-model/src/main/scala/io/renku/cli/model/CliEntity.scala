@@ -22,8 +22,8 @@ import io.renku.cli.model.Ontologies.{Prov, Renku}
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.generations
 import io.renku.jsonld.JsonLDDecoder.Result
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliEntity(
     resourceId:    ResourceId,

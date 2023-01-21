@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.renku.graph.model.cli.CliPerson
+import io.renku.cli.model.CliPerson
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
 import io.renku.jsonld._
@@ -188,8 +188,8 @@ object Person {
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       import io.circe.DecodingFailure
+      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
 
       def decodeSameAs[T](use: JsonLDDecoder[T], onMultiple: String): Either[DecodingFailure, Option[T]] =
         cursor
@@ -238,10 +238,10 @@ object Person {
 
   object Ontology {
 
-    val typeClass: Class = Class(schema / "Person")
-    val sameAs: Property = schema / "sameAs"
-    val nameProperty: DataProperty.Def = DataProperty(schema / "name", xsd / "string")
-    val emailProperty: DataProperty.Def = DataProperty(schema / "email", xsd / "string")
+    val typeClass:           Class            = Class(schema / "Person")
+    val sameAs:              Property         = schema / "sameAs"
+    val nameProperty:        DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val emailProperty:       DataProperty.Def = DataProperty(schema / "email", xsd / "string")
     val affiliationProperty: DataProperty.Def = DataProperty(schema / "affiliation", xsd / "string")
 
     lazy val typeDef: Type = {

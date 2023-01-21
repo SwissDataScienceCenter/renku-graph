@@ -225,8 +225,10 @@ trait RenkuTinyTypeGenerators {
   implicit val planDerivedFroms: Gen[plans.DerivedFrom] =
     Generators.validatedUrls.map(_.value).map(plans.DerivedFrom.apply)
 
-  def planDatesCreated(after: InstantTinyType): Gen[plans.DateCreated] =
+  def planCreatedDates(after: InstantTinyType): Gen[plans.DateCreated] =
     Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateCreated)
+  def planModifiedDates(after: InstantTinyType): Gen[plans.DateModified] =
+    Generators.timestampsNotInTheFuture(after.value).toGeneratorOf(plans.DateModified)
 
   val entityResourceIds: Gen[entityModel.ResourceId] =
     Generators.validatedUrls.map(_.value).map(entityModel.ResourceId)

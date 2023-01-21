@@ -63,18 +63,20 @@ class HierarchyOnInvalidationUpdaterSpec extends AnyWordSpec with MockFactory wi
       givenDS(entitiesInternal, notInvalidatedOn = Set(entitiesProject.resourceId))
       val internalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.Internal]))
-        .expects(entitiesInternal)
+        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.Internal])(
+          _: entities.Dataset.Provenance.Internal.type
+        ))
+        .expects(entitiesInternal, *)
         .returning(internalDsQueries)
 
       val entitiesImportedExternal = importedExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
       givenDS(entitiesImportedExternal, notInvalidatedOn = Set(entitiesProject.resourceId))
       val importedExternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdatesWhenInvalidatedExt(_: projects.ResourceId,
-                                          _: entities.Dataset[entities.Dataset.Provenance.ImportedExternal]
-        ))
-        .expects(entitiesProject.resourceId, entitiesImportedExternal)
+        .prepareUpdatesWhenInvalidated(_: projects.ResourceId,
+                                       _: entities.Dataset[entities.Dataset.Provenance.ImportedExternal]
+        )(_: entities.Dataset.Provenance.ImportedExternal.type))
+        .expects(entitiesProject.resourceId, entitiesImportedExternal, *)
         .returning(importedExternalDsQueries)
 
       val entitiesAncestorInternal =
@@ -82,10 +84,10 @@ class HierarchyOnInvalidationUpdaterSpec extends AnyWordSpec with MockFactory wi
       givenDS(entitiesAncestorInternal, notInvalidatedOn = Set(entitiesProject.resourceId))
       val ancestorInternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdatesWhenInvalidatedInt(_: projects.ResourceId,
-                                          _: entities.Dataset[entities.Dataset.Provenance.ImportedInternal]
-        ))
-        .expects(entitiesProject.resourceId, entitiesAncestorInternal)
+        .prepareUpdatesWhenInvalidated(_: projects.ResourceId,
+                                       _: entities.Dataset[entities.Dataset.Provenance.ImportedInternal]
+        )(_: entities.Dataset.Provenance.ImportedInternal.type))
+        .expects(entitiesProject.resourceId, entitiesAncestorInternal, *)
         .returning(ancestorInternalDsQueries)
 
       val entitiesAncestorExternal =
@@ -93,10 +95,10 @@ class HierarchyOnInvalidationUpdaterSpec extends AnyWordSpec with MockFactory wi
       givenDS(entitiesAncestorExternal, notInvalidatedOn = Set(entitiesProject.resourceId))
       val ancestorExternalDsQueries = sparqlQueries.generateList()
       (updatesCreator
-        .prepareUpdatesWhenInvalidatedInt(_: projects.ResourceId,
-                                          _: entities.Dataset[entities.Dataset.Provenance.ImportedInternal]
-        ))
-        .expects(entitiesProject.resourceId, entitiesAncestorExternal)
+        .prepareUpdatesWhenInvalidated(_: projects.ResourceId,
+                                       _: entities.Dataset[entities.Dataset.Provenance.ImportedInternal]
+        )(_: entities.Dataset.Provenance.ImportedInternal.type))
+        .expects(entitiesProject.resourceId, entitiesAncestorExternal, *)
         .returning(ancestorExternalDsQueries)
 
       val Success(updatedProject -> queries) =

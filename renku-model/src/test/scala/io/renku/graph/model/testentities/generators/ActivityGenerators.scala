@@ -41,7 +41,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   val activityIds: Gen[Activity.Id] = noDashUuid.toGeneratorOf(Activity.Id)
 
   def planDatesCreatedK: Kleisli[Gen, InstantTinyType, plans.DateCreated] =
-    Kleisli(planDatesCreated)
+    Kleisli(planCreatedDates)
 
   lazy val generationIds: Gen[Generation.Id] = noDashUuid.toGeneratorOf(Generation.Id)
 
@@ -92,7 +92,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     for {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
-      dateCreated  <- planDatesCreated(after = projectDateCreated)
+      dateCreated  <- planCreatedDates(after = projectDateCreated)
       creators     <- personEntities.toGeneratorOfList(max = 2)
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
   )

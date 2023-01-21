@@ -1,10 +1,11 @@
 package io.renku.graph.model.cli
 
 import cats.syntax.option._
-import io.renku.graph.model.entities
+import io.renku.cli.model._
+import io.renku.graph.model.{datasets, entities}
 
 /** Conversion functions for production model entities into cli entities. */
-trait CliConv {
+trait CliConverters {
 
   def from(dataset: entities.Dataset[entities.Dataset.Provenance]): CliDataset =
     CliDataset(
@@ -13,19 +14,15 @@ trait CliConv {
       title = dataset.identification.title,
       name = dataset.identification.name,
       createdOrPublished = dataset.provenance.date,
-      creators =
-        dataset.provenance.creators.map(p => CliPerson(p.resourceId, p.name, p.maybeEmail, p.maybeAffiliation)),
+      creators = dataset.provenance.creators.map(from),
       description = dataset.additionalInfo.maybeDescription,
       keywords = dataset.additionalInfo.keywords,
       images = dataset.additionalInfo.images,
       license = dataset.additionalInfo.maybeLicense,
       version = dataset.additionalInfo.maybeVersion,
-      datasetFiles = dataset.parts.map(p =>
-        CliDatasetFile(p.resourceId, p.external, p.entity, p.dateCreated, p.maybeSource, p.maybeInvalidationTime)
-      ),
+      datasetFiles = dataset.parts.map(from),
       dateModified = dataset.provenance match {
-        case m: entities.Dataset.Provenance.Modified =>
-          DateModified(m.date.value).some
+        case p: entities.Dataset.Provenance.Modified => datasets.DateModified(p.date).some
         case _ => None
       },
       sameAs = dataset.provenance match {
@@ -50,6 +47,27 @@ trait CliConv {
         case _ => None
       }
     )
+
+  def from(part: entities.DatasetPart): CliDatasetFile =
+    CliDatasetFile(part.resourceId,
+                   part.external,
+                   from(part.entity),
+                   part.dateCreated,
+                   part.maybeSource,
+                   part.maybeInvalidationTime
+    )
+
+  def from(entity: entities.Entity): CliEntity = entity match {
+    case entities.Entity.InputEntity(id, location, checksum) =>
+      CliEntity(id, EntityPath(location.value), checksum, generationIds = Nil)
+    case entities.Entity.OutputEntity(id, location, checksum, generationIds) =>
+      CliEntity(id, EntityPath(location.value), checksum, generationIds)
+  }
+
+  def from(person: entities.Person): CliPerson = {
+    person.maybeGitLabId.map(_ => throw new Exception(s"Cannot convert Person with GitLabId to CliPerson"))
+    CliPerson(person.resourceId, person.name, person.maybeEmail, person.maybeAffiliation)
+  }
 }
 
-object CliConv extends CliConv
+object CliConverters extends CliConverters

@@ -97,7 +97,7 @@ object LineageExemplarData {
     val plan1 = Plan.of(
       plans.Name("plan1"),
       Command("python").some,
-      planDatesCreated(after = project.dateCreated).generateOne,
+      planCreatedDates(after = project.dateCreated).generateOne,
       creators = Nil,
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
@@ -117,7 +117,7 @@ object LineageExemplarData {
     val plan2 = Plan.of(
       plans.Name("plan2"),
       Command("python").some,
-      planDatesCreated(after = activity1Plan1.startTime).generateOne,
+      planCreatedDates(after = activity1Plan1.startTime).generateOne,
       creators = Nil,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),

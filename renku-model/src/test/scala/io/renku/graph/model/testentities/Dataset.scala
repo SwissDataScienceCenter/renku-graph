@@ -21,8 +21,9 @@ package io.renku.graph.model.testentities
 import Dataset._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliDataset
 import io.renku.graph.model._
-import io.renku.graph.model.cli.{CliDataset, CliDatasetFile, CliDatasetSameAs, CliPerson, DateModified}
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images._
@@ -343,7 +344,7 @@ object Dataset {
       entities.Dataset.AdditionalInfo(
         dataset.additionalInfo.maybeDescription,
         dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images.toEntitiesImages(identification.resourceId),
+        dataset.additionalInfo.images.toEntitiesImages(identification.resourceId).toList,
         dataset.additionalInfo.maybeLicense,
         dataset.additionalInfo.maybeVersion
       ),
@@ -352,47 +353,8 @@ object Dataset {
     )
   }
 
-  implicit def toCliDataset[TP <: Provenance]: Dataset[TP] => CliDataset = dataset => {
-    val (modified, sameAs, derivedFrom, invalidationTime) = dataset.provenance match {
-      case p: Dataset.Provenance.ImportedInternalAncestorExternal =>
-        (None, CliDatasetSameAs(p.sameAs.value).some, None, None)
-      case p: Dataset.Provenance.ImportedInternalAncestorInternal =>
-        (None, CliDatasetSameAs(p.sameAs.value).some, None, None)
-      case p: Dataset.Provenance.ImportedExternal =>
-        (None, CliDatasetSameAs(p.sameAs.value).some, None, None)
-      case _: Dataset.Provenance.Internal =>
-        (None, None, None, None)
-      case p: Dataset.Provenance.Modified =>
-        (DateModified(p.date.value).some, None, p.derivedFrom.some, p.maybeInvalidationTime)
-    }
-
-    CliDataset(
-      resourceId = ResourceId(dataset.asEntityId.show),
-      identifier = dataset.identification.identifier,
-      title = dataset.identification.title,
-      name = dataset.identification.name,
-      createdOrPublished = dataset.provenance.date,
-      creators = dataset.provenance.creators.map(_.to[CliPerson]),
-      description = dataset.additionalInfo.maybeDescription,
-      keywords = dataset.additionalInfo.keywords.sorted,
-      images = dataset.additionalInfo.images.zipWithIndex.map { case (url, idx) =>
-        val imagePosition = ImagePosition(idx)
-        Image(
-          ImageResourceId(imageEntityId((dataset: Dataset[Provenance]).asEntityId, imagePosition).show),
-          url,
-          imagePosition
-        )
-      },
-      license = dataset.additionalInfo.maybeLicense,
-      version = dataset.additionalInfo.maybeVersion,
-      datasetFiles = dataset.parts.map(_.to[CliDatasetFile]),
-      dateModified = modified,
-      sameAs = sameAs,
-      derivedFrom = derivedFrom,
-      originalIdentifier = dataset.provenance.originalIdentifier.some,
-      invalidationTime = invalidationTime
-    )
-  }
+  implicit def toCliDataset[TP <: Provenance](implicit renkuUrl: RenkuUrl): Dataset[TP] => CliDataset = ds =>
+    CliConverters.from(ds.to[entities.Dataset[entities.Dataset.Provenance]])
 
   implicit def functions[P <: Provenance]: EntityFunctions[Dataset[P]] =
     EntityFunctions[entities.Dataset[entities.Dataset.Provenance]]
@@ -415,7 +377,7 @@ object Dataset {
 
   implicit class DatasetImagesOps(images: List[ImageUri]) {
 
-    def toEntitiesImages(dsResourceId: ResourceId) = images.zipWithIndex.map { case (url, idx) =>
+    def toEntitiesImages(dsResourceId: ResourceId): Seq[Image] = images.zipWithIndex.map { case (url, idx) =>
       val imagePosition = ImagePosition(idx)
       Image(
         ImageResourceId(imageEntityId(dsResourceId.asEntityId, imagePosition).show),
