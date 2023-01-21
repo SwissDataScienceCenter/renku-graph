@@ -31,7 +31,7 @@ class CliGenerationSpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  val generationGen = GenerationGenerators.generationGen
+  val generationGen = GenerationGenerators.generationGen()
 
   "decode/encode" should {
     "be compatible" in {

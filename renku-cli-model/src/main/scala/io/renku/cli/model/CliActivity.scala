@@ -77,7 +77,7 @@ object CliActivity {
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId  <- cursor.downEntityId.as[ResourceId]
-        generations <- cursor.focusTop.as[List[CliGeneration]]
+        generations <- cursor.downField(Prov.qualifiedGeneration).as[List[CliGeneration]]
         agents      <- cursor.downField(Prov.wasAssociatedWith).as[List[Agent]]
         agent <- agents.headOption.toRight(
                    DecodingFailure(

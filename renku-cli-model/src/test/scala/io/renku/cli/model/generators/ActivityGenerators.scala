@@ -41,10 +41,9 @@ trait ActivityGenerators {
       agent       <- activityAgentGen
       association <- AssociationGenerators.associationGen(planMinCreated)
       usages      <- Generators.listOf(UsageGenerators.usageGen, max = 3)
-      generations <- Generators.listOf(GenerationGenerators.generationGen, max = 3)
+      generations <- Generators.listOf(GenerationGenerators.generationGen(id), max = 3)
       parameters  <- Generators.listOf(ParameterValueGenerators.parameterValueGen, max = 3)
     } yield CliActivity(id, startTime, endTime, agent, association, usages, generations, parameters)
-
 }
 
 object ActivityGenerators extends ActivityGenerators

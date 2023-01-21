@@ -42,7 +42,7 @@ object CliEntity {
   private val withStrictEntityTypes: Cursor => Result[Boolean] =
     _.getEntityTypes.map(types => types == entityTypes)
 
-  implicit def jsonLdDecoder: JsonLDDecoder[CliEntity] =
+  implicit def jsonLDDecoder: JsonLDDecoder[CliEntity] =
     JsonLDDecoder.cacheableEntity(entityTypes, withStrictEntityTypes) { cursor =>
       for {
         resourceId    <- cursor.downEntityId.as[ResourceId]

@@ -72,7 +72,6 @@ private[cli] object Ontologies {
     val Generation    = prov / "Generation"
     val Location      = prov / "Location"
 
-    val hadMember            = prov / "hadMember"
     val activity             = prov / "activity"
     val agent                = prov / "agent"
     val hadPlan              = prov / "hadPlan"

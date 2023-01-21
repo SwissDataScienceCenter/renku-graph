@@ -20,6 +20,7 @@ package io.renku.cli.model
 
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher._
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, JsonLDDecoder, JsonLDEncoder}
 
 trait JsonLDCodecMatchers {
@@ -29,38 +30,28 @@ trait JsonLDCodecMatchers {
    * Note that this only works for structures that don't contain itself references to other As. The
    * assumption is that the given value produces as JSON-LD that contains only one value of type A.
    */
-  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](value: A, more: A*): Unit =
+  def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](value: A, more: A*): Any =
     assertCompatibleCodec((v: A) => List(v))(value, more: _*)
 
   /** Asserts that encoding the given value and decoding the result yields the expected value. */
   def assertCompatibleCodec[A <: CliModel: JsonLDDecoder: JsonLDEncoder: Diff](expected: A => List[A])(
       value: A,
       more:  A*
-  ): Unit = {
-    val jsonLD = value.asFlattenedJsonLD
-    val back = jsonLD.cursor
-      .as[List[A]]
-      .fold(throw _, identity)
+  ): Any = {
+    val firstEncoded = value.asFlattenedJsonLD
+    val firstDecoded = firstEncoded.cursor.as[List[A]].fold(throw _, identity)
 
-    back shouldMatchTo expected(value)
+    firstDecoded shouldMatchTo expected(value)
 
     if (more.nonEmpty) {
-      val all       = value :: more.toList
-      val allJsonLD = combineArrays(all.map(_.asFlattenedJsonLD))
-      //println(allJsonLD.toJson.spaces2)
-      //println(List.fill(80)("-").mkString)
-      val allBack = allJsonLD.cursor.as[List[A]].fold(throw _, identity)
+      val all        = value :: more.toList
+      val allEncoded = toFlattenedJsonLD(all.map(_.asJsonLD))
+      val allDecoded = allEncoded.cursor.as[List[A]].fold(throw _, identity)
 
-      allBack.sortBy(_.toString) shouldMatchTo all.flatMap(expected).sortBy(_.toString)
-      ()
+      allDecoded.sortBy(_.toString) shouldMatchTo all.flatMap(expected).sortBy(_.toString)
     }
   }
 
-  private def combineArrays(jsonld: Seq[JsonLD]): JsonLD =
-    jsonld.foldLeft(JsonLD.JsonLDArray(Seq.empty)) { (result, element) =>
-      element match {
-        case JsonLD.JsonLDArray(inner) => result.copy(jsons = inner ++ result.jsons)
-        case _                         => result.copy(element +: result.jsons)
-      }
-    }
+  private def toFlattenedJsonLD(jsonld: Seq[JsonLD]): JsonLD =
+    JsonLD.arr(jsonld: _*).flatten.fold(throw _, identity)
 }

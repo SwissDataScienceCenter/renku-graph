@@ -22,14 +22,15 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.CliGeneration.GenerationEntity
 import io.renku.cli.model.Ontologies.Prov
-import io.renku.graph.model.entityModel
 import io.renku.graph.model.generations._
+import io.renku.graph.model.{activities, entityModel}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Property, Reverse}
+import io.renku.jsonld._
 
 final case class CliGeneration(
-    resourceId: ResourceId,
-    entity:     GenerationEntity
+    resourceId:         ResourceId,
+    entity:             GenerationEntity,
+    activityResourceId: activities.ResourceId
 ) extends CliModel
 
 object CliGeneration {
@@ -62,7 +63,7 @@ object CliGeneration {
       CliEntity.matchingEntityTypes(ets) || CliCollection.matchingEntityTypes(ets)
 
     implicit def jsonLDDecoder: JsonLDDecoder[GenerationEntity] = {
-      val da = CliEntity.jsonLdDecoder.emap(e => Right(GenerationEntity(e)))
+      val da = CliEntity.jsonLDDecoder.emap(e => Right(GenerationEntity(e)))
       val db = CliCollection.jsonLdDecoder.emap(e => Right(GenerationEntity(e)))
       JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentTypes = cursor.getEntityTypes
@@ -90,7 +91,7 @@ object CliGeneration {
         generation.resourceId.asEntityId,
         entityTypes,
         Reverse.ofJsonLDsUnsafe(Prov.qualifiedGeneration -> generation.entity.asJsonLD),
-        Map.empty[Property, JsonLD]
+        Prov.activity -> generation.activityResourceId.asEntityId.asJsonLD
       )
     }
 
@@ -98,10 +99,11 @@ object CliGeneration {
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]
-        allEntity  <- cursor.focusTop.as[List[GenerationEntity]]
-        entity <- allEntity
+        activityId <- cursor.downField(Prov.activity).downEntityId.as[activities.ResourceId]
+        allEntities  <- cursor.focusTop.as[List[GenerationEntity]]
+        entity <- allEntities
                     .find(_.generationIds.contains(resourceId))
                     .toRight(DecodingFailure(s"No related entity found for generation '$resourceId'", Nil))
-      } yield CliGeneration(resourceId, entity)
+      } yield CliGeneration(resourceId, entity, activityId)
     }
 }

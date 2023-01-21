@@ -19,8 +19,9 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.CliGeneration
-import io.renku.graph.model.RenkuTinyTypeGenerators
 import io.renku.graph.model.generations.ResourceId
+import io.renku.graph.model.{RenkuTinyTypeGenerators, activities}
+import RenkuTinyTypeGenerators.activityResourceIdGen
 import org.scalacheck.Gen
 
 trait GenerationGenerators {
@@ -35,11 +36,12 @@ trait GenerationGenerators {
         .map(CliGeneration.GenerationEntity.apply)
     )
 
-  def generationGen: Gen[CliGeneration] =
+  def generationGen(activityIdGen: Gen[activities.ResourceId] = activityResourceIdGen): Gen[CliGeneration] =
     for {
-      id     <- RenkuTinyTypeGenerators.generationsResourceIdGen
-      entity <- generationEntityGen(id)
-    } yield CliGeneration(id, entity)
+      id         <- RenkuTinyTypeGenerators.generationsResourceIdGen
+      entity     <- generationEntityGen(id)
+      activityId <- activityIdGen
+    } yield CliGeneration(id, entity, activityId)
 }
 
 object GenerationGenerators extends GenerationGenerators
