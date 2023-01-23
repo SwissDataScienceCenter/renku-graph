@@ -18,17 +18,12 @@
 
 package io.renku.cli.model.generators
 
-import io.renku.cli.model.{CliDatasetSameAs, EntityPath}
+import io.renku.cli.model.EntityPath
 import io.renku.generators.Generators
-import io.renku.graph.model.RenkuTinyTypeGenerators
 import org.scalacheck.Gen
 
 trait BaseGenerators {
-  val entityPathGen: Gen[EntityPath] =
-    Generators.relativePaths().map(EntityPath)
-
-  val datasetSameAs: Gen[CliDatasetSameAs] =
-    RenkuTinyTypeGenerators.datasetSameAs.map(v => CliDatasetSameAs(v.value))
+  val entityPathGen: Gen[EntityPath] = Generators.relativePaths().map(EntityPath)
 }
 
 object BaseGenerators extends BaseGenerators

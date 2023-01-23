@@ -33,7 +33,6 @@ class CliDatasetSpec
     with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
   val datasetGen = DatasetGenerators.datasetGen
 
   "decode/encode" should {

@@ -44,7 +44,7 @@ trait DatasetGenerators {
       version       <- Gen.option(RenkuTinyTypeGenerators.datasetVersions)
       files         <- DatasetFileGenerators.datasetFileGen(createdOrPublished.instant).toGeneratorOfList(max = 3)
       modifiedDate  <- RenkuTinyTypeGenerators.datasetModifiedDates(createdOrPublished).toGeneratorOfOptions
-      sameAs        <- BaseGenerators.datasetSameAs.toGeneratorOfOptions
+      sameAs        <- RenkuTinyTypeGenerators.datasetSameAs.toGeneratorOfOptions
       derivedFrom   <- RenkuTinyTypeGenerators.datasetDerivedFroms.toGeneratorOfOptions
       originalIdent <- RenkuTinyTypeGenerators.datasetOriginalIdentifiers.toGeneratorOfOptions
       invalidTime   <- RenkuTinyTypeGenerators.invalidationTimes(createdOrPublished.instant).toGeneratorOfOptions

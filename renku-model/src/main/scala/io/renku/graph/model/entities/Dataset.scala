@@ -21,8 +21,8 @@ package io.renku.graph.model.entities
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model._
 import io.renku.cli.model.{CliDataset, CliDatasetProvenance}
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
@@ -149,7 +149,7 @@ object Dataset {
   object Provenance {
 
     implicit object Internal {
-      object FromCli {
+      private[Dataset] object FromCli {
         def unapply(cli: CliDataset): Option[NonEmptyList[Person] => Internal] =
           cli.provenance match {
             case CliDatasetProvenance(dateCreated: DateCreated, None, None, None, _, None) =>
@@ -171,18 +171,13 @@ object Dataset {
     }
 
     implicit object ImportedExternal {
-      object FromCli {
+      private[Dataset] object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedExternal] =
           cliData.provenance match {
-            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs), None, _, None)
+            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs: ExternalSameAs), None, _, None)
                 if cliData.originalIdEqualCurrentId =>
               Some(creators =>
-                ImportedExternal(cliData.resourceId,
-                                 cliData.identifier,
-                                 sameAs.toExternalSameAs,
-                                 datePublished,
-                                 creators.sortBy(_.name)
-                )
+                ImportedExternal(cliData.resourceId, cliData.identifier, sameAs, datePublished, creators.sortBy(_.name))
               )
             case _ => None
           }
@@ -215,16 +210,22 @@ object Dataset {
     }
 
     object ImportedInternalAncestorExternal {
-      object FromCli {
+      private[Dataset] object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorExternal] =
           cliData.provenance match {
-            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs), None, maybeOriginalId, None) =>
+            case CliDatasetProvenance(datePublished: DatePublished,
+                                      None,
+                                      Some(sameAs: InternalSameAs),
+                                      None,
+                                      maybeOriginalId,
+                                      None
+                ) =>
               Some(creators =>
                 ImportedInternalAncestorExternal(
                   cliData.resourceId,
                   cliData.identifier,
-                  sameAs.toInternalSameAs,
-                  TopmostSameAs(sameAs.toInternalSameAs),
+                  sameAs,
+                  TopmostSameAs(sameAs),
                   maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
                   datePublished,
                   creators.sortBy(_.name)
@@ -246,16 +247,22 @@ object Dataset {
     }
 
     object ImportedInternalAncestorInternal {
-      object FromCli {
+      private[Dataset] object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorInternal] =
           cliData.provenance match {
-            case CliDatasetProvenance(dateCreated: DateCreated, None, Some(sameAs), None, maybeOriginalId, None) =>
+            case CliDatasetProvenance(dateCreated: DateCreated,
+                                      None,
+                                      Some(sameAs: InternalSameAs),
+                                      None,
+                                      maybeOriginalId,
+                                      None
+                ) =>
               Some(creators =>
                 ImportedInternalAncestorInternal(
                   cliData.resourceId,
                   cliData.identifier,
-                  sameAs.toInternalSameAs,
-                  TopmostSameAs(sameAs.toInternalSameAs),
+                  sameAs,
+                  TopmostSameAs(sameAs),
                   maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
                   dateCreated,
                   creators.sortBy(_.name)
@@ -277,7 +284,7 @@ object Dataset {
     }
 
     object Modified {
-      object FromCli {
+      private[Dataset] object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => Modified] =
           cliData.provenance match {
             case CliDatasetProvenance(_,

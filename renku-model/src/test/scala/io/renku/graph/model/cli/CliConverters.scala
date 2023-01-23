@@ -34,14 +34,10 @@ trait CliConverters {
       version = dataset.additionalInfo.maybeVersion,
       datasetFiles = dataset.parts.map(from),
       sameAs = dataset.provenance match {
-        case p: entities.Dataset.Provenance.ImportedExternal =>
-          CliDatasetSameAs(p.sameAs.value).some
-        case p: entities.Dataset.Provenance.ImportedInternal =>
-          CliDatasetSameAs(p.sameAs.value).some
-        case _: entities.Dataset.Provenance.Internal =>
-          None
-        case _: entities.Dataset.Provenance.Modified =>
-          None
+        case p: entities.Dataset.Provenance.ImportedExternal => p.sameAs.some
+        case p: entities.Dataset.Provenance.ImportedInternal => p.sameAs.some
+        case _: entities.Dataset.Provenance.Internal         => None
+        case _: entities.Dataset.Provenance.Modified         => None
       },
       derivedFrom = dataset.provenance match {
         case m: entities.Dataset.Provenance.Modified =>

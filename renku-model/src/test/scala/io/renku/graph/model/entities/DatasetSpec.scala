@@ -55,8 +55,8 @@ class DatasetSpec
     implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Dataset entity into the Dataset object" in {
-      forAll(datasetEntities(provenanceNonModified(cliShapePersons)).decoupledFromProject) { entitiesDs =>
-        val modelDs = entitiesDs.to[entities.Dataset[entities.Dataset.Provenance]]
+      forAll(datasetEntities(provenanceNonModified(cliShapePersons)).decoupledFromProject) { testDs =>
+        val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
         val cliDs   = modelDs.toCliEntity
 
         flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
@@ -66,25 +66,20 @@ class DatasetSpec
 
     "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
 
-      val dataset = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+      val modelDs = datasetEntities(
+        provenanceImportedExternal(personEntitiesGen = cliShapePersons)
+      ).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
-      val Left(error) = parse {
-        dataset.asJsonLD.toJson
-          .deepMerge(
-            Json.obj(
-              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
-            )
-          )
-      }.fold(throw _, identity)
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+      val cliDs = modelDs.toCliEntity.copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
+      val result = flattenedJsonLD(cliDs).cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
+      result shouldBe a[Left[_, _]]
+      val Left(error) = result
       error shouldBe a[DecodingFailure]
       error.getMessage should startWith(
-        s"Cannot decode entity with ${dataset.resourceId}: DecodingFailure at : Invalid dataset data"
+        s"Cannot decode entity with ${modelDs.resourceId}: DecodingFailure at : Invalid dataset data"
       )
     }
 

@@ -34,7 +34,7 @@ trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val cliProvenanceDiff: Diff[CliDatasetProvenance] = Diff.derived[CliDatasetProvenance]
 
-  implicit val cliDatasetDiff: Diff[CliDataset] = Diff.derived[CliDataset]
+  implicit lazy val cliDatasetDiff: Diff[CliDataset] = Diff.derived[CliDataset]
 
   implicit val cliPublicationEventDiff: Diff[CliPublicationEvent] = Diff.derived[CliPublicationEvent]
 

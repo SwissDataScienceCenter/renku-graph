@@ -23,6 +23,7 @@ import com.softwaremill.diffx.Diff
 import io.renku.tinytypes._
 
 trait TinyTypeDiffInstances {
+
   implicit def nonEmptyListDiff[A: Diff]: Diff[NonEmptyList[A]] =
     Diff.diffForSeq[List, A].contramap(_.toList)
 
@@ -58,7 +59,6 @@ trait TinyTypeDiffInstances {
 
   implicit def relativePathTinyType[A <: RelativePathTinyType]: Diff[A] =
     Diff.diffForString.contramap(_.value)
-
 }
 
 object TinyTypeDiffInstances extends TinyTypeDiffInstances
