@@ -28,8 +28,8 @@ trait DatasetGenerators {
 
   def datasetGen(implicit renkuUrl: RenkuUrl): Gen[CliDataset] =
     for {
-      resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds
-      ident              <- RenkuTinyTypeGenerators.datasetIdentifiers
+      identifier         <- RenkuTinyTypeGenerators.datasetIdentifiers
+      resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds(identifier)
       title              <- RenkuTinyTypeGenerators.datasetTitles
       name               <- RenkuTinyTypeGenerators.datasetNames
       createdOrPublished <- RenkuTinyTypeGenerators.datasetDates
@@ -50,7 +50,7 @@ trait DatasetGenerators {
       invalidTime   <- RenkuTinyTypeGenerators.invalidationTimes(createdOrPublished.instant).toGeneratorOfOptions
     } yield CliDataset(
       resourceId = resourceId,
-      identifier = ident,
+      identifier = identifier,
       title = title,
       name = name,
       createdOrPublished = createdOrPublished,
@@ -65,7 +65,8 @@ trait DatasetGenerators {
       sameAs = sameAs,
       derivedFrom = derivedFrom,
       originalIdentifier = originalIdent,
-      invalidationTime = invalidTime
+      invalidationTime = invalidTime,
+      publicationEvents = Nil
     )
 }
 

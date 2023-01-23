@@ -34,6 +34,7 @@ final case class CliDataset(
     title:              Title,
     name:               Name,
     createdOrPublished: Date,
+    dateModified:       Option[DateModified],
     creators:           NonEmptyList[CliPerson],
     description:        Option[Description],
     keywords:           List[Keyword],
@@ -41,11 +42,11 @@ final case class CliDataset(
     license:            Option[License],
     version:            Option[Version],
     datasetFiles:       List[CliDatasetFile],
-    dateModified:       Option[DateModified],
     sameAs:             Option[CliDatasetSameAs],
     derivedFrom:        Option[DerivedFrom],
     originalIdentifier: Option[OriginalIdentifier],
-    invalidationTime:   Option[InvalidationTime]
+    invalidationTime:   Option[InvalidationTime],
+    publicationEvents:  List[CliPublicationEvent]
 ) extends CliModel {
 
   val provenance: CliDatasetProvenance =
@@ -103,6 +104,7 @@ object CliDataset {
         title,
         name,
         date,
+        maybeDateModified,
         creators,
         maybeDescription,
         keywords,
@@ -110,11 +112,11 @@ object CliDataset {
         maybeLicense,
         maybeVersion,
         parts,
-        maybeDateModified,
         maybeSameAs,
         maybeDerivedFrom,
         maybeOriginalIdentifier,
-        maybeInvalidationTime
+        maybeInvalidationTime,
+        publicationEvents = Nil
       )
     }
 
