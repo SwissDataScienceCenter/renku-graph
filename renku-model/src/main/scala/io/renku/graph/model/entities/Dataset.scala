@@ -184,8 +184,7 @@ object Dataset {
                                  creators.sortBy(_.name)
                 )
               )
-            case _ =>
-              None
+            case _ => None
           }
       }
     }
@@ -473,13 +472,16 @@ object Dataset {
       } yield dataset
     }
 
-  private def createProvenance(cliData: CliDataset): Result[(Provenance, Option[FixableFailure])] = {
-    val creators: Result[NonEmptyList[Person]] =
-      cliData.creators.traverse(Person.fromCli).toEither.leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
+  private def createProvenance(
+      cliDS: CliDataset
+  )(implicit renkuUrl: RenkuUrl): Result[(Provenance, Option[FixableFailure])] = {
 
-    cliData match {
+    val creators: Result[NonEmptyList[Person]] =
+      cliDS.creators.traverse(Person.fromCli).toEither.leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
+
+    cliDS match {
       case Internal.FromCli(p) =>
-        if (cliData.originalIdNotEqualCurrentId) creators.map(p).map(_ -> FixableFailure.MissingDerivedFrom.some)
+        if (cliDS.originalIdNotEqualCurrentId) creators.map(p).map(_ -> FixableFailure.MissingDerivedFrom.some)
         else creators.map(p).map(_ -> None)
 
       case ImportedExternal.FromCli(p) => creators.map(p).map(_ -> None)
@@ -493,13 +495,13 @@ object Dataset {
       case _ =>
         DecodingFailure(
           "Invalid dataset data: " +
-            s"identifier: ${cliData.identifier}, " +
-            show"createdOrPublished: ${cliData.createdOrPublished}, " +
-            s"dateModified: ${cliData.dateModified}, " +
-            s"sameAs: ${cliData.sameAs}, " +
-            s"derivedFrom: ${cliData.derivedFrom}, " +
-            s"originalIdentifier: ${cliData.originalIdentifier}, " +
-            s"maybeInvalidationTime: ${cliData.invalidationTime}",
+            s"identifier: ${cliDS.identifier}, " +
+            show"createdOrPublished: ${cliDS.createdOrPublished}, " +
+            s"dateModified: ${cliDS.dateModified}, " +
+            s"sameAs: ${cliDS.sameAs}, " +
+            s"derivedFrom: ${cliDS.derivedFrom}, " +
+            s"originalIdentifier: ${cliDS.originalIdentifier}, " +
+            s"maybeInvalidationTime: ${cliDS.invalidationTime}",
           Nil
         ).asLeft
     }

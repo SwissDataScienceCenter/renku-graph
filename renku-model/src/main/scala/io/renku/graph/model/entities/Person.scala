@@ -18,11 +18,11 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.ValidatedNel
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.CliPerson
+import io.renku.graph.model._
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 
@@ -110,6 +110,20 @@ object Person {
       Person.WithNameOnly(id, name, maybeOrcid, maybeAffiliation).validNel
     case _ =>
       show"Invalid Person: $resourceId, name = $name, gitLabId = $maybeGitLabId, orcidId = $maybeOrcid, email = $maybeEmail, affiliation = $maybeAffiliation".invalidNel
+  }
+
+  def fromCli(cli: CliPerson)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Person] = {
+
+    val maybeOrcidId         = OrcidId.from(cli.resourceId.value).toOption
+    val maybeOrcidResourceId = maybeOrcidId.map(persons.ResourceId(_)).map(_.asRight[NonEmptyList[String]])
+
+    val cliResourceId = maybeOrcidResourceId getOrElse {
+      persons.ResourceId.from(cli.resourceId.value).leftMap(err => NonEmptyList.one(err.getMessage))
+    }
+
+    cliResourceId
+      .flatMap(Person.from(_, cli.name, cli.email, None, maybeOrcidId, cli.affiliation).toEither)
+      .toValidated
   }
 
   implicit def functions[P <: Person](implicit glApiUrl: GitLabApiUrl): EntityFunctions[P] =
@@ -257,10 +271,5 @@ object Person {
         DataProperties(emailProperty, nameProperty, affiliationProperty)
       )
     }
-  }
-
-  def fromCli(cli: CliPerson): ValidatedNel[String, Person] = {
-    val maybeOrcidId = OrcidId.from(cli.resourceId.value).toOption
-    Person.from(cli.resourceId, cli.name, cli.email, None, maybeOrcidId, cli.affiliation)
   }
 }

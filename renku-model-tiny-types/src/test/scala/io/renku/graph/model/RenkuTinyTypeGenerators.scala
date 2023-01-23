@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.generators.Generators._
 import io.renku.graph.model.images.{ImageResourceId, ImageUri}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.tinytypes.InstantTinyType
@@ -149,6 +149,10 @@ trait RenkuTinyTypeGenerators {
   implicit val filePaths: Gen[projects.FilePath] = Generators.relativePaths() map projects.FilePath.apply
 
   implicit val datasetIdentifiers: Gen[datasets.Identifier] = Generators.noDashUuid.toGeneratorOf(datasets.Identifier)
+  implicit val datasetResourceIds: Gen[datasets.ResourceId] = datasetResourceIds()(renkuUrls.generateOne)
+  def datasetResourceIds(datasetIdGen: Gen[datasets.Identifier] = datasetIdentifiers)(implicit
+      renkuUrl: RenkuUrl
+  ): Gen[datasets.ResourceId] = datasetIdGen.map(id => datasets.ResourceId((renkuUrl / "datasets" / id).show))
 
   implicit val datasetOriginalIdentifiers: Gen[datasets.OriginalIdentifier] =
     datasetIdentifiers map (id => datasets.OriginalIdentifier(id.toString))
@@ -175,8 +179,6 @@ trait RenkuTinyTypeGenerators {
     Generators.validatedUrls.map(_.value).map(datasets.DerivedFrom.apply)
   implicit val datasetTopmostDerivedFroms: Gen[datasets.TopmostDerivedFrom] =
     datasetDerivedFroms.map(datasets.TopmostDerivedFrom.apply)
-  implicit val datasetResourceIds: Gen[datasets.ResourceId] =
-    datasetIdentifiers.map(id => datasets.ResourceId((renkuUrls.generateOne / "datasets" / id).show))
 
   def datasetPublishedDates(min: datasets.DatePublished = LocalDate.EPOCH): Gen[datasets.DatePublished] =
     Generators
@@ -206,6 +208,22 @@ trait RenkuTinyTypeGenerators {
       .relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
       .map(datasets.PartLocation.apply)
+
+  implicit val publicationEventNames: Gen[publicationEvents.Name] =
+    nonEmptyStrings(minLength = 5).toGeneratorOf(publicationEvents.Name.apply)
+  def publicationEventResourceIds(nameGen:      Gen[publicationEvents.Name] = publicationEventNames,
+                                  datasetIdGen: Gen[datasets.ResourceId] = datasetResourceIds
+  )(implicit renkuUrl: RenkuUrl): Gen[publicationEvents.ResourceId] =
+    (nameGen -> datasetIdGen).mapN((name, dsId) =>
+      publicationEvents.ResourceId((renkuUrl / "datasettags" / show"$name@$dsId").show)
+    )
+  def publicationEventAbout(datasetIdentifierGen: Gen[datasets.Identifier] = datasetIdentifiers)(implicit
+      renkuUrl: RenkuUrl
+  ): Gen[publicationEvents.About] =
+    datasetIdentifierGen.map(datasetIdentifier => (renkuUrl / "urls" / "datasets" / datasetIdentifier).show)
+
+  implicit val publicationEventDesc: Gen[publicationEvents.Description] =
+    sentences().map(_.value).map(publicationEvents.Description.apply)
 
   implicit val planIdentifiers: Gen[plans.Identifier] = Generators.noDashUuid.toGeneratorOf(plans.Identifier)
 

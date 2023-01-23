@@ -18,16 +18,11 @@
 
 package io.renku.cli.model
 
-import io.renku.graph.model.InvalidationTime
-import io.renku.graph.model.datasets._
+import io.renku.graph.model.views.EntityIdJsonLDOps
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
-/** View on the dataset focusing on provenance properties.
- */
-final case class CliDatasetProvenance(
-    createdOrPublished: Date,
-    dateModified:       Option[DateModified],
-    sameAs:             Option[CliDatasetSameAs],
-    derivedFrom:        Option[DerivedFrom],
-    originalIdentifier: Option[OriginalIdentifier],
-    invalidationTime:   Option[InvalidationTime]
-)
+class CliPersonResourceId private (val value: String) extends AnyVal with StringTinyType
+
+object CliPersonResourceId
+    extends TinyTypeFactory[CliPersonResourceId](new CliPersonResourceId(_))
+    with EntityIdJsonLDOps[CliPersonResourceId]

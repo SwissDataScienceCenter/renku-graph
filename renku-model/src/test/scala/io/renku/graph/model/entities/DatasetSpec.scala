@@ -23,19 +23,19 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{DecodingFailure, Json}
 import io.renku.cli.model.CliDataset
-import io.renku.cli.model.diffx.CliDiffInstances.cliDatasetDiff
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import GraphModelGenerators.graphClasses
-import io.renku.graph.model.cli.CliGenerators
+import io.renku.graph.model.cli.CliEntityConverterSyntax
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.graph.model.tools.AdditionalMatchers
+import io.renku.graph.model.tools.JsonLDTools._
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
@@ -48,19 +48,19 @@ class DatasetSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with AdditionalMatchers
+    with CliEntityConverterSyntax
     with DiffInstances {
 
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Dataset entity into the Dataset object" in {
-      forAll(CliGenerators.datasetGen()) { dataset =>
-        JsonLD
-          .arr(dataset.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[CliDataset]] shouldMatchToRight List(dataset)
+      forAll(datasetEntities(provenanceNonModified(cliShapePersons)).decoupledFromProject) { entitiesDs =>
+        val modelDs = entitiesDs.to[entities.Dataset[entities.Dataset.Provenance]]
+        val cliDs   = modelDs.toCliEntity
+
+        flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
+          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldMatchToRight List(modelDs)
       }
     }
 
