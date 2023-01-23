@@ -70,22 +70,24 @@ trait DatasetEntitiesGenerators {
 
   def datasetAndModificationEntities[P <: Dataset.Provenance](
       provenance:         ProvenanceGen[P],
-      projectDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
+      projectDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      personEntitiesGen:  Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
     original <- datasetEntities(provenance)(renkuUrl)(projectDateCreated)
-    modified <- modifiedDatasetEntities(original, projectDateCreated)
+    modified <- modifiedDatasetEntities(original, projectDateCreated, personEntitiesGen)
   } yield original -> modified
 
   def modifiedDatasetEntities(
       original:           Dataset[Provenance],
-      projectDateCreated: projects.DateCreated
+      projectDateCreated: projects.DateCreated,
+      personEntitiesGen:  Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
     identifier <- datasetIdentifiers
     title      <- datasetTitles
     date <- datasetCreatedDates(
               List(original.provenance.date.instant, projectDateCreated.value).max
             )
-    modifyingPerson <- personEntities
+    modifyingPerson <- personEntitiesGen
     additionalInfo  <- datasetAdditionalInfos
     parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
     publicationEventFactories <- publicationEventFactories {

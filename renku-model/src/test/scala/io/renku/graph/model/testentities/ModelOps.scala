@@ -316,7 +316,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def createModification(
         modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
+      (projectDate => modifiedDatasetEntities(dataset, projectDate, personEntities)).modify(modifier)
 
     def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 
