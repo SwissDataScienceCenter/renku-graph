@@ -35,10 +35,10 @@ class CliPlanSpec
     with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-  val planGen                      = PlanGenerators.planGen(Instant.now)
-  val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.now)
-  val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.now)
-  val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.now)
+  val planGen                      = PlanGenerators.planGen(Instant.EPOCH)
+  val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.EPOCH)
+  val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.EPOCH)
+  val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.EPOCH)
 
   "plan decode/encode" should {
     "be compatible" in {
