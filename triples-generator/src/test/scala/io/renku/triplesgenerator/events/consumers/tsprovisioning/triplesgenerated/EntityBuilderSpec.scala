@@ -31,11 +31,12 @@ import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
+import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.tools.AdditionalMatchers
+import io.renku.graph.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -60,10 +61,8 @@ class EntityBuilderSpec
   "buildEntity" should {
 
     "successfully deserialize JsonLD to the model - case of a Renku Project" in new TestCase {
-      val project = anyRenkuProjectEntities
-        .withDatasets(datasetEntities(provenanceNonModified))
-        .withActivities(activityEntities)
-        .generateOne
+
+      val project = anyRenkuProjectEntities.withActivities(activityEntities).generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
@@ -72,10 +71,8 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, project.path),
-            payload = JsonLD
-              .arr(project.asJsonLD :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
-              .flatten
-              .fold(throw _, identity)
+            payload =
+              flattenedJsonLDFrom(project.asJsonLD, project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
           )
         )
         .value
@@ -85,6 +82,7 @@ class EntityBuilderSpec
     }
 
     "successfully deserialize JsonLD to the model - case of a Non-Renku Project" in new TestCase {
+
       val project = anyNonRenkuProjectEntities.generateOne
 
       givenFindProjectInfo(project.path)
@@ -94,7 +92,7 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, project.path),
-            payload = project.asJsonLD.flatten.fold(throw _, identity)
+            payload = flattenedJsonLD(project)
           )
         )
         .value
@@ -103,6 +101,7 @@ class EntityBuilderSpec
     }
 
     "fail if there's no project info found for the project" in new TestCase {
+
       val projectPath = projectPaths.generateOne
 
       givenFindProjectInfo(projectPath)
@@ -124,6 +123,7 @@ class EntityBuilderSpec
     }
 
     "fail if fetching the project info fails" in new TestCase {
+
       val projectPath = projectPaths.generateOne
 
       val exception = exceptions.generateOne
@@ -141,7 +141,10 @@ class EntityBuilderSpec
     }
 
     "fail if no project is found in the JsonLD" in new TestCase {
-      val project = anyRenkuProjectEntities.withDatasets(datasetEntities(provenanceNonModified)).generateOne
+
+      val project = anyRenkuProjectEntities
+        .withDatasets(datasetEntities(provenanceNonModified(creatorsGen = cliShapedPersons)))
+        .generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
@@ -152,7 +155,7 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = JsonLD.arr(project.datasets.map(_.asJsonLD): _*).flatten.fold(throw _, identity)
+            payload = flattenedJsonLD(project.datasets.head)
           )
         )
         .value
@@ -162,6 +165,7 @@ class EntityBuilderSpec
     }
 
     "fail if there are other projects in the JsonLD" in new TestCase {
+
       val project      = anyProjectEntities.generateOne
       val otherProject = anyProjectEntities.generateOne
 
@@ -174,10 +178,7 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = JsonLD
-              .arr(project.asJsonLD, otherProject.asJsonLD)
-              .flatten
-              .fold(throw _, identity)
+            payload = flattenedJsonLDFrom(project.asJsonLD, otherProject.asJsonLD)
           )
         )
         .value
@@ -187,6 +188,7 @@ class EntityBuilderSpec
     }
 
     "fail if the project found in the payload is different than the project in the event" in new TestCase {
+
       val project      = anyProjectEntities.generateOne
       val eventProject = consumerProjects.generateOne
 
@@ -196,7 +198,7 @@ class EntityBuilderSpec
       val Failure(error) = entityBuilder.buildEntity {
         triplesGeneratedEvents.generateOne.copy(
           project = eventProject,
-          payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+          payload = flattenedJsonLD(project)
         )
       }.value
 
@@ -206,6 +208,7 @@ class EntityBuilderSpec
 
     "successfully deserialize JsonLD to the model " +
       "if project from the payload has the same path in case insensitive way as the project in the event" in new TestCase {
+
         val project      = anyProjectEntities.generateOne
         val eventProject = consumers.Project(projectIds.generateOne, projects.Path(project.path.value.toUpperCase()))
 
@@ -215,7 +218,7 @@ class EntityBuilderSpec
         val Success(results) = entityBuilder.buildEntity {
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+            payload = flattenedJsonLD(project)
           )
         }.value
 
@@ -223,6 +226,7 @@ class EntityBuilderSpec
       }
 
     "fail if the payload is invalid" in new TestCase {
+
       val project = renkuProjectEntities(anyVisibility).generateOne
 
       givenFindProjectInfo(project.path)
@@ -233,22 +237,21 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = project
-              .to[entities.RenkuProject.WithoutParent]
-              .copy(activities =
-                activityEntities
-                  .map(
-                    _.replaceStartTime(
-                      timestamps(max = project.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime)
+            payload = flattenedJsonLD(
+              project
+                .to[entities.RenkuProject.WithoutParent]
+                .copy(activities =
+                  activityEntities
+                    .map(
+                      _.replaceStartTime(
+                        timestamps(max = project.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime)
+                      )
                     )
-                  )
-                  .run(project.dateCreated)
-                  .generateFixedSizeList(1)
-                  .map(_.to[entities.Activity])
-              )
-              .asJsonLD
-              .flatten
-              .fold(throw _, identity)
+                    .run(project.dateCreated)
+                    .generateFixedSizeList(1)
+                    .map(_.to[entities.Activity])
+                )
+            )
           )
         )
         .value
@@ -317,5 +320,4 @@ class EntityBuilderSpec
       .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
       .buildProvenanceUnsafe()
   }
-
 }
