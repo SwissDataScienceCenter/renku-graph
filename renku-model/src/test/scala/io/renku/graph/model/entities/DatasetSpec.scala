@@ -69,7 +69,7 @@ class DatasetSpec
     "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
 
       val modelDs = datasetEntities(
-        provenanceImportedExternal(personEntitiesGen = cliShapedPersons)
+        provenanceImportedExternal(creatorsGen = cliShapedPersons)
       ).decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
       val cliDs = modelDs.toCliEntity.copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
@@ -86,10 +86,10 @@ class DatasetSpec
       Table(
         "DS generator" -> "DS type",
         datasetEntities(
-          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapedPersons)
+          provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons)
         ) -> "Imported Internal Ancestor External",
         datasetEntities(
-          provenanceImportedInternalAncestorExternal(personEntitiesGen = cliShapedPersons)
+          provenanceImportedInternalAncestorExternal(creatorsGen = cliShapedPersons)
         ) -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
@@ -152,9 +152,9 @@ class DatasetSpec
 
     forAll {
       Table(
-        "DS generator"                                                                    -> "DS type",
-        datasetEntities(provenanceInternal(cliShapedPersons))                             -> "Internal",
-        datasetEntities(provenanceImportedExternal(personEntitiesGen = cliShapedPersons)) -> "Imported External",
+        "DS generator"                                                              -> "DS type",
+        datasetEntities(provenanceInternal(cliShapedPersons))                       -> "Internal",
+        datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons)) -> "Imported External",
         datasetEntities(
           provenanceImportedInternalAncestorExternal(cliShapedPersons)
         ) -> "Imported Internal Ancestor External"
@@ -188,10 +188,10 @@ class DatasetSpec
       Table(
         "DS generator" -> "DS type",
         datasetAndModificationEntities(provenanceNonModified(cliShapedPersons),
-                                       modificationCreatorEntityGen = cliShapedPersons
+                                       modificationCreatorGen = cliShapedPersons
         ).map(_._2) -> "Modified",
         datasetEntities(
-          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapedPersons)
+          provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons)
         ).decoupledFromProject -> "Imported Ancestor Internal"
       )
     } { (dsGen, dsType) =>
@@ -218,7 +218,7 @@ class DatasetSpec
     "skip looking into a modified dataset dateCreated" in {
 
       val _ -> modelDs = datasetAndModificationEntities(provenanceNonModified(cliShapedPersons),
-                                                        modificationCreatorEntityGen = cliShapedPersons
+                                                        modificationCreatorGen = cliShapedPersons
       ).generateOne.map(_.to[entities.Dataset[entities.Dataset.Provenance.Modified]])
 
       assume(modelDs.identification.identifier.value != modelDs.provenance.originalIdentifier.value)
@@ -232,7 +232,7 @@ class DatasetSpec
 
       val modelDs = {
         val _ -> ds = datasetAndModificationEntities(provenanceNonModified(cliShapedPersons),
-                                                     modificationCreatorEntityGen = cliShapedPersons
+                                                     modificationCreatorGen = cliShapedPersons
         ).generateOne.map(_.to[entities.Dataset[entities.Dataset.Provenance.Modified]])
         ds.copy(provenance = ds.provenance.copy(originalIdentifier = datasetOriginalIdentifiers.generateOne))
       }
@@ -245,7 +245,7 @@ class DatasetSpec
     "fail if invalidationTime is older than the dataset" in {
 
       val modelDs = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
-                                                   modificationCreatorEntityGen = cliShapedPersons
+                                                   modificationCreatorGen = cliShapedPersons
       ).generateOne._2.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
 
       val invalidationTime = timestamps(max = modelDs.provenance.date.instant).generateAs(InvalidationTime)
@@ -282,12 +282,12 @@ class DatasetSpec
       Table(
         "DS type"          -> "ds",
         "Internal"         -> datasetEntities(provenanceInternal(cliShapedPersons)),
-        "ImportedExternal" -> datasetEntities(provenanceImportedExternal(personEntitiesGen = cliShapedPersons)),
+        "ImportedExternal" -> datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons)),
         "ImportedInternalAncestorExternal" -> datasetEntities(
-          provenanceImportedInternalAncestorExternal(personEntitiesGen = cliShapedPersons)
+          provenanceImportedInternalAncestorExternal(creatorsGen = cliShapedPersons)
         ),
         "ImportedInternalAncestorInternal" -> datasetEntities(
-          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapedPersons)
+          provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons)
         ),
         "Modified" -> datasetEntities(provenanceInternal(cliShapedPersons)).decoupledFromProject.generateOne
           .createModification(creatorEntityGen = cliShapedPersons)

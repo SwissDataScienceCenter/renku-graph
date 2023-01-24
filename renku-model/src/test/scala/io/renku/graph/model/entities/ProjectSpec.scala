@@ -39,12 +39,14 @@ import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
+import io.renku.graph.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import monocle.Lens
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -59,6 +61,7 @@ class ProjectSpec
     with ModelOps
     with ScalaCheckPropertyChecks
     with DiffShouldMatcher
+    with EitherValues
     with DiffInstances {
 
   "ProjectMember.add" should {
@@ -86,19 +89,14 @@ class ProjectSpec
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
         val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity1, plan1) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-        val (activity2, plan2) =
-          activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
+        val creatorAsCliPerson = creator.toCliPayloadPerson(creator.chooseSomeName)
+        val (activity1, plan1) = activityWith(member2.toCliPayloadPerson(member2.chooseSomeName))(info.dateCreated)
+        val (activity2, plan2) = activityWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
         val (activity3, plan3) = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1 = datasetWith(
-          NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
-        )(info.dateCreated)
-        val dataset2 = datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
-          info.dateCreated
-        )
+        val dataset1           = datasetWith(member3.toCliPayloadPerson(member3.chooseSomeName))(info.dateCreated)
+        val dataset2           = datasetWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
@@ -113,12 +111,13 @@ class ProjectSpec
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity1.author, member2)
-        val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
+        val mergedMember3 = dataset1.provenance.creators
+          .find(byEmail(member3))
+          .map(merge(_, member3))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
 
         val expectedActivities =
-          (activity1.copy(author = mergedMember2) ::
-            activity2 ::
-            replaceAgent(activity3, mergedCreator) :: Nil)
+          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
             .sortBy(_.startTime)
         jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil).head shouldMatchTo
           entities.RenkuProject.WithoutParent(
@@ -131,12 +130,10 @@ class ProjectSpec
             maybeCreator = mergedCreator.some,
             info.visibility,
             info.keywords,
-            members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
+            members = Set(member1.toPerson, mergedMember2, mergedMember3),
             schemaVersion,
             expectedActivities,
-            addTo(dataset1,
-                  mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
-            ) :: dataset2 :: Nil,
+            addTo(dataset1, NonEmptyList.one(mergedMember3)) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
             ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
           )
@@ -151,20 +148,14 @@ class ProjectSpec
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
         val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity1, plan1) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-        val (activity2, plan2) =
-          activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
+        val creatorAsCliPerson = creator.toCliPayloadPerson(creator.chooseSomeName)
+        val (activity1, plan1) = activityWith(member2.toCliPayloadPerson(member2.chooseSomeName))(info.dateCreated)
+        val (activity2, plan2) = activityWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
         val (activity3, plan3) = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1 = datasetWith(
-          NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
-        )(info.dateCreated)
-        val dataset2 =
-          datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
-            info.dateCreated
-          )
+        val dataset1           = datasetWith(member3.toCliPayloadPerson(member3.chooseSomeName))(info.dateCreated)
+        val dataset2           = datasetWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
@@ -179,12 +170,14 @@ class ProjectSpec
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity1.author, member2)
-        val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
+        val mergedMember3 = dataset1.provenance.creators
+          .find(byEmail(member3))
+          .map(merge(_, member3))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
 
-        val expectedActivities = (activity1.copy(author = mergedMember2) ::
-          activity2 ::
-          replaceAgent(activity3, mergedCreator) :: Nil)
-          .sortBy(_.startTime)
+        val expectedActivities =
+          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+            .sortBy(_.startTime)
         jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
           entities.RenkuProject.WithParent(
             resourceId,
@@ -196,12 +189,10 @@ class ProjectSpec
             mergedCreator.some,
             info.visibility,
             info.keywords,
-            members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
+            members = Set(member1.toPerson, mergedMember2, mergedMember3),
             schemaVersion,
             expectedActivities,
-            addTo(dataset1,
-                  mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
-            ) :: dataset2 :: Nil,
+            addTo(dataset1, NonEmptyList.one(mergedMember3)) :: dataset2 :: Nil,
             plan1 :: plan2 :: plan3 :: Nil,
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
             ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
@@ -217,7 +208,7 @@ class ProjectSpec
         val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
         val resourceId = projects.ResourceId(info.path)
 
-        val jsonLD = minimalCliLikeJsonLD(resourceId)
+        val jsonLD = minimalCliJsonLD(resourceId)
 
         jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
           entities.NonRenkuProject.WithoutParent(
@@ -243,7 +234,7 @@ class ProjectSpec
         val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
         val resourceId = projects.ResourceId(info.path)
 
-        val jsonLD = minimalCliLikeJsonLD(resourceId)
+        val jsonLD = minimalCliJsonLD(resourceId)
 
         jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
           entities.NonRenkuProject.WithParent(
@@ -277,11 +268,11 @@ class ProjectSpec
 
         val projectInfo        = info.copy(maybeCreator = creator.some, members = Set(member2))
         val resourceId         = projects.ResourceId(projectInfo.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity, plan) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(projectInfo.dateCreated)
+        val creatorAsCliPerson = creator.toCliPayloadPerson(creator.chooseSomeName)
+        val (activity, plan) = activityWith(member2.toCliPayloadPerson(member2.chooseSomeName))(projectInfo.dateCreated)
           .bimap(identity, PlanLens.planCreators.set(List(creatorAsCliPerson)))
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
@@ -315,7 +306,7 @@ class ProjectSpec
         val planModification2         = planModification1.createModification()
         val entitiesPlanModification2 = planModification2.to[entities.StepPlan.Modified]
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
@@ -350,7 +341,7 @@ class ProjectSpec
         val plan             = activity.plan
         val entitiesPlan     = plan.to[entities.Plan]
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
@@ -407,12 +398,10 @@ class ProjectSpec
           this.validateCompositePlanData(plans)
       }
 
-      val invalidPlanGen =
-        for {
-          cp <- compositePlanNonEmptyMappings
-                  .mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
-          step <- stepPlanGenFactory
-        } yield cp.copy(plans = NonEmptyList.one(step))
+      val invalidPlanGen = for {
+        cp   <- compositePlanNonEmptyMappings.mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
+        step <- stepPlanGenFactory
+      } yield cp.copy(plans = NonEmptyList.one(step))
 
       val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
 
@@ -460,7 +449,7 @@ class ProjectSpec
         testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
 
       // for convenience decode it all into a list
-      val decodeAll = invalidPlan.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[entities.Plan]]
+      val decodeAll = flattenedJsonLD(invalidPlan).cursor.as[List[entities.Plan]]
 
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
@@ -474,7 +463,7 @@ class ProjectSpec
 
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -487,20 +476,21 @@ class ProjectSpec
         plans = Nil
       )
 
-      val Left(error) = JsonLD
-        .arr(jsonLD,
-             JsonLD.entity(personResourceIds.generateOne.asEntityId,
-                           entities.Person.entityTypes,
-                           Map.empty[Property, JsonLD]
-             )
+      val result = jsonLD.asArray
+        .map(jsons =>
+          JsonLD.arr(
+            JsonLD.entity(personResourceIds.generateOne.asEntityId,
+                          entities.Person.entityTypes,
+                          Map.empty[Property, JsonLD]
+            ) :: jsons.toList: _*
+          )
         )
-        .flatten
-        .fold(throw _, identity)
+        .getOrElse(fail("Expected flattened json"))
         .cursor
         .as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
+      result.left.value            shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
     }
 
     "return a DecodingFailure if there's a modified Plan pointing to a non-existing parent" in new TestCase {
@@ -519,7 +509,7 @@ class ProjectSpec
         p.to[entities.Plan] -> modification
       }
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -531,10 +521,12 @@ class ProjectSpec
         plans = plan :: planModification :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
 
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should include(s"Cannot find parent plan ${planModification.derivation.derivedFrom}")
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should include(
+        s"Cannot find parent plan ${planModification.derivation.derivedFrom}"
+      )
     }
 
     "return a DecodingFailure if there's a modified Plan with the date from before the parent date" in new TestCase {
@@ -553,7 +545,7 @@ class ProjectSpec
         p.to[entities.Plan] -> modification
       }
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -565,41 +557,40 @@ class ProjectSpec
         plans = plan :: planModification :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should include(
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should include(
         show"Plan ${planModification.resourceId} is older than it's parent ${planModification.derivation.derivedFrom}"
       )
     }
 
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+        projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
-        datasets = datasetEntities(provenanceInternal)
+        datasets = datasetEntities(provenanceInternal(cliShapedPersons))
           .withDateBefore(projectInfo.dateCreated)
           .generateFixedSizeList(1)
           .map(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]].copy())
       )
 
-      val Left(error) = jsonLD.flatten
-        .fold(throw _, identity)
-        .cursor
-        .as(decodeList(entities.Project.decoder(projectInfo)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should (include("Dataset") and include("is older than project"))
+      result.left.value            shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should (include("Dataset") and include("is older than project"))
     }
 
     "return a DecodingFailure when there's an Activity entity created before project creation" in new TestCase {
+
       val projectInfo       = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId        = projects.ResourceId(projectInfo.path)
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
@@ -612,95 +603,102 @@ class ProjectSpec
       ).run(projects.DateCreated(dateBeforeProject))
         .generateOne
       val entitiesActivity = activity.to[entities.Activity]
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+        projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = entitiesActivity :: Nil,
         plans = activity.plan.to[entities.Plan] :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should include(
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should include(
         s"Activity ${entitiesActivity.resourceId} " +
           s"date ${activity.startTime} is older than project ${projectInfo.dateCreated}"
       )
     }
 
     "return a DecodingFailure when there's an internal Dataset entity created before project without parent" in new TestCase {
-      val projectInfo     = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId      = projects.ResourceId(projectInfo.path)
-      val dataset         = datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne
+
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val resourceId  = projects.ResourceId(projectInfo.path)
+      val dataset =
+        datasetEntities(provenanceInternal(cliShapedPersons)).withDateBefore(projectInfo.dateCreated).generateOne
       val entitiesDataset = dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+        projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         datasets = entitiesDataset :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should endWith(
         s"Dataset ${entitiesDataset.resourceId} " +
           s"date ${dataset.provenance.date} is older than project ${projectInfo.dateCreated}"
       )
     }
 
     "return a DecodingFailure when there's a Plan entity created before project without parent" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val plan = stepPlanEntities()(planCommands)(projectInfo.dateCreated).generateOne
         .replacePlanDateCreated(timestamps(max = projectInfo.dateCreated.value).generateAs[plans.DateCreated])
       val entitiesPlan = plan.to[entities.Plan]
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+        projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         plans = entitiesPlan :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should endWith(
         s"Plan ${entitiesPlan.resourceId} " +
           s"date ${entitiesPlan.dateCreated} is older than project ${projectInfo.dateCreated}"
       )
     }
 
     "decode project when there's an internal or modified Dataset entity created before project with parent" in new TestCase {
+
       val parentPath  = projectPaths.generateOne
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentPath.some)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val dataset1 =
-        datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne.copy(parts = Nil)
-      val (dataset2, dateset2Modified) = datasetAndModificationEntities(provenanceInternal).map {
-        case (orig, modified) =>
-          val newOrigDate = timestamps(max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
-          val newModificationDate =
-            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
-          (
-            orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
-            modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
-          )
+      val dataset1 = datasetEntities(provenanceInternal(cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+        .copy(parts = Nil)
+      val (dataset2, dateset2Modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                                        modificationCreatorGen = cliShapedPersons
+      ).map { case (orig, modified) =>
+        val newOrigDate = timestamps(max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+        val newModificationDate =
+          timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+        (
+          orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
+          modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
+        )
       }.generateOne
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -734,15 +732,19 @@ class ProjectSpec
     }
 
     "return a DecodingFailure when there's a modified Dataset entity created before project without parent" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val (dataset, modifiedDataset) =
-        datasetAndModificationEntities(provenanceImportedExternal).map { case (orig, modified) =>
+        datasetAndModificationEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons),
+                                       modificationCreatorGen = cliShapedPersons
+        ).map { case (orig, modified) =>
           val newOrigDate = timestamps(max = projectInfo.dateCreated.value)
             .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
             .generateAs[datasets.DatePublished]
           val newModificationDate =
-            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value)
+              .generateAs[datasets.DateCreated]
           (
             orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
             modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
@@ -750,38 +752,41 @@ class ProjectSpec
         }.generateOne
       val entitiesModifiedDataset = modifiedDataset.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+        projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         datasets =
           dataset.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]] :: entitiesModifiedDataset :: Nil
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      result.left.value shouldBe a[DecodingFailure]
+      result.left.value.getMessage() should endWith(
         s"Dataset ${entitiesModifiedDataset.resourceId} " +
           s"date ${entitiesModifiedDataset.provenance.date} is older than project ${projectInfo.dateCreated}"
       )
     }
 
     "decode project when there's a Dataset (neither internal nor modified) created before project creation" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val dataset1    = datasetEntities(provenanceImportedExternal).withDateBefore(projectInfo.dateCreated).generateOne
-      val dataset2 =
-        datasetEntities(provenanceImportedInternalAncestorExternal).withDateBefore(projectInfo.dateCreated).generateOne
-      val dataset3 =
-        datasetEntities(provenanceImportedInternalAncestorInternal())
-          .withDateBefore(projectInfo.dateCreated)
-          .generateOne
-      val jsonLD = cliLikeJsonLD(
+      val dataset1 = datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+      val dataset2 = datasetEntities(provenanceImportedInternalAncestorExternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+      val dataset3 = datasetEntities(provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -814,30 +819,36 @@ class ProjectSpec
     }
 
     "return a DecodingFailure when there's a modified Dataset that is derived from a non-existing dataset" in new TestCase {
+
       Set(
         gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
         gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
       ) foreach { projectInfo =>
         val resourceId = projects.ResourceId(projectInfo.path)
-        val (original, modified) =
-          datasetAndModificationEntities(provenanceInternal, projectInfo.dateCreated).generateOne
-        val (_, broken) = datasetAndModificationEntities(provenanceInternal, projectInfo.dateCreated).generateOne
+        val (original, modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                                  projectInfo.dateCreated,
+                                                                  modificationCreatorGen = cliShapedPersons
+        ).generateOne
+        val (_, broken) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                         projectInfo.dateCreated,
+                                                         modificationCreatorGen = cliShapedPersons
+        ).generateOne
 
-        val jsonLD = cliLikeJsonLD(
+        val jsonLD = cliJsonLD(
           resourceId,
           cliVersion,
           schemaVersion,
           projectInfo.maybeDescription,
           projectInfo.keywords,
-          projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
+          projectInfo.maybeCreator.map(c => c.toCliPayloadPerson(c.chooseSomeName)),
           projectInfo.dateCreated,
           datasets = List(original, modified, broken).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
         )
 
-        val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+        val result = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
 
-        error shouldBe a[DecodingFailure]
-        error.getMessage() should endWith(
+        result.left.value shouldBe a[DecodingFailure]
+        result.left.value.getMessage() should endWith(
           show"Dataset ${broken.identification.identifier} is derived from non-existing dataset ${broken.provenance.derivedFrom}"
         )
       }
@@ -850,7 +861,7 @@ class ProjectSpec
       val projectInfo  = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
       val resourceId   = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -881,7 +892,8 @@ class ProjectSpec
       ).asRight
     }
 
-    "favor the CLI description and keywords over the gitlab values" in new TestCase {
+    "favour the CLI description and keywords over the gitlab values" in new TestCase {
+
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
@@ -894,8 +906,7 @@ class ProjectSpec
       val keywords    = projectKeywords.generateSet(min = 1)
       val resourceId  = projects.ResourceId(projectInfo.path)
 
-      val jsonLD =
-        cliLikeJsonLD(resourceId, cliVersion, schemaVersion, description, keywords, maybeCreator = None, cliDate)
+      val jsonLD = cliJsonLD(resourceId, cliVersion, schemaVersion, description, keywords, maybeCreator = None, cliDate)
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
         entities.RenkuProject.WithoutParent(
@@ -919,6 +930,7 @@ class ProjectSpec
     }
 
     "fallback to GitLab's description and/or keywords if they are absent in the CLI payload" in new TestCase {
+
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
@@ -930,7 +942,7 @@ class ProjectSpec
       )
       val resourceId = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -962,6 +974,7 @@ class ProjectSpec
     }
 
     "return no description and/or keywords if they are absent in both the CLI payload and gitlab" in new TestCase {
+
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
@@ -972,7 +985,7 @@ class ProjectSpec
       )
       val resourceId = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(
+      val jsonLD = cliJsonLD(
         resourceId,
         cliVersion,
         schemaVersion,
@@ -1227,16 +1240,16 @@ class ProjectSpec
     val schemaVersion = projectSchemaVersions.generateOne
   }
 
-  private def cliLikeJsonLD(resourceId:       projects.ResourceId,
-                            cliVersion:       CliVersion,
-                            schemaVersion:    SchemaVersion,
-                            maybeDescription: Option[Description],
-                            keywords:         Set[Keyword],
-                            maybeCreator:     Option[entities.Person],
-                            dateCreated:      DateCreated,
-                            activities:       List[entities.Activity] = Nil,
-                            datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
-                            plans:            List[entities.Plan] = Nil
+  private def cliJsonLD(resourceId:       projects.ResourceId,
+                        cliVersion:       CliVersion,
+                        schemaVersion:    SchemaVersion,
+                        maybeDescription: Option[Description],
+                        keywords:         Set[Keyword],
+                        maybeCreator:     Option[entities.Person],
+                        dateCreated:      DateCreated,
+                        activities:       List[entities.Activity] = Nil,
+                        datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
+                        plans:            List[entities.Plan] = Nil
   )(implicit graph: GraphClass): JsonLD = {
 
     val descriptionJsonLD = maybeDescription match {
@@ -1246,58 +1259,43 @@ class ProjectSpec
         else maybeDescription.asJsonLD
     }
 
-    // we must use here the encoder that creates the CLI data and not the data we store in our jena
-    val datasetCliEncoder: JsonLDEncoder[entities.Dataset[entities.Dataset.Provenance]] = ds =>
-      CliConverters.from(ds).asJsonLD
-
-    JsonLD
-      .arr(
-        JsonLD.entity(
-          resourceId.asEntityId,
-          EntityTypes of (prov / "Location", schema / "Project"),
-          schema / "agent"         -> cliVersion.asJsonLD,
-          schema / "schemaVersion" -> schemaVersion.asJsonLD,
-          schema / "description"   -> descriptionJsonLD,
-          schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
-          schema / "creator"       -> maybeCreator.asJsonLD,
-          schema / "dateCreated"   -> dateCreated.asJsonLD,
-          renku / "hasActivity"    -> activities.asJsonLD,
-          renku / "hasDataset"     -> datasets.map(datasetCliEncoder.apply).asJsonLD,
-          renku / "hasPlan"        -> plans.asJsonLD
-        ) :: datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
-      )
-      .flatten
-      .fold(throw _, identity)
+    flattenedJsonLDFrom(
+      JsonLD.entity(
+        resourceId.asEntityId,
+        EntityTypes of (prov / "Location", schema / "Project"),
+        schema / "agent"         -> cliVersion.asJsonLD,
+        schema / "schemaVersion" -> schemaVersion.asJsonLD,
+        schema / "description"   -> descriptionJsonLD,
+        schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
+        schema / "creator"       -> maybeCreator.asJsonLD,
+        schema / "dateCreated"   -> dateCreated.asJsonLD,
+        renku / "hasActivity"    -> activities.asJsonLD,
+        renku / "hasDataset"     -> datasets.map(CliConverters.from).asJsonLD,
+        renku / "hasPlan"        -> plans.asJsonLD
+      ),
+      datasets.flatMap(_.publicationEvents.map(CliConverters.from).map(_.asJsonLD)): _*
+    )
   }
 
-  private def minimalCliLikeJsonLD(resourceId: projects.ResourceId) =
+  private def minimalCliJsonLD(resourceId: projects.ResourceId) = flattenedJsonLDFrom(
     JsonLD
       .entity(
         resourceId.asEntityId,
         EntityTypes.of(prov / "Location", schema / "Project"),
         Map.empty[Property, JsonLD]
       )
-      .flatten
-      .fold(throw _, identity)
+  )
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 
-    def toCLIPayloadPerson(name: Name): entities.Person = gitLabPerson match {
+    def toCliPayloadPerson(name: Name): entities.Person = gitLabPerson match {
       case _: ProjectMemberNoEmail =>
-        personEntities.generateOne
-          .copy(
-            name = name,
-            maybeEmail = None,
-            maybeGitLabId = None
-          )
+        cliShapedPersons.generateOne
+          .copy(name = name, maybeEmail = None)
           .to[entities.Person]
       case member: ProjectMemberWithEmail =>
-        personEntities.generateOne
-          .copy(
-            name = name,
-            maybeEmail = member.email.some,
-            maybeGitLabId = None
-          )
+        cliShapedPersons.generateOne
+          .copy(name = name, maybeEmail = member.email.some)
           .to[entities.Person]
     }
 
@@ -1344,11 +1342,12 @@ class ProjectSpec
     }
 
   private def datasetWith(
-      creators: NonEmptyList[entities.Person]
+      creator: entities.Person,
+      other:   entities.Person*
   ): projects.DateCreated => entities.Dataset[entities.Dataset.Provenance] = dateCreated => {
     val ds = datasetEntities(provenanceNonModified)(renkuUrl)(dateCreated).generateOne
       .to[entities.Dataset[entities.Dataset.Provenance]]
-    addTo(ds, creators)
+    addTo(ds, NonEmptyList.of(creator, other: _*))
   }
 
   private def addTo(
