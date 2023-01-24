@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.renku.cli.model.{CliCollectionEntity, CliSingleEntity}
+import io.renku.cli.model.{CliCollectionEntity, CliEntity, CliSingleEntity}
 import io.renku.graph.model.Schemas.{prov, renku}
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.generations
@@ -42,6 +42,8 @@ object Entity {
                                 checksum:              Checksum,
                                 generationResourceIds: List[generations.ResourceId]
   ) extends Entity
+
+  def fromCli(entity: CliEntity): Entity = entity.fold(fromCli(_), fromCli(_))
 
   def fromCli(entity: CliSingleEntity): Entity = entity.generationIds match {
     case Nil => InputEntity(entity.resourceId, Location.File(entity.path.value), entity.checksum)

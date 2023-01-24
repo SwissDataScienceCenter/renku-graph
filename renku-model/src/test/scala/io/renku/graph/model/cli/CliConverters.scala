@@ -20,7 +20,7 @@ package io.renku.graph.model.cli
 
 import cats.syntax.all._
 import io.renku.cli.model._
-import io.renku.graph.model.{datasets, entities}
+import io.renku.graph.model.{datasets, entities, entityModel}
 
 /** Conversion functions for production model entities into cli entities. */
 trait CliConverters {
@@ -81,11 +81,21 @@ trait CliConverters {
   def from(pe: entities.PublicationEvent): CliPublicationEvent =
     CliPublicationEvent(pe.resourceId, pe.about, pe.datasetResourceId, pe.maybeDescription, pe.name, pe.startDate)
 
-  def from(entity: entities.Entity): CliSingleEntity = entity match {
+  def from(entity: entities.Entity): CliEntity = entity match {
     case entities.Entity.InputEntity(id, location, checksum) =>
-      CliSingleEntity(id, EntityPath(location.value), checksum, generationIds = Nil)
+      location match {
+        case l: entityModel.Location.File =>
+          CliEntity(CliSingleEntity(id, EntityPath(l.value), checksum, generationIds = Nil))
+        case l: entityModel.Location.Folder =>
+          CliEntity(CliCollectionEntity(id, EntityPath(l.value), checksum, generationIds = Nil))
+      }
     case entities.Entity.OutputEntity(id, location, checksum, generationIds) =>
-      CliSingleEntity(id, EntityPath(location.value), checksum, generationIds)
+      location match {
+        case l: entityModel.Location.File =>
+          CliEntity(CliSingleEntity(id, EntityPath(l.value), checksum, generationIds))
+        case l: entityModel.Location.Folder =>
+          CliEntity(CliCollectionEntity(id, EntityPath(l.value), checksum, generationIds))
+      }
   }
 }
 
