@@ -62,7 +62,10 @@ class EntityBuilderSpec
 
     "successfully deserialize JsonLD to the model - case of a Renku Project" in new TestCase {
 
-      val project = anyRenkuProjectEntities.withActivities(activityEntities).generateOne
+      val project = anyRenkuProjectEntities
+        .withDatasets(datasetEntities(provenanceNonModified(creatorsGen = cliShapedPersons)))
+        .withActivities(activityEntities)
+        .generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))

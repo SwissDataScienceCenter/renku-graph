@@ -244,15 +244,10 @@ trait DatasetEntitiesGenerators {
 
   def datasetPartEntities(minDateCreated: Instant): Gen[DatasetPart] = for {
     external    <- datasetPartExternals
-    entity      <- datasetPartEntities
+    entity      <- inputEntities
     dateCreated <- datasetCreatedDates(minDateCreated)
     maybeSource <- datasetPartSources.toGeneratorOfOptions
   } yield DatasetPart(datasetPartIds.generateOne, external, entity, dateCreated, maybeSource)
-
-  private lazy val datasetPartEntities: Gen[Entity] = for {
-    location <- entityFileLocations
-    checksum <- entityChecksums
-  } yield Entity.InputEntity(location, checksum)
 
   lazy val publicationEventFactories: Instant => Gen[Dataset[Provenance] => PublicationEvent] = minDateCreated =>
     for {

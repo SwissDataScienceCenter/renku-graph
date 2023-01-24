@@ -58,14 +58,12 @@ trait CliConverters {
         case _: entities.Dataset.Provenance.Modified         => None
       },
       derivedFrom = dataset.provenance match {
-        case m: entities.Dataset.Provenance.Modified =>
-          m.derivedFrom.some
+        case m: entities.Dataset.Provenance.Modified => m.derivedFrom.some
         case _ => None
       },
       originalIdentifier = dataset.provenance.originalIdentifier.some,
       invalidationTime = dataset.provenance match {
-        case m: entities.Dataset.Provenance.Modified =>
-          m.maybeInvalidationTime
+        case m: entities.Dataset.Provenance.Modified => m.maybeInvalidationTime
         case _ => None
       },
       dataset.publicationEvents.map(from)
