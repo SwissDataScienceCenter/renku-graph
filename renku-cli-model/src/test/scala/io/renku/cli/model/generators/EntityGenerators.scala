@@ -18,7 +18,7 @@
 
 package io.renku.cli.model.generators
 
-import io.renku.cli.model.{CliEntity, CliEntityCollection}
+import io.renku.cli.model.{CliCollectionEntity, CliEntity}
 import io.renku.generators.Generators
 import io.renku.graph.model.RenkuTinyTypeGenerators
 import org.scalacheck.Gen
@@ -32,12 +32,12 @@ trait EntityGenerators {
     genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
   } yield CliEntity(id, location, checksum, genIds)
 
-  def entityCollectionGen: Gen[CliEntityCollection] = for {
+  def collectionEntityGen: Gen[CliCollectionEntity] = for {
     id       <- RenkuTinyTypeGenerators.entityResourceIds
     location <- BaseGenerators.entityPathGen
     checksum <- RenkuTinyTypeGenerators.entityChecksums
     genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
-  } yield CliEntityCollection(id, location, checksum, genIds)
+  } yield CliCollectionEntity(id, location, checksum, genIds)
 }
 
 object EntityGenerators extends EntityGenerators

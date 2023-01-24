@@ -38,36 +38,36 @@ object CliGeneration {
   sealed trait GenerationEntity {
     def resourceId:    entityModel.ResourceId
     def generationIds: List[ResourceId]
-    def fold[A](fa: CliEntity => A, fb: CliEntityCollection => A): A
+    def fold[A](fa: CliEntity => A, fb: CliCollectionEntity => A): A
   }
 
   object GenerationEntity {
     final case class Entity(entity: CliEntity) extends GenerationEntity {
       val resourceId:    entityModel.ResourceId = entity.resourceId
       val generationIds: List[ResourceId]       = entity.generationIds
-      def fold[A](fa: CliEntity => A, fb: CliEntityCollection => A): A = fa(entity)
+      def fold[A](fa: CliEntity => A, fb: CliCollectionEntity => A): A = fa(entity)
     }
 
-    final case class Collection(collection: CliEntityCollection) extends GenerationEntity {
+    final case class Collection(collection: CliCollectionEntity) extends GenerationEntity {
       val resourceId:    entityModel.ResourceId = collection.resourceId
       val generationIds: List[ResourceId]       = collection.generationIds
-      def fold[A](fa: CliEntity => A, fb: CliEntityCollection => A): A = fb(collection)
+      def fold[A](fa: CliEntity => A, fb: CliCollectionEntity => A): A = fb(collection)
     }
 
     def apply(entity: CliEntity):           GenerationEntity = Entity(entity)
-    def apply(coll:   CliEntityCollection): GenerationEntity = Collection(coll)
+    def apply(coll:   CliCollectionEntity): GenerationEntity = Collection(coll)
 
     private val entityTypes = EntityTypes.of(Prov.Entity)
 
     private def selectCandidates(ets: EntityTypes): Boolean =
-      CliEntity.matchingEntityTypes(ets) || CliEntityCollection.matchingEntityTypes(ets)
+      CliEntity.matchingEntityTypes(ets) || CliCollectionEntity.matchingEntityTypes(ets)
 
     implicit def jsonLDDecoder: JsonLDDecoder[GenerationEntity] = {
       val da = CliEntity.jsonLDDecoder.emap(e => Right(GenerationEntity(e)))
-      val db = CliEntityCollection.jsonLdDecoder.emap(e => Right(GenerationEntity(e)))
+      val db = CliCollectionEntity.jsonLdDecoder.emap(e => Right(GenerationEntity(e)))
       JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentTypes = cursor.getEntityTypes
-        (currentTypes.map(CliEntity.matchingEntityTypes), currentTypes.map(CliEntityCollection.matchingEntityTypes))
+        (currentTypes.map(CliEntity.matchingEntityTypes), currentTypes.map(CliCollectionEntity.matchingEntityTypes))
           .flatMapN {
             case (_, true) => db(cursor)
             case (true, _) => da(cursor)

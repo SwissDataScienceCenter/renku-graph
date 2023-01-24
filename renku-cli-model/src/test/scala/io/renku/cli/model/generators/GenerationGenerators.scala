@@ -31,7 +31,7 @@ trait GenerationGenerators {
       EntityGenerators.entityGen
         .map(_.copy(generationIds = List(generationId)))
         .map(CliGeneration.GenerationEntity.apply),
-      EntityGenerators.entityCollectionGen
+      EntityGenerators.collectionEntityGen
         .map(_.copy(generationIds = List(generationId)))
         .map(CliGeneration.GenerationEntity.apply)
     )

@@ -28,7 +28,7 @@ trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val cliEntityDiff: Diff[CliEntity] = Diff.derived[CliEntity]
 
-  implicit val cliEntityCollectionDiff: Diff[CliEntityCollection] = Diff.derived[CliEntityCollection]
+  implicit val cliCollectionEntityDiff: Diff[CliCollectionEntity] = Diff.derived[CliCollectionEntity]
 
   implicit val cliDatasetFileDiff: Diff[CliDatasetFile] = Diff.derived[CliDatasetFile]
 
