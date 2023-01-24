@@ -35,8 +35,7 @@ class CliAssociationSpec
     with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val associationGen = AssociationGenerators.associationGen(Instant.now)
+  val associationGen = AssociationGenerators.associationGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {

@@ -35,8 +35,7 @@ class CliProjectSpec
     with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val projectGen = ProjectGenerators.projectGen(Instant.now)
+  val projectGen = ProjectGenerators.projectGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {

@@ -54,9 +54,7 @@ class CommitHistoryChangesSpec
 
     Scenario("A change in the commit history should trigger the re-provisioning process") {
 
-      val project = dataProjects(
-        renkuProjectEntities(visibilityPublic).withDatasets(datasetEntities(provenanceInternal))
-      ).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("there is data in the TS")

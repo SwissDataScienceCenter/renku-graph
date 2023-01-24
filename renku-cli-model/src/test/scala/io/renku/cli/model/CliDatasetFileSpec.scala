@@ -35,8 +35,7 @@ class CliDatasetFileSpec
     with JsonLDCodecMatchers {
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val datasetFileGen = DatasetFileGenerators.datasetFileGen(Instant.now)
+  val datasetFileGen = DatasetFileGenerators.datasetFileGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {
