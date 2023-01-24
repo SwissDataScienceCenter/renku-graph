@@ -67,12 +67,17 @@ object CliDataset {
       fileDecoder:   JsonLDDecoder[CliDatasetFile],
       personDecoder: JsonLDDecoder[CliPerson]
   ): JsonLDDecoder[CliDataset] = JsonLDDecoder.entity(entityTypes) { cursor =>
+    def failIfNoCreators(identifier: Identifier)(creators: List[CliPerson]) = Either.fromOption(
+      NonEmptyList.fromList(creators),
+      DecodingFailure(show"No creators on dataset with id: $identifier", Nil)
+    )
+
     for {
       resourceId         <- cursor.downEntityId.as[ResourceId]
       identifier         <- cursor.downField(Schema.identifier).as[Identifier]
       title              <- cursor.downField(Schema.name).as[Title]
       name               <- cursor.downField(Renku.slug).as[Name]
-      creators           <- cursor.downField(Schema.creator).as[NonEmptyList[CliPerson]]
+      creators           <- cursor.downField(Schema.creator).as[List[CliPerson]] >>= failIfNoCreators(identifier)
       maybeDateCreated   <- cursor.downField(Schema.dateCreated).as[Option[DateCreated]]
       maybeDatePublished <- cursor.downField(Schema.datePublished).as[Option[DatePublished]]
       date <- maybeDateCreated

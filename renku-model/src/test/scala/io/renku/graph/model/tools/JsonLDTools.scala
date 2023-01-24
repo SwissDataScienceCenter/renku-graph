@@ -47,6 +47,9 @@ object JsonLDTools {
 
     final def addType(et: Property): JsonLDElementView = addType(EntityType.of(et))
 
+    /** Remove the given property. */
+    def remove(ets: EntityTypes, property: Property): JsonLDElementView
+
     def value: JsonLD
   }
 
@@ -62,11 +65,17 @@ object JsonLDTools {
             if (filter(el)) update(el) else el
           })
 
-        def selectByTypes(ets: EntityTypes): JsonLDElementView =
+        override def selectByTypes(ets: EntityTypes): JsonLDElementView =
           apply(root, filter && Filter.containsAllTypes(ets), update)
 
-        def addType(et: EntityType): JsonLDElementView =
+        override def addType(et: EntityType): JsonLDElementView =
           JsonLDElementView(root, filter, update.andThen(Update.addEntityType(et)))
+
+        override def remove(ets: EntityTypes, property: Property): JsonLDElementView =
+          JsonLDElementView(root,
+                            filter && Filter.containsAllTypes(ets),
+                            update.andThen(Update.removeProperty(property))
+          )
       }
 
     object Update {
@@ -75,6 +84,11 @@ object JsonLDTools {
       def addEntityType(et: EntityType): JsonLD => JsonLD = {
         case e: JsonLD.JsonLDEntity =>
           e.copy(types = EntityTypes(e.types.list.prepend(et)))
+        case e => e
+      }
+
+      def removeProperty(property: Property): JsonLD => JsonLD = {
+        case e: JsonLD.JsonLDEntity => e.copy(properties = e.properties - property)
         case e => e
       }
     }

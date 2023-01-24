@@ -34,6 +34,7 @@ import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
+import org.scalacheck.Gen
 
 trait ModelOps extends Dataset.ProvenanceOps {
 
@@ -314,9 +315,10 @@ trait ModelOps extends Dataset.ProvenanceOps {
         }
 
     def createModification(
-        modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
+        modifier:         Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity,
+        creatorEntityGen: Gen[Person] = personEntities
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate, personEntities)).modify(modifier)
+      (projectDate => modifiedDatasetEntities(dataset, projectDate, creatorEntityGen)).modify(modifier)
 
     def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 

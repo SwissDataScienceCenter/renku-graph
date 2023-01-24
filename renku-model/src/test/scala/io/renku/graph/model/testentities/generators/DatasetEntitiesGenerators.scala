@@ -80,14 +80,14 @@ trait DatasetEntitiesGenerators {
   def modifiedDatasetEntities(
       original:           Dataset[Provenance],
       projectDateCreated: projects.DateCreated,
-      personEntitiesGen:  Gen[Person] = personEntities
+      creatorEntityGen:   Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
     identifier <- datasetIdentifiers
     title      <- datasetTitles
     date <- datasetCreatedDates(
               List(original.provenance.date.instant, projectDateCreated.value).max
             )
-    modifyingPerson <- personEntitiesGen
+    modifyingPerson <- creatorEntityGen
     additionalInfo  <- datasetAdditionalInfos
     parts           <- datasetPartEntities(date.instant).toGeneratorOfList()
     publicationEventFactories <- publicationEventFactories {
