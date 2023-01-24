@@ -69,12 +69,12 @@ trait DatasetEntitiesGenerators {
       .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
   def datasetAndModificationEntities[P <: Dataset.Provenance](
-      provenance:         ProvenanceGen[P],
-      projectDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH),
-      personEntitiesGen:  Gen[Person] = personEntities
+      provenance:                   ProvenanceGen[P],
+      projectDateCreated:           projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      modificationCreatorEntityGen: Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
     original <- datasetEntities(provenance)(renkuUrl)(projectDateCreated)
-    modified <- modifiedDatasetEntities(original, projectDateCreated, personEntitiesGen)
+    modified <- modifiedDatasetEntities(original, projectDateCreated, modificationCreatorEntityGen)
   } yield original -> modified
 
   def modifiedDatasetEntities(

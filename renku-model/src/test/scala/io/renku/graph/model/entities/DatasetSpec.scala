@@ -26,6 +26,7 @@ import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import GraphModelGenerators.graphClasses
+import io.renku.cli.model.CliDataset
 import io.renku.cli.model.generators.DatasetFileGenerators.datasetFileGen
 import io.renku.graph.model.cli.CliEntityConverterSyntax
 import io.renku.graph.model.entities.Dataset.Provenance
@@ -56,24 +57,23 @@ class DatasetSpec
     implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Dataset entity into the Dataset object" in {
-      forAll(datasetEntities(provenanceNonModified(cliShapePersons)).decoupledFromProject) { testDs =>
+      forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { testDs =>
         val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
         val cliDs   = modelDs.toCliEntity
 
-        flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldMatchToRight List(modelDs)
+        encodeAndDecodeToModel(cliDs) shouldMatchToRight List(modelDs)
       }
     }
 
     "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
 
       val modelDs = datasetEntities(
-        provenanceImportedExternal(personEntitiesGen = cliShapePersons)
+        provenanceImportedExternal(personEntitiesGen = cliShapedPersons)
       ).decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
       val cliDs = modelDs.toCliEntity.copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-      val Left(error) = flattenedJsonLD(cliDs).cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]]
+      val Left(error) = encodeAndDecodeToModel(cliDs)
 
       error shouldBe a[DecodingFailure]
       error.getMessage should startWith(
@@ -85,10 +85,10 @@ class DatasetSpec
       Table(
         "DS generator" -> "DS type",
         datasetEntities(
-          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapePersons)
+          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapedPersons)
         ) -> "Imported Internal Ancestor External",
         datasetEntities(
-          provenanceImportedInternalAncestorExternal(personEntitiesGen = cliShapePersons)
+          provenanceImportedInternalAncestorExternal(personEntitiesGen = cliShapedPersons)
         ) -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
@@ -99,9 +99,7 @@ class DatasetSpec
           val otherOriginalId = datasetOriginalIdentifiers.generateOne
           val cliDs           = modelDs.toCliEntity.copy(originalIdentifier = otherOriginalId.some)
 
-          val Right(decodedDs :: Nil) =
-            flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-              .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+          val Right(decodedDs :: Nil) = encodeAndDecodeToModel(cliDs)
 
           decodedDs shouldMatchTo modelDs.copy(provenance = modelDs.provenance match {
             case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
@@ -116,7 +114,7 @@ class DatasetSpec
     "treat DS with originalIdentifier but no derivedFrom as Internal -" +
       "drop originalIdentifier and move its dateCreated to the oldest parts' date" in {
         val modelDs = {
-          val ds    = datasetEntities(provenanceInternal(cliShapePersons)).decoupledFromProject.generateOne
+          val ds    = datasetEntities(provenanceInternal(cliShapedPersons)).decoupledFromProject.generateOne
           val part1 = datasetPartEntities(ds.provenance.date.instant).generateOne
           val part2 = datasetPartEntities(ds.provenance.date.instant).generateOne
             .copy(dateCreated = timestamps(max = ds.provenance.date.instant).generateAs(datasets.DateCreated))
@@ -127,8 +125,7 @@ class DatasetSpec
 
         val cliDs = modelDs.toCliEntity.copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-        flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+        encodeAndDecodeToModel(cliDs) shouldBe List(
           modelDs.copy(provenance = modelDs.provenance.copy(date = modelDs.parts.map(_.dateCreated).min))
         ).asRight
       }
@@ -136,7 +133,7 @@ class DatasetSpec
     "treat DS with originalIdentifier but no derivedFrom as Internal -" +
       "drop originalIdentifier and keep its dateCreated if parts' dates are younger than the DS" in {
         val modelDs = {
-          val ds    = datasetEntities(provenanceInternal(cliShapePersons)).decoupledFromProject.generateOne
+          val ds    = datasetEntities(provenanceInternal(cliShapedPersons)).decoupledFromProject.generateOne
           val part1 = datasetPartEntities(ds.provenance.date.instant).generateOne
           val part2 = datasetPartEntities(ds.provenance.date.instant).generateOne
           ds.copy(parts = List(part1, part2))
@@ -146,17 +143,16 @@ class DatasetSpec
 
         val cliDs = modelDs.toCliEntity.copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-        flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(modelDs).asRight
+        encodeAndDecodeToModel(cliDs) shouldBe List(modelDs).asRight
       }
 
     forAll {
       Table(
-        "DS generator"                                                                   -> "DS type",
-        datasetEntities(provenanceInternal(cliShapePersons))                             -> "Internal",
-        datasetEntities(provenanceImportedExternal(personEntitiesGen = cliShapePersons)) -> "Imported External",
+        "DS generator"                                                                    -> "DS type",
+        datasetEntities(provenanceInternal(cliShapedPersons))                             -> "Internal",
+        datasetEntities(provenanceImportedExternal(personEntitiesGen = cliShapedPersons)) -> "Imported External",
         datasetEntities(
-          provenanceImportedInternalAncestorExternal(cliShapePersons)
+          provenanceImportedInternalAncestorExternal(cliShapedPersons)
         ) -> "Imported Internal Ancestor External"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
@@ -174,8 +170,7 @@ class DatasetSpec
           cli.copy(datasetFiles = invalidFile :: cli.datasetFiles)
         }
 
-        val Left(error) = flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+        val Left(error) = encodeAndDecodeToModel(cliDs)
 
         error shouldBe a[DecodingFailure]
         error.getMessage should endWith(
@@ -185,15 +180,19 @@ class DatasetSpec
       }
     }
 
-    "succeed if dataset parts are older than the modified or imported internal dataset" in {
-      List(
-        datasetAndModificationEntities(provenanceNonModified(cliShapePersons), personEntitiesGen = cliShapePersons)
-          .map(_._2),
+    forAll {
+      Table(
+        "DS generator" -> "DS type",
+        datasetAndModificationEntities(provenanceNonModified(cliShapedPersons),
+                                       modificationCreatorEntityGen = cliShapedPersons
+        ).map(_._2) -> "Modified",
         datasetEntities(
-          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapePersons)
-        ).decoupledFromProject
-      ) foreach { datasetGen =>
-        val modelDs = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+          provenanceImportedInternalAncestorInternal(personEntitiesGen = cliShapedPersons)
+        ).decoupledFromProject -> "Imported Ancestor Internal"
+      )
+    } { (dsGen, dsType) =>
+      s"succeed for $dsType dataset with parts older than the dataset itself" in {
+        val modelDs = dsGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
 
         val olderFile = datasetFileGen(Instant.now()).generateOne
           .copy(dateCreated = timestamps(max = modelDs.provenance.date.instant).generateAs(datasets.DateCreated),
@@ -207,31 +206,24 @@ class DatasetSpec
 
         val modelOlderFile = entities.DatasetPart.fromCli(olderFile).fold(err => fail(err.intercalate("; ")), identity)
         val expectedDs     = modelDs.copy(parts = modelOlderFile :: modelDs.parts)
-        flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(expectedDs).asRight
+        encodeAndDecodeToModel(cliDs) shouldBe List(expectedDs).asRight
       }
     }
 
     "succeed if originalIdentifier on a modified dataset is different than its identifier" in {
-      val dataset = {
-        val ds = datasetAndModificationEntities(provenanceNonModified)
-          .map(_._2)
-          .generateOne
-          .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+      val modelDs = {
+        val _ -> ds = datasetAndModificationEntities(provenanceNonModified(cliShapedPersons),
+                                                     modificationCreatorEntityGen = cliShapedPersons
+        ).generateOne.map(_.to[entities.Dataset[entities.Dataset.Provenance.Modified]])
         ds.copy(provenance = ds.provenance.copy(originalIdentifier = datasetOriginalIdentifiers.generateOne))
       }
 
-      assume(dataset.identification.identifier.value != dataset.provenance.originalIdentifier.value)
+      assume(modelDs.identification.identifier.value != modelDs.provenance.originalIdentifier.value)
 
-      dataset.asJsonLD.flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
-        dataset.copy(publicationEvents = Nil)
-      ).asRight
+      encodeAndDecodeToModel(modelDs.toCliEntity) shouldBe List(modelDs).asRight
     }
 
-    "fail if invalidationTime is older than the dataset" in {
+    "--fail if invalidationTime is older than the dataset" in {
       val dataset = datasetAndModificationEntities(provenanceInternal).generateOne._2
         .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
       val invalidationTime = timestamps(max = dataset.provenance.date.instant).generateAs(InvalidationTime)
@@ -450,4 +442,8 @@ class DatasetSpec
       )
     }
   }
+
+  private def encodeAndDecodeToModel(cliDs: CliDataset) =
+    flattenedJsonLDFrom(cliDs.asJsonLD, cliDs.publicationEvents.map(_.asJsonLD): _*).cursor
+      .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 }
