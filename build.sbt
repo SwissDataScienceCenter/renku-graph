@@ -78,13 +78,13 @@ lazy val renkuModelTinyTypes = project
   .settings(commonSettings)
   .dependsOn(tinyTypes % "compile->compile; test->test")
 
-lazy val renkuCliModel = project.
-  in(file("renku-cli-model")).
-  withId("renku-cli-model").
-  enablePlugins(AutomateHeaderPlugin).
-  settings(commonSettings).
-  dependsOn(
-    tinyTypes % "compile->compile; test->test",
+lazy val renkuCliModel = project
+  .in(file("renku-cli-model"))
+  .withId("renku-cli-model")
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(commonSettings)
+  .dependsOn(
+    tinyTypes           % "compile->compile; test->test",
     renkuModelTinyTypes % "compile->compile; test->test"
   )
 
