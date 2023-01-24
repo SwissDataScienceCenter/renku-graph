@@ -34,18 +34,18 @@ class CliEntitySpec
 
   implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
 
-  val entityGen           = EntityGenerators.entityGen
+  val singleEntityGen     = EntityGenerators.singleEntityGen
   val collectionEntityGen = EntityGenerators.collectionEntityGen
 
   "entity decode/encode" should {
     "be compatible" in {
-      forAll(entityGen) { cliEntity =>
+      forAll(singleEntityGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
       }
     }
 
     "work on multiple items" in {
-      forAll(entityGen, entityGen) { (cliEntity1, cliEntity2) =>
+      forAll(singleEntityGen, singleEntityGen) { (cliEntity1, cliEntity2) =>
         assertCompatibleCodec(cliEntity1, cliEntity2)
       }
     }

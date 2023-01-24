@@ -29,7 +29,7 @@ trait DatasetFileGenerators {
     for {
       id          <- RenkuTinyTypeGenerators.partResourceIdGen
       external    <- RenkuTinyTypeGenerators.datasetPartExternals
-      entity      <- EntityGenerators.entityGen
+      entity      <- EntityGenerators.singleEntityGen
       created     <- RenkuTinyTypeGenerators.datasetCreatedDates(minCreated)
       source      <- Gen.option(RenkuTinyTypeGenerators.datasetPartSources)
       invalidTime <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(created))

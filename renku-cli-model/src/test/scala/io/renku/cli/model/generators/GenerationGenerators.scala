@@ -28,7 +28,7 @@ trait GenerationGenerators {
 
   def generationEntityGen(generationId: ResourceId): Gen[CliGeneration.GenerationEntity] =
     Gen.oneOf(
-      EntityGenerators.entityGen
+      EntityGenerators.singleEntityGen
         .map(_.copy(generationIds = List(generationId)))
         .map(CliGeneration.GenerationEntity.apply),
       EntityGenerators.collectionEntityGen

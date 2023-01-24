@@ -81,11 +81,11 @@ trait CliConverters {
   def from(pe: entities.PublicationEvent): CliPublicationEvent =
     CliPublicationEvent(pe.resourceId, pe.about, pe.datasetResourceId, pe.maybeDescription, pe.name, pe.startDate)
 
-  def from(entity: entities.Entity): CliEntity = entity match {
+  def from(entity: entities.Entity): CliSingleEntity = entity match {
     case entities.Entity.InputEntity(id, location, checksum) =>
-      CliEntity(id, EntityPath(location.value), checksum, generationIds = Nil)
+      CliSingleEntity(id, EntityPath(location.value), checksum, generationIds = Nil)
     case entities.Entity.OutputEntity(id, location, checksum, generationIds) =>
-      CliEntity(id, EntityPath(location.value), checksum, generationIds)
+      CliSingleEntity(id, EntityPath(location.value), checksum, generationIds)
   }
 }
 

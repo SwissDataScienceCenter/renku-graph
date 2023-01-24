@@ -23,7 +23,7 @@ import io.renku.graph.model.usages._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld._
 
-final case class CliUsage(resourceId: ResourceId, entity: CliEntity) extends CliModel
+final case class CliUsage(resourceId: ResourceId, entity: CliSingleEntity) extends CliModel
 
 object CliUsage {
 
@@ -33,7 +33,7 @@ object CliUsage {
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]
-        entity     <- cursor.downField(Prov.entity).as[CliEntity]
+        entity     <- cursor.downField(Prov.entity).as[CliSingleEntity]
       } yield CliUsage(resourceId, entity)
     }
 

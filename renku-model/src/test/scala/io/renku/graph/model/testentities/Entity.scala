@@ -19,7 +19,7 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
-import io.renku.cli.model.CliEntity
+import io.renku.cli.model.CliSingleEntity
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
@@ -47,7 +47,7 @@ object Entity {
     case e: OutputEntity => toOutputEntity(renkuUrl)(e)
   }
 
-  implicit def toCliEntity(implicit renkuUrl: RenkuUrl): Entity => CliEntity = e =>
+  implicit def toCliEntity(implicit renkuUrl: RenkuUrl): Entity => CliSingleEntity = e =>
     CliConverters.from(e.to[entities.Entity])
 
   implicit def toInputEntity(implicit renkuUrl: RenkuUrl): InputEntity => entities.Entity.InputEntity =

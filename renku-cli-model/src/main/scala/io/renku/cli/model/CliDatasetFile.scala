@@ -25,12 +25,12 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld._
 
 final case class CliDatasetFile(
-    resourceId:       PartResourceId,
-    external:         PartExternal,
-    entity:           CliEntity,
-    dateCreated:      DateCreated,
-    source:           Option[PartSource],
-    invalidationTime: Option[InvalidationTime]
+                                 resourceId:       PartResourceId,
+                                 external:         PartExternal,
+                                 entity:           CliSingleEntity,
+                                 dateCreated:      DateCreated,
+                                 source:           Option[PartSource],
+                                 invalidationTime: Option[InvalidationTime]
 ) extends CliModel
 
 object CliDatasetFile {
@@ -41,7 +41,7 @@ object CliDatasetFile {
       for {
         resourceId            <- cursor.downEntityId.as[PartResourceId]
         external              <- cursor.downField(Renku.external).as[PartExternal]
-        entity                <- cursor.downField(Prov.entity).as[CliEntity]
+        entity                <- cursor.downField(Prov.entity).as[CliSingleEntity]
         dateCreated           <- cursor.downField(Schema.dateCreated).as[DateCreated]
         maybeSource           <- cursor.downField(Renku.source).as[Option[PartSource]]
         maybeInvalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]

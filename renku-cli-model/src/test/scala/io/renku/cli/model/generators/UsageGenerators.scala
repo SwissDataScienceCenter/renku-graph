@@ -27,7 +27,7 @@ trait UsageGenerators {
   def usageGen: Gen[CliUsage] =
     for {
       id     <- RenkuTinyTypeGenerators.usageResourceIdGen
-      entity <- EntityGenerators.entityGen
+      entity <- EntityGenerators.singleEntityGen
     } yield CliUsage(id, entity)
 }
 

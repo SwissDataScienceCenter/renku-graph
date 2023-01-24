@@ -18,7 +18,7 @@
 
 package io.renku.graph.model.cli
 
-import io.renku.cli.model.{CliDataset, CliEntity, CliPerson, CliPublicationEvent}
+import io.renku.cli.model.{CliDataset, CliSingleEntity, CliPerson, CliPublicationEvent}
 import io.renku.graph.model.entities
 
 /** Convert from the production entities into cli entities. The test model entities can
@@ -31,7 +31,7 @@ trait CliEntityConverterSyntax {
   }
 
   final implicit class EntityOps(self: entities.Entity) {
-    def toCliEntity: CliEntity = CliConverters.from(self)
+    def toCliEntity: CliSingleEntity = CliConverters.from(self)
   }
 
   final implicit class DatasetOps(self: entities.Dataset[entities.Dataset.Provenance]) {
