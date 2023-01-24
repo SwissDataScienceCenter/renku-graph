@@ -137,7 +137,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
     private val renkuApiUrl = renkuApiUrls.generateOne
     implicit val renkuResourceUrl: renku.ResourceUrl =
-      (renkuApiUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+      (renkuApiUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) && (Sort.sort.parameterName -> sort.sortBy.toList) && (query.parameterName -> maybePhrase)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val datasetsFinder        = mock[DatasetsFinder[IO]]

@@ -33,17 +33,20 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.DatasetSearchResult.ExemplarProject
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.OrderBy
+import io.renku.triplesstore.client.sparql.SparqlEncoder
 import org.typelevel.log4cats.Logger
 
 private trait DatasetsFinder[F[_]] {
   def findDatasets(maybePhrase: Option[Phrase],
-                   sort:        Sort.By,
+                   sort:        Sorting[Endpoint.Sort.type],
                    paging:      PagingRequest,
                    maybeUser:   Option[AuthUser]
   ): F[PagingResponse[DatasetSearchResult]]
@@ -69,7 +72,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
   import creatorsFinder._
 
   override def findDatasets(maybePhrase:   Option[Phrase],
-                            sort:          Sort.By,
+                            sort:          Sorting[Endpoint.Sort.type],
                             pagingRequest: PagingRequest,
                             maybeUser:     Option[AuthUser]
   ): F[PagingResponse[DatasetSearchResult]] = {
@@ -82,91 +85,92 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
     } yield updatedPage
   }
 
-  private def query(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
-    name = "ds free-text search",
-    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
-    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date 
-        |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectPath) AS ?projectSamplePath) ?projectsCount         
-        |  (GROUP_CONCAT(?keyword; separator='|') AS ?keywords)
-        |  (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images) 
-        |WHERE { 
-        |  { 
-        |    SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) 
-        |      (SAMPLE(?dsId) AS ?dsIdSample) (SAMPLE(?projectId) AS ?projectIdSample) 
-        |    WHERE { 
-        |      { 
-        |        SELECT ?sameAs ?projectId ?dsId 
-        |          (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds) 
-        |          (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
-        |        WHERE {
-        |          {
-        |            SELECT DISTINCT ?projectId ?id
-        |            WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
-        |          } {
-        |            GRAPH ?projectId {
-        |              ?id a schema:Dataset
-        |            }
-        |            BIND(?id AS ?dsId)
-        |          } UNION {
-        |            GRAPH <${GraphClass.Persons.id}> {
-        |              ?id a schema:Person
-        |            }
-        |            GRAPH ?projectId {
-        |              ?dsId schema:creator ?id;
-        |                    a schema:Dataset
-        |            }
-        |          }
-        |          GRAPH ?projectId {
-        |            ?dsId renku:topmostSameAs ?sameAs;
-        |                  ^renku:hasDataset ?projectId.
-        |            ${projectMemberFilterQuery(maybeUser)}
-        |            OPTIONAL {
-        |              ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
-        |                         ^renku:hasDataset ?childProjectId.
-        |            }
-        |            OPTIONAL {
-        |              ?dsId prov:invalidatedAtTime ?invalidationTime;
-        |                    ^renku:hasDataset ?projectIdWhereInvalidated
-        |            }
-        |          }
-        |        }
-        |        GROUP BY ?sameAs ?projectId ?dsId
-        |      }
-        |      FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
-        |      FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
-        |    }
-        |    GROUP BY ?sameAs 
-        |  }
-        |  GRAPH ?projectIdSample {
-        |    ?dsIdSample renku:topmostSameAs ?sameAs;
-        |                schema:identifier ?identifier;
-        |                schema:name ?name;
-        |                renku:slug ?slug. 
-        |    ?projectIdSample renku:projectPath ?projectPath.
-        |    OPTIONAL {
-        |      ?dsIdSample schema:image ?imageId.
-        |      ?imageId schema:position ?imagePosition;
-        |               schema:contentUrl ?imageUrl.
-        |      BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-        |    }
-        |    OPTIONAL { ?dsIdSample schema:keywords ?keyword }
-        |    OPTIONAL { ?dsIdSample schema:description ?maybeDescription }
-        |    OPTIONAL { ?dsIdSample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |    OPTIONAL {
-        |      ?dsIdSample schema:dateCreated ?maybeDateCreated.
-        |      BIND (?maybeDateCreated AS ?date)
-        |    }
-        |    OPTIONAL {
-        |      ?dsIdSample schema:datePublished ?maybeDatePublished
-        |      BIND (?maybeDatePublished AS ?date)
-        |    }
-        |  }
-        |}
-        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date
-        |  ?maybeDerivedFrom ?sameAs ?projectsCount
-        |${`ORDER BY`(sort)}
-        |""".stripMargin
-  )
+  private def query(phrase: Phrase, sort: Sorting[Endpoint.Sort.type], maybeUser: Option[AuthUser]): SparqlQuery =
+    SparqlQuery.of(
+      name = "ds free-text search",
+      Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
+      s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date 
+          |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectPath) AS ?projectSamplePath) ?projectsCount         
+          |  (GROUP_CONCAT(?keyword; separator='|') AS ?keywords)
+          |  (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images) 
+          |WHERE { 
+          |  { 
+          |    SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) 
+          |      (SAMPLE(?dsId) AS ?dsIdSample) (SAMPLE(?projectId) AS ?projectIdSample) 
+          |    WHERE { 
+          |      { 
+          |        SELECT ?sameAs ?projectId ?dsId 
+          |          (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds) 
+          |          (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
+          |        WHERE {
+          |          {
+          |            SELECT DISTINCT ?projectId ?id
+          |            WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
+          |          } {
+          |            GRAPH ?projectId {
+          |              ?id a schema:Dataset
+          |            }
+          |            BIND(?id AS ?dsId)
+          |          } UNION {
+          |            GRAPH <${GraphClass.Persons.id}> {
+          |              ?id a schema:Person
+          |            }
+          |            GRAPH ?projectId {
+          |              ?dsId schema:creator ?id;
+          |                    a schema:Dataset
+          |            }
+          |          }
+          |          GRAPH ?projectId {
+          |            ?dsId renku:topmostSameAs ?sameAs;
+          |                  ^renku:hasDataset ?projectId.
+          |            ${projectMemberFilterQuery(maybeUser)}
+          |            OPTIONAL {
+          |              ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+          |                         ^renku:hasDataset ?childProjectId.
+          |            }
+          |            OPTIONAL {
+          |              ?dsId prov:invalidatedAtTime ?invalidationTime;
+          |                    ^renku:hasDataset ?projectIdWhereInvalidated
+          |            }
+          |          }
+          |        }
+          |        GROUP BY ?sameAs ?projectId ?dsId
+          |      }
+          |      FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
+          |      FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
+          |    }
+          |    GROUP BY ?sameAs 
+          |  }
+          |  GRAPH ?projectIdSample {
+          |    ?dsIdSample renku:topmostSameAs ?sameAs;
+          |                schema:identifier ?identifier;
+          |                schema:name ?name;
+          |                renku:slug ?slug. 
+          |    ?projectIdSample renku:projectPath ?projectPath.
+          |    OPTIONAL {
+          |      ?dsIdSample schema:image ?imageId.
+          |      ?imageId schema:position ?imagePosition;
+          |               schema:contentUrl ?imageUrl.
+          |      BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+          |    }
+          |    OPTIONAL { ?dsIdSample schema:keywords ?keyword }
+          |    OPTIONAL { ?dsIdSample schema:description ?maybeDescription }
+          |    OPTIONAL { ?dsIdSample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
+          |    OPTIONAL {
+          |      ?dsIdSample schema:dateCreated ?maybeDateCreated.
+          |      BIND (?maybeDateCreated AS ?date)
+          |    }
+          |    OPTIONAL {
+          |      ?dsIdSample schema:datePublished ?maybeDatePublished
+          |      BIND (?maybeDatePublished AS ?date)
+          |    }
+          |  }
+          |}
+          |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date
+          |  ?maybeDerivedFrom ?sameAs ?projectsCount
+          |${`ORDER BY`(sort)}
+          |""".stripMargin
+    )
 
   private lazy val projectMemberFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
@@ -187,11 +191,15 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |""".stripMargin
   }
 
-  private def `ORDER BY`(sort: Sort.By): String = sort.property match {
-    case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
-    case Sort.DateProperty          => s"ORDER BY ${sort.direction}(?date)"
-    case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybeDatePublished)"
-    case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
+  private def `ORDER BY`(sort: Sorting[Endpoint.Sort.type])(implicit encoder: SparqlEncoder[OrderBy]): String = {
+    def mapPropertyName(property: Sort.SearchProperty) = property match {
+      case Sort.TitleProperty         => OrderBy.Property("?name")
+      case Sort.DateProperty          => OrderBy.Property("?date")
+      case Sort.DatePublishedProperty => OrderBy.Property("?maybeDatePublished")
+      case Sort.ProjectsCountProperty => OrderBy.Property("?projectsCount")
+    }
+
+    encoder(sort.toOrderBy(mapPropertyName)).sparql
   }
 
   private lazy val addCreators: DatasetSearchResult => F[DatasetSearchResult] = dataset =>

@@ -301,6 +301,18 @@ trait DatasetEntitiesGenerators {
   def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
     identificationLens[P].modify(_.copy(name = to))
 
+  def replaceDSDateCreatedOrPublished[P <: Dataset.Provenance](to: Instant): Dataset[P] => Dataset[P] = {
+    val datePublished = datasets.DatePublished(to.atOffset(ZoneOffset.UTC).toLocalDate)
+    val dateCreated   = datasets.DateCreated(to)
+    provenanceLens[P].modify {
+      case p: Provenance.Internal                         => p.copy(date = dateCreated).asInstanceOf[P]
+      case p: Provenance.ImportedExternal                 => p.copy(date = datePublished).asInstanceOf[P]
+      case p: Provenance.ImportedInternalAncestorExternal => p.copy(date = datePublished).asInstanceOf[P]
+      case p: Provenance.ImportedInternalAncestorInternal => p.copy(date = dateCreated).asInstanceOf[P]
+      case p: Provenance.Modified                         => p.copy(date = dateCreated).asInstanceOf[P]
+    }
+  }
+
   def replaceDSKeywords[P <: Dataset.Provenance](to: List[datasets.Keyword]): Dataset[P] => Dataset[P] =
     additionalInfoLens[P].modify(_.copy(keywords = to))
 

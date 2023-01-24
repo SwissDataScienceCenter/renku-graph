@@ -120,18 +120,18 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
         projectPath <- projectPaths
         maybeStatus <- eventStatuses.toGeneratorOfOptions
         maybeDates  <- filtersOnDates.toGeneratorOfOptions
-        sorting     <- sortBys(Criteria.Sorting)
+        sorting     <- sortBys(Criteria.Sort)
         paging      <- pagingRequests
       } yield Criteria(Filters.ProjectEvents(projectPath, maybeStatus, maybeDates), sorting, paging),
       for {
         status     <- eventStatuses
         maybeDates <- filtersOnDates.toGeneratorOfOptions
-        sorting    <- sortBys(Criteria.Sorting)
+        sorting    <- sortBys(Criteria.Sort)
         paging     <- pagingRequests
       } yield Criteria(Filters.EventsWithStatus(status, maybeDates), sorting, paging),
       for {
         dates   <- filtersOnDates
-        sorting <- sortBys(Criteria.Sorting)
+        sorting <- sortBys(Criteria.Sort)
         paging  <- pagingRequests
       } yield Criteria(dates, sorting, paging)
     )

@@ -100,7 +100,10 @@ trait ModelOps extends Dataset.ProvenanceOps {
     }
 
     private def newChildGen(parentProject: RenkuProject) =
-      renkuProjectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
+      renkuProjectEntities(
+        fixed(parentProject.visibility),
+        projectDateCreatedGen = projectCreatedDates(parentProject.dateCreated.value)
+      ).map(child =>
         RenkuProject.WithParent(
           child.path,
           child.name,
