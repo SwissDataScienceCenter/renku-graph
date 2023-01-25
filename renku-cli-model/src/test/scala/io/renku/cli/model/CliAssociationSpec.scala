@@ -20,6 +20,7 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.AssociationGenerators
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,8 +35,8 @@ class CliAssociationSpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-  val associationGen = AssociationGenerators.associationGen(Instant.EPOCH)
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val associationGen = AssociationGenerators.associationGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {

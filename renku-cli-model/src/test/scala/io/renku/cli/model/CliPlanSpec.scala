@@ -20,6 +20,7 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.PlanGenerators
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,11 +35,11 @@ class CliPlanSpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-  val planGen                      = PlanGenerators.planGen(Instant.EPOCH)
-  val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.EPOCH)
-  val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.EPOCH)
-  val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.EPOCH)
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val planGen                      = PlanGenerators.planGen(Instant.EPOCH)
+  private val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.EPOCH)
+  private val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.EPOCH)
+  private val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.EPOCH)
 
   "plan decode/encode" should {
     "be compatible" in {

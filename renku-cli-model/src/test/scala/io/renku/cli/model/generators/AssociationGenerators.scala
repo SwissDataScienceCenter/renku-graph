@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.cli.model.generators
+package io.renku.cli.model
+package generators
 
-import io.renku.cli.model.CliAssociation
+import AgentGenerators.agentGenerator
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
@@ -36,7 +37,7 @@ trait AssociationGenerators {
   def associationGen(planMinCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliAssociation] =
     for {
       id    <- RenkuTinyTypeGenerators.associationResourceIdGen
-      agent <- Gen.option(AgentGenerators.agentGen)
+      agent <- agentGenerator
       plan  <- associatedPlanGen(planMinCreated)
     } yield CliAssociation(id, agent, plan)
 }

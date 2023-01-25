@@ -18,15 +18,15 @@
 
 package io.renku.cli.model
 
+import CliCompositePlan._
 import Ontologies.{Prov, Renku, Schema}
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.cli.model.CliCompositePlan.ChildPlan
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliCompositePlan(
     id:               ResourceId,
@@ -34,6 +34,7 @@ final case class CliCompositePlan(
     description:      Option[Description],
     creators:         List[CliPerson],
     dateCreated:      DateCreated,
+    dateModified:     Option[DateModified],
     keywords:         List[Keyword],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime],
@@ -103,6 +104,7 @@ object CliCompositePlan {
         description      <- cursor.downField(Schema.description).as[Option[Description]]
         creators         <- cursor.downField(Schema.creator).as[List[CliPerson]]
         dateCreated      <- cursor.downField(Schema.dateCreated).as[DateCreated]
+        dateModified     <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
         keywords         <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
         derivedFrom      <- cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
@@ -115,6 +117,7 @@ object CliCompositePlan {
         description,
         creators,
         dateCreated,
+        dateModified,
         keywords,
         derivedFrom,
         invalidationTime,
@@ -133,6 +136,7 @@ object CliCompositePlan {
         Schema.description     -> plan.description.asJsonLD,
         Schema.creator         -> plan.creators.asJsonLD,
         Schema.dateCreated     -> plan.dateCreated.asJsonLD,
+        Schema.dateModified    -> plan.dateModified.asJsonLD,
         Schema.keywords        -> plan.keywords.asJsonLD,
         Prov.wasDerivedFrom    -> plan.derivedFrom.asJsonLD,
         Prov.invalidatedAtTime -> plan.invalidationTime.asJsonLD,

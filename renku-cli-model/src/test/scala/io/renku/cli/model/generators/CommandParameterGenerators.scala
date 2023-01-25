@@ -19,83 +19,77 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model._
-import io.renku.generators.Generators
-import io.renku.graph.model.RenkuTinyTypeGenerators
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.commandParameters.IOStream
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
 trait CommandParameterGenerators {
 
-  def mappedIOStreamGen: Gen[CliMappedIOStream] =
-    for {
-      id         <- RenkuTinyTypeGenerators.commandParameterResourceId
-      streamType <- Gen.oneOf(CliMappedIOStream.StreamType.all.toList)
-    } yield CliMappedIOStream(id, streamType)
+  def mappedIOStreamGen(implicit renkuUrl: RenkuUrl): Gen[CliMappedIOStream] = for {
+    streamType <- Gen.oneOf(CliMappedIOStream.StreamType.all.toList)
+  } yield CliMappedIOStream(IOStream.ResourceId((renkuUrl / "iostreams" / streamType.name).value), streamType)
 
-  def commandParameterGen: Gen[CliCommandParameter] =
-    for {
-      id     <- RenkuTinyTypeGenerators.commandParameterResourceId
-      name   <- RenkuTinyTypeGenerators.commandParameterNames
-      descr  <- Gen.option(RenkuTinyTypeGenerators.commandParameterDescription)
-      prefix <- Gen.option(RenkuTinyTypeGenerators.commandParameterPrefixGen)
-      pos    <- Gen.option(RenkuTinyTypeGenerators.commandParameterPositionGen)
-      defVal <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
-    } yield CliCommandParameter(id, name, descr, prefix, pos, defVal)
+  def commandParameterGen: Gen[CliCommandParameter] = for {
+    id     <- RenkuTinyTypeGenerators.commandParameterResourceId
+    name   <- RenkuTinyTypeGenerators.commandParameterNames
+    descr  <- RenkuTinyTypeGenerators.commandParameterDescription.toGeneratorOfOptions
+    prefix <- RenkuTinyTypeGenerators.commandParameterPrefixGen.toGeneratorOfOptions
+    pos    <- RenkuTinyTypeGenerators.commandParameterPositionGen.toGeneratorOfOptions
+    defVal <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
+  } yield CliCommandParameter(id, name, descr, prefix, pos, defVal)
 
-  def commandInputGen: Gen[CliCommandInput] =
-    for {
-      id        <- RenkuTinyTypeGenerators.commandParameterResourceId
-      name      <- RenkuTinyTypeGenerators.commandParameterNames
-      descr     <- Gen.option(RenkuTinyTypeGenerators.commandParameterDescription)
-      prefix    <- Gen.option(RenkuTinyTypeGenerators.commandParameterPrefixGen)
-      pos       <- Gen.option(RenkuTinyTypeGenerators.commandParameterPositionGen)
-      defVal    <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
-      encFormat <- Gen.option(RenkuTinyTypeGenerators.commandParameterEncodingFormats)
-      mapped    <- Gen.option(mappedIOStreamGen)
-    } yield CliCommandInput(id, name, descr, prefix, pos, defVal, mapped, encFormat)
+  def commandInputGen(implicit renkuUrl: RenkuUrl): Gen[CliCommandInput] = for {
+    id        <- RenkuTinyTypeGenerators.commandParameterResourceId
+    name      <- RenkuTinyTypeGenerators.commandParameterNames
+    descr     <- RenkuTinyTypeGenerators.commandParameterDescription.toGeneratorOfOptions
+    prefix    <- RenkuTinyTypeGenerators.commandParameterPrefixGen.toGeneratorOfOptions
+    pos       <- RenkuTinyTypeGenerators.commandParameterPositionGen.toGeneratorOfOptions
+    defVal    <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
+    encFormat <- RenkuTinyTypeGenerators.commandParameterEncodingFormats.toGeneratorOfOptions
+    mapped    <- mappedIOStreamGen.toGeneratorOfOptions
+  } yield CliCommandInput(id, name, descr, prefix, pos, defVal, mapped, encFormat)
 
-  def commandOutputGen: Gen[CliCommandOutput] =
-    for {
-      id           <- RenkuTinyTypeGenerators.commandParameterResourceId
-      name         <- RenkuTinyTypeGenerators.commandParameterNames
-      descr        <- Gen.option(RenkuTinyTypeGenerators.commandParameterDescription)
-      prefix       <- Gen.option(RenkuTinyTypeGenerators.commandParameterPrefixGen)
-      pos          <- Gen.option(RenkuTinyTypeGenerators.commandParameterPositionGen)
-      defVal       <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
-      encFormat    <- Gen.option(RenkuTinyTypeGenerators.commandParameterEncodingFormats)
-      mapped       <- Gen.option(mappedIOStreamGen)
-      createFolder <- RenkuTinyTypeGenerators.commandParameterFolderCreation
-    } yield CliCommandOutput(id, name, descr, prefix, pos, defVal, mapped, encFormat, createFolder)
+  def commandOutputGen(implicit renkuUrl: RenkuUrl): Gen[CliCommandOutput] = for {
+    id           <- RenkuTinyTypeGenerators.commandParameterResourceId
+    name         <- RenkuTinyTypeGenerators.commandParameterNames
+    descr        <- RenkuTinyTypeGenerators.commandParameterDescription.toGeneratorOfOptions
+    prefix       <- RenkuTinyTypeGenerators.commandParameterPrefixGen.toGeneratorOfOptions
+    pos          <- RenkuTinyTypeGenerators.commandParameterPositionGen.toGeneratorOfOptions
+    defVal       <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen
+    encFormat    <- RenkuTinyTypeGenerators.commandParameterEncodingFormats.toGeneratorOfOptions
+    mapped       <- mappedIOStreamGen.toGeneratorOfOptions
+    createFolder <- RenkuTinyTypeGenerators.commandParameterFolderCreation
+  } yield CliCommandOutput(id, name, descr, prefix, pos, defVal, mapped, encFormat, createFolder)
 
-  def mappedParamGen: Gen[CliParameterMapping.MappedParam] =
+  def mappedParamGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterMapping.MappedParam] =
     Gen.oneOf(
       commandParameterGen.map(CliParameterMapping.MappedParam.apply),
       commandOutputGen.map(CliParameterMapping.MappedParam.apply),
       commandInputGen.map(CliParameterMapping.MappedParam.apply)
     )
 
-  def parameterMappingGen: Gen[CliParameterMapping] =
-    for {
-      id     <- RenkuTinyTypeGenerators.commandParameterResourceId
-      name   <- RenkuTinyTypeGenerators.commandParameterNames
-      descr  <- Gen.option(RenkuTinyTypeGenerators.commandParameterDescription)
-      prefix <- Gen.option(RenkuTinyTypeGenerators.commandParameterPrefixGen)
-      pos    <- Gen.option(RenkuTinyTypeGenerators.commandParameterPositionGen)
-      defVal <- Gen.option(RenkuTinyTypeGenerators.commandParameterDefaultValueGen)
-      mapsTo <- mappedParamGen
-    } yield CliParameterMapping(id, name, descr, prefix, pos, defVal, mapsTo)
+  def parameterMappingGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterMapping] = for {
+    id     <- RenkuTinyTypeGenerators.commandParameterResourceId
+    name   <- RenkuTinyTypeGenerators.commandParameterNames
+    descr  <- RenkuTinyTypeGenerators.commandParameterDescription.toGeneratorOfOptions
+    prefix <- RenkuTinyTypeGenerators.commandParameterPrefixGen.toGeneratorOfOptions
+    pos    <- RenkuTinyTypeGenerators.commandParameterPositionGen.toGeneratorOfOptions
+    defVal <- RenkuTinyTypeGenerators.commandParameterDefaultValueGen.toGeneratorOfOptions
+    mapsTo <- mappedParamGen.toGeneratorOfNonEmptyList(max = 1)
+  } yield CliParameterMapping(id, name, descr, prefix, pos, defVal, mapsTo)
 
-  def parameterLinkSinkGen: Gen[CliParameterLink.Sink] =
+  def parameterLinkSinkGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterLink.Sink] =
     Gen.oneOf(
       commandParameterGen.map(CliParameterLink.Sink.apply),
       commandInputGen.map(CliParameterLink.Sink.apply)
     )
 
-  def parameterLinkGen: Gen[CliParameterLink] =
-    for {
-      id     <- RenkuTinyTypeGenerators.parameterLinkResourceIdGen
-      source <- commandOutputGen
-      sinks  <- Generators.nonEmptyList(parameterLinkSinkGen, max = 3)
-    } yield CliParameterLink(id, source, sinks)
+  def parameterLinkGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterLink] = for {
+    id     <- RenkuTinyTypeGenerators.parameterLinkResourceIdGen
+    source <- commandOutputGen
+    sinks  <- parameterLinkSinkGen.toGeneratorOfNonEmptyList(max = 3)
+  } yield CliParameterLink(id, source, sinks)
 }
 
 object CommandParameterGenerators extends CommandParameterGenerators

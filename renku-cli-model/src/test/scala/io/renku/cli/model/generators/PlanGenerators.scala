@@ -75,6 +75,7 @@ trait PlanGenerators {
       description      <- planDescriptions.toGeneratorOfOptions
       creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
       dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
       keywords         <- planKeywords.toGeneratorOfList(max = 3)
       derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
       invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
@@ -87,6 +88,7 @@ trait PlanGenerators {
       description,
       creators,
       dateCreated,
+      dateModified,
       keywords,
       derivedFrom,
       invalidationTime,

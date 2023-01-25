@@ -21,7 +21,7 @@ package io.renku.cli.model
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 
 /** Marker trait to annotate a class that models an entity from the cli schema. */
-trait CliModel
+trait CliModel extends Product with Serializable
 
 object CliModel {
 

@@ -24,7 +24,7 @@ object all
     with EntityGenerators
     with DatasetFileGenerators
     with DatasetGenerators
-    with AgentGenerators
+    with SoftwareAgentGenerators
     with ParameterValueGenerators
     with CommandParameterGenerators
     with PlanGenerators

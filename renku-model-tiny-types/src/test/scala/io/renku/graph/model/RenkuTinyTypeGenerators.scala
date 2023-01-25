@@ -32,6 +32,7 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 trait RenkuTinyTypeGenerators {
+
   def associationResourceIdGen: Gen[associations.ResourceId] =
     Generators.validatedUrls.map(_.value).map(associations.ResourceId)
 
@@ -282,6 +283,7 @@ trait RenkuTinyTypeGenerators {
         Generators.nonEmptyStrings().generateOne
       )
       .map(commandParameters.EncodingFormat(_))
+
   implicit val commandParameterFolderCreation: Gen[commandParameters.FolderCreation] =
     Gen.oneOf(commandParameters.FolderCreation.yes, commandParameters.FolderCreation.no)
 

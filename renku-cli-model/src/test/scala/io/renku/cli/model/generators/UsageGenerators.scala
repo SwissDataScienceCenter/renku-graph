@@ -24,11 +24,10 @@ import org.scalacheck.Gen
 
 trait UsageGenerators {
 
-  def usageGen: Gen[CliUsage] =
-    for {
-      id     <- RenkuTinyTypeGenerators.usageResourceIdGen
-      entity <- EntityGenerators.singleEntityGen
-    } yield CliUsage(id, entity)
+  def usageGen: Gen[CliUsage] = for {
+    id     <- RenkuTinyTypeGenerators.usageResourceIdGen
+    entity <- EntityGenerators.entityGen
+  } yield CliUsage(id, entity)
 }
 
 object UsageGenerators extends UsageGenerators

@@ -18,17 +18,17 @@
 
 package io.renku.cli.model
 
+import CliAssociation.AssociatedPlan
+import Ontologies.{Prov, Schema}
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.cli.model.CliAssociation.AssociatedPlan
-import io.renku.cli.model.Ontologies.{Prov, Schema}
 import io.renku.graph.model.associations._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliAssociation(
     id:    ResourceId,
-    agent: Option[CliAgent],
+    agent: CliAgent,
     plan:  AssociatedPlan
 ) extends CliModel
 
@@ -91,7 +91,7 @@ object CliAssociation {
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]
         plan       <- cursor.downField(Prov.hadPlan).as[AssociatedPlan]
-        agent      <- cursor.downField(Prov.agent).as[Option[CliAgent]]
+        agent      <- cursor.downField(Prov.agent).as[CliAgent]
       } yield CliAssociation(resourceId, agent, plan)
     }
 

@@ -19,22 +19,19 @@
 package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
-import io.renku.cli.model.generators.AgentGenerators
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.cli.model.generators.SoftwareAgentGenerators
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CliAgentSpec
+class CliSoftwareAgentSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val agentGen = AgentGenerators.agentGen
+  private val agentGen = SoftwareAgentGenerators.softwareAgentGen
 
   "decode/encode" should {
     "be compatible" in {

@@ -35,9 +35,8 @@ class CliActivitySpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
-
-  val activityGen = ActivityGenerators.activityGen(Instant.EPOCH)
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val activityGen = ActivityGenerators.activityGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {
