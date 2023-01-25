@@ -65,8 +65,6 @@ trait CliActivityConverters extends CliPlanConverters {
       CliParameterValue(v.resourceId, v.valueReference.resourceId, ValueOverride(v.value.value))
     case v: entities.ParameterValue.CommandParameterValue =>
       CliParameterValue(v.resourceId, v.valueReference.resourceId, v.value)
-    case v: entities.ParameterValue.CommandParameterValue =>
-      CliParameterValue(v.resourceId, v.valueReference.resourceId, v.value)
   }
 }
 

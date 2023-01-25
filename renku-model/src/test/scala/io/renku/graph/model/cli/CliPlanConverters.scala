@@ -84,8 +84,8 @@ trait CliPlanConverters extends CliCommonConverters {
         derivedFrom = None,
         invalidationTime = None,
         collectAllPlans(p.plans, allPlans).map(from),
-        p.links.map(from),
-        p.mappings.map(from)
+        p.links.map(from(_, allPlans)),
+        p.mappings.map(from(_, allPlans))
       )
     case p: entities.CompositePlan.Modified =>
       CliCompositePlan(
@@ -97,10 +97,10 @@ trait CliPlanConverters extends CliCommonConverters {
         dateModified = plans.DateModified(p.dateCreated.value).some,
         p.keywords,
         derivedFrom = None,
-        invalidationTime = None,
+        invalidationTime = p.maybeInvalidationTime,
         collectAllPlans(p.plans, allPlans).map(from),
-        p.links.map(from),
-        p.mappings.map(from)
+        p.links.map(from(_, allPlans)),
+        p.mappings.map(from(_, allPlans))
       )
   }
 
@@ -197,16 +197,16 @@ trait CliPlanConverters extends CliCommonConverters {
     StreamType.fromString(ioStream.name.value).fold(err => throw new Exception(err), identity)
   )
 
-  def from(pl: entities.ParameterLink, plans: List[entities.Plan]): CliParameterLink =
+  def from(pl: entities.ParameterLink, allPlans: List[entities.Plan]): CliParameterLink =
     CliParameterLink(
       pl.resourceId,
-      from(findCommandOutput(pl.source, plans)),
-      buildSinks(pl.sinks, plans)
+      from(findCommandOutput(pl.source, allPlans)),
+      buildSinks(pl.sinks, allPlans)
     )
 
-  private def buildSinks(sinkIds: NonEmptyList[commandParameters.ResourceId], plans: List[entities.Plan]) = {
-    val paramSinks = collectAllParameters(sinkIds, plans).map(from).map(CliParameterLink.Sink.apply)
-    val inputSinks = collectAllInputParameters(sinkIds, plans).map(from).map(CliParameterLink.Sink.apply)
+  private def buildSinks(sinkIds: NonEmptyList[commandParameters.ResourceId], allPlans: List[entities.Plan]) = {
+    val paramSinks = collectAllParameters(sinkIds, allPlans).map(from).map(CliParameterLink.Sink.apply)
+    val inputSinks = collectAllInputParameters(sinkIds, allPlans).map(from).map(CliParameterLink.Sink.apply)
 
     paramSinks ::: inputSinks match {
       case s if s.size == sinkIds.size => NonEmptyList.fromListUnsafe(s)
@@ -214,7 +214,7 @@ trait CliPlanConverters extends CliCommonConverters {
     }
   }
 
-  def from(mapping: entities.ParameterMapping): CliParameterMapping =
+  def from(mapping: entities.ParameterMapping, allPlans: List[entities.Plan]): CliParameterMapping =
     CliParameterMapping(
       mapping.resourceId,
       mapping.name,
@@ -222,8 +222,19 @@ trait CliPlanConverters extends CliCommonConverters {
       mapping.maybePrefix,
       position = None,
       commandParameters.ParameterDefaultValue(mapping.defaultValue.value).some,
-      mapping.mappedParameter
+      buildMappedParams(mapping.mappedParameter, allPlans)
     )
+
+  private def buildMappedParams(paramIds: NonEmptyList[commandParameters.ResourceId], allPlans: List[entities.Plan]) = {
+    val params  = collectAllParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
+    val inputs  = collectAllInputParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
+    val outputs = collectAllOutputParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
+
+    params ::: inputs ::: outputs match {
+      case s if s.size == paramIds.size => NonEmptyList.fromListUnsafe(s)
+      case _                            => throw new Exception("Cannot find all mapsTo ParameterMappings")
+    }
+  }
 }
 
 object CliPlanConverters extends CliPlanConverters

@@ -58,6 +58,11 @@ private trait CliConversionFunctions {
   ): List[entities.StepPlanCommandParameter.CommandInput] =
     allPlans.flatMap(commandInputsPF).filter(p => ids.contains_(p.resourceId))
 
+  def collectAllOutputParameters(ids:      NonEmptyList[commandParameters.ResourceId],
+                                 allPlans: List[entities.Plan]
+  ): List[entities.StepPlanCommandParameter.CommandOutput] =
+    allPlans.flatMap(commandOutputsPF).filter(p => ids.contains_(p.resourceId))
+
   private lazy val commandParametersPF
       : PartialFunction[entities.Plan, List[entities.StepPlanCommandParameter.CommandParameter]] =
     _.fold[List[StepPlanCommandParameter.CommandParameter]](_.parameters, _.parameters, _ => Nil, _ => Nil)
@@ -65,6 +70,10 @@ private trait CliConversionFunctions {
   private lazy val commandInputsPF
       : PartialFunction[entities.Plan, List[entities.StepPlanCommandParameter.CommandInput]] =
     _.fold[List[StepPlanCommandParameter.CommandInput]](_.inputs, _.inputs, _ => Nil, _ => Nil)
+
+  private lazy val commandOutputsPF
+      : PartialFunction[entities.Plan, List[entities.StepPlanCommandParameter.CommandOutput]] =
+    _.fold[List[StepPlanCommandParameter.CommandOutput]](_.outputs, _.outputs, _ => Nil, _ => Nil)
 
   private def commandOutputPF(
       paramId: commandParameters.ResourceId
