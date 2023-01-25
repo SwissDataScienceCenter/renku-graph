@@ -22,7 +22,6 @@ import cats.syntax.all._
 import io.renku.cli.model._
 import io.renku.graph.model.{datasets, entities}
 
-/** Conversion functions for production model entities into cli entities. */
 trait CliDatasetConverters extends CliCommonConverters {
 
   def from(dataset: entities.Dataset[entities.Dataset.Provenance]): CliDataset =

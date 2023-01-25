@@ -43,7 +43,7 @@ object Entity {
                                 generationResourceIds: List[generations.ResourceId]
   ) extends Entity
 
-  def fromCli(entity: CliEntity): Entity = entity.fold(fromCli(_), fromCli(_))
+  def fromCli(entity: CliEntity): Entity = entity.fold(fromCli, fromCli)
 
   def fromCli(entity: CliSingleEntity): Entity = entity.generationIds match {
     case Nil => InputEntity(entity.resourceId, Location.File(entity.path.value), entity.checksum)

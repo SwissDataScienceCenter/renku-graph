@@ -49,3 +49,5 @@ trait CliCommonConverters {
       }
   }
 }
+
+object CliCommonConverters extends CliCommonConverters

@@ -42,6 +42,12 @@ sealed trait Plan extends Product with Serializable {
   val keywords:         List[Keyword]
 
   type PlanGroup <: Plan
+
+  def fold[P](spnm: StepPlan.NonModified => P,
+              spm:  StepPlan.Modified => P,
+              cpnm: CompositePlan.NonModified => P,
+              cpm:  CompositePlan.Modified => P
+  ): P
 }
 
 object Plan {
@@ -126,7 +132,13 @@ object StepPlan {
                                inputs:                   List[CommandInput],
                                outputs:                  List[CommandOutput],
                                successCodes:             List[SuccessCode]
-  ) extends StepPlan
+  ) extends StepPlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = spnm(this)
+  }
 
   final case class Modified(resourceId:               ResourceId,
                             name:                     Name,
@@ -142,7 +154,13 @@ object StepPlan {
                             successCodes:             List[SuccessCode],
                             derivation:               Derivation,
                             maybeInvalidationTime:    Option[InvalidationTime]
-  ) extends StepPlan
+  ) extends StepPlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = spm(this)
+  }
 
   def from(resourceId:               ResourceId,
            name:                     Name,
@@ -370,7 +388,13 @@ object CompositePlan {
       plans:            NonEmptyList[ResourceId],
       mappings:         List[ParameterMapping],
       links:            List[ParameterLink]
-  ) extends CompositePlan
+  ) extends CompositePlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = cpnm(this)
+  }
 
   final case class Modified(
       resourceId:            ResourceId,
@@ -384,7 +408,13 @@ object CompositePlan {
       links:                 List[ParameterLink],
       maybeInvalidationTime: Option[InvalidationTime],
       derivation:            Plan.Derivation
-  ) extends CompositePlan
+  ) extends CompositePlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = cpm(this)
+  }
 
   // noinspection TypeAnnotation
   object Ontology {

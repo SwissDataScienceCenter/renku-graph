@@ -28,7 +28,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 
-class CliPlanSpec
+class CliStepPlanSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
@@ -56,7 +56,7 @@ class CliPlanSpec
   }
 
   def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
-    in :: in.plans.collect { case CliCompositePlan.ChildPlan.Composite(p) => p }.flatMap(allCompositePlans)
+    in :: in.plans.collect { case CliPlan.Composite(p) => p }.flatMap(allCompositePlans)
 
   "composite plan decode/encode" should {
     "be compatible" in {

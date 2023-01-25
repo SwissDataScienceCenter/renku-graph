@@ -18,11 +18,8 @@
 
 package io.renku.cli.model
 
-import CliCompositePlan._
 import Ontologies.{Prov, Renku, Schema}
 import cats.data.NonEmptyList
-import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
 import io.renku.jsonld._
@@ -38,57 +35,12 @@ final case class CliCompositePlan(
     keywords:         List[Keyword],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime],
-    plans:            NonEmptyList[ChildPlan],
+    plans:            NonEmptyList[CliPlan],
     links:            List[CliParameterLink],
     mappings:         List[CliParameterMapping]
 ) extends CliModel
 
 object CliCompositePlan {
-
-  sealed trait ChildPlan {
-    def fold[A](fa: CliPlan => A, fb: CliCompositePlan => A): A
-  }
-
-  object ChildPlan {
-    final case class Step(value: CliPlan) extends ChildPlan {
-      def fold[A](fa: CliPlan => A, fb: CliCompositePlan => A): A = fa(value)
-    }
-    final case class Composite(value: CliCompositePlan) extends ChildPlan {
-      def fold[A](fa: CliPlan => A, fb: CliCompositePlan => A): A = fb(value)
-    }
-
-    def apply(value: CliPlan):          ChildPlan = Step(value)
-    def apply(value: CliCompositePlan): ChildPlan = Composite(value)
-
-    private val entityTypes: EntityTypes =
-      EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
-
-    private def selectCandidates(ets: EntityTypes): Boolean =
-      CliPlan.matchingEntityTypes(ets) || CliCompositePlan.matchingEntityTypes(ets)
-
-    implicit def jsonLDDecoder: JsonLDDecoder[ChildPlan] = {
-      val plan = CliPlan.jsonLDDecoder.emap(plan => ChildPlan(plan).asRight)
-      val cp   = CliCompositePlan.jsonLDDecoder.emap(plan => ChildPlan(plan).asRight)
-
-      JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
-        val currentEntityTypes = cursor.getEntityTypes
-        (currentEntityTypes.map(CliPlan.matchingEntityTypes),
-         currentEntityTypes.map(CliCompositePlan.matchingEntityTypes)
-        ).flatMapN {
-          case (true, _) => plan(cursor)
-          case (_, true) => cp(cursor)
-          case _ =>
-            DecodingFailure(
-              s"Invalid entity for decoding child plans of a composite plan: $currentEntityTypes",
-              Nil
-            ).asLeft
-        }
-      }
-    }
-
-    implicit def jsonLDEncoder: JsonLDEncoder[ChildPlan] =
-      JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
-  }
 
   private val entityTypes: EntityTypes =
     EntityTypes.of(Renku.CompositePlan, Prov.Plan, Schema.Action, Schema.CreativeWork)
@@ -110,7 +62,7 @@ object CliCompositePlan {
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
         mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[ChildPlan]]
+        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliPlan]]
       } yield CliCompositePlan(
         resourceId,
         name,

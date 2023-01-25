@@ -63,14 +63,13 @@ trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit lazy val cliParameterLinkDiff: Diff[CliParameterLink] = Diff.derived[CliParameterLink]
 
-  implicit lazy val cliPlanDiff: Diff[CliPlan] = Diff.derived[CliPlan]
+  implicit lazy val cliStepPlanDiff: Diff[CliStepPlan] = Diff.derived[CliStepPlan]
 
-  implicit lazy val cliCompositePlanChildPlanDiff: Diff[CliCompositePlan.ChildPlan] =
-    Diff.derived[CliCompositePlan.ChildPlan]
+  implicit lazy val cliPlanDiff: Diff[CliPlan] = Diff.derived[CliPlan]
 
   implicit lazy val cliCompositePlan: Diff[CliCompositePlan] = Diff.derived[CliCompositePlan]
 
-  implicit lazy val cliWorkflowFilePlanDiff: Diff[CliWorkflowFilePlan] = Diff.derived[CliWorkflowFilePlan]
+  implicit lazy val cliWorkflowFileStepPlanDiff: Diff[CliWorkflowFileStepPlan] = Diff.derived[CliWorkflowFileStepPlan]
 
   implicit lazy val cliWorkflowFileCompositePlanDiff: Diff[CliWorkflowFileCompositePlan] =
     Diff.derived[CliWorkflowFileCompositePlan]

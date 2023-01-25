@@ -49,77 +49,77 @@ object CliProject {
   sealed trait ProjectPlan {
     def resourceId: plans.ResourceId
     def fold[A](
-        fa: CliPlan => A,
-        fb: CliCompositePlan => A,
-        fc: CliWorkflowFilePlan => A,
-        fd: CliWorkflowFileCompositePlan => A
+                 fa: CliStepPlan => A,
+                 fb: CliCompositePlan => A,
+                 fc: CliWorkflowFileStepPlan => A,
+                 fd: CliWorkflowFileCompositePlan => A
     ): A
   }
   object ProjectPlan {
-    final case class Step(plan: CliPlan) extends ProjectPlan {
+    final case class Step(plan: CliStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
-          fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
-          fd: CliWorkflowFileCompositePlan => A
+                   fa: CliStepPlan => A,
+                   fb: CliCompositePlan => A,
+                   fc: CliWorkflowFileStepPlan => A,
+                   fd: CliWorkflowFileCompositePlan => A
       ): A = fa(plan)
     }
     final case class Composite(plan: CliCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
-          fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
-          fd: CliWorkflowFileCompositePlan => A
+                   fa: CliStepPlan => A,
+                   fb: CliCompositePlan => A,
+                   fc: CliWorkflowFileStepPlan => A,
+                   fd: CliWorkflowFileCompositePlan => A
       ): A = fb(plan)
     }
-    final case class WorkflowFile(plan: CliWorkflowFilePlan) extends ProjectPlan {
+    final case class WorkflowFile(plan: CliWorkflowFileStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
-          fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
-          fd: CliWorkflowFileCompositePlan => A
+                   fa: CliStepPlan => A,
+                   fb: CliCompositePlan => A,
+                   fc: CliWorkflowFileStepPlan => A,
+                   fd: CliWorkflowFileCompositePlan => A
       ): A = fc(plan)
     }
     final case class WorkflowFileComposite(plan: CliWorkflowFileCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
-          fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
-          fd: CliWorkflowFileCompositePlan => A
+                   fa: CliStepPlan => A,
+                   fb: CliCompositePlan => A,
+                   fc: CliWorkflowFileStepPlan => A,
+                   fd: CliWorkflowFileCompositePlan => A
       ): A = fd(plan)
     }
 
-    def apply(plan: CliPlan):                      ProjectPlan = Step(plan)
+    def apply(plan: CliStepPlan):                      ProjectPlan = Step(plan)
     def apply(plan: CliCompositePlan):             ProjectPlan = Composite(plan)
-    def apply(plan: CliWorkflowFilePlan):          ProjectPlan = WorkflowFile(plan)
+    def apply(plan: CliWorkflowFileStepPlan):          ProjectPlan = WorkflowFile(plan)
     def apply(plan: CliWorkflowFileCompositePlan): ProjectPlan = WorkflowFileComposite(plan)
 
     private val entityTypes: EntityTypes = EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
     private def selectCandidates(ets: EntityTypes): Boolean =
-      CliPlan.matchingEntityTypes(ets) ||
+      CliStepPlan.matchingEntityTypes(ets) ||
         CliCompositePlan.matchingEntityTypes(ets) ||
-        CliWorkflowFilePlan.matchingEntityTypes(ets) ||
+        CliWorkflowFileStepPlan.matchingEntityTypes(ets) ||
         CliWorkflowFileCompositePlan.matchingEntityTypes(ets)
 
     implicit def jsonLDDecoder: JsonLDDecoder[ProjectPlan] =
       JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentTypes = cursor.getEntityTypes
-        (currentTypes.map(CliPlan.matchingEntityTypes),
+        (currentTypes.map(CliStepPlan.matchingEntityTypes),
          currentTypes.map(CliCompositePlan.matchingEntityTypes),
-         currentTypes.map(CliWorkflowFilePlan.matchingEntityTypes),
+         currentTypes.map(CliWorkflowFileStepPlan.matchingEntityTypes),
          currentTypes.map(CliWorkflowFileCompositePlan.matchingEntityTypes)
         ).flatMapN {
           case (true, _, _, _) =>
-            CliPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
+            CliStepPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, true, _, _) =>
             CliCompositePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, _, true, _) =>
-            CliWorkflowFilePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
+            CliWorkflowFileStepPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, _, _, true) =>
             CliWorkflowFileCompositePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case _ =>

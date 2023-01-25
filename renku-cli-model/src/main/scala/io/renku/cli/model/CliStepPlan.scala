@@ -24,8 +24,7 @@ import io.renku.graph.model.plans._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld._
 
-/** It's actually exactly the same as the CliPlan. */
-final case class CliWorkflowFilePlan(
+final case class CliStepPlan(
     id:               ResourceId,
     name:             Name,
     description:      Option[Description],
@@ -42,15 +41,15 @@ final case class CliWorkflowFilePlan(
     invalidationTime: Option[InvalidationTime]
 ) extends CliModel
 
-object CliWorkflowFilePlan {
+object CliStepPlan {
 
   private val entityTypes: EntityTypes =
-    EntityTypes.of(Renku.WorkflowFilePlan, Prov.Plan, Schema.Action, Schema.CreativeWork)
+    EntityTypes.of(Renku.Plan, Prov.Plan, Schema.Action, Schema.CreativeWork)
 
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit val jsonLDDecoder: JsonLDDecoder[CliWorkflowFilePlan] =
+  implicit val jsonLDDecoder: JsonLDDecoder[CliStepPlan] =
     JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[ResourceId]
@@ -68,7 +67,7 @@ object CliWorkflowFilePlan {
         derivedFrom <-
           cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
-      } yield CliWorkflowFilePlan(
+      } yield CliStepPlan(
         resourceId,
         name,
         description,
@@ -86,7 +85,7 @@ object CliWorkflowFilePlan {
       )
     }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliWorkflowFilePlan] =
+  implicit val jsonLDEncoder: JsonLDEncoder[CliStepPlan] =
     JsonLDEncoder.instance { plan =>
       JsonLD.entity(
         plan.id.asEntityId,

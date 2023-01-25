@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.cli
 
-trait CliConverters extends CliCommonConverters with CliDatasetConverters
+/** Conversion functions for production model entities into cli entities. */
+trait CliConverters extends CliCommonConverters with CliDatasetConverters with CliPlanConverters
 
 object CliConverters extends CliConverters

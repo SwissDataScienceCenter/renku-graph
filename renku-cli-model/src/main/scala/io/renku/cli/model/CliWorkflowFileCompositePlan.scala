@@ -26,18 +26,18 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld._
 
 final case class CliWorkflowFileCompositePlan(
-    id:               ResourceId,
-    name:             Name,
-    description:      Option[Description],
-    creators:         List[CliPerson],
-    dateCreated:      DateCreated,
-    keywords:         List[Keyword],
-    derivedFrom:      Option[DerivedFrom],
-    invalidationTime: Option[InvalidationTime],
-    plans:            NonEmptyList[CliWorkflowFilePlan],
-    links:            List[CliParameterLink],
-    mappings:         List[CliParameterMapping],
-    path:             entityModel.Location.FileOrFolder // TODO clarify what this property really is
+                                               id:               ResourceId,
+                                               name:             Name,
+                                               description:      Option[Description],
+                                               creators:         List[CliPerson],
+                                               dateCreated:      DateCreated,
+                                               keywords:         List[Keyword],
+                                               derivedFrom:      Option[DerivedFrom],
+                                               invalidationTime: Option[InvalidationTime],
+                                               plans:            NonEmptyList[CliWorkflowFileStepPlan],
+                                               links:            List[CliParameterLink],
+                                               mappings:         List[CliParameterMapping],
+                                               path:             entityModel.Location.FileOrFolder // TODO clarify what this property really is
 ) extends CliModel
 
 object CliWorkflowFileCompositePlan {
@@ -61,7 +61,7 @@ object CliWorkflowFileCompositePlan {
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
         mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliWorkflowFilePlan]]
+        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliWorkflowFileStepPlan]]
         path             <- cursor.downField(Prov.atLocation).as[entityModel.Location.FileOrFolder]
       } yield CliWorkflowFileCompositePlan(
         resourceId,

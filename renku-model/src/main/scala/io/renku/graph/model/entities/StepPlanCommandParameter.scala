@@ -114,6 +114,7 @@ object StepPlanCommandParameter {
 
   sealed trait CommandInput extends CommandInputOrOutput {
     override type DefaultValue = InputDefaultValue
+    val resourceId:          ResourceId
     val maybeEncodingFormat: Option[EncodingFormat]
   }
 

@@ -35,53 +35,43 @@ final case class CliAssociation(
 object CliAssociation {
 
   sealed trait AssociatedPlan {
-    def fold[A](fa: CliPlan => A, fb: CliWorkflowFilePlan => A, fc: CliWorkflowFileCompositePlan => A): A
+    def fold[A](fa: CliStepPlan => A, fb: CliWorkflowFileStepPlan => A): A
   }
   object AssociatedPlan {
-    final case class Step(plan: CliPlan) extends AssociatedPlan {
-      def fold[A](fa: CliPlan => A, fb: CliWorkflowFilePlan => A, fc: CliWorkflowFileCompositePlan => A): A = fa(plan)
+    final case class Step(plan: CliStepPlan) extends AssociatedPlan {
+      def fold[A](fa: CliStepPlan => A, fb: CliWorkflowFileStepPlan => A): A = fa(plan)
     }
 
-    final case class WorkflowFile(plan: CliWorkflowFilePlan) extends AssociatedPlan {
-      def fold[A](fa: CliPlan => A, fb: CliWorkflowFilePlan => A, fc: CliWorkflowFileCompositePlan => A): A = fb(plan)
+    final case class WorkflowFile(plan: CliWorkflowFileStepPlan) extends AssociatedPlan {
+      def fold[A](fa: CliStepPlan => A, fb: CliWorkflowFileStepPlan => A): A = fb(plan)
     }
 
-    final case class WorkflowFileComposite(plan: CliWorkflowFileCompositePlan) extends AssociatedPlan {
-      def fold[A](fa: CliPlan => A, fb: CliWorkflowFilePlan => A, fc: CliWorkflowFileCompositePlan => A): A = fc(plan)
-    }
-
-    def apply(plan: CliPlan):                      AssociatedPlan = Step(plan)
-    def apply(plan: CliWorkflowFilePlan):          AssociatedPlan = WorkflowFile(plan)
-    def apply(plan: CliWorkflowFileCompositePlan): AssociatedPlan = WorkflowFileComposite(plan)
+    def apply(plan: CliStepPlan):             AssociatedPlan = Step(plan)
+    def apply(plan: CliWorkflowFileStepPlan): AssociatedPlan = WorkflowFile(plan)
 
     private val entityTypes: EntityTypes = EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
     private def selectCandidates(ets: EntityTypes): Boolean =
-      CliPlan.matchingEntityTypes(ets) ||
-        CliWorkflowFilePlan.matchingEntityTypes(ets) ||
-        CliWorkflowFileCompositePlan.matchingEntityTypes(ets)
+      CliStepPlan.matchingEntityTypes(ets) ||
+        CliWorkflowFileStepPlan.matchingEntityTypes(ets)
 
     implicit val jsonLDDecoder: JsonLDDecoder[AssociatedPlan] = {
-      val da = CliPlan.jsonLDDecoder.emap(p => AssociatedPlan(p).asRight)
-      val db = CliWorkflowFilePlan.jsonLDDecoder.emap(p => AssociatedPlan(p).asRight)
-      val dc = CliWorkflowFileCompositePlan.jsonLDDecoder.emap(p => AssociatedPlan(p).asRight)
+      val da = CliStepPlan.jsonLDDecoder.emap(p => AssociatedPlan(p).asRight)
+      val db = CliWorkflowFileStepPlan.jsonLDDecoder.emap(p => AssociatedPlan(p).asRight)
 
       JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentTypes = cursor.getEntityTypes
-        (currentTypes.map(CliPlan.matchingEntityTypes),
-         currentTypes.map(CliWorkflowFilePlan.matchingEntityTypes),
-         currentTypes.map(CliWorkflowFileCompositePlan.matchingEntityTypes)
-        ).flatMapN {
-          case (true, _, _) => da(cursor)
-          case (_, true, _) => db(cursor)
-          case (_, _, true) => dc(cursor)
-          case _ => Left(DecodingFailure(s"Invalid entity types for decoding associated plan: $currentTypes", Nil))
-        }
+        (currentTypes.map(CliStepPlan.matchingEntityTypes) ->
+          currentTypes.map(CliWorkflowFileStepPlan.matchingEntityTypes))
+          .flatMapN {
+            case (true, _) => da(cursor)
+            case (_, true) => db(cursor)
+            case _ => Left(DecodingFailure(s"Invalid entity types for decoding associated plan: $currentTypes", Nil))
+          }
       }
     }
 
-    implicit val jsonLDEncoder: JsonLDEncoder[AssociatedPlan] =
-      JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD, _.asJsonLD))
+    implicit val jsonLDEncoder: JsonLDEncoder[AssociatedPlan] = JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
   }
 
   private val entityTypes: EntityTypes = EntityTypes.of(Prov.Association)

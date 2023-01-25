@@ -29,7 +29,7 @@ import java.time.Instant
 
 trait PlanGenerators {
 
-  def planGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliPlan] =
+  def planGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliStepPlan] =
     for {
       id               <- planResourceIds
       name             <- planNames
@@ -45,7 +45,7 @@ trait PlanGenerators {
       successCodes     <- planSuccessCodes.toGeneratorOfList(max = 3)
       derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
       invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
-    } yield CliPlan(
+    } yield CliStepPlan(
       id,
       name,
       descr,
@@ -62,9 +62,9 @@ trait PlanGenerators {
       invalidationTime
     )
 
-  def compositePlanChildPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliCompositePlan.ChildPlan] = {
-    val plan = planGen(minCreated).map(CliCompositePlan.ChildPlan.apply)
-    val cp   = compositePlanGen(minCreated).map(CliCompositePlan.ChildPlan.apply)
+  def compositePlanChildPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliPlan] = {
+    val plan = planGen(minCreated).map(CliPlan.apply)
+    val cp   = compositePlanGen(minCreated).map(CliPlan.apply)
     Gen.frequency(1 -> cp, 9 -> plan)
   }
 
@@ -97,7 +97,7 @@ trait PlanGenerators {
       mappings
     )
 
-  def workflowFilePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFilePlan] =
+  def workflowFilePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileStepPlan] =
     for {
       id               <- planResourceIds
       name             <- planNames
@@ -113,7 +113,7 @@ trait PlanGenerators {
       successCodes     <- planSuccessCodes.toGeneratorOfList(max = 3)
       derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
       invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
-    } yield CliWorkflowFilePlan(
+    } yield CliWorkflowFileStepPlan(
       id,
       name,
       descr,
