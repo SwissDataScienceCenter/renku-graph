@@ -23,11 +23,11 @@ import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model
-import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
+import io.renku.graph.model._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
@@ -50,6 +50,12 @@ sealed trait Project extends Product with Serializable {
   val plans:      List[Plan]
   lazy val namespaces:     List[Namespace]       = path.toNamespaces
   lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
+
+  def fold[P](rnp:  RenkuProject.WithoutParent => P,
+              rwp:  RenkuProject.WithParent => P,
+              nrnp: entities.NonRenkuProject.WithoutParent => P,
+              nrwp: NonRenkuProject.WithParent => P
+  ): P
 }
 
 sealed trait NonRenkuProject extends Project with Product with Serializable {
@@ -75,7 +81,13 @@ object NonRenkuProject {
                                  keywords:         Set[Keyword],
                                  members:          Set[Person],
                                  images:           List[Image]
-  ) extends NonRenkuProject
+  ) extends NonRenkuProject {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = nrnp(this)
+  }
 
   final case class WithParent(resourceId:       ResourceId,
                               path:             Path,
@@ -89,7 +101,13 @@ object NonRenkuProject {
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends NonRenkuProject
-      with Parent
+      with Parent {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = nrwp(this)
+  }
 }
 
 sealed trait RenkuProject extends Project with Product with Serializable {
@@ -117,7 +135,13 @@ object RenkuProject {
                                  datasets:         List[Dataset[Dataset.Provenance]],
                                  plans:            List[Plan],
                                  images:           List[Image]
-  ) extends RenkuProject
+  ) extends RenkuProject {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = rnp(this)
+  }
 
   object WithoutParent extends ProjectFactory {
 
@@ -221,7 +245,13 @@ object RenkuProject {
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends RenkuProject
-      with Parent
+      with Parent {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = rwp(this)
+  }
 
   object WithParent extends ProjectFactory {
 

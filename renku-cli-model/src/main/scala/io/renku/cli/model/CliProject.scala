@@ -26,14 +26,14 @@ import io.renku.graph.model.images.Image
 import io.renku.graph.model.plans
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliProject(
     id:            ResourceId,
     name:          Option[Name],
     description:   Option[Description],
-    dateCreated:   Option[DateCreated],
+    dateCreated:   DateCreated,
     creator:       Option[CliPerson],
     keywords:      Set[Keyword],
     images:        List[Image],
@@ -49,54 +49,55 @@ object CliProject {
   sealed trait ProjectPlan {
     def resourceId: plans.ResourceId
     def fold[A](
-                 fa: CliStepPlan => A,
-                 fb: CliCompositePlan => A,
-                 fc: CliWorkflowFileStepPlan => A,
-                 fd: CliWorkflowFileCompositePlan => A
+        fa: CliStepPlan => A,
+        fb: CliCompositePlan => A,
+        fc: CliWorkflowFileStepPlan => A,
+        fd: CliWorkflowFileCompositePlan => A
     ): A
   }
   object ProjectPlan {
     final case class Step(plan: CliStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-                   fa: CliStepPlan => A,
-                   fb: CliCompositePlan => A,
-                   fc: CliWorkflowFileStepPlan => A,
-                   fd: CliWorkflowFileCompositePlan => A
+          fa: CliStepPlan => A,
+          fb: CliCompositePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
+          fd: CliWorkflowFileCompositePlan => A
       ): A = fa(plan)
     }
     final case class Composite(plan: CliCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-                   fa: CliStepPlan => A,
-                   fb: CliCompositePlan => A,
-                   fc: CliWorkflowFileStepPlan => A,
-                   fd: CliWorkflowFileCompositePlan => A
+          fa: CliStepPlan => A,
+          fb: CliCompositePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
+          fd: CliWorkflowFileCompositePlan => A
       ): A = fb(plan)
     }
     final case class WorkflowFile(plan: CliWorkflowFileStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-                   fa: CliStepPlan => A,
-                   fb: CliCompositePlan => A,
-                   fc: CliWorkflowFileStepPlan => A,
-                   fd: CliWorkflowFileCompositePlan => A
+          fa: CliStepPlan => A,
+          fb: CliCompositePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
+          fd: CliWorkflowFileCompositePlan => A
       ): A = fc(plan)
     }
     final case class WorkflowFileComposite(plan: CliWorkflowFileCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-                   fa: CliStepPlan => A,
-                   fb: CliCompositePlan => A,
-                   fc: CliWorkflowFileStepPlan => A,
-                   fd: CliWorkflowFileCompositePlan => A
+          fa: CliStepPlan => A,
+          fb: CliCompositePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
+          fd: CliWorkflowFileCompositePlan => A
       ): A = fd(plan)
     }
 
-    def apply(plan: CliStepPlan):                      ProjectPlan = Step(plan)
+    def apply(plan: CliStepPlan):                  ProjectPlan = Step(plan)
     def apply(plan: CliCompositePlan):             ProjectPlan = Composite(plan)
-    def apply(plan: CliWorkflowFileStepPlan):          ProjectPlan = WorkflowFile(plan)
+    def apply(plan: CliWorkflowFileStepPlan):      ProjectPlan = WorkflowFile(plan)
     def apply(plan: CliWorkflowFileCompositePlan): ProjectPlan = WorkflowFileComposite(plan)
+    def apply(plan: CliPlan):                      ProjectPlan = plan.fold(apply, apply)
 
     private val entityTypes: EntityTypes = EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
@@ -144,7 +145,7 @@ object CliProject {
         id          <- cursor.downEntityId.as[ResourceId]
         name        <- cursor.downField(Schema.name).as[Option[Name]]
         description <- cursor.downField(Schema.description).as[Option[Description]]
-        dateCreated <- cursor.downField(Schema.dateCreated).as[Option[DateCreated]]
+        dateCreated <- cursor.downField(Schema.dateCreated).as[DateCreated]
         creator     <- cursor.downField(Schema.creator).as[Option[CliPerson]]
         keywords    <- cursor.downField(Schema.keywords).as[Set[Keyword]]
         images <-
