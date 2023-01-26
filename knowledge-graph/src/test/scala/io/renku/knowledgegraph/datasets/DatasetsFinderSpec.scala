@@ -28,6 +28,7 @@ import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.{Dataset, Person, RenkuProject}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.http.server.security.model.AuthUser
@@ -66,7 +67,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project3)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           val expectedResults = List(
@@ -92,7 +93,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projects: _*)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe projects
@@ -113,7 +114,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project3)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -135,7 +136,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project2Updated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -156,7 +157,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project2Fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -180,7 +181,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(dataset1Modified -> project1, dataset2Modified -> project2)
@@ -199,7 +200,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectWithAllDatasets)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((modification2, projectWithAllDatasets).toDatasetSearchResult(projectsCount = 1))
@@ -217,7 +218,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -238,7 +239,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2Updated)
 
           val result = datasetsFinder
-            .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -259,7 +260,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -278,7 +279,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectUpdated, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -303,7 +304,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, forkUpdated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -323,7 +324,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
@@ -339,7 +340,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, forkUpdated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
@@ -355,7 +356,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, afterForkingUpdated, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset, fork).toDatasetSearchResult(projectsCount = 1))
@@ -371,7 +372,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectUpdated)
 
           datasetsFinder
-            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
             .results shouldBe Nil
         }
@@ -405,7 +406,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, project1, project2, project3, project4, project5, projectWithoutPhrase)
 
         val result = datasetsFinder
-          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+          .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
 
         result.results shouldBe List((dataset1, project1),
@@ -424,7 +425,11 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project)
 
       datasetsFinder
-        .findDatasets(Some(phrases.generateOne), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrases.generateOne),
+                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                      PagingRequest.default,
+                      None
+        )
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -439,7 +444,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -459,7 +464,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
     }
@@ -477,7 +482,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2Updated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset2Modified, project2Updated).toDatasetSearchResult(projectsCount = 1))
     }
@@ -493,7 +498,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, projectUpdate2)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -510,7 +515,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project, forkUpdated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
     }
@@ -526,7 +531,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project, forkUpdated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((datasetModified, forkUpdated).toDatasetSearchResult(projectsCount = 1))
     }
@@ -542,7 +547,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, project)
 
         datasetsFinder
-          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+          .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
           .results shouldBe Nil
       }
@@ -569,7 +574,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2, project3, projectNonPhrased)
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
@@ -599,7 +604,11 @@ class DatasetsFinderSpec
       )
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default, None)
+        .findDatasets(Some(phrase),
+                      Sorting(Sort.By(DatePublishedProperty, Direction.Desc)),
+                      PagingRequest.default,
+                      None
+        )
         .unsafeRunSync()
         .results
 
@@ -629,7 +638,7 @@ class DatasetsFinderSpec
       )
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(DateProperty, Direction.Desc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(DateProperty, Direction.Desc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
@@ -662,7 +671,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2)
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(ProjectsCountProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
@@ -701,7 +710,7 @@ class DatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), pagingRequest, None)
         .unsafeRunSync()
 
       result.results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
@@ -731,7 +740,7 @@ class DatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), pagingRequest, None)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -752,7 +761,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, publicProject, privateProject)
 
         val result = datasetsFinder
-          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, maybeUser = None)
+          .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, maybeUser = None)
           .unsafeRunSync()
 
         result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
@@ -769,7 +778,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, publicProject, privateProjectWithPublicDataset)
 
         val result = datasetsFinder
-          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+          .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
 
         result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
@@ -802,7 +811,7 @@ class DatasetsFinderSpec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sort.By(TitleProperty, Direction.Asc),
+                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
                       PagingRequest.default,
                       userWithGitlabId.toAuthUser.some
         )
@@ -827,7 +836,7 @@ class DatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sort.By(TitleProperty, Direction.Asc),
+                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
                       PagingRequest.default,
                       authUsers.generateSome
         )
@@ -846,7 +855,7 @@ class DatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sort.By(TitleProperty, Direction.Asc),
+                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
                       PagingRequest.default,
                       authUsers.generateSome
         )
@@ -884,7 +893,7 @@ class DatasetsFinderSpec
 
         val result = datasetsFinder
           .findDatasets(maybePhrase = None,
-                        Sort.By(TitleProperty, Direction.Asc),
+                        Sorting(Sort.By(TitleProperty, Direction.Asc)),
                         PagingRequest.default,
                         userWithGitlabId.toAuthUser.some
           )

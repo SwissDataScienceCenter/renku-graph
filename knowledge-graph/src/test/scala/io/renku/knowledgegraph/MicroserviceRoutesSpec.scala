@@ -33,7 +33,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.rest.SortBy
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -82,9 +82,9 @@ class MicroserviceRoutesSpec
       val maybeAuthUser = authUsers.generateOption
       val phrase        = nonEmptyStrings().generateOne
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+        .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Phrase(phrase).some,
-                 Sort.By(TitleProperty, Direction.Asc),
+                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser
         )
@@ -100,9 +100,9 @@ class MicroserviceRoutesSpec
       val maybeAuthUser = authUsers.generateOption
 
       (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+        .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Option.empty[Phrase],
-                 Sort.By(TitleProperty, Direction.Asc),
+                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser
         )
@@ -131,8 +131,8 @@ class MicroserviceRoutesSpec
             .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-          .expects(phrase.some, sortBy, PagingRequest.default, maybeAuthUser)
+          .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
+          .expects(phrase.some, Sorting(sortBy), PagingRequest.default, maybeAuthUser)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes(maybeAuthUser).call(request)
@@ -155,8 +155,12 @@ class MicroserviceRoutesSpec
             .withQueryParam("per_page", perPage.value)
         )
         (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-          .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage), maybeAuthUser)
+          .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
+          .expects(phrase.some,
+                   Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                   PagingRequest(page, perPage),
+                   maybeAuthUser
+          )
           .returning(IO.pure(Response[IO](Ok)))
 
         routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -246,7 +250,7 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/entities" should {
     import io.renku.entities.search.Criteria
-    import io.renku.entities.search.Criteria.Sorting._
+    import io.renku.entities.search.Criteria.Sort._
     import io.renku.entities.search.Criteria._
     import io.renku.entities.search.Generators._
 
@@ -318,18 +322,29 @@ class MicroserviceRoutesSpec
         sortingDirections
           .map(dir =>
             uri"/knowledge-graph/entities" +? ("sort" -> s"matchingScore:$dir") -> Criteria(sorting =
-              Sorting.By(ByMatchingScore, dir)
+              Sorting(Sort.By(Sort.ByMatchingScore, dir))
             )
           )
           .generateOne,
         sortingDirections
           .map(dir =>
-            uri"/knowledge-graph/entities" +? ("sort" -> s"name:$dir") -> Criteria(sorting = Sorting.By(ByName, dir))
+            uri"/knowledge-graph/entities" +? ("sort" -> s"name:$dir") -> Criteria(sorting =
+              Sorting(Sort.By(ByName, dir))
+            )
           )
           .generateOne,
         sortingDirections
           .map(dir =>
-            uri"/knowledge-graph/entities" +? ("sort" -> s"date:$dir") -> Criteria(sorting = Sorting.By(ByDate, dir))
+            uri"/knowledge-graph/entities" +? ("sort" -> s"date:$dir") -> Criteria(sorting =
+              Sorting(Sort.By(ByDate, dir))
+            )
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            uri"/knowledge-graph/entities" ++? ("sort" -> Seq(s"date:$dir", s"name:$dir")) -> Criteria(
+              sorting = Sorting(Sort.By(ByDate, dir), Sort.By(ByName, dir))
+            )
           )
           .generateOne,
         pages

@@ -19,7 +19,7 @@
 package io.renku.entities.search
 
 import Criteria.Filters._
-import Criteria.{Filters, Sorting}
+import Criteria.{Filters, Sort}
 import EntityConverters._
 import Generators._
 import cats.data.NonEmptyList
@@ -32,7 +32,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.{Dataset, StepPlan}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.rest.SortBy
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
 import io.renku.testtools.IOSpec
@@ -85,6 +85,48 @@ class EntitiesFinderSpec
   }
 
   "findEntities - with query filter" should {
+    "return all entities sorted by two sorting parameters" in new TestCase {
+      val projectDate = Instant.parse("2020-10-10T12:00:00Z")
+      val otherDate   = Instant.parse("2021-06-15T00:00:00Z")
+      val projectBase = renkuProjectEntities(
+        visibilityGen = visibilityPublic,
+        projectDateCreatedGen = fixed(projects.DateCreated(projectDate))
+      )
+        .modify(replaceProjectName(projects.Name("hello 1 hello 1 hello 1")))
+        .withActivities(activityEntities(stepPlanEntities(fixed(plans.DateCreated(projectDate)))))
+        .withDatasets(
+          datasetEntities(provenanceNonModified)
+            .modify(replaceDSName(datasets.Name("hello 2")))
+            .modify(replaceDSDateCreatedOrPublished(otherDate))
+        )
+        .generateOne
+
+      val newPlan = projectBase.plans.head
+        .createModification()
+        .asInstanceOf[StepPlan.Modified]
+        .replacePlanDateCreated(plans.DateCreated(otherDate))
+        .replacePlanName(plans.Name("hello 3"))
+      val project = projectBase.copy(unlinkedPlans = newPlan :: projectBase.unlinkedPlans)
+
+      upload(to = projectsDataset, project)
+      val results =
+        finder
+          .findEntities(
+            Criteria(
+              filters = Criteria.Filters(maybeQuery = Query("hello").some),
+              sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc), Sort.byNameAsc)
+            )
+          )
+          .unsafeRunSync()
+          .resultsWithSkippedMatchingScore
+
+      implicit val entityOrdering: Ordering[model.Entity] =
+        Ordering.by(e => s"${e.date}, ${e.name}".toLowerCase)
+
+      val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
+
+      results shouldBe expected
+    }
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
@@ -894,7 +936,7 @@ class EntitiesFinderSpec
       val direction = sortingDirections.generateOne
 
       finder
-        .findEntities(Criteria(sorting = Sorting.By(Sorting.ByName, direction)))
+        .findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByName, direction))))
         .unsafeRunSync()
         .results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering).use(direction)
     }
@@ -911,7 +953,7 @@ class EntitiesFinderSpec
       val direction = sortingDirections.generateOne
 
       val results = finder
-        .findEntities(Criteria(sorting = Sorting.By(Sorting.ByDate, direction)))
+        .findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByDate, direction))))
         .unsafeRunSync()
         .results
 
@@ -953,7 +995,7 @@ class EntitiesFinderSpec
       finder
         .findEntities(
           Criteria(Filters(maybeQuery = Filters.Query(query.value).some),
-                   Sorting.By(Sorting.ByMatchingScore, direction)
+                   Sorting(Sort.By(Sort.ByMatchingScore, direction))
           )
         )
         .unsafeRunSync()

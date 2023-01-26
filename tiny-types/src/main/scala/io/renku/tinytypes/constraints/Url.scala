@@ -78,18 +78,21 @@ trait UrlOps[T <: UrlTinyType] {
 
     def &[Value](keyAndValue: (String, Value))(implicit convert: Value => QueryParamValue): UrlWithQueryParam =
       keyAndValue match {
-        case (key, value) => add(key, value)
+        case (key, value) => add(url, key, value)
       }
 
     def &&[Value](
-        keyAndValue: (String, Option[Value])
-    )(implicit convert: Value => QueryParamValue): UrlWithQueryParam =
-      keyAndValue match {
-        case (_, None)          => url
-        case (key, Some(value)) => add(key, value)
+        keyAndValue: (String, IterableOnce[Value])
+    )(implicit convert: Value => QueryParamValue): UrlWithQueryParam = {
+      val (key, values) = keyAndValue
+      values.iterator.foldLeft(url) { (current, value) =>
+        add(current, key, value)
       }
+    }
 
-    private def add[Value](key: String, value: Value)(implicit convert: Value => QueryParamValue) =
+    private def add[Value](url: UrlWithQueryParam, key: String, value: Value)(implicit
+        convert: Value => QueryParamValue
+    ) =
       UrlWithQueryParam {
         apply {
           if (url.toString contains s"$key=")

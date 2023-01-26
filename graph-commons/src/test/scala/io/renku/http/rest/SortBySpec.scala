@@ -35,7 +35,7 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "return the valid Sort.By instance for a valid name and direction" in {
       forAll(testSortBys) { sort =>
-        TestSort.from(serialize(sort)) shouldBe Right(sort)
+        TestSort.from(serialize(sort.sortBy.head)) shouldBe Right(sort.sortBy.head)
       }
     }
 
@@ -67,8 +67,8 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "decode a valid sort query parameter" in {
       forAll(testSortBys) { sort =>
-        Map("sort" -> Seq(serialize(sort))) match {
-          case TestSort.sort(actual) => actual shouldBe Some(Validated.validNel(sort))
+        Map("sort" -> Seq(serialize(sort.sortBy.head))) match {
+          case TestSort.sort(actual) => actual shouldBe Validated.validNel(sort.sortBy.toList)
         }
       }
     }
@@ -76,15 +76,15 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     "fail to decode an invalid sort query parameter" in {
       Map("sort" -> Seq(s"invalid:$Desc")) match {
         case TestSort.sort(actual) =>
-          actual shouldBe Some(Validated.invalidNel {
+          actual shouldBe Validated.invalidNel {
             ParseFailure(TestSort.Property.from("invalid").swap.getOrElse(throw new Exception("ERROR!")).getMessage, "")
-          })
+          }
       }
     }
 
     "return None when no sort query parameter" in {
       Map.empty[String, List[String]] match {
-        case TestSort.sort(actual) => actual shouldBe None
+        case TestSort.sort(actual) => actual shouldBe Validated.valid(Nil)
       }
     }
   }
@@ -96,7 +96,7 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
       val sort = testSortBys.generateOne
 
-      convert(sort).value shouldBe urlEncode(serialize(sort))
+      convert(sort.sortBy.head).value shouldBe urlEncode(serialize(sort.sortBy.head))
     }
   }
 

@@ -30,6 +30,7 @@ import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -71,7 +72,7 @@ object EventsEndpoint {
 
   final case class Criteria(
       filters: Criteria.Filters,
-      sorting: Criteria.Sorting.By = Sorting.default,
+      sorting: Sorting[Criteria.Sort.type] = Criteria.Sort.default,
       paging:  PagingRequest = PagingRequest.default
   )
 
@@ -91,7 +92,7 @@ object EventsEndpoint {
       final case class EventsSinceAndUntil(since: EventsSince, until: EventsUntil)              extends FiltersOnDate
     }
 
-    object Sorting extends io.renku.http.rest.SortBy {
+    object Sort extends io.renku.http.rest.SortBy {
       import io.renku.http.rest.SortBy.Direction
 
       type PropertyType = SortProperty
@@ -100,7 +101,7 @@ object EventsEndpoint {
 
       final case object EventDate extends Property("eventDate") with SortProperty
 
-      lazy val default: Sorting.By = Sorting.By(EventDate, Direction.Desc)
+      lazy val default: Sorting[Sort.type] = Sorting(Sort.By(EventDate, Direction.Desc))
 
       override lazy val properties: Set[SortProperty] = Set(EventDate)
     }
