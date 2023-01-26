@@ -34,7 +34,7 @@ final case class CliWorkflowFileCompositePlan(
     keywords:         List[Keyword],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime],
-    plans:            NonEmptyList[CliWorkflowFilePlan],
+    plans:            NonEmptyList[CliWorkflowFileStepPlan],
     links:            List[CliParameterLink],
     mappings:         List[CliParameterMapping],
     path:             entityModel.Location.FileOrFolder // TODO clarify what this property really is
@@ -61,7 +61,7 @@ object CliWorkflowFileCompositePlan {
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
         mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliWorkflowFilePlan]]
+        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliWorkflowFileStepPlan]]
         path             <- cursor.downField(Prov.atLocation).as[entityModel.Location.FileOrFolder]
       } yield CliWorkflowFileCompositePlan(
         resourceId,

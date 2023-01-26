@@ -42,14 +42,13 @@ trait RenkuProjectEntitiesGenerators {
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val anyVisibility:       Gen[Visibility] = projectVisibilities
 
-  lazy val anyRenkuProjectEntities: Gen[RenkuProject] = Gen.oneOf(
-    renkuProjectEntities(anyVisibility),
-    renkuProjectWithParentEntities(anyVisibility)
-  )
+  lazy val anyRenkuProjectEntities: Gen[RenkuProject] = anyRenkuProjectEntities(anyVisibility)
 
-  def anyRenkuProjectEntities(visibilityGen: Gen[Visibility]): Gen[RenkuProject] = Gen.oneOf(
-    renkuProjectEntities(visibilityGen),
-    renkuProjectWithParentEntities(visibilityGen)
+  def anyRenkuProjectEntities(visibilityGen: Gen[Visibility],
+                              creatorGen:    Gen[Person] = personEntities(withGitLabId)
+  ): Gen[RenkuProject] = Gen.oneOf(
+    renkuProjectEntities(visibilityGen, creatorGen = creatorGen),
+    renkuProjectWithParentEntities(visibilityGen, creatorGen = creatorGen)
   )
 
   lazy val renkuProjectEntitiesWithDatasetsAndActivities: Gen[RenkuProject] =
@@ -64,6 +63,7 @@ trait RenkuProjectEntitiesGenerators {
   def renkuProjectEntities(
       visibilityGen:         Gen[Visibility],
       projectDateCreatedGen: Gen[projects.DateCreated] = projectCreatedDates(Instant.EPOCH),
+      creatorGen:            Gen[Person] = personEntities(withGitLabId),
       activityFactories:     List[ActivityGenFactory] = Nil,
       datasetFactories:      List[DatasetGenFactory[Dataset.Provenance]] = Nil,
       forksCountGen:         Gen[ForksCount] = anyForksCount
@@ -73,7 +73,7 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
     dateCreated      <- projectDateCreatedGen
-    maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
+    maybeCreator     <- creatorGen.toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
@@ -101,8 +101,10 @@ trait RenkuProjectEntitiesGenerators {
 
   def renkuProjectWithParentEntities(
       visibilityGen:  Gen[Visibility],
-      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  ): Gen[RenkuProject.WithParent] = renkuProjectEntities(visibilityGen, minDateCreated).map(_.forkOnce()._2)
+      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      creatorGen:     Gen[Person] = personEntities(withGitLabId)
+  ): Gen[RenkuProject.WithParent] =
+    renkuProjectEntities(visibilityGen, minDateCreated, creatorGen = creatorGen).map(_.forkOnce(creatorGen)._2)
 
   implicit val forksCountZero:    Gen[ForksCount.Zero]    = Gen.const(ForksCount.Zero)
   implicit val forksCountNonZero: Gen[ForksCount.NonZero] = positiveInts(max = 100) map ForksCount.apply

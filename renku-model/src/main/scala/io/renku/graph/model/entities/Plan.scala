@@ -29,7 +29,7 @@ import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import plans.{Command, DateCreated, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
+import plans.{Command, DateCreated, DateModified, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 import scala.math.Ordering.Implicits._
 
@@ -42,6 +42,12 @@ sealed trait Plan extends Product with Serializable {
   val keywords:         List[Keyword]
 
   type PlanGroup <: Plan
+
+  def fold[P](spnm: StepPlan.NonModified => P,
+              spm:  StepPlan.Modified => P,
+              cpnm: CompositePlan.NonModified => P,
+              cpm:  CompositePlan.Modified => P
+  ): P
 }
 
 object Plan {
@@ -126,7 +132,13 @@ object StepPlan {
                                inputs:                   List[CommandInput],
                                outputs:                  List[CommandOutput],
                                successCodes:             List[SuccessCode]
-  ) extends StepPlan
+  ) extends StepPlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = spnm(this)
+  }
 
   final case class Modified(resourceId:               ResourceId,
                             name:                     Name,
@@ -142,7 +154,13 @@ object StepPlan {
                             successCodes:             List[SuccessCode],
                             derivation:               Derivation,
                             maybeInvalidationTime:    Option[InvalidationTime]
-  ) extends StepPlan
+  ) extends StepPlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = spm(this)
+  }
 
   def from(resourceId:               ResourceId,
            name:                     Name,
@@ -268,12 +286,14 @@ object StepPlan {
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
-        resourceId            <- cursor.downEntityId.as[ResourceId]
-        name                  <- cursor.downField(schema / "name").as[Name]
-        maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
-        maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
-        creators              <- cursor.downField(schema / "creator").as[List[Person]]
-        dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        resourceId       <- cursor.downEntityId.as[ResourceId]
+        name             <- cursor.downField(schema / "name").as[Name]
+        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
+        maybeCommand     <- cursor.downField(renku / "command").as[Option[Command]]
+        creators         <- cursor.downField(schema / "creator").as[List[Person]]
+        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        dateModified     <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
+        createdAt = dateModified.map(m => DateCreated(m.value)).getOrElse(dateCreated)
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
         parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
@@ -292,7 +312,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          dateCreated,
+                          createdAt,
                           maybeProgrammingLang,
                           keywords,
                           parameters,
@@ -308,7 +328,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          dateCreated,
+                          createdAt,
                           maybeProgrammingLang,
                           keywords,
                           parameters,
@@ -368,7 +388,13 @@ object CompositePlan {
       plans:            NonEmptyList[ResourceId],
       mappings:         List[ParameterMapping],
       links:            List[ParameterLink]
-  ) extends CompositePlan
+  ) extends CompositePlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = cpnm(this)
+  }
 
   final case class Modified(
       resourceId:            ResourceId,
@@ -382,7 +408,13 @@ object CompositePlan {
       links:                 List[ParameterLink],
       maybeInvalidationTime: Option[InvalidationTime],
       derivation:            Plan.Derivation
-  ) extends CompositePlan
+  ) extends CompositePlan {
+    override def fold[P](spnm: StepPlan.NonModified => P,
+                         spm:  StepPlan.Modified => P,
+                         cpnm: CompositePlan.NonModified => P,
+                         cpm:  CompositePlan.Modified => P
+    ): P = cpm(this)
+  }
 
   // noinspection TypeAnnotation
   object Ontology {

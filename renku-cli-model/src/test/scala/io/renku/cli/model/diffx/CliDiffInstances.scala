@@ -24,68 +24,76 @@ import io.renku.graph.model.diffx.ModelTinyTypesDiffInstances
 
 trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
-  implicit val cliPersonDiff: Diff[CliPerson] = Diff.derived[CliPerson]
+  implicit lazy val cliPersonDiff: Diff[CliPerson] = Diff.derived[CliPerson]
 
-  implicit val cliEntityDiff: Diff[CliEntity] = Diff.derived[CliEntity]
+  implicit lazy val cliSingleEntityDiff: Diff[CliSingleEntity] = Diff.derived[CliSingleEntity]
 
-  implicit val cliCollectionDiff: Diff[CliCollection] = Diff.derived[CliCollection]
+  implicit lazy val cliCollectionEntityDiff: Diff[CliCollectionEntity] = Diff.derived[CliCollectionEntity]
 
-  implicit val cliDatasetFileDiff: Diff[CliDatasetFile] = Diff.derived[CliDatasetFile]
+  implicit lazy val cliEntityDiff: Diff[CliEntity] = Diff.derived[CliEntity]
 
-  implicit val cliDatasetDiff: Diff[CliDataset] = Diff.derived[CliDataset]
+  implicit lazy val cliDatasetFileDiff: Diff[CliDatasetFile] = Diff.derived[CliDatasetFile]
 
-  implicit val cliAgentDiff: Diff[CliAgent] = Diff.derived[CliAgent]
+  implicit lazy val cliProvenanceDiff: Diff[CliDatasetProvenance] = Diff.derived[CliDatasetProvenance]
 
-  implicit val cliParameterValueDiff: Diff[CliParameterValue] = Diff.derived[CliParameterValue]
+  implicit lazy val cliDatasetDiff: Diff[CliDataset] = Diff.derived[CliDataset]
 
-  implicit val cliCommandParameterDiff: Diff[CliCommandParameter] = Diff.derived[CliCommandParameter]
+  implicit lazy val cliPublicationEventDiff: Diff[CliPublicationEvent] = Diff.derived[CliPublicationEvent]
 
-  implicit val cliStreamTypeDiff: Diff[CliMappedIOStream.StreamType] = Diff.derived[CliMappedIOStream.StreamType]
+  implicit lazy val cliSoftwareAgentDiff: Diff[CliSoftwareAgent] = Diff.derived[CliSoftwareAgent]
 
-  implicit val cliMappedIOStreamDiff: Diff[CliMappedIOStream] = Diff.derived[CliMappedIOStream]
+  implicit lazy val cliParameterValueDiff: Diff[CliParameterValue] = Diff.derived[CliParameterValue]
 
-  implicit val cliCommandInputDiff: Diff[CliCommandInput] = Diff.derived[CliCommandInput]
+  implicit lazy val cliCommandParameterDiff: Diff[CliCommandParameter] = Diff.derived[CliCommandParameter]
 
-  implicit val cliCommandOutputDiff: Diff[CliCommandOutput] = Diff.derived[CliCommandOutput]
+  implicit lazy val cliStreamTypeDiff: Diff[CliMappedIOStream.StreamType] = Diff.derived[CliMappedIOStream.StreamType]
 
-  implicit val cliMappedParamDiff: Diff[CliParameterMapping.MappedParam] = Diff.derived[CliParameterMapping.MappedParam]
+  implicit lazy val cliMappedIOStreamDiff: Diff[CliMappedIOStream] = Diff.derived[CliMappedIOStream]
 
-  implicit val cliParameterMappingDiff: Diff[CliParameterMapping] = Diff.derived[CliParameterMapping]
+  implicit lazy val cliCommandInputDiff: Diff[CliCommandInput] = Diff.derived[CliCommandInput]
 
-  implicit val cliParameterLinkSinkDiff: Diff[CliParameterLink.Sink] = Diff.derived[CliParameterLink.Sink]
+  implicit lazy val cliCommandOutputDiff: Diff[CliCommandOutput] = Diff.derived[CliCommandOutput]
 
-  implicit val cliParameterLinkDiff: Diff[CliParameterLink] = Diff.derived[CliParameterLink]
+  implicit lazy val cliMappedParamDiff: Diff[CliParameterMapping.MappedParam] =
+    Diff.derived[CliParameterMapping.MappedParam]
 
-  implicit val cliPlanDiff: Diff[CliPlan] = Diff.derived[CliPlan]
+  implicit lazy val cliParameterMappingDiff: Diff[CliParameterMapping] = Diff.derived[CliParameterMapping]
 
-  implicit val cliCompositePlanChildPlanDiff: Diff[CliCompositePlan.ChildPlan] =
-    Diff.derived[CliCompositePlan.ChildPlan]
+  implicit lazy val cliParameterLinkSinkDiff: Diff[CliParameterLink.Sink] = Diff.derived[CliParameterLink.Sink]
 
-  implicit val cliCompositePlan: Diff[CliCompositePlan] = Diff.derived[CliCompositePlan]
+  implicit lazy val cliParameterLinkDiff: Diff[CliParameterLink] = Diff.derived[CliParameterLink]
 
-  implicit val cliWorkflowFilePlanDiff: Diff[CliWorkflowFilePlan] = Diff.derived[CliWorkflowFilePlan]
+  implicit lazy val cliStepPlanDiff: Diff[CliStepPlan] = Diff.derived[CliStepPlan]
 
-  implicit val cliWorkflowFileCompositePlanDiff: Diff[CliWorkflowFileCompositePlan] =
+  implicit lazy val cliPlanDiff: Diff[CliPlan] = Diff.derived[CliPlan]
+
+  implicit lazy val cliCompositePlan: Diff[CliCompositePlan] = Diff.derived[CliCompositePlan]
+
+  implicit lazy val cliWorkflowFileStepPlanDiff: Diff[CliWorkflowFileStepPlan] = Diff.derived[CliWorkflowFileStepPlan]
+
+  implicit lazy val cliWorkflowFileCompositePlanDiff: Diff[CliWorkflowFileCompositePlan] =
     Diff.derived[CliWorkflowFileCompositePlan]
 
-  implicit val cliAssociatedPlanDiff: Diff[CliAssociation.AssociatedPlan] = Diff.derived[CliAssociation.AssociatedPlan]
+  implicit lazy val cliAssociatedPlanDiff: Diff[CliAssociation.AssociatedPlan] =
+    Diff.derived[CliAssociation.AssociatedPlan]
 
-  implicit val cliAssociationDiff: Diff[CliAssociation] = Diff.derived[CliAssociation]
+  implicit lazy val cliAssociationDiff: Diff[CliAssociation] = Diff.derived[CliAssociation]
 
-  implicit val cliActivityAgentDiff: Diff[CliActivity.Agent] = Diff.derived[CliActivity.Agent]
+  implicit lazy val cliAgentSoftwareDiff: Diff[CliAgent.Software] = Diff.derived[CliAgent.Software]
 
-  implicit val cliUsageDiff: Diff[CliUsage] = Diff.derived[CliUsage]
+  implicit lazy val cliAgentPersonDiff: Diff[CliAgent.Person] = Diff.derived[CliAgent.Person]
 
-  implicit val cliGenerationEntityDiff: Diff[CliGeneration.GenerationEntity] =
-    Diff.derived[CliGeneration.GenerationEntity]
+  implicit lazy val cliAgentDiff: Diff[CliAgent] = Diff.derived[CliAgent]
 
-  implicit val cliGenerationDiff: Diff[CliGeneration] = Diff.derived[CliGeneration]
+  implicit lazy val cliUsageDiff: Diff[CliUsage] = Diff.derived[CliUsage]
 
-  implicit val cliActivityDiff: Diff[CliActivity] = Diff.derived[CliActivity]
+  implicit lazy val cliGenerationDiff: Diff[CliGeneration] = Diff.derived[CliGeneration]
 
-  implicit val cliProjectPlanDiff: Diff[CliProject.ProjectPlan] = Diff.derived[CliProject.ProjectPlan]
+  implicit lazy val cliActivityDiff: Diff[CliActivity] = Diff.derived[CliActivity]
 
-  implicit val cliProjectDiff: Diff[CliProject] = Diff.derived[CliProject]
+  implicit lazy val cliProjectPlanDiff: Diff[CliProject.ProjectPlan] = Diff.derived[CliProject.ProjectPlan]
+
+  implicit lazy val cliProjectDiff: Diff[CliProject] = Diff.derived[CliProject]
 }
 
 object CliDiffInstances extends CliDiffInstances

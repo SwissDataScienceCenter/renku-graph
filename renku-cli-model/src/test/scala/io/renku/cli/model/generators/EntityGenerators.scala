@@ -16,31 +16,42 @@
  * limitations under the License.
  */
 
-package io.renku.cli.model.generators
+package io.renku.cli.model
+package generators
 
-import io.renku.cli.model.{CliCollection, CliEntity}
 import io.renku.generators.Generators
-import io.renku.graph.model.RenkuTinyTypeGenerators
+import io.renku.graph.model.{RenkuTinyTypeGenerators, generations}
 import org.scalacheck.Gen
 
 trait EntityGenerators {
 
-  def entityGen: Gen[CliEntity] =
-    for {
-      id       <- RenkuTinyTypeGenerators.entityResourceIds
-      location <- BaseGenerators.entityPathGen
-      checksum <- RenkuTinyTypeGenerators.entityChecksums
-      genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
-    } yield CliEntity(id, location, checksum, genIds)
+  def singleEntityGen: Gen[CliSingleEntity] = for {
+    id       <- RenkuTinyTypeGenerators.entityResourceIds
+    location <- BaseGenerators.entityPathGen
+    checksum <- RenkuTinyTypeGenerators.entityChecksums
+    genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
+  } yield CliSingleEntity(id, location, checksum, genIds)
 
-  def collectionGen: Gen[CliCollection] =
-    for {
-      id       <- RenkuTinyTypeGenerators.entityResourceIds
-      location <- BaseGenerators.entityPathGen
-      checksum <- RenkuTinyTypeGenerators.entityChecksums
-      genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
-    } yield CliCollection(id, location, checksum, genIds)
+  def collectionEntityGen: Gen[CliCollectionEntity] = for {
+    id       <- RenkuTinyTypeGenerators.entityResourceIds
+    location <- BaseGenerators.entityPathGen
+    checksum <- RenkuTinyTypeGenerators.entityChecksums
+    genIds   <- Generators.listOf(RenkuTinyTypeGenerators.generationsResourceIdGen)
+  } yield CliCollectionEntity(id, location, checksum, genIds)
 
+  val entityGen: Gen[CliEntity] = Gen.oneOf(
+    EntityGenerators.singleEntityGen.map(CliEntity.apply),
+    EntityGenerators.collectionEntityGen.map(CliEntity.apply)
+  )
+
+  def entityGen(generationId: generations.ResourceId): Gen[CliEntity] = Gen.oneOf(
+    EntityGenerators.singleEntityGen
+      .map(_.copy(generationIds = List(generationId)))
+      .map(CliEntity.apply),
+    EntityGenerators.collectionEntityGen
+      .map(_.copy(generationIds = List(generationId)))
+      .map(CliEntity.apply)
+  )
 }
 
 object EntityGenerators extends EntityGenerators

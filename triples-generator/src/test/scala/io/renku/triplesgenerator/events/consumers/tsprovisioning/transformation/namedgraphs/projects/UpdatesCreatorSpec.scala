@@ -160,6 +160,7 @@ class UpdatesCreatorSpec
     }
 
     "generate queries which delete the project images when changed" in {
+
       val project = anyProjectEntities.suchThat(_.images.nonEmpty).generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)

@@ -20,17 +20,17 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.jsonld._
 import io.renku.jsonld.ontology.{Class, DataProperty, DataPropertyRange, Type}
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.syntax._
-import io.renku.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 
 object commandParameters {
 

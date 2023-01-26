@@ -19,27 +19,17 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.CliGeneration
-import io.renku.graph.model.generations.ResourceId
 import io.renku.graph.model.{RenkuTinyTypeGenerators, activities}
 import RenkuTinyTypeGenerators.activityResourceIdGen
+import io.renku.cli.model.generators.all.entityGen
 import org.scalacheck.Gen
 
 trait GenerationGenerators {
 
-  def generationEntityGen(generationId: ResourceId): Gen[CliGeneration.GenerationEntity] =
-    Gen.oneOf(
-      EntityGenerators.entityGen
-        .map(_.copy(generationIds = List(generationId)))
-        .map(CliGeneration.GenerationEntity.apply),
-      EntityGenerators.collectionGen
-        .map(_.copy(generationIds = List(generationId)))
-        .map(CliGeneration.GenerationEntity.apply)
-    )
-
   def generationGen(activityIdGen: Gen[activities.ResourceId] = activityResourceIdGen): Gen[CliGeneration] =
     for {
       id         <- RenkuTinyTypeGenerators.generationsResourceIdGen
-      entity     <- generationEntityGen(id)
+      entity     <- entityGen(id)
       activityId <- activityIdGen
     } yield CliGeneration(id, entity, activityId)
 }

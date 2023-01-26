@@ -21,29 +21,31 @@ package io.renku.cli.model.generators
 import io.renku.cli.model._
 import io.renku.generators.Generators
 import io.renku.graph.model._
+import RenkuTinyTypeGenerators._
+import io.renku.generators.Generators.Implicits._
 import org.scalacheck.Gen
 
 import java.time.Instant
 
 trait PlanGenerators {
 
-  def planGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliPlan] =
+  def planGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliStepPlan] =
     for {
-      id               <- RenkuTinyTypeGenerators.planResourceIds
-      name             <- RenkuTinyTypeGenerators.planNames
-      descr            <- Gen.option(RenkuTinyTypeGenerators.planDescriptions)
-      creators         <- Generators.listOf(PersonGenerators.cliPersonGen, max = 3)
-      dateCreated      <- RenkuTinyTypeGenerators.planDatesCreated(plans.DateCreated(minCreated))
-      dateModified     <- Gen.option(BaseGenerators.dateModified)
-      keywords         <- Generators.listOf(RenkuTinyTypeGenerators.planKeywords, max = 3)
-      command          <- Gen.option(RenkuTinyTypeGenerators.planCommands)
-      parameters       <- Generators.listOf(CommandParameterGenerators.commandParameterGen, max = 3)
-      inputs           <- Generators.listOf(CommandParameterGenerators.commandInputGen, max = 3)
-      outputs          <- Generators.listOf(CommandParameterGenerators.commandOutputGen, max = 3)
-      successCodes     <- Generators.listOf(RenkuTinyTypeGenerators.planSuccessCodes, max = 3)
-      derivedFrom      <- Gen.option(RenkuTinyTypeGenerators.planDerivedFroms)
-      invalidationTime <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(minCreated.minusMillis(1000)))
-    } yield CliPlan(
+      id               <- planResourceIds
+      name             <- planNames
+      descr            <- planDescriptions.toGeneratorOfOptions
+      creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
+      dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      keywords         <- planKeywords.toGeneratorOfList(max = 3)
+      command          <- planCommands.toGeneratorOfOptions
+      parameters       <- CommandParameterGenerators.commandParameterGen.toGeneratorOfList(max = 3)
+      inputs           <- CommandParameterGenerators.commandInputGen.toGeneratorOfList(max = 3)
+      outputs          <- CommandParameterGenerators.commandOutputGen.toGeneratorOfList(max = 3)
+      successCodes     <- planSuccessCodes.toGeneratorOfList(max = 3)
+      derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
+      invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
+    } yield CliStepPlan(
       id,
       name,
       descr,
@@ -60,31 +62,33 @@ trait PlanGenerators {
       invalidationTime
     )
 
-  def compositePlanChildPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliCompositePlan.ChildPlan] = {
-    val plan = planGen(minCreated).map(CliCompositePlan.ChildPlan.apply)
-    val cp   = compositePlanGen(minCreated).map(CliCompositePlan.ChildPlan.apply)
+  def compositePlanChildPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliPlan] = {
+    val plan = planGen(minCreated).map(CliPlan.apply)
+    val cp   = compositePlanGen(minCreated).map(CliPlan.apply)
     Gen.frequency(1 -> cp, 9 -> plan)
   }
 
   def compositePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliCompositePlan] =
     for {
-      id               <- RenkuTinyTypeGenerators.planResourceIds
-      name             <- RenkuTinyTypeGenerators.planNames
-      description      <- Gen.option(RenkuTinyTypeGenerators.planDescriptions)
-      creators         <- Generators.listOf(PersonGenerators.cliPersonGen, max = 3)
-      dateCreated      <- RenkuTinyTypeGenerators.planDatesCreated(plans.DateCreated(minCreated))
-      keywords         <- Generators.listOf(RenkuTinyTypeGenerators.planKeywords, max = 3)
-      derivedFrom      <- Gen.option(RenkuTinyTypeGenerators.planDerivedFroms)
-      invalidationTime <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(minCreated.minusMillis(1000)))
+      id               <- planResourceIds
+      name             <- planNames
+      description      <- planDescriptions.toGeneratorOfOptions
+      creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
+      dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      keywords         <- planKeywords.toGeneratorOfList(max = 3)
+      derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
+      invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
       childPlans       <- Generators.nonEmptyList(compositePlanChildPlanGen(minCreated))
-      links            <- Generators.listOf(CommandParameterGenerators.parameterLinkGen, max = 3)
-      mappings         <- Generators.listOf(CommandParameterGenerators.parameterMappingGen, max = 3)
+      links            <- CommandParameterGenerators.parameterLinkGen.toGeneratorOfList(max = 3)
+      mappings         <- CommandParameterGenerators.parameterMappingGen.toGeneratorOfList(max = 3)
     } yield CliCompositePlan(
       id,
       name,
       description,
       creators,
       dateCreated,
+      dateModified,
       keywords,
       derivedFrom,
       invalidationTime,
@@ -93,23 +97,23 @@ trait PlanGenerators {
       mappings
     )
 
-  def workflowFilePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFilePlan] =
+  def workflowFilePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileStepPlan] =
     for {
-      id               <- RenkuTinyTypeGenerators.planResourceIds
-      name             <- RenkuTinyTypeGenerators.planNames
-      descr            <- Gen.option(RenkuTinyTypeGenerators.planDescriptions)
-      creators         <- Generators.listOf(PersonGenerators.cliPersonGen, max = 3)
-      dateCreated      <- RenkuTinyTypeGenerators.planDatesCreated(plans.DateCreated(minCreated))
-      dateModified     <- Gen.option(BaseGenerators.dateModified)
-      keywords         <- Generators.listOf(RenkuTinyTypeGenerators.planKeywords, max = 3)
-      command          <- Gen.option(RenkuTinyTypeGenerators.planCommands)
-      parameters       <- Generators.listOf(CommandParameterGenerators.commandParameterGen, max = 3)
-      inputs           <- Generators.listOf(CommandParameterGenerators.commandInputGen, max = 3)
-      outputs          <- Generators.listOf(CommandParameterGenerators.commandOutputGen, max = 3)
-      successCodes     <- Generators.listOf(RenkuTinyTypeGenerators.planSuccessCodes, max = 3)
-      derivedFrom      <- Gen.option(RenkuTinyTypeGenerators.planDerivedFroms)
-      invalidationTime <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(minCreated.minusMillis(1000)))
-    } yield CliWorkflowFilePlan(
+      id               <- planResourceIds
+      name             <- planNames
+      descr            <- planDescriptions.toGeneratorOfOptions
+      creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
+      dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      keywords         <- planKeywords.toGeneratorOfList(max = 3)
+      command          <- planCommands.toGeneratorOfOptions
+      parameters       <- CommandParameterGenerators.commandParameterGen.toGeneratorOfList(max = 3)
+      inputs           <- CommandParameterGenerators.commandInputGen.toGeneratorOfList(max = 3)
+      outputs          <- CommandParameterGenerators.commandOutputGen.toGeneratorOfList(max = 3)
+      successCodes     <- planSuccessCodes.toGeneratorOfList(max = 3)
+      derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
+      invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
+    } yield CliWorkflowFileStepPlan(
       id,
       name,
       descr,
@@ -130,17 +134,17 @@ trait PlanGenerators {
       minCreated: Instant
   )(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileCompositePlan] =
     for {
-      id               <- RenkuTinyTypeGenerators.planResourceIds
-      name             <- RenkuTinyTypeGenerators.planNames
-      description      <- Gen.option(RenkuTinyTypeGenerators.planDescriptions)
-      creators         <- Generators.listOf(PersonGenerators.cliPersonGen, max = 3)
-      dateCreated      <- RenkuTinyTypeGenerators.planDatesCreated(plans.DateCreated(minCreated))
-      keywords         <- Generators.listOf(RenkuTinyTypeGenerators.planKeywords, max = 3)
-      derivedFrom      <- Gen.option(RenkuTinyTypeGenerators.planDerivedFroms)
-      invalidationTime <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(minCreated.minusMillis(1000)))
-      childPlans       <- Generators.nonEmptyList(workflowFilePlanGen(minCreated), max = 3)
-      links            <- Generators.listOf(CommandParameterGenerators.parameterLinkGen, max = 3)
-      mappings         <- Generators.listOf(CommandParameterGenerators.parameterMappingGen, max = 3)
+      id               <- planResourceIds
+      name             <- planNames
+      description      <- planDescriptions.toGeneratorOfOptions
+      creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
+      dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      keywords         <- planKeywords.toGeneratorOfList(max = 3)
+      derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
+      invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
+      childPlans       <- workflowFilePlanGen(minCreated).toGeneratorOfNonEmptyList(max = 3)
+      links            <- CommandParameterGenerators.parameterLinkGen.toGeneratorOfList(max = 3)
+      mappings         <- CommandParameterGenerators.parameterMappingGen.toGeneratorOfList(max = 3)
       path             <- Generators.relativePaths().map(entityModel.Location.FileOrFolder.apply) // TODO
     } yield CliWorkflowFileCompositePlan(
       id,

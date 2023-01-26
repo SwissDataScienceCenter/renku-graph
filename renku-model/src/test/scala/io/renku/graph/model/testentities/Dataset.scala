@@ -21,7 +21,9 @@ package io.renku.graph.model.testentities
 import Dataset._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliDataset
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images._
@@ -342,7 +344,7 @@ object Dataset {
       entities.Dataset.AdditionalInfo(
         dataset.additionalInfo.maybeDescription,
         dataset.additionalInfo.keywords.sorted,
-        dataset.additionalInfo.images.toEntitiesImages(identification.resourceId),
+        dataset.additionalInfo.images.toEntitiesImages(identification.resourceId).toList,
         dataset.additionalInfo.maybeLicense,
         dataset.additionalInfo.maybeVersion
       ),
@@ -350,6 +352,10 @@ object Dataset {
       dataset.publicationEvents.map(_.to[entities.PublicationEvent])
     )
   }
+
+  implicit def toCliDataset[TP <: Provenance](implicit renkuUrl: RenkuUrl): Dataset[TP] => CliDataset =
+    ((_: Dataset[Dataset.Provenance]).to[entities.Dataset[entities.Dataset.Provenance]]) andThen
+      (CliConverters.from(_: entities.Dataset[entities.Dataset.Provenance]))
 
   implicit def functions[P <: Provenance]: EntityFunctions[Dataset[P]] =
     EntityFunctions[entities.Dataset[entities.Dataset.Provenance]]
@@ -372,7 +378,7 @@ object Dataset {
 
   implicit class DatasetImagesOps(images: List[ImageUri]) {
 
-    def toEntitiesImages(dsResourceId: ResourceId) = images.zipWithIndex.map { case (url, idx) =>
+    def toEntitiesImages(dsResourceId: ResourceId): Seq[Image] = images.zipWithIndex.map { case (url, idx) =>
       val imagePosition = ImagePosition(idx)
       Image(
         ImageResourceId(imageEntityId(dsResourceId.asEntityId, imagePosition).show),

@@ -19,16 +19,18 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.CliAgent
-import io.renku.graph.model.RenkuTinyTypeGenerators
+import io.renku.cli.model.generators.PersonGenerators.cliPersonGen
+import io.renku.cli.model.generators.SoftwareAgentGenerators.softwareAgentGen
+import io.renku.graph.model.RenkuUrl
 import org.scalacheck.Gen
 
 trait AgentGenerators {
 
-  def agentGen: Gen[CliAgent] =
-    for {
-      id   <- RenkuTinyTypeGenerators.agentResourceIdGen
-      name <- RenkuTinyTypeGenerators.agentNameGen
-    } yield CliAgent(id, name)
+  val agentSoftwareGenerator: Gen[CliAgent.Software] = softwareAgentGen.map(CliAgent.apply)
+  def agentPersonGenerator(implicit renkuUrl: RenkuUrl): Gen[CliAgent.Person] = cliPersonGen.map(CliAgent.apply)
+
+  def agentGenerator(implicit renkuUrl: RenkuUrl): Gen[CliAgent] =
+    Gen.oneOf(agentSoftwareGenerator, agentPersonGenerator)
 }
 
 object AgentGenerators extends AgentGenerators

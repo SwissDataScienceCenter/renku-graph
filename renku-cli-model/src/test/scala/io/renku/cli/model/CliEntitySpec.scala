@@ -20,6 +20,7 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.EntityGenerators
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,20 +33,19 @@ class CliEntitySpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val entityGen     = EntityGenerators.entityGen
-  val collectionGen = EntityGenerators.collectionGen
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val singleEntityGen     = EntityGenerators.singleEntityGen
+  private val collectionEntityGen = EntityGenerators.collectionEntityGen
 
   "entity decode/encode" should {
     "be compatible" in {
-      forAll(entityGen) { cliEntity =>
+      forAll(singleEntityGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
       }
     }
 
     "work on multiple items" in {
-      forAll(entityGen, entityGen) { (cliEntity1, cliEntity2) =>
+      forAll(singleEntityGen, singleEntityGen) { (cliEntity1, cliEntity2) =>
         assertCompatibleCodec(cliEntity1, cliEntity2)
       }
     }
@@ -53,12 +53,12 @@ class CliEntitySpec
 
   "collection decode/encode" should {
     "be compatible" in {
-      forAll(collectionGen) { cliEntity =>
+      forAll(collectionEntityGen) { cliEntity =>
         assertCompatibleCodec(cliEntity)
       }
     }
     "work on multiple items" in {
-      forAll(collectionGen, collectionGen) { (cliColl1, cliColl2) =>
+      forAll(collectionEntityGen, collectionEntityGen) { (cliColl1, cliColl2) =>
         assertCompatibleCodec(cliColl1, cliColl2)
       }
     }

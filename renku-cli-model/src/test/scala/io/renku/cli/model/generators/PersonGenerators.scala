@@ -18,19 +18,20 @@
 
 package io.renku.cli.model.generators
 
-import io.renku.cli.model.CliPerson
-import io.renku.graph.model.persons.ResourceId
+import io.renku.cli.model.{CliPerson, CliPersonResourceId}
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
 
 trait PersonGenerators {
 
-  def cliPersonIdGen(implicit renkuUrl: RenkuUrl): Gen[ResourceId] =
-    Gen.oneOf(
-      RenkuTinyTypeGenerators.personEmailResourceId,
-      RenkuTinyTypeGenerators.personNameResourceId,
-      RenkuTinyTypeGenerators.personOrcidResourceId
-    )
+  def cliPersonIdGen(implicit renkuUrl: RenkuUrl): Gen[CliPersonResourceId] =
+    Gen
+      .oneOf(
+        RenkuTinyTypeGenerators.personEmailResourceId,
+        RenkuTinyTypeGenerators.personNameResourceId,
+        RenkuTinyTypeGenerators.personOrcidIds
+      )
+      .map(id => CliPersonResourceId(id.value))
 
   def cliPersonGen(implicit renkuUrl: RenkuUrl): Gen[CliPerson] =
     for {

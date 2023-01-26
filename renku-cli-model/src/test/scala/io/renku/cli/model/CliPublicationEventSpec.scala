@@ -18,34 +18,39 @@
 
 package io.renku.cli.model
 
+import CliPublicationEvent._
 import io.renku.cli.model.diffx.CliDiffInstances
-import io.renku.cli.model.generators.AgentGenerators
+import io.renku.cli.model.generators.DatasetGenerators.datasetGen
+import io.renku.cli.model.generators.PublicationEventGenerators.publicationEventGen
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.jsonld.JsonLDDecoder
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CliAgentSpec
+class CliPublicationEventSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val agentGen = AgentGenerators.agentGen
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val dataset   = datasetGen.generateOne
+  private val entityGen = publicationEventGen(dataset)
+  private implicit val decoder: JsonLDDecoder[CliPublicationEvent] = CliPublicationEvent.decoder(dataset)
 
   "decode/encode" should {
     "be compatible" in {
-      forAll(agentGen) { cliAgent =>
-        assertCompatibleCodec(cliAgent)
+      forAll(entityGen) { entity =>
+        assertCompatibleCodec(entity)
       }
     }
 
     "work on multiple items" in {
-      forAll(agentGen, agentGen) { (cliAgent1, cliAgent2) =>
-        assertCompatibleCodec(cliAgent1, cliAgent2)
+      forAll(entityGen, entityGen) { (entity1, entity2) =>
+        assertCompatibleCodec(entity1, entity2)
       }
     }
   }

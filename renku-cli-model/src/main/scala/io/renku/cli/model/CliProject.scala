@@ -21,19 +21,19 @@ package io.renku.cli.model
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.CliProject.ProjectPlan
-import io.renku.cli.model.Ontologies.{Prov, Schema}
+import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.plans
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliProject(
     id:            ResourceId,
     name:          Option[Name],
     description:   Option[Description],
-    dateCreated:   Option[DateCreated],
+    dateCreated:   DateCreated,
     creator:       Option[CliPerson],
     keywords:      Set[Keyword],
     images:        List[Image],
@@ -49,77 +49,78 @@ object CliProject {
   sealed trait ProjectPlan {
     def resourceId: plans.ResourceId
     def fold[A](
-        fa: CliPlan => A,
+        fa: CliStepPlan => A,
         fb: CliCompositePlan => A,
-        fc: CliWorkflowFilePlan => A,
+        fc: CliWorkflowFileStepPlan => A,
         fd: CliWorkflowFileCompositePlan => A
     ): A
   }
   object ProjectPlan {
-    final case class Step(plan: CliPlan) extends ProjectPlan {
+    final case class Step(plan: CliStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
+          fa: CliStepPlan => A,
           fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
           fd: CliWorkflowFileCompositePlan => A
       ): A = fa(plan)
     }
     final case class Composite(plan: CliCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
+          fa: CliStepPlan => A,
           fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
           fd: CliWorkflowFileCompositePlan => A
       ): A = fb(plan)
     }
-    final case class WorkflowFile(plan: CliWorkflowFilePlan) extends ProjectPlan {
+    final case class WorkflowFile(plan: CliWorkflowFileStepPlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
+          fa: CliStepPlan => A,
           fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
           fd: CliWorkflowFileCompositePlan => A
       ): A = fc(plan)
     }
     final case class WorkflowFileComposite(plan: CliWorkflowFileCompositePlan) extends ProjectPlan {
       val resourceId: plans.ResourceId = plan.id
       def fold[A](
-          fa: CliPlan => A,
+          fa: CliStepPlan => A,
           fb: CliCompositePlan => A,
-          fc: CliWorkflowFilePlan => A,
+          fc: CliWorkflowFileStepPlan => A,
           fd: CliWorkflowFileCompositePlan => A
       ): A = fd(plan)
     }
 
-    def apply(plan: CliPlan):                      ProjectPlan = Step(plan)
+    def apply(plan: CliStepPlan):                  ProjectPlan = Step(plan)
     def apply(plan: CliCompositePlan):             ProjectPlan = Composite(plan)
-    def apply(plan: CliWorkflowFilePlan):          ProjectPlan = WorkflowFile(plan)
+    def apply(plan: CliWorkflowFileStepPlan):      ProjectPlan = WorkflowFile(plan)
     def apply(plan: CliWorkflowFileCompositePlan): ProjectPlan = WorkflowFileComposite(plan)
+    def apply(plan: CliPlan):                      ProjectPlan = plan.fold(apply, apply)
 
     private val entityTypes: EntityTypes = EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
     private def selectCandidates(ets: EntityTypes): Boolean =
-      CliPlan.matchingEntityTypes(ets) ||
+      CliStepPlan.matchingEntityTypes(ets) ||
         CliCompositePlan.matchingEntityTypes(ets) ||
-        CliWorkflowFilePlan.matchingEntityTypes(ets) ||
+        CliWorkflowFileStepPlan.matchingEntityTypes(ets) ||
         CliWorkflowFileCompositePlan.matchingEntityTypes(ets)
 
     implicit def jsonLDDecoder: JsonLDDecoder[ProjectPlan] =
       JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
         val currentTypes = cursor.getEntityTypes
-        (currentTypes.map(CliPlan.matchingEntityTypes),
+        (currentTypes.map(CliStepPlan.matchingEntityTypes),
          currentTypes.map(CliCompositePlan.matchingEntityTypes),
-         currentTypes.map(CliWorkflowFilePlan.matchingEntityTypes),
+         currentTypes.map(CliWorkflowFileStepPlan.matchingEntityTypes),
          currentTypes.map(CliWorkflowFileCompositePlan.matchingEntityTypes)
         ).flatMapN {
           case (true, _, _, _) =>
-            CliPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
+            CliStepPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, true, _, _) =>
             CliCompositePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, _, true, _) =>
-            CliWorkflowFilePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
+            CliWorkflowFileStepPlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case (_, _, _, true) =>
             CliWorkflowFileCompositePlan.jsonLDDecoder.emap(p => Right(ProjectPlan(p)))(cursor)
           case _ =>
@@ -144,7 +145,7 @@ object CliProject {
         id          <- cursor.downEntityId.as[ResourceId]
         name        <- cursor.downField(Schema.name).as[Option[Name]]
         description <- cursor.downField(Schema.description).as[Option[Description]]
-        dateCreated <- cursor.downField(Schema.dateCreated).as[Option[DateCreated]]
+        dateCreated <- cursor.downField(Schema.dateCreated).as[DateCreated]
         creator     <- cursor.downField(Schema.creator).as[Option[CliPerson]]
         keywords    <- cursor.downField(Schema.keywords).as[Set[Keyword]]
         images <-
@@ -152,9 +153,9 @@ object CliProject {
             .downField(Schema.image)
             .as[List[Image]]
             .map(_.sortBy(_.position))
-        plans         <- cursor.downField(Schema.hasPlan).as[List[ProjectPlan]]
-        datasets      <- cursor.downField(Schema.hasDataset).as[List[CliDataset]]
-        activities    <- cursor.downField(Schema.hasActivity).as[List[CliActivity]]
+        plans         <- cursor.downField(Renku.hasPlan).as[List[ProjectPlan]]
+        datasets      <- cursor.downField(Renku.hasDataset).as[List[CliDataset]]
+        activities    <- cursor.downField(Renku.hasActivity).as[List[CliActivity]]
         agentVersion  <- cursor.downField(Schema.agent).as[Option[CliVersion]]
         schemaVersion <- cursor.downField(Schema.schemaVersion).as[Option[SchemaVersion]]
       } yield CliProject(
@@ -186,9 +187,9 @@ object CliProject {
         Schema.schemaVersion -> project.schemaVersion.asJsonLD,
         Schema.image         -> project.images.asJsonLD,
         Schema.keywords      -> project.keywords.asJsonLD,
-        Schema.hasPlan       -> project.plans.asJsonLD,
-        Schema.hasDataset    -> project.datasets.asJsonLD,
-        Schema.hasActivity   -> project.activities.asJsonLD
+        Renku.hasPlan        -> project.plans.asJsonLD,
+        Renku.hasDataset     -> project.datasets.asJsonLD,
+        Renku.hasActivity    -> project.activities.asJsonLD
       )
     }
 }

@@ -20,7 +20,6 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.DatasetFileGenerators
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,9 +33,7 @@ class CliDatasetFileSpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-
-  val datasetFileGen = DatasetFileGenerators.datasetFileGen(Instant.now)
+  private val datasetFileGen = DatasetFileGenerators.datasetFileGen(Instant.EPOCH)
 
   "decode/encode" should {
     "be compatible" in {

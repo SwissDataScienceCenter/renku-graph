@@ -18,37 +18,35 @@
 
 package io.renku.cli.model
 
-import Ontologies.{Prov, Schema}
-import io.renku.graph.model.agents._
+import cats.syntax.all._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld._
+import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
 
-final case class CliAgent(
-    resourceId: ResourceId,
-    name:       Name
-) extends CliModel
+sealed trait CliAgent {
+  def fold[A](fa: CliPerson => A, fb: CliSoftwareAgent => A): A
+}
 
 object CliAgent {
-  private val entityTypes: EntityTypes = EntityTypes.of(Prov.SoftwareAgent)
 
-  private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
-    entityTypes == this.entityTypes
+  final case class Person(person: CliPerson) extends CliAgent {
+    def fold[A](fa: CliPerson => A, fb: CliSoftwareAgent => A): A = fa(person)
+  }
 
-  implicit val jsonLDEncoder: JsonLDEncoder[CliAgent] =
-    JsonLDEncoder.instance { agent =>
-      JsonLD.entity(
-        agent.resourceId.asEntityId,
-        entityTypes,
-        Schema.name -> agent.name.asJsonLD
-      )
-    }
+  final case class Software(agent: CliSoftwareAgent) extends CliAgent {
+    def fold[A](fa: CliPerson => A, fb: CliSoftwareAgent => A): A = fb(agent)
+  }
+
+  def apply(person: CliPerson): CliAgent.Person = Person(person)
+
+  def apply(agent: CliSoftwareAgent): CliAgent.Software = Software(agent)
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliAgent] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        label      <- cursor.downField(Schema.name).as[Name]
-      } yield CliAgent(resourceId, label)
+    (CliSoftwareAgent.jsonLDCliModelDecoder orElse CliPerson.jsonLDCliModelDecoder).emap {
+      case a: CliSoftwareAgent => Right(CliAgent(a))
+      case a: CliPerson        => Right(CliAgent(a))
+      case _ => "Cannot decode entity as CliAgent".asLeft
     }
 
+  implicit def jsonLDEncoder[A <: CliAgent]: JsonLDEncoder[A] =
+    JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
 }

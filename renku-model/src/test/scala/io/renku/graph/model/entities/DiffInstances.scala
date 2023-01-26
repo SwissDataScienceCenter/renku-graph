@@ -31,109 +31,91 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit val personDiff: Diff[Person] = Diff.derived[Person]
 
-  implicit val explCommandParamDiff: Diff[StepPlanCommandParameter.ExplicitCommandParameter] =
+  implicit val explicitCommandParamDiff: Diff[StepPlanCommandParameter.ExplicitCommandParameter] =
     Diff.derived[StepPlanCommandParameter.ExplicitCommandParameter]
-
-  implicit val implCommandParamDiff: Diff[StepPlanCommandParameter.ImplicitCommandParameter] =
+  implicit val implicitCommandParamDiff: Diff[StepPlanCommandParameter.ImplicitCommandParameter] =
     Diff.derived[StepPlanCommandParameter.ImplicitCommandParameter]
 
   implicit val commandInputDiff: Diff[StepPlanCommandParameter.CommandInput] =
     Diff.derived[StepPlanCommandParameter.CommandInput]
   implicit val commandOutputDiff: Diff[StepPlanCommandParameter.CommandOutput] =
     Diff.derived[StepPlanCommandParameter.CommandOutput]
+  implicit lazy val commandInputOrOutputDiff: Diff[StepPlanCommandParameter.CommandInputOrOutput] =
+    Diff.derived[StepPlanCommandParameter.CommandInputOrOutput]
 
   implicit lazy val locationCommandOutputDiff: Diff[StepPlanCommandParameter.LocationCommandOutput] =
     Diff.derived[StepPlanCommandParameter.LocationCommandOutput]
-
+  implicit lazy val mappedCommandOutputDiff: Diff[StepPlanCommandParameter.MappedCommandOutput] =
+    Diff.derived[StepPlanCommandParameter.MappedCommandOutput]
   implicit lazy val implicitCommandOutputDiff: Diff[StepPlanCommandParameter.ImplicitCommandOutput] =
     Diff.derived[StepPlanCommandParameter.ImplicitCommandOutput]
 
-  implicit lazy val mappedCommandOutputDiff: Diff[StepPlanCommandParameter.MappedCommandOutput] =
-    Diff.derived[StepPlanCommandParameter.MappedCommandOutput]
-
-  implicit val implicitCommandInputDiff: Diff[StepPlanCommandParameter.ImplicitCommandInput] =
-    Diff.derived[StepPlanCommandParameter.ImplicitCommandInput]
-
   implicit val locationCommandInputDiff: Diff[StepPlanCommandParameter.LocationCommandInput] =
     Diff.derived[StepPlanCommandParameter.LocationCommandInput]
+  implicit lazy val mappedCommandInputDiff: Diff[StepPlanCommandParameter.MappedCommandInput] =
+    Diff.derived[StepPlanCommandParameter.MappedCommandInput]
+  implicit val implicitCommandInputDiff: Diff[StepPlanCommandParameter.ImplicitCommandInput] =
+    Diff.derived[StepPlanCommandParameter.ImplicitCommandInput]
 
   implicit val commandParamDiff: Diff[StepPlanCommandParameter.CommandParameter] =
     Diff.derived[StepPlanCommandParameter.CommandParameter]
 
-  implicit val planDerivationDiff: Diff[Plan.Derivation] =
-    Diff.derived[Plan.Derivation]
+  implicit val planDerivationDiff: Diff[Plan.Derivation] = Diff.derived[Plan.Derivation]
 
-  implicit val parameterMappingDiff: Diff[ParameterMapping] =
-    Diff.derived[ParameterMapping]
+  implicit val parameterMappingDiff: Diff[ParameterMapping] = Diff.derived[ParameterMapping]
 
-  implicit val parameterLinkDiff: Diff[ParameterLink] =
-    Diff.derived[ParameterLink]
+  implicit val parameterLinkDiff: Diff[ParameterLink] = Diff.derived[ParameterLink]
 
   implicit val commandParameterValueDiff: Diff[ParameterValue.CommandParameterValue] =
     Diff.derived[ParameterValue.CommandParameterValue]
-
   implicit val commandInputValueDiff: Diff[ParameterValue.CommandInputValue] =
     Diff.derived[ParameterValue.CommandInputValue]
-
   implicit val commandOutputValue: Diff[ParameterValue.CommandOutputValue] =
     Diff.derived[ParameterValue.CommandOutputValue]
-
   implicit val locationParameterValueDiff: Diff[ParameterValue.LocationParameterValue] =
     Diff.derived[ParameterValue.LocationParameterValue]
+  implicit val parameterValueDiff: Diff[ParameterValue] = Diff.derived[ParameterValue]
 
-  implicit val parameterValueDiff: Diff[ParameterValue] =
-    Diff.derived[ParameterValue]
+  implicit val nonModifiedStepPlanDiff: Diff[StepPlan.NonModified] = Diff.derived[StepPlan.NonModified]
+  implicit val modifiedStepPlanDiff:    Diff[StepPlan.Modified]    = Diff.derived[StepPlan.Modified]
+  implicit val stepPlanDiff:            Diff[StepPlan]             = Diff.derived[StepPlan]
 
-  implicit val stepPlanDiff: Diff[StepPlan] = Diff.derived[StepPlan]
-
-  implicit val compositePlanDiff: Diff[CompositePlan] = Diff.derived[CompositePlan]
+  implicit val nonModifiedCompositePlanDiff: Diff[CompositePlan.NonModified] = Diff.derived[CompositePlan.NonModified]
+  implicit val modifiedCompositePlanDiff:    Diff[CompositePlan.Modified]    = Diff.derived[CompositePlan.Modified]
+  implicit val compositePlanDiff:            Diff[CompositePlan]             = Diff.derived[CompositePlan]
 
   implicit val planDiff: Diff[Plan] = Diff.derived[Plan]
 
-  implicit val agentDiff: Diff[Agent] =
-    Diff.derived[Agent]
+  implicit val agentDiff: Diff[Agent] = Diff.derived[Agent]
 
-  implicit val inputEntityDiff: Diff[Entity.InputEntity] =
-    Diff.derived[Entity.InputEntity]
+  implicit val inputEntityDiff:  Diff[Entity.InputEntity]  = Diff.derived[Entity.InputEntity]
+  implicit val outputEntityDiff: Diff[Entity.OutputEntity] = Diff.derived[Entity.OutputEntity]
+  implicit val entityDiff:       Diff[Entity]              = Diff.derived[Entity]
 
-  implicit val outputEntityDiff: Diff[Entity.OutputEntity] =
-    Diff.derived[Entity.OutputEntity]
+  implicit val renkuAgentAssociationDiff:  Diff[Association.WithRenkuAgent]  = Diff.derived[Association.WithRenkuAgent]
+  implicit val personAgentAssociationDiff: Diff[Association.WithPersonAgent] = Diff.derived[Association.WithPersonAgent]
+  implicit val associationDiff:            Diff[Association]                 = Diff.derived[Association]
 
-  implicit val entityDiff: Diff[Entity] =
-    Diff.derived[Entity]
+  implicit val usagesDiff: Diff[Usage] = Diff.derived[Usage]
 
-  implicit val associationDiff: Diff[Association] =
-    Diff.derived[Association]
+  implicit val generationDiff: Diff[Generation] = Diff.derived[Generation]
 
-  implicit val usagesDiff: Diff[Usage] =
-    Diff.derived[Usage]
-
-  implicit val generationDiff: Diff[Generation] =
-    Diff.derived[Generation]
-
-  implicit val activityDiff: Diff[Activity] =
-    Diff.derived[Activity]
+  implicit val activityDiff: Diff[Activity] = Diff.derived[Activity]
 
   implicit val importedInternalAncestorExternalDiff: Diff[ImportedInternalAncestorExternal] =
     Diff.derived[ImportedInternalAncestorExternal]
 
-  implicit val provenanceDiff: Diff[Provenance] =
-    Diff.derived[Provenance]
+  implicit val provenanceDiff: Diff[Provenance] = Diff.derived[Provenance]
 
-  implicit val identificationDiff: Diff[Identification] =
-    Diff.derived[Identification]
+  implicit val identificationDiff: Diff[Identification] = Diff.derived[Identification]
 
-  implicit val additionalInfoDiff: Diff[AdditionalInfo] =
-    Diff.derived[AdditionalInfo]
+  implicit val additionalInfoDiff: Diff[AdditionalInfo] = Diff.derived[AdditionalInfo]
 
-  implicit val datasetPartDiff: Diff[DatasetPart] =
-    Diff.derived[DatasetPart]
+  implicit val datasetPartDiff: Diff[DatasetPart] = Diff.derived[DatasetPart]
 
-  implicit val publicationEventDiff: Diff[PublicationEvent] =
-    Diff.derived[PublicationEvent]
+  implicit val publicationEventDiff: Diff[PublicationEvent] = Diff.derived[PublicationEvent]
 
-  implicit def datasetDiff: Diff[Dataset[Provenance]] =
-    Diff.derived[Dataset[Provenance]]
+  implicit def datasetDiff: Diff[Dataset[Provenance]] = Diff.derived[Dataset[Provenance]]
 
   implicit val renkuProjectWithParentDiff: Diff[RenkuProject.WithParent] =
     Diff.derived[RenkuProject.WithParent]
@@ -141,8 +123,7 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val renkuProjectWithoutParentDiff: Diff[RenkuProject.WithoutParent] =
     Diff.derived[RenkuProject.WithoutParent]
 
-  implicit val renkuProjectDiff: Diff[RenkuProject] =
-    Diff.derived[RenkuProject]
+  implicit val renkuProjectDiff: Diff[RenkuProject] = Diff.derived[RenkuProject]
 
   implicit val nonRenkuProjectWithoutParentDiff: Diff[NonRenkuProject.WithoutParent] =
     Diff.derived[NonRenkuProject.WithoutParent]
@@ -150,11 +131,9 @@ trait DiffInstances extends ModelTinyTypesDiffInstances {
   implicit val nonRenkuProjectWithParentDiff: Diff[NonRenkuProject.WithParent] =
     Diff.derived[NonRenkuProject.WithParent]
 
-  implicit val nonRenkuProjectDiff: Diff[NonRenkuProject] =
-    Diff.derived[NonRenkuProject]
+  implicit val nonRenkuProjectDiff: Diff[NonRenkuProject] = Diff.derived[NonRenkuProject]
 
-  implicit val projectDiff: Diff[Project] =
-    Diff.derived[Project]
+  implicit val projectDiff: Diff[Project] = Diff.derived[Project]
 }
 
 object DiffInstances extends DiffInstances

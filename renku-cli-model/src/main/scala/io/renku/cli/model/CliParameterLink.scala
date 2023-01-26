@@ -18,15 +18,15 @@
 
 package io.renku.cli.model
 
+import CliParameterLink.Sink
+import Ontologies.Renku
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.cli.model.CliParameterLink.Sink
-import io.renku.cli.model.Ontologies.Renku
 import io.renku.graph.model.commandParameters
 import io.renku.graph.model.parameterLinks._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliParameterLink(
     id:     ResourceId,

@@ -21,6 +21,7 @@ package io.renku.graph.model.entities
 import cats.data.ValidatedNel
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.CliDatasetFile
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource}
 
@@ -45,6 +46,15 @@ object DatasetPart {
     validate(maybeInvalidationTime, entity, dateCreated).map { _ =>
       DatasetPart(resourceId, external, entity, dateCreated, maybeSource, maybeInvalidationTime)
     }
+
+  def fromCli(cliPart: CliDatasetFile): ValidatedNel[String, DatasetPart] =
+    from(cliPart.resourceId,
+         cliPart.external,
+         Entity.fromCli(cliPart.entity),
+         cliPart.dateCreated,
+         cliPart.source,
+         cliPart.invalidationTime
+    )
 
   private def validate(
       maybeInvalidationTime: Option[InvalidationTime],

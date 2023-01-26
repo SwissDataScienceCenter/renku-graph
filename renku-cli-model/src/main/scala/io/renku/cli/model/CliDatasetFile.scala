@@ -21,8 +21,8 @@ package io.renku.cli.model
 import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliDatasetFile(
     resourceId:       PartResourceId,
@@ -49,18 +49,17 @@ object CliDatasetFile {
       } yield part
     }
 
-  implicit def jsonLDEncoder: JsonLDEncoder[CliDatasetFile] =
-    JsonLDEncoder.instance { file =>
-      JsonLD.entity(
-        file.resourceId.asEntityId,
-        entityTypes,
-        List(
-          Some(Renku.external     -> file.external.asJsonLD),
-          Some(Prov.entity        -> file.entity.asJsonLD),
-          Some(Schema.dateCreated -> file.dateCreated.asJsonLD),
-          file.source.map(s => Renku.source -> s.asJsonLD),
-          file.invalidationTime.map(t => Prov.invalidatedAtTime -> t.asJsonLD)
-        ).flatten.toMap
-      )
-    }
+  implicit def jsonLDEncoder: JsonLDEncoder[CliDatasetFile] = JsonLDEncoder.instance { file =>
+    JsonLD.entity(
+      file.resourceId.asEntityId,
+      entityTypes,
+      List(
+        Some(Renku.external     -> file.external.asJsonLD),
+        Some(Prov.entity        -> file.entity.asJsonLD),
+        Some(Schema.dateCreated -> file.dateCreated.asJsonLD),
+        file.source.map(s => Renku.source -> s.asJsonLD),
+        file.invalidationTime.map(t => Prov.invalidatedAtTime -> t.asJsonLD)
+      ).flatten.toMap
+    )
+  }
 }

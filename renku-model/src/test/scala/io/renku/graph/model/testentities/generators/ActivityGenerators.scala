@@ -19,10 +19,10 @@
 package io.renku.graph.model.testentities
 package generators
 
-import cats.syntax.all._
 import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
 import cats.data.{Kleisli, NonEmptyList}
+import cats.syntax.all._
 import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, PlanGenFactory, ProjectBasedGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, positiveInts}
@@ -41,7 +41,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   val activityIds: Gen[Activity.Id] = noDashUuid.toGeneratorOf(Activity.Id)
 
   def planDatesCreatedK: Kleisli[Gen, InstantTinyType, plans.DateCreated] =
-    Kleisli(planDatesCreated)
+    Kleisli(planCreatedDates)
 
   lazy val generationIds: Gen[Generation.Id] = noDashUuid.toGeneratorOf(Generation.Id)
 
@@ -88,14 +88,21 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
 
   def stepPlanEntities(
       parameterFactories: CommandParameterFactory*
-  )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory = Kleisli(projectDateCreated =>
+  )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory =
+    stepPlanEntities(planCommandsGen, personEntities, parameterFactories: _*)
+
+  def stepPlanEntities(
+      planCommandsGen:    Gen[Command],
+      creatorsGen:        Gen[Person],
+      parameterFactories: CommandParameterFactory*
+  ): StepPlanGenFactory = Kleisli { projectDateCreated =>
     for {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
-      dateCreated  <- planDatesCreated(after = projectDateCreated)
-      creators     <- personEntities.toGeneratorOfList(max = 2)
+      dateCreated  <- planCreatedDates(after = projectDateCreated)
+      creators     <- creatorsGen.toGeneratorOfList(max = 2)
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
-  )
+  }
 
   def stepPlanEntities(
       planDateCreatedGen: Gen[plans.DateCreated],
@@ -234,17 +241,19 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   def executionPlanners(planGen: StepPlanGenFactory, project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
 
-  def executionPlanners(planGen: StepPlanGenFactory, projectDateCreated: projects.DateCreated): Gen[ExecutionPlanner] =
-    for {
-      plan       <- planGen.run(projectDateCreated)
-      author     <- personEntities
-      cliVersion <- cliVersions
-    } yield ExecutionPlanner.of(plan,
-                                activityStartTimes(plan.dateCreated).generateOne,
-                                author,
-                                cliVersion,
-                                projectDateCreated
-    )
+  def executionPlanners(planGen:            StepPlanGenFactory,
+                        projectDateCreated: projects.DateCreated,
+                        authorGen:          Gen[Person] = personEntities
+  ): Gen[ExecutionPlanner] = for {
+    plan       <- planGen.run(projectDateCreated)
+    author     <- authorGen
+    cliVersion <- cliVersions
+  } yield ExecutionPlanner.of(plan,
+                              activityStartTimes(plan.dateCreated).generateOne,
+                              author,
+                              cliVersion,
+                              projectDateCreated
+  )
 
   def executionPlannersDecoupledFromProject(planGen: StepPlanGenFactory): Gen[ExecutionPlanner] =
     executionPlanners(planGen, projectCreatedDates().generateOne)

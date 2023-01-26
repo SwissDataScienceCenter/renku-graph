@@ -18,8 +18,8 @@
 
 package io.renku.cli.model.generators
 
-import cats.data.NonEmptyList
 import io.renku.cli.model.CliDataset
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.images.{Image, ImagePosition, ImageResourceId}
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
@@ -28,44 +28,45 @@ trait DatasetGenerators {
 
   def datasetGen(implicit renkuUrl: RenkuUrl): Gen[CliDataset] =
     for {
-      resourceId <- RenkuTinyTypeGenerators.datasetResourceIds
-      ident      <- RenkuTinyTypeGenerators.datasetIdentifiers
-      title      <- RenkuTinyTypeGenerators.datasetTitles
-      name       <- RenkuTinyTypeGenerators.datasetNames
-      date       <- RenkuTinyTypeGenerators.datasetDates
-      creators   <- Gen.choose(1, 3).flatMap(n => Gen.listOfN(n, PersonGenerators.cliPersonGen))
-      descr      <- Gen.option(RenkuTinyTypeGenerators.datasetDescriptions)
-      keywords   <- Gen.choose(0, 3).flatMap(n => Gen.listOfN(n, RenkuTinyTypeGenerators.datasetKeywords))
-      imageUris  <- Gen.choose(0, 3).flatMap(n => Gen.listOfN(n, RenkuTinyTypeGenerators.imageUris))
+      identifier         <- RenkuTinyTypeGenerators.datasetIdentifiers
+      resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds(identifier)
+      title              <- RenkuTinyTypeGenerators.datasetTitles
+      name               <- RenkuTinyTypeGenerators.datasetNames
+      createdOrPublished <- RenkuTinyTypeGenerators.datasetDates
+      creators           <- PersonGenerators.cliPersonGen.toGeneratorOfNonEmptyList(max = 3)
+      descr              <- RenkuTinyTypeGenerators.datasetDescriptions.toGeneratorOfOptions
+      keywords           <- RenkuTinyTypeGenerators.datasetKeywords.toGeneratorOfList(max = 3)
+      imageUris          <- RenkuTinyTypeGenerators.imageUris.toGeneratorOfList(max = 3)
       images = imageUris.zipWithIndex.map { case (uri, index) =>
                  Image(ImageResourceId(s"${resourceId.value}/images/$index"), uri, ImagePosition(index))
                }
       license       <- Gen.option(RenkuTinyTypeGenerators.datasetLicenses)
       version       <- Gen.option(RenkuTinyTypeGenerators.datasetVersions)
-      files         <- Gen.choose(0, 3).flatMap(n => Gen.listOfN(n, DatasetFileGenerators.datasetFileGen(date.instant)))
-      modified      <- Gen.option(BaseGenerators.dateModified)
-      sameAs        <- Gen.option(BaseGenerators.datasetSameAs)
-      derivedFrom   <- Gen.option(RenkuTinyTypeGenerators.datasetDerivedFroms)
-      originalIdent <- Gen.option(RenkuTinyTypeGenerators.datasetOriginalIdentifiers)
-      invalidTime   <- Gen.option(RenkuTinyTypeGenerators.invalidationTimes(date.instant))
+      files         <- DatasetFileGenerators.datasetFileGen(createdOrPublished.instant).toGeneratorOfList(max = 3)
+      modifiedDate  <- RenkuTinyTypeGenerators.datasetModifiedDates(createdOrPublished).toGeneratorOfOptions
+      sameAs        <- RenkuTinyTypeGenerators.datasetSameAs.toGeneratorOfOptions
+      derivedFrom   <- RenkuTinyTypeGenerators.datasetDerivedFroms.toGeneratorOfOptions
+      originalIdent <- RenkuTinyTypeGenerators.datasetOriginalIdentifiers.toGeneratorOfOptions
+      invalidTime   <- RenkuTinyTypeGenerators.invalidationTimes(createdOrPublished.instant).toGeneratorOfOptions
     } yield CliDataset(
       resourceId = resourceId,
-      identifier = ident,
+      identifier = identifier,
       title = title,
       name = name,
-      createdOrPublished = date,
-      creators = NonEmptyList.fromListUnsafe(creators),
+      createdOrPublished = createdOrPublished,
+      creators = creators,
       description = descr,
       keywords = keywords.sorted,
       images = images,
       license = license,
       version = version,
       datasetFiles = files,
-      dateModified = modified,
+      dateModified = modifiedDate,
       sameAs = sameAs,
       derivedFrom = derivedFrom,
       originalIdentifier = originalIdent,
-      invalidationTime = invalidTime
+      invalidationTime = invalidTime,
+      publicationEvents = Nil
     )
 }
 

@@ -75,6 +75,8 @@ trait EntitiesGenerators
 
   implicit lazy val personEntities: Gen[Person] = personEntities()
 
+  val cliShapedPersons: Gen[Person] = personEntities(withoutGitLabId)
+
   def personEntities(
       maybeGitLabIds: Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfOptions,
       maybeEmails:    Gen[Option[Email]] = personEmails.toGeneratorOfOptions

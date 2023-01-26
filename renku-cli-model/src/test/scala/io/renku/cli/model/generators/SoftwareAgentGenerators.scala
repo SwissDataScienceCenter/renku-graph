@@ -16,17 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.cli.model
+package io.renku.cli.model.generators
 
-import io.renku.graph.model.views.TinyTypeJsonLDOps
-import io.renku.tinytypes.constraints.InstantNotInTheFuture
-import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
+import io.renku.cli.model.CliSoftwareAgent
+import io.renku.graph.model.RenkuTinyTypeGenerators
+import org.scalacheck.Gen
 
-import java.time.Instant
+trait SoftwareAgentGenerators {
 
-final class DateModified private (val value: Instant) extends InstantTinyType
+  def softwareAgentGen: Gen[CliSoftwareAgent] =
+    for {
+      id   <- RenkuTinyTypeGenerators.agentResourceIdGen
+      name <- RenkuTinyTypeGenerators.agentNameGen
+    } yield CliSoftwareAgent(id, name)
+}
 
-object DateModified
-    extends TinyTypeFactory[DateModified](new DateModified(_))
-    with InstantNotInTheFuture[DateModified]
-    with TinyTypeJsonLDOps[DateModified]
+object SoftwareAgentGenerators extends SoftwareAgentGenerators

@@ -25,14 +25,14 @@ import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-final case class CliCollection(
+final case class CliCollectionEntity(
     resourceId:    ResourceId,
     path:          EntityPath,
     checksum:      Checksum,
     generationIds: List[generations.ResourceId]
 ) extends CliModel
 
-object CliCollection {
+object CliCollectionEntity {
 
   private val entityTypes: EntityTypes = EntityTypes.of(Prov.Entity, Prov.Collection)
 
@@ -42,7 +42,7 @@ object CliCollection {
   private val withStrictEntityTypes: Cursor => Result[Boolean] =
     _.getEntityTypes.map(types => types == entityTypes)
 
-  implicit def jsonLdDecoder: JsonLDDecoder[CliCollection] =
+  implicit def jsonLdDecoder: JsonLDDecoder[CliCollectionEntity] =
     JsonLDDecoder.cacheableEntity(entityTypes, withStrictEntityTypes) { cursor =>
       for {
         resourceId    <- cursor.downEntityId.as[ResourceId]
@@ -50,10 +50,10 @@ object CliCollection {
         checksum      <- cursor.downField(Renku.checksum).as[Checksum]
         generationIds <- cursor.downField(Prov.qualifiedGeneration).as[List[generations.ResourceId]]
 
-      } yield CliCollection(resourceId, path, checksum, generationIds)
+      } yield CliCollectionEntity(resourceId, path, checksum, generationIds)
     }
 
-  implicit def jsonLDEncoder: JsonLDEncoder[CliCollection] =
+  implicit def jsonLDEncoder: JsonLDEncoder[CliCollectionEntity] =
     JsonLDEncoder.instance { entity =>
       JsonLD.entity(
         entity.resourceId.asEntityId,

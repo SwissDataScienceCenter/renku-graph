@@ -18,12 +18,11 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.ValidatedNel
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliPerson
+import io.renku.graph.model._
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
-import io.renku.jsonld.JsonLDDecoder.{Result, decodeList}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 
@@ -110,7 +109,21 @@ object Person {
     case (id: ResourceId.OrcidIdBased, None, None) if maybeOrcid.forall(orcid => id.show endsWith orcid.id) =>
       Person.WithNameOnly(id, name, maybeOrcid, maybeAffiliation).validNel
     case _ =>
-      show"Invalid Person with $resourceId, gitLabId = $maybeGitLabId, orcidId = $maybeOrcid, email = $maybeEmail".invalidNel
+      show"Invalid Person: $resourceId, name = $name, gitLabId = $maybeGitLabId, orcidId = $maybeOrcid, email = $maybeEmail, affiliation = $maybeAffiliation".invalidNel
+  }
+
+  def fromCli(cli: CliPerson)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Person] = {
+
+    val maybeOrcidId         = OrcidId.from(cli.resourceId.value).toOption
+    val maybeOrcidResourceId = maybeOrcidId.map(persons.ResourceId(_)).map(_.asRight[NonEmptyList[String]])
+
+    val cliResourceId = maybeOrcidResourceId getOrElse {
+      persons.ResourceId.from(cli.resourceId.value).leftMap(err => NonEmptyList.one(err.getMessage))
+    }
+
+    cliResourceId
+      .flatMap(Person.from(_, cli.name, cli.email, None, maybeOrcidId, cli.affiliation).toEither)
+      .toValidated
   }
 
   implicit def functions[P <: Person](implicit glApiUrl: GitLabApiUrl): EntityFunctions[P] =
@@ -189,12 +202,13 @@ object Person {
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
+      import io.circe.DecodingFailure
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
 
       def decodeSameAs[T](use: JsonLDDecoder[T], onMultiple: String): Either[DecodingFailure, Option[T]] =
         cursor
           .downField(schema / "sameAs")
-          .as(decodeList(use))
+          .as(JsonLDDecoder.decodeList(use))
           .leftFlatMap(_ => List.empty.asRight)
           .flatMap(failIfMoreThanOne[T](onMultiple))
 
@@ -233,7 +247,7 @@ object Person {
       _.downEntityId.as[OrcidId]
     }
 
-  private def and(additionalType: String): Cursor => Result[Boolean] =
+  private def and(additionalType: String): Cursor => io.circe.Decoder.Result[Boolean] =
     _.downField(schema / "additionalType").as[String].map(_ == additionalType)
 
   object Ontology {

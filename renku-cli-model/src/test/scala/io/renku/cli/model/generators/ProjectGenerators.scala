@@ -19,7 +19,7 @@
 package io.renku.cli.model.generators
 
 import io.renku.cli.model.CliProject
-import io.renku.generators.Generators
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalacheck.Gen
@@ -36,36 +36,33 @@ trait ProjectGenerators {
       1 -> PlanGenerators.workflowFileCompositePlanGen(minCreated).map(CliProject.ProjectPlan.apply)
     )
 
-  def projectGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliProject] =
-    for {
-      id          <- RenkuTinyTypeGenerators.projectResourceIds
-      name        <- Gen.option(RenkuTinyTypeGenerators.projectNames)
-      description <- Gen.option(RenkuTinyTypeGenerators.projectDescriptions)
-      dateCreated <- Gen.option(RenkuTinyTypeGenerators.projectCreatedDates(minCreated))
-      creator     <- Gen.option(PersonGenerators.cliPersonGen)
-      keywords    <- Generators.listOf(RenkuTinyTypeGenerators.projectKeywords, max = 3)
-      images <- Generators
-                  .listOf(RenkuTinyTypeGenerators.imageUris, max = 3)
-                  .map(uris => Image.projectImage(id, uris))
-      plans         <- Generators.listOf(projectPlanGen(minCreated), max = 3)
-      activities    <- Generators.listOf(ActivityGenerators.activityGen(minCreated), max = 1)
-      datasets      <- Generators.listOf(DatasetGenerators.datasetGen, max = 3)
-      agentVersion  <- Gen.option(RenkuTinyTypeGenerators.cliVersions)
-      schemaVersion <- Gen.option(RenkuTinyTypeGenerators.projectSchemaVersions)
-    } yield CliProject(
-      id,
-      name,
-      description,
-      dateCreated,
-      creator,
-      keywords.toSet,
-      images,
-      plans,
-      datasets,
-      activities,
-      agentVersion,
-      schemaVersion
-    )
+  def projectGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliProject] = for {
+    id          <- RenkuTinyTypeGenerators.projectResourceIds
+    name        <- RenkuTinyTypeGenerators.projectNames.toGeneratorOfOptions
+    description <- RenkuTinyTypeGenerators.projectDescriptions.toGeneratorOfOptions
+    dateCreated <- RenkuTinyTypeGenerators.projectCreatedDates(minCreated)
+    creator     <- PersonGenerators.cliPersonGen.toGeneratorOfOptions
+    keywords    <- RenkuTinyTypeGenerators.projectKeywords.toGeneratorOfList(max = 3)
+    images     <- RenkuTinyTypeGenerators.imageUris.toGeneratorOfList(max = 3).map(uris => Image.projectImage(id, uris))
+    plans      <- projectPlanGen(minCreated).toGeneratorOfList(max = 3)
+    activities <- ActivityGenerators.activityGen(minCreated).toGeneratorOfList(max = 1)
+    datasets   <- DatasetGenerators.datasetGen.toGeneratorOfList(max = 3)
+    agentVersion  <- RenkuTinyTypeGenerators.cliVersions.toGeneratorOfOptions
+    schemaVersion <- RenkuTinyTypeGenerators.projectSchemaVersions.toGeneratorOfOptions
+  } yield CliProject(
+    id,
+    name,
+    description,
+    dateCreated,
+    creator,
+    keywords.toSet,
+    images,
+    plans,
+    datasets,
+    activities,
+    agentVersion,
+    schemaVersion
+  )
 }
 
 object ProjectGenerators extends ProjectGenerators

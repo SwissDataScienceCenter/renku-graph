@@ -21,12 +21,12 @@ package io.renku.cli.model
 import cats.syntax.either._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.{Prov, Schema}
-import io.renku.graph.model.persons.{Affiliation, Email, Name, ResourceId}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.persons.{Affiliation, Email, Name}
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 final case class CliPerson(
-    resourceId:  ResourceId,
+    resourceId:  CliPersonResourceId,
     name:        Name,
     email:       Option[Email],
     affiliation: Option[Affiliation]
@@ -39,18 +39,28 @@ object CliPerson {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliPerson] =
+  implicit val jsonLDDecoder: JsonLDDecoder[CliPerson] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
+        resourceId       <- cursor.downEntityId.as[CliPersonResourceId]
         names            <- cursor.downField(Schema.name).as[List[Name]]
         maybeEmail       <- cursor.downField(Schema.email).as[Option[Email]]
         maybeAffiliation <- cursor.downField(Schema.affiliation).as[List[Affiliation]].map(_.reverse.headOption)
         name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
                 else names.reverse.head.asRight
-        person =
-          CliPerson(resourceId, name, maybeEmail, maybeAffiliation)
-      } yield person
+      } yield CliPerson(resourceId, name, maybeEmail, maybeAffiliation)
+    }
+
+  private[model] val jsonLDCliModelDecoder: JsonLDEntityDecoder[CliModel] =
+    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
+      for {
+        resourceId       <- cursor.downEntityId.as[CliPersonResourceId]
+        names            <- cursor.downField(Schema.name).as[List[Name]]
+        maybeEmail       <- cursor.downField(Schema.email).as[Option[Email]]
+        maybeAffiliation <- cursor.downField(Schema.affiliation).as[List[Affiliation]].map(_.reverse.headOption)
+        name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
+                else names.reverse.head.asRight
+      } yield CliPerson(resourceId, name, maybeEmail, maybeAffiliation)
     }
 
   implicit def jsonLDEncoder: JsonLDEncoder[CliPerson] =

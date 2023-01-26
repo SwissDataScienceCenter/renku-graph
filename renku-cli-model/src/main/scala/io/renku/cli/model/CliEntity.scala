@@ -18,48 +18,67 @@
 
 package io.renku.cli.model
 
-import io.renku.cli.model.Ontologies.{Prov, Renku}
-import io.renku.graph.model.entityModel._
-import io.renku.graph.model.generations
-import io.renku.jsonld.JsonLDDecoder.Result
+import cats.syntax.all._
+import io.circe.DecodingFailure
+import io.renku.cli.model.Ontologies.Prov
+import io.renku.graph.model.{entityModel, generations}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLDDecoder, JsonLDEncoder}
 
-final case class CliEntity(
-    resourceId:    ResourceId,
-    path:          EntityPath,
-    checksum:      Checksum,
-    generationIds: List[generations.ResourceId]
-) extends CliModel
+sealed trait CliEntity extends CliModel {
+  def resourceId:    entityModel.ResourceId
+  def path:          EntityPath
+  def checksum:      entityModel.Checksum
+  def generationIds: List[generations.ResourceId]
+
+  def fold[A](fa: CliSingleEntity => A, fb: CliCollectionEntity => A): A
+}
 
 object CliEntity {
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Prov.Entity)
+  final case class Entity(entity: CliSingleEntity) extends CliEntity {
+    override val resourceId:    entityModel.ResourceId       = entity.resourceId
+    override val generationIds: List[generations.ResourceId] = entity.generationIds
+    override val path:          EntityPath                   = entity.path
+    override val checksum:      entityModel.Checksum         = entity.checksum
 
-  private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
-    entityTypes == this.entityTypes
+    def fold[A](fa: CliSingleEntity => A, fb: CliCollectionEntity => A): A = fa(entity)
+  }
 
-  private val withStrictEntityTypes: Cursor => Result[Boolean] =
-    _.getEntityTypes.map(types => types == entityTypes)
+  final case class Collection(collection: CliCollectionEntity) extends CliEntity {
+    override val resourceId:    entityModel.ResourceId       = collection.resourceId
+    override val generationIds: List[generations.ResourceId] = collection.generationIds
+    override val path:          EntityPath                   = collection.path
+    override val checksum:      entityModel.Checksum         = collection.checksum
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliEntity] =
-    JsonLDDecoder.cacheableEntity(entityTypes, withStrictEntityTypes) { cursor =>
-      for {
-        resourceId    <- cursor.downEntityId.as[ResourceId]
-        path          <- cursor.downField(Prov.atLocation).as[EntityPath]
-        checksum      <- cursor.downField(Renku.checksum).as[Checksum]
-        generationIds <- cursor.downField(Prov.qualifiedGeneration).as[List[generations.ResourceId]]
-      } yield CliEntity(resourceId, path, checksum, generationIds)
+    def fold[A](fa: CliSingleEntity => A, fb: CliCollectionEntity => A): A = fb(collection)
+  }
+
+  def apply(entity: CliSingleEntity): CliEntity = Entity(entity)
+
+  def apply(coll: CliCollectionEntity): CliEntity = Collection(coll)
+
+  private val entityTypes = EntityTypes.of(Prov.Entity)
+
+  private def selectCandidates(ets: EntityTypes): Boolean =
+    CliSingleEntity.matchingEntityTypes(ets) || CliCollectionEntity.matchingEntityTypes(ets)
+
+  implicit def jsonLDDecoder: JsonLDDecoder[CliEntity] = {
+    val da = CliSingleEntity.jsonLDDecoder.emap(e => Right(CliEntity(e)))
+    val db = CliCollectionEntity.jsonLdDecoder.emap(e => Right(CliEntity(e)))
+    JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
+      val currentTypes = cursor.getEntityTypes
+      (currentTypes.map(CliSingleEntity.matchingEntityTypes), currentTypes.map(CliCollectionEntity.matchingEntityTypes))
+        .flatMapN {
+          case (_, true) => db(cursor)
+          case (true, _) => da(cursor)
+          case _ =>
+            Left(
+              DecodingFailure(s"Invalid entity types for decoding related entity for a generation: $entityTypes", Nil)
+            )
+        }
     }
+  }
 
-  implicit def jsonLDEncoder: JsonLDEncoder[CliEntity] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.resourceId.asEntityId,
-        entityTypes,
-        Prov.atLocation          -> entity.path.asJsonLD,
-        Renku.checksum           -> entity.checksum.asJsonLD,
-        Prov.qualifiedGeneration -> entity.generationIds.asJsonLD
-      )
-    }
+  implicit def jsonLDEncoder: JsonLDEncoder[CliEntity] = JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
 }

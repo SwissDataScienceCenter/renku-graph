@@ -20,6 +20,8 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.CommandParameterGenerators
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -31,7 +33,8 @@ class CliCommandOutputSpec
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  val commandOutputGen = CommandParameterGenerators.commandOutputGen
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val commandOutputGen = CommandParameterGenerators.commandOutputGen
 
   "decode/encode" should {
     "be compatible" in {

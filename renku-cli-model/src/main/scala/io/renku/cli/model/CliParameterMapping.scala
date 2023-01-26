@@ -18,13 +18,14 @@
 
 package io.renku.cli.model
 
+import CliParameterMapping._
+import Ontologies.{Renku, Schema}
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.cli.model.CliParameterMapping.MappedParam
-import io.renku.cli.model.Ontologies.{Renku, Schema}
 import io.renku.graph.model.commandParameters._
-import io.renku.jsonld.syntax.JsonEncoderOps
 import io.renku.jsonld._
+import io.renku.jsonld.syntax.JsonEncoderOps
 
 final case class CliParameterMapping(
     resourceId:   ResourceId,
@@ -33,7 +34,7 @@ final case class CliParameterMapping(
     prefix:       Option[Prefix],
     position:     Option[Position],
     defaultValue: Option[ParameterDefaultValue],
-    mapsTo:       MappedParam
+    mapsTo:       NonEmptyList[MappedParam]
 ) extends CliModel
 
 object CliParameterMapping {
@@ -95,7 +96,7 @@ object CliParameterMapping {
         maybeDescription <- cursor.downField(Schema.description).as[Option[Description]]
         maybePrefix      <- cursor.downField(Renku.prefix).as[Option[Prefix]]
         defaultValue     <- cursor.downField(Schema.defaultValue).as[Option[ParameterDefaultValue]]
-        mapsTo           <- cursor.downField(Renku.mapsTo).as[MappedParam]
+        mapsTo           <- cursor.downField(Renku.mapsTo).as[NonEmptyList[MappedParam]]
       } yield CliParameterMapping(resourceId, name, maybeDescription, maybePrefix, position, defaultValue, mapsTo)
     }
 

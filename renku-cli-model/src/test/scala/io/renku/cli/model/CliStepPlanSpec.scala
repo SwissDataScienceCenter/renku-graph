@@ -20,6 +20,7 @@ package io.renku.cli.model
 
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.PlanGenerators
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -27,18 +28,18 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 
-class CliPlanSpec
+class CliStepPlanSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
     with JsonLDCodecMatchers {
 
-  implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.sample.get
-  val planGen                      = PlanGenerators.planGen(Instant.now)
-  val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.now)
-  val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.now)
-  val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.now)
+  private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
+  private val planGen                      = PlanGenerators.planGen(Instant.EPOCH)
+  private val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.EPOCH)
+  private val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.EPOCH)
+  private val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.EPOCH)
 
   "plan decode/encode" should {
     "be compatible" in {
@@ -55,7 +56,7 @@ class CliPlanSpec
   }
 
   def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
-    in :: in.plans.collect { case CliCompositePlan.ChildPlan.Composite(p) => p }.flatMap(allCompositePlans)
+    in :: in.plans.collect { case CliPlan.Composite(p) => p }.flatMap(allCompositePlans)
 
   "composite plan decode/encode" should {
     "be compatible" in {
