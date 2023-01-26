@@ -164,7 +164,7 @@ object RenkuProject {
       validateDates(dateCreated, activities, datasets, plans),
       validatePlansDates(plans),
       validateDatasets(datasets),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities))
+      updatePlansOriginalId(plans)
     ).mapN { (_, _, _, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
@@ -274,7 +274,7 @@ object RenkuProject {
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
       validatePlansDates(plans),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities)),
+      updatePlansOriginalId(plans),
       validateCompositePlanData(plans)
     ) mapN { (_, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
@@ -344,31 +344,6 @@ object RenkuProject {
           )
           .getOrElse(plan.validNel)
       }
-    }
-
-    // The Plan dateCreated is updated only because of a bug on CLI which can produce Activities with dates before the Plan
-    // Though CLI fixed the issue for new projects, there still might be old ones affected with the issue.
-    // CLI is going to add a migration which will fix the old projects so this update won't be needed.
-    // See https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
-    protected def updatePlansDateCreated(plans: List[Plan], activities: List[Activity]): List[Plan] = {
-
-      def findMinActivityDate(planId: model.plans.ResourceId): Option[model.activities.StartTime] =
-        activities.collect {
-          case a if a.association.planId == planId => a.startTime
-        } match {
-          case Nil   => None
-          case dates => dates.min.some
-        }
-
-      plans
-        .map(p =>
-          findMinActivityDate(p.resourceId) match {
-            case None                                                                                => p
-            case Some(minActivityDate) if (p.dateCreated.value compareTo minActivityDate.value) <= 0 => p
-            case Some(minActivityDate) =>
-              PlanLens.planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
-          }
-        )
     }
 
     private def findParentPlan(derivedFrom: model.plans.DerivedFrom, plans: List[Plan]) =

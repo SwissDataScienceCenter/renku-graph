@@ -18,7 +18,6 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens._
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
@@ -325,40 +324,6 @@ class ProjectSpec
         actualPlan2 shouldBe entitiesPlanModification1
         actualPlan3 shouldBe (modifiedPlanDerivation >>> planDerivationOriginalId)
           .set(entitiesPlan.resourceId)(entitiesPlanModification2)
-      }
-
-      s"update Plans' dateCreated if there are Activities created before the Plan for project $projectType" in new TestCase {
-
-        val resourceId = projects.ResourceId(info.path)
-        val activity = {
-          val a = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
-          a.replaceStartTime(
-            timestamps(min = info.dateCreated.value, max = a.plan.dateCreated.value.minusSeconds(1))
-              .generateAs(activities.StartTime)
-          )
-        }
-        val entitiesActivity = activity.to[entities.Activity]
-        val plan             = activity.plan
-        val entitiesPlan     = plan.to[entities.Plan]
-
-        val jsonLD = cliJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          maybeCreator = None,
-          info.dateCreated,
-          activities = entitiesActivity :: Nil,
-          plans = entitiesPlan :: Nil
-        )
-
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
-
-        actual.plans shouldBe List(
-          planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan)
-        )
-        actual.activities shouldBe List(entitiesActivity)
       }
     }
 
