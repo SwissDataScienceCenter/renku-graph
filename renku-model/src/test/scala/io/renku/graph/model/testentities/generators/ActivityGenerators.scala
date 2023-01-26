@@ -104,6 +104,20 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
   }
 
+  def stepPlanEntities(
+      planDateCreatedGen: Gen[plans.DateCreated],
+      parameterFactories: Seq[CommandParameterFactory] = Seq.empty[CommandParameterFactory]
+  )(implicit
+      planCommandsGen: Gen[Command]
+  ): StepPlanGenFactory = Kleisli(_ =>
+    for {
+      name         <- planNames
+      maybeCommand <- planCommandsGen.toGeneratorOfOptions
+      dateCreated  <- planDateCreatedGen
+      creators     <- personEntities.toGeneratorOfList(max = 2)
+    } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
+  )
+
   def compositePlanEntities(childGen: ProjectBasedGenFactory[List[Plan]]): CompositePlanGenFactory =
     (planDatesCreatedK, childGen).flatMapN { (dateCreated, childPlans) =>
       for {

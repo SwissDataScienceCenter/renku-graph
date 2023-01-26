@@ -33,6 +33,7 @@ import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.version
@@ -68,7 +69,7 @@ class MicroserviceRoutesSpec
 
   "GET /events" should {
     import EventsEndpoint.Criteria
-    import EventsEndpoint.Criteria.Sorting._
+    import EventsEndpoint.Criteria.Sort._
     import EventsEndpoint.Criteria._
 
     forAll {
@@ -151,7 +152,7 @@ class MicroserviceRoutesSpec
         (eventStatuses -> sortingDirections).mapN { (status, dir) =>
           uri"/events" +? ("status" -> status.value) +? ("sort" -> s"eventDate:$dir") -> Criteria(
             Filters.EventsWithStatus(status, maybeDates = None),
-            Sorting.By(EventDate, dir)
+            Sorting(Sort.By(EventDate, dir))
           )
         }.generateOne,
         (eventStatuses -> pages).mapN { (status, page) =>

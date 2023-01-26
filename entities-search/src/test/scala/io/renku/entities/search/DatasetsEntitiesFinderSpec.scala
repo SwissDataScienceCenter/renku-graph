@@ -18,14 +18,14 @@
 
 package io.renku.entities.search
 
-import Criteria.{Filters, Sorting}
+import Criteria.{Filters, Sort}
 import EntityConverters._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.rest.SortBy
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
@@ -105,7 +105,7 @@ class DatasetsEntitiesFinderSpec
       finder
         .findEntities(
           Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
-                   sorting = Sorting.By(Sorting.ByDate, SortBy.Direction.Asc)
+                   sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc))
           )
         )
         .unsafeRunSync()

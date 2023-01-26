@@ -22,6 +22,7 @@ import Criteria._
 import io.circe.Decoder
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
@@ -31,7 +32,7 @@ import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 import java.time.LocalDate
 
 final case class Criteria(filters:   Filters = Filters(),
-                          sorting:   Sorting.By = Sorting.default,
+                          sorting:   Sorting[Criteria.Sort.type] = Criteria.Sort.default,
                           paging:    PagingRequest = PagingRequest.default,
                           maybeUser: Option[AuthUser] = None
 )
@@ -78,7 +79,7 @@ object Criteria {
     object Until extends TinyTypeFactory[Until](new Until(_)) with LocalDateNotInTheFuture[Until]
   }
 
-  object Sorting extends io.renku.http.rest.SortBy {
+  object Sort extends io.renku.http.rest.SortBy {
 
     type PropertyType = SortProperty
 
@@ -88,7 +89,9 @@ object Criteria {
     final case object ByMatchingScore extends Property("matchingScore") with SortProperty
     final case object ByDate          extends Property("date") with SortProperty
 
-    lazy val default: Sorting.By = Sorting.By(ByName, Direction.Asc)
+    val byNameAsc = Sort.By(ByName, Direction.Asc)
+
+    val default: Sorting[Sort.type] = Sorting(byNameAsc)
 
     override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate)
   }

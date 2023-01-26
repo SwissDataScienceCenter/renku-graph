@@ -16,20 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph
+package io.renku.triplesstore.client.model
 
-import io.renku.generators.CommonGraphGenerators.sortBys
-import io.renku.generators.Generators.nonBlankStrings
-import io.renku.graph.model.testentities.Person
-import io.renku.http.rest.Sorting
-import io.renku.knowledgegraph.datasets.Endpoint.Query.Phrase
-import org.scalacheck.Gen
+import io.renku.triplesstore.client.model.OrderBy.{Direction, Property}
+import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-package object datasets {
+class OrderBySpec extends AnyWordSpec with should.Matchers {
 
-  val phrases: Gen[Phrase] = nonBlankStrings(minLength = 5) map (_.value) map Phrase.apply
-  implicit val searchEndpointSorts: Gen[Sorting[Endpoint.Sort.type]] = sortBys(Endpoint.Sort)
+  "OrderBy" should {
 
-  implicit lazy val personToCreator: Person => DatasetCreator =
-    person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
+    "encode to valid sparql" in {
+      val order = OrderBy(
+        Direction.Asc(Property("?date")),
+        Direction.Desc(Property("?name"))
+      )
+      val sparql = SparqlEncoder[OrderBy].apply(order)
+      sparql shouldBe Fragment("ORDER BY ASC(?date) DESC(?name)")
+    }
+  }
 }

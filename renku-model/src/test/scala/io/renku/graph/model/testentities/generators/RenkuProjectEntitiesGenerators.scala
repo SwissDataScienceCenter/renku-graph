@@ -61,18 +61,18 @@ trait RenkuProjectEntitiesGenerators {
       )
 
   def renkuProjectEntities(
-      visibilityGen:     Gen[Visibility],
-      minDateCreated:    projects.DateCreated = projects.DateCreated(Instant.EPOCH),
-      creatorGen:        Gen[Person] = personEntities(withGitLabId),
-      activityFactories: List[ActivityGenFactory] = Nil,
-      datasetFactories:  List[DatasetGenFactory[Dataset.Provenance]] = Nil,
-      forksCountGen:     Gen[ForksCount] = anyForksCount
+      visibilityGen:         Gen[Visibility],
+      projectDateCreatedGen: Gen[projects.DateCreated] = projectCreatedDates(Instant.EPOCH),
+      creatorGen:            Gen[Person] = personEntities(withGitLabId),
+      activityFactories:     List[ActivityGenFactory] = Nil,
+      datasetFactories:      List[DatasetGenFactory[Dataset.Provenance]] = Nil,
+      forksCountGen:         Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
     path             <- projectPaths
     name             <- Gen.const(path.toName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
-    dateCreated      <- projectCreatedDates(minDateCreated.value)
+    dateCreated      <- projectDateCreatedGen
     maybeCreator     <- creatorGen.toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen

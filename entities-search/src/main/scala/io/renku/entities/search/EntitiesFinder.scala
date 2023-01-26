@@ -22,8 +22,11 @@ import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
+import io.renku.triplesstore.client.model.OrderBy
+import io.renku.triplesstore.client.sparql.SparqlEncoder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import model._
 import org.typelevel.log4cats.Logger
@@ -66,10 +69,16 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
         |""".stripMargin
   )
 
-  private def `ORDER BY`(sorting: Criteria.Sorting.By): String = sorting.property match {
-    case Criteria.Sorting.ByName          => s"ORDER BY ${sorting.direction}(LCASE(?name))"
-    case Criteria.Sorting.ByDate          => s"ORDER BY ${sorting.direction}(?date)"
-    case Criteria.Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
+  private def `ORDER BY`(
+      sorting: Sorting[Criteria.Sort.type]
+  )(implicit encoder: SparqlEncoder[OrderBy]): String = {
+    def mapPropertyName(property: Criteria.Sort.SortProperty) = property match {
+      case Criteria.Sort.ByName          => OrderBy.Property("LCASE(?name)")
+      case Criteria.Sort.ByDate          => OrderBy.Property("?date")
+      case Criteria.Sort.ByMatchingScore => OrderBy.Property("?matchingScore")
+    }
+
+    encoder(sorting.toOrderBy(mapPropertyName)).sparql
   }
 
   private implicit lazy val recordDecoder: Decoder[Entity] = { implicit cursor =>
