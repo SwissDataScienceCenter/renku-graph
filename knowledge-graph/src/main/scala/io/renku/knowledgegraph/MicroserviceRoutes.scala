@@ -39,7 +39,6 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
-import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -53,7 +52,6 @@ private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:     datasets.Endpoint[F],
     datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
-    queryEndpoint:              QueryEndpoint[F],
     lineageEndpoint:            projects.files.lineage.Endpoint[F],
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
@@ -78,14 +76,13 @@ private class MicroserviceRoutes[F[_]: Async](
   import projectDatasetsEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
-  import queryEndpoint._
   import routesMetrics._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
-    `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*` <+> otherAuthRoutes
+    `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*`
   }
 
   private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
@@ -138,17 +135,12 @@ private class MicroserviceRoutes[F[_]: Async](
     }
   }
 
-  private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
-    case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
-  }
-
   private lazy val `GET /projects/*` : AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       routeToProjectsEndpoints(path, maybeUser)(authReq.req)
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql"          => schema()
     case req @ GET -> "knowledge-graph" /: "ontology" /: path => `GET /ontology`(path)(req)
     case GET -> Root / "knowledge-graph" / "spec.json"        => docsEndpoint.`get /spec.json`
     case GET -> Root / "ping"                                 => Ok("pong")
@@ -296,7 +288,6 @@ private object MicroserviceRoutes {
     datasetsSearchEndpoint                <- datasets.Endpoint[IO]
     datasetDetailsEndpoint                <- datasets.details.Endpoint[IO]
     entitiesEndpoint                      <- entities.Endpoint[IO]
-    queryEndpoint                         <- QueryEndpoint()
     lineageEndpoint                       <- projects.files.lineage.Endpoint[IO]
     ontologyEndpoint                      <- ontology.Endpoint[IO]
     projectDetailsEndpoint                <- projects.details.Endpoint[IO]
@@ -313,7 +304,6 @@ private object MicroserviceRoutes {
     datasetsSearchEndpoint,
     datasetDetailsEndpoint,
     entitiesEndpoint,
-    queryEndpoint,
     lineageEndpoint,
     ontologyEndpoint,
     projectDetailsEndpoint,

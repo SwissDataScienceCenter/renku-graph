@@ -89,34 +89,11 @@ object TokenRepositoryClient {
 }
 
 object KnowledgeGraphClient {
-  import sangria.ast.Document
 
   def apply()(implicit logger: Logger[IO]): KnowledgeGraphClient = new KnowledgeGraphClient
 
   class KnowledgeGraphClient(implicit logger: Logger[IO]) extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
-
-    def POST(query: Document, variables: Map[String, String] = Map.empty, maybeAccessToken: Option[AccessToken] = None)(
-        implicit ioRuntime: IORuntime
-    ): ClientResponse = {
-      for {
-        uri      <- validateUri(s"$baseUrl/knowledge-graph/graphql")
-        payload  <- preparePayload(query, variables)
-        response <- send(request(Method.POST, uri, maybeAccessToken) withEntity payload)(mapResponse)
-      } yield response
-    }.unsafeRunSync()
-
-    private def preparePayload(query: Document, variables: Map[String, String]): IO[Json] = IO {
-      variables match {
-        case vars if vars.isEmpty => json"""{
-          "query": ${query.source.getOrElse("")}
-        }"""
-        case nonEmptyVars => json"""{
-          "query": ${query.source.getOrElse("")},
-          "variables": $nonEmptyVars 
-        }"""
-      }
-    }
 
     def `GET /knowledge-graph/ontology`(implicit ioRuntime: IORuntime): (Status, Headers, String) = {
       import io.renku.http.server.EndpointTester.stringEntityDecoder
