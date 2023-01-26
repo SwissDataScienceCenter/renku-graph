@@ -28,7 +28,4 @@ libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
 libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.11"
 
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.5.0"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
-
 resolvers += "jitpack" at "https://jitpack.io"
