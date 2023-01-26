@@ -27,11 +27,11 @@ import io.renku.graph.model.{commandParameters, entities, plans}
 
 trait CliPlanConverters extends CliCommonConverters {
 
-  def from(plan: entities.Plan): CliPlan = plan.fold(
-    from(_: entities.StepPlan),
-    from(_: entities.StepPlan),
-    from(_: entities.CompositePlan),
-    from(_: entities.CompositePlan)
+  def from(plan: entities.Plan, allPlans: List[entities.Plan]): CliPlan = plan.fold(
+    spnm => CliPlan(from(spnm)),
+    spm => CliPlan(from(spm)),
+    cpnm => CliPlan(from(cpnm, allPlans)),
+    cpm => CliPlan(from(cpm, allPlans))
   )
 
   def from(plan: entities.StepPlan): CliStepPlan = plan match {
@@ -83,7 +83,7 @@ trait CliPlanConverters extends CliCommonConverters {
         p.keywords,
         derivedFrom = None,
         invalidationTime = None,
-        collectAllPlans(p.plans, allPlans).map(from),
+        collectAllPlans(p.plans, allPlans).map(from(_, allPlans)),
         p.links.map(from(_, allPlans)),
         p.mappings.map(from(_, allPlans))
       )
@@ -98,7 +98,7 @@ trait CliPlanConverters extends CliCommonConverters {
         p.keywords,
         derivedFrom = None,
         invalidationTime = p.maybeInvalidationTime,
-        collectAllPlans(p.plans, allPlans).map(from),
+        collectAllPlans(p.plans, allPlans).map(from(_, allPlans)),
         p.links.map(from(_, allPlans)),
         p.mappings.map(from(_, allPlans))
       )

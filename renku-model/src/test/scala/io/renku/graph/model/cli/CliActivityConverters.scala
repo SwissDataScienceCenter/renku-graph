@@ -39,8 +39,9 @@ trait CliActivityConverters extends CliPlanConverters {
 
   def from(a: entities.Agent): CliSoftwareAgent = CliSoftwareAgent(a.resourceId, a.name)
 
-  def from(association: entities.Association, plans: List[entities.Plan]): CliAssociation = {
-    val associatedPlan = CliAssociation.AssociatedPlan(from(findStepPlanOrFail(association.planId, plans)))
+  def from(association: entities.Association, allPlans: List[entities.Plan]): CliAssociation = {
+    val stepPlan       = findStepPlanOrFail(association.planId, allPlans)
+    val associatedPlan = CliAssociation.AssociatedPlan(from(stepPlan))
     association
       .fold { a =>
         CliAssociation(a.resourceId, CliAgent(from(a.agent)), associatedPlan)

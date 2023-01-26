@@ -29,21 +29,25 @@ import java.time.Instant
 trait NonRenkuProjectEntitiesGenerators {
   self: EntitiesGenerators with RenkuProjectEntitiesGenerators =>
 
-  lazy val anyNonRenkuProjectEntities: Gen[NonRenkuProject] = Gen.oneOf(
-    nonRenkuProjectEntities(anyVisibility),
-    nonRenkuProjectWithParentEntities(anyVisibility)
-  )
+  lazy val anyNonRenkuProjectEntities: Gen[NonRenkuProject] = anyNonRenkuProjectEntities()
+
+  def anyNonRenkuProjectEntities(creatorGen: Gen[Person] = personEntities(withGitLabId)): Gen[NonRenkuProject] =
+    Gen.oneOf(
+      nonRenkuProjectEntities(anyVisibility, creatorGen = creatorGen),
+      nonRenkuProjectWithParentEntities(anyVisibility, creatorGen = creatorGen)
+    )
 
   def nonRenkuProjectEntities(
       visibilityGen:  Gen[Visibility],
       minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      creatorGen:     Gen[Person] = personEntities(withGitLabId),
       forksCountGen:  Gen[ForksCount] = anyForksCount
   ): Gen[NonRenkuProject.WithoutParent] = for {
     path             <- projectPaths
     name             <- Gen.const(path.toName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates(minDateCreated.value)
-    maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
+    maybeCreator     <- creatorGen.toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
@@ -64,8 +68,11 @@ trait NonRenkuProjectEntitiesGenerators {
 
   def nonRenkuProjectWithParentEntities(
       visibilityGen:  Gen[Visibility],
-      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  ): Gen[NonRenkuProject.WithParent] = nonRenkuProjectEntities(visibilityGen, minDateCreated).map(_.forkOnce()._2)
+      minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      creatorGen:     Gen[Person] = personEntities(withGitLabId)
+  ): Gen[NonRenkuProject.WithParent] =
+    nonRenkuProjectEntities(visibilityGen, minDateCreated, creatorGen = creatorGen)
+      .map(_.forkOnce(creatorGen = creatorGen)._2)
 
   implicit class NonRenkuProjectWithParentGenFactoryOps(projectGen: Gen[NonRenkuProject.WithParent]) {
     def modify(f: NonRenkuProject.WithParent => NonRenkuProject.WithParent): Gen[NonRenkuProject.WithParent] =

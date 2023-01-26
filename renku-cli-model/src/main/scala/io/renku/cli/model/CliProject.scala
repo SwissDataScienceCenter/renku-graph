@@ -21,7 +21,7 @@ package io.renku.cli.model
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.CliProject.ProjectPlan
-import io.renku.cli.model.Ontologies.{Prov, Schema}
+import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.plans
 import io.renku.graph.model.projects._
@@ -153,9 +153,9 @@ object CliProject {
             .downField(Schema.image)
             .as[List[Image]]
             .map(_.sortBy(_.position))
-        plans         <- cursor.downField(Schema.hasPlan).as[List[ProjectPlan]]
-        datasets      <- cursor.downField(Schema.hasDataset).as[List[CliDataset]]
-        activities    <- cursor.downField(Schema.hasActivity).as[List[CliActivity]]
+        plans         <- cursor.downField(Renku.hasPlan).as[List[ProjectPlan]]
+        datasets      <- cursor.downField(Renku.hasDataset).as[List[CliDataset]]
+        activities    <- cursor.downField(Renku.hasActivity).as[List[CliActivity]]
         agentVersion  <- cursor.downField(Schema.agent).as[Option[CliVersion]]
         schemaVersion <- cursor.downField(Schema.schemaVersion).as[Option[SchemaVersion]]
       } yield CliProject(
@@ -187,9 +187,9 @@ object CliProject {
         Schema.schemaVersion -> project.schemaVersion.asJsonLD,
         Schema.image         -> project.images.asJsonLD,
         Schema.keywords      -> project.keywords.asJsonLD,
-        Schema.hasPlan       -> project.plans.asJsonLD,
-        Schema.hasDataset    -> project.datasets.asJsonLD,
-        Schema.hasActivity   -> project.activities.asJsonLD
+        Renku.hasPlan        -> project.plans.asJsonLD,
+        Renku.hasDataset     -> project.datasets.asJsonLD,
+        Renku.hasActivity    -> project.activities.asJsonLD
       )
     }
 }

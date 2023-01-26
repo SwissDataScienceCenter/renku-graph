@@ -37,11 +37,13 @@ trait ProjectEntitiesGenerators {
 
   lazy val anyProjectEntities: Gen[Project] = projectEntities(anyVisibility)
 
-  def projectEntities(visibilityGen: Gen[Visibility]): Gen[Project] = Gen.oneOf(
-    renkuProjectEntities(visibilityGen),
-    renkuProjectWithParentEntities(visibilityGen),
-    nonRenkuProjectEntities(visibilityGen),
-    nonRenkuProjectWithParentEntities(visibilityGen)
+  def projectEntities(visibilityGen: Gen[Visibility],
+                      creatorGen:    Gen[Person] = personEntities(withGitLabId)
+  ): Gen[Project] = Gen.oneOf(
+    renkuProjectEntities(visibilityGen, creatorGen = creatorGen),
+    renkuProjectWithParentEntities(visibilityGen, creatorGen = creatorGen),
+    nonRenkuProjectEntities(visibilityGen, creatorGen = creatorGen),
+    nonRenkuProjectWithParentEntities(visibilityGen, creatorGen = creatorGen)
   )
 
   lazy val memberGitLabIdLens: Lens[ProjectMember, persons.GitLabId] =

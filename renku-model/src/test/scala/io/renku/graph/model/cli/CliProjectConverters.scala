@@ -40,7 +40,7 @@ trait CliProjectConverters extends CliActivityConverters with CliDatasetConverte
       p.maybeCreator.map(from),
       p.keywords,
       p.images,
-      p.plans.map(from).map(CliProject.ProjectPlan.apply),
+      p.plans.map(from(_, p.plans)).map(CliProject.ProjectPlan.apply),
       p.datasets.map(from),
       p.activities.map(from(_, p.plans)),
       p.agent.some,

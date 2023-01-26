@@ -41,6 +41,10 @@ trait CliEntityConverterSyntax {
   final implicit class PublicationEventOps(self: entities.PublicationEvent) {
     def toCliEntity: CliPublicationEvent = CliConverters.from(self)
   }
+
+  final implicit class ProjectOps(self: entities.Project) {
+    def toCliEntity: CliProject = CliConverters.from(self)
+  }
 }
 
 object CliEntityConverterSyntax extends CliEntityConverterSyntax
