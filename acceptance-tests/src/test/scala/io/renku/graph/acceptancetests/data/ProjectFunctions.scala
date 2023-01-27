@@ -23,6 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.graph.model.cli.CliEntityConverterSyntax._
 import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
 import io.renku.graph.model.tools.JsonLDTools.flattenedJsonLDFrom
 import io.renku.graph.model.{entities, persons, testentities}
 import io.renku.jsonld.JsonLD
@@ -31,11 +32,11 @@ import monocle.Lens
 
 trait ProjectFunctions {
 
-  def replaceCreatorId(gitLabId: persons.GitLabId): Project => Project =
-    p => p.copy(maybeCreator = p.maybeCreator.map(memberGitLabId.set(gitLabId)))
-
-  def replaceCreatorFrom(creator: testentities.Person, gitLabId: persons.GitLabId): Project => Project =
-    _.copy(maybeCreator = toProjectMember(creator, gitLabId).some)
+  def replaceCreatorFrom(creator: testentities.Person, gitLabId: persons.GitLabId): Project => Project = p =>
+    p.copy(
+      maybeCreator = toProjectMember(creator, gitLabId).some,
+      entitiesProject = replaceProjectCreator(creator.some)(p.entitiesProject)
+    )
 
   def addMemberWithId(gitLabId: persons.GitLabId): Project => Project =
     p => p.copy(members = p.members :+ ProjectMember(personNames.generateOne, personUsernames.generateOne, gitLabId))

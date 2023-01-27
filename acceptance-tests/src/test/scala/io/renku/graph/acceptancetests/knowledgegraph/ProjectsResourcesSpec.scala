@@ -49,21 +49,23 @@ class ProjectsResourcesSpec
     val creatorEmail    = personEmails.generateOne
     val creator         = cliShapedPersons.generateOne.copy(maybeEmail = creatorEmail.some)
 
-    val (parent, child) = renkuProjectEntities(visibilityPublic)
-      .modify(replaceProjectCreator(creator.some))
+    val (parent, child) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
       .withDatasets(datasetEntities(provenanceInternal(cliShapedPersons)))
       .generateOne
       .forkOnce(creatorsGen = cliShapedPersons)
       .bimap(removeMembers(), removeMembers())
 
-    (dataProjects(parent)
-       .map(replaceCreatorFrom(creator, creatorGitLabId))
-       .map(addMemberFrom(creator, creatorGitLabId))
-       .generateOne,
-     dataProjects(child.copy(visibility = Visibility.Private))
-       .map(addMemberWithId(user.id))
-       .generateOne
-    )
+    val parentDataProject = dataProjects(parent)
+      .map(replaceCreatorFrom(creator, creatorGitLabId))
+      .map(addMemberFrom(creator, creatorGitLabId))
+      .generateOne
+
+    val childDataProject =
+      dataProjects(child.copy(visibility = Visibility.Private, parent = parentDataProject.entitiesProject))
+        .map(addMemberWithId(user.id))
+        .generateOne
+
+    parentDataProject -> childDataProject
   }
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {

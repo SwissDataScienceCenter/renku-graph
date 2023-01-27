@@ -57,8 +57,7 @@ class DatasetsResourcesSpec
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
     val (dataset1 ::~ dataset2 ::~ dataset2Modified, testProject) =
-      renkuProjectEntities(visibilityPublic)
-        .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .addDatasetAndModification(
@@ -66,13 +65,15 @@ class DatasetsResourcesSpec
           creatorGen = cliShapedPersons
         )
         .generateOne
-    val project      = dataProjects(testProject).map(replaceCreatorId(creator.id)).generateOne
-    val modelProject = testProject.to[entities.Project]
+    val project =
+      dataProjects(testProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
+    val modelProject = project.entitiesProject.to[entities.Project]
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
+
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(modelProject), commitId)
@@ -176,18 +177,21 @@ class DatasetsResourcesSpec
 
     Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
 
-      val (_, testPrivateProject) = renkuProjectEntities(visibilityPrivate)
-        .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+      val (_, testPrivateProject) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
-      val privateProject = dataProjects(testPrivateProject).map(replaceCreatorId(creator.id)).generateOne
+      val privateProject =
+        dataProjects(testPrivateProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
 
       Given("there's a private project in KG")
       val commitId = commitIds.generateOne
       gitLabStub.addAuthenticated(creator, user)
       gitLabStub.setupProject(privateProject, commitId)
-      mockCommitDataOnTripleGenerator(privateProject, toPayloadJsonLD(testProject.to[entities.Project]), commitId)
+      mockCommitDataOnTripleGenerator(privateProject,
+                                      toPayloadJsonLD(privateProject.entitiesProject.to[entities.Project]),
+                                      commitId
+      )
       `data in the Triples Store`(privateProject, commitId, creator.accessToken)
 
       When("there's an authenticated user who is not a member of the project")
@@ -240,13 +244,12 @@ class DatasetsResourcesSpec
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
       val project5 = dataProjects(testProject5).generateOne
-      val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate)
-        .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+      val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
       val project6Private = dataProjects(testProject6Private)
-        .map(replaceCreatorId(creator.id))
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .map(addMemberWithId(user.id))
         .generateOne
 
@@ -378,26 +381,24 @@ class DatasetsResourcesSpec
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
       val project1 = dataProjects(testProject1)
-        .map(replaceCreatorId(creator.id))
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .generateOne
 
-      val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate)
-        .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+      val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
       val project2Private = dataProjects(testProject2Private)
-        .map(replaceCreatorId(creator.id))
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .generateOne
 
       val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
-        renkuProjectEntities(visibilityPrivate)
-          .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+        renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
           .modify(removeMembers())
           .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
           .generateOne
       val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)
-        .map(replaceCreatorId(creator.id))
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .map(addMemberWithId(user.id))
         .generateOne
 
@@ -444,8 +445,8 @@ class DatasetsResourcesSpec
       val project = dataProjects(testProject).generateOne
 
       Given("some data in the Triples Store")
-      val commitId = commitIds.generateOne
       gitLabStub.addAuthenticated(creator)
+      val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
@@ -462,14 +463,13 @@ class DatasetsResourcesSpec
       "As an authenticated and authorised user I should be able to see details of a dataset on a private project " +
         "and not see them if either not authorised or not authenticated"
     ) {
-      val (dataset, testProject) = renkuProjectEntities(visibilityPrivate)
-        .modify(replaceProjectCreator(cliShapedPersons.generateSome))
+      val (dataset, testProject) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
       val project = dataProjects(testProject)
-        .map(replaceCreatorId(creator.id))
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .map(addMemberWithId(user.id))
         .generateOne
 
