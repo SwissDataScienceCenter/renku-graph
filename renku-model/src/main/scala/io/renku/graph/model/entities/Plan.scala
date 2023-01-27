@@ -75,7 +75,13 @@ object Plan {
         ).asLeft
       }
 
-      StepPlan.decoder.apply(cursor) orElse CompositePlan.decoder.apply(cursor) orElse noMatchFailure
+      cursor.getEntityTypes.flatMap { ets =>
+        if (ets.contains(StepPlan.entityTypes)) StepPlan.decoder.apply(cursor)
+        else if (ets.contains(CompositePlan.Ontology.entityTypes)) CompositePlan.decoder.apply(cursor)
+        else noMatchFailure
+      }
+
+//      StepPlan.decoder.apply(cursor) orElse CompositePlan.decoder.apply(cursor) orElse noMatchFailure
     }
 
   lazy val ontology: Type =
@@ -337,14 +343,29 @@ object StepPlan {
                           Derivation(derivedFrom, ResourceId(derivedFrom.value)),
                           mit
                         )
+                    case (Some(derivedFrom), Some(invalidTime), None) =>
+                      StepPlan.from(
+                        resourceId,
+                        name,
+                        maybeDescription,
+                        maybeCommand,
+                        creators,
+                        DateCreated(invalidTime.value),
+                        maybeProgrammingLang,
+                        keywords,
+                        parameters,
+                        inputs,
+                        outputs,
+                        successCodes,
+                        Derivation(derivedFrom, ResourceId(derivedFrom.value)),
+                        invalidTime.some
+                      )
                     case (None, Some(_), None) => show"Plan $resourceId has no parent but invalidation time".invalidNel
                     case (None, None, Some(_)) => show"Plan $resourceId has no parent but modified time".invalidNel
                     case (None, Some(_), Some(_)) =>
                       show"Plan $resourceId has no parent but modified and invalidation time".invalidNel
                     case (Some(_), None, None) =>
                       show"Plan $resourceId has a parent but no modified and no invalidation time".invalidNel
-                    case (Some(_), Some(_), None) =>
-                      show"Plan $resourceId has a parent and invalidation time, but no modification time".invalidNel
                   }
                 }.toEither.leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
       } yield plan

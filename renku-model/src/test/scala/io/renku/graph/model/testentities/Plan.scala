@@ -36,6 +36,12 @@ trait Plan extends PlanAlg {
   type PlanGroup <: Plan
   type PlanGroupModified <: PlanGroup with Plan.Modified
   type PlanType <: PlanGroup
+
+  def fold[P](spnm: StepPlan.NonModified => P,
+              spm:  StepPlan.Modified => P,
+              cpnm: CompositePlan.NonModified => P,
+              cpm:  CompositePlan.Modified => P
+  ): P
 }
 
 trait PlanAlg { self: Plan =>

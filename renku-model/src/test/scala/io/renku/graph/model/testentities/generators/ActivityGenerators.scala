@@ -63,8 +63,8 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   lazy val parameterValueOverrides: Gen[ValueOverride] =
     nonBlankStrings().map(v => ValueOverride(v.value))
 
-  def activityEntities(planGen: StepPlanGenFactory): ActivityGenFactory =
-    Kleisli(executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe()))
+  def activityEntities(planGen: StepPlanGenFactory, authorGen: Gen[Person] = personEntities): ActivityGenFactory =
+    Kleisli(executionPlanners(planGen, _: projects.DateCreated, authorGen).map(_.buildProvenanceUnsafe()))
 
   def planEntities(
       creatorGen:         Gen[Person],
