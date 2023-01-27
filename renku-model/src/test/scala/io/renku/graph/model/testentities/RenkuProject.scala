@@ -62,7 +62,7 @@ object RenkuProject {
   /** For more convenient creation given the composite plan generator. Example for add a composite plan referencing 
    * all step plans:
    * {{{
-   * p.addCompositePlan(CreateCompositePlan(compositePlanEntities))
+   * p.addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _))
    * }}}
    */
   object CreateCompositePlan {

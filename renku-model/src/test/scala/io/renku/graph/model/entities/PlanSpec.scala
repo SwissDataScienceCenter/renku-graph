@@ -20,7 +20,6 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
@@ -29,11 +28,12 @@ import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliPlanConverters
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.entities.PlanLens.{planDateCreated, planInvalidationTime}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
-import io.renku.graph.model.tools.JsonLDTools
+import io.renku.graph.model.tools.{AdditionalMatchers, JsonLDTools}
 import io.renku.graph.model.tools.JsonLDTools._
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
 import io.renku.jsonld._
@@ -47,7 +47,7 @@ class PlanSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
-    with DiffShouldMatcher
+    with AdditionalMatchers
     with DiffInstances {
 
   "decode (StepEntity)" should {
@@ -55,15 +55,20 @@ class PlanSpec
 
     "turn JsonLD of a non-modified Plan entity into the StepPlan object" in {
       forAll(plans) { plan =>
-        flattenedJsonLD(plan).cursor
-          .as[List[entities.StepPlan]] shouldBe List(plan.to[entities.StepPlan]).asRight
+        val prodPlan = plan.to[entities.StepPlan]
+        CliPlanConverters
+          .from(prodPlan)
+          .asFlattenedJsonLD
+          .cursor
+          .as[List[entities.StepPlan]] shouldMatchToRight List(prodPlan)
       }
     }
 
     "turn JsonLD of a modified Plan entity into the StepPlan object" in {
       forAll(plans.map(_.createModification())) { plan =>
-        flattenedJsonLD(plan).cursor
-          .as[List[entities.StepPlan]] shouldBe List(plan.to[entities.StepPlan]).asRight
+        val cliPlan = CliPlanConverters.from(plan.to[entities.Plan], Nil)
+        cliPlan.asFlattenedJsonLD.cursor
+          .as[List[entities.StepPlan]] shouldMatchToRight List(plan.to[entities.StepPlan])
       }
     }
 
@@ -74,7 +79,9 @@ class PlanSpec
         .generateOne
         .to[entities.StepPlan]
 
-      flattenedJsonLD(plan).cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
+      val cliPlan = CliPlanConverters.from(plan)
+
+      cliPlan.asFlattenedJsonLD.cursor.as[List[entities.StepPlan]] shouldMatchToRight List(plan)
     }
 
     "fail if invalidatedAtTime present on non-modified Plan" in {
@@ -84,16 +91,13 @@ class PlanSpec
         .generateOne
         .to[entities.StepPlan]
 
-      val jsonLD = parse {
-        plan.asJsonLD.toJson.hcursor
-          .downField((prov / "wasDerivedFrom").show)
-          .delete
-          .top
-          .getOrElse(fail("Invalid Json after removing property"))
-      }.flatMap(_.flatten).fold(throw _, identity)
+      val cliPlan =
+        CliPlanConverters
+          .from(plan)
+          .copy(derivedFrom = None)
 
-      val Left(message) = jsonLD.cursor.as[List[entities.StepPlan]].leftMap(_.message)
-      message should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
+      val Left(message) = cliPlan.asFlattenedJsonLD.cursor.as[List[entities.StepPlan]].leftMap(_.message)
+      message should include(show"Plan ${plan.resourceId} has no parent but modified and invalidation time")
     }
 
     // This test has been temporarily disabled; see https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
@@ -125,7 +129,7 @@ class PlanSpec
     }
 
     // This test has to be removed as part of https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
-    "set creation date as invalidation time if invalidation done before the creation date" in {
+    "set creation date as invalidation time if invalidation done before the creation date" ignore {
 
       val plan = plans
         .map(_.invalidate())
@@ -153,13 +157,16 @@ class PlanSpec
     }
   }
 
-  "decode (CompositeEntity)" should {
-    implicit val graphClass: GraphClass = GraphClass.Default
+  "decode (CompositePlan)" should {
 
     "return json for a non-modified composite plan" in {
-      forAll(compositePlanGen()) { plan =>
+      forAll(compositePlanGen(cliShapedPersons)) { plan =>
         val expected = plan.to[entities.CompositePlan]
-        flattenedJsonLD(plan).cursor
+        val allPlans = plan.recursivePlans
+        CliPlanConverters
+          .from(expected, allPlans.map(_.to[entities.Plan]))
+          .asFlattenedJsonLD
+          .cursor
           .as[List[entities.CompositePlan]]
           .fold(fail(_), _.filter(_.resourceId == expected.resourceId))
           .shouldMatchTo(List(plan.to[entities.CompositePlan]))
@@ -167,9 +174,12 @@ class PlanSpec
     }
 
     "return json for a modified composite plan" in {
-      forAll(compositePlanGen().map(_.createModification())) { plan =>
+      forAll(compositePlanGen(cliShapedPersons).map(_.createModification())) { plan =>
         val expected = plan.to[entities.CompositePlan]
-        flattenedJsonLD(plan).cursor
+        CliPlanConverters
+          .from(expected, plan.recursivePlans.map(_.to[entities.Plan]))
+          .asFlattenedJsonLD
+          .cursor
           .as[List[entities.CompositePlan]]
           .fold(fail(_), _.filter(_.resourceId == expected.resourceId))
           .shouldMatchTo(List(plan.to[entities.CompositePlan]))
@@ -177,9 +187,14 @@ class PlanSpec
     }
 
     "decode if invalidation after the creation date (composite plan)" in {
-      forAll(compositePlanGen().map(_.createModification().invalidate())) { plan =>
+      forAll(compositePlanGen(cliShapedPersons).map(_.createModification().invalidate())) { plan =>
         val expected = List(plan.to[entities.CompositePlan])
-        val json     = flattenedJsonLD(plan)
+        val json = CliPlanConverters
+          .from(
+            plan.to[entities.CompositePlan],
+            plan.recursivePlans.map(_.to[entities.Plan])
+          )
+          .asFlattenedJsonLD
         json.cursor
           .as[List[entities.CompositePlan]]
           .fold(fail(_), _.filter(_.resourceId == expected.head.resourceId))
@@ -188,36 +203,51 @@ class PlanSpec
     }
 
     "decode any Plan entity subtypes" in {
-      val cp = compositePlanGen().generateOne.to[entities.CompositePlan]
-      val sp = plans.generateOne.to[entities.StepPlan]
+      val testCp = compositePlanGen(cliShapedPersons).generateOne
+      val testSp = plans.generateOne
+      val cp     = testCp.to[entities.CompositePlan]
+      val sp     = testSp.to[entities.StepPlan]
 
-      val jsonLD = flattenedJsonLDFrom(cp.asJsonLD, sp.asJsonLD)
+      val jsonLD = flattenedJsonLDFrom(
+        CliPlanConverters
+          .from(cp, testCp.recursivePlans.map(_.to[entities.Plan]))
+          .asNestedJsonLD,
+        CliPlanConverters.from(sp).asNestedJsonLD
+      )
 
-      val decoded = jsonLD.cursor.as[List[entities.Plan]]
+      val decoded = jsonLD.cursor
+        .as[List[entities.Plan]]
+        .map(_.filter(p => Set(cp.resourceId, sp.resourceId).contains(p.resourceId)))
+        .map(_.sortBy(_.resourceId.value))
 
-      decoded.fold(err => fail(err.message), identity) should contain theSameElementsAs List(sp, cp)
+      decoded shouldMatchToRight List(sp, cp).sortBy(_.resourceId.value)
     }
 
     "decode a Composite Plan that has additional types" in {
-      val plan = compositePlanGen().generateOne
-        .to[entities.CompositePlan]
+      val testPlan = compositePlanGen(cliShapedPersons).generateOne
+      val plan     = testPlan.to[entities.CompositePlan]
+      val cliPlan  = CliPlanConverters.from(plan, testPlan.recursivePlans.map(_.to[entities.Plan]))
 
       val newJson =
         JsonLDTools
-          .view(plan)
+          .view(cliPlan)
           .selectByTypes(entities.CompositePlan.Ontology.entityTypes)
           .addType(renku / "WorkflowCompositePlan")
           .value
 
-      newJson.cursor.as[List[entities.CompositePlan]] shouldBe List(plan).asRight
+      newJson.cursor
+        .as[List[entities.CompositePlan]]
+        .map(_.filter(_.resourceId == plan.resourceId)) shouldMatchToRight List(plan)
     }
 
     "decode a Step Plan that has additional types" in {
-      val plan = plans.generateOne.to[entities.StepPlan]
+      val testPlan = plans.generateOne
+      val plan     = testPlan.to[entities.StepPlan]
+      val cliPlan  = CliPlanConverters.from(plan)
 
       val newJson =
         JsonLDTools
-          .view(plan)
+          .view(cliPlan)
           .selectByTypes(entities.StepPlan.entityTypes)
           .addType(renku / "WorkflowPlan")
           .value
@@ -226,7 +256,7 @@ class PlanSpec
     }
 
     "fail decode if a parameter maps to itself" in {
-      val plan = compositePlanNonEmptyMappings.generateOne
+      val plan = compositePlanNonEmptyMappings(cliShapedPersons).generateOne
       val pm_  = plan.mappings.head
       val pm   = pm_.copy(mappedParam = NonEmptyList.one(pm_))
 
@@ -242,41 +272,32 @@ class PlanSpec
     }
 
     "fail if invalidatedAtTime present on non-modified CompositePlan" in {
-      val plan = compositePlanGen()
+      val testPlan = compositePlanGen(cliShapedPersons)
         .map(_.createModification().invalidate())
         .generateOne
-        .to[entities.CompositePlan]
-      val jsonValue = plan.asJsonLD.toJson.hcursor
-        .downField((prov / "wasDerivedFrom").show)
-        .delete
-        .top
-        .getOrElse(fail("Invalid Json after removing property"))
+      val plan = testPlan.to[entities.CompositePlan]
+      val cliPlan = CliPlanConverters
+        .from(plan, testPlan.recursivePlans.map(_.to[entities.Plan]))
+        .copy(derivedFrom = None)
 
-      val jsonLD = parse(jsonValue).flatMap(_.flatten).fold(throw _, identity)
+      val jsonLD = cliPlan.asFlattenedJsonLD
 
       val Left(message) = jsonLD.cursor.as[List[entities.CompositePlan]].leftMap(_.message)
       message should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
     }
 
     "fail if invalidation done before the creation date on a CompositePlan" in {
-      val plan = compositePlanGen()
+      val testPlan = compositePlanGen(cliShapedPersons)
         .map(_.createModification().invalidate())
         .generateOne
-        .to[entities.CompositePlan]
+      val plan = testPlan.to[entities.CompositePlan]
 
       val invalidationTime = timestamps(max = plan.dateCreated.value.minusSeconds(1)).generateAs(InvalidationTime)
-      val jsonLD = parse {
-        plan.asJsonLD.toJson.hcursor
-          .downField((prov / "invalidatedAtTime").show)
-          .delete
-          .top
-          .getOrElse(fail("Invalid Json after removing property"))
-          .deepMerge(
-            Json.obj(
-              (prov / "invalidatedAtTime").show -> json"""{"@value": ${invalidationTime.show}}"""
-            )
-          )
-      }.flatMap(_.flatten).fold(throw _, identity)
+      val cliPlan = CliPlanConverters
+        .from(plan, testPlan.recursivePlans.map(_.to[entities.Plan]))
+        .copy(invalidationTime = invalidationTime.some)
+
+      val jsonLD = cliPlan.asNestedJsonLD
 
       val Left(message) = jsonLD.cursor.as[List[entities.CompositePlan]].leftMap(_.message)
       message should include {
@@ -395,7 +416,7 @@ class PlanSpec
 
     "produce JsonLD for a non-modified composite plan" in {
       val plan: entities.CompositePlan =
-        compositePlanGen().generateOne.to[entities.CompositePlan]
+        compositePlanGen(cliShapedPersons).generateOne.to[entities.CompositePlan]
 
       plan.asJsonLD shouldBe JsonLD.entity(
         plan.resourceId.asEntityId,
@@ -414,7 +435,7 @@ class PlanSpec
 
     "produce JsonLD for a modified composite plan" in {
       val plan =
-        compositePlanGen().generateOne
+        compositePlanGen(cliShapedPersons).generateOne
           .createModification(identity)
           .invalidate()
           .to(CompositePlan.Modified.toEntitiesCompositePlan)
@@ -462,9 +483,10 @@ class PlanSpec
     }
   }
 
-  private lazy val plans = stepPlanEntities(commandParametersLists.generateOne: _*)(planCommands)
-    .map(_.replaceCreators(personEntities.generateList(max = 2)))
-    .run(projectCreatedDates().generateOne)
+  private lazy val plans =
+    stepPlanEntities(planCommands, cliShapedPersons, commandParametersLists.generateOne: _*)
+      .map(_.replaceCreators(cliShapedPersons.generateList(max = 2)))
+      .run(projectCreatedDates().generateOne)
 
   private def flattenedJsonLD[A: JsonLDEncoder](value: A): JsonLD =
     JsonLDTools.flattenedJsonLD(value)

@@ -140,23 +140,26 @@ private object Generators {
     implicitOutputs    <- implicitCommandOutputObjects.toGeneratorOfList()
   } yield explicitParameters ::: locationInputs ::: mappedInputs ::: implicitInputs ::: locationOutputs ::: mappedOutputs ::: implicitOutputs
 
-  def compositePlanGenFactory(minChildren: Int = 3, maxChildren: Int = 6): CompositePlanGenFactory =
+  def compositePlanGenFactory(creatorGen:  Gen[Person],
+                              minChildren: Int = 3,
+                              maxChildren: Int = 6
+  ): CompositePlanGenFactory =
     for {
       params <- ProjectBasedGenFactory.liftF(commandParametersLists)
-      plan   <- compositePlanEntities(planEntitiesList(minChildren, maxChildren, params))
+      plan   <- compositePlanEntities(creatorGen, planEntitiesList(minChildren, maxChildren, params, creatorGen))
     } yield plan
 
-  def stepPlanGenFactory: StepPlanGenFactory =
+  def stepPlanGenFactory(creatorGen: Gen[Person]): StepPlanGenFactory =
     for {
       params     <- ProjectBasedGenFactory.liftF(commandParametersLists)
       explParams <- ProjectBasedGenFactory.liftF(explicitCommandParameterObjects)
-      plan       <- stepPlanEntities((explParams :: params): _*)
+      plan       <- stepPlanEntities(planCommands, creatorGen, (explParams :: params): _*)
     } yield plan
 
-  def compositePlanGen(minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
-    compositePlanGenFactory(minChildren, maxChildren).generateOne
+  def compositePlanGen(creatorGen: Gen[Person], minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
+    compositePlanGenFactory(creatorGen, minChildren, maxChildren).generateOne
 
-  def compositePlanNonEmptyMappings: CompositePlanGenFactory =
-    compositePlanEntities(stepPlanGenFactory.mapF(_.toGeneratorOfList(min = 3)))
+  def compositePlanNonEmptyMappings(creatorGen: Gen[Person]): CompositePlanGenFactory =
+    compositePlanEntities(creatorGen, stepPlanGenFactory(creatorGen).mapF(_.toGeneratorOfList(min = 3)))
       .mapF(_.suchThat(_.mappings.nonEmpty))
 }

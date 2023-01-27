@@ -399,8 +399,8 @@ class ProjectSpec
       }
 
       val invalidPlanGen = for {
-        cp   <- compositePlanNonEmptyMappings.mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
-        step <- stepPlanGenFactory
+        cp   <- compositePlanNonEmptyMappings(personEntities).mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
+        step <- stepPlanGenFactory(personEntities)
       } yield cp.copy(plans = NonEmptyList.one(step))
 
       val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
@@ -421,7 +421,7 @@ class ProjectSpec
           this.validateCompositePlanData(plans)
       }
       val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
-        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities)))
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _))))
 
       forAll(projectGen) { project =>
         validate(project.to[entities.Project].plans)
@@ -438,7 +438,7 @@ class ProjectSpec
     }
 
     "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanNonEmptyMappings.generateOne
+      val testPlan = compositePlanNonEmptyMappings(personEntities).generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
       // find a plan belonging to some mapped parameter

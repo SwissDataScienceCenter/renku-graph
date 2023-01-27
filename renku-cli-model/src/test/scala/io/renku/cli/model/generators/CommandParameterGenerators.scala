@@ -63,10 +63,11 @@ trait CommandParameterGenerators {
   } yield CliCommandOutput(id, name, descr, prefix, pos, defVal, mapped, encFormat, createFolder)
 
   def mappedParamGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterMapping.MappedParam] =
-    Gen.oneOf(
-      commandParameterGen.map(CliParameterMapping.MappedParam.apply),
-      commandOutputGen.map(CliParameterMapping.MappedParam.apply),
-      commandInputGen.map(CliParameterMapping.MappedParam.apply)
+    Gen.frequency(
+      9 -> commandParameterGen.map(CliParameterMapping.MappedParam.apply),
+      9 -> commandOutputGen.map(CliParameterMapping.MappedParam.apply),
+      9 -> commandInputGen.map(CliParameterMapping.MappedParam.apply),
+      1 -> parameterMappingGen.map(CliParameterMapping.MappedParam.apply)
     )
 
   def parameterMappingGen(implicit renkuUrl: RenkuUrl): Gen[CliParameterMapping] = for {

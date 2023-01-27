@@ -24,7 +24,7 @@ import io.circe.DecodingFailure
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-sealed trait CliPlan {
+sealed trait CliPlan extends CliModel {
   def fold[A](fa: CliStepPlan => A, fb: CliCompositePlan => A): A
 }
 

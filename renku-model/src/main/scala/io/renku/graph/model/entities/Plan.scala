@@ -286,14 +286,13 @@ object StepPlan {
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        name             <- cursor.downField(schema / "name").as[Name]
-        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-        maybeCommand     <- cursor.downField(renku / "command").as[Option[Command]]
-        creators         <- cursor.downField(schema / "creator").as[List[Person]]
-        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        dateModified     <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
-        createdAt = dateModified.map(m => DateCreated(m.value)).getOrElse(dateCreated)
+        resourceId            <- cursor.downEntityId.as[ResourceId]
+        name                  <- cursor.downField(schema / "name").as[Name]
+        maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
+        maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
+        creators              <- cursor.downField(schema / "creator").as[List[Person]]
+        dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        dateModified          <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
         parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
@@ -303,8 +302,8 @@ object StepPlan {
         maybeDerivedFrom      <- cursor.downField(prov / "wasDerivedFrom").as(decodeOption(DerivedFrom.ttDecoder))
         maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
         plan <- {
-                  (maybeDerivedFrom, maybeInvalidationTime) match {
-                    case (None, None) =>
+                  (maybeDerivedFrom, maybeInvalidationTime, dateModified) match {
+                    case (None, None, None) =>
                       StepPlan
                         .from(
                           resourceId,
@@ -312,7 +311,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          createdAt,
+                          dateCreated,
                           maybeProgrammingLang,
                           keywords,
                           parameters,
@@ -320,7 +319,7 @@ object StepPlan {
                           outputs,
                           successCodes
                         )
-                    case (Some(derivedFrom), mit) =>
+                    case (Some(derivedFrom), mit, Some(modifiedAt)) =>
                       StepPlan
                         .from(
                           resourceId,
@@ -328,7 +327,7 @@ object StepPlan {
                           maybeDescription,
                           maybeCommand,
                           creators,
-                          createdAt,
+                          DateCreated(modifiedAt.value),
                           maybeProgrammingLang,
                           keywords,
                           parameters,
@@ -338,7 +337,14 @@ object StepPlan {
                           Derivation(derivedFrom, ResourceId(derivedFrom.value)),
                           mit
                         )
-                    case (None, Some(_)) => show"Plan $resourceId has no parent but invalidation time".invalidNel
+                    case (None, Some(_), None) => show"Plan $resourceId has no parent but invalidation time".invalidNel
+                    case (None, None, Some(_)) => show"Plan $resourceId has no parent but modified time".invalidNel
+                    case (None, Some(_), Some(_)) =>
+                      show"Plan $resourceId has no parent but modified and invalidation time".invalidNel
+                    case (Some(_), None, None) =>
+                      show"Plan $resourceId has a parent but no modified and no invalidation time".invalidNel
+                    case (Some(_), Some(_), None) =>
+                      show"Plan $resourceId has a parent and invalidation time, but no modification time".invalidNel
                   }
                 }.toEither.leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
       } yield plan

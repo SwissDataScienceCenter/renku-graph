@@ -47,6 +47,12 @@ sealed trait CompositePlan extends Plan {
   def modify(f: PlanType => PlanType): PlanType
 
   final def widen: Plan = this
+
+  final def recursivePlans: List[Plan] =
+    plans.toList.flatMap {
+      case cp: CompositePlan => cp :: cp.recursivePlans
+      case sp: StepPlan      => List(sp)
+    }
 }
 
 object CompositePlan {
