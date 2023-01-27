@@ -38,7 +38,6 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 
@@ -54,8 +53,6 @@ class DatasetsResourcesSpec
 
   private val creator = authUsers.generateOne
   private val user    = authUsers.generateOne
-
-  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
@@ -482,7 +479,7 @@ class DatasetsResourcesSpec
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, testProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
       `wait for events to be processed`(project.id)
 

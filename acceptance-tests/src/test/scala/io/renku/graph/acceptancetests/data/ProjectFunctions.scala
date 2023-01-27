@@ -18,14 +18,15 @@
 
 package io.renku.graph.acceptancetests.data
 
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.graph.model.cli.CliEntityConverterSyntax._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.tools.JsonLDTools.flattenedJsonLDFrom
-import io.renku.graph.model.{entities, persons}
+import io.renku.graph.model.{entities, persons, testentities}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.graph.model.RenkuTinyTypeGenerators._
-import io.renku.generators.Generators.Implicits._
 import monocle.Lens
 
 trait ProjectFunctions {
@@ -33,8 +34,14 @@ trait ProjectFunctions {
   def replaceCreatorId(gitLabId: persons.GitLabId): Project => Project =
     p => p.copy(maybeCreator = p.maybeCreator.map(memberGitLabId.set(gitLabId)))
 
+  def replaceCreatorFrom(creator: testentities.Person, gitLabId: persons.GitLabId): Project => Project =
+    _.copy(maybeCreator = toProjectMember(creator, gitLabId).some)
+
   def addMemberWithId(gitLabId: persons.GitLabId): Project => Project =
     p => p.copy(members = p.members :+ ProjectMember(personNames.generateOne, personUsernames.generateOne, gitLabId))
+
+  def addMemberFrom(person: testentities.Person, gitLabId: persons.GitLabId): Project => Project =
+    p => p.copy(members = p.members :+ toProjectMember(person, gitLabId))
 
   private def memberGitLabId: Lens[ProjectMember, persons.GitLabId] =
     Lens[ProjectMember, persons.GitLabId](_.gitLabId) { newGlId =>
@@ -48,6 +55,9 @@ trait ProjectFunctions {
     val cliProject = p.toCliEntity
     flattenedJsonLDFrom(cliProject.asJsonLD, cliProject.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
   }
+
+  private def toProjectMember(p: testentities.Person, gitLabId: persons.GitLabId): ProjectMember =
+    ProjectMember(p.name, persons.Username(p.name.show), gitLabId)
 }
 
 object ProjectFunctions extends ProjectFunctions
