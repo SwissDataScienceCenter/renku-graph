@@ -56,8 +56,6 @@ trait RenkuTinyTypeGenerators {
   implicit val renkuUrls: Gen[RenkuUrl] =
     Generators.httpUrls(hostGenerator = Generators.nonEmptyStrings().map(_.toLowerCase)) map RenkuUrl.apply
 
-  implicit val usernames: Gen[persons.Username] =
-    Generators.nonBlankStrings(minLength = 5).map(v => persons.Username(v.value))
   implicit val personAffiliations: Gen[persons.Affiliation] =
     Generators.nonBlankStrings(minLength = 4).map(v => persons.Affiliation(v.value))
 
@@ -75,6 +73,8 @@ trait RenkuTinyTypeGenerators {
     } yield persons.Email(s"$beforeAt@$afterAt")
   }
 
+  implicit val personUsernames: Gen[persons.Username] =
+    Generators.nonBlankStrings(minLength = 5).map(v => persons.Username(v.value))
   implicit val personNames: Gen[persons.Name] = for {
     first <- Generators.nonBlankStrings(
                minLength = 3,

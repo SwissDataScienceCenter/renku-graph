@@ -138,7 +138,7 @@ trait RenkuProjectEntitiesGenerators {
 
   implicit lazy val projectMembersNoEmail: Gen[ProjectMemberNoEmail] = for {
     name     <- personNames
-    username <- usernames
+    username <- personUsernames
     gitLabId <- personGitLabIds
   } yield ProjectMemberNoEmail(name, username, gitLabId)
 
@@ -250,11 +250,12 @@ trait RenkuProjectEntitiesGenerators {
     } yield (entities -> ds) -> (project addDatasets ds)
 
     def addDatasetAndModification[P <: Dataset.Provenance](
-        factory: DatasetGenFactory[P]
+        factory:    DatasetGenFactory[P],
+        creatorGen: Gen[Person] = personEntities
     ): Gen[(((T, Dataset[P]), Dataset[Dataset.Provenance.Modified]), RenkuProject)] = for {
       (entities, project) <- tupleGen
       originalDs          <- factory(project.dateCreated)
-      modifiedDs          <- originalDs.createModification()(project.dateCreated)
+      modifiedDs          <- originalDs.createModification(creatorGen = creatorGen)(project.dateCreated)
     } yield ((entities -> originalDs) -> modifiedDs) -> project.addDatasets(originalDs, modifiedDs)
 
     def addDatasetAndInvalidation[P <: Dataset.Provenance](
@@ -273,8 +274,8 @@ trait RenkuProjectEntitiesGenerators {
         ((entities, imported), updatedProject)
       }
 
-    def forkOnce(): Gen[(T, (RenkuProject, RenkuProject.WithParent))] =
-      tupleGen map { case (entities, project) => entities -> project.forkOnce() }
+    def forkOnce(creatorGen: Gen[Person] = personEntities): Gen[(T, (RenkuProject, RenkuProject.WithParent))] =
+      tupleGen map { case (entities, project) => entities -> project.forkOnce(creatorGen) }
   }
 
   implicit class RenkuProjectWithParentGenFactoryOps(projectGen: Gen[RenkuProject.WithParent]) {

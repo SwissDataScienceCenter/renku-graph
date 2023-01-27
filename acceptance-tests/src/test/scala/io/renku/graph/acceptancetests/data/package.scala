@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.syntax.all._
 import io.renku.config.renku
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{httpUrls => urls, _}
@@ -27,6 +28,8 @@ import io.renku.graph.acceptancetests.data.Project.Urls._
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.testentities.projectMembers
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
@@ -43,12 +46,31 @@ package object data extends TSData {
   ): Gen[Project] = for {
     project     <- projectGen
     id          <- projectIds
+    members     <- projectMembers.toGeneratorOfNonEmptyList(max = 3)
     updatedAt   <- timestamps(min = project.dateCreated.value, max = now).toGeneratorOf[DateUpdated]
     urls        <- urlsObjects
     starsCount  <- starsCounts
     permissions <- permissionsObjects
     statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
-  } yield Project(project, id, updatedAt, urls, starsCount, permissions, statistics)
+    _ = if (project.members.nonEmpty)
+          throw new Exception(show"Test project should not have members")
+    _ = if (project.maybeCreator.flatMap(_.maybeGitLabId).nonEmpty)
+          throw new Exception(show"Test project creator with GitLab id")
+  } yield Project(project,
+                  id,
+                  maybeCreator = project.maybeCreator.map(_.to[ProjectMember]),
+                  members,
+                  updatedAt,
+                  urls,
+                  starsCount,
+                  permissions,
+                  statistics
+  )
+
+  private implicit lazy val testPersonToProjectMember: testentities.Person => ProjectMember = { p =>
+    val m = ProjectMember(p.name, persons.Username(p.name.value), personGitLabIds.generateOne)
+    p.maybeEmail.map(m.add).getOrElse(m)
+  }
 
   def dataProjects(project: testentities.RenkuProject): Gen[Project] = dataProjects(fixed(project))
 
