@@ -19,24 +19,22 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
+import data.Project.Statistics.CommitsCount
+import data._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import flows.{AccessTokenPresence, TSProvisioning}
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
-import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning}
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphClass
 import io.renku.graph.model.events.EventStatusProgress
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.concurrent.Eventually
+import testing.AcceptanceTestPatience
+import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
 class EventsProcessingStatusSpec
     extends AcceptanceSpec
@@ -47,15 +45,17 @@ class EventsProcessingStatusSpec
     with Eventually
     with AcceptanceTestPatience {
 
-  private implicit val graph: GraphClass           = GraphClass.Default
   private val numberOfEvents: Int Refined Positive = 5
 
   Feature("Status of processing for a given project") {
 
     Scenario("As a user I would like to see processing status of my project") {
 
-      val user    = authUsers.generateOne
-      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
+      val user = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount(numberOfEvents.value)
+        ).map(addMemberWithId(user.id)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
@@ -66,7 +66,7 @@ class EventsProcessingStatusSpec
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, allCommitIds)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), allCommitIds)
       `data in the Triples Store`(project, allCommitIds, user.accessToken)
 
       Then("the status endpoint should return OK with some progress info")

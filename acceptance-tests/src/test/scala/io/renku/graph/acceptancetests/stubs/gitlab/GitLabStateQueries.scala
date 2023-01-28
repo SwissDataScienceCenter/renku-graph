@@ -90,11 +90,11 @@ trait GitLabStateQueries {
   def findPersonById(id: persons.GitLabId): StateQuery[Option[Person]] =
     _.persons.find(_.maybeGitLabId == id.some)
 
-  def projectsFor(user: Option[persons.GitLabId]): StateQuery[List[Project]] =
+  def projectsFor(userId: Option[persons.GitLabId]): StateQuery[List[Project]] =
     _.projects.filter { p =>
       p.entitiesProject.visibility == projects.Visibility.Public ||
-      user.exists(p.entitiesProject.members.flatMap(_.maybeGitLabId).contains) ||
-      p.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId) == user
+      userId.exists(p.members.map(_.gitLabId).contains_) ||
+      p.maybeCreator.map(_.gitLabId) == userId
     }
 
   def findProject(id: projects.GitLabId, user: Option[persons.GitLabId]): StateQuery[Option[Project]] =

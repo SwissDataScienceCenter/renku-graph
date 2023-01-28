@@ -27,6 +27,7 @@ import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.testentities.{Parent, Person}
 import org.http4s.Uri
 
@@ -38,6 +39,10 @@ trait JsonEncoders {
 
   implicit val personEncoder: Encoder[Person] = Encoder.instance { person =>
     Map("id" -> person.maybeGitLabId.asJson, "username" -> person.name.asJson, "name" -> person.name.asJson).asJson
+  }
+
+  implicit val projectMemberEncoder: Encoder[ProjectMember] = Encoder.instance { pm =>
+    Map("id" -> pm.gitLabId.asJson, "username" -> pm.username.asJson, "name" -> pm.name.asJson).asJson
   }
 
   implicit val pushEventEncoder: Encoder[PushEvent] =
@@ -134,12 +139,10 @@ trait JsonEncoders {
           "star_count"          -> project.starsCount.value.asJson,
           "path_with_namespace" -> project.path.value.asJson,
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
-          "creator_id" -> project.entitiesProject.maybeCreator
-            .flatMap(_.maybeGitLabId)
-            .asJson,
-          "last_activity_at" -> project.updatedAt.value.asJson,
-          "permissions"      -> project.permissions.asJson,
-          "statistics"       -> project.statistics.asJson,
+          "creator_id"          -> project.maybeCreator.map(_.gitLabId).asJson,
+          "last_activity_at"    -> project.updatedAt.value.asJson,
+          "permissions"         -> project.permissions.asJson,
+          "statistics"          -> project.statistics.asJson,
           "forked_from_project" -> (project.entitiesProject match {
             case withParent: Parent =>
               Json.obj("path_with_namespace" -> withParent.parent.path.value.asJson)

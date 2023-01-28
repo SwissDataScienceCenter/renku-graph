@@ -290,7 +290,7 @@ class DatasetSpec
           provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons)
         ),
         "Modified" -> datasetEntities(provenanceInternal(cliShapedPersons)).decoupledFromProject.generateOne
-          .createModification(creatorEntityGen = cliShapedPersons)
+          .createModification(creatorGen = cliShapedPersons)
       )
     } { (dsType, dsGenerator) =>
       s"fail if no creators - case $dsType DS" in {

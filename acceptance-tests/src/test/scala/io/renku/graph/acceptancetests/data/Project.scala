@@ -18,13 +18,14 @@
 
 package io.renku.graph.acceptancetests.data
 
-import cats.data.Validated
+import cats.data.{NonEmptyList, Validated}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.projects.{GitLabId, Name, Path}
 import io.renku.graph.model.testentities
 import io.renku.tinytypes._
@@ -35,6 +36,8 @@ import java.time.Instant
 
 final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              GitLabId,
+                         maybeCreator:    Option[ProjectMember],
+                         members:         NonEmptyList[ProjectMember],
                          updatedAt:       DateUpdated,
                          urls:            Urls,
                          starsCount:      StarsCount,

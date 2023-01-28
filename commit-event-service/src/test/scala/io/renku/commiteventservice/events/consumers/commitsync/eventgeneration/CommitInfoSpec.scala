@@ -132,7 +132,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
       val Left(exception) = json"""{
         "id":              ${commitInfo.id.value},
-        "author_name":     ${usernames.generateOne.value},
+        "author_name":     ${personUsernames.generateOne.value},
         "author_email":    ${personEmails.generateOne.value},
         "committer_name":  ${blankStrings().generateOne},
         "committer_email": ${blankStrings().generateOne},

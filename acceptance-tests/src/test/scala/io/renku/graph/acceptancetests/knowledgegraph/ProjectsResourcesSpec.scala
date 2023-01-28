@@ -26,14 +26,12 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphClass
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
+import io.renku.graph.model.entities
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
-import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
-import io.renku.jsonld.syntax._
 import org.http4s.Status._
 
 class ProjectsResourcesSpec
@@ -42,25 +40,31 @@ class ProjectsResourcesSpec
     with TSProvisioning
     with DatasetsApiEncoders {
 
-  private implicit val graph: GraphClass = GraphClass.Default
-  private val user = authUsers.generateOne
-  private val accessToken: AccessToken = user.accessToken
+  private val user        = authUsers.generateOne
+  private val accessToken = user.accessToken
 
   private val (parentProject, project) = {
-    val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = renkuProjectEntities(visibilityPublic)
-      .withDatasets(datasetEntities(provenanceInternal))
-      .generateOne
-      .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
-      .forkOnce()
+    val creatorGitLabId = personGitLabIds.generateOne
+    val creatorEmail    = personEmails.generateOne
+    val creator         = cliShapedPersons.generateOne.copy(maybeEmail = creatorEmail.some)
 
-    (dataProjects(parent).generateOne,
-     dataProjects(
-       child.copy(visibility = Visibility.Private,
-                  members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
-       )
-     ).generateOne
-    )
+    val (parent, child) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+      .withDatasets(datasetEntities(provenanceInternal(cliShapedPersons)))
+      .generateOne
+      .forkOnce(creatorsGen = cliShapedPersons)
+      .bimap(removeMembers(), removeMembers())
+
+    val parentDataProject = dataProjects(parent)
+      .map(replaceCreatorFrom(creator, creatorGitLabId))
+      .map(addMemberFrom(creator, creatorGitLabId))
+      .generateOne
+
+    val childDataProject =
+      dataProjects(child.copy(visibility = Visibility.Private, parent = parentDataProject.entitiesProject))
+        .map(addMemberWithId(user.id))
+        .generateOne
+
+    parentDataProject -> childDataProject
   }
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
@@ -72,13 +76,13 @@ class ProjectsResourcesSpec
 
       And("there are some data in the Triples Store")
       val parentCommitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
+      mockCommitDataOnTripleGenerator(parentProject, toPayloadJsonLD(parentProject), parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
 
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
 
       val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
 
@@ -116,5 +120,4 @@ class ProjectsResourcesSpec
       projectDetailsResponseForNonMember.status shouldBe NotFound
     }
   }
-
 }
