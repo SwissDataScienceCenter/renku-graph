@@ -18,17 +18,18 @@
 
 package io.renku.graph.acceptancetests
 
+import data.Project.Statistics.CommitsCount
+import data._
+import flows.AccessTokenPresence
 import io.circe.syntax.EncoderOps
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
-import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import org.http4s.Status._
+import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
 class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with ApplicationServices with AccessTokenPresence {
 
@@ -36,9 +37,12 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
-      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
-
       val user = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount.zero
+        ).map(addMemberWithId(user.id)).generateOne
+
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -54,8 +58,11 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
 
     Scenario("No Graph Services webhook on the project in GitLab") {
 
-      val user    = authUsers.generateOne
-      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.one).generateOne
+      val user = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount.one
+        ).map(addMemberWithId(user.id)).generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
