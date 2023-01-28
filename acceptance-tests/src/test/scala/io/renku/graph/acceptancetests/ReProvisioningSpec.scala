@@ -18,31 +18,27 @@
 
 package io.renku.graph.acceptancetests
 
-import cats.syntax.all._
+import data._
+import flows.TSProvisioning
 import io.circe.Json
 import io.renku.config.ServiceVersion
 import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.graph.model.{GraphClass, testentities}
-import io.renku.http.client.AccessToken
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.{entities, testentities}
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
 import org.scalatest.enablers.Retrying
 import org.scalatest.time.{Minutes, Seconds, Span}
+import tooling.{AcceptanceSpec, ApplicationServices, ServiceClient}
 
 import java.nio.file.{Files, Paths}
 
-class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
-
-  private implicit val graph: GraphClass = GraphClass.Default
+class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("ReProvisioning") {
 
@@ -53,12 +49,12 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       And("There is data from this version in Jena")
 
-      val project  = dataProjects(testEntitiesProject).generateOne
+      val project  = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
       val commitId = commitIds.generateOne
 
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
 
       `data in the Triples Store`(project, commitId, accessToken)
 
@@ -67,14 +63,15 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
 
       val newSchemaVersion = SchemaVersion(nonEmptyStrings().generateOne)
-      val testEntitiesProjectWithNewSchemaVersion = project.entitiesProject match {
+      val testProjectWithNewSchemaVersion = project.entitiesProject match {
         case p: testentities.RenkuProject.WithParent    => p.copy(version = newSchemaVersion)
         case p: testentities.RenkuProject.WithoutParent => p.copy(version = newSchemaVersion)
       }
 
-      `GET <triples-generator>/projects/:id/commits/:id returning OK`(project,
-                                                                      commitId,
-                                                                      testEntitiesProjectWithNewSchemaVersion.asJsonLD
+      `GET <triples-generator>/projects/:id/commits/:id returning OK`(
+        project,
+        commitId,
+        toPayloadJsonLD(testProjectWithNewSchemaVersion.to[entities.Project])
       )
 
       When("The compatibility matrix is updated, TG version changed and TG is restarted")
@@ -97,15 +94,15 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
   private object TestData {
 
-    val user = authUsers.generateOne
-    val accessToken: AccessToken = user.accessToken
+    val user                        = authUsers.generateOne
+    val accessToken                 = user.accessToken
     val initialProjectSchemaVersion = SchemaVersion("8")
 
-    val testEntitiesProject = renkuProjectEntities(visibilityPublic)
+    val testProject = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+      .modify(removeMembers())
       .map(_.copy(version = initialProjectSchemaVersion))
-      .withActivities(activityEntities(stepPlanEntities()))
+      .withActivities(activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons))
       .generateOne
-      .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }
 
   private def projectDetailsResponseIsValid(projectDetailsResponse:       ServiceClient.ClientResponse,

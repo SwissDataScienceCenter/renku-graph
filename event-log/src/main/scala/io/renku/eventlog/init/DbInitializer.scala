@@ -153,12 +153,6 @@ object DbInitializer {
       currentStatus = GenerationNonRecoverableFailure,
       destinationStatus = New,
       discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-    ),
-    FailedEventsRestorer[F](
-      "%Invalidation time % on StepPlan % is older than dateCreated%",
-      currentStatus = TransformationNonRecoverableFailure,
-      destinationStatus = TriplesGenerated,
-      discardingStatuses = TriplesStore :: Nil
     )
   )
 

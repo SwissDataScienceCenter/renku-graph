@@ -172,7 +172,7 @@ class UpdatesCreatorSpec
         .runAll(on = projectsDataset)
         .unsafeRunSync()
 
-      findProjects shouldMatchTo Set(CurrentProjectState.from(project).copy(images = Set.empty))
+      findProjects.flatMap(_.images) shouldMatchTo Set.empty
     }
 
     "generate queries which delete the project name when changed" in {

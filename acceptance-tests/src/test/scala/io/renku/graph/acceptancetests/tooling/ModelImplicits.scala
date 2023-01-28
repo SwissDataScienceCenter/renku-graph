@@ -29,7 +29,7 @@ trait ModelImplicits {
   implicit class PersonOps(person: Person) {
 
     def asMember(): (persons.GitLabId, persons.Username, persons.Name) =
-      (person.maybeGitLabId getOrElse personGitLabIds.generateOne, usernames.generateOne, person.name)
+      (person.maybeGitLabId getOrElse personGitLabIds.generateOne, personUsernames.generateOne, person.name)
 
     def asMembersList(): NonEmptyList[(persons.GitLabId, persons.Username, persons.Name)] =
       NonEmptyList.of(person.asMember())

@@ -20,20 +20,19 @@ package io.renku.graph.acceptancetests
 
 import cats.effect.IO
 import cats.syntax.all._
+import data._
+import db.EventLog
+import flows.AccessTokenPresence
 import io.circe.literal._
 import io.renku.eventlog._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects._
+import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
@@ -42,6 +41,8 @@ import org.scalatest.time.{Minutes, Seconds, Span}
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Command, Session, ~}
+import testing.AcceptanceTestPatience
+import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
 import java.lang.Thread.sleep
 import java.time.Instant
@@ -65,11 +66,12 @@ class ZombieEventDetectionSpec
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
   ) {
-    val user      = authUsers.generateOne
-    val project   = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
-    val commitId  = commitIds.generateOne
-    val eventDate = eventDates.generateOne
+    val user = authUsers.generateOne
+    val project = dataProjects(
+      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
+    ).map(addMemberWithId(user.id)).generateOne
 
+    val commitId  = commitIds.generateOne
     Given("Triples generation is successful")
     `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
@@ -81,6 +83,7 @@ class ZombieEventDetectionSpec
     givenAccessTokenPresentFor(project, user.accessToken)
 
     And("an event that should be classified as zombie is in the EventLog DB")
+    val eventDate = eventDates.generateOne
     insertProjectToDB(project, eventDate) shouldBe 1
     EventLog.execute { implicit session =>
       insertEventToDB(commitId, project, eventDate) >> insertEventDeliveryToDB(commitId, project)

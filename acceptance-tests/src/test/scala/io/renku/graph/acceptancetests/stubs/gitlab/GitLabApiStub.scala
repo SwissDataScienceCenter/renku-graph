@@ -108,7 +108,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
         case GET -> Root / ProjectPath(path) / ("users" | "members") =>
           query(findProjectByPath(path, maybeAuthedReq))
-            .map(_.toList.flatMap(_.entitiesProject.members.toList))
+            .map(_.toList.flatMap(_.members.toList))
             .flatMap(Ok(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" =>

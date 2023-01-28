@@ -16,45 +16,43 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.knowledgegraph
+package io.renku.graph.acceptancetests
+package knowledgegraph
 
 import cats.syntax.all._
+import data._
+import flows.TSProvisioning
 import io.circe.literal._
 import io.circe.{ACursor, Json}
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.fixed
-import io.renku.graph.acceptancetests.data.{TSData, cliVersion, dataProjects}
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
-import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
-import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
+import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef, cliShapedPersons, removeMembers, replaceProjectCreator, visibilityPrivate}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
+import tooling.{AcceptanceSpec, ApplicationServices}
 
 class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
-
-  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/files/<location>/lineage to find a file's lineage") {
     val (exemplarData, project) = {
       val lineageData = LineageExemplarData(
-        renkuProjectEntities(visibilityPublic)
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
           .map(
             _.copy(
               path = projects.Path("public/lineage-project-for-rest"),
               agent = cliVersion
             )
           )
-          .generateOne
+          .generateOne,
+        personGen = cliShapedPersons
       )
       (lineageData, dataProjects(lineageData.project).generateOne)
     }
@@ -72,12 +70,12 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
      *                grid_plot
      */
     Scenario("As a user I would like to find a public project's lineage") {
-      val user = authUsers.generateOne
-      val token: AccessToken = user.accessToken
+      val user  = authUsers.generateOne
+      val token = user.accessToken
 
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, token)
@@ -88,7 +86,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
 
       Then("they should get Ok response with project lineage in Json")
       response.status shouldBe Ok
-      val lineageJson: ACursor = response.jsonBody.hcursor
+      val lineageJson = response.jsonBody.hcursor
 
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(exemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
@@ -101,16 +99,17 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
 
     Scenario("As an authenticated user I would like to find lineage of project I am a member of") {
       val accessibleExemplarData = LineageExemplarData(
-        renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
-          path = model.projects.Path("accessible/member-project-for-rest"),
-          members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-        )
+        renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .generateOne
+          .copy(path = model.projects.Path("accessible/member-project-for-rest")),
+        personGen = cliShapedPersons
       )
 
       Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
-      val project  = dataProjects(accessibleExemplarData.project).generateOne
-      mockCommitDataOnTripleGenerator(project, accessibleExemplarData.project.asJsonLD, commitId)
+      val project  = dataProjects(accessibleExemplarData.project).map(addMemberWithId(user.id)).generateOne
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
       `data in the Triples Store`(project, commitId, accessToken)
@@ -130,21 +129,24 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
     }
 
     Scenario("As an non-member user I should not be able to find a lineage from a private project") {
-      val creator = authUsers.generateOne
+      val creator       = authUsers.generateOne
+      val creatorPerson = cliShapedPersons.generateOne
       val privateExemplarData = LineageExemplarData(
-        renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
-          path = model.projects.Path("private/secret-project-for-rest"),
-          members = Set.empty,
-          maybeCreator = personEntities(fixed(creator.id.some)).generateOne.some
-        )
+        renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .modify(replaceProjectCreator(creatorPerson.some))
+          .generateOne
+          .copy(path = model.projects.Path("private/secret-project-for-rest")),
+        personGen = cliShapedPersons
       )
       val commitId = commitIds.generateOne
-      val project  = dataProjects(privateExemplarData.project).generateOne
+      val project =
+        dataProjects(privateExemplarData.project).map(replaceCreatorFrom(creatorPerson, creator.id)).generateOne
 
       Given("I am authenticated")
       gitLabStub.addAuthenticated(creator)
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, privateExemplarData.project.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")

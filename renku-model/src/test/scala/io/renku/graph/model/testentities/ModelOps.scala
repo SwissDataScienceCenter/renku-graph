@@ -327,10 +327,10 @@ trait ModelOps extends Dataset.ProvenanceOps {
         }
 
     def createModification(
-        modifier:         Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity,
-        creatorEntityGen: Gen[Person] = personEntities
+        modifier:   Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity,
+        creatorGen: Gen[Person] = personEntities
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate, creatorEntityGen)).modify(modifier)
+      (projectDate => modifiedDatasetEntities(dataset, projectDate, creatorGen)).modify(modifier)
 
     def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 
@@ -456,8 +456,13 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
   implicit val creatorUsernameUpdaterInternal
-      : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
-    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
+      : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal =
+    creatorUsernameUpdaterInternal()
+
+  def creatorUsernameUpdaterInternal(
+      creatorGen: Gen[Person] = personEntities
+  ): (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
+    prov.copy(creators = (creatorGen.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorInternal
