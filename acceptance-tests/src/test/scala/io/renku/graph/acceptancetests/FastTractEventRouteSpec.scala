@@ -45,7 +45,7 @@ class FastTractEventRouteSpec
 
       val user = authUsers.generateOne
       val project = dataProjects(
-        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
       ).map(addMemberWithId(user.id)).generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
