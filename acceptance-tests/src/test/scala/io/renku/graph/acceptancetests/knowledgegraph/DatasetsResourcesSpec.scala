@@ -48,7 +48,6 @@ class DatasetsResourcesSpec
     with ApplicationServices
     with TSProvisioning
     with TSData
-    with ProjectFunctions
     with DatasetsApiEncoders {
 
   private val creator = authUsers.generateOne

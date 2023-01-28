@@ -20,25 +20,20 @@ package io.renku.graph.acceptancetests
 package knowledgegraph
 
 import cats.syntax.all._
-import data.dataProjects
+import data._
 import flows.TSProvisioning
 import io.circe.Decoder._
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.userAccessTokens
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, projects}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.{entities, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
 import tooling.{AcceptanceSpec, ApplicationServices}
 
 class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
-
-  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {
 
@@ -46,31 +41,31 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
 
       Given("user has an activated project")
 
-      val userId      = personGitLabIds.generateOne
-      val user        = personEntities(fixed(userId.some)).generateOne
-      val accessToken = userAccessTokens.generateOne
-      gitLabStub.addAuthenticated(userId, accessToken)
+      val user = authUsers.generateOne
+      gitLabStub.addAuthenticated(user.id, user.accessToken)
 
       val activatedProject = dataProjects(
-        renkuProjectEntities(anyVisibility).modify(replaceMembers(Set(user))).generateOne
-      ).generateOne
+        renkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
+      ).map(addMemberWithId(user.id)).generateOne
 
       val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(activatedProject, activatedProject.entitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(activatedProject,
+                                      toPayloadJsonLD(activatedProject.entitiesProject.to[entities.Project]),
+                                      commitId
+      )
       gitLabStub.setupProject(activatedProject, commitId)
-      `data in the Triples Store`(activatedProject, commitId, accessToken)
+      `data in the Triples Store`(activatedProject, commitId, user.accessToken)
 
       And("he has a not activated project")
-
       val notActivatedProject = dataProjects(
-        renkuProjectEntities(visibilityPublic).generateOne
-      ).generateOne
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()).generateOne
+      ).map(addMemberWithId(user.id)).generateOne
 
       gitLabStub.addProject(notActivatedProject)
 
       When("user navigates to GET knowledge-graph/users/:id/projects")
 
-      val response = knowledgeGraphClient GET (s"knowledge-graph/users/$userId/projects", accessToken)
+      val response = knowledgeGraphClient GET (s"knowledge-graph/users/${user.id}/projects", user.accessToken)
 
       Then("he should get OK response with all the projects")
       response.status shouldBe Ok

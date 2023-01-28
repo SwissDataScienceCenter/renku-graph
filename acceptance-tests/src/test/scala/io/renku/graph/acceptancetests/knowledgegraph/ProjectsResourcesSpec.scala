@@ -38,7 +38,6 @@ class ProjectsResourcesSpec
     extends AcceptanceSpec
     with ApplicationServices
     with TSProvisioning
-    with ProjectFunctions
     with DatasetsApiEncoders {
 
   private val user        = authUsers.generateOne
