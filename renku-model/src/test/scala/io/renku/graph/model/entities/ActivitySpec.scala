@@ -186,9 +186,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       error.message should endWith(s"Activity ${entitiesActivity.resourceId} without or with multiple authors")
     }
 
-    // This test needed to be temporarily disabled; see https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
-    "fail if Activity startTime is older than Plan creation date" ignore {
-
+    "fail if Activity startTime is older than Plan creation date" in {
       val activity = {
         val a = activityEntities(stepPlanEntities())(projectCreatedDates().generateOne).generateOne
         a.replaceStartTime(timestamps(max = a.plan.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime))

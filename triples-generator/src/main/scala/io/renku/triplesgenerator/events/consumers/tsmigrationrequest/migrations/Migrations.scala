@@ -37,7 +37,6 @@ private[tsmigrationrequest] object Migrations {
     datasetsRemover                <- DatasetsRemover[F]
     reProvisioning                 <- ReProvisioning[F](config)
     removeNotLinkedPersons         <- RemoveNotLinkedPersons[F]
-    fixPlansYoungerThanActivities  <- FixPlansYoungerThanActivities[F]
     compositePlan                  <- CompositePlanProvision.create[F]
     fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
     addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
@@ -46,7 +45,6 @@ private[tsmigrationrequest] object Migrations {
                     datasetsRemover,
                     reProvisioning,
                     removeNotLinkedPersons,
-                    fixPlansYoungerThanActivities,
                     compositePlan,
                     fixMultipleProjectCreatedDates,
                     addRenkuPlanWhereMissing
