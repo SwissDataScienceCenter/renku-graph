@@ -29,7 +29,6 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.entities
 import io.renku.graph.model.events.EventStatusProgress
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import org.http4s.Status._
@@ -67,10 +66,7 @@ class EventsProcessingStatusSpec
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
-      mockCommitDataOnTripleGenerator(project,
-                                      toPayloadJsonLD(project.entitiesProject.to[entities.Project]),
-                                      allCommitIds
-      )
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), allCommitIds)
       `data in the Triples Store`(project, allCommitIds, user.accessToken)
 
       Then("the status endpoint should return OK with some progress info")

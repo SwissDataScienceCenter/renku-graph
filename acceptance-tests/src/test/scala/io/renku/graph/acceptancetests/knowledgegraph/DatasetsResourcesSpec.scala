@@ -187,10 +187,7 @@ class DatasetsResourcesSpec
       val commitId = commitIds.generateOne
       gitLabStub.addAuthenticated(creator, user)
       gitLabStub.setupProject(privateProject, commitId)
-      mockCommitDataOnTripleGenerator(privateProject,
-                                      toPayloadJsonLD(privateProject.entitiesProject.to[entities.Project]),
-                                      commitId
-      )
+      mockCommitDataOnTripleGenerator(privateProject, toPayloadJsonLD(privateProject), commitId)
       `data in the Triples Store`(privateProject, commitId, creator.accessToken)
 
       When("there's an authenticated user who is not a member of the project")
@@ -425,7 +422,7 @@ class DatasetsResourcesSpec
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
 
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
 
       `data in the Triples Store`(project, commitId, authUser.accessToken)
     }
@@ -447,7 +444,7 @@ class DatasetsResourcesSpec
       gitLabStub.addAuthenticated(creator)
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches dataset details with GET knowledge-graph/datasets/:id")
@@ -478,7 +475,7 @@ class DatasetsResourcesSpec
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
       `wait for events to be processed`(project.id)
 

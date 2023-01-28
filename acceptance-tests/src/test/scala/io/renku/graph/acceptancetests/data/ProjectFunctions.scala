@@ -25,7 +25,7 @@ import io.renku.graph.model.cli.CliEntityConverterSyntax._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
 import io.renku.graph.model.tools.JsonLDTools.flattenedJsonLDFrom
-import io.renku.graph.model.{entities, persons, testentities}
+import io.renku.graph.model._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import monocle.Lens
@@ -51,6 +51,11 @@ trait ProjectFunctions {
         case m: ProjectMember.ProjectMemberWithEmail => m.copy(gitLabId = newGlId)
       }
     }
+
+  def toPayloadJsonLD(p: Project)(implicit renkuUrl: RenkuUrl): JsonLD = {
+    import io.renku.graph.model.testentities.ProjectOps
+    toPayloadJsonLD(new ProjectOps(p.entitiesProject).to[entities.Project])
+  }
 
   val toPayloadJsonLD: entities.Project => JsonLD = p => {
     val cliProject = p.toCliEntity

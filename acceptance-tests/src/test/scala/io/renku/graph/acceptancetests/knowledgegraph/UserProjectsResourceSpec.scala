@@ -27,8 +27,8 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
 import tooling.{AcceptanceSpec, ApplicationServices}
@@ -49,10 +49,7 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
       ).map(addMemberWithId(user.id)).generateOne
 
       val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(activatedProject,
-                                      toPayloadJsonLD(activatedProject.entitiesProject.to[entities.Project]),
-                                      commitId
-      )
+      mockCommitDataOnTripleGenerator(activatedProject, toPayloadJsonLD(activatedProject), commitId)
       gitLabStub.setupProject(activatedProject, commitId)
       `data in the Triples Store`(activatedProject, commitId, user.accessToken)
 

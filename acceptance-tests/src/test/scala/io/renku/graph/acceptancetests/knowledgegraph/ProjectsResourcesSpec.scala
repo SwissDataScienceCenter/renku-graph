@@ -76,10 +76,7 @@ class ProjectsResourcesSpec
 
       And("there are some data in the Triples Store")
       val parentCommitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(parentProject,
-                                      toPayloadJsonLD(parentProject.entitiesProject.to[entities.Project]),
-                                      parentCommitId
-      )
+      mockCommitDataOnTripleGenerator(parentProject, toPayloadJsonLD(parentProject), parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
 
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
