@@ -28,27 +28,25 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data
+import io.renku.graph.acceptancetests.data.toPayloadJsonLD
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, TestLogger}
 import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
-import io.renku.jsonld.syntax._
 
 trait RemoteTriplesGenerator {
   self: ApplicationServices =>
-
-  private implicit val graph: GraphClass = GraphClass.Default
 
   import RemoteTriplesGeneratorWiremockInstance._
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:  data.Project,
       commitId: CommitId
-  )(implicit gitLabApiUrl: GitLabApiUrl, renkuUrl: RenkuUrl): Unit =
+  )(implicit renkuUrl: RenkuUrl): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
-      project.entitiesProject.asJsonLD.flatten.fold(throw _, identity)
+      toPayloadJsonLD(project)
     )
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK`(
