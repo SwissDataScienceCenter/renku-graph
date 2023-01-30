@@ -35,56 +35,56 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 
 private sealed trait Dataset extends Product with Serializable {
-  val resourceId:       ResourceId
-  val id:               Identifier
-  val title:            Title
-  val name:             Name
-  val versions:         DatasetVersions
-  val maybeInitialTag:  Option[Tag]
-  val maybeDescription: Option[Description]
-  val creators:         List[DatasetCreator]
-  val date:             Date
-  val parts:            List[DatasetPart]
-  val project:          DatasetProject
-  val usedIn:           List[DatasetProject]
-  val keywords:         List[Keyword]
-  val images:           List[ImageUri]
+  val resourceId:         ResourceId
+  val id:                 Identifier
+  val title:              Title
+  val name:               Name
+  val versions:           DatasetVersions
+  val maybeInitialTag:    Option[Tag]
+  val maybeDescription:   Option[Description]
+  val creators:           List[DatasetCreator]
+  val createdOrPublished: CreatedOrPublished
+  val parts:              List[DatasetPart]
+  val project:            DatasetProject
+  val usedIn:             List[DatasetProject]
+  val keywords:           List[Keyword]
+  val images:             List[ImageUri]
 }
 
 private object Dataset {
 
-  final case class NonModifiedDataset(resourceId:       ResourceId,
-                                      id:               Identifier,
-                                      title:            Title,
-                                      name:             Name,
-                                      sameAs:           SameAs,
-                                      versions:         DatasetVersions,
-                                      maybeInitialTag:  Option[Tag],
-                                      maybeDescription: Option[Description],
-                                      creators:         List[DatasetCreator],
-                                      date:             Date,
-                                      parts:            List[DatasetPart],
-                                      project:          DatasetProject,
-                                      usedIn:           List[DatasetProject],
-                                      keywords:         List[Keyword],
-                                      images:           List[ImageUri]
+  final case class NonModifiedDataset(resourceId:         ResourceId,
+                                      id:                 Identifier,
+                                      title:              Title,
+                                      name:               Name,
+                                      sameAs:             SameAs,
+                                      versions:           DatasetVersions,
+                                      maybeInitialTag:    Option[Tag],
+                                      maybeDescription:   Option[Description],
+                                      creators:           List[DatasetCreator],
+                                      createdOrPublished: CreatedOrPublished,
+                                      parts:              List[DatasetPart],
+                                      project:            DatasetProject,
+                                      usedIn:             List[DatasetProject],
+                                      keywords:           List[Keyword],
+                                      images:             List[ImageUri]
   ) extends Dataset
 
-  final case class ModifiedDataset(resourceId:       ResourceId,
-                                   id:               Identifier,
-                                   title:            Title,
-                                   name:             Name,
-                                   derivedFrom:      DerivedFrom,
-                                   versions:         DatasetVersions,
-                                   maybeInitialTag:  Option[Tag],
-                                   maybeDescription: Option[Description],
-                                   creators:         List[DatasetCreator],
-                                   date:             DateCreated,
-                                   parts:            List[DatasetPart],
-                                   project:          DatasetProject,
-                                   usedIn:           List[DatasetProject],
-                                   keywords:         List[Keyword],
-                                   images:           List[ImageUri]
+  final case class ModifiedDataset(resourceId:         ResourceId,
+                                   id:                 Identifier,
+                                   title:              Title,
+                                   name:               Name,
+                                   derivedFrom:        DerivedFrom,
+                                   versions:           DatasetVersions,
+                                   maybeInitialTag:    Option[Tag],
+                                   maybeDescription:   Option[Description],
+                                   creators:           List[DatasetCreator],
+                                   createdOrPublished: DateCreated,
+                                   parts:              List[DatasetPart],
+                                   project:            DatasetProject,
+                                   usedIn:             List[DatasetProject],
+                                   keywords:           List[Keyword],
+                                   images:             List[ImageUri]
   ) extends Dataset
 
   final case class DatasetPart(location: PartLocation)
@@ -112,8 +112,8 @@ private object Dataset {
         ("versions" -> dataset.versions.asJson).some,
         dataset.maybeInitialTag.map(tag => "tags" -> json"""{"initial": ${tag.asJson}}"""),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        ("published" -> (dataset.creators -> dataset.date).asJson).some,
-        dataset.date match {
+        ("published" -> (dataset.creators -> dataset.createdOrPublished).asJson).some,
+        dataset.createdOrPublished match {
           case DatePublished(_)  => Option.empty[(String, Json)]
           case DateCreated(date) => ("created" -> date.asJson).some
         },
@@ -131,7 +131,7 @@ private object Dataset {
   }
   // format: on
 
-  private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
+  private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], CreatedOrPublished)] = Encoder.instance {
     case (creators, DatePublished(date)) => json"""{
       "datePublished": $date,
       "creator"      : $creators

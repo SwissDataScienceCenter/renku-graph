@@ -32,7 +32,7 @@ trait DatasetGenerators {
       resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds(identifier)
       title              <- RenkuTinyTypeGenerators.datasetTitles
       name               <- RenkuTinyTypeGenerators.datasetNames
-      createdOrPublished <- RenkuTinyTypeGenerators.datasetDates
+      createdOrPublished <- RenkuTinyTypeGenerators.datasetCreatedOrPublished
       creators           <- PersonGenerators.cliPersonGen.toGeneratorOfNonEmptyList(max = 3)
       descr              <- RenkuTinyTypeGenerators.datasetDescriptions.toGeneratorOfOptions
       keywords           <- RenkuTinyTypeGenerators.datasetKeywords.toGeneratorOfList(max = 3)

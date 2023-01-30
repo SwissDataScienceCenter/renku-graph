@@ -33,7 +33,7 @@ final case class CliDataset(
     identifier:         Identifier,
     title:              Title,
     name:               Name,
-    createdOrPublished: Date,
+    createdOrPublished: CreatedOrPublished,
     dateModified:       Option[DateModified],
     creators:           NonEmptyList[CliPerson],
     description:        Option[Description],

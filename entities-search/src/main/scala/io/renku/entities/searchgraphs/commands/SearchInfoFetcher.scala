@@ -195,7 +195,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
       def toCreatedOrPublished(maybeDateCreated:   Option[datasets.DateCreated],
                                maybeDatePublished: Option[datasets.DatePublished]
-      )(implicit topSameAs: TopmostSameAs): Either[DecodingFailure, datasets.Date] = Either.fromOption(
+      )(implicit topSameAs: TopmostSameAs): Either[DecodingFailure, datasets.CreatedOrPublished] = Either.fromOption(
         maybeDateCreated orElse maybeDatePublished,
         ifNone = DecodingFailure(
           DecodingFailure.Reason.CustomReason(s"neither dateCreated nor datePublished for $topSameAs"),

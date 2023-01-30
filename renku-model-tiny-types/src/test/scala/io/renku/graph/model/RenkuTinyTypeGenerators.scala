@@ -190,10 +190,10 @@ trait RenkuTinyTypeGenerators {
   def datasetCreatedDates(min: Instant = Instant.EPOCH): Gen[datasets.DateCreated] =
     Generators.timestamps(min, max = Instant.now()).map(datasets.DateCreated.apply)
 
-  lazy val datasetDates: Gen[datasets.Date] =
+  lazy val datasetCreatedOrPublished: Gen[datasets.CreatedOrPublished] =
     Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(datasets.DatePublished(LocalDate.EPOCH)))
 
-  def datasetModifiedDates(notYoungerThan: datasets.Date): Gen[datasets.DateModified] =
+  def datasetModifiedDates(notYoungerThan: datasets.CreatedOrPublished): Gen[datasets.DateModified] =
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(datasets.DateModified(_))
 
   implicit val datasetKeywords: Gen[datasets.Keyword] =

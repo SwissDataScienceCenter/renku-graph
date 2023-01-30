@@ -172,8 +172,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] =
-      Encoder.instance[(List[DatasetCreator], Date)] {
+    private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], CreatedOrPublished)] =
+      Encoder.instance[(List[DatasetCreator], CreatedOrPublished)] {
         case (creators, DatePublished(date)) => json"""{
           "creator":       $creators,
           "datePublished": $date
@@ -223,7 +223,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     name              <- datasetNames
     maybeDescription  <- datasetDescriptions.toGeneratorOfOptions
     creators          <- personEntities.toGeneratorOfNonEmptyList(max = 4)
-    dates             <- datasetDates
+    dates             <- datasetCreatedOrPublished
     exemplarProjectId <- projectResourceIds
     projectsCount     <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     keywords          <- datasetKeywords.toGeneratorOfList()

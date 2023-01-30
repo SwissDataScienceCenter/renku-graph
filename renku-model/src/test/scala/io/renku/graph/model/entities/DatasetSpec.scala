@@ -223,7 +223,7 @@ class DatasetSpec
 
       assume(modelDs.identification.identifier.value != modelDs.provenance.originalIdentifier.value)
 
-      val cliDs = modelDs.toCliEntity.copy(createdOrPublished = datasetDates.generateOne)
+      val cliDs = modelDs.toCliEntity.copy(createdOrPublished = datasetCreatedOrPublished.generateOne)
 
       encodeAndDecodeToModel(cliDs) shouldBe List(modelDs).asRight
     }
