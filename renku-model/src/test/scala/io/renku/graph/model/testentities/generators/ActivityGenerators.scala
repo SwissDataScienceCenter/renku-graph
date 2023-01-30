@@ -131,7 +131,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
         id       <- ProjectBasedGenFactory.liftF(planIdentifiers)
         name     <- ProjectBasedGenFactory.liftF(planNames)
         creators <- ProjectBasedGenFactory.liftF(creatorGen.toGeneratorOfList(max = 3))
-        descr    <- ProjectBasedGenFactory.liftF(Gen.some(planDescriptions))
+        descr    <- ProjectBasedGenFactory.liftF(planDescriptions.toGeneratorOfSomes)
         kw       <- ProjectBasedGenFactory.liftF(planKeywords.toGeneratorOfList())
         cp = CompositePlan.NonModified(
                id = id,

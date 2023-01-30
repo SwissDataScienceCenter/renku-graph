@@ -23,13 +23,13 @@ import cats.syntax.all._
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.DecodingFailure
 import io.circe.syntax._
-import io.renku.cli.model.CliProject
+import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.cli.{CliActivityConverters, CliCommonConverters, CliConverters, CliPlanConverters, CliProjectConverters}
+import io.renku.graph.model.cli._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
@@ -363,7 +363,8 @@ class ProjectSpec
       }
     }
 
-    "validate composite plans in a project failing to find referenced entities" in {
+    "fail composite plans validation in case of missing referenced entities" in {
+
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
@@ -387,12 +388,14 @@ class ProjectSpec
     }
 
     "validate a correct composite plan in a project" in {
+
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
-      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
-        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _))))
+
+      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities(personGen = cliShapedPersons)
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities(cliShapedPersons, _))))
 
       forAll(projectGen) { project =>
         validate(project.to[entities.Project].plans)
@@ -405,34 +408,42 @@ class ProjectSpec
           .cursor
           .as[List[entities.CompositePlan]]
 
-        decoded shouldBe Right(project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan]))
+        decoded.value shouldBe project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan])
       }
     }
 
-    "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanNonEmptyMappings(personEntities).generateOne
+    "fail composite plan validation in case there are references pointing outside of this composite plan" in {
+
+      val testPlan = compositePlanNonEmptyMappings(cliShapedPersons).generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
-      // find a plan belonging to some mapped parameter
-      val mappedPlanId = testPlan.mappings.head.mappedParam.head.planId
+      val testCliPlan =
+        CliPlanConverters.from(testPlan.to[entities.CompositePlan], testPlan.recursivePlans.map(_.to[entities.Plan]))
+
+      // find a parameter id that is mapped
+      val mappedParameterId =
+        testCliPlan.mappings.headOption
+          .map(_.mapsTo.head.fold(_.resourceId, _.resourceId, _.resourceId, _.resourceId))
+          .getOrElse(fail("Cannot find any mapping"))
 
       // remove this plan from the children plan list
-      val invalidPlan =
-        testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
+      val invalidCliPlan =
+        testCliPlan.copy(plans =
+          NonEmptyList.fromListUnsafe(
+            testCliPlan.plans.filterNot(_.fold(allStepParameterIds, allMappingParameterIds).contains(mappedParameterId))
+          )
+        )
 
       // for convenience decode it all into a list
-      val decodeAll = CliPlanConverters
-        .from(invalidPlan.to[entities.CompositePlan], invalidPlan.recursivePlans.map(_.to[entities.Plan]))
-        .asFlattenedJsonLD
-        .cursor
-        .as[List[entities.Plan]]
+      val decoded = invalidCliPlan.asFlattenedJsonLD.cursor.as[List[entities.Plan]]
 
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
 
-      validate(decodeAll.toOption.get).isInvalid shouldBe true
+      decoded                           shouldBe a[Right[_, _]]
+      validate(decoded.value).isInvalid shouldBe true
     }
 
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
@@ -1223,50 +1234,6 @@ class ProjectSpec
     val schemaVersion = projectSchemaVersions.generateOne
   }
 
-  private def projectCli(
-      resourceId:    projects.ResourceId,
-      cliVersion:    CliVersion,
-      schemaVersion: SchemaVersion,
-      description:   Option[Description],
-      keywords:      Set[Keyword],
-      creator:       Option[Person],
-      created:       DateCreated,
-      //activities:    List[Activity],
-      //datasets:      List[Dataset[Dataset.Provenance]],
-      plans:         List[testentities.Plan]
-  ): CliProject =
-    CliProject(
-      id = resourceId,
-      name = None,
-      description = description,
-      dateCreated = created,
-      creator = creator.map(CliConverters.from),
-      keywords = keywords,
-      images = Nil,
-      plans = plans.map(
-        _.fold(
-          p =>
-            CliProject.ProjectPlan(
-              CliProjectConverters.from(p.asInstanceOf[testentities.StepPlan].to[entities.StepPlan])
-            ),
-          p =>
-            CliProject.ProjectPlan(CliPlanConverters.from(p.asInstanceOf[testentities.StepPlan].to[entities.StepPlan])),
-          p =>
-            CliProject.ProjectPlan(
-              CliPlanConverters.from(p.asInstanceOf[testentities.CompositePlan].to[entities.CompositePlan], Nil)
-            ),
-          p =>
-            CliProject.ProjectPlan(
-              CliPlanConverters.from(p.asInstanceOf[testentities.CompositePlan].to[entities.CompositePlan], Nil)
-            )
-        )
-      ),
-      datasets = Nil,
-      activities = Nil,
-      agentVersion = cliVersion.some,
-      schemaVersion = schemaVersion.some
-    )
-
   private def cliJsonLD(resourceId:       projects.ResourceId,
                         cliVersion:       CliVersion,
                         schemaVersion:    SchemaVersion,
@@ -1285,26 +1252,23 @@ class ProjectSpec
         if (Random.nextBoolean()) blankStrings().generateOne.asJsonLD
         else maybeDescription.asJsonLD
     }
-    implicit val gc: GraphClass = GraphClass.Default
-    val x = scala.util.Try(
-      flattenedJsonLDFrom(
-        JsonLD.entity(
-          resourceId.asEntityId,
-          EntityTypes of (prov / "Location", schema / "Project"),
-          schema / "agent"         -> cliVersion.asJsonLD,
-          schema / "schemaVersion" -> schemaVersion.asJsonLD,
-          schema / "description"   -> descriptionJsonLD,
-          schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
-          schema / "creator"       -> maybeCreator.map(CliCommonConverters.from).asJsonLD,
-          schema / "dateCreated"   -> dateCreated.asJsonLD,
-          renku / "hasActivity"    -> activities.map(CliActivityConverters.from(_, plans)).asJsonLD,
-          renku / "hasDataset"     -> datasets.map(CliConverters.from).asJsonLD,
-          renku / "hasPlan"        -> plans.asJsonLD
-        ),
-        datasets.flatMap(_.publicationEvents.map(CliConverters.from).map(_.asJsonLD)): _*
-      )
+
+    flattenedJsonLDFrom(
+      JsonLD.entity(
+        resourceId.asEntityId,
+        EntityTypes of (prov / "Location", schema / "Project"),
+        schema / "agent"         -> cliVersion.asJsonLD,
+        schema / "schemaVersion" -> schemaVersion.asJsonLD,
+        schema / "description"   -> descriptionJsonLD,
+        schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
+        schema / "creator"       -> maybeCreator.map(CliCommonConverters.from).asJsonLD,
+        schema / "dateCreated"   -> dateCreated.asJsonLD,
+        renku / "hasActivity"    -> activities.map(CliActivityConverters.from(_, plans)).asJsonLD,
+        renku / "hasDataset"     -> datasets.map(CliConverters.from).asJsonLD,
+        renku / "hasPlan"        -> plans.map(CliPlanConverters.from(_, plans)).asJsonLD
+      ),
+      datasets.flatMap(_.publicationEvents.map(CliConverters.from).map(_.asJsonLD)): _*
     )
-    x.get
   }
 
   private def minimalCliJsonLD(resourceId: projects.ResourceId) = flattenedJsonLDFrom(

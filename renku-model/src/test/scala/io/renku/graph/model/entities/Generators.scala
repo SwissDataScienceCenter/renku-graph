@@ -153,7 +153,7 @@ private object Generators {
     for {
       params     <- ProjectBasedGenFactory.liftF(commandParametersLists)
       explParams <- ProjectBasedGenFactory.liftF(explicitCommandParameterObjects)
-      plan       <- stepPlanEntities(planCommands, creatorGen, (explParams :: params): _*)
+      plan       <- stepPlanEntities(planCommands, creatorGen, explParams :: params: _*)
     } yield plan
 
   def compositePlanGen(creatorGen: Gen[Person], minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
