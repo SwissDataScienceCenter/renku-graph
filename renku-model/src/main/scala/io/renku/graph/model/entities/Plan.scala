@@ -80,8 +80,6 @@ object Plan {
         else if (ets.contains(CompositePlan.Ontology.entityTypes)) CompositePlan.decoder.apply(cursor)
         else noMatchFailure
       }
-
-//      StepPlan.decoder.apply(cursor) orElse CompositePlan.decoder.apply(cursor) orElse noMatchFailure
     }
 
   lazy val ontology: Type =
@@ -292,7 +290,7 @@ object StepPlan {
         maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
         creators              <- cursor.downField(schema / "creator").as[List[Person]]
         dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        dateModified          <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
+        maybeDateModified     <- cursor.downField(schema / "dateModified").as[Option[DateModified]]
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
         parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
@@ -302,7 +300,7 @@ object StepPlan {
         maybeDerivedFrom      <- cursor.downField(prov / "wasDerivedFrom").as(decodeOption(DerivedFrom.ttDecoder))
         maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
         plan <- {
-                  (maybeDerivedFrom, maybeInvalidationTime, dateModified) match {
+                  (maybeDerivedFrom, maybeInvalidationTime, maybeDateModified) match {
                     case (None, None, None) =>
                       StepPlan
                         .from(
@@ -335,16 +333,16 @@ object StepPlan {
                           outputs,
                           successCodes,
                           Derivation(derivedFrom, ResourceId(derivedFrom.value)),
-                          mit
+                          maybeInvalidationTime = mit
                         )
-                    case (Some(derivedFrom), Some(invalidTime), None) =>
+                    case (Some(derivedFrom), Some(invalidationTime), None) =>
                       StepPlan.from(
                         resourceId,
                         name,
                         maybeDescription,
                         maybeCommand,
                         creators,
-                        DateCreated(invalidTime.value),
+                        DateCreated(invalidationTime.value),
                         maybeProgrammingLang,
                         keywords,
                         parameters,
@@ -352,7 +350,7 @@ object StepPlan {
                         outputs,
                         successCodes,
                         Derivation(derivedFrom, ResourceId(derivedFrom.value)),
-                        invalidTime.some
+                        invalidationTime.some
                       )
                     case (None, Some(_), None) => show"Plan $resourceId has no parent but invalidation time".invalidNel
                     case (None, None, Some(_)) => show"Plan $resourceId has no parent but modified time".invalidNel
