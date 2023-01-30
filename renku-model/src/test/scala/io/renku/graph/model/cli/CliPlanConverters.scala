@@ -66,8 +66,8 @@ trait CliPlanConverters extends CliCommonConverters {
         p.inputs.map(from),
         p.outputs.map(from),
         p.successCodes,
-        derivedFrom = None,
-        invalidationTime = None
+        derivedFrom = p.derivation.derivedFrom.some,
+        invalidationTime = p.maybeInvalidationTime
       )
   }
 
@@ -96,7 +96,7 @@ trait CliPlanConverters extends CliCommonConverters {
         p.dateCreated,
         dateModified = plans.DateModified(p.dateCreated.value).some,
         p.keywords,
-        derivedFrom = None,
+        derivedFrom = p.derivation.derivedFrom.some,
         invalidationTime = p.maybeInvalidationTime,
         collectAllPlans(p.plans, allPlans).map(from(_, allPlans)),
         p.links.map(from(_, allPlans)),
@@ -229,10 +229,13 @@ trait CliPlanConverters extends CliCommonConverters {
     val params  = collectAllParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
     val inputs  = collectAllInputParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
     val outputs = collectAllOutputParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
+    val mappings =
+      collectAllParameterMappings(paramIds, allPlans).map(from(_, allPlans)).map(CliParameterMapping.MappedParam.apply)
 
-    params ::: inputs ::: outputs match {
+    params ::: inputs ::: outputs ::: mappings match {
       case s if s.size == paramIds.size => NonEmptyList.fromListUnsafe(s)
-      case _                            => throw new Exception("Cannot find all mapsTo ParameterMappings")
+      case s =>
+        throw new Exception(s"Cannot find all mapsTo ParameterMappings: found ${s.size}, expected ${paramIds.size}")
     }
   }
 }

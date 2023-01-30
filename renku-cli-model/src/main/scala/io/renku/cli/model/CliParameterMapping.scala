@@ -40,40 +40,72 @@ final case class CliParameterMapping(
 object CliParameterMapping {
 
   sealed trait MappedParam {
-    def fold[A](fa: CliCommandInput => A, fb: CliCommandOutput => A, fc: CliCommandParameter => A): A
+    def fold[A](
+        fa: CliCommandInput => A,
+        fb: CliCommandOutput => A,
+        fc: CliCommandParameter => A,
+        fd: CliParameterMapping => A
+    ): A
   }
 
   object MappedParam {
     final case class Input(value: CliCommandInput) extends MappedParam {
-      def fold[A](fa: CliCommandInput => A, fb: CliCommandOutput => A, fc: CliCommandParameter => A): A = fa(value)
+      def fold[A](
+          fa: CliCommandInput => A,
+          fb: CliCommandOutput => A,
+          fc: CliCommandParameter => A,
+          fd: CliParameterMapping => A
+      ): A = fa(value)
     }
     final case class Output(value: CliCommandOutput) extends MappedParam {
-      def fold[A](fa: CliCommandInput => A, fb: CliCommandOutput => A, fc: CliCommandParameter => A): A = fb(value)
+      def fold[A](
+          fa: CliCommandInput => A,
+          fb: CliCommandOutput => A,
+          fc: CliCommandParameter => A,
+          fd: CliParameterMapping => A
+      ): A = fb(value)
     }
     final case class Param(value: CliCommandParameter) extends MappedParam {
-      def fold[A](fa: CliCommandInput => A, fb: CliCommandOutput => A, fc: CliCommandParameter => A): A = fc(value)
+      def fold[A](
+          fa: CliCommandInput => A,
+          fb: CliCommandOutput => A,
+          fc: CliCommandParameter => A,
+          fd: CliParameterMapping => A
+      ): A = fc(value)
+    }
+    final case class Mapping(value: CliParameterMapping) extends MappedParam {
+      def fold[A](
+          fa: CliCommandInput => A,
+          fb: CliCommandOutput => A,
+          fc: CliCommandParameter => A,
+          fd: CliParameterMapping => A
+      ): A = fd(value)
     }
 
-    def apply(input:  CliCommandInput):     MappedParam = Input(input)
-    def apply(output: CliCommandOutput):    MappedParam = Output(output)
-    def apply(param:  CliCommandParameter): MappedParam = Param(param)
+    def apply(input:   CliCommandInput):     MappedParam = Input(input)
+    def apply(output:  CliCommandOutput):    MappedParam = Output(output)
+    def apply(param:   CliCommandParameter): MappedParam = Param(param)
+    def apply(mapping: CliParameterMapping): MappedParam = Mapping(mapping)
 
     private val entityTypes: EntityTypes = EntityTypes.of(Renku.CommandParameterBase)
 
-    implicit val jsonLDDecoder: JsonLDDecoder[MappedParam] = {
-      val in    = CliCommandInput.jsonLDDecoder.emap(input => MappedParam(input).asRight)
-      val out   = CliCommandOutput.jsonLDDecoder.emap(output => MappedParam(output).asRight)
-      val param = CliCommandParameter.jsonLDDecoder.emap(param => MappedParam(param).asRight)
+    implicit def jsonLDDecoder: JsonLDDecoder[MappedParam] = {
+      val in      = CliCommandInput.jsonLDDecoder.emap(input => MappedParam(input).asRight)
+      val out     = CliCommandOutput.jsonLDDecoder.emap(output => MappedParam(output).asRight)
+      val param   = CliCommandParameter.jsonLDDecoder.emap(param => MappedParam(param).asRight)
+      val mapping = CliParameterMapping.jsonLDDecoder.emap(m => MappedParam(m).asRight)
 
       JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
         val currentEntityTypes = cursor.getEntityTypes
         (currentEntityTypes.map(CliCommandInput.matchingEntityTypes),
          currentEntityTypes.map(CliCommandOutput.matchingEntityTypes),
-         currentEntityTypes.map(CliCommandParameter.matchingEntityTypes)
+         currentEntityTypes.map(CliCommandParameter.matchingEntityTypes),
+         currentEntityTypes.map(CliParameterMapping.matchingEntityTypes)
         ).flatMapN {
-          case (true, _, _) => in(cursor)
-          case (_, true, _) => out(cursor)
-          case (_, _, true) => param(cursor)
+          case (true, _, _, _) => in(cursor)
+          case (_, true, _, _) => out(cursor)
+          case (_, _, true, _) => param(cursor)
+          case (_, _, _, true) => mapping(cursor)
           case _ => DecodingFailure(s"Invalid entity for decoding mapped parameter: $currentEntityTypes", Nil).asLeft
         }
       }
@@ -81,11 +113,14 @@ object CliParameterMapping {
 
     implicit val jsonLDEncoder: JsonLDEncoder[MappedParam] =
       JsonLDEncoder.instance { param =>
-        param.fold(_.asJsonLD, _.asJsonLD, _.asJsonLD)
+        param.fold(_.asJsonLD, _.asJsonLD, _.asJsonLD, _.asJsonLD)
       }
   }
 
   private val entityTypes: EntityTypes = EntityTypes.of(Renku.ParameterMapping, Renku.CommandParameterBase)
+
+  private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
+    entityTypes == this.entityTypes
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliParameterMapping] =
     JsonLDDecoder.entity(entityTypes) { cursor =>

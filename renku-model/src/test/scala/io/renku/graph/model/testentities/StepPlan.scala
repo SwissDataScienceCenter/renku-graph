@@ -65,6 +65,12 @@ object StepPlan {
       with NonModifiedAlg {
 
     override type PlanType = StepPlan.NonModified
+
+    def fold[P](spnm: StepPlan.NonModified => P,
+                spm:  StepPlan.Modified => P,
+                cpnm: CompositePlan.NonModified => P,
+                cpm:  CompositePlan.Modified => P
+    ): P = spnm(this)
   }
 
   object NonModified {
@@ -158,6 +164,12 @@ object StepPlan {
     override type ParentType = StepPlan
     override type PlanType   = StepPlan.Modified
 
+    def fold[P](spnm: StepPlan.NonModified => P,
+                spm:  StepPlan.Modified => P,
+                cpnm: CompositePlan.NonModified => P,
+                cpm:  CompositePlan.Modified => P
+    ): P = spm(this)
+
     lazy val topmostParent: StepPlan = parent match {
       case p: NonModified => p
       case p: Modified    => p.topmostParent
@@ -239,7 +251,7 @@ object StepPlan {
           }
         }
 
-    private lazy val checkIfNotInvalidated: ValidatedNel[String, Unit] = this match {
+    private def checkIfNotInvalidated: ValidatedNel[String, Unit] = this match {
       case _: HavingInvalidationTime =>
         Validated.invalidNel(show"Plan with id: $id is invalidated and cannot be invalidated again")
       case _ => Validated.valid(())

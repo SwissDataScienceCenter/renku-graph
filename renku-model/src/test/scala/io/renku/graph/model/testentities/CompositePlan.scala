@@ -47,6 +47,12 @@ sealed trait CompositePlan extends Plan {
   def modify(f: PlanType => PlanType): PlanType
 
   final def widen: Plan = this
+
+  final def recursivePlans: List[Plan] =
+    plans.toList.flatMap {
+      case cp: CompositePlan => cp :: cp.recursivePlans
+      case sp: StepPlan      => List(sp)
+    }
 }
 
 object CompositePlan {
@@ -64,6 +70,11 @@ object CompositePlan {
   ) extends CompositePlan {
     override type PlanType = NonModified
 
+    def fold[P](spnm: StepPlan.NonModified => P,
+                spm:  StepPlan.Modified => P,
+                cpnm: CompositePlan.NonModified => P,
+                cpm:  CompositePlan.Modified => P
+    ): P = cpnm(this)
     def modify(f: NonModified => NonModified): NonModified =
       f(this)
 
@@ -140,6 +151,12 @@ object CompositePlan {
       with Plan.Modified {
     override type PlanType   = Modified
     override type ParentType = CompositePlan
+
+    def fold[P](spnm: StepPlan.NonModified => P,
+                spm:  StepPlan.Modified => P,
+                cpnm: CompositePlan.NonModified => P,
+                cpm:  CompositePlan.Modified => P
+    ): P = cpm(this)
 
     lazy val topmostParent: CompositePlan = parent match {
       case p: NonModified => p

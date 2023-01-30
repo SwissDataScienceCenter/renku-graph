@@ -19,11 +19,11 @@
 package io.renku.graph.model.entities
 
 import com.softwaremill.diffx._
-import io.renku.graph.model.diffx.ModelTinyTypesDiffInstances
+import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.graph.model.entities.Dataset.Provenance.ImportedInternalAncestorExternal
 import io.renku.graph.model.entities.Dataset.{AdditionalInfo, Identification, Provenance}
 
-trait DiffInstances extends ModelTinyTypesDiffInstances {
+trait DiffInstances extends CliDiffInstances {
 
   implicit val personWithGitlabIdDiff: Diff[Person.WithGitLabId] = Diff.derived[Person.WithGitLabId]
   implicit val personWithEmailDiff:    Diff[Person.WithEmail]    = Diff.derived[Person.WithEmail]

@@ -168,7 +168,7 @@ class WorkflowsEntitiesFinderSpec
         renkuProjectEntities(visibilityPublic)
           .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
-          .addCompositePlan(CreateCompositePlan(compositePlanEntities))
+          .addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _)))
 
       upload(to = projectsDataset, project)
 

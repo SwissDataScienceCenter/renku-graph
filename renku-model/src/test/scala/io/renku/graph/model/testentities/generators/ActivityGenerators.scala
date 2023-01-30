@@ -67,13 +67,14 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     Kleisli(executionPlanners(planGen, _: projects.DateCreated, authorGen).map(_.buildProvenanceUnsafe()))
 
   def planEntities(
+      creatorGen:         Gen[Person],
       parameterFactories: CommandParameterFactory*
   )(implicit planCommandsGen: Gen[Command]): PlanGenFactory =
     Kleisli { dateCreated =>
       Gen.recursive[Plan] { recurse =>
-        val spGen = stepPlanEntities(parameterFactories: _*)(planCommandsGen).run(dateCreated).map(_.widen)
+        val spGen = stepPlanEntities(planCommandsGen, creatorGen, parameterFactories: _*).run(dateCreated).map(_.widen)
         val cpGen =
-          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 6)))
+          compositePlanEntities(creatorGen, Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 6)))
             .run(dateCreated)
             .map(_.widen)
 
@@ -81,10 +82,14 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
       }
     }
 
-  def planEntitiesList(min: Int = 3, max: Int = 6, parameterFactories: List[CommandParameterFactory])(implicit
+  def planEntitiesList(min:                Int = 3,
+                       max:                Int = 6,
+                       parameterFactories: List[CommandParameterFactory],
+                       creatorGen:         Gen[Person]
+  )(implicit
       planCommandsGen: Gen[Command]
   ): ProjectBasedGenFactory[List[Plan]] =
-    planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
+    planEntities(creatorGen, parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
 
   def stepPlanEntities(
       parameterFactories: CommandParameterFactory*
@@ -118,13 +123,15 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
   )
 
-  def compositePlanEntities(childGen: ProjectBasedGenFactory[List[Plan]]): CompositePlanGenFactory =
+  def compositePlanEntities(creatorGen: Gen[Person],
+                            childGen:   ProjectBasedGenFactory[List[Plan]]
+  ): CompositePlanGenFactory =
     (planDatesCreatedK, childGen).flatMapN { (dateCreated, childPlans) =>
       for {
         id       <- ProjectBasedGenFactory.liftF(planIdentifiers)
         name     <- ProjectBasedGenFactory.liftF(planNames)
-        creators <- ProjectBasedGenFactory.liftF(personEntities.toGeneratorOfList(max = 3))
-        descr    <- ProjectBasedGenFactory.liftF(Gen.some(planDescriptions))
+        creators <- ProjectBasedGenFactory.liftF(creatorGen.toGeneratorOfList(max = 3))
+        descr    <- ProjectBasedGenFactory.liftF(planDescriptions.toGeneratorOfSomes)
         kw       <- ProjectBasedGenFactory.liftF(planKeywords.toGeneratorOfList())
         cp = CompositePlan.NonModified(
                id = id,

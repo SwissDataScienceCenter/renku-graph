@@ -23,12 +23,13 @@ import cats.syntax.all._
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.DecodingFailure
 import io.circe.syntax._
+import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.cli.CliConverters
+import io.renku.graph.model.cli._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
@@ -38,7 +39,7 @@ import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
-import io.renku.graph.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
+import io.renku.graph.model.tools.JsonLDTools.flattenedJsonLDFrom
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
@@ -78,7 +79,6 @@ class ProjectSpec
   }
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Project entity without parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
@@ -118,7 +118,10 @@ class ProjectSpec
         val expectedActivities =
           (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
             .sortBy(_.startTime)
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil).head shouldMatchTo
+
+        val decoded = jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil)
+        decoded should not be empty
+        decoded.head shouldMatchTo
           entities.RenkuProject.WithoutParent(
             resourceId,
             info.path,
@@ -286,7 +289,7 @@ class ProjectSpec
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity.author, member2)
 
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+        val actual = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))).fold(throw _, _.head)
 
         actual.maybeCreator shouldBe mergedCreator.some
         actual.members      shouldBe Set(mergedMember2)
@@ -296,8 +299,10 @@ class ProjectSpec
 
       s"update Plans' originalResourceId for project $projectType" in new TestCase {
 
-        val resourceId                = projects.ResourceId(info.path)
-        val activity                  = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+        val resourceId = projects.ResourceId(info.path)
+        val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          info.dateCreated
+        ).generateOne
         val plan                      = activity.plan
         val entitiesPlan              = plan.to[entities.Plan]
         val planModification1         = plan.createModification()
@@ -317,7 +322,8 @@ class ProjectSpec
           plans = entitiesPlan :: entitiesPlanModification1 :: entitiesPlanModification2 :: Nil
         )
 
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+        val actualV = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+        val actual  = actualV.fold(throw _, _.head)
 
         val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = actual.plans
         actualPlan1 shouldBe entitiesPlan
@@ -357,15 +363,16 @@ class ProjectSpec
       }
     }
 
-    "validate composite plans in a project failing to find referenced entities" in {
+    "fail composite plans validation in case of missing referenced entities" in {
+
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
 
       val invalidPlanGen = for {
-        cp   <- compositePlanNonEmptyMappings.mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
-        step <- stepPlanGenFactory
+        cp   <- compositePlanNonEmptyMappings(personEntities).mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
+        step <- stepPlanGenFactory(personEntities)
       } yield cp.copy(plans = NonEmptyList.one(step))
 
       val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
@@ -381,47 +388,62 @@ class ProjectSpec
     }
 
     "validate a correct composite plan in a project" in {
+
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
-      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
-        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities)))
+
+      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities(personGen = cliShapedPersons)
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities(cliShapedPersons, _))))
 
       forAll(projectGen) { project =>
         validate(project.to[entities.Project].plans)
           .leftMap(_.toList.intercalate("; "))
           .fold(fail(_), identity)
 
-        val decoded = project.asJsonLD.flatten
-          .fold(fail(_), identity)
+        val decoded = CliProjectConverters
+          .from(project.to[entities.Project])
+          .asFlattenedJsonLD
           .cursor
           .as[List[entities.CompositePlan]]
 
-        decoded shouldBe Right(project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan]))
+        decoded.value shouldBe project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan])
       }
     }
 
-    "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanNonEmptyMappings.generateOne
+    "fail composite plan validation in case there are references pointing outside of this composite plan" in {
+
+      val testPlan = compositePlanNonEmptyMappings(cliShapedPersons).generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
-      // find a plan belonging to some mapped parameter
-      val mappedPlanId = testPlan.mappings.head.mappedParam.head.planId
+      val testCliPlan =
+        CliPlanConverters.from(testPlan.to[entities.CompositePlan], testPlan.recursivePlans.map(_.to[entities.Plan]))
+
+      // find a parameter id that is mapped
+      val mappedParameterId =
+        testCliPlan.mappings.headOption
+          .map(_.mapsTo.head.fold(_.resourceId, _.resourceId, _.resourceId, _.resourceId))
+          .getOrElse(fail("Cannot find any mapping"))
 
       // remove this plan from the children plan list
-      val invalidPlan =
-        testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
+      val invalidCliPlan =
+        testCliPlan.copy(plans =
+          NonEmptyList.fromListUnsafe(
+            testCliPlan.plans.filterNot(_.fold(allStepParameterIds, allMappingParameterIds).contains(mappedParameterId))
+          )
+        )
 
       // for convenience decode it all into a list
-      val decodeAll = flattenedJsonLD(invalidPlan).cursor.as[List[entities.Plan]]
+      val decoded = invalidCliPlan.asFlattenedJsonLD.cursor.as[List[entities.Plan]]
 
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
 
-      validate(decodeAll.toOption.get).isInvalid shouldBe true
+      decoded                           shouldBe a[Right[_, _]]
+      validate(decoded.value).isInvalid shouldBe true
     }
 
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
@@ -462,7 +484,9 @@ class ProjectSpec
 
       val info       = gitLabProjectInfos.generateOne
       val resourceId = projects.ResourceId(info.path)
-      val activity   = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+        info.dateCreated
+      ).generateOne
       val (plan, planModification) = {
         val p = activity.plan
         val modification = p
@@ -498,7 +522,9 @@ class ProjectSpec
 
       val info       = gitLabProjectInfos.generateOne
       val resourceId = projects.ResourceId(info.path)
-      val activity   = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+        info.dateCreated
+      ).generateOne
       val (plan, planModification) = {
         val p = activity.plan
         val modification = p
@@ -560,7 +586,10 @@ class ProjectSpec
       val resourceId        = projects.ResourceId(projectInfo.path)
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
-        stepPlanEntities().map(_.replacePlanDateCreated(plans.DateCreated(dateBeforeProject)))
+        stepPlanEntities(planCommands, cliShapedPersons).map(
+          _.replacePlanDateCreated(plans.DateCreated(dateBeforeProject))
+        ),
+        cliShapedPersons
       ).map(
         _.replaceStartTime(
           timestamps(min = dateBeforeProject, max = projectInfo.dateCreated.value).generateAs[activities.StartTime]
@@ -620,7 +649,7 @@ class ProjectSpec
 
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val plan = stepPlanEntities()(planCommands)(projectInfo.dateCreated).generateOne
+      val plan = stepPlanEntities(planCommands, cliShapedPersons)(projectInfo.dateCreated).generateOne
         .replacePlanDateCreated(timestamps(max = projectInfo.dateCreated.value).generateAs[plans.DateCreated])
       val entitiesPlan = plan.to[entities.Plan]
       val jsonLD = cliJsonLD(
@@ -1215,7 +1244,7 @@ class ProjectSpec
                         activities:       List[entities.Activity] = Nil,
                         datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
                         plans:            List[entities.Plan] = Nil
-  )(implicit graph: GraphClass): JsonLD = {
+  ): JsonLD = {
 
     val descriptionJsonLD = maybeDescription match {
       case Some(desc) => desc.asJsonLD
@@ -1232,11 +1261,11 @@ class ProjectSpec
         schema / "schemaVersion" -> schemaVersion.asJsonLD,
         schema / "description"   -> descriptionJsonLD,
         schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
-        schema / "creator"       -> maybeCreator.asJsonLD,
+        schema / "creator"       -> maybeCreator.map(CliCommonConverters.from).asJsonLD,
         schema / "dateCreated"   -> dateCreated.asJsonLD,
-        renku / "hasActivity"    -> activities.asJsonLD,
+        renku / "hasActivity"    -> activities.map(CliActivityConverters.from(_, plans)).asJsonLD,
         renku / "hasDataset"     -> datasets.map(CliConverters.from).asJsonLD,
-        renku / "hasPlan"        -> plans.asJsonLD
+        renku / "hasPlan"        -> plans.map(CliPlanConverters.from(_, plans)).asJsonLD
       ),
       datasets.flatMap(_.publicationEvents.map(CliConverters.from).map(_.asJsonLD)): _*
     )
@@ -1290,7 +1319,10 @@ class ProjectSpec
 
   private def activityWith(author: entities.Person): projects.DateCreated => (entities.Activity, entities.StepPlan) =
     dateCreated => {
-      val activity = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
+      val activity =
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()), cliShapedPersons)(
+          dateCreated
+        ).generateOne
       activity.to[entities.Activity].copy(author = author) -> activity.plan.to[entities.StepPlan]
     }
 
@@ -1298,7 +1330,9 @@ class ProjectSpec
       agent: entities.Person
   ): projects.DateCreated => (entities.Activity, entities.StepPlan) =
     dateCreated => {
-      val activity         = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()),
+                                      cliShapedPersons
+      )(dateCreated).generateOne
       val entitiesActivity = activity.to[entities.Activity]
       val entitiesPlan     = activity.plan.to[entities.StepPlan]
       entitiesActivity.copy(association =

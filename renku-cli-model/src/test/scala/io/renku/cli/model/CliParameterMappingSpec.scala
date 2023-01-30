@@ -39,14 +39,17 @@ class CliParameterMappingSpec
   "decode/encode" should {
     "be compatible" in {
       forAll(parameterMappingGen) { cliParam =>
-        assertCompatibleCodec(cliParam)
+        assertCompatibleCodec(allMappings _)(cliParam)
       }
     }
 
     "work on multiple items" in {
       forAll(parameterMappingGen, parameterMappingGen) { (cliParam1, cliParam2) =>
-        assertCompatibleCodec(cliParam1, cliParam2)
+        assertCompatibleCodec(allMappings _)(cliParam1, cliParam2)
       }
     }
   }
+
+  def allMappings(cliParam: CliParameterMapping): List[CliParameterMapping] =
+    cliParam :: cliParam.mapsTo.collect { case CliParameterMapping.MappedParam.Mapping(n) => n }.flatMap(allMappings)
 }

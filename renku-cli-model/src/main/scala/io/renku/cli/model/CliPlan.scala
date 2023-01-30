@@ -21,14 +21,16 @@ package io.renku.cli.model
 import Ontologies.{Prov, Schema}
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.graph.model.commandParameters
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-sealed trait CliPlan {
+sealed trait CliPlan extends CliModel {
   def fold[A](fa: CliStepPlan => A, fb: CliCompositePlan => A): A
 }
 
 object CliPlan {
+
   final case class Step(value: CliStepPlan) extends CliPlan {
     def fold[A](fa: CliStepPlan => A, fb: CliCompositePlan => A): A = fa(value)
   }
@@ -40,6 +42,12 @@ object CliPlan {
   def apply(value: CliStepPlan): CliPlan = Step(value)
 
   def apply(value: CliCompositePlan): CliPlan = Composite(value)
+
+  lazy val allStepParameterIds: CliStepPlan => Set[commandParameters.ResourceId] = p =>
+    (p.parameters ::: p.inputs ::: p.outputs).map(_.resourceId).toSet
+
+  lazy val allMappingParameterIds: CliCompositePlan => Set[commandParameters.ResourceId] = p =>
+    p.mappings.map(_.resourceId).toSet
 
   private val entityTypes: EntityTypes =
     EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)

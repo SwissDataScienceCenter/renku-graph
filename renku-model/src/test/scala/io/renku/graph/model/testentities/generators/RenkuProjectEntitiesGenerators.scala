@@ -52,12 +52,17 @@ trait RenkuProjectEntitiesGenerators {
   )
 
   lazy val renkuProjectEntitiesWithDatasetsAndActivities: Gen[RenkuProject] =
-    renkuProjectEntities(anyVisibility)
+    renkuProjectEntitiesWithDatasetsAndActivities()
+
+  def renkuProjectEntitiesWithDatasetsAndActivities(personGen: Gen[Person] = personEntities): Gen[RenkuProject] =
+    renkuProjectEntities(anyVisibility, creatorGen = personGen)
       .withActivities(
-        List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(stepPlanEntities())): _*
+        List.fill(nonNegativeInts(max = 5).generateOne.value)(
+          activityEntities(stepPlanEntities(planCommands, creatorsGen = personGen), authorGen = personGen)
+        ): _*
       )
       .withDatasets(
-        List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*
+        List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified(personGen))): _*
       )
 
   def renkuProjectEntities(

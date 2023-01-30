@@ -62,7 +62,7 @@ class AddRenkuPlanWhereMissingSpec
       val project3 = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
-        .addCompositePlan(CreateCompositePlan(compositePlanEntities))
+        .addCompositePlan(CreateCompositePlan(compositePlanEntities(personEntities, _)))
         .to[entities.Project]
 
       upload(to = projectsDataset, project1, project2, project3)
