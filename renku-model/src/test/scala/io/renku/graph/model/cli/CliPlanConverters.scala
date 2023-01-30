@@ -221,7 +221,7 @@ trait CliPlanConverters extends CliCommonConverters {
       mapping.maybeDescription,
       mapping.maybePrefix,
       position = None,
-      commandParameters.ParameterDefaultValue(mapping.defaultValue.value).some,
+      mapping.defaultValue.map(v => commandParameters.ParameterDefaultValue(v.value)),
       buildMappedParams(mapping.mappedParameter, allPlans)
     )
 

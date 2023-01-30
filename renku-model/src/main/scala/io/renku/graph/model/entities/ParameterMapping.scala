@@ -31,12 +31,12 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 /** A parameter for a [[CompositePlan]] that is mapping onto parameters of its enclosing plans. */
 final case class ParameterMapping(
     resourceId:       ResourceId,
-    defaultValue:     ParameterMapping.DefaultValue,
+    defaultValue:     Option[ParameterMapping.DefaultValue],
     maybeDescription: Option[Description],
     name:             Name,
     mappedParameter:  NonEmptyList[ResourceId]
 ) extends CommandParameterBase {
-  override type DefaultValue = ParameterMapping.DefaultValue
+  override type DefaultValue = Option[ParameterMapping.DefaultValue]
   // ParameterMappings do not have a prefix.
   override val maybePrefix: Option[Prefix] = None
 }
@@ -94,7 +94,7 @@ object ParameterMapping {
       for {
         id          <- cursor.downEntityId.as[ResourceId]
         name        <- cursor.downField(Ontology.name).as[Name]
-        defaultVal  <- cursor.downField(Ontology.defaultValue).as[DefaultValue]
+        defaultVal  <- cursor.downField(Ontology.defaultValue).as[Option[DefaultValue]]
         descr       <- cursor.downField(Ontology.description).as[Option[Description]]
         mappedParam <- cursor.downField(Ontology.mapsTo).as[NonEmptyList[ResourceId]]
       } yield ParameterMapping(id, defaultVal, descr, name, mappedParam)

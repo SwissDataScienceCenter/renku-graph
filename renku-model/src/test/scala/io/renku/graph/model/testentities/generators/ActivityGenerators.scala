@@ -180,13 +180,13 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
             for {
               id          <- noDashUuid.map(ParameterMapping.Identifier(_))
               mappingName <- commandParameterNames
-              defval      <- parameterDefaultValues
+              maybeDefVal <- parameterDefaultValues.toGeneratorOfOptions
               descr       <- Gen.some(commandParameterDescription)
             } yield ParameterMapping(
               id = id,
               name = mappingName,
               description = descr,
-              defaultValue = defval.value,
+              defaultValue = maybeDefVal.map(_.value),
               planId = parent.id,
               mappedParam = NonEmptyList.one(target)
             )
@@ -200,13 +200,13 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
             for {
               id          <- noDashUuid.map(ParameterMapping.Identifier(_))
               mappingName <- commandParameterNames
-              defval      <- parameterDefaultValues
+              maybeDefVal <- parameterDefaultValues.toGeneratorOfOptions
               descr       <- Gen.some(commandParameterDescription)
             } yield ParameterMapping(
               id = id,
               name = mappingName,
               description = descr,
-              defaultValue = defval.value,
+              defaultValue = maybeDefVal.map(_.value),
               planId = parent.id,
               mappedParam = NonEmptyList.one(targetMapping)
             )
