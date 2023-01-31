@@ -81,6 +81,22 @@ class PlanSpec
       cliPlan.asFlattenedJsonLD.cursor.as[List[entities.StepPlan]] shouldMatchToRight List(plan)
     }
 
+    "decode a Step Plan that has additional types" in {
+
+      val testPlan = stepPlans.generateOne
+      val plan     = testPlan.to[entities.StepPlan]
+      val cliPlan  = CliPlanConverters.from(plan)
+
+      val newJson =
+        JsonLDTools
+          .view(cliPlan)
+          .selectByTypes(entities.StepPlan.entityTypes)
+          .addType(renku / "WorkflowPlan")
+          .value
+
+      newJson.cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
+    }
+
     "fail if invalidatedAtTime present on non-modified Plan" in {
 
       val plan = stepPlans
@@ -149,7 +165,7 @@ class PlanSpec
       }
     }
 
-    "decode if invalidation after the creation date (composite plan)" in {
+    "decode if invalidation after the creation date" in {
       forAll(compositePlanGen(cliShapedPersons).map(_.createModification().invalidate())) { plan =>
         val expected = List(plan.to[entities.CompositePlan])
         val json = CliPlanConverters
@@ -186,6 +202,29 @@ class PlanSpec
       decoded shouldMatchToRight List(sp, cp).sortBy(_.resourceId.value)
     }
 
+    "decode a Composite Plan without default value on its Parameter Mapping" in {
+
+      val testPlan  = compositePlanNonEmptyMappings(cliShapedPersons).generateOne
+      val modelPlan = testPlan.to[entities.CompositePlan]
+      val cliPlan   = CliPlanConverters.from(modelPlan, testPlan.recursivePlans.map(_.to[entities.Plan]))
+      val cliFirstMapping :: otherMappings = cliPlan.mappings
+
+      val result = cliPlan
+        .copy(mappings = cliFirstMapping.copy(defaultValue = None) :: otherMappings)
+        .asFlattenedJsonLD
+        .cursor
+        .as[List[entities.CompositePlan]]
+
+      val firstModelMapping = modelPlan.mappings
+        .find(_.resourceId == cliFirstMapping.resourceId)
+        .getOrElse(fail(s"No Mapping with ${cliFirstMapping.resourceId}"))
+      val otherModelMappings = modelPlan.mappings.filterNot(_.resourceId == cliFirstMapping.resourceId)
+      val expectedMappings   = firstModelMapping.copy(defaultValue = None) :: otherModelMappings
+      result.value shouldBe List(
+        modelPlan.fold(identity, identity, _.copy(mappings = expectedMappings), _.copy(mappings = expectedMappings))
+      )
+    }
+
     "decode a Composite Plan that has additional types" in {
       val testPlan = compositePlanGen(cliShapedPersons).generateOne
       val plan     = testPlan.to[entities.CompositePlan]
@@ -201,21 +240,6 @@ class PlanSpec
       newJson.cursor
         .as[List[entities.CompositePlan]]
         .map(_.filter(_.resourceId == plan.resourceId)) shouldMatchToRight List(plan)
-    }
-
-    "decode a Step Plan that has additional types" in {
-      val testPlan = stepPlans.generateOne
-      val plan     = testPlan.to[entities.StepPlan]
-      val cliPlan  = CliPlanConverters.from(plan)
-
-      val newJson =
-        JsonLDTools
-          .view(cliPlan)
-          .selectByTypes(entities.StepPlan.entityTypes)
-          .addType(renku / "WorkflowPlan")
-          .value
-
-      newJson.cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
     }
 
     "fail decode if a parameter maps to itself" in {
