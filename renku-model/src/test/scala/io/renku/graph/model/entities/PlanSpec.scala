@@ -111,7 +111,7 @@ class PlanSpec
 
       val result = cliPlan.asFlattenedJsonLD.cursor.as[List[entities.StepPlan]].leftMap(_.message)
 
-      result.left.value should include(show"Plan ${plan.resourceId} has no parent but modified and invalidation time")
+      result.left.value should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
     }
 
     "fail if invalidation done before the creation date" in {

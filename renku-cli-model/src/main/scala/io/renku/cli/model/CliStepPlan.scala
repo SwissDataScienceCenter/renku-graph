@@ -30,7 +30,7 @@ final case class CliStepPlan(
     description:      Option[Description],
     creators:         List[CliPerson],
     dateCreated:      DateCreated,
-    dateModified:     Option[DateModified],
+    dateModified:     DateModified,
     keywords:         List[Keyword],
     command:          Option[Command],
     parameters:       List[CliCommandParameter],
@@ -58,7 +58,7 @@ object CliStepPlan {
         command      <- cursor.downField(Renku.command).as[Option[Command]]
         creators     <- cursor.downField(Schema.creator).as[List[CliPerson]]
         dateCreated  <- cursor.downField(Schema.dateCreated).as[DateCreated]
-        dateModified <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
+        dateModified <- cursor.downField(Schema.dateModified).as[DateModified]
         keywords     <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
         parameters   <- cursor.downField(Renku.hasArguments).as[List[CliCommandParameter]]
         inputs       <- cursor.downField(Renku.hasInputs).as[List[CliCommandInput]]
