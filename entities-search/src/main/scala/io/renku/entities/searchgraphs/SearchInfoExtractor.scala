@@ -44,19 +44,19 @@ private object SearchInfoExtractor {
 
   private def findDateOriginal[F[_]: MonadThrow](prov:    Dataset.Provenance.Modified,
                                                  project: Project
-  ): F[datasets.Date] =
+  ): F[datasets.CreatedOrPublished] =
     project.datasets
       .find(_.identification.resourceId.value == prov.topmostDerivedFrom.value)
-      .map(_.provenance.date.pure[F].widen[datasets.Date])
+      .map(_.provenance.date.pure[F].widen[datasets.CreatedOrPublished])
       .getOrElse(
         new Exception(
           show"Cannot find original Dataset ${prov.topmostDerivedFrom} for project ${project.resourceId}"
-        ).raiseError[F, datasets.Date]
+        ).raiseError[F, datasets.CreatedOrPublished]
       )
       .widen
 
   private def createSearchInfo(ds:                 Dataset[Dataset.Provenance],
-                               createdOrPublished: datasets.Date,
+                               createdOrPublished: datasets.CreatedOrPublished,
                                maybeDateModified:  Option[datasets.DateModified],
                                project:            Project
   ) = SearchInfo(

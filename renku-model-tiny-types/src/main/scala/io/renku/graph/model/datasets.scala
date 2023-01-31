@@ -237,24 +237,23 @@ object datasets {
       with UrlConstraint[PartResourceId]
       with EntityIdJsonLDOps[PartResourceId]
 
-  sealed trait Date extends Any with TinyType {
+  sealed trait CreatedOrPublished extends Any with TinyType {
     def instant: Instant
   }
-
-  object Date {
-    implicit val encoder: Encoder[Date] = Encoder.instance {
+  object CreatedOrPublished {
+    implicit val encoder: Encoder[CreatedOrPublished] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson
     }
 
-    implicit val show: Show[Date] =
+    implicit val show: Show[CreatedOrPublished] =
       Show.show {
         case d: DateCreated   => d.show
         case d: DatePublished => d.show
       }
   }
 
-  final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
+  final class DateCreated private (val value: Instant) extends AnyVal with CreatedOrPublished with InstantTinyType {
     override def instant: Instant = value
   }
   implicit object DateCreated
@@ -265,7 +264,10 @@ object datasets {
       Show.show(d => s"DateCreated(${d.value})")
   }
 
-  final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
+  final class DatePublished private (val value: LocalDate)
+      extends AnyVal
+      with CreatedOrPublished
+      with LocalDateTinyType {
     override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
   }
   implicit object DatePublished
@@ -282,7 +284,7 @@ object datasets {
       with InstantNotInTheFuture[DateModified]
       with TinyTypeJsonLDOps[DateModified] {
 
-    def apply(date: datasets.Date): DateModified = DateModified(date.instant)
+    def apply(date: datasets.CreatedOrPublished): DateModified = DateModified(date.instant)
   }
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType

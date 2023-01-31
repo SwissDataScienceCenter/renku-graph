@@ -24,7 +24,7 @@ import io.renku.graph.model.datasets._
 /** View on the dataset focusing on provenance properties.
  */
 final case class CliDatasetProvenance(
-    createdOrPublished: Date,
+    createdOrPublished: CreatedOrPublished,
     dateModified:       Option[DateModified],
     sameAs:             Option[SameAs],
     derivedFrom:        Option[DerivedFrom],

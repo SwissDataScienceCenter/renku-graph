@@ -213,7 +213,7 @@ private object BaseDetailsFinderImpl {
                                    Option[DerivedFrom],
                                    SameAs,
                                    OriginalIdentifier,
-                                   Date,
+                                   CreatedOrPublished,
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
@@ -228,7 +228,7 @@ private object BaseDetailsFinderImpl {
         maybeInitialTag = None,
         maybeDesc,
         creators = List.empty,
-        date = dates,
+        createdOrPublished = dates,
         parts = List.empty,
         project = project,
         usedIn = List.empty,
@@ -246,7 +246,7 @@ private object BaseDetailsFinderImpl {
         maybeInitialTag = None,
         maybeDescription,
         creators = List.empty,
-        date = date,
+        createdOrPublished = date,
         parts = List.empty,
         project = project,
         usedIn = List.empty,
@@ -270,16 +270,16 @@ private object BaseDetailsFinderImpl {
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs           <- extract[SameAs]("topmostSameAs")
         initialVersion   <- extract[OriginalIdentifier]("initialVersion")
-        date <- maybeDerivedFrom match {
-                  case Some(_) => extract[DateCreated]("maybeDateCreated").widen[Date]
-                  case _ =>
-                    extract[Option[DatePublished]]("maybeDatePublished")
-                      .flatMap {
-                        case Some(published) => published.asRight
-                        case None            => extract[DateCreated]("maybeDateCreated")
-                      }
-                      .widen[Date]
-                }
+        createdOrPublished <- maybeDerivedFrom match {
+                                case Some(_) => extract[DateCreated]("maybeDateCreated").widen[CreatedOrPublished]
+                                case _ =>
+                                  extract[Option[DatePublished]]("maybeDatePublished")
+                                    .flatMap {
+                                      case Some(published) => published.asRight
+                                      case None            => extract[DateCreated]("maybeDateCreated")
+                                    }
+                                    .widen[CreatedOrPublished]
+                              }
         maybeDescription <- extract[Option[Description]]("description")
 
         project <- (extract[projects.ResourceId]("projectId"),
@@ -295,7 +295,7 @@ private object BaseDetailsFinderImpl {
                                  maybeDerivedFrom,
                                  sameAs,
                                  initialVersion,
-                                 date,
+                                 createdOrPublished,
                                  maybeDescription,
                                  project
                    )

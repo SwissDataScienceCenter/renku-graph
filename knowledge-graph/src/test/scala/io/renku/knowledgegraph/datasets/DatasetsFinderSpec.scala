@@ -614,7 +614,7 @@ class DatasetsFinderSpec
 
       results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
-        .sortBy(_.date.instant)
+        .sortBy(_.createdOrPublished.instant)
         .reverse
     }
 
@@ -644,7 +644,7 @@ class DatasetsFinderSpec
 
       results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
-        .sortBy(_.date.instant)
+        .sortBy(_.createdOrPublished.instant)
         .reverse
     }
 

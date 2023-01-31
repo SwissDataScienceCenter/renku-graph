@@ -26,7 +26,8 @@ trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
 
   implicit val imageUriDiff: Diff[ImageUri] = Diff.diffForString.contramap(_.value)
 
-  implicit val datasetsDateDiff: Diff[datasets.Date] = Diff.derived[datasets.Date]
+  implicit val datasetsCreatedOrPublishedDiff: Diff[datasets.CreatedOrPublished] =
+    Diff.derived[datasets.CreatedOrPublished]
 
   implicit val datasetsSameAsDiff: Diff[datasets.SameAs] = Diff.diffForString.contramap {
     case sa: datasets.InternalSameAs => sa.value

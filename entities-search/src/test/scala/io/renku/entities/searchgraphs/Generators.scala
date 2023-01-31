@@ -36,7 +36,7 @@ private object Generators {
   implicit lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
     topmostSameAs      <- datasetTopmostSameAs
     name               <- datasetNames
-    createdOrPublished <- datasetDates
+    createdOrPublished <- datasetCreatedOrPublished
     visibility         <- projectVisibilities
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
     creators           <- personInfos.toGeneratorOfNonEmptyList(max = 2)

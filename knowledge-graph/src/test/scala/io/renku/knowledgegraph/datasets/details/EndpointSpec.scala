@@ -213,7 +213,7 @@ class EndpointSpec
       date <-
         maybeDateCreated
           .orElse(published._2)
-          .widen[Date]
+          .widen[CreatedOrPublished]
           .map(_.asRight)
           .getOrElse(DecodingFailure("No date found", Nil).asLeft)
     } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
