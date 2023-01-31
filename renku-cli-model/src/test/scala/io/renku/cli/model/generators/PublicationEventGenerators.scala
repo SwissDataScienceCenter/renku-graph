@@ -30,9 +30,7 @@ import java.time.Instant
 trait PublicationEventGenerators {
 
   def publicationEventGen(dataset: CliDataset)(implicit renkuUrl: RenkuUrl): Gen[CliPublicationEvent] =
-    publicationEventGen(dataset.identifier,
-                        dataset.dateModified.map(_.value).getOrElse(dataset.createdOrPublished.instant)
-    )
+    publicationEventGen(dataset.identifier, dataset.dateModified.value)
 
   def publicationEventGen(
       datasetIdentifier: datasets.Identifier,

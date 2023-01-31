@@ -152,7 +152,7 @@ object Dataset {
       private[Dataset] object FromCli {
         def unapply(cli: CliDataset): Option[NonEmptyList[Person] => Internal] =
           cli.provenance match {
-            case CliDatasetProvenance(dateCreated: DateCreated, None, None, None, _, None) =>
+            case CliDatasetProvenance(dateCreated: DateCreated, _, None, None, _, None) =>
               Some(creators => Internal(cli.resourceId, cli.identifier, dateCreated, creators.sortBy(_.name)))
             case _ => None
           }
@@ -174,7 +174,7 @@ object Dataset {
       private[Dataset] object FromCli {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedExternal] =
           cliData.provenance match {
-            case CliDatasetProvenance(datePublished: DatePublished, None, Some(sameAs: ExternalSameAs), None, _, None)
+            case CliDatasetProvenance(datePublished: DatePublished, _, Some(sameAs: ExternalSameAs), None, _, None)
                 if cliData.originalIdEqualCurrentId =>
               Some(creators =>
                 ImportedExternal(cliData.resourceId, cliData.identifier, sameAs, datePublished, creators.sortBy(_.name))
@@ -214,7 +214,7 @@ object Dataset {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorExternal] =
           cliData.provenance match {
             case CliDatasetProvenance(datePublished: DatePublished,
-                                      None,
+                                      _,
                                       Some(sameAs: InternalSameAs),
                                       None,
                                       maybeOriginalId,
@@ -251,7 +251,7 @@ object Dataset {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorInternal] =
           cliData.provenance match {
             case CliDatasetProvenance(dateCreated: DateCreated,
-                                      None,
+                                      _,
                                       Some(sameAs: InternalSameAs),
                                       None,
                                       maybeOriginalId,
@@ -288,7 +288,7 @@ object Dataset {
         def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => Modified] =
           cliData.provenance match {
             case CliDatasetProvenance(_,
-                                      Some(dateModified),
+                                      dateModified,
                                       None,
                                       Some(derivedFrom),
                                       Some(originalId),

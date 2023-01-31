@@ -36,7 +36,7 @@ trait PlanGenerators {
       descr            <- planDescriptions.toGeneratorOfOptions
       creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
       dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
-      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      dateModified     <- planModifiedDates(after = dateCreated)
       keywords         <- planKeywords.toGeneratorOfList(max = 3)
       command          <- planCommands.toGeneratorOfOptions
       parameters       <- CommandParameterGenerators.commandParameterGen.toGeneratorOfList(max = 3)
@@ -75,7 +75,7 @@ trait PlanGenerators {
       description      <- planDescriptions.toGeneratorOfOptions
       creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
       dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
-      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      dateModified     <- planModifiedDates(after = dateCreated)
       keywords         <- planKeywords.toGeneratorOfList(max = 3)
       derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
       invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions

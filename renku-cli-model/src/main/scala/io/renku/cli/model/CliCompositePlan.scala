@@ -31,7 +31,7 @@ final case class CliCompositePlan(
     description:      Option[Description],
     creators:         List[CliPerson],
     dateCreated:      DateCreated,
-    dateModified:     Option[DateModified],
+    dateModified:     DateModified,
     keywords:         List[Keyword],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime],
@@ -56,7 +56,7 @@ object CliCompositePlan {
         description      <- cursor.downField(Schema.description).as[Option[Description]]
         creators         <- cursor.downField(Schema.creator).as[List[CliPerson]]
         dateCreated      <- cursor.downField(Schema.dateCreated).as[DateCreated]
-        dateModified     <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
+        dateModified     <- cursor.downField(Schema.dateModified).as[DateModified]
         keywords         <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
         derivedFrom      <- cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
