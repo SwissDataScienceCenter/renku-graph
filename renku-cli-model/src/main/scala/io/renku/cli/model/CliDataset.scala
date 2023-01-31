@@ -34,7 +34,7 @@ final case class CliDataset(
     title:              Title,
     name:               Name,
     createdOrPublished: CreatedOrPublished,
-    dateModified:       Option[DateModified],
+    dateModified:       DateModified,
     creators:           NonEmptyList[CliPerson],
     description:        Option[Description],
     keywords:           List[Keyword],
@@ -83,7 +83,7 @@ object CliDataset {
       date <- maybeDateCreated
                 .orElse(maybeDatePublished)
                 .toRight(DecodingFailure("No dateCreated or datePublished found on dataset", Nil))
-      maybeDateModified <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
+      maybeDateModified <- cursor.downField(Schema.dateModified).as[DateModified]
       maybeInternalSameAs <- cursor
                                .downField(Schema.sameAs)
                                .as[InternalSameAs]
@@ -144,7 +144,7 @@ object CliDataset {
           case d: DateCreated   => (Schema.dateCreated   -> d.asJsonLD).some
           case d: DatePublished => (Schema.datePublished -> d.asJsonLD).some
         },
-        ds.dateModified.map(m => Schema.dateModified -> m.asJsonLD),
+        Some(Schema.dateModified -> ds.dateModified.asJsonLD),
         ds.sameAs.map(e => Schema.sameAs -> e.asJsonLD),
         ds.derivedFrom.map(e => Prov.wasDerivedFrom -> e.asJsonLD),
         ds.originalIdentifier.map(e => Renku.originalIdentifier -> e.asJsonLD),

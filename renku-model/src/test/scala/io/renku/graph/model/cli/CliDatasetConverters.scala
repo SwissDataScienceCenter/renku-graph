@@ -31,10 +31,7 @@ trait CliDatasetConverters extends CliCommonConverters {
       title = dataset.identification.title,
       name = dataset.identification.name,
       createdOrPublished = dataset.provenance.date,
-      dateModified = dataset.provenance match {
-        case p: entities.Dataset.Provenance.Modified => datasets.DateModified(p.date).some
-        case _ => None
-      },
+      dateModified = datasets.DateModified(dataset.provenance.date),
       creators = dataset.provenance.creators.map(from),
       description = dataset.additionalInfo.maybeDescription,
       keywords = dataset.additionalInfo.keywords,

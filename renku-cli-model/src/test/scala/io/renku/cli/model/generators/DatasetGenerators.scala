@@ -43,7 +43,7 @@ trait DatasetGenerators {
       license       <- Gen.option(RenkuTinyTypeGenerators.datasetLicenses)
       version       <- Gen.option(RenkuTinyTypeGenerators.datasetVersions)
       files         <- DatasetFileGenerators.datasetFileGen(createdOrPublished.instant).toGeneratorOfList(max = 3)
-      modifiedDate  <- RenkuTinyTypeGenerators.datasetModifiedDates(createdOrPublished).toGeneratorOfOptions
+      modifiedDate  <- RenkuTinyTypeGenerators.datasetModifiedDates(createdOrPublished)
       sameAs        <- RenkuTinyTypeGenerators.datasetSameAs.toGeneratorOfOptions
       derivedFrom   <- RenkuTinyTypeGenerators.datasetDerivedFroms.toGeneratorOfOptions
       originalIdent <- RenkuTinyTypeGenerators.datasetOriginalIdentifiers.toGeneratorOfOptions
