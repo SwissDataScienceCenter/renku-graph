@@ -33,7 +33,6 @@ import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventDate, EventId, EventStatus, ExecutionDate}
-import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -68,7 +67,7 @@ class AllEventsToNewUpdaterSpec
           .expects(
             EventRequestContent.NoPayload(toEventJson(project)),
             EventSender.EventContext(CategoryName(ProjectEventsToNew.eventType.show),
-                                     show"$categoryName: Generating ${ProjectEventsToNew.eventType} for $project failed"
+                                     show"$categoryName: generating ${ProjectEventsToNew.eventType} for $project failed"
             )
           )
           .returning(().pure[IO])
@@ -84,7 +83,6 @@ class AllEventsToNewUpdaterSpec
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventSender = mock[EventSender[IO]]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
@@ -130,9 +128,9 @@ class AllEventsToNewUpdaterSpec
   private def toEventJson(project: Project) = json"""{
     "categoryName": "EVENTS_STATUS_CHANGE",
     "project": {
-      "id":   ${project.id.value},
-      "path": ${project.path.value}
+      "id":   ${project.id},
+      "path": ${project.path}
     },
-    "newStatus": ${EventStatus.New.value}
+    "newStatus": ${EventStatus.New}
   }"""
 }

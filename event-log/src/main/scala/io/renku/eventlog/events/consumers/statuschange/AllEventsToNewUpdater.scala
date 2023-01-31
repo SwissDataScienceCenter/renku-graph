@@ -18,17 +18,16 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -60,7 +59,8 @@ private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]
   ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
-    SqlStatement(name = "all_to_new - find projects")
+    SqlStatement
+      .named("all_to_new - find projects")
       .select[Void, ProjectEventsToNew](
         sql"""SELECT proj.project_id, proj.project_path
               FROM project proj
@@ -81,7 +81,7 @@ private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
             EventRequestContent.NoPayload(event.asJson),
             EventSender.EventContext(
               CategoryName(ProjectEventsToNew.eventType.show),
-              show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+              show"$categoryName: generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
             )
           ) >> sendEventIfFound(cursor, areMore)
       }
@@ -89,7 +89,7 @@ private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private implicit val encoder: Encoder[ProjectEventsToNew] = Encoder.instance { event =>
     json"""{
-      "categoryName": ${categoryName.value},
+      "categoryName": $categoryName,
       "project": {
         "id":   ${event.project.id},
         "path": ${event.project.path}

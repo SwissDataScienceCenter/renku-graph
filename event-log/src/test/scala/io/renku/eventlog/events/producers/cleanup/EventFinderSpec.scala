@@ -61,12 +61,12 @@ private class EventFinderSpec
         insertCleanUpEvent(project2, date = OffsetDateTime.now())
         upsertProject(project2, EventDate(Instant.EPOCH))
 
-        generateEvent(
+        generateAndStoreEvent(
           project1,
           Gen.oneOf(EventStatus.all - AwaitingDeletion - Deleting).generateOne,
           ExecutionDate(now minusSeconds 2)
         )
-        val project1Event2 = generateEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 1))
+        val project1Event2 = generateAndStoreEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 1))
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
@@ -75,8 +75,8 @@ private class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
 
-        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe 0d
+        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 0d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -92,7 +92,7 @@ private class EventFinderSpec
         upsertProject(project1, EventDate(Instant.EPOCH))
 
         val project2      = consumerProjects.generateOne
-        val project2Event = generateEvent(project2, AwaitingDeletion, ExecutionDate(now))
+        val project2Event = generateAndStoreEvent(project2, AwaitingDeletion, ExecutionDate(now))
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
@@ -115,16 +115,16 @@ private class EventFinderSpec
       "- case with no events in the clean_up_events_queue" in new TestCase {
 
         val project1 = consumerProjects.generateOne
-        generateEvent(
+        generateAndStoreEvent(
           project1,
           Gen.oneOf(EventStatus.all - AwaitingDeletion - Deleting).generateOne,
           ExecutionDate(now minusSeconds 3)
         )
-        val project1Event2 = generateEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 2))
-        val project1Event3 = generateEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 1))
+        val project1Event2 = generateAndStoreEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 2))
+        val project1Event3 = generateAndStoreEvent(project1, AwaitingDeletion, ExecutionDate(now minusSeconds 1))
 
         val project2      = consumerProjects.generateOne
-        val project2Event = generateEvent(project2, AwaitingDeletion, ExecutionDate(now))
+        val project2Event = generateAndStoreEvent(project2, AwaitingDeletion, ExecutionDate(now))
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
@@ -152,14 +152,14 @@ private class EventFinderSpec
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     implicit val gauges:                   EventStatusGauges[IO]     = TestEventStatusGauges[IO]
-    val currentTime = mockFunction[Instant]
+    private val currentTime = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
     val finder = new EventFinderImpl[IO](currentTime)
   }
 
-  private def generateEvent(project:       Project,
-                            eventStatus:   EventStatus,
-                            executionDate: ExecutionDate
+  private def generateAndStoreEvent(project:       Project,
+                                    eventStatus:   EventStatus,
+                                    executionDate: ExecutionDate
   ): CompoundEventId = {
     val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
     storeEvent(eventId,
