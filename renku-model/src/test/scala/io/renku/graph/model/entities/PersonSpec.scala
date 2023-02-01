@@ -20,6 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.CliPerson
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder, orcidIdEncoder}
@@ -27,7 +28,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, persons}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -72,31 +73,8 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
   "decode" should {
 
     "turn JsonLD Person entity into the Person object" in {
-      implicit val graph: GraphClass = GraphClass.Default
-      forAll { person: Person =>
-        person.asJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
-      }
-    }
-
-    "turn JsonLD of a Person in the CLI shape into the Person object" in {
-
-      val encoder = JsonLDEncoder.instance[entities.Person] { person =>
-        val entityId = person.maybeOrcidId match {
-          case Some(orcid) => EntityId of orcid.show
-          case _           => EntityId of person.resourceId.value
-        }
-
-        JsonLD.entity(
-          entityId,
-          entityTypes,
-          schema / "email"       -> person.maybeEmail.asJsonLD,
-          schema / "name"        -> person.name.asJsonLD,
-          schema / "affiliation" -> person.maybeAffiliation.asJsonLD
-        )
-      }
-
-      forAll(personEntities(withoutGitLabId).map(_.to[entities.Person])) { person =>
-        person.asJsonLD(encoder).cursor.as[entities.Person] shouldBe person.asRight
+      forAll(cliShapedPersons) { person: Person =>
+        person.to[CliPerson].asFlattenedJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
       }
     }
 
@@ -128,19 +106,6 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
       )
 
       jsonLDPerson.cursor.as[entities.Person].map(_.maybeAffiliation) shouldBe affiliation2.some.asRight
-    }
-
-    "fail if there's no name for a Person" in {
-      val resourceId = personResourceIds.generateOne
-      val jsonLDPerson = JsonLD.entity(
-        resourceId.asEntityId,
-        entityTypes,
-        schema / "email" -> personEmails.generateOne.asJsonLD
-      )
-
-      val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
-      failure         shouldBe a[DecodingFailure]
-      failure.message shouldBe show"No name on Person $resourceId"
     }
 
     "fail if person's ResourceId does not match the GitLabId based ResourceId if GitLabId given" in {

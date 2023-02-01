@@ -19,12 +19,12 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliPublicationEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLDDecoder
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -43,7 +43,7 @@ class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCh
           dataset.to[entities.Dataset[entities.Dataset.Provenance]].identification
         )
 
-        event.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.PublicationEvent]] shouldBe List(
+        event.to[CliPublicationEvent].asFlattenedJsonLD.cursor.as[List[entities.PublicationEvent]] shouldBe List(
           event.to[entities.PublicationEvent]
         ).asRight
       }
