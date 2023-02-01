@@ -20,7 +20,9 @@ package io.renku.graph.model.testentities
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliCompositePlan
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl, entities, plans}
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name}
 import io.renku.jsonld.JsonLDEncoder
@@ -134,6 +136,9 @@ object CompositePlan {
             )
           )
           .fold(errors => sys.error(errors.intercalate("; ")), _.asInstanceOf[entities.CompositePlan.NonModified])
+
+    implicit def toCliCompositePlan[P <: NonModified](implicit renkuUrl: RenkuUrl): P => CliCompositePlan =
+      CliConverters.from(_)
   }
 
   case class Modified(
@@ -244,12 +249,18 @@ object CompositePlan {
             )
           )
           .fold(errors => sys.error(errors.intercalate("; ")), _.asInstanceOf[entities.CompositePlan.Modified])
+
+    def toCliCompositePlan(implicit renkuUrl: RenkuUrl): Modified => CliCompositePlan =
+      CliConverters.from(_)
   }
 
   implicit def toEntitiesCompositePlan(implicit renkuUrl: RenkuUrl): CompositePlan => entities.CompositePlan = {
     case p: NonModified => NonModified.toEntitiesCompositePlan(renkuUrl)(p)
     case p: Modified    => Modified.toEntitiesCompositePlan(renkuUrl)(p)
   }
+
+  implicit def toCliCompositePlan(implicit renkuUrl: RenkuUrl): CompositePlan => CliCompositePlan =
+    CliConverters.from(_)
 
   // maybe just use the project encoder on the production entities
   implicit def jsonLDEncoder(implicit

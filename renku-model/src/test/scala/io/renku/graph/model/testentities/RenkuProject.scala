@@ -20,9 +20,11 @@ package io.renku.graph.model.testentities
 
 import cats.data.ValidatedNel
 import cats.syntax.all._
+import io.renku.cli.model.CliProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
@@ -236,6 +238,9 @@ object RenkuProject {
     case p: RenkuProject.WithoutParent => toEntitiesRenkuProjectWithoutParent(renkuUrl)(p)
     case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuUrl)(p)
   }
+
+  implicit def toCliRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => CliProject =
+    CliConverters.from(_)
 
   implicit def toEntitiesRenkuProjectWithoutParent(implicit
       renkuUrl: RenkuUrl

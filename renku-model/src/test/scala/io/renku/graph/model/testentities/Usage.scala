@@ -20,8 +20,10 @@ package io.renku.graph.model.testentities
 
 import Usage.Id
 import cats.syntax.all._
+import io.renku.cli.model.CliUsage
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.noDashUuid
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.{RenkuUrl, entities, usages}
 import io.renku.tinytypes.constraints.UUID
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -43,6 +45,9 @@ object Usage {
 
   implicit def toEntitiesUsage(implicit renkuUrl: RenkuUrl): Usage => entities.Usage = usage =>
     entities.Usage(usages.ResourceId(usage.asEntityId.show), usage.entity.to[entities.Entity])
+
+  implicit def toCliUsage(implicit renkuUrl: RenkuUrl): Usage => CliUsage =
+    CliConverters.from(_)
 
   implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance(_.to[entities.Usage].asJsonLD)

@@ -354,8 +354,7 @@ object Dataset {
   }
 
   implicit def toCliDataset[TP <: Provenance](implicit renkuUrl: RenkuUrl): Dataset[TP] => CliDataset =
-    ((_: Dataset[Dataset.Provenance]).to[entities.Dataset[entities.Dataset.Provenance]]) andThen
-      (CliConverters.from(_: entities.Dataset[entities.Dataset.Provenance]))
+    CliConverters.from(_)
 
   implicit def functions[P <: Provenance]: EntityFunctions[Dataset[P]] =
     EntityFunctions[entities.Dataset[entities.Dataset.Provenance]]

@@ -20,9 +20,11 @@ package io.renku.graph.model.testentities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliPlan
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.plans._
 
@@ -103,6 +105,9 @@ object Plan {
     case p: CompositePlan.NonModified => p.to[entities.Plan](CompositePlan.NonModified.toEntitiesCompositePlan)
     case p: CompositePlan.Modified    => p.to[entities.Plan](CompositePlan.Modified.toEntitiesCompositePlan)
   }
+
+  implicit def toCliPlan[P <: Plan](implicit renkuUrl: RenkuUrl): P => CliPlan =
+    CliConverters.from(_)
 
   implicit def encoder[P <: Plan](implicit
       renkuUrl:     RenkuUrl,

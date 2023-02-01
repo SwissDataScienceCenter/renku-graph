@@ -20,7 +20,9 @@ package io.renku.graph.model.testentities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import io.renku.cli.model.CliParameterMapping
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.{Description, Name}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
@@ -56,6 +58,9 @@ object ParameterMapping {
       name = m.name,
       mappedParameter = m.mappedParam.map(c => commandParameters.ResourceId(c.asEntityId.show))
     )
+
+  implicit def toCliParameterMapping(implicit renkuUrl: RenkuUrl): ParameterMapping => CliParameterMapping =
+    CliConverters.from(_)
 
   implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ParameterMapping] =
     JsonLDEncoder.instance(toEntitiesParameterMapping(_).asJsonLD)

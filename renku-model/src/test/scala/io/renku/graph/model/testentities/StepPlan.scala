@@ -24,6 +24,8 @@ import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import commandParameters.Position
 import entityModel.Location
+import io.renku.cli.model.CliStepPlan
+import io.renku.graph.model.cli.CliConverters
 import plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 trait StepPlan extends Plan {
@@ -89,6 +91,9 @@ object StepPlan {
         plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput]),
         plan.successCodes
       )
+
+    implicit def toCliStepPlan(implicit renkuUrl: RenkuUrl): NonModified => CliStepPlan =
+      CliConverters.from(_)
   }
 
   trait NonModifiedAlg extends PlanAlg {
@@ -203,6 +208,9 @@ object StepPlan {
           maybeInvalidationTime
         )
       }
+
+    implicit def toCliStepPlan[P <: Modified](implicit renkuUrl: RenkuUrl): P => CliStepPlan =
+      CliConverters.from(_)
   }
 
   trait ModifiedAlg extends PlanAlg {
@@ -294,6 +302,9 @@ object StepPlan {
     case p: StepPlan.NonModified => StepPlan.NonModified.toEntitiesStepPlan(renkuUrl)(p)
     case p: StepPlan.Modified    => StepPlan.Modified.toEntitiesStepPlan(renkuUrl)(p)
   }
+
+  implicit def toCliStepPlan(implicit renkuUrl: RenkuUrl): StepPlan => CliStepPlan =
+    CliConverters.from(_)
 
   object CommandParameters {
 

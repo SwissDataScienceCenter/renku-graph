@@ -60,7 +60,7 @@ object DatasetPart {
   }
 
   implicit def toCliDatasetFile(implicit renkuUrl: RenkuUrl): DatasetPart => CliDatasetFile =
-    ((_: DatasetPart).to[entities.DatasetPart]) andThen (CliConverters.from(_: entities.DatasetPart))
+    CliConverters.from(_)
 
   implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[DatasetPart] =
     JsonLDEncoder.instance(_.to[entities.DatasetPart].asJsonLD)

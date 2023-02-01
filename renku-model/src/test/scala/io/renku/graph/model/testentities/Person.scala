@@ -67,8 +67,7 @@ object Person {
       )
   }
 
-  implicit def toCliPerson(implicit renkuUrl: RenkuUrl): Person => CliPerson = p =>
-    CliConverters.from(p.to[entities.Person])
+  implicit def toCliPerson(implicit renkuUrl: RenkuUrl): Person => CliPerson = CliConverters.from(_)
 
   implicit def toMaybeEntitiesPersonWithGitLabId(implicit
       renkuUrl: RenkuUrl
