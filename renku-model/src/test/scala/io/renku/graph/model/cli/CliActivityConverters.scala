@@ -18,10 +18,12 @@
 
 package io.renku.graph.model.cli
 
+import cats.syntax.show._
 import CliConversionFunctions._
 import io.renku.cli.model._
-import io.renku.graph.model.entities
+import io.renku.graph.model.{RenkuUrl, activities, agents, associations, commandParameters, entities, generations, parameterValues, testentities, usages}
 import io.renku.graph.model.parameterValues.ValueOverride
+import io.renku.jsonld.syntax._
 
 trait CliActivityConverters extends CliPlanConverters {
 
@@ -37,7 +39,22 @@ trait CliActivityConverters extends CliPlanConverters {
     a.parameters.map(from)
   )
 
+  def from(a: testentities.Activity)(implicit renkuUrl: RenkuUrl): CliActivity = CliActivity(
+    activities.ResourceId(a.asEntityId.show),
+    a.startTime,
+    a.endTime,
+    CliAgent.Software(from(a.agent)),
+    CliAgent.Person(from(a.author)),
+    from(a.association),
+    a.usages.map(from),
+    a.generations.map(from),
+    a.parameters.map(from)
+  )
+
   def from(a: entities.Agent): CliSoftwareAgent = CliSoftwareAgent(a.resourceId, a.name)
+
+  def from(a: testentities.Agent)(implicit renkuUrl: RenkuUrl): CliSoftwareAgent =
+    CliSoftwareAgent(agents.ResourceId(a.asEntityId.show), agents.Name(s"renku ${a.cliVersion}"))
 
   def from(association: entities.Association, allPlans: List[entities.Plan]): CliAssociation = {
     val stepPlan       = findStepPlanOrFail(association.planId, allPlans)
@@ -50,8 +67,23 @@ trait CliActivityConverters extends CliPlanConverters {
       }
   }
 
+  def from(association: testentities.Association)(implicit renkuUrl: RenkuUrl): CliAssociation = {
+    val associatedPlan = CliAssociation.AssociatedPlan(from(association.plan))
+    val agent = association.agentOrPerson.fold(
+      a => CliAgent(from(a)),
+      a => CliAgent(from(a))
+    )
+    val id = associations.ResourceId(association.asEntityId.show)
+    CliAssociation(id, agent, associatedPlan)
+  }
+
   def from(usage: entities.Usage): CliUsage = CliUsage(
     usage.resourceId,
+    from(usage.entity)
+  )
+
+  def from(usage: testentities.Usage)(implicit renkuUrl: RenkuUrl): CliUsage = CliUsage(
+    usages.ResourceId(usage.asEntityId.show),
     from(usage.entity)
   )
 
@@ -61,11 +93,29 @@ trait CliActivityConverters extends CliPlanConverters {
     generation.activityResourceId
   )
 
+  def from(generation: testentities.Generation)(implicit renkuUrl: RenkuUrl): CliGeneration = CliGeneration(
+    generations.ResourceId(generation.asEntityId.show),
+    from(generation.entity),
+    activities.ResourceId(generation.activity.asEntityId.show)
+  )
+
   def from(paramValue: entities.ParameterValue): CliParameterValue = paramValue match {
     case v: entities.ParameterValue.LocationParameterValue =>
       CliParameterValue(v.resourceId, v.valueReference.resourceId, ValueOverride(v.value.value))
     case v: entities.ParameterValue.CommandParameterValue =>
       CliParameterValue(v.resourceId, v.valueReference.resourceId, v.value)
+  }
+
+  def from(paramValue: testentities.ParameterValue)(implicit renkuUrl: RenkuUrl): CliParameterValue = {
+    val id = parameterValues.ResourceId(paramValue.asEntityId.show)
+    paramValue match {
+      case p: testentities.ParameterValue.LocationParameterValue.CommandOutputValue =>
+        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), ValueOverride(p.value.value))
+      case p: testentities.ParameterValue.LocationParameterValue.CommandInputValue =>
+        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), ValueOverride(p.value.value))
+      case p: testentities.ParameterValue.CommandParameterValue =>
+        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), p.value)
+    }
   }
 }
 

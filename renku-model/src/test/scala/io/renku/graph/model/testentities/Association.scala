@@ -27,15 +27,20 @@ sealed trait Association {
   val activity: Activity
   val agent:    AgentType
   val plan:     StepPlan
+
+  def agentOrPerson: Either[Agent, Person]
 }
 
 object Association {
 
   final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: StepPlan) extends Association {
     type AgentType = Agent
+
+    def agentOrPerson: Either[Agent, Person] = Left(agent)
   }
   final case class WithPersonAgent(activity: Activity, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
+    def agentOrPerson: Either[Agent, Person] = Right(agent)
   }
 
   def factory(agent: Agent, plan: StepPlan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)

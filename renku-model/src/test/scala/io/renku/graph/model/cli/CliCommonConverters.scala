@@ -20,9 +20,39 @@ package io.renku.graph.model.cli
 
 import cats.syntax.all._
 import io.renku.cli.model._
-import io.renku.graph.model.{entities, entityModel}
+import io.renku.graph.model.{RenkuUrl, entities, entityModel, generations, testentities}
+import io.renku.jsonld.syntax._
 
 trait CliCommonConverters {
+
+  def from(person: testentities.Person): CliPerson = {
+    person.maybeGitLabId.map(_ => throw new Exception(s"Cannot convert Person with GitLabId to CliPerson"))
+    val resourceId = person.maybeOrcidId
+      .map(id => CliPersonResourceId(id.show))
+      .getOrElse(CliPersonResourceId(person.resourceId.value))
+    CliPerson(resourceId, person.name, person.maybeEmail, person.maybeAffiliation)
+  }
+
+  def from(entity: testentities.Entity)(implicit renkuUrl: RenkuUrl): CliEntity = {
+    val id = entityModel.ResourceId(entity.asEntityId.show)
+    entity match {
+      case testentities.Entity.InputEntity(location, checksum) =>
+        location match {
+          case l: entityModel.Location.File =>
+            CliEntity(CliSingleEntity(id, EntityPath(l.value), checksum, generationIds = Nil))
+          case l: entityModel.Location.Folder =>
+            CliEntity(CliCollectionEntity(id, EntityPath(l.value), checksum, generationIds = Nil))
+        }
+      case testentities.Entity.OutputEntity(location, checksum, generation) =>
+        val genId = generations.ResourceId(generation.asEntityId.show)
+        location match {
+          case l: entityModel.Location.File =>
+            CliEntity(CliSingleEntity(id, EntityPath(l.value), checksum, List(genId)))
+          case l: entityModel.Location.Folder =>
+            CliEntity(CliCollectionEntity(id, EntityPath(l.value), checksum, List(genId)))
+        }
+    }
+  }
 
   def from(person: entities.Person): CliPerson = {
     person.maybeGitLabId.map(_ => throw new Exception(s"Cannot convert Person with GitLabId to CliPerson"))

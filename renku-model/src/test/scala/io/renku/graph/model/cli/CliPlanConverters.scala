@@ -23,7 +23,9 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.cli.model.CliMappedIOStream.StreamType
 import io.renku.cli.model._
-import io.renku.graph.model.{commandParameters, entities, plans}
+import io.renku.graph.model.testentities.HavingInvalidationTime
+import io.renku.graph.model.{RenkuUrl, commandParameters, entities, parameterLinks, plans, testentities}
+import io.renku.jsonld.syntax._
 
 trait CliPlanConverters extends CliCommonConverters {
 
@@ -32,6 +34,13 @@ trait CliPlanConverters extends CliCommonConverters {
     spm => CliPlan(from(spm)),
     cpnm => CliPlan(from(cpnm, allPlans)),
     cpm => CliPlan(from(cpm, allPlans))
+  )
+
+  def from(plan: testentities.Plan)(implicit renkuUrl: RenkuUrl): CliPlan = plan.fold(
+    p => CliPlan(from(p)),
+    p => CliPlan(from(p)),
+    p => CliPlan(from(p)),
+    p => CliPlan(from(p))
   )
 
   def from(plan: entities.StepPlan): CliStepPlan = plan match {
@@ -71,6 +80,32 @@ trait CliPlanConverters extends CliCommonConverters {
       )
   }
 
+  def from(plan: testentities.StepPlan)(implicit renkuUrl: RenkuUrl): CliStepPlan =
+    CliStepPlan(
+      plans.ResourceId(plan.asEntityId.show),
+      plan.name,
+      plan.maybeDescription,
+      plan.creators.map(from),
+      plan.dateCreated,
+      plans.DateModified(plan.dateCreated.value),
+      plan.keywords,
+      plan.maybeCommand,
+      plan.parameters.map(from),
+      plan.inputs.map(from),
+      plan.outputs.map(from),
+      plan.successCodes,
+      derivedFrom = plan match {
+        case p: testentities.StepPlan.Modified =>
+          plans.DerivedFrom(p.parent.asEntityId).some
+        case _ => None
+      },
+      invalidationTime = plan match {
+        case p: HavingInvalidationTime =>
+          p.invalidationTime.some
+        case _ => None
+      }
+    )
+
   def from(plan: entities.CompositePlan, allPlans: List[entities.Plan]): CliCompositePlan = plan match {
     case p: entities.CompositePlan.NonModified =>
       CliCompositePlan(
@@ -104,6 +139,30 @@ trait CliPlanConverters extends CliCommonConverters {
       )
   }
 
+  def from(plan: testentities.CompositePlan)(implicit renkuUrl: RenkuUrl): CliCompositePlan =
+    CliCompositePlan(
+      plans.ResourceId(plan.asEntityId.show),
+      plan.name,
+      plan.maybeDescription,
+      plan.creators.map(from),
+      plan.dateCreated,
+      dateModified = plans.DateModified(plan.dateCreated.value),
+      plan.keywords,
+      derivedFrom = plan match {
+        case p: testentities.CompositePlan.Modified =>
+          plans.DerivedFrom(p.parent.asEntityId).some
+        case _ => None
+      },
+      invalidationTime = plan match {
+        case p: testentities.HavingInvalidationTime =>
+          p.invalidationTime.some
+        case _ => None
+      },
+      plan.plans.map(from),
+      plan.links.map(from(_)),
+      plan.mappings.map(from(_))
+    )
+
   def from(cp: entities.StepPlanCommandParameter.CommandParameter): CliCommandParameter = cp match {
     case cp: entities.StepPlanCommandParameter.ExplicitCommandParameter =>
       CliCommandParameter(cp.resourceId,
@@ -116,6 +175,23 @@ trait CliPlanConverters extends CliCommonConverters {
     case cp: entities.StepPlanCommandParameter.ImplicitCommandParameter =>
       CliCommandParameter(cp.resourceId, cp.name, cp.maybeDescription, cp.maybePrefix, position = None, cp.defaultValue)
   }
+
+  def from(
+      cp: testentities.StepPlanCommandParameter.CommandParameter
+  )(implicit renkuUrl: RenkuUrl): CliCommandParameter =
+    CliCommandParameter(
+      commandParameters.ResourceId(cp.asEntityId.show),
+      cp.name,
+      cp.maybeDescription,
+      cp.maybePrefix,
+      cp match {
+        case p: testentities.StepPlanCommandParameter.ExplicitCommandParameter =>
+          p.position.some
+        case _: testentities.StepPlanCommandParameter.ImplicitCommandParameter =>
+          None
+      },
+      cp.defaultValue
+    )
 
   def from(cp: entities.StepPlanCommandParameter.CommandInput): CliCommandInput = cp match {
     case cp: entities.StepPlanCommandParameter.LocationCommandInput =>
@@ -152,6 +228,38 @@ trait CliPlanConverters extends CliCommonConverters {
         cp.maybeEncodingFormat
       )
   }
+  def from(cp: testentities.StepPlanCommandParameter.CommandInput)(implicit renkuUrl: RenkuUrl): CliCommandInput =
+    CliCommandInput(
+      commandParameters.ResourceId(cp.asEntityId.show),
+      cp.name,
+      description = cp match {
+        case _: testentities.StepPlanCommandParameter.CommandInput.ImplicitCommandInput =>
+          None
+        case p: testentities.StepPlanCommandParameter.CommandInput.MappedCommandInput =>
+          p.maybeDescription
+        case p: testentities.StepPlanCommandParameter.CommandInput.LocationCommandInput =>
+          p.maybeDescription
+      },
+      cp.maybePrefix,
+      position = cp match {
+        case _: testentities.StepPlanCommandParameter.CommandInput.ImplicitCommandInput =>
+          None
+        case p: testentities.StepPlanCommandParameter.CommandInput.MappedCommandInput =>
+          p.position.some
+        case p: testentities.StepPlanCommandParameter.CommandInput.LocationCommandInput =>
+          p.position.some
+      },
+      commandParameters.ParameterDefaultValue(cp.defaultValue.value.value),
+      mappedTo = cp match {
+        case _: testentities.StepPlanCommandParameter.CommandInput.ImplicitCommandInput =>
+          None
+        case p: testentities.StepPlanCommandParameter.CommandInput.MappedCommandInput =>
+          from(p.mappedTo).some
+        case _: testentities.StepPlanCommandParameter.CommandInput.LocationCommandInput =>
+          None
+      },
+      cp.maybeEncodingFormat
+    )
 
   def from(cp: entities.StepPlanCommandParameter.CommandOutput): CliCommandOutput = cp match {
     case cp: entities.StepPlanCommandParameter.LocationCommandOutput =>
@@ -192,6 +300,40 @@ trait CliPlanConverters extends CliCommonConverters {
       )
   }
 
+  def from(cp: testentities.StepPlanCommandParameter.CommandOutput)(implicit renkuUrl: RenkuUrl): CliCommandOutput =
+    CliCommandOutput(
+      commandParameters.ResourceId(cp.asEntityId.show),
+      cp.name,
+      description = cp match {
+        case c: testentities.StepPlanCommandParameter.CommandOutput.MappedCommandOutput =>
+          c.maybeDescription
+        case c: testentities.StepPlanCommandParameter.CommandOutput.LocationCommandOutput =>
+          c.maybeDescription
+        case _: testentities.StepPlanCommandParameter.CommandOutput.ImplicitCommandOutput =>
+          None
+      },
+      cp.maybePrefix,
+      position = cp match {
+        case c: testentities.StepPlanCommandParameter.CommandOutput.MappedCommandOutput =>
+          c.position.some
+        case c: testentities.StepPlanCommandParameter.CommandOutput.LocationCommandOutput =>
+          c.position.some
+        case _: testentities.StepPlanCommandParameter.CommandOutput.ImplicitCommandOutput =>
+          None
+      },
+      commandParameters.ParameterDefaultValue(cp.defaultValue.value.value),
+      mappedTo = cp match {
+        case c: testentities.StepPlanCommandParameter.CommandOutput.MappedCommandOutput =>
+          from(c.mappedTo).some
+        case _: testentities.StepPlanCommandParameter.CommandOutput.LocationCommandOutput =>
+          None
+        case _: testentities.StepPlanCommandParameter.CommandOutput.ImplicitCommandOutput =>
+          None
+      },
+      cp.maybeEncodingFormat,
+      cp.folderCreation
+    )
+
   def from(ioStream: commandParameters.IOStream): CliMappedIOStream = CliMappedIOStream(
     ioStream.resourceId,
     StreamType.fromString(ioStream.name.value).fold(err => throw new Exception(err), identity)
@@ -202,6 +344,18 @@ trait CliPlanConverters extends CliCommonConverters {
       pl.resourceId,
       from(findCommandOutput(pl.source, allPlans)),
       buildSinks(pl.sinks, allPlans)
+    )
+
+  def from(pl: testentities.ParameterLink)(implicit renkuUrl: RenkuUrl): CliParameterLink =
+    CliParameterLink(
+      parameterLinks.ResourceId(pl.id.asEntityId.show),
+      from(pl.source),
+      pl.sinks.map {
+        case s: testentities.ParameterLink.Sink.Input =>
+          CliParameterLink.Sink(from(s.input))
+        case s: testentities.ParameterLink.Sink.Param =>
+          CliParameterLink.Sink(from(s.param))
+      }
     )
 
   private def buildSinks(sinkIds: NonEmptyList[commandParameters.ResourceId], allPlans: List[entities.Plan]) = {
@@ -224,6 +378,25 @@ trait CliPlanConverters extends CliCommonConverters {
       mapping.defaultValue.map(v => commandParameters.ParameterDefaultValue(v.value)),
       buildMappedParams(mapping.mappedParameter, allPlans)
     )
+
+  def from(mapping: testentities.ParameterMapping)(implicit renkuUrl: RenkuUrl): CliParameterMapping =
+    CliParameterMapping(
+      commandParameters.ResourceId(mapping.id.asEntityId.show),
+      mapping.name,
+      mapping.description,
+      mapping.maybePrefix,
+      position = None,
+      mapping.defaultValue.map(commandParameters.ParameterDefaultValue(_)),
+      mapping.mappedParam.map(fromBase)
+    )
+
+  def fromBase(param: testentities.CommandParameterBase)(implicit renkuUrl: RenkuUrl): CliParameterMapping.MappedParam =
+    param match {
+      case p: testentities.StepPlanCommandParameter.CommandInput     => CliParameterMapping.MappedParam(from(p))
+      case p: testentities.StepPlanCommandParameter.CommandOutput    => CliParameterMapping.MappedParam(from(p))
+      case p: testentities.StepPlanCommandParameter.CommandParameter => CliParameterMapping.MappedParam(from(p))
+      case p: testentities.ParameterMapping                          => CliParameterMapping.MappedParam(from(p))
+    }
 
   private def buildMappedParams(paramIds: NonEmptyList[commandParameters.ResourceId], allPlans: List[entities.Plan]) = {
     val params  = collectAllParameters(paramIds, allPlans).map(from).map(CliParameterMapping.MappedParam.apply)
