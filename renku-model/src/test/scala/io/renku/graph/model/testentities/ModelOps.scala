@@ -255,7 +255,9 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def widen[T <: Dataset.Provenance](implicit ev: P <:< T): Dataset[T] = dataset.asInstanceOf[Dataset[T]]
 
-    def invalidate(time: InvalidationTime): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] = {
+    def invalidate(time:       InvalidationTime,
+                   creatorGen: Gen[Person]
+    ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] = {
       val newIdentifier = datasetIdentifiers.generateOne
       dataset.provenance.date match {
         case dateCreated: DateCreated =>
@@ -269,7 +271,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
-                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+                (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             ),
@@ -285,7 +287,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
-                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+                (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             )
@@ -293,17 +295,21 @@ trait ModelOps extends Dataset.ProvenanceOps {
       }
     }
 
-    def invalidateNow: Dataset[Dataset.Provenance.Modified] = invalidateUnsafe(InvalidationTime.now)
+    def invalidateNow(creatorGen: Gen[Person]): Dataset[Dataset.Provenance.Modified] =
+      invalidateUnsafe(InvalidationTime.now, creatorGen)
 
-    def invalidateUnsafe(time: InvalidationTime): Dataset[Dataset.Provenance.Modified] =
-      invalidate(time).fold(errors => throw new IllegalArgumentException(errors.intercalate(", ")), identity)
+    def invalidateUnsafe(time: InvalidationTime, creatorGen: Gen[Person]): Dataset[Dataset.Provenance.Modified] =
+      invalidate(time, creatorGen).fold(errors => throw new IllegalArgumentException(errors.intercalate(", ")),
+                                        identity
+      )
 
-    def invalidatePartNow(part: DatasetPart): Dataset[Provenance.Modified] =
-      invalidatePart(part, InvalidationTime.now)
+    def invalidatePartNow(part: DatasetPart, creatorGen: Gen[Person]): Dataset[Provenance.Modified] =
+      invalidatePart(part, InvalidationTime.now, creatorGen)
         .fold(errors => throw new IllegalArgumentException(errors.intercalate("; ")), identity)
 
-    def invalidatePart(part: DatasetPart,
-                       time: InvalidationTime
+    def invalidatePart(part:       DatasetPart,
+                       time:       InvalidationTime,
+                       creatorGen: Gen[Person]
     ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] =
       dataset.parts
         .find(_ == part)
@@ -319,7 +325,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
               dataset.provenance.topmostDerivedFrom,
               dataset.provenance.originalIdentifier,
               datasets.DateCreated(time.value),
-              (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+              (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
               maybeInvalidationTime = None
             ),
             parts = dataset.parts.filterNot(_ == part) ::: invalidatedPart :: Nil

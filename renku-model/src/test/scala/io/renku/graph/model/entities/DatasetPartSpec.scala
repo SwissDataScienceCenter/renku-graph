@@ -20,57 +20,65 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.{CliDataset, CliDatasetFile}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, InvalidationTime, entities}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.tools.AdditionalMatchers
+import io.renku.graph.model.{InvalidationTime, entities}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetPartSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class DatasetPartSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with AdditionalMatchers
+    with DiffInstances {
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
-
     "turn JsonLD DatasetPart entity into the DatasetPart object" in {
       val startDate = timestampsNotInTheFuture.generateOne
       forAll(datasetPartEntities(startDate)) { datasetPart =>
-        datasetPart.asJsonLD.cursor
-          .as[entities.DatasetPart] shouldBe datasetPart.to[entities.DatasetPart].asRight
+        datasetPart
+          .to[CliDatasetFile]
+          .asFlattenedJsonLD
+          .cursor
+          .as[List[entities.DatasetPart]] shouldMatchToRight List(datasetPart.to[entities.DatasetPart])
       }
     }
 
     "turn JsonLD DatasetPart with InvalidationTime entity into the DatasetPart object" in {
-      forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
+      forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { dataset =>
         val datasetPart      = datasetPartEntities(dataset.provenance.date.instant).generateOne
         val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
         val invalidatedDataset = dataset
           .copy(parts = List(datasetPart))
-          .invalidatePart(datasetPart, invalidationTime)
+          .invalidatePart(datasetPart, invalidationTime, cliShapedPersons)
           .fold(errors => fail(errors.intercalate("; ")), identity)
 
-        invalidatedDataset.asJsonLD.flatten
-          .fold(throw _, identity)
+        invalidatedDataset
+          .to[CliDataset]
+          .asFlattenedJsonLD
           .cursor
           .as[List[entities.DatasetPart]] shouldBe invalidatedDataset.parts.map(_.to[entities.DatasetPart]).asRight
       }
     }
 
     "fail if invalidationTime is older than the part" in {
-      val datasetPart = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
+      val datasetPart      = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[CliDatasetFile]
       val invalidationTime = timestamps(max = datasetPart.dateCreated.value).generateAs(InvalidationTime)
 
       val Left(error) = datasetPart
-        .copy(maybeInvalidationTime = invalidationTime.some)
-        .asJsonLD
+        .copy(invalidationTime = invalidationTime.some)
+        .asFlattenedJsonLD
         .cursor
-        .as[entities.DatasetPart]
+        .as[List[entities.DatasetPart]]
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage shouldBe s"DatasetPart ${datasetPart.entity.location} " +
-        s"invalidationTime $invalidationTime is older than DatasetPart ${datasetPart.dateCreated.value}"
+      error          shouldBe a[DecodingFailure]
+      error.getMessage should include
+      s"invalidationTime $invalidationTime is older than DatasetPart ${datasetPart.dateCreated.value}"
     }
   }
 }

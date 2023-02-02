@@ -19,6 +19,8 @@
 package io.renku.cli.model
 
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+import shapeless.poly._
+import shapeless._
 
 /** Marker trait to annotate a class that models an entity from the cli schema. */
 trait CliModel extends Product
@@ -37,5 +39,27 @@ object CliModel {
     /** Creates a nested JSON-LD representation of the value. */
     def asNestedJsonLD(implicit encoder: JsonLDEncoder[A]): JsonLD =
       encoder(self)
+  }
+
+  implicit def hnilJsonEncoder: JsonLDEncoder[HNil] =
+    JsonLDEncoder.instance(_ => JsonLD.arr())
+
+  implicit def hlistJsonEncoder[A, L <: HList](implicit
+      he: JsonLDEncoder[A],
+      te: JsonLDEncoder[L]
+  ): JsonLDEncoder[A :: L] =
+    JsonLDEncoder.instance { hl =>
+      val el = he.apply(hl.head)
+      te.apply(hl.tail) match {
+        case JsonLD.JsonLDArray(els) =>
+          JsonLD.arr(el +: els: _*)
+        case json =>
+          JsonLD.arr(el, json)
+      }
+    }
+
+  final implicit class HListCliModelOps[A <: CliModel, L <: HList](hl: A :: L) {
+    def asFlattenedJsonLD(implicit enc: JsonLDEncoder[A :: L]): JsonLD =
+      enc.apply(hl).flatten.fold(throw _, identity)
   }
 }
