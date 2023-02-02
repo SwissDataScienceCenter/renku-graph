@@ -26,6 +26,7 @@ import io.circe.Decoder
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.users.projects.model.Project
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
@@ -57,9 +58,9 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |       (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |       ?maybeDescription 
         |WHERE {
-        |  GRAPH <${GraphClass.Persons.id}> {
-        |    ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-        |                  schema:identifier ${criteria.userId.value};
+        |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
+        |    ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
+        |                  schema:identifier ${criteria.userId.asObject.asSparql.sparql};
         |                  ^schema:sameAs ?memberId
         |  }
         |  GRAPH ?projectId {
@@ -74,7 +75,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |    OPTIONAL { ?projectId schema:keywords ?keyword }
         |    OPTIONAL {
         |      ?projectId schema:creator ?maybeCreatorResourceId.
-        |      GRAPH <${GraphClass.Persons.id}> {
+        |      GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
         |        ?maybeCreatorResourceId schema:name ?maybeCreatorName
         |      }
         |    }
@@ -88,21 +89,28 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
     def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String =
       criteria.maybeUser match {
-        case Some(authUser) =>
-          s"""|OPTIONAL {
-              |    $projectIdVariable schema:member ?projectMemberId
-              |    GRAPH <${GraphClass.Persons.id}> {
-              |      ?projectMemberId schema:sameAs ?projectMemberSameAs.
-              |      ?projectMemberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-              |                           schema:identifier ?userGitlabId
-              |    }
+        case Some(user) =>
+          s"""|{
+              |  VALUES ($visibilityVariable) {
+              |    (${projects.Visibility.Public.asObject.asSparql.sparql})
+              |    (${projects.Visibility.Internal.asObject.asSparql.sparql})
+              |  }
+              |} UNION {
+              |  VALUES ($visibilityVariable) {
+              |    (${projects.Visibility.Private.asObject.asSparql.sparql})
+              |  }
+              |  $projectIdVariable schema:member ?projectMemberId
+              |  GRAPH ${GraphClass.Persons.id.asSparql.sparql} {
+              |    ?projectMemberId schema:sameAs ?projectMemberSameAs.
+              |    ?projectMemberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
+              |                         schema:identifier ${user.id.asObject.asSparql.sparql}
+              |  }
               |}
-              |FILTER (
-              |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${authUser.id.value}
-              |)
               |""".stripMargin
         case _ =>
-          s"""FILTER ($visibilityVariable = '${projects.Visibility.Public.value}')"""
+          s"""|VALUES ($visibilityVariable) {
+              |  (${projects.Visibility.Public.asObject.asSparql.sparql})
+              |}""".stripMargin
       }
   }
 
