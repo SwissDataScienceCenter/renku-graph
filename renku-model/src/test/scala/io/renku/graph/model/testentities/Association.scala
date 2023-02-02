@@ -19,7 +19,9 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliAssociation
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.jsonld._
 
 sealed trait Association {
@@ -27,15 +29,20 @@ sealed trait Association {
   val activity: Activity
   val agent:    AgentType
   val plan:     StepPlan
+
+  def agentOrPerson: Either[Agent, Person]
 }
 
 object Association {
 
   final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: StepPlan) extends Association {
     type AgentType = Agent
+
+    def agentOrPerson: Either[Agent, Person] = Left(agent)
   }
   final case class WithPersonAgent(activity: Activity, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
+    def agentOrPerson: Either[Agent, Person] = Right(agent)
   }
 
   def factory(agent: Agent, plan: StepPlan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
@@ -54,6 +61,9 @@ object Association {
                                            plan.to[entities.StepPlan].resourceId
       )
   }
+
+  implicit def toCliAssociation(implicit renkuUrl: RenkuUrl): Association => CliAssociation =
+    CliConverters.from(_)
 
   implicit def encoder(implicit renkuUrl: RenkuUrl, graph: GraphClass): JsonLDEncoder[Association] =
     JsonLDEncoder.instance(_.to[entities.Association].asJsonLD)

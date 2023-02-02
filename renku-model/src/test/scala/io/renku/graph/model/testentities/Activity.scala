@@ -19,8 +19,10 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliActivity
 import io.renku.graph.model._
 import io.renku.graph.model.activities.{EndTime, StartTime}
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.testentities.Activity._
 import io.renku.graph.model.testentities.Entity.OutputEntity
@@ -102,6 +104,9 @@ object Activity {
       activity.generations.map(_.to[entities.Generation]),
       activity.parameters.map(_.to[entities.ParameterValue])
     )
+
+  implicit def toCliActivity(implicit renkuUrl: RenkuUrl): Activity => CliActivity =
+    CliConverters.from(_)
 
   implicit def encoder(implicit
       renkuUrl:     RenkuUrl,

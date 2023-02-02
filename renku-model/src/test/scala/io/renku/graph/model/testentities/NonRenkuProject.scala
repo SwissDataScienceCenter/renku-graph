@@ -18,7 +18,9 @@
 
 package io.renku.graph.model.testentities
 
+import io.renku.cli.model.CliProject
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.jsonld.JsonLDEncoder
@@ -111,6 +113,9 @@ object NonRenkuProject {
         projects.ResourceId(project.parent.asEntityId),
         convertImageUris(project.asEntityId)(project.images)
       )
+
+  implicit def toCliNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => CliProject =
+    CliConverters.from(_)
 
   implicit def encoder[P <: NonRenkuProject](implicit
       renkuUrl:     RenkuUrl,

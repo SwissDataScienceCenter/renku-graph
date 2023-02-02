@@ -19,8 +19,10 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliParameterValue
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.noDashUuid
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entityModel.LocationLike
 import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities.StepPlanCommandParameter._
@@ -67,6 +69,9 @@ object ParameterValue {
                                                 p.valueReference.to[entities.StepPlanCommandParameter.CommandInput]
       )
   }
+
+  implicit def toCliParameterValue(implicit renkuUrl: RenkuUrl): ParameterValue => CliParameterValue =
+    CliConverters.from(_)
 
   object LocationParameterValue {
 

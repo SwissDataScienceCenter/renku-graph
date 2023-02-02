@@ -47,8 +47,8 @@ object Entity {
     case e: OutputEntity => toOutputEntity(renkuUrl)(e)
   }
 
-  implicit def toCliEntity(implicit renkuUrl: RenkuUrl): Entity => CliEntity = e =>
-    CliConverters.from(e.to[entities.Entity])
+  implicit def toCliEntity(implicit renkuUrl: RenkuUrl): Entity => CliEntity =
+    CliConverters.from(_)
 
   implicit def toInputEntity(implicit renkuUrl: RenkuUrl): InputEntity => entities.Entity.InputEntity =
     entity =>

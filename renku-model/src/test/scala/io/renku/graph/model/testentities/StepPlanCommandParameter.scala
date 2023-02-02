@@ -20,6 +20,8 @@ package io.renku.graph.model.testentities
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.cli.model.{CliCommandInput, CliCommandOutput}
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entityModel.Location
@@ -209,6 +211,9 @@ object StepPlanCommandParameter {
         )
     }
 
+    implicit def toCliCommandInput(implicit renkuUrl: RenkuUrl): CommandInput => CliCommandInput =
+      CliConverters.from(_)
+
     implicit def commandInputEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[CommandInput] =
       JsonLDEncoder.instance(_.to[entities.StepPlanCommandParameter.CommandInput].asJsonLD)
 
@@ -333,6 +338,9 @@ object StepPlanCommandParameter {
           parameter.maybeEncodingFormat
         )
     }
+
+    implicit def toCliCommandOutput(implicit renkuUrl: RenkuUrl): CommandOutput => CliCommandOutput =
+      CliConverters.from(_)
 
     implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuUrl: RenkuUrl): JsonLDEncoder[O] =
       JsonLDEncoder.instance(_.to[entities.StepPlanCommandParameter.CommandOutput].asJsonLD)
