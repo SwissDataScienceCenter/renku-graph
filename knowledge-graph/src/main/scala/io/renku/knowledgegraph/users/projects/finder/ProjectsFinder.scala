@@ -54,12 +54,17 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
   import tsProjectsFinder._
 
   override def findProjects(criteria: Criteria): F[PagingResponse[model.Project]] =
-    (findProjectsInTS(criteria) -> findProjectsInGL(criteria))
-      .mapN(mergeFavouringActivated)
+    queryProjects(criteria)
       .map(filterBy(criteria.filters.state))
       .map(_.sortBy(_.name))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
       .flatMap(_.flatMap(addCreatorsNames(criteria)))
+
+  private def queryProjects(criteria: Criteria): F[List[Project]] =
+    criteria.filters.state match {
+      case ActivationState.Activated => findProjectsInTS(criteria).widen
+      case _ => (findProjectsInTS(criteria) -> findProjectsInGL(criteria)).mapN(mergeFavouringActivated)
+    }
 
   private val mergeFavouringActivated
       : (List[model.Project.Activated], List[model.Project.NotActivated]) => List[model.Project] = {

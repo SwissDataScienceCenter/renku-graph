@@ -61,33 +61,6 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       actualResults.success.value.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
 
-    "add person names only to the requested page" in new TestCase {
-
-      val paging   = PagingRequest(Page(2), PerPage(5))
-      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All), paging = paging)
-      val projects = modelProjects.generateList(
-        min = paging.perPage.value + 1,
-        max = paging.perPage.value * paging.page.value + 1
-      )
-
-      val tsProjects = projects.collect { case p: model.Project.Activated => p }
-      givenTSFinding(criteria, returning = tsProjects.pure[Try])
-
-      val glProjects = projects.collect { case p: model.Project.NotActivated => p }
-      givenGLFinding(criteria, returning = glProjects.pure[Try])
-
-      val allSortedProjects = (tsProjects ::: glProjects).sortBy(_.name)
-      val pageProjects =
-        PagingResponse.from[Try, model.Project](allSortedProjects, paging).fold(throw _, identity).results
-      val enrichedPageProjects = modelProjects.generateFixedSizeList(pageProjects.size)
-      givenGLCreatorsNamesAdding(criteria, pageProjects, returning = enrichedPageProjects.pure[Try])
-
-      val actualResults = finder.findProjects(criteria)
-
-      actualResults.success.value.results          shouldBe enrichedPageProjects
-      actualResults.success.value.pagingInfo.total shouldBe Total(allSortedProjects.size)
-    }
-
     "return not activated projects only if ActivationState is set to 'NotActivated'" in new TestCase {
 
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.NotActivated))
@@ -117,9 +90,6 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
       givenTSFinding(criteria, returning = tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList(max = 4)
-      givenGLFinding(criteria, returning = (commonProject :: glProjects).pure[Try])
-
       val allSortedProjects = tsProjects.sortBy(_.name)
       val expectedProjects  = modelProjects.generateFixedSizeList(allSortedProjects.size)
       givenGLCreatorsNamesAdding(criteria, allSortedProjects, returning = expectedProjects.pure[Try])
@@ -128,6 +98,33 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       actualResults.success.value.results          shouldBe expectedProjects
       actualResults.success.value.pagingInfo.total shouldBe Total(expectedProjects.size)
+    }
+
+    "add person names only to the requested page" in new TestCase {
+
+      val paging   = PagingRequest(Page(2), PerPage(5))
+      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All), paging = paging)
+      val projects = modelProjects.generateList(
+        min = paging.perPage.value + 1,
+        max = paging.perPage.value * paging.page.value + 1
+      )
+
+      val tsProjects = projects.collect { case p: model.Project.Activated => p }
+      givenTSFinding(criteria, returning = tsProjects.pure[Try])
+
+      val glProjects = projects.collect { case p: model.Project.NotActivated => p }
+      givenGLFinding(criteria, returning = glProjects.pure[Try])
+
+      val allSortedProjects = (tsProjects ::: glProjects).sortBy(_.name)
+      val pageProjects =
+        PagingResponse.from[Try, model.Project](allSortedProjects, paging).fold(throw _, identity).results
+      val enrichedPageProjects = modelProjects.generateFixedSizeList(pageProjects.size)
+      givenGLCreatorsNamesAdding(criteria, pageProjects, returning = enrichedPageProjects.pure[Try])
+
+      val actualResults = finder.findProjects(criteria)
+
+      actualResults.success.value.results          shouldBe enrichedPageProjects
+      actualResults.success.value.pagingInfo.total shouldBe Total(allSortedProjects.size)
     }
 
     "fail if finding projects in TS fails" in new TestCase {
