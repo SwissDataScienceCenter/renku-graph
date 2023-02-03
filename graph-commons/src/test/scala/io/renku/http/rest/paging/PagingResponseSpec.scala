@@ -18,6 +18,7 @@
 
 package io.renku.http.rest.paging
 
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
@@ -27,13 +28,19 @@ import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.TestTinyTypes.UrlTestType
 import org.scalacheck.Gen
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Failure, Success, Try}
 
-class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PagingResponseSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with TryValues {
 
   "from" should {
 
@@ -191,6 +198,28 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
       httpResponse.contentType                    shouldBe Some(`Content-Type`(application.json))
       httpResponse.headers.headers                  should contain allElementsOf PagingHeaders.from(response)
       httpResponse.as[List[Json]].unsafeRunSync() shouldBe response.results.map(_.asJson)
+    }
+  }
+
+  "flatMap" should {
+
+    "execute the given function on the results" in {
+
+      val response = PagingResponse.from[Try, Int](1 :: 2 :: Nil, PagingRequest.default)
+
+      val result = response.success.value.flatMap(_.map(_ + 1).pure[Try])
+
+      result.success.value.results    shouldBe 2 :: 3 :: Nil
+      result.success.value.pagingInfo shouldBe response.success.value.pagingInfo
+    }
+
+    "fail if the given function changes the page size" in {
+
+      val response = PagingResponse.from[Try, Int](1 :: 2 :: Nil, PagingRequest.default)
+
+      val result = response.success.value.flatMap(_ => List(1).pure[Try])
+
+      result.failure.exception.getMessage shouldBe "Paging response mapping changed page size"
     }
   }
 }
