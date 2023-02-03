@@ -409,7 +409,7 @@ class UpdatesCreatorSpec
           |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
           |  (GROUP_CONCAT(?imageId; separator=',') AS ?images)
           |WHERE {
-          |  GRAPH ?g {
+          |  GRAPH ?id {
           |    ?id a schema:Project
           |    OPTIONAL { ?id schema:name ?name } 
           |    OPTIONAL { ?id schema:dateCreated ?dateCreated } 
