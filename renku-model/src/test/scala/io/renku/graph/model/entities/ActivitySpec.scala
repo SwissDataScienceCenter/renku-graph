@@ -20,6 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.CliActivity
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
@@ -37,14 +38,18 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Activity entity into the Activity object" in {
-      forAll(activityEntities(stepPlanEntities())(projectCreatedDates().generateOne)) { activity =>
+      forAll(
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          projectCreatedDates().generateOne
+        )
+      ) { activity =>
         implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
 
-        activity.asJsonLD.flatten
-          .fold(throw _, identity)
+        activity
+          .to[CliActivity]
+          .asFlattenedJsonLD
           .cursor
           .as[List[entities.Activity]] shouldBe List(activity.to[entities.Activity]).asRight
       }
@@ -53,8 +58,10 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
       val activity =
-        executionPlanners(stepPlanEntities(CommandInput.fromLocation(location)),
-                          anyRenkuProjectEntities.generateOne
+        executionPlanners(
+          stepPlanEntities(planCommands, cliShapedPersons, CommandInput.fromLocation(location)),
+          anyRenkuProjectEntities.generateOne.topAncestorDateCreated,
+          cliShapedPersons
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
           .buildProvenanceUnsafe()
@@ -76,8 +83,11 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
       implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
 
-      val Left(error) = activity.asJsonLD.flatten
-        .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
+      val Left(error) = activity
+        .to[CliActivity]
+        .asFlattenedJsonLD
+        .asArray
+        .fold(fail("JsonLD is not an array"))(replaceEntityLocation)
         .cursor
         .as[List[entities.Activity]]
 
@@ -88,8 +98,9 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
       val location = entityLocations.generateOne
       val activity = executionPlanners(
-        stepPlanEntities(CommandOutput.fromLocation(location)),
-        anyRenkuProjectEntities.generateOne
+        stepPlanEntities(planCommands, cliShapedPersons, CommandOutput.fromLocation(location)),
+        anyRenkuProjectEntities.generateOne.topAncestorDateCreated,
+        cliShapedPersons
       ).generateOne.buildProvenanceUnsafe()
 
       lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
@@ -109,8 +120,11 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
       implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
 
-      val Left(error) = activity.asJsonLD.flatten
-        .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
+      val Left(error) = activity
+        .to[CliActivity]
+        .asFlattenedJsonLD
+        .asArray
+        .fold(fail("JsonLD is not an array"))(replaceEntityLocation)
         .cursor
         .as[List[entities.Activity]]
 
@@ -118,85 +132,20 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       error.getMessage() should endWith(s"No Generation found for CommandOutputValue with $location")
     }
 
-    "fail if there is no Agent entity" in {
-
-      val encoder = JsonLDEncoder.instance[entities.Activity] { entity =>
-        JsonLD.entity(
-          entity.resourceId.asEntityId,
-          entityTypes,
-          Reverse.ofJsonLDsUnsafe((prov / "activity") -> entity.generations.asJsonLD),
-          prov / "startedAtTime"        -> entity.startTime.asJsonLD,
-          prov / "endedAtTime"          -> entity.endTime.asJsonLD,
-          prov / "wasAssociatedWith"    -> JsonLD.arr(entity.author.asJsonLD),
-          prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-          prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-          renku / "parameter"           -> entity.parameters.asJsonLD
-        )
-      }
-
-      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
-        .buildProvenanceUnsafe()
-
-      implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
-
-      val entitiesActivity = activity.to[entities.Activity]
-
-      val Left(error) = entitiesActivity
-        .asJsonLD(encoder)
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Activity]]
-
-      error       shouldBe a[DecodingFailure]
-      error.message should endWith(s"Activity ${entitiesActivity.resourceId} without or with multiple agents")
-    }
-
-    "fail if there is no Author entity" in {
-
-      val encoder = JsonLDEncoder.instance[entities.Activity] { entity =>
-        JsonLD.entity(
-          entity.resourceId.asEntityId,
-          entityTypes,
-          Reverse.ofJsonLDsUnsafe((prov / "activity") -> entity.generations.asJsonLD),
-          prov / "startedAtTime"        -> entity.startTime.asJsonLD,
-          prov / "endedAtTime"          -> entity.endTime.asJsonLD,
-          prov / "wasAssociatedWith"    -> JsonLD.arr(entity.agent.asJsonLD),
-          prov / "qualifiedAssociation" -> entity.association.asJsonLD,
-          prov / "qualifiedUsage"       -> entity.usages.asJsonLD,
-          renku / "parameter"           -> entity.parameters.asJsonLD
-        )
-      }
-
-      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
-        .buildProvenanceUnsafe()
-
-      implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
-
-      val entitiesActivity = activity.to[entities.Activity]
-
-      val Left(error) = entitiesActivity
-        .asJsonLD(encoder)
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as[List[entities.Activity]]
-
-      error       shouldBe a[DecodingFailure]
-      error.message should endWith(s"Activity ${entitiesActivity.resourceId} without or with multiple authors")
-    }
-
     "fail if Activity startTime is older than Plan creation date" in {
       val activity = {
-        val a = activityEntities(stepPlanEntities())(projectCreatedDates().generateOne).generateOne
+        val a = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          projectCreatedDates().generateOne
+        ).generateOne
         a.replaceStartTime(timestamps(max = a.plan.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime))
       }
       val entitiesActivity = activity.to[entities.Activity]
 
       implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
 
-      val Left(error) = entitiesActivity.asJsonLD.flatten
-        .fold(throw _, identity)
+      val Left(error) = activity
+        .to[CliActivity]
+        .asFlattenedJsonLD
         .cursor
         .as[List[entities.Activity]]
 

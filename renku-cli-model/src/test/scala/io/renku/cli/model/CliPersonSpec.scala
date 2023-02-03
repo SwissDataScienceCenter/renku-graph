@@ -66,5 +66,35 @@ class CliPersonSpec
         failure.message shouldBe show"No name on Person ${person.resourceId}"
       }
     }
+
+    "support multiple names, picking any" in {
+      val resourceId = RenkuTinyTypeGenerators.personNameResourceId.generateOne
+      val firstName  = RenkuTinyTypeGenerators.personNames.generateOne
+      val secondName = RenkuTinyTypeGenerators.personNames.generateOne
+      val jsonLDPerson = JsonLD.entity(
+        resourceId.asEntityId,
+        CliPerson.entityTypes,
+        Ontologies.Schema.name -> JsonLD.arr(firstName.asJsonLD, secondName.asJsonLD)
+      )
+
+      val Right(person) = jsonLDPerson.cursor.as[CliPerson]
+
+      person.name should (be(firstName) or be(secondName))
+    }
+
+    "support multiple affiliations, picking last" in {
+      val resourceId   = RenkuTinyTypeGenerators.personNameResourceId.generateOne
+      val name         = RenkuTinyTypeGenerators.personNames.generateOne
+      val affiliation1 = RenkuTinyTypeGenerators.personAffiliations.generateOne
+      val affiliation2 = RenkuTinyTypeGenerators.personAffiliations.generateOne
+      val jsonLDPerson = JsonLD.entity(
+        resourceId.asEntityId,
+        CliPerson.entityTypes,
+        Ontologies.Schema.name        -> name.asJsonLD,
+        Ontologies.Schema.affiliation -> List(affiliation1, affiliation2).asJsonLD
+      )
+
+      jsonLDPerson.cursor.as[CliPerson].map(_.affiliation) shouldBe affiliation2.some.asRight
+    }
   }
 }

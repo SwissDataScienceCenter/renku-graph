@@ -19,14 +19,14 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliActivity
+import io.renku.cli.model.CliModel._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities}
-import io.renku.jsonld.JsonLD
+import io.renku.graph.model.entities
 import io.renku.jsonld.JsonLDDecoder._
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -34,20 +34,23 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
-
     "turn JsonLD Generation entity into the Generation object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity1 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
-        val activity2 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
+        val testActivity1 =
+          activityEntities(stepPlanEntities(planCommands, cliShapedPersons, commandOutput), cliShapedPersons)(
+            projectCreatedDates().generateOne
+          ).generateOne
+        val activity1 = testActivity1.to[entities.Activity]
 
-        JsonLD
-          .arr(activity1.asJsonLD, activity2.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
+        val testActivity2 =
+          activityEntities(stepPlanEntities(planCommands, cliShapedPersons, commandOutput), cliShapedPersons)(
+            projectCreatedDates().generateOne
+          ).generateOne
+
+        val jsonLD =
+          List(testActivity1.to[CliActivity], testActivity2.to[CliActivity]).asFlattenedJsonLD
+
+        jsonLD.cursor
           .as[List[entities.Generation]](
             decodeList(entities.Generation.decoder(activity1.resourceId))
           ) shouldBe activity1.generations.asRight

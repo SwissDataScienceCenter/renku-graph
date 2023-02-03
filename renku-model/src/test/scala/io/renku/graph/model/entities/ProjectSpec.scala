@@ -21,9 +21,11 @@ package io.renku.graph.model.entities
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
+import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.circe.syntax._
 import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
+import io.renku.cli.model.{CliProject, CliPublicationEvent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -34,7 +36,7 @@ import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, 
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
-import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
+import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword}
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
@@ -87,57 +89,64 @@ class ProjectSpec
         val member2            = projectMembersWithEmail.generateOne
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
-        val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCliPayloadPerson(creator.chooseSomeName)
-        val (activity1, plan1) = activityWith(member2.toCliPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-        val (activity2, plan2) = activityWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
-        val (activity3, plan3) = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1           = datasetWith(member3.toCliPayloadPerson(member3.chooseSomeName))(info.dateCreated)
-        val dataset2           = datasetWith(cliShapedPersons.generateOne.to[entities.Person])(info.dateCreated)
+        val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
+        val activity1          = activityWith2(member2.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val activity2          = activityWith2(cliShapedPersons.generateOne)(info.dateCreated)
+        val activity3 = activityWithAssociationAgent2(creator.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val dataset1  = datasetWith2(member3.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val dataset2: testentities.Dataset[testentities.Dataset.Provenance] =
+          datasetWith2(cliShapedPersons.generateOne)(info.dateCreated)
 
-        val jsonLD = cliJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          None,
-          info.dateCreated,
-          activity1 :: activity2 :: activity3 :: Nil,
-          dataset1 :: dataset2 :: Nil,
-          plan1 :: plan2 :: plan3 :: Nil
-        )
+        val testProject: testentities.Project =
+          testentities.RenkuProject.WithoutParent(
+            path = info.path,
+            name = info.name,
+            maybeDescription = info.maybeDescription,
+            agent = cliVersion,
+            dateCreated = info.dateCreated,
+            maybeCreator = None,
+            visibility = info.visibility,
+            forksCount = ForksCount(1),
+            keywords = info.keywords,
+            members = Set.empty,
+            version = schemaVersion,
+            activities = activity1 :: activity2 :: activity3 :: Nil,
+            datasets = dataset1 :: dataset2 :: Nil,
+            unlinkedPlans = Nil,
+            images = info.avatarUrl.toList,
+            createCompositePlans = Nil
+          )
 
-        val mergedCreator = merge(creatorAsCliPerson, creator)
-        val mergedMember2 = merge(activity1.author, member2)
+        val pubEvents =
+          (dataset1.publicationEvents ::: dataset2.publicationEvents).map(_.to[CliPublicationEvent].asNestedJsonLD)
+        val jsonLD = flattenedJsonLDFrom(testProject.to[CliProject].asNestedJsonLD, pubEvents: _*)
+
+        val mergedCreator = merge2(creatorAsCliPerson, creator)
+        val mergedMember2 = merge2(activity1.author, member2)
         val mergedMember3 = dataset1.provenance.creators
-          .find(byEmail(member3))
-          .map(merge(_, member3))
+          .find(byEmail2(member3))
+          .map(merge2(_, member3))
           .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
 
-        val expectedActivities =
-          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+        val expectedActivities: List[testentities.Activity] =
+          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent2(activity3, mergedCreator) :: Nil)
             .sortBy(_.startTime)
 
         val decoded = jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil)
         decoded should not be empty
-        decoded.head shouldMatchTo
-          entities.RenkuProject.WithoutParent(
-            resourceId,
-            info.path,
-            info.name,
-            info.maybeDescription,
-            cliVersion,
-            info.dateCreated,
-            maybeCreator = mergedCreator.some,
-            info.visibility,
-            info.keywords,
-            members = Set(member1.toPerson, mergedMember2, mergedMember3),
-            schemaVersion,
-            expectedActivities,
-            addTo(dataset1, NonEmptyList.one(mergedMember3)) :: dataset2 :: Nil,
-            plan1 :: plan2 :: plan3 :: Nil,
-            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+        decoded.head shouldMatchTo testProject
+          .to[entities.Project]
+          .asInstanceOf[entities.RenkuProject.WithoutParent]
+          .copy(
+            activities = expectedActivities.map(_.to[entities.Activity]),
+            maybeCreator = mergedCreator.to[entities.Person].some,
+            datasets = List(
+              addTo2(dataset1, NonEmptyList.one(mergedMember3))
+                .to[entities.Dataset[entities.Dataset.Provenance]],
+              dataset2
+                .to[entities.Dataset[entities.Dataset.Provenance]]
+            ),
+            members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person])
           )
       }
     }
@@ -1312,6 +1321,19 @@ class ProjectSpec
         )
     }
 
+    lazy val toTestPerson: testentities.Person = gitLabPerson match {
+      case ProjectMemberNoEmail(name, _, gitLabId) =>
+        testentities.Person(
+          name,
+          maybeEmail = None,
+          gitLabId.some,
+          maybeOrcidId = None,
+          maybeAffiliation = None
+        )
+      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
+        testentities.Person(name, email.some, gitLabId.some, maybeOrcidId = None, maybeAffiliation = None)
+    }
+
     def chooseSomeName =
       if (Random.nextBoolean()) gitLabPerson.name
       else persons.Name(gitLabPerson.username.value)
@@ -1324,6 +1346,17 @@ class ProjectSpec
           dateCreated
         ).generateOne
       activity.to[entities.Activity].copy(author = author) -> activity.plan.to[entities.StepPlan]
+    }
+
+  private def activityWith2(
+      author: testentities.Person
+  ): projects.DateCreated => testentities.Activity =
+    dateCreated => {
+      val activity =
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()), cliShapedPersons)(
+          dateCreated
+        ).generateOne
+      activity.copy(author = author)
     }
 
   private def activityWithAssociationAgent(
@@ -1339,6 +1372,16 @@ class ProjectSpec
         entities.Association.WithPersonAgent(entitiesActivity.association.resourceId, agent, entitiesPlan.resourceId)
       ) -> entitiesPlan
     }
+  private def activityWithAssociationAgent2(
+      agent: testentities.Person
+  ): projects.DateCreated => testentities.Activity =
+    dateCreated => {
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()),
+                                      cliShapedPersons
+      )(dateCreated).generateOne
+
+      activity.copy(associationFactory = a => testentities.Association.WithPersonAgent(a, agent, activity.plan))
+    }
 
   private def datasetWith(
       creator: entities.Person,
@@ -1347,6 +1390,15 @@ class ProjectSpec
     val ds = datasetEntities(provenanceNonModified)(renkuUrl)(dateCreated).generateOne
       .to[entities.Dataset[entities.Dataset.Provenance]]
     addTo(ds, NonEmptyList.of(creator, other: _*))
+  }
+
+  private def datasetWith2(
+      creator: testentities.Person,
+      other:   testentities.Person*
+  ): projects.DateCreated => testentities.Dataset[testentities.Dataset.Provenance] = dateCreated => {
+    val ds = datasetEntities(provenanceNonModified(cliShapedPersons))(renkuUrl)(dateCreated).generateOne
+
+    addTo2(ds, NonEmptyList.of(creator, other: _*))
   }
 
   private def addTo(
@@ -1361,16 +1413,41 @@ class ProjectSpec
       case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators.sortBy(_.name))
     })
 
+  private def addTo2(
+      dataset:  testentities.Dataset[testentities.Dataset.Provenance],
+      creators: NonEmptyList[testentities.Person]
+  ): testentities.Dataset[testentities.Dataset.Provenance] =
+    dataset.copy(provenance = dataset.provenance match {
+      case p: testentities.Dataset.Provenance.Internal         => p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedExternal => p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedInternalAncestorInternal =>
+        p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedInternalAncestorExternal =>
+        p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.Modified => p.copy(creators = creators.sortBy(_.name))
+    })
+
   private def replaceAgent(activity: entities.Activity, newAgent: entities.Person): entities.Activity =
     ActivityLens.activityAssociationAgent.modify(_.map(_ => newAgent))(activity)
 
+  private def replaceAgent2(activity: testentities.Activity, newAgent: testentities.Person): testentities.Activity =
+    activity.copy(associationFactory = activity.associationFactory andThen {
+      case a: testentities.Association.WithPersonAgent => a.copy(agent = newAgent)
+      case a => a
+    })
+
   private def byEmail(member: ProjectMemberWithEmail): entities.Person => Boolean =
     _.maybeEmail.contains(member.email)
+  private def byEmail2(member: ProjectMemberWithEmail): testentities.Person => Boolean =
+    _.maybeEmail.exists(_ == member.email)
 
   private def merge(person: entities.Person, member: ProjectMemberWithEmail): entities.Person =
     person
       .add(member.gitLabId)
       .copy(name = member.name, maybeEmail = member.email.some)
+
+  private def merge2(person: testentities.Person, member: ProjectMemberWithEmail): testentities.Person =
+    person.copy(maybeGitLabId = member.gitLabId.some, name = member.name, maybeEmail = member.email.some)
 
   private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Path]] =
     Lens[GitLabProjectInfo, Option[projects.Path]](_.maybeParentPath)(mpp => _.copy(maybeParentPath = mpp))

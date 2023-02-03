@@ -59,7 +59,18 @@ object CliModel {
     }
 
   final implicit class HListCliModelOps[A <: CliModel, L <: HList](hl: A :: L) {
+    def asNestedJsonLD(implicit enc: JsonLDEncoder[A :: L]): JsonLD =
+      enc.apply(hl)
+
     def asFlattenedJsonLD(implicit enc: JsonLDEncoder[A :: L]): JsonLD =
       enc.apply(hl).flatten.fold(throw _, identity)
+  }
+
+  final implicit class ListCliModelOps[A <: CliModel](list: List[A]) {
+    def asNestedJsonLD(implicit enc: JsonLDEncoder[List[A]]): JsonLD =
+      enc.apply(list)
+
+    def asFlattenedJsonLD(implicit enc: JsonLDEncoder[List[A]]): JsonLD =
+      enc.apply(list).flatten.fold(throw _, identity)
   }
 }
