@@ -34,13 +34,12 @@ private trait GLProjectFinder[F[_]] {
 
 private object GLProjectFinder {
   def apply[F[_]: Async: GitLabClient: Logger]: F[GLProjectFinder[F]] =
-    GLCreatorFinder[F].map(new GLProjectFinderImpl[F](_))
+    new GLProjectFinderImpl[F].pure[F].widen
 
   val requestPageSize: PerPage = PerPage(100)
 }
 
-private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFinder: GLCreatorFinder[F])
-    extends GLProjectFinder[F] {
+private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLProjectFinder[F] {
 
   import GLProjectFinder.requestPageSize
   import GitLabClient.maybeNextPage
@@ -55,37 +54,9 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
   import org.http4s.implicits._
 
   override def findProjectsInGL(criteria: Criteria): F[List[Project.NotActivated]] =
-    findProjectsAndCreators(criteria) >>= addCreators(criteria)
+    findProjects(criteria)
 
-  private def addCreators(
-      criteria: Criteria
-  )(projectsAndCreators: List[ProjectAndCreator]): F[List[Project.NotActivated]] =
-    findDistinctCreatorIds(projectsAndCreators)
-      .map(fetchCreatorName(criteria))
-      .sequence
-      .map(updateProjects(projectsAndCreators))
-
-  private val findDistinctCreatorIds: List[ProjectAndCreator] => List[persons.GitLabId] =
-    _.flatMap(_._2).distinct
-
-  private type CreatorInfo = (persons.GitLabId, Option[persons.Name])
-
-  private def fetchCreatorName(criteria: Criteria)(id: persons.GitLabId): F[CreatorInfo] =
-    creatorFinder.findCreatorName(id)(criteria.maybeUser.map(_.accessToken)).map(id -> _)
-
-  private def updateProjects(
-      projectsAndCreators: List[ProjectAndCreator]
-  ): List[CreatorInfo] => List[model.Project.NotActivated] = creators =>
-    projectsAndCreators.map {
-      case (proj, Some(creatorId)) =>
-        creators
-          .find(_._1 == creatorId)
-          .map { case (_, maybeName) => proj.copy(maybeCreator = maybeName) }
-          .getOrElse(proj)
-      case (proj, None) => proj
-    }
-
-  private def findProjectsAndCreators(criteria: Criteria, page: Page = Page.first): F[List[ProjectAndCreator]] =
+  private def findProjects(criteria: Criteria, page: Page = Page.first): F[List[Project.NotActivated]] =
     GitLabClient[F]
       .get(
         (uri"users" / criteria.userId / "projects")
@@ -95,20 +66,18 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
       )(mapResponse)(criteria.maybeUser.map(_.accessToken))
       .flatMap {
         case (results, None)           => results.pure[F]
-        case (results, Some(nextPage)) => findProjectsAndCreators(criteria, nextPage).map(results ::: _)
+        case (results, Some(nextPage)) => findProjects(criteria, nextPage).map(results ::: _)
       }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(List[ProjectAndCreator], Option[Page])]] = {
-    case (Ok, _, resp)    => (resp.as[List[ProjectAndCreator]], maybeNextPage(resp)).mapN(_ -> _)
-    case (NotFound, _, _) => (List.empty[ProjectAndCreator], Option.empty[Page]).pure[F]
+      : PartialFunction[(Status, Request[F], Response[F]), F[(List[Project.NotActivated], Option[Page])]] = {
+    case (Ok, _, resp)    => (resp.as[List[Project.NotActivated]], maybeNextPage(resp)).mapN(_ -> _)
+    case (NotFound, _, _) => (List.empty[Project.NotActivated], Option.empty[Page]).pure[F]
   }
 
-  private type ProjectAndCreator = (model.Project.NotActivated, Option[persons.GitLabId])
+  private implicit lazy val projectDecoder: EntityDecoder[F, List[Project.NotActivated]] = {
 
-  private implicit lazy val projectDecoder: EntityDecoder[F, List[ProjectAndCreator]] = {
-
-    implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
+    implicit val decoder: Decoder[Project.NotActivated] = cursor =>
       for {
         id              <- cursor.downField("id").as[projects.GitLabId]
         name            <- cursor.downField("name").as[projects.Name]
@@ -123,11 +92,12 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
                                          path,
                                          maybeVisibility.getOrElse(projects.Visibility.Public),
                                          dateCreated,
+                                         maybeCreatorId,
                                          maybeCreator = None,
                                          keywords.sorted,
                                          maybeDesc
-      ) -> maybeCreatorId
+      )
 
-    jsonOf[F, List[ProjectAndCreator]]
+    jsonOf[F, List[Project.NotActivated]]
   }
 }

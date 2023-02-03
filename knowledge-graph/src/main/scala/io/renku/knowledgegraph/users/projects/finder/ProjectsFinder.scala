@@ -37,17 +37,19 @@ private[projects] trait ProjectsFinder[F[_]] {
 
 private[projects] object ProjectsFinder {
   def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
-    (TSProjectFinder[F], GLProjectFinder[F]).mapN(new ProjectsFinderImpl(_, _))
+    (TSProjectFinder[F], GLProjectFinder[F], GLCreatorsNamesAdder[F]).mapN(new ProjectsFinderImpl(_, _, _))
 
   implicit val nameOrdering: Ordering[projects.Name] = Ordering.by(_.value.toLowerCase)
 }
 
 private class ProjectsFinderImpl[F[_]: MonadThrow](
-    tsProjectsFinder: TSProjectFinder[F],
-    glProjectsFinder: GLProjectFinder[F]
+    tsProjectsFinder:     TSProjectFinder[F],
+    glProjectsFinder:     GLProjectFinder[F],
+    glCreatorsNamesAdder: GLCreatorsNamesAdder[F]
 ) extends ProjectsFinder[F] {
 
   import ProjectsFinder.nameOrdering
+  import glCreatorsNamesAdder._
   import glProjectsFinder._
   import tsProjectsFinder._
 
@@ -57,6 +59,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
       .map(filterBy(criteria.filters.state))
       .map(_.sortBy(_.name))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
+      .flatMap(_.flatMap(addCreatorsNames(criteria)))
 
   private val mergeFavouringActivated
       : (List[model.Project.Activated], List[model.Project.NotActivated]) => List[model.Project] = {

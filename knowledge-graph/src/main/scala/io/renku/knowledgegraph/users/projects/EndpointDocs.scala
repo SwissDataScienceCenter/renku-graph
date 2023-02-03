@@ -106,6 +106,7 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
         projects.Path("group/subgroup/name"),
         projects.Visibility.Public,
         projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+        persons.GitLabId(1).some,
         persons.Name("Jan Kowalski").some,
         List(projects.Keyword("key")),
         projects.Description("Some project").some

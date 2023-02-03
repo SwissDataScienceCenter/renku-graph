@@ -61,7 +61,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
         response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-        response.as[List[model.Project]].unsafeRunSync() shouldBe results.results.map(sortKeywords)
+        response.as[List[model.Project]].unsafeRunSync() shouldBe results.results.map(sortKeywords).map(removeCreatorId)
       }
     }
 
@@ -158,7 +158,16 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
                                     DecodingFailure(s"$link not equal $expected", Nil)
                    )
                  }
-        } yield model.Project.NotActivated(id, name, path, visibility, date, maybeCreator, keywords, maybeDesc)
+        } yield model.Project.NotActivated(id,
+                                           name,
+                                           path,
+                                           visibility,
+                                           date,
+                                           maybeCreatorId = None,
+                                           maybeCreator,
+                                           keywords,
+                                           maybeDesc
+        )
       case _ => fail("Neither 'details' nor 'activation' link in the response")
     }
   }
@@ -166,5 +175,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
   private lazy val sortKeywords: model.Project => model.Project = {
     case p: model.Project.Activated    => p.copy(keywords = p.keywords.sorted)
     case p: model.Project.NotActivated => p.copy(keywords = p.keywords.sorted)
+  }
+
+  private lazy val removeCreatorId: model.Project => model.Project = {
+    case p: model.Project.Activated    => p.copy(keywords = p.keywords.sorted)
+    case p: model.Project.NotActivated => p.copy(maybeCreatorId = None)
   }
 }

@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.users.projects
 package finder
 
+import Endpoint.Criteria
 import Endpoint.Criteria.Filters
 import Endpoint.Criteria.Filters._
 import ProjectsFinder.nameOrdering
@@ -26,35 +27,65 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects
-import io.renku.http.rest.paging.model.Total
+import io.renku.http.rest.paging.model._
+import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
-class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "findProjects" should {
 
-    "combine results from both TS and GitLab favouring TS projects when having the same path" in new TestCase {
+    "combine results from both TS and GL favouring TS projects when having the same path" in new TestCase {
 
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.All))
       val commonProject = notActivatedProjects.generateOne
 
       val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
-      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
+      givenTSFinding(criteria, returning = tsProjects.pure[Try])
 
       val glProjects = notActivatedProjects.generateList(max = 4)
-      (glProjectsFinder.findProjectsInGL _)
-        .expects(criteria)
-        .returning((commonProject :: glProjects).pure[Try])
+      givenGLFinding(criteria, returning = (commonProject :: glProjects).pure[Try])
 
-      val Success(actualResults) = finder.findProjects(criteria)
+      val allSortedProjects = (tsProjects ::: glProjects).sortBy(_.name)
+      val expectedProjects  = modelProjects.generateFixedSizeList(allSortedProjects.size)
+      givenGLCreatorsNamesAdding(criteria, allSortedProjects, returning = expectedProjects.pure[Try])
 
-      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name)
-      actualResults.results          shouldBe expectedProjects
-      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
+      val actualResults = finder.findProjects(criteria)
+
+      actualResults.success.value.results          shouldBe expectedProjects
+      actualResults.success.value.pagingInfo.total shouldBe Total(expectedProjects.size)
+    }
+
+    "add person names only to the requested page" in new TestCase {
+
+      val paging   = PagingRequest(Page(2), PerPage(5))
+      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All), paging = paging)
+      val projects = modelProjects.generateList(
+        min = paging.perPage.value + 1,
+        max = paging.perPage.value * paging.page.value + 1
+      )
+
+      val tsProjects = projects.collect { case p: model.Project.Activated => p }
+      givenTSFinding(criteria, returning = tsProjects.pure[Try])
+
+      val glProjects = projects.collect { case p: model.Project.NotActivated => p }
+      givenGLFinding(criteria, returning = glProjects.pure[Try])
+
+      val allSortedProjects = (tsProjects ::: glProjects).sortBy(_.name)
+      val pageProjects =
+        PagingResponse.from[Try, model.Project](allSortedProjects, paging).fold(throw _, identity).results
+      val enrichedPageProjects = modelProjects.generateFixedSizeList(pageProjects.size)
+      givenGLCreatorsNamesAdding(criteria, pageProjects, returning = enrichedPageProjects.pure[Try])
+
+      val actualResults = finder.findProjects(criteria)
+
+      actualResults.success.value.results          shouldBe enrichedPageProjects
+      actualResults.success.value.pagingInfo.total shouldBe Total(allSortedProjects.size)
     }
 
     "return not activated projects only if ActivationState is set to 'NotActivated'" in new TestCase {
@@ -63,18 +94,19 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val commonProject = notActivatedProjects.generateOne
 
       val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
-      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
+      givenTSFinding(criteria, returning = tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList(max = 4)
-      (glProjectsFinder.findProjectsInGL _)
-        .expects(criteria)
-        .returning((commonProject :: glProjects).pure[Try])
+      val glProjects = notActivatedProjects.generateNonEmptyList(max = 4).toList
+      givenGLFinding(criteria, returning = (commonProject :: glProjects).pure[Try])
 
-      val Success(actualResults) = finder.findProjects(criteria)
+      val allSortedProjects = glProjects.sortBy(_.name)
+      val expectedProjects  = modelProjects.generateFixedSizeList(allSortedProjects.size)
+      givenGLCreatorsNamesAdding(criteria, allSortedProjects, returning = expectedProjects.pure[Try])
 
-      val expectedProjects = glProjects.sortBy(_.name)
-      actualResults.results          shouldBe expectedProjects
-      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
+      val actualResults = finder.findProjects(criteria)
+
+      actualResults.success.value.results          shouldBe expectedProjects
+      actualResults.success.value.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
 
     "return activated projects only if ActivationState is set to 'Activated'" in new TestCase {
@@ -83,18 +115,19 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val commonProject = notActivatedProjects.generateOne
 
       val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
-      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
+      givenTSFinding(criteria, returning = tsProjects.pure[Try])
 
       val glProjects = notActivatedProjects.generateList(max = 4)
-      (glProjectsFinder.findProjectsInGL _)
-        .expects(criteria)
-        .returning((commonProject :: glProjects).pure[Try])
+      givenGLFinding(criteria, returning = (commonProject :: glProjects).pure[Try])
 
-      val Success(actualResults) = finder.findProjects(criteria)
+      val allSortedProjects = tsProjects.sortBy(_.name)
+      val expectedProjects  = modelProjects.generateFixedSizeList(allSortedProjects.size)
+      givenGLCreatorsNamesAdding(criteria, allSortedProjects, returning = expectedProjects.pure[Try])
 
-      val expectedProjects = tsProjects.sortBy(_.name)
-      actualResults.results          shouldBe expectedProjects
-      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
+      val actualResults = finder.findProjects(criteria)
+
+      actualResults.success.value.results          shouldBe expectedProjects
+      actualResults.success.value.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
 
     "fail if finding projects in TS fails" in new TestCase {
@@ -102,11 +135,9 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
       val exception = exceptions.generateOne
-      (tsProjectsFinder.findProjectsInTS _)
-        .expects(criteria)
-        .returning(exception.raiseError[Try, List[model.Project.Activated]])
+      givenTSFinding(criteria, returning = exception.raiseError[Try, List[model.Project.Activated]])
 
-      (glProjectsFinder.findProjectsInGL _).expects(criteria).returning(List.empty.pure[Try])
+      givenGLFinding(criteria, returning = List.empty.pure[Try])
 
       finder.findProjects(criteria) shouldBe exception.raiseError[Try, List[model.Project]]
     }
@@ -115,12 +146,10 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
-      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(List.empty.pure[Try])
+      givenTSFinding(criteria, returning = List.empty.pure[Try])
 
       val exception = exceptions.generateOne
-      (glProjectsFinder.findProjectsInGL _)
-        .expects(criteria)
-        .returning(exception.raiseError[Try, List[model.Project.NotActivated]])
+      givenGLFinding(criteria, returning = exception.raiseError[Try, List[model.Project.NotActivated]])
 
       finder.findProjects(criteria) shouldBe exception.raiseError[Try, List[model.Project]]
     }
@@ -129,13 +158,14 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
-      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(List.empty.pure[Try])
-      (glProjectsFinder.findProjectsInGL _).expects(criteria).returning(List.empty.pure[Try])
+      givenTSFinding(criteria, returning = List.empty.pure[Try])
+      givenGLFinding(criteria, returning = List.empty.pure[Try])
+      givenGLCreatorsNamesAdding(criteria, List.empty, returning = List.empty.pure[Try])
 
-      val Success(actualResults) = finder.findProjects(criteria)
+      val actualResults = finder.findProjects(criteria)
 
-      actualResults.results          shouldBe Nil
-      actualResults.pagingInfo.total shouldBe Total(0)
+      actualResults.success.value.results          shouldBe Nil
+      actualResults.success.value.pagingInfo.total shouldBe Total(0)
     }
   }
 
@@ -149,9 +179,28 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
   }
 
   private trait TestCase {
-    val tsProjectsFinder = mock[TSProjectFinder[Try]]
-    val glProjectsFinder = mock[GLProjectFinder[Try]]
-    val finder           = new ProjectsFinderImpl[Try](tsProjectsFinder, glProjectsFinder)
+    private val tsProjectsFinder     = mock[TSProjectFinder[Try]]
+    private val glProjectsFinder     = mock[GLProjectFinder[Try]]
+    private val glCreatorsNamesAdder = mock[GLCreatorsNamesAdder[Try]]
+    val finder = new ProjectsFinderImpl[Try](tsProjectsFinder, glProjectsFinder, glCreatorsNamesAdder)
+
+    def givenTSFinding(criteria: Criteria, returning: Try[List[model.Project.Activated]]) =
+      (tsProjectsFinder.findProjectsInTS _)
+        .expects(criteria)
+        .returning(returning)
+
+    def givenGLFinding(criteria: Criteria, returning: Try[List[model.Project.NotActivated]]) =
+      (glProjectsFinder.findProjectsInGL _)
+        .expects(criteria)
+        .returning(returning)
+
+    def givenGLCreatorsNamesAdding(criteria:  Criteria,
+                                   projects:  List[model.Project],
+                                   returning: Try[List[model.Project]]
+    ) = (glCreatorsNamesAdder
+      .addCreatorsNames(_: Criteria)(_: List[model.Project]))
+      .expects(criteria, projects)
+      .returning(returning)
   }
 
   private implicit class NotActivatedOps(project: model.Project.NotActivated) {
