@@ -31,7 +31,7 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
 import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
@@ -152,4 +152,14 @@ object GitLabClient {
       .map(Page.from)
       .map(MonadThrow[F].fromEither(_))
       .sequence
+
+  def maybeTotalPages[F[_]: MonadThrow](response: Response[F]): F[Option[Total]] = {
+    val header = ci"X-Total-Pages"
+    response.headers
+      .get(header)
+      .flatMap(_.head.value.toIntOption)
+      .map(Total.from)
+      .map(MonadThrow[F].fromEither(_))
+      .sequence
+  }
 }

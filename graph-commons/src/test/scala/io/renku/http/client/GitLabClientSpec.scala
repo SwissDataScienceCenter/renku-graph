@@ -39,18 +39,23 @@ import io.renku.testtools.IOSpec
 import org.http4s.Method.{GET, _}
 import org.http4s.Status.{Accepted, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.ci._
+
+import scala.util.Try
 
 class GitLabClientSpec
     extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
     with should.Matchers
+    with TryValues
     with TableDrivenPropertyChecks
     with MockFactory {
 
@@ -249,6 +254,36 @@ class GitLabClientSpec
       intercept[UnauthorizedException] {
         client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
+    }
+  }
+
+  "maybeNextPage" should {
+
+    "return the value from the 'X-Next-Page' response header" in {
+
+      val page     = pages.generateOne
+      val response = Response[Try]().withHeaders(Header.Raw(ci"X-Next-Page", page.value.show))
+
+      GitLabClient.maybeNextPage[Try](response).success.value shouldBe page.some
+    }
+
+    "return None if no 'X-Next-Page' header in the response" in {
+      GitLabClient.maybeNextPage[Try](Response[Try]()).success.value shouldBe None
+    }
+  }
+
+  "maybeTotal" should {
+
+    "return the value from the 'X-Total-Pages' response header" in {
+
+      val total    = totals.generateOne
+      val response = Response[Try]().withHeaders(Header.Raw(ci"X-Total-Pages", total.value.show))
+
+      GitLabClient.maybeTotalPages[Try](response).success.value shouldBe total.some
+    }
+
+    "return None if no 'X-Total-Pages' header in the response" in {
+      GitLabClient.maybeTotalPages[Try](Response[Try]()).success.value shouldBe None
     }
   }
 
