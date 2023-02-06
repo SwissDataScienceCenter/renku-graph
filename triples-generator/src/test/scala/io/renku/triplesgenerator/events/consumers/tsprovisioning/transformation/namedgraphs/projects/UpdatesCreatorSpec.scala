@@ -26,16 +26,18 @@ import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model
 import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.graph.model._
 import io.renku.graph.model.projects.DateCreated
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, projects}
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.syntax.all._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -156,7 +158,10 @@ class UpdatesCreatorSpec
         .runAll(on = projectsDataset)
         .unsafeRunSync()
 
-      findProjects shouldMatchTo Set(CurrentProjectState.from(project))
+      project.images.foreach { im =>
+        findImage(im.resourceId) shouldBe im.some
+      }
+      findProjects.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)
     }
 
     "generate queries which delete the project images when changed" in {
@@ -165,14 +170,16 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      prepareUpdates(
-        project,
-        toProjectMutableData(project).copy(images = projectImageResourceIds(project.resourceId).generateOne)
-      )
+      findProjects.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)
+
+      prepareUpdates(project, toProjectMutableData(project).copy(images = Nil))
         .runAll(on = projectsDataset)
         .unsafeRunSync()
 
-      findProjects.flatMap(_.images) shouldMatchTo Set.empty
+      findProjects.flatMap(_.images) shouldBe Set.empty
+      project.images.foreach { im =>
+        findImage(im.resourceId) shouldBe None
+      }
     }
 
     "generate queries which delete the project name when changed" in {
@@ -440,6 +447,31 @@ class UpdatesCreatorSpec
       )
     )
     .toSet
+
+  private def findImage(id: model.images.ImageResourceId): Option[model.images.Image] = runSelect(
+    on = projectsDataset,
+    SparqlQuery.of(
+      "fetch image",
+      Prefixes of schema -> "schema",
+      s"""|SELECT ?imageId ?uri ?position
+          |WHERE {
+          |  GRAPH ?id {
+          |    BIND (${id.asEntityId.asSparql.sparql} AS ?imageId)
+          |    ?imageId schema:contentUrl ?uri;
+          |             schema:position ?position.
+          |  }
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row =>
+      model.images.Image(
+        row.get("imageId").map(model.images.ImageResourceId.apply).getOrElse(fail("No image id")),
+        row.get("uri").map(model.images.ImageUri.apply).getOrElse(fail("No image uri")),
+        row.get("position").map(p => model.images.ImagePosition(p.toInt)).getOrElse(fail("No image position"))
+      )
+    )
+    .headOption
 
   def projectCreatedLens: Lens[entities.Project, DateCreated] =
     Lens[entities.Project, DateCreated](_.dateCreated) { created =>
