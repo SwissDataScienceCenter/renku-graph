@@ -67,7 +67,6 @@ private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] e
       .map(p => findProjects(criteria, Page(p)).map(_._1))
       .parSequence
       .map(_.reduce(_ ::: _))
-      .flatTap(results => println(s"TS ${results.size}").pure[F])
 
   private def findProjects(criteria: Criteria,
                            page:     Page = Page.first

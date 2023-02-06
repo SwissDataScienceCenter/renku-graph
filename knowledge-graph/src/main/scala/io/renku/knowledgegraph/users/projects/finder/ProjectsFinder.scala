@@ -21,9 +21,9 @@ package finder
 
 import Endpoint.Criteria.Filters._
 import Endpoint._
-import cats.{MonadThrow, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.PagingResponse
@@ -42,7 +42,7 @@ private[projects] object ProjectsFinder {
   implicit val nameOrdering: Ordering[projects.Name] = Ordering.by(_.value.toLowerCase)
 }
 
-private class ProjectsFinderImpl[F[_]: MonadThrow](
+private class ProjectsFinderImpl[F[_]: MonadThrow: NonEmptyParallel](
     tsProjectsFinder:     TSProjectFinder[F],
     glProjectsFinder:     GLProjectFinder[F],
     glCreatorsNamesAdder: GLCreatorsNamesAdder[F]
@@ -63,7 +63,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
   private def queryProjects(criteria: Criteria): F[List[Project]] =
     criteria.filters.state match {
       case ActivationState.Activated => findProjectsInTS(criteria).widen
-      case _ => (findProjectsInTS(criteria) -> findProjectsInGL(criteria)).mapN(mergeFavouringActivated)
+      case _ => (findProjectsInTS(criteria) -> findProjectsInGL(criteria)).parMapN(mergeFavouringActivated)
     }
 
   private val mergeFavouringActivated
