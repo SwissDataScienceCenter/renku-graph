@@ -20,11 +20,12 @@ package io.renku.knowledgegraph.users.projects
 package finder
 
 import Endpoint.Criteria
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.GitLabClient
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.knowledgegraph.users.projects.model.Project
 import org.typelevel.log4cats.Logger
 
@@ -33,16 +34,16 @@ private trait GLProjectFinder[F[_]] {
 }
 
 private object GLProjectFinder {
-  def apply[F[_]: Async: GitLabClient: Logger]: F[GLProjectFinder[F]] =
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger]: F[GLProjectFinder[F]] =
     new GLProjectFinderImpl[F].pure[F].widen
 
-  val requestPageSize: Int = 2000
+  val requestPageSize: Page = Page(100)
 }
 
-private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLProjectFinder[F] {
+private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] extends GLProjectFinder[F] {
 
   import GLProjectFinder.requestPageSize
-  import GitLabClient.maybeNextPage
+  import GitLabClient.maybeTotalPages
   import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.circe._
@@ -54,9 +55,23 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLP
   import org.http4s.implicits._
 
   override def findProjectsInGL(criteria: Criteria): F[List[Project.NotActivated]] =
-    findProjects(criteria)
+    findProjects(criteria) >>= {
+      case (projects, Some(total)) if total.value == 1 => projects.pure[F]
+      case (projects, Some(total))                     => fetchAllOtherPagesPar(criteria, total).map(projects ::: _)
+      case (_, None) =>
+        new Exception(s"User's Projects without 'X-Total-Pages'").raiseError[F, List[Project.NotActivated]]
+    }
 
-  private def findProjects(criteria: Criteria, page: Page = Page.first): F[List[Project.NotActivated]] =
+  private def fetchAllOtherPagesPar(criteria: Criteria, total: Total) =
+    (2 to total.value).toList
+      .map(p => findProjects(criteria, Page(p)).map(_._1))
+      .parSequence
+      .map(_.reduce(_ ::: _))
+      .flatTap(results => println(s"TS ${results.size}").pure[F])
+
+  private def findProjects(criteria: Criteria,
+                           page:     Page = Page.first
+  ): F[(List[Project.NotActivated], Option[Total])] =
     GitLabClient[F]
       .get(
         (uri"users" / criteria.userId / "projects")
@@ -64,15 +79,11 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GLP
           .withQueryParam("per_page", requestPageSize),
         "user-projects"
       )(mapResponse)(criteria.maybeUser.map(_.accessToken))
-      .flatMap {
-        case (results, None)           => results.pure[F]
-        case (results, Some(nextPage)) => findProjects(criteria, nextPage).map(results ::: _)
-      }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(List[Project.NotActivated], Option[Page])]] = {
-    case (Ok, _, resp)    => (resp.as[List[Project.NotActivated]], maybeNextPage(resp)).mapN(_ -> _)
-    case (NotFound, _, _) => (List.empty[Project.NotActivated], Option.empty[Page]).pure[F]
+      : PartialFunction[(Status, Request[F], Response[F]), F[(List[Project.NotActivated], Option[Total])]] = {
+    case (Ok, _, resp)    => (resp.as[List[Project.NotActivated]], maybeTotalPages(resp)).mapN(_ -> _)
+    case (NotFound, _, _) => (List.empty[Project.NotActivated], Option.empty[Total]).pure[F]
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[F, List[Project.NotActivated]] = {

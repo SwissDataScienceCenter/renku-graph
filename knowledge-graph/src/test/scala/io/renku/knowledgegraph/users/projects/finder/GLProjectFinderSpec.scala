@@ -28,13 +28,14 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.generators.CommonGraphGenerators.pages
+import io.renku.generators.CommonGraphGenerators.totals
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.rest.paging.model.Page
+import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
@@ -53,27 +54,28 @@ class GLProjectFinderSpec
     with MockFactory
     with GitLabClientTools[IO] {
 
-  private type ResultsChunk = (List[model.Project.NotActivated], Option[Page])
+  private type ResultsChunk = (List[model.Project.NotActivated], Option[Total])
 
   "findProjectsInGL" should {
 
-    "call the GitLab User Projects API and return the results" in new TestCase {
+    "call the GitLab User Projects API once and return the results " +
+      "if there's a single page of results" in new TestCase {
 
-      val criteria = criterias.generateOne
+        val criteria = criterias.generateOne
 
-      val projects = notActivatedProjects
-        .generateNonEmptyList(max = pageSize)
-        .toList
+        val projects = notActivatedProjects
+          .generateNonEmptyList(max = pageSize)
+          .toList
 
-      (gitLabClient
-        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ResultsChunk])(_: Option[AccessToken]))
-        .expects(uri(criteria, Page.first), endpointName, *, criteria.maybeUser.map(_.accessToken))
-        .returning((projects -> Option.empty[Page]).pure[IO])
+        (gitLabClient
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ResultsChunk])(_: Option[AccessToken]))
+          .expects(uri(criteria, Page.first), endpointName, *, criteria.maybeUser.map(_.accessToken))
+          .returning((projects -> totalFrom(projects)).pure[IO])
 
-      finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projects
-    }
+        finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projects
+      }
 
-    "read the data from all pages" in new TestCase {
+    "read the data from the first page and all the other pages if there are many" in new TestCase {
 
       val criteria = criterias.generateOne
 
@@ -81,16 +83,12 @@ class GLProjectFinderSpec
         .generateNonEmptyList(min = pageSize + 1, max = pageSize * 3)
         .toList
 
-      def maybeNextPage(resultsPage: List[model.Project.NotActivated], currentPage: Page): Option[Page] =
-        if (resultsPage.last.id == projects.last.id) Option.empty[Page]
-        else Page(currentPage.value + 1).some
-
       projects.sliding(pageSize, pageSize).zipWithIndex foreach { case (resultsPage, idx) =>
         val currentPage = Page(idx + 1)
         (gitLabClient
           .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ResultsChunk])(_: Option[AccessToken]))
           .expects(uri(criteria, currentPage), endpointName, *, criteria.maybeUser.map(_.accessToken))
-          .returning((resultsPage -> maybeNextPage(resultsPage, currentPage)).pure[IO])
+          .returning((resultsPage -> totalFrom(projects)).pure[IO])
       }
 
       finder.findProjectsInGL(criteria).unsafeRunSync() shouldBe projects
@@ -98,14 +96,14 @@ class GLProjectFinderSpec
 
     "map OK response from GitLab to list of NotActivated" in new TestCase {
 
-      val project       = notActivatedProjects.generateOne.copy(visibility = projects.Visibility.Public)
-      val maybeNextPage = pages.generateOption
+      val project = notActivatedProjects.generateOne.copy(visibility = projects.Visibility.Public)
+      val total   = totals.generateOne
 
       val response = Response[IO](Status.Ok)
         .withEntity(List(project).asJson)
-        .withHeaders(maybeNextPage.map(p => Header.Raw(ci"X-Next-Page", p.show)).toSeq)
+        .withHeaders(Header.Raw(ci"X-Total-Pages", total.show))
 
-      val expected = List(project.copy(maybeCreator = None, keywords = project.keywords.sorted)) -> maybeNextPage
+      val expected = List(project.copy(maybeCreator = None, keywords = project.keywords.sorted)) -> total.some
 
       mapResponse(Status.Ok, Request[IO](), response).unsafeRunSync() shouldBe expected
     }
@@ -137,11 +135,14 @@ class GLProjectFinderSpec
     lazy val mapResponse = captureMapping(gitLabClient)(
       finder.findProjectsInGL(criterias.generateOne).unsafeRunSync(),
       (notActivatedProjects
-         .map(p => p.maybeCreator.map(_ => p -> personGitLabIds.generateOption).getOrElse(p -> None))
+         .map(p => p.maybeCreator.map(_ => p -> personGitLabIds.generateOption).getOrElse(p -> Total(1).some))
          .toGeneratorOfList(),
-       pages.toGeneratorOfNones
+       fixed(Option(Total(1)))
       ).mapN(_ -> _)
     )
+
+    def totalFrom(projects: List[model.Project.NotActivated]) =
+      Total(projects.size / pageSize + (if ((projects.size % pageSize) == 0) 0 else 1)).some
   }
 
   private def uri(criteria: Criteria, page: Page) =

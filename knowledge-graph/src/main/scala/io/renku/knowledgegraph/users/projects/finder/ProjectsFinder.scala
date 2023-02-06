@@ -21,7 +21,7 @@ package finder
 
 import Endpoint.Criteria.Filters._
 import Endpoint._
-import cats.MonadThrow
+import cats.{MonadThrow, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
@@ -36,7 +36,7 @@ private[projects] trait ProjectsFinder[F[_]] {
 }
 
 private[projects] object ProjectsFinder {
-  def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
     (TSProjectFinder[F], GLProjectFinder[F], GLCreatorsNamesAdder[F]).mapN(new ProjectsFinderImpl(_, _, _))
 
   implicit val nameOrdering: Ordering[projects.Name] = Ordering.by(_.value.toLowerCase)
