@@ -272,7 +272,7 @@ class GitLabClientSpec
     }
   }
 
-  "maybeTotal" should {
+  "maybeTotalPages" should {
 
     "return the value from the 'X-Total-Pages' response header" in {
 

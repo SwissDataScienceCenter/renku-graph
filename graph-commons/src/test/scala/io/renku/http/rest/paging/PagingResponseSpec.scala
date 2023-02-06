@@ -201,13 +201,13 @@ class PagingResponseSpec
     }
   }
 
-  "flatMap" should {
+  "flatMapResults" should {
 
     "execute the given function on the results" in {
 
       val response = PagingResponse.from[Try, Int](1 :: 2 :: Nil, PagingRequest.default)
 
-      val result = response.success.value.flatMap(_.map(_ + 1).pure[Try])
+      val result = response.success.value.flatMapResults(_.map(_ + 1).pure[Try])
 
       result.success.value.results    shouldBe 2 :: 3 :: Nil
       result.success.value.pagingInfo shouldBe response.success.value.pagingInfo
@@ -217,7 +217,7 @@ class PagingResponseSpec
 
       val response = PagingResponse.from[Try, Int](1 :: 2 :: Nil, PagingRequest.default)
 
-      val result = response.success.value.flatMap(_ => List(1).pure[Try])
+      val result = response.success.value.flatMapResults(_ => List(1).pure[Try])
 
       result.failure.exception.getMessage shouldBe "Paging response mapping changed page size"
     }

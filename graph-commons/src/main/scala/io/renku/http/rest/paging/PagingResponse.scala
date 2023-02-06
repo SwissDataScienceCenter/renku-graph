@@ -28,7 +28,7 @@ import org.http4s.Header
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
 
-  def flatMap[F[_]: MonadThrow](f: List[Result] => F[List[Result]]): F[PagingResponse[Result]] =
+  def flatMapResults[F[_]: MonadThrow](f: List[Result] => F[List[Result]]): F[PagingResponse[Result]] =
     f(results) >>= {
       case r if r.size == results.size => new PagingResponse[Result](r, pagingInfo).pure[F]
       case _ => new Exception("Paging response mapping changed page size").raiseError[F, PagingResponse[Result]]

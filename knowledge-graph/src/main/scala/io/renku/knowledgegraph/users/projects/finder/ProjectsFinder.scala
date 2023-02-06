@@ -58,7 +58,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
       .map(filterBy(criteria.filters.state))
       .map(_.sortBy(_.name))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
-      .flatMap(_.flatMap(addCreatorsNames(criteria)))
+      .flatMap(_.flatMapResults(addCreatorsNames(criteria)))
 
   private def queryProjects(criteria: Criteria): F[List[Project]] =
     criteria.filters.state match {
