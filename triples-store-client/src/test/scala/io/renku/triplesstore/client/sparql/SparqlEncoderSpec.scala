@@ -23,8 +23,8 @@ import TriplesStoreGenerators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import model.{Quad, Triple}
-import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
+import org.eclipse.rdf4j.query.parser.sparql.SPARQLQueries
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -62,7 +62,7 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
 
     "be able to encode TripleObject.String as sparql with Jena specific characters escaping" in {
       val obj = stringTripleObjects.generateOne
-      obj.asSparql.sparql shouldBe s"'${EscapeStr.stringEsc(obj.value)}'"
+      obj.asSparql.sparql shouldBe s"'${SPARQLQueries.escape(obj.value)}'"
     }
 
     "be able to encode TripleObject.Instant as sparql" in {
