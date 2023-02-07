@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.users.projects
 
 import Endpoint._
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import finder._
@@ -91,7 +92,7 @@ object Endpoint {
       }
   }
 
-  def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     projectsFinder <- ProjectsFinder[F]
     renkuUrl       <- RenkuUrlLoader()
     renkuApiUrl    <- renku.ApiUrl()
