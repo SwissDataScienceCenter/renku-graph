@@ -18,7 +18,7 @@
 
 package io.renku.graph.model
 
-import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, Url}
 import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
@@ -39,7 +39,7 @@ object publicationEvents {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]

@@ -25,7 +25,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entityModel.{Location, LocationLike}
-import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology.{Class, DataProperty, DataPropertyRange, Type}
 import io.renku.jsonld.syntax._
@@ -57,19 +57,19 @@ object commandParameters {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   final class EncodingFormat private (val value: String) extends AnyVal with StringTinyType
   implicit object EncodingFormat
       extends TinyTypeFactory[EncodingFormat](new EncodingFormat(_))
       with NonBlank[EncodingFormat]
-      with TinyTypeJsonLDOps[EncodingFormat]
+      with NonBlankTTJsonLDOps[EncodingFormat]
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix
       extends TinyTypeFactory[Prefix](new Prefix(_))
       with NonBlank[Prefix]
-      with TinyTypeJsonLDOps[Prefix]
+      with NonBlankTTJsonLDOps[Prefix]
 
   final case class InputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
   object InputDefaultValue {

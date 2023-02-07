@@ -142,17 +142,13 @@ object CliProject {
   implicit def jsonLDDecoder: JsonLDDecoder[CliProject] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        id          <- cursor.downEntityId.as[ResourceId]
-        name        <- cursor.downField(Schema.name).as[Option[Name]]
-        description <- cursor.downField(Schema.description).as[Option[Description]]
-        dateCreated <- cursor.downField(Schema.dateCreated).as[DateCreated]
-        creator     <- cursor.downField(Schema.creator).as[Option[CliPerson]]
-        keywords    <- cursor.downField(Schema.keywords).as[Set[Keyword]]
-        images <-
-          cursor
-            .downField(Schema.image)
-            .as[List[Image]]
-            .map(_.sortBy(_.position))
+        id            <- cursor.downEntityId.as[ResourceId]
+        name          <- cursor.downField(Schema.name).as[Option[Name]]
+        description   <- cursor.downField(Schema.description).as[Option[Description]]
+        dateCreated   <- cursor.downField(Schema.dateCreated).as[DateCreated]
+        creator       <- cursor.downField(Schema.creator).as[Option[CliPerson]]
+        keywords      <- cursor.downField(Schema.keywords).as[Set[Option[Keyword]]].map(_.flatten)
+        images        <- cursor.downField(Schema.image).as[List[Image]].map(_.sortBy(_.position))
         plans         <- cursor.downField(Renku.hasPlan).as[List[ProjectPlan]]
         datasets      <- cursor.downField(Renku.hasDataset).as[List[CliDataset]]
         activities    <- cursor.downField(Renku.hasActivity).as[List[CliActivity]]

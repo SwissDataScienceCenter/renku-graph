@@ -220,13 +220,14 @@ object Person {
         }
 
       for {
-        maybeOrcidAsId   <- cursor.downEntityId.as[OrcidId].map(_.some).leftFlatMap(_ => None.asRight)
-        resourceId       <- maybeOrcidAsId.map(ResourceId(_).asRight).getOrElse(cursor.downEntityId.as[ResourceId])
-        names            <- cursor.downField(schema / "name").as[List[Name]]
-        maybeEmail       <- cursor.downField(schema / "email").as[Option[Email]]
-        maybeAffiliation <- cursor.downField(schema / "affiliation").as[List[Affiliation]].map(_.reverse.headOption)
-        maybeGitLabId    <- decodeSameAs(use = gitLabIdDecoder, onMultiple = "multiple GitLabId sameAs")
-        maybeOrcidId     <- decodeSameAs(use = orcidIdDecoder, onMultiple = "multiple OrcidId sameAs")
+        maybeOrcidAsId <- cursor.downEntityId.as[OrcidId].map(_.some).leftFlatMap(_ => None.asRight)
+        resourceId     <- maybeOrcidAsId.map(ResourceId(_).asRight).getOrElse(cursor.downEntityId.as[ResourceId])
+        names          <- cursor.downField(schema / "name").as[List[Option[Name]]].map(_.flatten)
+        maybeEmail     <- cursor.downField(schema / "email").as[Option[Email]]
+        maybeAffiliation <-
+          cursor.downField(schema / "affiliation").as[List[Option[Affiliation]]].map(_.flatten.reverse.headOption)
+        maybeGitLabId <- decodeSameAs(use = gitLabIdDecoder, onMultiple = "multiple GitLabId sameAs")
+        maybeOrcidId  <- decodeSameAs(use = orcidIdDecoder, onMultiple = "multiple OrcidId sameAs")
         name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
                 else names.reverse.head.asRight
         person <-

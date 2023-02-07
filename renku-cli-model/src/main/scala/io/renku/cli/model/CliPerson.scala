@@ -42,10 +42,11 @@ object CliPerson {
   implicit val jsonLDDecoder: JsonLDDecoder[CliPerson] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        resourceId       <- cursor.downEntityId.as[CliPersonResourceId]
-        names            <- cursor.downField(Schema.name).as[List[Name]]
-        maybeEmail       <- cursor.downField(Schema.email).as[Option[Email]]
-        maybeAffiliation <- cursor.downField(Schema.affiliation).as[List[Affiliation]].map(_.reverse.headOption)
+        resourceId <- cursor.downEntityId.as[CliPersonResourceId]
+        names      <- cursor.downField(Schema.name).as[List[Option[Name]]].map(_.flatten)
+        maybeEmail <- cursor.downField(Schema.email).as[Option[Email]]
+        maybeAffiliation <-
+          cursor.downField(Schema.affiliation).as[List[Option[Affiliation]]].map(_.flatten.reverse.headOption)
         name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
                 else names.reverse.head.asRight
       } yield CliPerson(resourceId, name, maybeEmail, maybeAffiliation)
@@ -54,10 +55,11 @@ object CliPerson {
   private[model] val jsonLDCliModelDecoder: JsonLDEntityDecoder[CliModel] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        resourceId       <- cursor.downEntityId.as[CliPersonResourceId]
-        names            <- cursor.downField(Schema.name).as[List[Name]]
-        maybeEmail       <- cursor.downField(Schema.email).as[Option[Email]]
-        maybeAffiliation <- cursor.downField(Schema.affiliation).as[List[Affiliation]].map(_.reverse.headOption)
+        resourceId <- cursor.downEntityId.as[CliPersonResourceId]
+        names      <- cursor.downField(Schema.name).as[List[Option[Name]]].map(_.flatten)
+        maybeEmail <- cursor.downField(Schema.email).as[Option[Email]]
+        maybeAffiliation <-
+          cursor.downField(Schema.affiliation).as[List[Option[Affiliation]]].map(_.flatten.reverse.headOption)
         name <- if (names.isEmpty) DecodingFailure(s"No name on Person $resourceId", Nil).asLeft
                 else names.reverse.head.asRight
       } yield CliPerson(resourceId, name, maybeEmail, maybeAffiliation)

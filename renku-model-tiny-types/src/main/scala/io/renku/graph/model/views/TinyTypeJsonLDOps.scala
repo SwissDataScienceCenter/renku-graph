@@ -19,10 +19,8 @@
 package io.renku.graph.model.views
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.jsonld.JsonLDDecoder.{decodeOption, decodeString}
 import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
-import io.renku.tinytypes.{From, StringTinyType, TinyType}
+import io.renku.tinytypes.{From, TinyType}
 
 trait TinyTypeJsonLDOps[TT <: TinyType] extends JsonLDTinyTypeDecoder[TT] with JsonLDTinyTypeEncoder[TT] {
   self: From[TT] =>
@@ -40,25 +38,4 @@ trait JsonLDTinyTypeEncoder[TT <: TinyType] {
 
   implicit def encoder(implicit valueEncoder: JsonLDEncoder[TT#V]): JsonLDEncoder[TT] =
     valueEncoder.contramap[TT](_.value)
-}
-
-object StringTinyTypeJsonLDDecoders {
-
-  implicit def decodeBlankStringToNone[TT <: StringTinyType](implicit
-      tinyTypeFactory: From[TT]
-  ): JsonLDDecoder[Option[TT]] =
-    decodeOption(decodeString).emap((blankToNone andThen toOption)(_).leftMap(_.getMessage()))
-
-  private lazy val blankToNone: Option[String] => Option[String] = _.map(_.trim) >>= {
-    case ""       => None
-    case nonBlank => Some(nonBlank)
-  }
-
-  private def toOption[TT <: StringTinyType](implicit
-      tinyTypeFactory: From[TT]
-  ): Option[String] => Either[DecodingFailure, Option[TT]] = {
-    case Some(nonBlank) =>
-      tinyTypeFactory.from(nonBlank).map(Option.apply).leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-    case None => Right(None)
-  }
 }
