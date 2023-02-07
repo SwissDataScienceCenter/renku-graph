@@ -22,6 +22,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{blankStrings, nonEmptyStrings}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
+import cats.syntax.all._
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.EitherValues
@@ -52,6 +53,21 @@ class NonBlankTTJsonLDOpsSpec extends AnyWordSpec with should.Matchers with Eith
     "produce a Json String" in {
       val tt = nonEmptyStrings().generateAs(TestStringTinyType)
       tt.asJsonLD shouldBe JsonLD.fromString(tt.value)
+    }
+  }
+
+  "failIfNone" should {
+
+    "return the value for Some" in {
+      val tinyType = nonEmptyStrings().generateAs(TestStringTinyType)
+
+      TestStringTinyType.failIfNone(tinyType.some) shouldBe tinyType.asRight
+    }
+
+    "fail for None" in {
+      val result = TestStringTinyType.failIfNone(None)
+
+      result.left.value.getMessage() shouldBe s"A value of '${TestStringTinyType.typeName}' expected but got any"
     }
   }
 }

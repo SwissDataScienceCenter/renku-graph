@@ -28,8 +28,13 @@ import io.renku.tinytypes.{From, StringTinyType, TinyTypeFactory}
 trait NonBlankTTJsonLDOps[TT <: StringTinyType] extends JsonLDTinyTypeEncoder[TT] with StringTinyTypeJsonLDDecoders {
   self: TinyTypeFactory[TT] with NonBlank[TT] =>
 
-  implicit lazy val decoder: JsonLDDecoder[Option[TT]] =
+  implicit lazy val optionalTTDecoder: JsonLDDecoder[Option[TT]] =
     decodeBlankStringToNone[TT](self)
+
+  val failIfNone: Option[TT] => JsonLDDecoder.Result[TT] = {
+    case Some(v) => v.asRight
+    case None    => DecodingFailure(s"A value of '$typeName' expected but got any", Nil).asLeft
+  }
 }
 
 object StringTinyTypeJsonLDDecoders extends StringTinyTypeJsonLDDecoders

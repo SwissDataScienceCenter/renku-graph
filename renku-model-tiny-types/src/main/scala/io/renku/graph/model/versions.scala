@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.Show
 import cats.syntax.show._
 import io.circe.Decoder
-import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.graph.model.views.NonBlankTTJsonLDOps
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.json.TinyTypeDecoders
@@ -29,7 +29,10 @@ import io.renku.tinytypes.json.TinyTypeDecoders
 object versions {
 
   final class CliVersion private (val value: String) extends AnyVal with StringTinyType
-  object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with TinyTypeJsonLDOps[CliVersion] {
+  object CliVersion
+      extends TinyTypeFactory[CliVersion](new CliVersion(_))
+      with NonBlankTTJsonLDOps[CliVersion]
+      with NonBlank[CliVersion] {
 
     private val validationRegex: String = raw"\d+\.\d+\.\d+.*"
 
@@ -75,7 +78,7 @@ object versions {
   object SchemaVersion
       extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_))
       with NonBlank[SchemaVersion]
-      with TinyTypeJsonLDOps[SchemaVersion] {
+      with NonBlankTTJsonLDOps[SchemaVersion] {
     implicit val jsonDecoder: Decoder[SchemaVersion] = TinyTypeDecoders.stringDecoder(SchemaVersion)
   }
 }

@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps, UrlResourceRenderer}
 import io.renku.jsonld.{EntityId, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes._
@@ -90,7 +90,7 @@ object projects {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with NonBlankTTJsonLDOps[Name]
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreated
@@ -109,7 +109,7 @@ object projects {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   sealed trait Visibility extends StringTinyType with Product with Serializable {
     def compareTo(other: Visibility): Int =
@@ -186,5 +186,5 @@ object projects {
   implicit object Keyword
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
-      with TinyTypeJsonLDOps[Keyword]
+      with NonBlankTTJsonLDOps[Keyword]
 }

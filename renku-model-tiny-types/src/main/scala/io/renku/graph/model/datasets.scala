@@ -31,7 +31,7 @@ import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, UrlOps, Url => UrlConstraint}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -62,7 +62,7 @@ object datasets {
   implicit object OriginalIdentifier
       extends TinyTypeFactory[OriginalIdentifier](new OriginalIdentifier(_))
       with DatasetIdentifierFactory[OriginalIdentifier]
-      with TinyTypeJsonLDOps[OriginalIdentifier]
+      with NonBlankTTJsonLDOps[OriginalIdentifier]
       with NonBlank[OriginalIdentifier]
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
@@ -75,25 +75,25 @@ object datasets {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   final class License private (val value: String) extends AnyVal with StringTinyType
   implicit object License
       extends TinyTypeFactory[License](new License(_))
       with NonBlank[License]
-      with TinyTypeJsonLDOps[License]
+      with NonBlankTTJsonLDOps[License]
 
   final class Version private (val value: String) extends AnyVal with StringTinyType
   implicit object Version
       extends TinyTypeFactory[Version](new Version(_))
       with NonBlank[Version]
-      with TinyTypeJsonLDOps[Version]
+      with NonBlankTTJsonLDOps[Version]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
   implicit object Keyword
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
-      with TinyTypeJsonLDOps[Keyword]
+      with NonBlankTTJsonLDOps[Keyword]
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation
