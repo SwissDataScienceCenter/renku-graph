@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.cli.model.{CliCompositePlan, CliStepPlan}
+import io.renku.cli.model.{CliCompositePlan, CliPlan, CliStepPlan}
 import io.renku.cli.model.CliModel._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
@@ -55,7 +55,7 @@ class PlanSpec
       forAll(stepPlans) { plan =>
         val prodPlan = plan.to[entities.StepPlan]
         plan
-          .to[CliStepPlan]
+          .to[CliPlan]
           .asFlattenedJsonLD
           .cursor
           .as[List[entities.StepPlan]] shouldMatchToRight List(prodPlan)
@@ -64,7 +64,7 @@ class PlanSpec
 
     "turn JsonLD of a modified Plan entity into the StepPlan object" in {
       forAll(stepPlans.map(_.createModification())) { (plan: StepPlan) =>
-        val cliPlan = plan.to[CliStepPlan]
+        val cliPlan = plan.to[CliPlan]
         cliPlan.asFlattenedJsonLD.cursor
           .as[List[entities.StepPlan]] shouldMatchToRight List(plan.to[entities.StepPlan])
       }
@@ -76,7 +76,7 @@ class PlanSpec
         .map(_.invalidate())
         .generateOne
 
-      val cliPlan = plan.to[CliStepPlan]
+      val cliPlan = plan.to[CliPlan]
 
       cliPlan.asFlattenedJsonLD.cursor.as[List[entities.StepPlan]] shouldMatchToRight List(plan.to[entities.StepPlan])
     }
@@ -85,7 +85,7 @@ class PlanSpec
 
       val testPlan = stepPlans.generateOne
       val plan     = testPlan.to[entities.StepPlan]
-      val cliPlan  = testPlan.to[CliStepPlan]
+      val cliPlan  = testPlan.to[CliPlan]
 
       val newJson =
         JsonLDTools

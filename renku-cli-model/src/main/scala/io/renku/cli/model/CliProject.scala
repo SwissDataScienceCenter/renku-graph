@@ -192,4 +192,11 @@ object CliProject {
         Renku.hasActivity    -> project.activities.asJsonLD
       )
     }
+
+  /** Encodes into a flat array, including publication events. */
+  def flatJsonLDEncoder: JsonLDEncoder[CliProject] =
+    JsonLDEncoder.instance { project =>
+      val data = project.asNestedJsonLD :: project.datasets.flatMap(_.publicationEvents).map(_.asNestedJsonLD)
+      JsonLD.arr(data: _*).flatten.fold(throw _, identity)
+    }
 }

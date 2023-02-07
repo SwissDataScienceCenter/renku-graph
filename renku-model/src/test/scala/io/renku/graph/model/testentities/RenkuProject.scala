@@ -55,6 +55,15 @@ sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with
   lazy val plans: List[Plan] = stepPlans ::: createCompositePlans.flatMap(_.apply(stepPlans, dateCreated))
 
   lazy val compositePlans: List[CompositePlan] = plans.collect { case cp: CompositePlan => cp }
+
+  def fold[A](f1: RenkuProject.WithParent => A, f2: RenkuProject.WithoutParent => A): A
+
+  final def fold[A](
+      f1: RenkuProject.WithParent => A,
+      f2: RenkuProject.WithoutParent => A,
+      f3: NonRenkuProject.WithParent => A,
+      f4: NonRenkuProject.WithoutParent => A
+  ): A = fold(f1, f2)
 }
 
 object RenkuProject {
@@ -93,14 +102,8 @@ object RenkuProject {
     validateDates(dateCreated, activities, datasets)
       .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
+    def fold[A](f1: RenkuProject.WithParent => A, f2: RenkuProject.WithoutParent => A): A = f2(this)
     override type ProjectType = RenkuProject.WithoutParent
-
-    override def fold[A](
-        f1: WithParent => A,
-        f2: WithoutParent => A,
-        f3: NonRenkuProject.WithParent => A,
-        f4: NonRenkuProject.WithoutParent => A
-    ): A = f2(this)
 
     override def addActivities(toAdd: Activity*): RenkuProject.WithoutParent =
       copy(activities = activities ::: toAdd.toList)
@@ -176,12 +179,8 @@ object RenkuProject {
       with Parent {
     override type ProjectType = RenkuProject.WithParent
 
-    override def fold[A](
-        f1: WithParent => A,
-        f2: WithoutParent => A,
-        f3: NonRenkuProject.WithParent => A,
-        f4: NonRenkuProject.WithoutParent => A
-    ): A = f1(this)
+    def fold[A](f1: RenkuProject.WithParent => A, f2: RenkuProject.WithoutParent => A): A =
+      f1(this)
 
     override def addActivities(toAdd: Activity*): RenkuProject.WithParent =
       copy(activities = activities ::: toAdd.toList)
@@ -239,7 +238,7 @@ object RenkuProject {
     case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuUrl)(p)
   }
 
-  implicit def toCliRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => CliProject =
+  def toCliRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => CliProject =
     CliConverters.from(_)
 
   implicit def toEntitiesRenkuProjectWithoutParent(implicit

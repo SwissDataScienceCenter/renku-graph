@@ -158,4 +158,13 @@ object CliDataset {
       ).flatten.toMap
     )
   }
+
+  /** Encodes into a flat array, including publication events. */
+  def flatJsonLDEncoder(implicit
+      fileEncoder:   JsonLDEncoder[CliDatasetFile],
+      personEncoder: JsonLDEncoder[CliPerson]
+  ): JsonLDEncoder[CliDataset] = JsonLDEncoder.instance { dataset =>
+    val data = dataset.asNestedJsonLD :: dataset.publicationEvents.map(_.asNestedJsonLD)
+    JsonLD.arr(data: _*).flatten.fold(throw _, identity)
+  }
 }

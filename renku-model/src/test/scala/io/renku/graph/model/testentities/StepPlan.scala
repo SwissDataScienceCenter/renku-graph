@@ -26,6 +26,7 @@ import commandParameters.Position
 import entityModel.Location
 import io.renku.cli.model.CliStepPlan
 import io.renku.graph.model.cli.CliConverters
+import monocle.Lens
 import plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 trait StepPlan extends Plan {
@@ -45,6 +46,14 @@ trait StepPlan extends Plan {
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
 
   final def widen: Plan = this
+
+  def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P
+
+  final def fold[P](spnm: StepPlan.NonModified => P,
+                    spm:  StepPlan.Modified => P,
+                    cpnm: CompositePlan.NonModified => P,
+                    cpm:  CompositePlan.Modified => P
+  ): P = fold(spnm, spm)
 }
 
 object StepPlan {
@@ -68,11 +77,7 @@ object StepPlan {
 
     override type PlanType = StepPlan.NonModified
 
-    def fold[P](spnm: StepPlan.NonModified => P,
-                spm:  StepPlan.Modified => P,
-                cpnm: CompositePlan.NonModified => P,
-                cpm:  CompositePlan.Modified => P
-    ): P = spnm(this)
+    def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spnm(this)
   }
 
   object NonModified {
@@ -169,11 +174,7 @@ object StepPlan {
     override type ParentType = StepPlan
     override type PlanType   = StepPlan.Modified
 
-    def fold[P](spnm: StepPlan.NonModified => P,
-                spm:  StepPlan.Modified => P,
-                cpnm: CompositePlan.NonModified => P,
-                cpm:  CompositePlan.Modified => P
-    ): P = spm(this)
+    def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spm(this)
 
     lazy val topmostParent: StepPlan = parent match {
       case p: NonModified => p
@@ -318,4 +319,11 @@ object StepPlan {
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
+
+  object Lenses {
+    val creators: Lens[StepPlan, List[Person]] =
+      Lens[StepPlan, List[Person]](_.fold(_.creators, _.creators))(creators =>
+        plan => plan.fold(_.copy(creators = creators), _.copy(creators = creators))
+      )
+  }
 }

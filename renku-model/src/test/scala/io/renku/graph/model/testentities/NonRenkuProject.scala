@@ -26,7 +26,16 @@ import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyw
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 
-sealed trait NonRenkuProject extends Project with Product with Serializable
+sealed trait NonRenkuProject extends Project with Product with Serializable {
+  def fold[A](f1: NonRenkuProject.WithParent => A, f2: NonRenkuProject.WithoutParent => A): A
+
+  final def fold[A](
+      f1: RenkuProject.WithParent => A,
+      f2: RenkuProject.WithoutParent => A,
+      f3: NonRenkuProject.WithParent => A,
+      f4: NonRenkuProject.WithoutParent => A
+  ): A = fold(f3, f4)
+}
 
 object NonRenkuProject {
 
@@ -42,13 +51,7 @@ object NonRenkuProject {
                                  images:           List[ImageUri]
   ) extends NonRenkuProject {
     override type ProjectType = NonRenkuProject.WithoutParent
-
-    override def fold[A](
-        f1: RenkuProject.WithParent => A,
-        f2: RenkuProject.WithoutParent => A,
-        f3: WithParent => A,
-        f4: WithoutParent => A
-    ): A = f4(this)
+    def fold[A](f1: NonRenkuProject.WithParent => A, f2: NonRenkuProject.WithoutParent => A): A = f2(this)
   }
 
   final case class WithParent(path:             Path,
@@ -66,12 +69,7 @@ object NonRenkuProject {
       with Parent {
     override type ProjectType = NonRenkuProject.WithParent
 
-    override def fold[A](
-        f1: RenkuProject.WithParent => A,
-        f2: RenkuProject.WithoutParent => A,
-        f3: WithParent => A,
-        f4: WithoutParent => A
-    ): A = f3(this)
+    def fold[A](f1: NonRenkuProject.WithParent => A, f2: NonRenkuProject.WithoutParent => A): A = f1(this)
   }
 
   implicit def toEntitiesNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => entities.NonRenkuProject = {
@@ -114,7 +112,7 @@ object NonRenkuProject {
         convertImageUris(project.asEntityId)(project.images)
       )
 
-  implicit def toCliNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => CliProject =
+  def toCliNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => CliProject =
     CliConverters.from(_)
 
   implicit def encoder[P <: NonRenkuProject](implicit

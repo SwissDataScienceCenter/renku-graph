@@ -27,6 +27,7 @@ import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUr
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name}
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
+import monocle.Lens
 
 sealed trait CompositePlan extends Plan {
   override type PlanGroup         = CompositePlan
@@ -55,6 +56,17 @@ sealed trait CompositePlan extends Plan {
       case cp: CompositePlan => cp :: cp.recursivePlans
       case sp: StepPlan      => List(sp)
     }
+
+  def fold[P](
+      cpnm: CompositePlan.NonModified => P,
+      cpm:  CompositePlan.Modified => P
+  ): P
+
+  final def fold[P](spnm: StepPlan.NonModified => P,
+                    spm:  StepPlan.Modified => P,
+                    cpnm: CompositePlan.NonModified => P,
+                    cpm:  CompositePlan.Modified => P
+  ): P = fold(cpnm, cpm)
 }
 
 object CompositePlan {
@@ -72,11 +84,8 @@ object CompositePlan {
   ) extends CompositePlan {
     override type PlanType = NonModified
 
-    def fold[P](spnm: StepPlan.NonModified => P,
-                spm:  StepPlan.Modified => P,
-                cpnm: CompositePlan.NonModified => P,
-                cpm:  CompositePlan.Modified => P
-    ): P = cpnm(this)
+    def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpnm(this)
+
     def modify(f: NonModified => NonModified): NonModified =
       f(this)
 
@@ -157,11 +166,7 @@ object CompositePlan {
     override type PlanType   = Modified
     override type ParentType = CompositePlan
 
-    def fold[P](spnm: StepPlan.NonModified => P,
-                spm:  StepPlan.Modified => P,
-                cpnm: CompositePlan.NonModified => P,
-                cpm:  CompositePlan.Modified => P
-    ): P = cpm(this)
+    def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpm(this)
 
     lazy val topmostParent: CompositePlan = parent match {
       case p: NonModified => p
@@ -273,4 +278,11 @@ object CompositePlan {
       val children = cp.plans.map(_.asJsonLD)
       (cp.to[entities.CompositePlan].asJsonLD :: children).asJsonLD
     }
+
+  object Lenses {
+    val creators: Lens[CompositePlan, List[Person]] =
+      Lens[CompositePlan, List[Person]](_.fold(_.creators, _.creators))(creators =>
+        plan => plan.fold(_.copy(creators = creators), _.copy(creators = creators))
+      )
+  }
 }
