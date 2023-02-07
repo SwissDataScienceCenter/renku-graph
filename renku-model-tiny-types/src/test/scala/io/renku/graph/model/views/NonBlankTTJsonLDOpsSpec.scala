@@ -67,7 +67,7 @@ class NonBlankTTJsonLDOpsSpec extends AnyWordSpec with should.Matchers with Eith
     "fail for None" in {
       val result = TestStringTinyType.failIfNone(None)
 
-      result.left.value.getMessage() shouldBe s"A value of '${TestStringTinyType.typeName}' expected but got any"
+      result.left.value.getMessage() shouldBe s"A value of '${TestStringTinyType.typeName}' expected but got none"
     }
   }
 }

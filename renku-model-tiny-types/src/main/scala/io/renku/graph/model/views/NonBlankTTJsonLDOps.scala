@@ -33,7 +33,7 @@ trait NonBlankTTJsonLDOps[TT <: StringTinyType] extends JsonLDTinyTypeEncoder[TT
 
   val failIfNone: Option[TT] => JsonLDDecoder.Result[TT] = {
     case Some(v) => v.asRight
-    case None    => DecodingFailure(s"A value of '$typeName' expected but got any", Nil).asLeft
+    case None    => DecodingFailure(s"A value of '$typeName' expected but got none", Nil).asLeft
   }
 }
 
