@@ -31,7 +31,7 @@ import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, UrlOps, Url => UrlConstraint}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
