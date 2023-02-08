@@ -11,8 +11,6 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                                   |
 | GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
-| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                                      |
-| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                                               |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
@@ -426,94 +424,6 @@ Response body example:
 }
 ```
 
-#### GET /knowledge-graph/graphql
-
-Returns Knowledge Graph GraphQL endpoint schema.
-
-**Response**
-
-| Status                       | Description                    |
-|------------------------------|--------------------------------|
-| OK (200)                     | Schema of the GraphQL endpoint |
-| INTERNAL SERVER ERROR (500)  | Otherwise                      |
-
-**A curl command example**
-
-```
-curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
-```
-
-#### POST /knowledge-graph/graphql
-
-Endpoint to perform GraphQL queries on the Knowledge Graph data.
-
-**Response**
-
-| Status                       | Description                                  |
-|------------------------------|----------------------------------------------|
-| OK (200)                     | Body containing queried data                 |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                    |
-
-**Available queries**
-
-* Lineage
-
-Query example:
-
-```json
-{
-  "query": "{ 
-    lineage(projectPath: \"namespace/project\", filePath: \"zhbikes.parquet\") {
-      nodes { id location label type } 
-      edges { source target } 
-    } 
-  }"
-}
-
-```
-
-Response body example:
-
-```json
-{
-  "data": {
-    "lineage": {
-      "edges": [
-        {
-          "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
-        },
-        {
-          "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
-        }
-      ],
-      "nodes": [
-        {
-          "id":       "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "location": "data/zhbikes",
-          "label":    "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
-          "type":     "Directory"
-        },
-        {
-          "id":       "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
-          "label":    "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
-          "type":     "ProcessRun"
-        },
-        {
-          "id":       "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
-          "location": "data/preprocessed/zhbikes.parquet",
-          "label":    "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "type":     "File"
-        }
-      ]
-    }
-  }
-}
-```
-
 #### GET /knowledge-graph/ontology
 
 Returns ontology used in the Knowledge Graph as HTML page or JSON-LD.
@@ -862,7 +772,7 @@ Response body example:
 
 #### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
-Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
+Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file).
 
 | Status                       | Description                                                                                             |
 |------------------------------|---------------------------------------------------------------------------------------------------------|
