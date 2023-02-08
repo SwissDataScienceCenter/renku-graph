@@ -73,14 +73,15 @@ private object model {
     }
 
     final case class NotActivated(
-        id:           projects.GitLabId,
-        name:         projects.Name,
-        path:         projects.Path,
-        visibility:   projects.Visibility,
-        dateCreated:  projects.DateCreated,
-        maybeCreator: Option[persons.Name],
-        keywords:     List[projects.Keyword],
-        maybeDesc:    Option[projects.Description]
+        id:             projects.GitLabId,
+        name:           projects.Name,
+        path:           projects.Path,
+        visibility:     projects.Visibility,
+        dateCreated:    projects.DateCreated,
+        maybeCreatorId: Option[persons.GitLabId],
+        maybeCreator:   Option[persons.Name],
+        keywords:       List[projects.Keyword],
+        maybeDesc:      Option[projects.Description]
     ) extends Project
 
     object NotActivated {

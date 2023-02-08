@@ -39,7 +39,7 @@ libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sProme
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
 libraryDependencies += "org.tpolecat"  %% "skunk-core"    % "0.5.1"
-libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.5"
+libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.6"
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
 
 // Test dependencies

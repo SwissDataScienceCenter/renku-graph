@@ -20,7 +20,7 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.views.{EntityIdJsonLDOps, RdfResource, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, NonBlankTTJsonLDOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
 import io.renku.triplesstore.client.sparql.SparqlEncoder
@@ -192,7 +192,7 @@ object persons {
   implicit object Email
       extends TinyTypeFactory[Email](new Email(_))
       with NonBlank[Email]
-      with TinyTypeJsonLDOps[Email] {
+      with NonBlankTTJsonLDOps[Email] {
 
     addConstraint(
       check = _.split('@').toList match {
@@ -208,7 +208,7 @@ object persons {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with NonBlankTTJsonLDOps[Name]
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
   implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank[Username]
@@ -217,5 +217,5 @@ object persons {
   implicit object Affiliation
       extends TinyTypeFactory[Affiliation](new Affiliation(_))
       with NonBlank[Affiliation]
-      with TinyTypeJsonLDOps[Affiliation]
+      with NonBlankTTJsonLDOps[Affiliation]
 }

@@ -49,14 +49,14 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
         identifier   <- cursor.downField(schema / "identifier").as[projects.GitLabId]
         path         <- cursor.downField(renku / "projectPath").as[projects.Path]
-        name         <- cursor.downField(schema / "name").as[projects.Name]
+        name         <- cursor.downField(schema / "name").as[Option[projects.Name]].flatMap(projects.Name.failIfNone)
         maybeDesc    <- cursor.downField(schema / "description").as[Option[projects.Description]]
         visibility   <- cursor.downField(renku / "projectVisibility").as[projects.Visibility]
         dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
         maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
         dateUpdated  <- cursor.downField(schema / "dateModified").as[DateUpdated]
         maybeParent  <- cursor.downField(prov / "wasDerivedFrom").as[Option[ParentProject]]
-        keywords     <- cursor.downField(schema / "keywords").as[List[projects.Keyword]]
+        keywords     <- cursor.downField(schema / "keywords").as[List[Option[projects.Keyword]]].map(_.flatten)
         maybeVersion <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
         images       <- cursor.downField(schema / "image").as[List[ImageUri]]
       } yield Project(
@@ -83,7 +83,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
     JsonLDDecoder.entity(entities.Person.entityTypes) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[persons.ResourceId]
-        name             <- cursor.downField(schema / "name").as[persons.Name]
+        name             <- cursor.downField(schema / "name").as[Option[persons.Name]].flatMap(persons.Name.failIfNone)
         maybeEmail       <- cursor.downField(schema / "email").as[Option[persons.Email]]
         maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[persons.Affiliation]]
       } yield Creator(resourceId, name, maybeEmail, maybeAffiliation)
@@ -94,7 +94,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
       for {
         resourceId   <- cursor.downEntityId.as[projects.ResourceId]
         path         <- cursor.downField(renku / "projectPath").as[projects.Path]
-        name         <- cursor.downField(schema / "name").as[projects.Name]
+        name         <- cursor.downField(schema / "name").as[Option[projects.Name]].flatMap(projects.Name.failIfNone)
         dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
         maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
       } yield ParentProject(resourceId, path, name, Creation(dateCreated, maybeCreator))

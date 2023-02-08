@@ -21,6 +21,8 @@ name := "triples-store-client"
 
 libraryDependencies += "io.renku" %% "jsonld4s" % "0.7.0"
 
+libraryDependencies += "org.eclipse.rdf4j" % "rdf4j-queryparser-sparql" % "4.2.2"
+
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.17.0"  % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.15"  % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test

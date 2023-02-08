@@ -21,9 +21,9 @@ package finder
 
 import Endpoint.Criteria.Filters._
 import Endpoint._
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.PagingResponse
@@ -36,27 +36,35 @@ private[projects] trait ProjectsFinder[F[_]] {
 }
 
 private[projects] object ProjectsFinder {
-  def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
-    (TSProjectFinder[F], GLProjectFinder[F]).mapN(new ProjectsFinderImpl(_, _))
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectsFinder[F]] =
+    (TSProjectFinder[F], GLProjectFinder[F], GLCreatorsNamesAdder[F]).mapN(new ProjectsFinderImpl(_, _, _))
 
   implicit val nameOrdering: Ordering[projects.Name] = Ordering.by(_.value.toLowerCase)
 }
 
-private class ProjectsFinderImpl[F[_]: MonadThrow](
-    tsProjectsFinder: TSProjectFinder[F],
-    glProjectsFinder: GLProjectFinder[F]
+private class ProjectsFinderImpl[F[_]: MonadThrow: NonEmptyParallel](
+    tsProjectsFinder:     TSProjectFinder[F],
+    glProjectsFinder:     GLProjectFinder[F],
+    glCreatorsNamesAdder: GLCreatorsNamesAdder[F]
 ) extends ProjectsFinder[F] {
 
   import ProjectsFinder.nameOrdering
+  import glCreatorsNamesAdder._
   import glProjectsFinder._
   import tsProjectsFinder._
 
   override def findProjects(criteria: Criteria): F[PagingResponse[model.Project]] =
-    (findProjectsInTS(criteria) -> findProjectsInGL(criteria))
-      .mapN(mergeFavouringActivated)
+    queryProjects(criteria)
       .map(filterBy(criteria.filters.state))
       .map(_.sortBy(_.name))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
+      .flatMap(_.flatMapResults(addCreatorsNames(criteria)))
+
+  private def queryProjects(criteria: Criteria): F[List[Project]] =
+    criteria.filters.state match {
+      case ActivationState.Activated => findProjectsInTS(criteria).widen
+      case _ => (findProjectsInTS(criteria) -> findProjectsInGL(criteria)).parMapN(mergeFavouringActivated)
+    }
 
   private val mergeFavouringActivated
       : (List[model.Project.Activated], List[model.Project.NotActivated]) => List[model.Project] = {

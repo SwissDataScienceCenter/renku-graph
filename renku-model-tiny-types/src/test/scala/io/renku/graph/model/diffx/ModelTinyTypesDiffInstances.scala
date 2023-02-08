@@ -28,6 +28,8 @@ trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
 
   implicit val datasetsCreatedOrPublishedDiff: Diff[datasets.CreatedOrPublished] =
     Diff.derived[datasets.CreatedOrPublished]
+  implicit val datasetsDateModified: Diff[datasets.DateModified] =
+    Diff.derived[datasets.DateModified]
 
   implicit val datasetsSameAsDiff: Diff[datasets.SameAs] = Diff.diffForString.contramap {
     case sa: datasets.InternalSameAs => sa.value

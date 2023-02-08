@@ -20,11 +20,12 @@ package io.renku.knowledgegraph.users.projects
 package finder
 
 import Endpoint.Criteria
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.GitLabClient
-import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.rest.paging.model.{Page, Total}
 import io.renku.knowledgegraph.users.projects.model.Project
 import org.typelevel.log4cats.Logger
 
@@ -33,17 +34,16 @@ private trait GLProjectFinder[F[_]] {
 }
 
 private object GLProjectFinder {
-  def apply[F[_]: Async: GitLabClient: Logger]: F[GLProjectFinder[F]] =
-    GLCreatorFinder[F].map(new GLProjectFinderImpl[F](_))
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger]: F[GLProjectFinder[F]] =
+    new GLProjectFinderImpl[F].pure[F].widen
 
-  val requestPageSize: PerPage = PerPage(100)
+  val requestPageSize: Page = Page(100)
 }
 
-private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFinder: GLCreatorFinder[F])
-    extends GLProjectFinder[F] {
+private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] extends GLProjectFinder[F] {
 
   import GLProjectFinder.requestPageSize
-  import GitLabClient.maybeNextPage
+  import GitLabClient.maybeTotalPages
   import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.circe._
@@ -55,37 +55,22 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
   import org.http4s.implicits._
 
   override def findProjectsInGL(criteria: Criteria): F[List[Project.NotActivated]] =
-    findProjectsAndCreators(criteria) >>= addCreators(criteria)
-
-  private def addCreators(
-      criteria: Criteria
-  )(projectsAndCreators: List[ProjectAndCreator]): F[List[Project.NotActivated]] =
-    findDistinctCreatorIds(projectsAndCreators)
-      .map(fetchCreatorName(criteria))
-      .sequence
-      .map(updateProjects(projectsAndCreators))
-
-  private val findDistinctCreatorIds: List[ProjectAndCreator] => List[persons.GitLabId] =
-    _.flatMap(_._2).distinct
-
-  private type CreatorInfo = (persons.GitLabId, Option[persons.Name])
-
-  private def fetchCreatorName(criteria: Criteria)(id: persons.GitLabId): F[CreatorInfo] =
-    creatorFinder.findCreatorName(id)(criteria.maybeUser.map(_.accessToken)).map(id -> _)
-
-  private def updateProjects(
-      projectsAndCreators: List[ProjectAndCreator]
-  ): List[CreatorInfo] => List[model.Project.NotActivated] = creators =>
-    projectsAndCreators.map {
-      case (proj, Some(creatorId)) =>
-        creators
-          .find(_._1 == creatorId)
-          .map { case (_, maybeName) => proj.copy(maybeCreator = maybeName) }
-          .getOrElse(proj)
-      case (proj, None) => proj
+    findProjects(criteria) >>= {
+      case (projects, Some(total)) if total.value == 1 => projects.pure[F]
+      case (projects, Some(total))                     => fetchAllOtherPagesPar(criteria, total).map(projects ::: _)
+      case (_, None) =>
+        new Exception(s"User's Projects without 'X-Total-Pages'").raiseError[F, List[Project.NotActivated]]
     }
 
-  private def findProjectsAndCreators(criteria: Criteria, page: Page = Page.first): F[List[ProjectAndCreator]] =
+  private def fetchAllOtherPagesPar(criteria: Criteria, total: Total) =
+    (2 to total.value).toList
+      .map(p => findProjects(criteria, Page(p)).map(_._1))
+      .parSequence
+      .map(_.reduce(_ ::: _))
+
+  private def findProjects(criteria: Criteria,
+                           page:     Page = Page.first
+  ): F[(List[Project.NotActivated], Option[Total])] =
     GitLabClient[F]
       .get(
         (uri"users" / criteria.userId / "projects")
@@ -93,22 +78,16 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
           .withQueryParam("per_page", requestPageSize),
         "user-projects"
       )(mapResponse)(criteria.maybeUser.map(_.accessToken))
-      .flatMap {
-        case (results, None)           => results.pure[F]
-        case (results, Some(nextPage)) => findProjectsAndCreators(criteria, nextPage).map(results ::: _)
-      }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(List[ProjectAndCreator], Option[Page])]] = {
-    case (Ok, _, resp)    => (resp.as[List[ProjectAndCreator]], maybeNextPage(resp)).mapN(_ -> _)
-    case (NotFound, _, _) => (List.empty[ProjectAndCreator], Option.empty[Page]).pure[F]
+      : PartialFunction[(Status, Request[F], Response[F]), F[(List[Project.NotActivated], Option[Total])]] = {
+    case (Ok, _, resp)    => (resp.as[List[Project.NotActivated]], maybeTotalPages(resp)).mapN(_ -> _)
+    case (NotFound, _, _) => (List.empty[Project.NotActivated], Option.empty[Total]).pure[F]
   }
 
-  private type ProjectAndCreator = (model.Project.NotActivated, Option[persons.GitLabId])
+  private implicit lazy val projectDecoder: EntityDecoder[F, List[Project.NotActivated]] = {
 
-  private implicit lazy val projectDecoder: EntityDecoder[F, List[ProjectAndCreator]] = {
-
-    implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
+    implicit val decoder: Decoder[Project.NotActivated] = cursor =>
       for {
         id              <- cursor.downField("id").as[projects.GitLabId]
         name            <- cursor.downField("name").as[projects.Name]
@@ -123,11 +102,12 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
                                          path,
                                          maybeVisibility.getOrElse(projects.Visibility.Public),
                                          dateCreated,
+                                         maybeCreatorId,
                                          maybeCreator = None,
                                          keywords.sorted,
                                          maybeDesc
-      ) -> maybeCreatorId
+      )
 
-    jsonOf[F, List[ProjectAndCreator]]
+    jsonOf[F, List[Project.NotActivated]]
   }
 }
