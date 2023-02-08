@@ -19,12 +19,12 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliActivity
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.{RenkuUrl, entities}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -32,18 +32,21 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
+    implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
     "turn JsonLD Usage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
-        val activity = executionPlanners(stepPlanEntities(CommandInput.fromLocation(location)),
-                                         projectCreatedDates().generateOne
+        val activity = executionPlanners(
+          stepPlanEntities(planCommands, cliShapedPersons, CommandInput.fromLocation(location)),
+          projectCreatedDates().generateOne,
+          cliShapedPersons
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
 
-        activity.asJsonLD.flatten
-          .fold(throw _, identity)
+        activity
+          .to[CliActivity]
+          .asFlattenedJsonLD
           .cursor
           .as[List[entities.Usage]] shouldBe activity.usages.map(_.to[entities.Usage]).asRight
       }

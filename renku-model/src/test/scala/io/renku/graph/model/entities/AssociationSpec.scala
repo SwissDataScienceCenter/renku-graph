@@ -19,29 +19,33 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliAssociation
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, plans}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, JsonLDDecoder}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
 
   "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Association entity with Renku agent into the Association object" in {
-      forAll(activityEntities(stepPlanEntities())(projectCreatedDates().generateOne).map(_.association)) {
-        association =>
-          implicit val decoder: JsonLDDecoder[entities.Association] =
-            createDecoder(association.plan.to[entities.StepPlan])
+      forAll(
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          projectCreatedDates().generateOne
+        ).map(_.association)
+      ) { association =>
+        implicit val decoder: JsonLDDecoder[entities.Association] =
+          createDecoder(association.plan.to[entities.StepPlan])
 
-          association.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.Association]] shouldBe
-            List(association.to[entities.Association]).asRight
+        association.to[CliAssociation].asFlattenedJsonLD.cursor.as[List[entities.Association]] shouldBe
+          List(association.to[entities.Association]).asRight
       }
     }
 
@@ -49,27 +53,31 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
       val (association, _, plan) = generateAssociationWithPersonAgent
 
-      implicit val decoder: JsonLDDecoder[entities.Association] = createDecoder(plan)
+      implicit val decoder: JsonLDDecoder[entities.Association] = createDecoder(plan.to[entities.StepPlan])
 
-      association.asJsonLD.flatten
-        .fold(throw _, identity)
+      association
+        .to[CliAssociation]
+        .asFlattenedJsonLD
         .cursor
-        .as[List[entities.Association]] shouldBe List(association).asRight
+        .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
     }
 
     "fail decoding if there's no Plan with the Id the Association points to" in {
 
-      val association =
-        activityEntities(stepPlanEntities())(projectCreatedDates().generateOne)
+      val testAssociation =
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          projectCreatedDates().generateOne
+        )
           .map(_.association)
           .generateOne
-          .to[entities.Association]
+
+      val association = testAssociation.to[entities.Association]
 
       implicit val dl: DependencyLinks = (_: plans.ResourceId) => Option.empty[entities.StepPlan]
 
-      val Left(failure) = association.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.Association]]
+      val result = testAssociation.to[CliAssociation].asFlattenedJsonLD.cursor.as[List[entities.Association]]
 
-      failure.message should include(
+      result.left.value.message should include(
         show"Association ${association.resourceId} points to a non-existing Plan ${association.planId}"
       )
     }
@@ -80,7 +88,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
     "produce JsonLD with all the relevant properties" in {
 
-      val (association, agent, _) = generateAssociationWithPersonAgent
+      val (association, agent) = generateEntitiesAssociationWithPersonAgent
 
       association.asJsonLD shouldBe JsonLD.entity(
         association.resourceId.asEntityId,
@@ -96,12 +104,12 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
     "produce JsonLD with all the relevant properties and only links to Person entities" in {
 
-      val (association, agent, _) = generateAssociationWithPersonAgent
+      val (association, agent) = generateEntitiesAssociationWithPersonAgent
 
       association.asJsonLD shouldBe JsonLD.entity(
         association.resourceId.asEntityId,
         entities.Association.entityTypes,
-        prov / "agent"   -> agent.asEntityId.asJsonLD,
+        prov / "agent"   -> agent.resourceId.asEntityId.asJsonLD,
         prov / "hadPlan" -> association.planId.asEntityId.asJsonLD
       )
     }
@@ -111,9 +119,9 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
     "return Association's agent if of type Person" in {
 
-      val (association, agent, _) = generateAssociationWithPersonAgent
+      val (association, agent) = generateEntitiesAssociationWithPersonAgent
 
-      EntityFunctions[entities.Association].findAllPersons(association) shouldBe Set(agent.to[entities.Person])
+      EntityFunctions[entities.Association].findAllPersons(association) shouldBe Set(agent)
     }
   }
 
@@ -121,7 +129,7 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
     "return encoder that honors the given GraphClass" in {
 
-      val (association, _, _) = generateAssociationWithPersonAgent
+      val (association, _) = generateEntitiesAssociationWithPersonAgent
 
       implicit val graph: GraphClass = graphClasses.generateOne
       val functionsEncoder = EntityFunctions[entities.Association].encoder(graph)
@@ -130,18 +138,25 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     }
   }
 
-  private def generateAssociationWithPersonAgent: (entities.Association, Person, entities.StepPlan) = {
+  private def generateEntitiesAssociationWithPersonAgent: (entities.Association, entities.Person) = {
+    val (association, agent, _) = generateAssociationWithPersonAgent
+    (association.to[entities.Association], agent.to[entities.Person])
+  }
+
+  private def generateAssociationWithPersonAgent: (Association, Person, StepPlan) = {
     val associationWithRenkuAgent =
-      activityEntities(stepPlanEntities())(projectCreatedDates().generateOne)
+      activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+        projectCreatedDates().generateOne
+      )
         .map(_.association)
         .generateOne
 
-    val agent = personEntities.generateOne
-    val plan  = associationWithRenkuAgent.plan.to[entities.StepPlan]
-    val association = entities.Association.WithPersonAgent(
-      associationWithRenkuAgent.to[entities.Association].resourceId,
-      agent.to[entities.Person],
-      plan.resourceId
+    val agent = cliShapedPersons.generateOne
+    val plan  = associationWithRenkuAgent.plan
+    val association = Association.WithPersonAgent(
+      associationWithRenkuAgent.activity,
+      agent,
+      associationWithRenkuAgent.plan
     )
 
     (association, agent, plan)

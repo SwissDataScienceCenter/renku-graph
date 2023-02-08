@@ -335,7 +335,7 @@ class DatasetsFinderSpec
 
           val (dataset, project -> fork) =
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
-          val forkUpdated = fork.addDatasets(dataset.invalidateNow)
+          val forkUpdated = fork.addDatasets(dataset.invalidateNow(personEntities))
 
           upload(to = projectsDataset, project, forkUpdated)
 
@@ -351,7 +351,7 @@ class DatasetsFinderSpec
 
           val (dataset, project -> fork) =
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
-          val afterForkingUpdated = project.addDatasets(dataset.invalidateNow)
+          val afterForkingUpdated = project.addDatasets(dataset.invalidateNow(personEntities))
 
           upload(to = projectsDataset, afterForkingUpdated, fork)
 
@@ -367,7 +367,7 @@ class DatasetsFinderSpec
 
           val (_ -> datasetModified, project) =
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-          val projectUpdated = project.addDatasets(datasetModified.invalidateNow)
+          val projectUpdated = project.addDatasets(datasetModified.invalidateNow(personEntities))
 
           upload(to = projectsDataset, projectUpdated)
 

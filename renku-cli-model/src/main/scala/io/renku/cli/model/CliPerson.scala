@@ -34,7 +34,7 @@ final case class CliPerson(
 
 object CliPerson {
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Schema.Person, Prov.Person)
+  private[model] val entityTypes: EntityTypes = EntityTypes.of(Schema.Person, Prov.Person)
 
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes

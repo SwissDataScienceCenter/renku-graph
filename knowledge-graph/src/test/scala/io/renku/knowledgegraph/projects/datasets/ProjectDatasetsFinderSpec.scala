@@ -149,7 +149,7 @@ class ProjectDatasetsFinderSpec
       val (_ -> modification, project) =
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
-      upload(to = projectsDataset, project.addDatasets(modification.invalidateNow))
+      upload(to = projectsDataset, project.addDatasets(modification.invalidateNow(personEntities)))
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe Nil
     }

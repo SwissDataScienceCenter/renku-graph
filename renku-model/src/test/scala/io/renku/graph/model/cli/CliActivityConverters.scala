@@ -110,11 +110,17 @@ trait CliActivityConverters extends CliPlanConverters {
     val id = parameterValues.ResourceId(paramValue.asEntityId.show)
     paramValue match {
       case p: testentities.ParameterValue.LocationParameterValue.CommandOutputValue =>
-        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), ValueOverride(p.value.value))
+        CliParameterValue(id,
+                          commandParameters.ResourceId(p.valueReference.asEntityId.show),
+                          ValueOverride(p.value.value)
+        )
       case p: testentities.ParameterValue.LocationParameterValue.CommandInputValue =>
-        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), ValueOverride(p.value.value))
+        CliParameterValue(id,
+                          commandParameters.ResourceId(p.valueReference.asEntityId.show),
+                          ValueOverride(p.value.value)
+        )
       case p: testentities.ParameterValue.CommandParameterValue =>
-        CliParameterValue(id, commandParameters.ResourceId(p.asEntityId.show), p.value)
+        CliParameterValue(id, commandParameters.ResourceId(p.valueReference.asEntityId.show), p.value)
     }
   }
 }

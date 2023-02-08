@@ -87,7 +87,7 @@ class DatasetsCollectorSpec extends AnyWordSpec with should.Matchers with TableD
         .withDatasets(datasetEntities(provenanceNonModified))
         .modify { p =>
           val modifications = p.datasets.map(_.createModification()(p.dateCreated).generateOne)
-          val invalidations = modifications.map(_.invalidateNow)
+          val invalidations = modifications.map(_.invalidateNow(personEntities))
           p.addDatasets(modifications ::: invalidations: _*)
         }
         .generateOne

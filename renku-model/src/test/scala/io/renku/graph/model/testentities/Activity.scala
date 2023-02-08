@@ -28,6 +28,7 @@ import io.renku.graph.model.testentities.Activity._
 import io.renku.graph.model.testentities.Entity.OutputEntity
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.UUID
+import monocle.Lens
 
 final case class Activity(id:                  Id,
                           startTime:           StartTime,
@@ -116,4 +117,18 @@ object Activity {
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance(entity => EntityId of renkuUrl / "activities" / entity.id)
+
+  object Lenses {
+    val association: Lens[Activity, Association] =
+      Lens[Activity, Association](_.association)(assoc => a => a.copy(associationFactory = _ => assoc))
+
+    val plan: Lens[Activity, StepPlan] =
+      association.composeLens(Association.Lenses.plan)
+
+    val planCreators: Lens[Activity, List[Person]] =
+      plan.composeLens(StepPlan.Lenses.creators)
+
+    val associationAgent: Lens[Activity, Either[Agent, Person]] =
+      association.composeLens(Association.Lenses.agent)
+  }
 }

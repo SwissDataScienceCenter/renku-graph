@@ -190,7 +190,7 @@ class DatasetFinderSpec
         )
         .generateOne
       val partToInvalidate           = Random.shuffle(dataset.parts).head
-      val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate)
+      val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate, personEntities)
       val projectBothDatasets        = project.addDatasets(datasetWithInvalidatedPart)
 
       upload(to = projectsDataset, projectBothDatasets)
@@ -426,7 +426,7 @@ class DatasetFinderSpec
       "- case when a dataset on a fork is deleted" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
           case (original, project -> fork) =>
-            val invalidation         = original.invalidateNow
+            val invalidation         = original.invalidateNow(personEntities)
             val forkWithInvalidation = fork.addDatasets(invalidation)
 
             upload(to = projectsDataset, project, forkWithInvalidation)
@@ -453,7 +453,7 @@ class DatasetFinderSpec
             .addDataset(datasetEntities(provenanceInternal))
             .forkOnce()
             .generateOne
-        val invalidation            = original.invalidateNow
+        val invalidation            = original.invalidateNow(personEntities)
         val projectWithInvalidation = project.addDatasets(invalidation)
 
         upload(to = projectsDataset, projectWithInvalidation, fork)
@@ -579,7 +579,7 @@ class DatasetFinderSpec
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-        val dataset2Invalidation = dataset2.invalidateNow
+        val dataset2Invalidation = dataset2.invalidateNow(personEntities)
         val project2Updated      = project2.addDatasets(dataset2Invalidation)
 
         upload(to = projectsDataset, project1, project2Updated)
@@ -604,7 +604,7 @@ class DatasetFinderSpec
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-        val dataset1Invalidation = dataset1.invalidateNow
+        val dataset1Invalidation = dataset1.invalidateNow(personEntities)
         val project1Updated      = project1.addDatasets(dataset1Invalidation)
 
         upload(to = projectsDataset, project1Updated, project2)
@@ -627,7 +627,7 @@ class DatasetFinderSpec
         val (dataset -> datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .generateOne
-        val datasetInvalidation = datasetModified.invalidateNow
+        val datasetInvalidation = datasetModified.invalidateNow(personEntities)
         val projectUpdated      = project.addDatasets(datasetInvalidation)
 
         upload(to = projectsDataset, projectUpdated)

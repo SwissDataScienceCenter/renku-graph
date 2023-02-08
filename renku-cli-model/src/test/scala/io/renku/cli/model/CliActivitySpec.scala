@@ -18,10 +18,12 @@
 
 package io.renku.cli.model
 
+import io.circe.DecodingFailure
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.ActivityGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.jsonld.{JsonLD, JsonLDEncoder, Reverse}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -49,6 +51,59 @@ class CliActivitySpec
       forAll(activityGen, activityGen) { (act1, act2) =>
         assertCompatibleCodec(act1, act2)
       }
+    }
+
+    "fail if there is no Agent entity" in {
+      import io.renku.jsonld.syntax._
+      val encoder = JsonLDEncoder.instance[CliActivity] { entity =>
+        JsonLD.entity(
+          entity.resourceId.asEntityId,
+          CliActivity.entityTypes,
+          Reverse.ofJsonLDsUnsafe(Ontologies.Prov.activity -> entity.generations.asJsonLD),
+          Ontologies.Prov.startedAtTime        -> entity.startTime.asJsonLD,
+          Ontologies.Prov.endedAtTime          -> entity.endTime.asJsonLD,
+          Ontologies.Prov.wasAssociatedWith    -> JsonLD.arr(entity.personAgent.asJsonLD),
+          Ontologies.Prov.qualifiedAssociation -> entity.association.asJsonLD,
+          Ontologies.Prov.qualifiedUsage       -> entity.usages.asJsonLD,
+          Ontologies.Renku.parameter           -> entity.parameters.asJsonLD
+        )
+      }
+
+      val activity = ActivityGenerators.activityGen(Instant.EPOCH).generateOne
+
+      val Left(error) = activity
+        .asFlattenedJsonLD(encoder)
+        .cursor
+        .as[List[CliActivity]]
+
+      error       shouldBe a[DecodingFailure]
+      error.message should endWith(s"Cannot decode SoftwareAgent on activity ${activity.resourceId}")
+    }
+    "fail if there is no Author entity" in {
+      import io.renku.jsonld.syntax._
+      val encoder = JsonLDEncoder.instance[CliActivity] { entity =>
+        JsonLD.entity(
+          entity.resourceId.asEntityId,
+          CliActivity.entityTypes,
+          Reverse.ofJsonLDsUnsafe(Ontologies.Prov.activity -> entity.generations.asJsonLD),
+          Ontologies.Prov.startedAtTime        -> entity.startTime.asJsonLD,
+          Ontologies.Prov.endedAtTime          -> entity.endTime.asJsonLD,
+          Ontologies.Prov.wasAssociatedWith    -> JsonLD.arr(entity.softwareAgent.asJsonLD),
+          Ontologies.Prov.qualifiedAssociation -> entity.association.asJsonLD,
+          Ontologies.Prov.qualifiedUsage       -> entity.usages.asJsonLD,
+          Ontologies.Renku.parameter           -> entity.parameters.asJsonLD
+        )
+      }
+
+      val activity = ActivityGenerators.activityGen(Instant.EPOCH).generateOne
+
+      val Left(error) = activity
+        .asFlattenedJsonLD(encoder)
+        .cursor
+        .as[List[CliActivity]]
+
+      error       shouldBe a[DecodingFailure]
+      error.message should endWith(s"Cannot decode PersonAgent on activity ${activity.resourceId}")
     }
   }
 }

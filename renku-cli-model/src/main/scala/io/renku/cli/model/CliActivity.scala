@@ -39,7 +39,7 @@ final case class CliActivity(
 
 object CliActivity {
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Prov.Activity)
+  private[model] val entityTypes: EntityTypes = EntityTypes.of(Prov.Activity)
 
   implicit def jsonLDDecoder: JsonLDDecoder[CliActivity] =
     JsonLDDecoder.entity(entityTypes) { cursor =>

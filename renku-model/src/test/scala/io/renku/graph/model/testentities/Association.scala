@@ -23,6 +23,7 @@ import io.renku.cli.model.CliAssociation
 import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.jsonld._
+import monocle.Lens
 
 sealed trait Association {
   type AgentType
@@ -31,6 +32,8 @@ sealed trait Association {
   val plan:     StepPlan
 
   def agentOrPerson: Either[Agent, Person]
+
+  def fold[A](f1: Association.WithRenkuAgent => A, f2: Association.WithPersonAgent => A): A
 }
 
 object Association {
@@ -39,10 +42,14 @@ object Association {
     type AgentType = Agent
 
     def agentOrPerson: Either[Agent, Person] = Left(agent)
+
+    def fold[A](f1: Association.WithRenkuAgent => A, f2: Association.WithPersonAgent => A): A = f1(this)
   }
   final case class WithPersonAgent(activity: Activity, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
     def agentOrPerson: Either[Agent, Person] = Right(agent)
+
+    def fold[A](f1: Association.WithRenkuAgent => A, f2: Association.WithPersonAgent => A): A = f2(this)
   }
 
   def factory(agent: Agent, plan: StepPlan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
@@ -70,4 +77,22 @@ object Association {
 
   implicit def entityIdEncoder[A <: Association](implicit renkuUrl: RenkuUrl): EntityIdEncoder[A] =
     EntityIdEncoder.instance(_.activity.asEntityId.asUrlEntityId / "association")
+
+  object Lenses {
+    val plan: Lens[Association, StepPlan] = Lens[Association, StepPlan](_.plan)(p =>
+      a =>
+        a.fold(
+          _.copy(plan = p),
+          _.copy(plan = p)
+        )
+    )
+
+    val agent: Lens[Association, Either[Agent, Person]] =
+      Lens[Association, Either[Agent, Person]](_.agentOrPerson) {
+        case Right(person) =>
+          a => a.fold(p => Association.WithPersonAgent(p.activity, person, p.plan), _.copy(agent = person))
+        case Left(agent) =>
+          a => a.fold(_.copy(agent = agent), p => Association.WithRenkuAgent(p.activity, agent, p.plan))
+      }
+  }
 }

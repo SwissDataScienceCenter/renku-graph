@@ -27,6 +27,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.plans._
+import monocle.Lens
 
 trait Plan extends PlanAlg {
   val id:               Identifier
@@ -121,4 +122,12 @@ object Plan {
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => plan.id.asEntityId)
+
+  object Lenses {
+    val creators: Lens[Plan, List[Person]] =
+      Lens[Plan, List[Person]](_.creators)(persons => {
+        case sp: StepPlan      => StepPlan.Lenses.creators.set(persons)(sp)
+        case cp: CompositePlan => CompositePlan.Lenses.creators.set(persons)(cp)
+      })
+  }
 }

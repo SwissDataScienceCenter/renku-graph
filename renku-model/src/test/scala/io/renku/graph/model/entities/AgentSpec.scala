@@ -19,10 +19,10 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliSoftwareAgent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -33,7 +33,9 @@ class AgentSpec extends AnyWordSpec with should.Matchers with ScalaCheckProperty
 
     "turn JsonLD Agent entity into the Agent object" in {
       forAll { agent: Agent =>
-        agent.asJsonLD.cursor.as[entities.Agent] shouldBe agent.to[entities.Agent].asRight
+        agent.to[CliSoftwareAgent].asFlattenedJsonLD.cursor.as[List[entities.Agent]] shouldBe List(
+          agent.to[entities.Agent]
+        ).asRight
       }
     }
   }
