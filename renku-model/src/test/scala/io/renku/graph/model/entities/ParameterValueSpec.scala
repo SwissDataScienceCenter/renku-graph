@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Swiss Data Science Center (ßSDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,6 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.CliActivity
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
@@ -32,6 +31,7 @@ import io.renku.graph.model.{entities, plans}
 import io.renku.jsonld.JsonLDDecoder._
 import monocle.Lens
 import org.scalacheck.Gen
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -39,6 +39,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ParameterValueSpec
     extends AnyWordSpec
     with should.Matchers
+    with EitherValues
     with ScalaCheckPropertyChecks
     with AdditionalMatchers
     with DiffInstances {
@@ -122,14 +123,13 @@ class ParameterValueSpec
       implicit val dl: DependencyLinks =
         createDependencyLinks(planParametersLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
 
-      val Left(failure) = activity
+      val results = activity
         .to[CliActivity]
         .asFlattenedJsonLD
         .cursor
         .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
 
-      failure shouldBe a[DecodingFailure]
-      failure.message should endWith(
+      results.left.value.message should endWith(
         s"ParameterValue points to a non-existing command parameter ${entitiesActivity.parameters.head.valueReference.resourceId}"
       )
     }
@@ -144,14 +144,13 @@ class ParameterValueSpec
       implicit val dl: DependencyLinks =
         createDependencyLinks(planInputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
 
-      val Left(failure) = activity
+      val results = activity
         .to[CliActivity]
         .asFlattenedJsonLD
         .cursor
         .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
 
-      failure shouldBe a[DecodingFailure]
-      failure.message should endWith(
+      results.left.value.message should endWith(
         s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].inputs.map(_.resourceId).head}"
       )
     }
@@ -164,14 +163,13 @@ class ParameterValueSpec
       implicit val dl: DependencyLinks =
         createDependencyLinks(planOutputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
 
-      val Left(failure) = activity
+      val results = activity
         .to[CliActivity]
         .asFlattenedJsonLD
         .cursor
         .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
 
-      failure shouldBe a[DecodingFailure]
-      failure.message should endWith(
+      results.left.value.message should endWith(
         s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].outputs.map(_.resourceId).head}"
       )
     }

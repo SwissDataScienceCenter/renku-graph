@@ -38,7 +38,7 @@ class StepPlanCommandParameterSpec extends AnyWordSpec with should.Matchers with
       stepPlanEntities(planCommands, cliShapedPersons, parameterFactory)(date)
     }
 
-  show"StepPlanCommandParameter.decode" should {
+  "StepPlanCommandParameter.decode" should {
 
     "turn JsonLD of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {
       forAll(explicitCommandParameterObjects) { parameterFactory =>
@@ -69,7 +69,7 @@ class StepPlanCommandParameterSpec extends AnyWordSpec with should.Matchers with
     }
   }
 
-  show"CommandInput.decode" should {
+  "CommandInput.decode" should {
 
     "turn JsonLD of LocationCommandInput entity into the LocationCommandInput object" in {
       forAll(locationCommandInputObjects) { parameterFactory =>

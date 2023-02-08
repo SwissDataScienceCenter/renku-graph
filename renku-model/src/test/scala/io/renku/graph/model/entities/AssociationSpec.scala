@@ -26,11 +26,12 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, plans}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, JsonLDDecoder}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
 
   "decode" should {
 
@@ -74,9 +75,9 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
       implicit val dl: DependencyLinks = (_: plans.ResourceId) => Option.empty[entities.StepPlan]
 
-      val Left(failure) = testAssociation.to[CliAssociation].asFlattenedJsonLD.cursor.as[List[entities.Association]]
+      val result = testAssociation.to[CliAssociation].asFlattenedJsonLD.cursor.as[List[entities.Association]]
 
-      failure.message should include(
+      result.left.value.message should include(
         show"Association ${association.resourceId} points to a non-existing Plan ${association.planId}"
       )
     }

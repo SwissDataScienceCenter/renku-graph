@@ -26,6 +26,7 @@ import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{InvalidationTime, entities}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -33,6 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class DatasetPartSpec
     extends AnyWordSpec
     with should.Matchers
+    with EitherValues
     with ScalaCheckPropertyChecks
     with AdditionalMatchers
     with DiffInstances {
@@ -70,14 +72,14 @@ class DatasetPartSpec
       val datasetPart      = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[CliDatasetFile]
       val invalidationTime = timestamps(max = datasetPart.dateCreated.value).generateAs(InvalidationTime)
 
-      val Left(error) = datasetPart
+      val result = datasetPart
         .copy(invalidationTime = invalidationTime.some)
         .asFlattenedJsonLD
         .cursor
         .as[List[entities.DatasetPart]]
 
-      error          shouldBe a[DecodingFailure]
-      error.getMessage should include
+      result.left.value          shouldBe a[DecodingFailure]
+      result.left.value.getMessage should include
       s"invalidationTime $invalidationTime is older than DatasetPart ${datasetPart.dateCreated.value}"
     }
   }

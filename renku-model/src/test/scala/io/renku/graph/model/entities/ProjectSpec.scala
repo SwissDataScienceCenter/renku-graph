@@ -23,9 +23,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.circe.syntax._
-import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
-import io.renku.cli.model.{CliActivity, CliCompositePlan, CliDataset, CliPlan, CliProject}
 import io.renku.cli.model.CliModel._
+import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
+import io.renku.cli.model._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -34,7 +34,6 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -172,7 +171,7 @@ class ProjectSpec
 
         val decoded = jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).fold(throw _, identity)
         decoded should not be empty
-        println(decoded.head)
+
         decoded.head shouldMatchTo testProject
           .to[entities.Project]
           .asInstanceOf[entities.RenkuProject.WithParent]
@@ -270,7 +269,6 @@ class ProjectSpec
 
       s"update Plans' originalResourceId for project $projectType" in new TestCase {
 
-        val resourceId = projects.ResourceId(info.path)
         val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
           info.dateCreated
         ).generateOne
@@ -291,10 +289,9 @@ class ProjectSpec
 
         val jsonLD = testProject.to[CliProject].asFlattenedJsonLD
 
-        val actualV = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
-        val actual  = actualV.fold(throw _, _.head)
+        val results = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
 
-        val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = actual.plans
+        val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = results.value.head.plans
         actualPlan1 shouldBe entitiesPlan
         actualPlan2 shouldBe entitiesPlanModification1
         actualPlan3 shouldBe (modifiedPlanDerivation >>> planDerivationOriginalId)
@@ -416,12 +413,11 @@ class ProjectSpec
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
 
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
 
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
       val jsonLD      = testProject.to[CliProject].asFlattenedJsonLD
 
-      val result = jsonLD.asArray
+      val results = jsonLD.asArray
         .map(jsons =>
           JsonLD.arr(
             JsonLD.entity(personResourceIds.generateOne.asEntityId,
@@ -434,14 +430,15 @@ class ProjectSpec
         .cursor
         .as(decodeList(entities.Project.decoder(projectInfo)))
 
-      result.left.value            shouldBe a[DecodingFailure]
-      result.left.value.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
+      results.left.value shouldBe a[DecodingFailure]
+      results.left.value.getMessage() should include(
+        s"Finding Person entities for project ${projectInfo.path} failed: "
+      )
     }
 
     "return a DecodingFailure if there's a modified Plan pointing to a non-existing parent" in new TestCase {
 
-      val info       = gitLabProjectInfos.generateOne
-      val resourceId = projects.ResourceId(info.path)
+      val info = gitLabProjectInfos.generateOne
       val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
         info.dateCreated
       ).generateOne
@@ -478,8 +475,7 @@ class ProjectSpec
 
     "return a DecodingFailure if there's a modified Plan with the date from before the parent date" in new TestCase {
 
-      val info       = gitLabProjectInfos.generateOne
-      val resourceId = projects.ResourceId(info.path)
+      val info = gitLabProjectInfos.generateOne
       val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
         info.dateCreated
       ).generateOne
@@ -516,7 +512,6 @@ class ProjectSpec
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in new TestCase {
 
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
 
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
 
@@ -575,7 +570,6 @@ class ProjectSpec
     "return a DecodingFailure when there's an internal Dataset entity created before project without parent" in new TestCase {
 
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
       val dataset =
         datasetEntities(provenanceInternal(cliShapedPersons)).withDateBefore(projectInfo.dateCreated).generateOne
       val entitiesDataset = dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -1210,17 +1204,6 @@ class ProjectSpec
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 
-    def toCliPayloadPerson(name: Name): entities.Person = gitLabPerson match {
-      case _: ProjectMemberNoEmail =>
-        cliShapedPersons.generateOne
-          .copy(name = name, maybeEmail = None)
-          .to[entities.Person]
-      case member: ProjectMemberWithEmail =>
-        cliShapedPersons.generateOne
-          .copy(name = name, maybeEmail = member.email.some)
-          .to[entities.Person]
-    }
-
     lazy val toPerson: entities.Person = gitLabPerson match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
         entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
@@ -1241,16 +1224,21 @@ class ProjectSpec
     }
 
     lazy val toTestPerson: testentities.Person = gitLabPerson match {
-      case ProjectMemberNoEmail(name, _, gitLabId) =>
+      case ProjectMemberNoEmail(_, username, gitLabId) =>
         testentities.Person(
-          name,
+          persons.Name(username.value),
           maybeEmail = None,
           gitLabId.some,
           maybeOrcidId = None,
           maybeAffiliation = None
         )
-      case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        testentities.Person(name, email.some, gitLabId.some, maybeOrcidId = None, maybeAffiliation = None)
+      case ProjectMemberWithEmail(_, username, gitLabId, email) =>
+        testentities.Person(persons.Name(username.value),
+                            email.some,
+                            gitLabId.some,
+                            maybeOrcidId = None,
+                            maybeAffiliation = None
+        )
     }
   }
 
