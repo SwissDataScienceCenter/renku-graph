@@ -20,12 +20,17 @@ name := "knowledge-graph"
 
 Test / fork := true
 
-// log4j-core is needed only by widoco
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.5"
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.19.0"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.5"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
 libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.11"
+
+// needed by widoco only - explicitly bumped up to work with rdf4j-queryparser-sparql (triples-store-client)
+// from 5.1.18 that widoco comes with
+libraryDependencies += "net.sourceforge.owlapi" % "owlapi-distribution" % "5.5.0"
+
+// needed by widoco only
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.19.0"
 
 resolvers += "jitpack" at "https://jitpack.io"
