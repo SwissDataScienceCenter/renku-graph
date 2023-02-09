@@ -21,7 +21,7 @@ name := "tiny-types"
 
 libraryDependencies += "eu.timepit" %% "refined" % "0.10.1"
 
-val circeVersion       = "0.14.3"
+val circeVersion       = "0.14.4"
 val circeOpticsVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
