@@ -34,8 +34,6 @@ import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import io.renku.webhookservice.{CommitSyncRequestSender, hookvalidation}
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 private trait HookCreator[F[_]] {
   def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult]
 }
@@ -74,18 +72,18 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
           (HookExisted: CreationResult).pure[F]
       }
 
-    (for {
-      hookValidation <- validateHook(projectId, Some(accessToken))
-      projectInfo    <- findProjectInfo(projectId)(Some(accessToken))
-      result         <- createIfMissing(hookValidation, projectInfo)
-      _              <- Spawn[F].start(sendCommitSyncReq(projectInfo))
-    } yield result).recoverWith(loggingError(projectId))
+    {
+      for {
+        hookValidation <- validateHook(projectId, Some(accessToken))
+        projectInfo    <- findProjectInfo(projectId)(Some(accessToken))
+        result         <- createIfMissing(hookValidation, projectInfo)
+        _              <- Spawn[F].start(sendCommitSyncReq(projectInfo))
+      } yield result
+    }.onError(loggingError(projectId))
   }
 
-  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[CreationResult]] = {
-    case NonFatal(exception) =>
-      Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
-      exception.raiseError[F, CreationResult]
+  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
+    Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
   }
 }
 

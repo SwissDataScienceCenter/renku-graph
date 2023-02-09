@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice.hookcreation
 
-import cats.Applicative
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -37,7 +36,6 @@ private trait ProjectHookCreator[F[_]] {
 
 private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookCreator[F] {
 
-  import cats.effect._
   import io.circe.Json
   import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Status.{Created, Unauthorized}
@@ -45,7 +43,7 @@ private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends 
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
     val uri = uri"projects" / projectHook.projectId.show / "hooks"
-    GitLabClient[F].post(uri, "create-hook", payload(projectHook))(mapResponse)(Some(accessToken))
+    GitLabClient[F].post(uri, "create-hook", payload(projectHook))(mapResponse(projectHook))(Some(accessToken))
   }
 
   private def payload(projectHook: ProjectHook) = Json.obj(
@@ -55,9 +53,14 @@ private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends 
     "token"       -> Json.fromString(projectHook.serializedHookToken.value)
   )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
-    case (Created, _, _)      => Applicative[F].unit
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+  private def mapResponse(hook: ProjectHook): PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (Created, _, _)      => ().pure[F]
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError[F, Unit]
+    case (other, _, resp) =>
+      resp.as[String] >>= { msg =>
+        new Exception(s"Hook creation for project ${hook.projectId} failed: $other, $msg")
+          .raiseError[F, Unit]
+      }
   }
 }
 
