@@ -24,6 +24,7 @@ import StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.CliCompositePlan
 import io.renku.graph.model.entities.Plan.Derivation
 import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
 import io.renku.jsonld._
@@ -53,6 +54,9 @@ sealed trait Plan extends Product with Serializable {
 object Plan {
 
   final case class Derivation(derivedFrom: DerivedFrom, originalResourceId: ResourceId)
+
+//  def fromCli(cliPlan: CliPlan): ValidatedNel[String, Plan] =
+//    cliPlan.fold(StepPlan.fromCli, CompositePlan.fromCli)
 
   implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
     new EntityFunctions[Plan] {
@@ -237,6 +241,27 @@ object StepPlan {
     )
   }
 
+//  def fromCli(cliPlan: CliStepPlan): ValidatedNel[String, StepPlan] =
+//    cliPlan.derivedFrom match {
+//      case Some(derived) =>
+//        ???
+//      case None =>
+//        from(
+//          cliPlan.id,
+//          cliPlan.name,
+//          cliPlan.description,
+//          cliPlan.command,
+//          cliPlan.creators,
+//          cliPlan.dateCreated,
+//          None,
+//          cliPlan.keywords,
+//          cliPlan.parameters,
+//          cliPlan.inputs,
+//          cliPlan.outputs,
+//          cliPlan.successCodes
+//        )
+//    }
+
   val entityTypes: EntityTypes =
     EntityTypes of (renku / "Plan", prov / "Plan", schema / "Action", schema / "CreativeWork")
 
@@ -282,7 +307,6 @@ object StepPlan {
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId            <- cursor.downEntityId.as[ResourceId]
         name                  <- cursor.downField(schema / "name").as[Name]
@@ -430,6 +454,9 @@ object CompositePlan {
                          cpm:  CompositePlan.Modified => P
     ): P = cpm(this)
   }
+
+  def fromCli(cliPlan: CliCompositePlan): ValidatedNel[String, CompositePlan] =
+    ???
 
   // noinspection TypeAnnotation
   object Ontology {

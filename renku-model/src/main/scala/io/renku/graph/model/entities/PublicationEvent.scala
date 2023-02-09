@@ -18,8 +18,9 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliPublicationEvent
 import io.renku.graph.model.datasets
 import io.renku.graph.model.publicationEvents._
 
@@ -62,30 +63,20 @@ object PublicationEvent {
       )
   }
 
-  private def forDataset(datasetId: datasets.Identifier): Cursor => JsonLDDecoder.Result[Boolean] =
-    _.downField(schema / "about").as[EntityId].map(_.show endsWith datasetId.show)
-
   def decoder(datasetId: Dataset.Identification): JsonLDDecoder[PublicationEvent] =
-    JsonLDDecoder.entity(entityTypes, forDataset(datasetId.identifier)) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-      for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        about            <- cursor.downField(schema / "about").as(datasetEdgeDecoder(datasetId.resourceId))
-        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-        name             <- cursor.downField(schema / "name").as[Name]
-        startDate        <- cursor.downField(schema / "startDate").as[StartDate]
-      } yield PublicationEvent(resourceId, about, datasetId.resourceId, maybeDescription, name, startDate)
+    CliPublicationEvent.decoder(datasetId.identifier, datasetId.resourceId).emap { cliEvent =>
+      fromCli(cliEvent).toEither.leftMap(_.intercalate("; "))
     }
 
-  private def datasetEdgeDecoder(datasetId: datasets.ResourceId): JsonLDDecoder[About] =
-    JsonLDDecoder.entity(urlEntityTypes) { cursor =>
-      for {
-        about <- cursor.downEntityId.as[About]
-        url   <- cursor.downField(schema / "url").downEntityId.as[datasets.ResourceId]
-        _ <- if (url.show == datasetId.show) ().asRight
-             else DecodingFailure(show"Publication Event $about does not point to $url", Nil).asLeft
-      } yield about
-    }
+  def fromCli(cliEvent: CliPublicationEvent): ValidatedNel[String, PublicationEvent] =
+    PublicationEvent(
+      cliEvent.resourceId,
+      cliEvent.about,
+      cliEvent.datasetResourceId,
+      cliEvent.maybeDescription,
+      cliEvent.name,
+      cliEvent.startDate
+    ).validNel
 
   val ontology: ReverseProperty = ReverseProperty(dsClass =>
     Type.Def(

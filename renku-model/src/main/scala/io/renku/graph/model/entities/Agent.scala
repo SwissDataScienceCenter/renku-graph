@@ -18,6 +18,9 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.ValidatedNel
+import cats.syntax.all._
+import io.renku.cli.model.CliSoftwareAgent
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.agents._
 import io.renku.jsonld._
@@ -40,12 +43,13 @@ object Agent {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Agent] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-    for {
-      resourceId <- cursor.downEntityId.as[ResourceId]
-      label      <- cursor.downField(schema / "name").as[Name]
-    } yield Agent(resourceId, label)
-  }
+  implicit lazy val decoder: JsonLDDecoder[Agent] =
+    CliSoftwareAgent.jsonLDDecoder.emap { cliAgent =>
+      fromCli(cliAgent).toEither.leftMap(_.intercalate("; "))
+    }
+
+  def fromCli(cliAgent: CliSoftwareAgent): ValidatedNel[String, Agent] =
+    Agent(cliAgent.resourceId, cliAgent.name).validNel
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "SoftwareAgent"),
