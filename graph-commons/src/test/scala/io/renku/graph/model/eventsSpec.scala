@@ -20,11 +20,11 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.circe.Json
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
+import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.constraints.{DurationNotNegative, NonBlank}
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -32,8 +32,8 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.{Clock, Duration => JavaDuration, Instant, ZoneId}
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
-import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
 import scala.util.Random
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
