@@ -26,16 +26,17 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.tinytypes.constraints.{DurationNotNegative, NonBlank}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
-import java.time.{Clock, Duration => JavaDuration, Instant, ZoneId}
+import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
 import scala.util.Random
 
-class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
 
   "EventStatus" should {
 
@@ -72,17 +73,13 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     "fail instantiation for unknown value" in {
       val unknown = nonEmptyStrings().generateOne
 
-      val Left(exception) = EventStatus.from(unknown)
-
-      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+      EventStatus.from(unknown).left.value.getMessage shouldBe s"'$unknown' unknown EventStatus"
     }
 
     "fail deserialization for unknown value" in {
       val unknown = nonEmptyStrings().generateOne
 
-      val Left(exception) = Json.fromString(unknown).as[EventStatus]
-
-      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+      Json.fromString(unknown).as[EventStatus].left.value.getMessage should include(s"'$unknown' unknown EventStatus")
     }
 
     "be sortable in the way that reflects the possible state changes" in {

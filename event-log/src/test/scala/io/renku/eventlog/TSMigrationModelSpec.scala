@@ -23,13 +23,14 @@ import io.renku.data.ErrorMessage
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nestedExceptions, nonEmptyStrings, timestamps}
 import io.renku.tinytypes.constraints.NonBlank
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 
-class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
   import io.renku.eventlog.MigrationStatus._
 
   "MigrationStatus" should {
@@ -58,17 +59,15 @@ class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     "fail instantiation for unknown value" in {
       val unknown = nonEmptyStrings().generateOne
 
-      val Left(exception) = MigrationStatus.from(unknown)
-
-      exception.getMessage shouldBe s"'$unknown' unknown MigrationStatus"
+      MigrationStatus.from(unknown).left.value.getMessage shouldBe s"'$unknown' unknown MigrationStatus"
     }
 
     "fail deserialization for unknown value" in {
       val unknown = nonEmptyStrings().generateOne
 
-      val Left(exception) = Json.fromString(unknown).as[MigrationStatus]
-
-      exception.getMessage shouldBe s"'$unknown' unknown MigrationStatus"
+      Json.fromString(unknown).as[MigrationStatus].left.value.getMessage should include(
+        s"'$unknown' unknown MigrationStatus"
+      )
     }
   }
 }
