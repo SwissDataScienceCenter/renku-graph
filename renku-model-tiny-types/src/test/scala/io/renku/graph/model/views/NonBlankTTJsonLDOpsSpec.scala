@@ -69,7 +69,7 @@ class NonBlankTTJsonLDOpsSpec extends AnyWordSpec with should.Matchers with Eith
         .failIfNone(None)
         .left
         .value
-        .getMessage() should contain(s"A value of '${TestStringTinyType.typeName}' expected but got none")
+        .getMessage() should include(s"A value of '${TestStringTinyType.typeName}' expected but got none")
     }
   }
 }
