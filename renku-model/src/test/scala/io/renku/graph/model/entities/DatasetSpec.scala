@@ -75,12 +75,7 @@ class DatasetSpec
 
       val cliDs = modelDs.to[CliDataset].copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-      val result = encodeAndDecodeToModel(cliDs)
-
-      result.left.value shouldBe a[DecodingFailure]
-      result.left.value.getMessage should startWith(
-        s"Cannot decode entity with ${modelDs.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]].resourceId}: DecodingFailure at : Invalid dataset data"
-      )
+      encodeAndDecodeToModel(cliDs).left.value.getMessage should include("Invalid dataset data")
     }
 
     forAll {

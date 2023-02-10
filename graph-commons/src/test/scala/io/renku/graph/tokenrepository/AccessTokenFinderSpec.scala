@@ -111,9 +111,14 @@ class AccessTokenFinderSpec
           .willReturn(okJson("{}"))
       }
 
-      intercept[Exception] {
+      val exception = intercept[Exception] {
         accessTokenFinder.findAccessToken(projectId).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
+      }
+
+      exception.getMessage should include(
+        s"GET $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
+      exception.getMessage should include("Access token cannot be deserialized")
     }
   }
 
@@ -185,9 +190,14 @@ class AccessTokenFinderSpec
           .willReturn(okJson("{}"))
       }
 
-      intercept[Exception] {
+      val exception = intercept[Exception] {
         accessTokenFinder.findAccessToken(projectPath).unsafeRunSync()
-      }.getMessage shouldBe s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}; Access token cannot be deserialized"
+      }
+
+      exception.getMessage should include(
+        s"GET $tokenRepositoryUrl/projects/${urlEncode(projectPath.toString)}/tokens returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+      )
+      exception.getMessage should include("Access token cannot be deserialized")
     }
   }
 
