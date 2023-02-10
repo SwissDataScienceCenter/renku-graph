@@ -106,6 +106,8 @@ object CliDataset {
       maybeLicense     <- cursor.downField(Schema.license).as[Option[License]]
       maybeVersion     <- cursor.downField(Schema.version).as[Option[Version]]
       parts            <- cursor.downField(Schema.hasPart).as[List[CliDatasetFile]]
+      publicationEvents <-
+        cursor.focusTop.as(JsonLDDecoder.decodeList(CliPublicationEvent.decoder(identifier, resourceId)))
     } yield CliDataset(
       resourceId,
       identifier,
@@ -124,7 +126,7 @@ object CliDataset {
       maybeDerivedFrom,
       maybeOriginalIdentifier,
       maybeInvalidationTime,
-      publicationEvents = Nil
+      publicationEvents
     )
   }
 

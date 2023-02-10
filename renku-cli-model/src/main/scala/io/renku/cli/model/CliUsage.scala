@@ -29,7 +29,7 @@ object CliUsage {
 
   private val entityTypes: EntityTypes = EntityTypes.of(Prov.Usage)
 
-  implicit lazy val decoder: JsonLDDecoder[CliUsage] =
+  implicit lazy val jsonLDDecoder: JsonLDDecoder[CliUsage] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]

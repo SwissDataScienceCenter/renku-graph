@@ -55,17 +55,29 @@ object CliPlan {
   private def selectCandidates(ets: EntityTypes): Boolean =
     CliStepPlan.matchingEntityTypes(ets) || CliCompositePlan.matchingEntityTypes(ets)
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliPlan] = {
-    val plan = CliStepPlan.jsonLDDecoder.emap(plan => CliPlan(plan).asRight)
-    val cp   = CliCompositePlan.jsonLDDecoder.emap(plan => CliPlan(plan).asRight)
+  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =
+    jsonLDDecoderWith(CliStepPlan.jsonLDDecoder, CliCompositePlan.jsonLDDecoder)
 
-    JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
+  /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a step/composite plan. */
+  val jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliPlan] =
+    jsonLDDecoderWith(CliStepPlan.jsonLDDecoderLenientTyped, CliCompositePlan.jsonLDDecoderLenientTyped)
+
+  private def jsonLDDecoderWith(
+      stepPlanDecoder: JsonLDEntityDecoder[CliStepPlan],
+      compPlanDecoder: JsonLDEntityDecoder[CliCompositePlan]
+  ): JsonLDEntityDecoder[CliPlan] = {
+    val step = stepPlanDecoder.map(CliPlan.apply)
+    val comp = compPlanDecoder.map(CliPlan.apply)
+    val predicate = (cursor: Cursor) =>
+      (stepPlanDecoder.predicate(cursor), compPlanDecoder.predicate(cursor)).mapN(_ || _)
+
+    JsonLDDecoder.cacheableEntity(entityTypes, predicate) { cursor =>
       val currentEntityTypes = cursor.getEntityTypes
       (currentEntityTypes.map(CliStepPlan.matchingEntityTypes),
        currentEntityTypes.map(CliCompositePlan.matchingEntityTypes)
       ).flatMapN {
-        case (true, _) => plan(cursor)
-        case (_, true) => cp(cursor)
+        case (true, _) => step(cursor)
+        case (_, true) => comp(cursor)
         case _ =>
           DecodingFailure(
             s"Invalid entity for decoding child plans of a composite plan: $currentEntityTypes",

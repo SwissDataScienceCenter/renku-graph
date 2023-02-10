@@ -20,7 +20,6 @@ package io.renku.graph.model.entities
 
 import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.CliDatasetFile
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource}
@@ -86,20 +85,10 @@ object DatasetPart {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-    for {
-      resourceId            <- cursor.downEntityId.as[PartResourceId]
-      external              <- cursor.downField(renku / "external").as[PartExternal]
-      entity                <- cursor.downField(prov / "entity").as[Entity]
-      dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
-      maybeSource           <- cursor.downField(renku / "source").as[Option[PartSource]]
-      maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-      part <- DatasetPart
-                .from(resourceId, external, entity, dateCreated, maybeSource, maybeInvalidationTime)
-                .toEither
-                .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-    } yield part
-  }
+  implicit lazy val decoder: JsonLDDecoder[DatasetPart] =
+    CliDatasetFile.jsonLDDecoder.emap { cliPart =>
+      fromCli(cliPart).toEither.leftMap(_.intercalate("; "))
+    }
 
   val ontology: Type = Type.Def(
     Class(schema / "DigitalDocument", ParentClass(prov / "Entity")),

@@ -19,9 +19,10 @@
 package io.renku.graph.model.entities
 
 import ProjectLens._
-import cats.data.Validated
+import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.cli.model.CliProject
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
@@ -35,6 +36,50 @@ import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
 object ProjectJsonLDDecoder {
 
+  def fromCli(cliProject: CliProject, gitLabInfo: GitLabProjectInfo)(implicit
+      renkuUrl: RenkuUrl
+  ): ValidatedNel[String, Project] = {
+    val creatorV = cliProject.creator.traverse(Person.fromCli)
+    val planV = cliProject.plans.traverse(
+      _.fold(StepPlan.fromCli,
+             CompositePlan.fromCli,
+             p => StepPlan.fromCli(p.asCliStepPlan),
+             p => CompositePlan.fromCli(p.asCliCompositePlan)
+      )
+    )
+    val dependencyLinks = planV.map(new DecodingDependencyLinks(_))
+    val datasetV        = cliProject.datasets.traverse(Dataset.fromCli)
+    val activityV       = dependencyLinks.andThen(links => cliProject.activities.traverse(Activity.fromCli(_, links)))
+    val descr           = cliProject.description.orElse(gitLabInfo.maybeDescription)
+    val keywords = cliProject.keywords match {
+      case s if s.isEmpty => gitLabInfo.keywords
+      case s              => s
+    }
+    val dateCreated = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
+    val all         = (creatorV, datasetV, activityV, planV).mapN(Tuple4.apply)
+    all.andThen { case (creator, datasets, activities, plans) =>
+      newProject(
+        gitLabInfo,
+        cliProject.id,
+        dateCreated,
+        descr,
+        cliProject.agentVersion,
+        keywords,
+        cliProject.schemaVersion,
+        null, // TODO!!!
+        activities,
+        datasets,
+        plans,
+        cliProject.images
+      )
+    }
+  }
+
+  class DecodingDependencyLinks(allPlans: List[Plan]) extends DependencyLinks {
+    override def findStepPlan(planId: plans.ResourceId): Option[StepPlan] =
+      collectStepPlans(allPlans).find(_.resourceId == planId)
+  }
+
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       val maybeDescriptionR = cursor
@@ -44,11 +89,6 @@ object ProjectJsonLDDecoder {
       val keywordsR = cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten.toSet).map {
         case kwrds if kwrds.isEmpty => gitLabInfo.keywords
         case kwrds                  => kwrds
-      }
-
-      class DecodingDependencyLinks(allPlans: List[Plan]) extends DependencyLinks {
-        override def findStepPlan(planId: plans.ResourceId): Option[StepPlan] =
-          collectStepPlans(allPlans).find(_.resourceId == planId)
       }
 
       for {
@@ -84,7 +124,9 @@ object ProjectJsonLDDecoder {
                      datasets,
                      plans,
                      images
-                   )
+                   ).toEither
+                     .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+
       } yield project
     }
 
@@ -108,7 +150,7 @@ object ProjectJsonLDDecoder {
                          datasets:         List[Dataset[Dataset.Provenance]],
                          plans:            List[Plan],
                          images:           List[Image]
-  )(implicit renkuUrl: RenkuUrl): Either[DecodingFailure, Project] = {
+  )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Project] =
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
@@ -192,8 +234,6 @@ object ProjectJsonLDDecoder {
             s"parent: $maybeParent"
         )
     }
-  }.toEither
-    .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
 
   private def maybeCreator(
       allJsonLdPersons: Set[Person]

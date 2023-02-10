@@ -91,7 +91,7 @@ class PlanSpec
         JsonLDTools
           .view(cliPlan)
           .selectByTypes(entities.StepPlan.entityTypes)
-          .addType(renku / "WorkflowPlan")
+          .addType(renku / "WorkflowFilePlan")
           .value
 
       newJson.cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight

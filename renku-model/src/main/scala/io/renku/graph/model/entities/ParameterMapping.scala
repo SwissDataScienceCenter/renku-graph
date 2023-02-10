@@ -18,7 +18,9 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, ValidatedNel}
+import cats.syntax.all._
+import io.renku.cli.model.CliParameterMapping
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
@@ -77,6 +79,15 @@ object ParameterMapping {
       )
   }
 
+  def fromCli(cliParamMapping: CliParameterMapping): ValidatedNel[String, ParameterMapping] =
+    ParameterMapping(
+      cliParamMapping.resourceId,
+      cliParamMapping.defaultValue.map(v => DefaultValue(v.value)),
+      cliParamMapping.description,
+      cliParamMapping.name,
+      cliParamMapping.mapsTo.map(_.fold(_.resourceId, _.resourceId, _.resourceId, _.resourceId))
+    ).validNel
+
   implicit def encoder: JsonLDEncoder[ParameterMapping] =
     JsonLDEncoder.instance { mapping =>
       JsonLD.entity(
@@ -90,13 +101,7 @@ object ParameterMapping {
     }
 
   implicit def decoder: JsonLDDecoder[ParameterMapping] =
-    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
-      for {
-        id          <- cursor.downEntityId.as[ResourceId]
-        name        <- cursor.downField(Ontology.name).as[Name]
-        defaultVal  <- cursor.downField(Ontology.defaultValue).as[Option[DefaultValue]]
-        descr       <- cursor.downField(Ontology.description).as[Option[Description]]
-        mappedParam <- cursor.downField(Ontology.mapsTo).as[NonEmptyList[ResourceId]]
-      } yield ParameterMapping(id, defaultVal, descr, name, mappedParam)
+    CliParameterMapping.jsonLDDecoder.emap { cliMapping =>
+      fromCli(cliMapping).toEither.leftMap(_.intercalate("; "))
     }
 }

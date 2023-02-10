@@ -23,14 +23,12 @@ import Schemas.{prov, renku, schema}
 import StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.cli.model.CliCompositePlan
+import io.renku.cli.model.{CliCompositePlan, CliPlan, CliStepPlan}
 import io.renku.graph.model.entities.Plan.Derivation
-import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import plans.{Command, DateCreated, DateModified, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
+import plans.{Command, DateCreated, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 import scala.math.Ordering.Implicits._
 
@@ -55,8 +53,8 @@ object Plan {
 
   final case class Derivation(derivedFrom: DerivedFrom, originalResourceId: ResourceId)
 
-//  def fromCli(cliPlan: CliPlan): ValidatedNel[String, Plan] =
-//    cliPlan.fold(StepPlan.fromCli, CompositePlan.fromCli)
+  def fromCli(cliPlan: CliPlan)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Plan] =
+    cliPlan.fold(StepPlan.fromCli, CompositePlan.fromCli)
 
   implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
     new EntityFunctions[Plan] {
@@ -71,19 +69,8 @@ object Plan {
     }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
-    JsonLDDecoder.entity(EntityTypes of prov / "Plan") { cursor =>
-      lazy val noMatchFailure: Either[DecodingFailure, Plan] = cursor.getEntityTypes.flatMap { ets =>
-        DecodingFailure(
-          DecodingFailure.Reason.CustomReason(show"Cannot decode entity as Plan: $ets"),
-          cursor.jsonLD.toJson.hcursor
-        ).asLeft
-      }
-
-      cursor.getEntityTypes.flatMap { ets =>
-        if (ets.contains(StepPlan.entityTypes)) StepPlan.decoder.apply(cursor)
-        else if (ets.contains(CompositePlan.Ontology.entityTypes)) CompositePlan.decoder.apply(cursor)
-        else noMatchFailure
-      }
+    CliPlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
+      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
     }
 
   lazy val ontology: Type =
@@ -241,26 +228,51 @@ object StepPlan {
     )
   }
 
-//  def fromCli(cliPlan: CliStepPlan): ValidatedNel[String, StepPlan] =
-//    cliPlan.derivedFrom match {
-//      case Some(derived) =>
-//        ???
-//      case None =>
-//        from(
-//          cliPlan.id,
-//          cliPlan.name,
-//          cliPlan.description,
-//          cliPlan.command,
-//          cliPlan.creators,
-//          cliPlan.dateCreated,
-//          None,
-//          cliPlan.keywords,
-//          cliPlan.parameters,
-//          cliPlan.inputs,
-//          cliPlan.outputs,
-//          cliPlan.successCodes
-//        )
-//    }
+  def fromCli(cliPlan: CliStepPlan)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, StepPlan] = {
+    val creatorsV = cliPlan.creators.traverse(Person.fromCli)
+    val inputsV   = cliPlan.inputs.traverse(StepPlanCommandParameter.CommandInput.fromCli)
+    val outputsV  = cliPlan.outputs.traverse(StepPlanCommandParameter.CommandOutput.fromCli)
+    val paramsV   = cliPlan.parameters.traverse(StepPlanCommandParameter.CommandParameter.fromCli)
+    val all       = (creatorsV, inputsV, outputsV, paramsV).mapN(Tuple4.apply)
+    all.andThen { case (creators, inputs, outputs, params) =>
+      (cliPlan.derivedFrom, cliPlan.invalidationTime) match {
+        case (Some(derivedFrom), _) =>
+          from(
+            cliPlan.id,
+            cliPlan.name,
+            cliPlan.description,
+            cliPlan.command,
+            creators,
+            cliPlan.dateCreated,
+            None,
+            cliPlan.keywords,
+            params,
+            inputs,
+            outputs,
+            cliPlan.successCodes,
+            Derivation(derivedFrom, ResourceId(derivedFrom.value)),
+            cliPlan.invalidationTime
+          )
+        case (None, None) =>
+          from(
+            cliPlan.id,
+            cliPlan.name,
+            cliPlan.description,
+            cliPlan.command,
+            creators,
+            cliPlan.dateCreated,
+            None,
+            cliPlan.keywords,
+            params,
+            inputs,
+            outputs,
+            cliPlan.successCodes
+          )
+        case (None, Some(_)) =>
+          show"Plan ${cliPlan.id} has no parent but invalidation time".invalidNel
+      }
+    }
+  }
 
   val entityTypes: EntityTypes =
     EntityTypes of (renku / "Plan", prov / "Plan", schema / "Action", schema / "CreativeWork")
@@ -306,81 +318,8 @@ object StepPlan {
     }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      for {
-        resourceId            <- cursor.downEntityId.as[ResourceId]
-        name                  <- cursor.downField(schema / "name").as[Name]
-        maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
-        maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
-        creators              <- cursor.downField(schema / "creator").as[List[Person]]
-        dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
-        dateModified          <- cursor.downField(schema / "dateModified").as[DateModified]
-        maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
-        keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
-        parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
-        inputs                <- cursor.downField(renku / "hasInputs").as[List[CommandInput]]
-        outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
-        successCodes          <- cursor.downField(renku / "successCodes").as[List[SuccessCode]]
-        maybeDerivedFrom      <- cursor.downField(prov / "wasDerivedFrom").as(decodeOption(DerivedFrom.ttDecoder))
-        maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-        plan <- {
-                  (maybeDerivedFrom, maybeInvalidationTime) match {
-                    case (None, None) =>
-                      StepPlan
-                        .from(
-                          resourceId,
-                          name,
-                          maybeDescription,
-                          maybeCommand,
-                          creators,
-                          dateCreated,
-                          maybeProgrammingLang,
-                          keywords,
-                          parameters,
-                          inputs,
-                          outputs,
-                          successCodes
-                        )
-                    case (Some(derivedFrom), None) =>
-                      StepPlan
-                        .from(
-                          resourceId,
-                          name,
-                          maybeDescription,
-                          maybeCommand,
-                          creators,
-                          DateCreated(dateModified.value),
-                          maybeProgrammingLang,
-                          keywords,
-                          parameters,
-                          inputs,
-                          outputs,
-                          successCodes,
-                          Derivation(derivedFrom, ResourceId(derivedFrom.value)),
-                          maybeInvalidationTime = None
-                        )
-                    case (Some(derivedFrom), Some(invalidationTime)) =>
-                      StepPlan.from(
-                        resourceId,
-                        name,
-                        maybeDescription,
-                        maybeCommand,
-                        creators,
-                        DateCreated(dateModified.value),
-                        maybeProgrammingLang,
-                        keywords,
-                        parameters,
-                        inputs,
-                        outputs,
-                        successCodes,
-                        Derivation(derivedFrom, ResourceId(derivedFrom.value)),
-                        invalidationTime.some
-                      )
-                    case (None, Some(_)) =>
-                      show"Plan $resourceId has no parent but invalidation time".invalidNel
-                  }
-                }.toEither.leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-      } yield plan
+    CliStepPlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
+      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
     }
 
   lazy val ontology: Type = {
@@ -455,8 +394,49 @@ object CompositePlan {
     ): P = cpm(this)
   }
 
-  def fromCli(cliPlan: CliCompositePlan): ValidatedNel[String, CompositePlan] =
-    ???
+  def fromCli(cliPlan: CliCompositePlan)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, CompositePlan] = {
+    val creatorsV   = cliPlan.creators.traverse(Person.fromCli)
+    val childPlansV = cliPlan.plans.traverse(Plan.fromCli)
+    val linksV      = cliPlan.links.traverse(ParameterLink.fromCli)
+    val mappingsV   = cliPlan.mappings.traverse(ParameterMapping.fromCli)
+    val all         = (creatorsV, childPlansV, linksV, mappingsV).mapN(Tuple4.apply)
+    all.andThen { case (creators, childPlans, links, mappings) =>
+      (cliPlan.derivedFrom, cliPlan.invalidationTime) match {
+        case (None, None) =>
+          validate(
+            CompositePlan.NonModified(
+              cliPlan.id,
+              cliPlan.name,
+              cliPlan.description,
+              creators,
+              cliPlan.dateCreated,
+              cliPlan.keywords,
+              childPlans.map(_.resourceId),
+              mappings,
+              links
+            )
+          )
+        case (Some(derivedFrom), mit) =>
+          validate(
+            CompositePlan.Modified(
+              cliPlan.id,
+              cliPlan.name,
+              cliPlan.description,
+              creators,
+              cliPlan.dateCreated,
+              cliPlan.keywords,
+              childPlans.map(_.resourceId),
+              mappings,
+              links,
+              mit,
+              Derivation(derivedFrom, ResourceId(derivedFrom.value))
+            )
+          )
+        case (None, Some(_)) =>
+          show"Plan ${cliPlan.id} has no parent but invalidation time".invalidNel
+      }
+    }
+  }
 
   // noinspection TypeAnnotation
   object Ontology {
@@ -526,57 +506,8 @@ object CompositePlan {
     }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDEntityDecoder[CompositePlan] =
-    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-      for {
-        resourceId            <- cursor.downEntityId.as[ResourceId]
-        name                  <- cursor.downField(Ontology.name).as[Name]
-        maybeDescription      <- cursor.downField(Ontology.description).as[Option[Description]]
-        creators              <- cursor.downField(Ontology.creators).as[List[Person]]
-        dateCreated           <- cursor.downField(Ontology.dateCreated).as[DateCreated]
-        keywords              <- cursor.downField(Ontology.keywords).as[List[Option[Keyword]]].map(_.flatten)
-        maybeDerivedFrom      <- cursor.downField(Ontology.wasDerivedFrom).as(decodeOption(DerivedFrom.ttDecoder))
-        maybeInvalidationTime <- cursor.downField(Ontology.invalidatedAtTime).as[Option[InvalidationTime]]
-        links                 <- cursor.downField(Ontology.workflowLinks).as[List[ParameterLink]]
-        mappings              <- cursor.downField(Ontology.hasMappings).as[List[ParameterMapping]]
-        plans                 <- cursor.downField(Ontology.hasSubprocess).as[NonEmptyList[ResourceId]]
-        plan <- {
-                  (maybeDerivedFrom, maybeInvalidationTime) match {
-                    case (None, None) =>
-                      validate(
-                        CompositePlan.NonModified(
-                          resourceId,
-                          name,
-                          maybeDescription,
-                          creators,
-                          dateCreated,
-                          keywords,
-                          plans,
-                          mappings,
-                          links
-                        )
-                      )
-                    case (Some(derivedFrom), mit) =>
-                      validate(
-                        CompositePlan.Modified(
-                          resourceId,
-                          name,
-                          maybeDescription,
-                          creators,
-                          dateCreated,
-                          keywords,
-                          plans,
-                          mappings,
-                          links,
-                          mit,
-                          Derivation(derivedFrom, ResourceId(derivedFrom.value))
-                        )
-                      )
-                    case (None, Some(_)) =>
-                      show"Plan $resourceId has no parent but invalidation time".invalidNel
-                  }
-                }.toEither.leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-      } yield plan
+    CliCompositePlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
+      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
     }
 
   def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {

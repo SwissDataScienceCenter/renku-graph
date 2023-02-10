@@ -21,6 +21,7 @@ package io.renku.cli.model
 import io.renku.cli.model.Ontologies.{Prov, Renku, Schema}
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
+import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld.syntax._
 import io.renku.jsonld._
 
@@ -49,8 +50,15 @@ object CliStepPlan {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit val jsonLDDecoder: JsonLDDecoder[CliStepPlan] =
-    JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
+  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliStepPlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(matchingEntityTypes))
+
+  /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a step plan. */
+  val jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliStepPlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(_ contains entityTypes))
+
+  private def jsonLDDecoderWith(filter: Cursor => Result[Boolean]): JsonLDEntityDecoder[CliStepPlan] =
+    JsonLDDecoder.cacheableEntity(entityTypes, filter) { cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[ResourceId]
         name         <- cursor.downField(Schema.name).as[Name]

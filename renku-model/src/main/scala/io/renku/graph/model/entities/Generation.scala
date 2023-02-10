@@ -20,12 +20,11 @@ package io.renku.graph.model.entities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.CliGeneration
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.entities.Entity.OutputEntity
 import io.renku.graph.model.generations.ResourceId
-import io.renku.graph.model.{activities, generations}
+import io.renku.graph.model.activities
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax.JsonEncoderOps
@@ -61,20 +60,9 @@ object Generation {
     }
   }
 
-  private def withActivity(activityId: activities.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
-    _.downField(prov / "activity").downEntityId.as[activities.ResourceId].map(_ == activityId)
-
   def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
-    JsonLDDecoder.entity(entityTypes, withActivity(activityId)) { cursor =>
-      for {
-        resourceId         <- cursor.downEntityId.as[generations.ResourceId]
-        activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
-        entity <- cursor.focusTop
-                    .as[List[OutputEntity]](JsonLDDecoder.decodeList(Entity.outputEntityDecoder(resourceId))) >>= {
-                    case entity :: Nil => entity.asRight
-                    case _ => DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil).asLeft
-                  }
-      } yield Generation(resourceId, activityResourceId, entity)
+    CliGeneration.decoderForActivity(activityId).emap { cliGen =>
+      fromCli(cliGen).toEither.leftMap(_.intercalate("; "))
     }
 
   lazy val ontology: Type = Type.Def(
