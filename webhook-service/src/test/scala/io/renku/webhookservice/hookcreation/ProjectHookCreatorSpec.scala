@@ -75,9 +75,25 @@ class ProjectHookCreatorSpec
       } shouldBe UnauthorizedException
     }
 
-    "return an Exception if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
+    "return an Exception with a hint for solving the problem if remote responds with UNPROCESSABLE_ENTITY (422)" in new TestCase {
 
       val code    = Status.UnprocessableEntity
+      val message = nonEmptyStrings().generateOne
+
+      val exception = intercept[Exception] {
+        mapResponse(code, Request(), Response().withEntity(message)).unsafeRunSync()
+      }
+
+      exception.getMessage should include(s"$code, $message")
+      exception.getMessage should include(
+        "Check in GitLab settings to allow requests to the local network from web hooks and services"
+      )
+    }
+
+    "return an Exception with a generic message " +
+      "if remote responds with status other than CREATED, UNAUTHORIZED or UNPROCESSABLE_ENTITY" in new TestCase {
+
+      val code    = Status.ImATeapot
       val message = nonEmptyStrings().generateOne
 
       val exception = intercept[Exception] {
