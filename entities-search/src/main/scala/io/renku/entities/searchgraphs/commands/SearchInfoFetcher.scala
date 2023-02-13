@@ -57,10 +57,10 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?topSameAs ?name ?visibility ?maybeDescription
         |                ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
-        |                (GROUP_CONCAT(?creator; separator=',') AS ?creators)
-        |                (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
-        |                (GROUP_CONCAT(?image; separator=',') AS ?images)
-        |                (GROUP_CONCAT(?link; separator=',') AS ?links)
+        |                (GROUP_CONCAT(?creator; separator='$rowsSeparator') AS ?creators)
+        |                (GROUP_CONCAT(?keyword; separator='$rowsSeparator') AS ?keywords)
+        |                (GROUP_CONCAT(?image; separator='$rowsSeparator') AS ?images)
+        |                (GROUP_CONCAT(?link; separator='$rowsSeparator') AS ?links)
         |WHERE {
         |  {
         |    SELECT DISTINCT ?topSameAs
@@ -106,6 +106,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |""".stripMargin
   )
 
+  private lazy val rowsSeparator = "##"
+
   private implicit lazy val recordsDecoder: Decoder[List[SearchInfo]] = ResultsDecoder[List, SearchInfo] {
     implicit cur =>
       import Decoder._
@@ -113,7 +115,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       import io.renku.graph.model.{datasets, images, persons, projects}
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
-      val splitRows: String => List[String] = _.split(',').toList.distinct
+      val splitRows: String => List[String] = _.split(rowsSeparator).toList.distinct
 
       def decode[O](map: String => Decoder.Result[O], sort: List[O] => List[O]): String => Decoder.Result[List[O]] =
         splitRows(_).map(map).sequence.map(sort)

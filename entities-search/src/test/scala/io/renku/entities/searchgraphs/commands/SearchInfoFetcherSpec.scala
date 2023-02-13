@@ -27,8 +27,8 @@ import io.renku.graph.model.GraphModelGenerators.projectResourceIds
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -57,6 +57,17 @@ class SearchInfoFetcherSpec
                   links = info.links.sortBy(_.projectId)
         )
       }
+    }
+
+    "work if there are ',' in names" in new TestCase {
+
+      val infos = searchInfoObjectsGen(withLinkTo = projectId)
+        .map(_.copy(creators = personInfos.map(_.copy(name = "name, surname")).generateNonEmptyList(max = 1)))
+        .generateFixedSizeList(ofSize = 1)
+
+      insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
+
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name)
     }
 
     "return nothing if no Datasets for the Project" in new TestCase {
