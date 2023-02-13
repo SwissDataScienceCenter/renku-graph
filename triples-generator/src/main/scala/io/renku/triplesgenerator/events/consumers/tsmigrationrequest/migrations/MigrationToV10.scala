@@ -28,6 +28,7 @@ import io.circe.Decoder
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.{Schemas, projects}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -79,7 +80,7 @@ private object MigrationToV10 {
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder] = for {
     projectsFinder    <- PagedProjectsFinder[F]
-    eventsSender      <- EventSender[F]
+    eventsSender      <- EventSender[F](EventLogUrl)
     executionRegister <- MigrationExecutionRegister[F]
   } yield new MigrationToV10(projectsFinder, eventsSender, executionRegister)
 }

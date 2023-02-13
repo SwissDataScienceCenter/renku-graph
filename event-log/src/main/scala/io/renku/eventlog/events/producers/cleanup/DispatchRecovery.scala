@@ -24,9 +24,10 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.metrics.MetricsRegistry
@@ -71,7 +72,6 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventS
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, CleanUpEvent]] = for {
-    eventSender <- EventSender[F]
-  } yield new DispatchRecoveryImpl[F](eventSender)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, CleanUpEvent]] =
+    EventSender[F](EventLogUrl).map(new DispatchRecoveryImpl[F](_))
 }

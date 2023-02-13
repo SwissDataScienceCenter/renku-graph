@@ -29,11 +29,11 @@ import io.renku.events.CategoryName
 import io.renku.events.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.config.EventLogUrl
 import io.renku.graph.metrics.SentEventsGauge
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.UrlTinyType
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -161,11 +161,12 @@ class EventSenderSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val sentEventsGauge = mock[SentEventsGauge[IO]]
-    val eventLogUrl:  EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
-    val onErrorSleep: FiniteDuration = 500 millis
-    val eventSender = new EventSenderImpl[IO](eventLogUrl,
+    private val serviceUrl: UrlTinyType = new UrlTinyType {
+      override val value: String = externalServiceBaseUrl
+    }
+    val eventSender = new EventSenderImpl[IO](serviceUrl,
                                               sentEventsGauge,
-                                              onErrorSleep,
+                                              onErrorSleep = 500 millis,
                                               retryInterval = 100 millis,
                                               maxRetries = 2,
                                               requestTimeoutOverride = Some(requestTimeout)

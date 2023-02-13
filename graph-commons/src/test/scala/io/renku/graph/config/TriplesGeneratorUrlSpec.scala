@@ -29,27 +29,27 @@ import org.scalatest.TryValues
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class EventLogUrlSpec extends AnyWordSpec with should.Matchers with TryValues {
+class TriplesGeneratorUrlSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "apply" should {
 
-    "read 'services.event-log.url' from the config" in {
+    "read 'services.triples-generator.url' from the config" in {
       val url = httpUrls().generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "event-log" -> Map(
+            "triples-generator" -> Map(
               "url" -> url
             ).asJava
           ).asJava
         ).asJava
       )
 
-      EventLogUrl[Try](config).success.value shouldBe EventLogUrl(url)
+      TriplesGeneratorUrl[Try](config).success.value shouldBe TriplesGeneratorUrl(url)
     }
 
-    "fail if there's no 'services.event-log.url' entry" in {
-      EventLogUrl[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
+    "fail if there's no 'services.triples-generator.url' entry" in {
+      TriplesGeneratorUrl[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
     }
   }
 }

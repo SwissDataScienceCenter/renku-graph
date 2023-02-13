@@ -25,9 +25,10 @@ import io.circe.literal._
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.DispatchRecovery
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventMessage
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, New}
 import io.renku.metrics.MetricsRegistry
@@ -81,7 +82,6 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
-    eventSender <- EventSender[F]
-  } yield new DispatchRecoveryImpl[F](eventSender)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, AwaitingGenerationEvent]] =
+    EventSender[F](EventLogUrl).map(new DispatchRecoveryImpl[F](_))
 }

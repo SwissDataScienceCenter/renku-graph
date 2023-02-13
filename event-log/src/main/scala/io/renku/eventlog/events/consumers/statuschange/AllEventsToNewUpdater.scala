@@ -29,9 +29,10 @@ import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
@@ -101,5 +102,5 @@ private class AllEventsToNewUpdater[F[_]: Async: QueriesExecutionTimes](
 
 private object AllEventsToNewUpdater {
   def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]: F[AllEventsToNewUpdater[F]] =
-    EventSender[F] map (new AllEventsToNewUpdater(_))
+    EventSender[F](EventLogUrl) map (new AllEventsToNewUpdater(_))
 }

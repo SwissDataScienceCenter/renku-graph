@@ -24,9 +24,10 @@ import cats.syntax.all._
 import io.renku.commiteventservice.events.consumers.commitsync.categoryName
 import io.renku.commiteventservice.events.consumers.common.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import io.renku.commiteventservice.events.consumers.common.UpdateResult.{Created, Failed}
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{BatchDate, CommitId, EventBody}
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
@@ -125,5 +126,5 @@ private[consumers] class CommitToEventLogImpl[F[_]: MonadThrow](
 
 private[consumers] object CommitToEventLog {
   def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitToEventLog[F]] =
-    EventSender[F].map(new CommitToEventLogImpl[F](_, CommitEventSerializer))
+    EventSender[F](EventLogUrl).map(new CommitToEventLogImpl[F](_, CommitEventSerializer))
 }
