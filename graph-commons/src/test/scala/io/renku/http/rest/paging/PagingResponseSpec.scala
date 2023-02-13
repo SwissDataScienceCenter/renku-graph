@@ -22,8 +22,8 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.TestTinyTypes.UrlTestType
@@ -33,7 +33,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 class PagingResponseSpec
     extends AnyWordSpec
@@ -50,38 +50,38 @@ class PagingResponseSpec
         val total   = Total((page.value - 1) * perPage.value + results.size)
         val request = PagingRequest(page, perPage)
 
-        val Failure(exception) = PagingResponse.from[Try, String](results, request, total)
+        val result = PagingResponse.from[Try, String](results, request, total)
 
-        exception shouldBe an[IllegalArgumentException]
-        exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: $page and perPage: $perPage"
+        result.failure.exception shouldBe an[IllegalArgumentException]
+        result.failure.exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: $page and perPage: $perPage"
       }
     }
 
-    "fix the total if results is not empty and (page.value - 1) * perPage.value + results.size > total.value" in {
+    "fix the total if results is not empty and (page - 1) * perPage + results.size > total" in {
       forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = nonEmptyStrings().generateNonEmptyList(max = perPage.value).toList
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
         val request = PagingRequest(page, perPage)
 
-        val Success(response) = PagingResponse.from[Try, String](results, request, total)
+        val result = PagingResponse.from[Try, String](results, request, total)
 
-        response.results                  shouldBe results
-        response.pagingInfo.pagingRequest shouldBe request
-        response.pagingInfo.total         shouldBe Total((page.value - 1) * perPage.value + results.size)
+        result.success.value.results                  shouldBe results
+        result.success.value.pagingInfo.pagingRequest shouldBe request
+        result.success.value.pagingInfo.total         shouldBe Total((page.value - 1) * perPage.value + results.size)
       }
     }
 
-    "instantiate successfully if results list is empty and (page.value - 1) * perPage.value > total.value" in {
+    "instantiate successfully if results list is empty and (page - 1) * perPage > total" in {
       forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = List.empty[String]
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
         val request = PagingRequest(page, perPage)
 
-        val Success(response) = PagingResponse.from[Try, String](results, request, total)
+        val result = PagingResponse.from[Try, String](results, request, total)
 
-        response.results                  shouldBe results
-        response.pagingInfo.pagingRequest shouldBe request
-        response.pagingInfo.total         shouldBe total
+        result.success.value.results                  shouldBe results
+        result.success.value.pagingInfo.pagingRequest shouldBe request
+        result.success.value.pagingInfo.total         shouldBe total
       }
     }
 
@@ -91,11 +91,11 @@ class PagingResponseSpec
         val total   = ints(min = (page.value - 1) * perPage.value + results.size).generateAs(Total)
         val request = PagingRequest(page, perPage)
 
-        val Success(response) = PagingResponse.from[Try, String](results, request, total)
+        val result = PagingResponse.from[Try, String](results, request, total)
 
-        response.results                  shouldBe results
-        response.pagingInfo.pagingRequest shouldBe request
-        response.pagingInfo.total         shouldBe total
+        result.success.value.results                  shouldBe results
+        result.success.value.pagingInfo.pagingRequest shouldBe request
+        result.success.value.pagingInfo.total         shouldBe total
       }
     }
   }
@@ -106,11 +106,11 @@ class PagingResponseSpec
       val paging  = pagingRequests.generateOne.copy(page = Page(1))
       val results = nonBlankStrings().generateNonEmptyList(max = paging.perPage.value).toList
 
-      val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
+      val result = PagingResponse.from[Try, NonBlank](results, paging)
 
-      actual.results                  shouldBe results
-      actual.pagingInfo.pagingRequest shouldBe paging
-      actual.pagingInfo.total         shouldBe Total(results.size)
+      result.success.value.results                  shouldBe results
+      result.success.value.pagingInfo.pagingRequest shouldBe paging
+      result.success.value.pagingInfo.total         shouldBe Total(results.size)
     }
 
     "calculate the total from the given results if results size <= perPage - case not of the first page" in {
@@ -119,34 +119,34 @@ class PagingResponseSpec
         .generateNonEmptyList(min = paging.perPage.value + 1, max = paging.page.value * paging.perPage.value)
         .toList
 
-      val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
+      val result = PagingResponse.from[Try, NonBlank](results, paging)
 
-      actual.results                  shouldBe results.drop(paging.perPage.value)
-      actual.pagingInfo.pagingRequest shouldBe paging
-      actual.pagingInfo.total         shouldBe Total(results.size)
+      result.success.value.results                  shouldBe results.drop(paging.perPage.value)
+      result.success.value.pagingInfo.pagingRequest shouldBe paging
+      result.success.value.pagingInfo.total         shouldBe Total(results.size)
     }
 
     "accept an empty results list if page 1 requested" in {
       val paging = pagingRequests.generateOne.copy(page = Page(1))
 
-      val Success(actual) = PagingResponse.from[Try, NonBlank](List.empty, paging)
+      val result = PagingResponse.from[Try, NonBlank](List.empty, paging)
 
-      actual.results                  shouldBe Nil
-      actual.pagingInfo.pagingRequest shouldBe paging
-      actual.pagingInfo.total         shouldBe Total(0)
+      result.success.value.results                  shouldBe Nil
+      result.success.value.pagingInfo.pagingRequest shouldBe paging
+      result.success.value.pagingInfo.total         shouldBe Total(0)
     }
 
-    "fail if requested page and perPage is beyond the number of results" in {
-      val paging =
-        PagingRequest(page = Gen.oneOf(2, 3, 4, 5).generateAs(Page), perPage = ints(2, 100).generateAs[PerPage])
-      val results = nonBlankStrings()
-        .generateNonEmptyList(max = paging.perPage.value - 1)
-        .toList
+    "return an empty results list if requested page beyond the max page having results" in {
 
-      val Failure(exception) = PagingResponse.from[Try, NonBlank](results, paging)
+      val paging = PagingRequest(Page(3), PerPage(1))
 
-      exception shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: ${results.size}, page: ${paging.page} and perPage: ${paging.perPage}"
+      val results = nonBlankStrings().generateFixedSizeList(ofSize = 1)
+
+      val result = PagingResponse.from[Try, NonBlank](results, paging)
+
+      result.success.value.results                  shouldBe Nil
+      result.success.value.pagingInfo.pagingRequest shouldBe paging
+      result.success.value.pagingInfo.total         shouldBe Total(results.size)
     }
   }
 
@@ -158,10 +158,10 @@ class PagingResponseSpec
 
       val newResults = Gen.listOfN(response.results.size, nonBlankStrings()).generateOne
 
-      val Success(updated) = response.updateResults[Try](newResults)
+      val result = response.updateResults[Try](newResults)
 
-      updated.results    shouldBe newResults
-      updated.pagingInfo shouldBe response.pagingInfo
+      result.success.value.results    shouldBe newResults
+      result.success.value.pagingInfo shouldBe response.pagingInfo
     }
 
     "fail replacing the results if the new results have different number of elements" in {
@@ -171,10 +171,10 @@ class PagingResponseSpec
       val newResultsNumber = nonNegativeInts() generateDifferentThan Refined.unsafeApply(response.results.size)
       val newResults       = Gen.listOfN(newResultsNumber.value, nonBlankStrings()).generateOne
 
-      val Failure(exception) = response.updateResults[Try](newResults)
+      val result = response.updateResults[Try](newResults)
 
-      exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe "Cannot update Paging Results as there's different number of results"
+      result.failure.exception            shouldBe an[IllegalArgumentException]
+      result.failure.exception.getMessage shouldBe "Cannot update Paging Results as there's different number of results"
     }
   }
 
