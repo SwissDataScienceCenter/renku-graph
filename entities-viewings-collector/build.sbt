@@ -17,4 +17,4 @@
  */
 
 organization := "io.renku"
-name := "entities-views-collector"
+name := "entities-viewings-collector"
