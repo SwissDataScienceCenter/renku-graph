@@ -50,12 +50,4 @@ object CliSoftwareAgent {
         label      <- cursor.downField(Schema.name).as[Name]
       } yield CliSoftwareAgent(resourceId, label)
     }
-
-  private[model] val jsonLDCliModelDecoder: JsonLDEntityDecoder[CliModel] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        label      <- cursor.downField(Schema.name).as[Name]
-      } yield CliSoftwareAgent(resourceId, label)
-    }
 }
