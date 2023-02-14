@@ -82,7 +82,7 @@ object Microservice extends IOMicroservice {
                                 migrationRequestSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config.some).map(_.routes)
+    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
                     serviceReadinessChecker,
