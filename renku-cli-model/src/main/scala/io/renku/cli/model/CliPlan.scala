@@ -52,9 +52,6 @@ object CliPlan {
   private val entityTypes: EntityTypes =
     EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
-  private def selectCandidates(ets: EntityTypes): Boolean =
-    CliStepPlan.matchingEntityTypes(ets) || CliCompositePlan.matchingEntityTypes(ets)
-
   implicit val jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =
     jsonLDDecoderWith(CliStepPlan.jsonLDDecoder, CliCompositePlan.jsonLDDecoder)
 

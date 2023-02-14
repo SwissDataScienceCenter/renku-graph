@@ -79,6 +79,7 @@ class CliActivitySpec
       error       shouldBe a[DecodingFailure]
       error.message should endWith(s"Cannot decode SoftwareAgent on activity ${activity.resourceId}")
     }
+
     "fail if there is no Author entity" in {
       import io.renku.jsonld.syntax._
       val encoder = JsonLDEncoder.instance[CliActivity] { entity =>

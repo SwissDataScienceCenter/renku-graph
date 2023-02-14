@@ -21,22 +21,18 @@ package io.renku.graph.model.entities
 import ProjectLens._
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.cli.model.CliProject
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember, entityTypes}
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders.decodeBlankStringToNone
-import io.renku.jsonld.JsonLDDecoder.decodeList
-import io.renku.jsonld.{Cursor, JsonLDDecoder}
+import io.renku.jsonld.JsonLDDecoder
 
 object ProjectJsonLDDecoder {
 
-  def fromCli(cliProject: CliProject, gitLabInfo: GitLabProjectInfo)(implicit
+  def fromCli(cliProject: CliProject, allPersons: Set[CliPerson], gitLabInfo: GitLabProjectInfo)(implicit
       renkuUrl: RenkuUrl
   ): ValidatedNel[String, Project] = {
     val creatorV = cliProject.creator.traverse(Person.fromCli)
@@ -50,14 +46,15 @@ object ProjectJsonLDDecoder {
     val dependencyLinks = planV.map(new DecodingDependencyLinks(_))
     val datasetV        = cliProject.datasets.traverse(Dataset.fromCli)
     val activityV       = dependencyLinks.andThen(links => cliProject.activities.traverse(Activity.fromCli(_, links)))
+    val allPersonV      = allPersons.toList.traverse(Person.fromCli)
     val descr           = cliProject.description.orElse(gitLabInfo.maybeDescription)
     val keywords = cliProject.keywords match {
       case s if s.isEmpty => gitLabInfo.keywords
       case s              => s
     }
     val dateCreated = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
-    val all         = (creatorV, datasetV, activityV, planV).mapN(Tuple4.apply)
-    all.andThen { case (creator, datasets, activities, plans) =>
+    val all         = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
+    all.andThen { case (creator, _, datasets, activities, plans) =>
       newProject(
         gitLabInfo,
         cliProject.id,
@@ -66,7 +63,7 @@ object ProjectJsonLDDecoder {
         cliProject.agentVersion,
         keywords,
         cliProject.schemaVersion,
-        null, // TODO!!!
+        creator.toSet,
         activities,
         datasets,
         plans,
@@ -81,62 +78,9 @@ object ProjectJsonLDDecoder {
   }
 
   def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
-    JsonLDDecoder.entity(entityTypes) { cursor =>
-      val maybeDescriptionR = cursor
-        .downField(schema / "description")
-        .as[Option[Description]]
-        .map(_ orElse gitLabInfo.maybeDescription)
-      val keywordsR = cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten.toSet).map {
-        case kwrds if kwrds.isEmpty => gitLabInfo.keywords
-        case kwrds                  => kwrds
-      }
-
-      for {
-        maybeAgent                     <- cursor.downField(schema / "agent").as[Option[CliVersion]]
-        maybeVersion                   <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
-        maybeDateCreated               <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
-        maybeDescription               <- maybeDescriptionR
-        keywords                       <- keywordsR
-        allPersons                     <- findAllPersons(cursor, gitLabInfo)
-        plans                          <- cursor.downField(renku / "hasPlan").as[List[Plan]]
-        implicit0(dl: DependencyLinks) <- new DecodingDependencyLinks(plans).asRight
-        activities <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
-        datasets   <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
-        resourceId <- ResourceId(gitLabInfo.path).asRight
-        images <-
-          cursor
-            .downField(schema / "image")
-            .as[List[Image]]
-            .map(images =>
-              if (images.isEmpty) gitLabInfo.avatarUrl.toList.map(Image.projectImage(resourceId, _)) else images
-            )
-            .map(_.sortBy(_.position))
-        project <- newProject(
-                     gitLabInfo,
-                     resourceId,
-                     dateCreated = (gitLabInfo.dateCreated :: maybeDateCreated.toList).min,
-                     maybeDescription,
-                     maybeAgent,
-                     keywords,
-                     maybeVersion,
-                     allPersons,
-                     activities,
-                     datasets,
-                     plans,
-                     images
-                   ).toEither
-                     .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-
-      } yield project
+    CliProject.projectAndPersonDecoder.emap { case (project, persons) =>
+      fromCli(project, persons.toSet, gitLabInfo).toEither.leftMap(_.intercalate("; "))
     }
-
-  private def findAllPersons(cursor: Cursor, gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl) =
-    cursor.focusTop
-      .as[List[Person]]
-      .map(_.toSet)
-      .leftMap(failure =>
-        DecodingFailure(s"Finding Person entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}", Nil)
-      )
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,

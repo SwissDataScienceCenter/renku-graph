@@ -432,7 +432,7 @@ class ProjectSpec
 
       results.left.value shouldBe a[DecodingFailure]
       results.left.value.getMessage() should include(
-        s"Finding Person entities for project ${projectInfo.path} failed: "
+        s"Finding Person entities for project ${projectInfo.name.some.asRight} failed: "
       )
     }
 
