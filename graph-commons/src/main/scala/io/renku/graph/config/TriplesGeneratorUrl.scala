@@ -21,16 +21,16 @@ package io.renku.graph.config
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
-import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
+import io.renku.tinytypes.TinyTypeFactory
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import pureconfig.ConfigReader
 
-final class TriplesGeneratorUrl private (val value: String) extends AnyVal with UrlTinyType
+final class TriplesGeneratorUrl private (val value: String) extends AnyVal with EventConsumerUrl
 object TriplesGeneratorUrl
     extends TinyTypeFactory[TriplesGeneratorUrl](new TriplesGeneratorUrl(_))
     with Url[TriplesGeneratorUrl]
     with UrlOps[TriplesGeneratorUrl]
-    with EventConsumerUrl {
+    with EventConsumerUrlFactory {
 
   type T = TriplesGeneratorUrl
 

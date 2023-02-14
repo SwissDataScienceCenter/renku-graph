@@ -21,16 +21,16 @@ package io.renku.graph.config
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
-import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
+import io.renku.tinytypes.TinyTypeFactory
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import pureconfig.ConfigReader
 
-final class EventLogUrl private (val value: String) extends AnyVal with UrlTinyType
+final class EventLogUrl private (val value: String) extends AnyVal with EventConsumerUrl
 object EventLogUrl
     extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_))
     with Url[EventLogUrl]
     with UrlOps[EventLogUrl]
-    with EventConsumerUrl {
+    with EventConsumerUrlFactory {
 
   type T = EventLogUrl
 

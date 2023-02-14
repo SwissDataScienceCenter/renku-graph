@@ -22,9 +22,9 @@ import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.tinytypes.UrlTinyType
 
-trait EventConsumerUrl {
-
-  type T <: UrlTinyType
-
+trait EventConsumerUrlFactory {
+  type T <: EventConsumerUrl
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[T]
 }
+
+trait EventConsumerUrl extends Any with UrlTinyType
