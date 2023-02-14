@@ -50,13 +50,7 @@ class SearchInfoFetcherSpec
       // other project DS
       insert(projectsDataset, searchInfoObjectsGen.generateOne.asQuads)
 
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map { info =>
-        info.copy(creators = info.creators.sortBy(_.name),
-                  keywords = info.keywords.sorted,
-                  images = info.images.sortBy(_.position),
-                  links = info.links.sortBy(_.projectId)
-        )
-      }
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
     }
 
     "work if there are ',' in names" in new TestCase {
@@ -67,7 +61,7 @@ class SearchInfoFetcherSpec
 
       insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name)
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
     }
 
     "return nothing if no Datasets for the Project" in new TestCase {
@@ -86,4 +80,10 @@ class SearchInfoFetcherSpec
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val fetcher = new SearchInfoFetcherImpl[IO](projectsDSConnectionInfo)
   }
+
+  private def orderValues(info: SearchInfo) = info.copy(creators = info.creators.sortBy(_.name),
+                                                        keywords = info.keywords.sorted,
+                                                        images = info.images.sortBy(_.position),
+                                                        links = info.links.sortBy(_.projectId)
+  )
 }

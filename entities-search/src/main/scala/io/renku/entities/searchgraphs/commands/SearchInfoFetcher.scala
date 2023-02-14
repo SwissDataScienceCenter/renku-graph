@@ -106,7 +106,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |""".stripMargin
   )
 
-  private lazy val rowsSeparator = "##"
+  private lazy val rowsSeparator = '\u0000'
 
   private implicit lazy val recordsDecoder: Decoder[List[SearchInfo]] = ResultsDecoder[List, SearchInfo] {
     implicit cur =>
