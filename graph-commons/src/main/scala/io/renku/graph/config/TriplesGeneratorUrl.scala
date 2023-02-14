@@ -25,19 +25,19 @@ import io.renku.tinytypes.TinyTypeFactory
 import io.renku.tinytypes.constraints.{Url, UrlOps}
 import pureconfig.ConfigReader
 
-final class EventLogUrl private (val value: String) extends AnyVal with EventConsumerUrl
-object EventLogUrl
-    extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_))
-    with Url[EventLogUrl]
-    with UrlOps[EventLogUrl]
+final class TriplesGeneratorUrl private (val value: String) extends AnyVal with EventConsumerUrl
+object TriplesGeneratorUrl
+    extends TinyTypeFactory[TriplesGeneratorUrl](new TriplesGeneratorUrl(_))
+    with Url[TriplesGeneratorUrl]
+    with UrlOps[TriplesGeneratorUrl]
     with EventConsumerUrlFactory {
 
-  type T = EventLogUrl
+  type T = TriplesGeneratorUrl
 
-  implicit val eventLogUrlOps: EventLogUrl.type = this
+  implicit val eventLogUrlOps: TriplesGeneratorUrl.type = this
 
-  private implicit val urlReader: ConfigReader[EventLogUrl] = urlTinyTypeReader(EventLogUrl)
+  private implicit val urlReader: ConfigReader[TriplesGeneratorUrl] = urlTinyTypeReader(TriplesGeneratorUrl)
 
-  override def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[EventLogUrl] =
-    find[F, EventLogUrl]("services.event-log.url", config)
+  override def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[TriplesGeneratorUrl] =
+    find[F, TriplesGeneratorUrl]("services.triples-generator.url", config)
 }

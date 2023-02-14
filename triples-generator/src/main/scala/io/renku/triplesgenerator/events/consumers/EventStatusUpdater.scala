@@ -23,17 +23,18 @@ import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.projects
 import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.constraints.DurationNotNegative
 import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.DurationNotNegative
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
 import org.typelevel.log4cats.Logger
 
@@ -194,9 +195,8 @@ private object EventStatusUpdater {
   implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
-    eventSender <- EventSender[F]
-  } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
+  def apply[F[_]: Async: Logger: MetricsRegistry](categoryName: CategoryName): F[EventStatusUpdater[F]] =
+    EventSender[F](EventLogUrl).map(new EventStatusUpdaterImpl(_, categoryName, Zip))
 
   final class ExecutionDelay private (val value: Duration) extends AnyVal with DurationTinyType
   object ExecutionDelay

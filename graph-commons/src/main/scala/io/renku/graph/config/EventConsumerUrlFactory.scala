@@ -20,24 +20,11 @@ package io.renku.graph.config
 
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
-import io.renku.tinytypes.TinyTypeFactory
-import io.renku.tinytypes.constraints.{Url, UrlOps}
-import pureconfig.ConfigReader
+import io.renku.tinytypes.UrlTinyType
 
-final class EventLogUrl private (val value: String) extends AnyVal with EventConsumerUrl
-object EventLogUrl
-    extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_))
-    with Url[EventLogUrl]
-    with UrlOps[EventLogUrl]
-    with EventConsumerUrlFactory {
-
-  type T = EventLogUrl
-
-  implicit val eventLogUrlOps: EventLogUrl.type = this
-
-  private implicit val urlReader: ConfigReader[EventLogUrl] = urlTinyTypeReader(EventLogUrl)
-
-  override def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[EventLogUrl] =
-    find[F, EventLogUrl]("services.event-log.url", config)
+trait EventConsumerUrlFactory {
+  type T <: EventConsumerUrl
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[T]
 }
+
+trait EventConsumerUrl extends Any with UrlTinyType

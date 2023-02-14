@@ -27,7 +27,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.config.{EventLogUrl, RenkuUrlLoader}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
@@ -126,7 +126,7 @@ private[migrations] object ReProvisioning {
     for {
       retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
       migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
-      eventSender                <- EventSender[F]
+      eventSender                <- EventSender[F](EventLogUrl)
       microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       compatibility              <- VersionCompatibilityConfig.fromConfigF[F](config)
       executionTimeRecorder      <- ExecutionTimeRecorder[F]()

@@ -33,6 +33,7 @@ import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMecha
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -159,7 +160,7 @@ private[events] object EventHandler {
   ): F[EventHandler[F]] = for {
     tsStateChecker           <- TSStateChecker[F]
     migrationsRunner         <- MigrationsRunner[F](config)
-    eventSender              <- EventSender[F]
+    eventSender              <- EventSender[F](EventLogUrl)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
   } yield new EventHandler[F](subscriberUrl,
                               serviceId,

@@ -24,9 +24,10 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.consumers.commitsync.categoryName
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.metrics.MetricsRegistry
@@ -66,5 +67,5 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender
 
 private[consumers] object CommitEventsRemover {
   def apply[F[_]: Async: Temporal: Logger: MetricsRegistry]: F[CommitEventsRemover[F]] =
-    EventSender[F].map(new CommitEventsRemoverImpl[F](_))
+    EventSender[F](EventLogUrl).map(new CommitEventsRemoverImpl[F](_))
 }

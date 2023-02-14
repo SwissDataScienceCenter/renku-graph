@@ -21,8 +21,9 @@ package io.renku.webhookservice
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
+import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.model.CommitSyncRequest
 import org.typelevel.log4cats.Logger
@@ -64,5 +65,5 @@ private class CommitSyncRequestSenderImpl[F[_]: MonadThrow: Logger](eventSender:
 
 private object CommitSyncRequestSender {
   def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitSyncRequestSender[F]] =
-    EventSender[F].map(new CommitSyncRequestSenderImpl(_))
+    EventSender[F](EventLogUrl).map(new CommitSyncRequestSenderImpl(_))
 }
