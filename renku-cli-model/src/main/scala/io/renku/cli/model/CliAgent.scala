@@ -19,6 +19,7 @@
 package io.renku.cli.model
 
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDDecoder, JsonLDEncoder}
 
@@ -40,12 +41,16 @@ object CliAgent {
 
   def apply(agent: CliSoftwareAgent): CliAgent.Software = Software(agent)
 
-  implicit val jsonLDDecoder: JsonLDDecoder[CliAgent] =
-    (CliSoftwareAgent.jsonLDCliModelDecoder orElse CliPerson.jsonLDCliModelDecoder).emap {
-      case a: CliSoftwareAgent => Right(CliAgent(a))
-      case a: CliPerson        => Right(CliAgent(a))
-      case _ => "Cannot decode entity as CliAgent".asLeft
+  implicit val jsonLDDecoder: JsonLDDecoder[CliAgent] = {
+    val ds = CliSoftwareAgent.jsonLDDecoder.map(CliAgent.apply)
+    val dp = CliPerson.jsonLDDecoder.map(CliAgent.apply)
+
+    JsonLDDecoder.instance { cursor =>
+      val rs = ds.apply(cursor)
+      rs.orElse(dp.apply(cursor))
+        .leftMap(_ => DecodingFailure(s"Cannot decode entity as CliAgent: ${cursor.getEntityTypes}", Nil))
     }
+  }
 
   implicit def jsonLDEncoder[A <: CliAgent]: JsonLDEncoder[A] =
     JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
