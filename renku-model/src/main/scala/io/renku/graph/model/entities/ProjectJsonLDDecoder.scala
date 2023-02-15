@@ -54,7 +54,7 @@ object ProjectJsonLDDecoder {
     }
     val dateCreated = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
     val all         = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
-    all.andThen { case (creator, _, datasets, activities, plans) =>
+    all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
         gitLabInfo,
         cliProject.id,
@@ -63,7 +63,7 @@ object ProjectJsonLDDecoder {
         cliProject.agentVersion,
         keywords,
         cliProject.schemaVersion,
-        creator.toSet,
+        persons.toSet ++ creator.toSet,
         activities,
         datasets,
         plans,
