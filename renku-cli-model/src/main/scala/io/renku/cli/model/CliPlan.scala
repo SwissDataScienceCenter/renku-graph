@@ -52,11 +52,11 @@ object CliPlan {
   private val entityTypes: EntityTypes =
     EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
-  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =
+  implicit def jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =
     jsonLDDecoderWith(CliStepPlan.jsonLDDecoder, CliCompositePlan.jsonLDDecoder)
 
   /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a step/composite plan. */
-  val jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliPlan] =
+  def jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliPlan] =
     jsonLDDecoderWith(CliStepPlan.jsonLDDecoderLenientTyped, CliCompositePlan.jsonLDDecoderLenientTyped)
 
   private def jsonLDDecoderWith(
@@ -70,9 +70,7 @@ object CliPlan {
 
     JsonLDDecoder.cacheableEntity(entityTypes, predicate) { cursor =>
       val currentEntityTypes = cursor.getEntityTypes
-      (currentEntityTypes.map(CliStepPlan.matchingEntityTypes),
-       currentEntityTypes.map(CliCompositePlan.matchingEntityTypes)
-      ).flatMapN {
+      (stepPlanDecoder.predicate(cursor), compPlanDecoder.predicate(cursor)).flatMapN {
         case (true, _) => step(cursor)
         case (_, true) => comp(cursor)
         case _ =>

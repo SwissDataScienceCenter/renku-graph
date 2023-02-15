@@ -20,7 +20,11 @@ package io.renku.graph.model.tools
 
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
+import io.renku.jsonld.{JsonLD, JsonLDDecoder}
+import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{Assertion, Assertions}
+
+import scala.reflect.{ClassTag, classTag}
 
 trait AdditionalMatchers extends DiffShouldMatcher {
 
@@ -33,5 +37,46 @@ trait AdditionalMatchers extends DiffShouldMatcher {
         },
         b => b shouldMatchTo other
       )
+  }
+
+  def decodeAndEqualTo[A: JsonLDDecoder: Diff: ClassTag](right: A, filter: A => A = (a: A) => a): Matcher[JsonLD] =
+    new AdditionalMatchers.JsonLDDecodingMatcher[A](right, filter)
+}
+
+object AdditionalMatchers {
+
+  final class JsonLDDecodingMatcher[A: JsonLDDecoder: Diff: ClassTag](value: A, filter: A => A)
+      extends Matcher[JsonLD]
+      with DiffShouldMatcher {
+    def apply(left: JsonLD): MatchResult = {
+      val decoded = left.cursor.as[A].map(filter)
+      decoded match {
+        case Right(dval) =>
+          val matchResult = diffMatcher(value).apply(dval)
+          if (matchResult.matches) matchResult
+          else
+            matchResult.copy(rawFailureMessage = matchResult.rawFailureMessage + s"\nJsonLD:\n${left.toJson.noSpaces}")
+
+        case Left(err) =>
+          val clazz = classTag[A].runtimeClass
+          MatchResult(
+            matches = false,
+            s"Decoding JsonLD into a ${clazz.getSimpleName} failed: ${err.getMessage()}. JsonLD:\n  ${left.toJson.noSpaces}",
+            ""
+          )
+      }
+    }
+  }
+
+  // Note: copied from com.softwaremill.diffx.scalatest.DiffShouldMatcher, bc of private scope
+  private def diffMatcher[A: Diff](right: A): Matcher[A] = { left =>
+    val result = Diff[A].apply(left, right)
+    if (!result.isIdentical) {
+      val diff =
+        result.show().split('\n').mkString(Console.RESET, s"${Console.RESET}\n${Console.RESET}", Console.RESET)
+      MatchResult(matches = false, s"Matching error:\n$diff", "")
+    } else {
+      MatchResult(matches = true, "", "")
+    }
   }
 }

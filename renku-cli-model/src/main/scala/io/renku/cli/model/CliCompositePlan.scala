@@ -49,14 +49,16 @@ object CliCompositePlan {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliCompositePlan] =
-    jsonLDDecoderWith(_.getEntityTypes.map(matchingEntityTypes))
+  implicit def jsonLDDecoder: JsonLDEntityDecoder[CliCompositePlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(matchingEntityTypes), CliPlan.jsonLDDecoder)
 
   /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a composite plan. */
-  val jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliCompositePlan] =
-    jsonLDDecoderWith(_.getEntityTypes.map(_ contains entityTypes))
+  def jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliCompositePlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(_ contains entityTypes), CliPlan.jsonLDDecoderLenientTyped)
 
-  private def jsonLDDecoderWith(filter: Cursor => Result[Boolean]): JsonLDEntityDecoder[CliCompositePlan] =
+  private def jsonLDDecoderWith(filter:           Cursor => Result[Boolean],
+                                childPlanDecoder: => JsonLDDecoder[CliPlan]
+  ): JsonLDEntityDecoder[CliCompositePlan] =
     JsonLDDecoder.entity(entityTypes, filter) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
@@ -70,7 +72,9 @@ object CliCompositePlan {
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
         mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliPlan]]
+        plans <- cursor
+                   .downField(Renku.hasSubprocess)
+                   .as[NonEmptyList[CliPlan]](JsonLDDecoder.decodeNonEmptyList(childPlanDecoder))
       } yield CliCompositePlan(
         resourceId,
         name,
