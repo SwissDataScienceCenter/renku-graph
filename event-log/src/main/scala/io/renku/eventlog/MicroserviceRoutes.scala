@@ -30,6 +30,7 @@ import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.status.StatusEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventStatus}
@@ -55,6 +56,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     subscriptionsEndpoint: SubscriptionsEndpoint[F],
     eventDetailsEndpoint:  EventDetailsEndpoint[F],
     eventPayloadEndpoint:  EventPayloadEndpoint[F],
+    statusEndpoint:        StatusEndpoint[F],
     routesMetrics:         RoutesMetrics[F],
     isMigrating:           Ref[F, Boolean],
     versionRoutes:         version.Routes[F]
@@ -69,6 +71,7 @@ private class MicroserviceRoutes[F[_]: Sync](
   import eventsEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
+  import statusEndpoint._
   import subscriptionsEndpoint._
 
 
@@ -88,6 +91,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
+    case           GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
     case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
   }.withMetrics.map(_  <+> versionRoutes())
   // format: on
@@ -230,14 +234,17 @@ private object MicroserviceRoutes {
     subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
     eventDetailsEndpoint  <- EventDetailsEndpoint[F]
     eventPayloadEndpoint = EventPayloadEndpoint[F]
-    versionRoutes <- version.Routes[F]
-  } yield new MicroserviceRoutes(eventEndpoint,
-                                 eventsEndpoint,
-                                 subscriptionsEndpoint,
-                                 eventDetailsEndpoint,
-                                 eventPayloadEndpoint,
-                                 new RoutesMetrics[F],
-                                 isMigrating,
-                                 versionRoutes
+    statusEndpoint <- StatusEndpoint[F]
+    versionRoutes  <- version.Routes[F]
+  } yield new MicroserviceRoutes(
+    eventEndpoint,
+    eventsEndpoint,
+    subscriptionsEndpoint,
+    eventDetailsEndpoint,
+    eventPayloadEndpoint,
+    statusEndpoint,
+    new RoutesMetrics[F],
+    isMigrating,
+    versionRoutes
   )
 }

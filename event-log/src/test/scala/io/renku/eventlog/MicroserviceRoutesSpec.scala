@@ -27,6 +27,7 @@ import events.producers.SubscriptionsEndpoint
 import events.{EventEndpoint, EventsEndpoint}
 import io.circe.Json
 import io.circe.literal._
+import io.renku.eventlog.status.StatusEndpoint
 import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
@@ -264,9 +265,19 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /version" should {
-    "return response from the version endpoint" in new TestCase {
-      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
+  "GET /status" should {
+
+    "return response from the status endpoint" in new TestCase with IsNotMigrating {
+
+      val response = Response[IO](status = httpStatuses.generateOne)
+      (() => statusEndpoint.`GET /status`).expects().returning(response.pure[IO])
+
+      routes.call(Request(GET, uri"/status")).status shouldBe response.status
+    }
+
+    s"return $ServiceUnavailable when migration is running" in new TestCase {
+      givenMigrationIsRunning
+      routes.call(Request(GET, uri"/status")).status shouldBe ServiceUnavailable
     }
   }
 
@@ -278,6 +289,12 @@ class MicroserviceRoutesSpec
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
 
       routes.call(request).status shouldBe Accepted
+    }
+  }
+
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
     }
   }
 
@@ -294,9 +311,8 @@ class MicroserviceRoutesSpec
   "all endpoints except /ping and /version" should {
 
     s"return $ServiceUnavailable if migration is happening" in new TestCase {
-      (() => isMigrating.get)
-        .expects()
-        .returning(true.pure[IO])
+
+      givenMigrationIsRunning
 
       val request = Request[IO](GET, uri"/events".withQueryParam("project-path", projectPaths.generateOne.value))
       routes.call(request).status shouldBe ServiceUnavailable
@@ -307,7 +323,8 @@ class MicroserviceRoutesSpec
   }
 
   "GET /events/:event-id/:project-path/payload" should {
-    s"find event payload and return $Ok()" in new TestCase with IsNotMigrating {
+
+    s"find event payload and return $Ok" in new TestCase with IsNotMigrating {
       val eventId     = eventIds.generateOne
       val projectPath = projectPaths.generateOne
 
@@ -334,6 +351,7 @@ class MicroserviceRoutesSpec
     val subscriptionsEndpoint = mock[SubscriptionsEndpoint[IO]]
     val eventDetailsEndpoint  = mock[EventDetailsEndpoint[IO]]
     val eventPayloadEndpoint  = mock[EventPayloadEndpoint[IO]]
+    val statusEndpoint        = mock[StatusEndpoint[IO]]
     val routesMetrics         = TestRoutesMetrics()
     val isMigrating           = mock[Ref[IO, Boolean]]
     val versionRoutes         = mock[version.Routes[IO]]
@@ -342,6 +360,7 @@ class MicroserviceRoutesSpec
                                             subscriptionsEndpoint,
                                             eventDetailsEndpoint,
                                             eventPayloadEndpoint,
+                                            statusEndpoint,
                                             routesMetrics,
                                             isMigrating,
                                             versionRoutes
@@ -355,6 +374,11 @@ class MicroserviceRoutesSpec
         HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
       }
       .atLeastOnce()
+
+    def givenMigrationIsRunning =
+      (() => isMigrating.get)
+        .expects()
+        .returning(true.pure[IO])
   }
 
   private implicit def instantQueryParamEncoder[TT <: InstantTinyType](implicit

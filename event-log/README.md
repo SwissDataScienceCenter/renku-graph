@@ -13,6 +13,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
 | GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
 | GET    | ```/ping```                                 | Verifies service health                                                    |
+| GET    | ```/status```                               | Returns info about the state of the service                                |
 | POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
 | GET    | ```/version```                              | Returns info about service version                                         |
 
@@ -517,6 +518,34 @@ Response body example:
 ```json
 {
   "isMigrating": false
+}
+```
+
+### GET /status
+
+Returns info about the state of the service
+
+**Response**
+
+| Status                          | Description                                    |
+|---------------------------------|------------------------------------------------|
+| OK (200)                        | If finding info about the state was successful |
+| INTERNAL SERVER ERROR (500)     | When there were problems finding the data      |
+| SERVICE UNAVAILABLE ERROR (503) | When a migration is running                    |
+
+Response body example:
+
+```json
+{
+  "subscriptions": [
+    {
+      "categoryName": "AWAITING_GENERATION",
+      "subscribers": {
+        "total": 5,
+        "busy": 1
+      }
+    }
+  ]
 }
 ```
 
