@@ -26,7 +26,7 @@ import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 
 private object UrlAndIdSubscriptionDeserializer {
 
-  type PayloadFactory[SI] = (SubscriberUrl, SubscriberId, Option[Capacity]) => SI
+  type PayloadFactory[SI] = (SubscriberUrl, SubscriberId, Option[TotalCapacity]) => SI
 
   def apply[F[_]: MonadThrow, SI <: SubscriptionInfo](
       categoryName:   CategoryName,
@@ -45,23 +45,23 @@ private class UrlAndIdSubscriptionDeserializerImpl[F[_]: MonadThrow, SI <: Subsc
 
   override def deserialize(payload: Json): F[Option[SI]] =
     payload
-      .as[(String, SubscriberUrl, SubscriberId, Option[Capacity])]
+      .as[(String, SubscriberUrl, SubscriberId, Option[TotalCapacity])]
       .fold(_ => Option.empty[SI], toCategoryPayload)
       .pure[F]
 
-  private lazy val toCategoryPayload: ((String, SubscriberUrl, SubscriberId, Option[Capacity])) => Option[SI] = {
+  private lazy val toCategoryPayload: ((String, SubscriberUrl, SubscriberId, Option[TotalCapacity])) => Option[SI] = {
     case (categoryName.value, subscriberUrl, subscriberId, maybeCapacity) =>
       payloadFactory(subscriberUrl, subscriberId, maybeCapacity).some
     case _ => None
   }
 
-  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, SubscriberId, Option[Capacity])] = {
+  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, SubscriberId, Option[TotalCapacity])] = {
     cursor =>
       for {
         categoryName  <- cursor.downField("categoryName").as[String]
         subscriberUrl <- cursor.downField("subscriber").downField("url").as[SubscriberUrl]
         subscriberId  <- cursor.downField("subscriber").downField("id").as[SubscriberId]
-        maybeCapacity <- cursor.downField("subscriber").downField("capacity").as[Option[Capacity]]
+        maybeCapacity <- cursor.downField("subscriber").downField("capacity").as[Option[TotalCapacity]]
       } yield (categoryName, subscriberUrl, subscriberId, maybeCapacity)
   }
 }

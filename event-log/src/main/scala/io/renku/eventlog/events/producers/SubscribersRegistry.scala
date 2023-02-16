@@ -38,7 +38,7 @@ private trait SubscribersRegistry[F[_]] {
   def delete(subscriberUrl:   SubscriberUrl): F[Boolean]
   def markBusy(subscriberUrl: SubscriberUrl): F[Unit]
   def subscriberCount(): Int
-  def getTotalCapacity:  Option[Capacity]
+  def getTotalCapacity:  Option[TotalCapacity]
 }
 
 private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
@@ -49,7 +49,7 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
     checkupInterval:             FiniteDuration
 ) extends SubscribersRegistry[F] {
 
-  val monadThrow = MonadThrow[F]
+  private val monadThrow = MonadThrow[F]
 
   import SubscribersRegistry._
   import monadThrow._
@@ -141,11 +141,11 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
       .find { case (info, _) => info.subscriberUrl == subscriberUrl }
       .map { case (info, _) => info }
 
-  override def getTotalCapacity: Option[Capacity] =
+  override def getTotalCapacity: Option[TotalCapacity] =
     (availablePool.asScala.keySet ++ busyPool.asScala.keySet).toList
       .flatMap(_.maybeCapacity) match {
       case Nil        => None
-      case capacities => Some(Capacity(capacities.map(_.value).sum))
+      case capacities => Some(TotalCapacity(capacities.map(_.value).sum))
     }
 }
 

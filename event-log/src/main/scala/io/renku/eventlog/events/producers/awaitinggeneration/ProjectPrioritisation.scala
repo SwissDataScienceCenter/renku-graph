@@ -97,7 +97,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
       val prioritiesCorrectedByOccupancy = prioritiesList.map(
         correctPriority(
           totalCapacity =
-            UrlAndIdSubscribers[F].getTotalCapacity getOrElse Capacity((prioritiesList map toOccupancy).sum),
+            UrlAndIdSubscribers[F].getTotalCapacity getOrElse TotalCapacity((prioritiesList map toOccupancy).sum),
           totalPriority = (prioritiesList map toPriority).sum
         )
       )
@@ -110,7 +110,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
         .map(alignItemType)
   }
 
-  private def correctPriority(totalCapacity: Capacity,
+  private def correctPriority(totalCapacity: TotalCapacity,
                               totalPriority: BigDecimal
   ): ((ProjectIds, Priority, Int Refined NonNegative)) => (ProjectIds, BigDecimal) = {
     case (project, currentPriority, currentOccupancy) if currentOccupancy.value == 0 =>

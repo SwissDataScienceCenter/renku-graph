@@ -21,22 +21,25 @@ package io.renku.eventlog.events.producers
 import cats.Show
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import org.scalacheck.Gen
 
 private object Generators {
 
-  val capacities: Gen[Capacity] = positiveInts() map (v => Capacity(v.value))
+  val totalCapacities: Gen[TotalCapacity] = positiveInts() map (v => TotalCapacity(v.value))
+  val freeCapacities:  Gen[FreeCapacity]  = positiveInts() map (v => FreeCapacity(v.value))
+  val usedCapacities:  Gen[UsedCapacity]  = positiveInts() map (v => UsedCapacity(v.value))
 
   final case class TestUrlAndIdSubscriptionInfo(subscriberUrl: SubscriberUrl,
                                                 subscriberId:  SubscriberId,
-                                                maybeCapacity: Option[Capacity]
+                                                maybeCapacity: Option[TotalCapacity]
   ) extends UrlAndIdSubscriptionInfo
 
   final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl,
                                         subscriberId:  SubscriberId,
-                                        maybeCapacity: Option[Capacity]
+                                        maybeCapacity: Option[TotalCapacity]
   ) extends SubscriptionInfo
 
   object TestSubscriptionInfo {
@@ -48,14 +51,19 @@ private object Generators {
   implicit val urlAndIdSubscriptionInfos: Gen[TestUrlAndIdSubscriptionInfo] = for {
     url           <- subscriberUrls
     id            <- subscriberIds
-    maybeCapacity <- capacities.toGeneratorOfOptions
+    maybeCapacity <- totalCapacities.toGeneratorOfOptions
   } yield TestUrlAndIdSubscriptionInfo(url, id, maybeCapacity)
 
   implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
     url           <- subscriberUrls
     id            <- subscriberIds
-    maybeCapacity <- capacities.toGeneratorOfOptions
+    maybeCapacity <- totalCapacities.toGeneratorOfOptions
   } yield TestSubscriptionInfo(url, id, maybeCapacity)
 
   implicit val sendingResults: Gen[EventsSender.SendingResult] = Gen.oneOf(EventsSender.SendingResult.all)
+
+  implicit val eventProducerStatuses: Gen[EventProducerStatus] = for {
+    categoryName <- categoryNames
+    capacity     <- (totalCapacities -> freeCapacities).mapN(EventProducerStatus.Capacity).toGeneratorOfOptions
+  } yield EventProducerStatus(categoryName, capacity)
 }

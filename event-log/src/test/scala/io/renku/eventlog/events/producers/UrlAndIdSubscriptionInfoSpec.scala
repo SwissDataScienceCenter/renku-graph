@@ -69,7 +69,7 @@ class UrlAndIdSubscriptionInfoSpec extends AnyWordSpec with should.Matchers with
     }
 
     "return the url with capacity when it's present" in {
-      val capacity = capacities.generateOne
+      val capacity = totalCapacities.generateOne
       val info     = urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = Some(capacity))
       info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId} with capacity $capacity"
     }

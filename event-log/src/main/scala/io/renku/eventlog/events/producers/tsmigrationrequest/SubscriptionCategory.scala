@@ -46,5 +46,10 @@ private[producers] object SubscriptionCategory {
                      dispatchRecovery
                    )
     deserializer <- SubscriptionPayloadDeserializer[F]
-  } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
+  } yield new SubscriptionCategoryImpl(categoryName,
+                                       subscribers,
+                                       distributor,
+                                       deserializer,
+                                       CapacityFinder.noOpCapacityFinder[F]
+  )
 }

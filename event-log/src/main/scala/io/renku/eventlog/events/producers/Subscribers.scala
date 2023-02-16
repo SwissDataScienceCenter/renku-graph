@@ -34,7 +34,7 @@ private trait Subscribers[F[_], -SI <: SubscriptionInfo] {
 
   def runOnSubscriber(f: SubscriberUrl => F[Unit]): F[Unit]
 
-  def getTotalCapacity: Option[Capacity]
+  def getTotalCapacity: Option[TotalCapacity]
 }
 
 private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] private[producers] (
@@ -69,7 +69,7 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] 
     _                      <- f(subscriberUrl)
   } yield ()
 
-  def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
+  def getTotalCapacity: Option[TotalCapacity] = subscribersRegistry.getTotalCapacity
 }
 
 private object Subscribers {

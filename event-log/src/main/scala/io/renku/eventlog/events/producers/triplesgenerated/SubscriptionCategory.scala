@@ -28,6 +28,7 @@ import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.CategoryName
+import io.renku.graph.model.events.EventStatus
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -55,6 +56,10 @@ private[producers] object SubscriptionCategory {
   } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
                                                                subscribers,
                                                                eventsDistributor,
-                                                               deserializer
+                                                               deserializer,
+                                                               CapacityFinder.queryBased(capacityFindingQuery)
   )
+
+  private[triplesgenerated] val capacityFindingQuery =
+    s"SELECT COUNT(event_id) FROM event WHERE status='${EventStatus.TransformingTriples.value}'"
 }

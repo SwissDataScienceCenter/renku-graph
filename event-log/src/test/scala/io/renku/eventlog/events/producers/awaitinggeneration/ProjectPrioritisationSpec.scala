@@ -320,7 +320,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
     def `given totalCapacity`(capacity: Int) =
       (() => subscribers.getTotalCapacity)
         .expects()
-        .returning(Capacity(capacity).some)
+        .returning(TotalCapacity(capacity).some)
         .atLeastOnce()
   }
 

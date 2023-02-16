@@ -16,12 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.producers
-package commitsync
+package io.renku.eventlog.status
 
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+private trait SubscriptionsInfoFinder[F[_]] {
 
-private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
-                                       subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[TotalCapacity]
-) extends UrlAndIdSubscriptionInfo
+}

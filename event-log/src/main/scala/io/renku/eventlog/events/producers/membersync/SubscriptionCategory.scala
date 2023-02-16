@@ -48,6 +48,7 @@ private[producers] object SubscriptionCategory {
   } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
                                                                subscribers,
                                                                eventsDistributor,
-                                                               deserializer
+                                                               deserializer,
+                                                               CapacityFinder.noOpCapacityFinder[F]
   )
 }
