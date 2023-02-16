@@ -234,7 +234,7 @@ private object MicroserviceRoutes {
     subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
     eventDetailsEndpoint  <- EventDetailsEndpoint[F]
     eventPayloadEndpoint = EventPayloadEndpoint[F]
-    statusEndpoint <- StatusEndpoint[F]
+    statusEndpoint <- StatusEndpoint[F](eventProducersRegistry)
     versionRoutes  <- version.Routes[F]
   } yield new MicroserviceRoutes(
     eventEndpoint,

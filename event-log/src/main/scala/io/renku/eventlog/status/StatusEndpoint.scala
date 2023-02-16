@@ -33,7 +33,8 @@ trait StatusEndpoint[F[_]] {
 }
 
 object StatusEndpoint {
-  def apply[F[_]: MonadThrow]: F[StatusEndpoint[F]] = ???
+  def apply[F[_]: MonadThrow: Logger](eventProducersRegistry: EventProducersRegistry[F]): F[StatusEndpoint[F]] =
+    new StatusEndpointImpl(eventProducersRegistry).pure[F].widen
 }
 
 private class StatusEndpointImpl[F[_]: MonadThrow: Logger](eventProducersRegistry: EventProducersRegistry[F])
