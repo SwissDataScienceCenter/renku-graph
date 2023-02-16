@@ -20,14 +20,18 @@ package io.renku.graph.model.entities
 
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.{CliDataset, CliDatasetProvenance}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.images.Image
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.jsonld.JsonLDEncoder
+import io.renku.jsonld.JsonLDEncoder._
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, Property}
 
 import java.time.Instant
 
@@ -52,13 +56,6 @@ object Dataset {
     }
   }
 
-  import io.renku.graph.model.Schemas.{prov, renku, schema}
-  import io.renku.jsonld.JsonLDDecoder._
-  import io.renku.jsonld.JsonLDEncoder._
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Property}
-
   def from[P <: Provenance](identification:    Identification,
                             provenance:        P,
                             additionalInfo:    AdditionalInfo,
@@ -69,6 +66,28 @@ object Dataset {
     validate(publicationEvents, identification)
   ).sequence.map { _ =>
     Dataset(identification, provenance, additionalInfo, parts, publicationEvents)
+  }
+
+  def fromCli(cliDataset: CliDataset)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Dataset[Provenance]] = {
+    val pubEvents = cliDataset.publicationEvents.traverse(PublicationEvent.fromCli)
+    val parts     = cliDataset.datasetFiles.traverse(DatasetPart.fromCli)
+
+    def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
+                          parts:                       List[DatasetPart]
+    ): Provenance = provenanceAndFixableFailure match {
+      case (prov: Provenance.Internal, Some(Provenance.FixableFailure.MissingDerivedFrom)) =>
+        prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
+      case (prov, _) => prov
+    }
+
+    val all =
+      (parts, createProvenance(cliDataset), pubEvents).mapN { (files, provenance, events) =>
+        (fixProvenanceDate(provenance, files), files, events)
+      }
+
+    all.andThen { case (prov, parts, events) =>
+      from(Identification.fromCli(cliDataset), prov, AdditionalInfo.fromCli(cliDataset), parts, events)
+    }
   }
 
   private def validateDates[P <: Provenance](parts:          List[DatasetPart],
@@ -444,47 +463,15 @@ object Dataset {
   }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Dataset[Provenance]] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      import Dataset.Provenance.FixableFailure
-      import Dataset.Provenance.FixableFailure.MissingDerivedFrom
-
-      def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
-                            parts:                       List[DatasetPart]
-      ): Provenance = provenanceAndFixableFailure match {
-        case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
-          prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
-        case (prov, _) => prov
-      }
-
-      for {
-        cliDataset <- cursor.as[CliDataset]
-        identification = Identification.fromCli(cliDataset)
-        additionalInfo = AdditionalInfo.fromCli(cliDataset)
-        parts <- cliDataset.datasetFiles
-                   .traverse(DatasetPart.fromCli)
-                   .toEither
-                   .leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
-        provenanceAndFixableFailure <- createProvenance(cliDataset)
-        publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
-        dataset <-
-          Dataset
-            .from(identification,
-                  fixProvenanceDate(provenanceAndFixableFailure, parts),
-                  additionalInfo,
-                  parts,
-                  publicationEvents
-            )
-            .toEither
-            .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-      } yield dataset
+    CliDataset.jsonLDDecoder.emap { cliDataset =>
+      fromCli(cliDataset).toEither.leftMap(_.intercalate("; "))
     }
 
   private def createProvenance(
       cliDS: CliDataset
-  )(implicit renkuUrl: RenkuUrl): Result[(Provenance, Option[FixableFailure])] = {
+  )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, (Provenance, Option[FixableFailure])] = {
 
-    val creators: Result[NonEmptyList[Person]] =
-      cliDS.creators.traverse(Person.fromCli).toEither.leftMap(errs => DecodingFailure(errs.intercalate("; "), Nil))
+    val creators: ValidatedNel[String, NonEmptyList[Person]] = cliDS.creators.traverse(Person.fromCli)
 
     cliDS match {
       case Internal.FromCli(p) =>
@@ -500,17 +487,14 @@ object Dataset {
       case Modified.FromCli(p) => creators.map(p).map(_ -> None)
 
       case _ =>
-        DecodingFailure(
-          "Invalid dataset data: " +
-            s"identifier: ${cliDS.identifier}, " +
-            show"createdOrPublished: ${cliDS.createdOrPublished}, " +
-            s"dateModified: ${cliDS.dateModified}, " +
-            s"sameAs: ${cliDS.sameAs}, " +
-            s"derivedFrom: ${cliDS.derivedFrom}, " +
-            s"originalIdentifier: ${cliDS.originalIdentifier}, " +
-            s"maybeInvalidationTime: ${cliDS.invalidationTime}",
-          Nil
-        ).asLeft
+        ("Invalid dataset data: " +
+          s"identifier: ${cliDS.identifier}, " +
+          show"createdOrPublished: ${cliDS.createdOrPublished}, " +
+          s"dateModified: ${cliDS.dateModified}, " +
+          s"sameAs: ${cliDS.sameAs}, " +
+          s"derivedFrom: ${cliDS.derivedFrom}, " +
+          s"originalIdentifier: ${cliDS.originalIdentifier}, " +
+          s"maybeInvalidationTime: ${cliDS.invalidationTime}").invalidNel
     }
   }
 

@@ -18,8 +18,9 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliAssociation
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.graph.model._
@@ -79,31 +80,28 @@ object Association {
         )
     }
 
-  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Association] = {
-    def checkValid(implicit associationId: ResourceId): plans.ResourceId => JsonLDDecoder.Result[Unit] = planId =>
-      dependencyLinks.findStepPlan(planId) match {
-        case Some(_) => ().asRight
-        case None => DecodingFailure(show"Association $associationId points to a non-existing Plan $planId", Nil).asLeft
-      }
-
-    JsonLDDecoder.entity(entityTypes) { cursor =>
-      for {
-        implicit0(resourceId: ResourceId) <- cursor.downEntityId.as[ResourceId]
-        planId <- cursor.downField(prov / "hadPlan").downEntityId.as[plans.ResourceId] flatTap checkValid
-        association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
-                         case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, planId).asRight
-                         case _                  => tryAsPersonAgent(cursor, resourceId, planId)
-                       }
-      } yield association
-    }
+  def fromCli(cliAssociation: CliAssociation)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Association] = {
+    val planId = cliAssociation.plan.fold(_.id, _.id)
+    cliAssociation.agent.fold(
+      person => Person.fromCli(person).map(agent => WithPersonAgent(cliAssociation.id, agent, planId)),
+      software => Agent.fromCli(software).map(agent => WithRenkuAgent(cliAssociation.id, agent, planId))
+    )
   }
 
-  private def tryAsPersonAgent(cursor: Cursor, resourceId: ResourceId, planId: plans.ResourceId)(implicit
+  def fromCliCheckExistingPlan(cliAssociation: CliAssociation, dependencyLinks: DependencyLinks)(implicit
       renkuUrl: RenkuUrl
-  ) = cursor.downField(prov / "agent").as[Option[Person]] >>= {
-    case Some(agent) => Association.WithPersonAgent(resourceId, agent, planId).asRight
-    case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
-  }
+  ): ValidatedNel[String, Association] =
+    fromCli(cliAssociation).andThen { assoc =>
+      dependencyLinks
+        .findStepPlan(assoc.planId)
+        .toValidNel(show"Association ${assoc.resourceId} points to a non-existing Plan ${assoc.planId}")
+        .map(_ => assoc)
+    }
+
+  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
+    CliAssociation.jsonLDDecoder.emap { cliAssoc =>
+      fromCliCheckExistingPlan(cliAssoc, dependencyLinks).toEither.leftMap(_.intercalate("; "))
+    }
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Association"),

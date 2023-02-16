@@ -39,7 +39,7 @@ object CliPerson {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit val jsonLDDecoder: JsonLDDecoder[CliPerson] =
+  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliPerson] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
         resourceId <- cursor.downEntityId.as[CliPersonResourceId]

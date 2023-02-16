@@ -91,7 +91,7 @@ class PlanSpec
         JsonLDTools
           .view(cliPlan)
           .selectByTypes(entities.StepPlan.entityTypes)
-          .addType(renku / "WorkflowPlan")
+          .addType(renku / "WorkflowFilePlan")
           .value
 
       newJson.cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
@@ -227,9 +227,16 @@ class PlanSpec
           .addType(renku / "WorkflowCompositePlan")
           .value
 
-      newJson.cursor
-        .as[List[entities.CompositePlan]]
-        .map(_.filter(_.resourceId == plan.resourceId)) shouldMatchToRight List(plan)
+      // only decode the one plan and its children (not also include composite plans that
+      // are children of the generated one)
+      implicit val planListDecoder: JsonLDDecoder[List[entities.CompositePlan]] =
+        JsonLDDecoder
+          .decodeList(entities.CompositePlan.decoder)
+          .map(_.filter(_.resourceId == plan.resourceId))
+
+      val decoded = newJson.cursor.as[List[entities.CompositePlan]]
+      println(s"decoded plans: ${decoded.map(_.map(_.plans.size))}")
+      newJson should decodeAndEqualTo(List(plan))
     }
 
     "fail decode if a parameter maps to itself" in {

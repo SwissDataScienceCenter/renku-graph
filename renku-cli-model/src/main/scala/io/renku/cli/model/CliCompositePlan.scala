@@ -22,6 +22,7 @@ import Ontologies.{Prov, Renku, Schema}
 import cats.data.NonEmptyList
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.plans._
+import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -48,8 +49,17 @@ object CliCompositePlan {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliCompositePlan] =
-    JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
+  implicit def jsonLDDecoder: JsonLDEntityDecoder[CliCompositePlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(matchingEntityTypes), CliPlan.jsonLDDecoder)
+
+  /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a composite plan. */
+  def jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliCompositePlan] =
+    jsonLDDecoderWith(_.getEntityTypes.map(_ contains entityTypes), CliPlan.jsonLDDecoderLenientTyped)
+
+  private def jsonLDDecoderWith(filter:           Cursor => Result[Boolean],
+                                childPlanDecoder: => JsonLDDecoder[CliPlan]
+  ): JsonLDEntityDecoder[CliCompositePlan] =
+    JsonLDDecoder.entity(entityTypes, filter) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         name             <- cursor.downField(Schema.name).as[Name]
@@ -62,7 +72,9 @@ object CliCompositePlan {
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
         links            <- cursor.downField(Renku.workflowLink).as[List[CliParameterLink]]
         mappings         <- cursor.downField(Renku.hasMappings).as[List[CliParameterMapping]]
-        plans            <- cursor.downField(Renku.hasSubprocess).as[NonEmptyList[CliPlan]]
+        plans <- cursor
+                   .downField(Renku.hasSubprocess)
+                   .as[NonEmptyList[CliPlan]](JsonLDDecoder.decodeNonEmptyList(childPlanDecoder))
       } yield CliCompositePlan(
         resourceId,
         name,

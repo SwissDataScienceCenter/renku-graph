@@ -31,7 +31,7 @@ final case class CliWorkflowFileStepPlan(
     description:      Option[Description],
     creators:         List[CliPerson],
     dateCreated:      DateCreated,
-    dateModified:     Option[DateModified],
+    dateModified:     DateModified,
     keywords:         List[Keyword],
     command:          Option[Command],
     parameters:       List[CliCommandParameter],
@@ -40,17 +40,35 @@ final case class CliWorkflowFileStepPlan(
     successCodes:     List[SuccessCode],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime]
-) extends CliModel
+) extends CliModel {
+  def asCliStepPlan: CliStepPlan =
+    CliStepPlan(
+      id,
+      name,
+      description,
+      creators,
+      dateCreated,
+      dateModified,
+      keywords,
+      command,
+      parameters,
+      inputs,
+      outputs,
+      successCodes,
+      derivedFrom,
+      invalidationTime
+    )
+}
 
 object CliWorkflowFileStepPlan {
 
   private val entityTypes: EntityTypes =
-    EntityTypes.of(Renku.WorkflowFilePlan, Prov.Plan, Schema.Action, Schema.CreativeWork)
+    EntityTypes.of(Renku.WorkflowFilePlan, Renku.Plan, Prov.Plan, Schema.Action, Schema.CreativeWork)
 
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit val jsonLDDecoder: JsonLDDecoder[CliWorkflowFileStepPlan] =
+  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliWorkflowFileStepPlan] =
     JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
       for {
         resourceId   <- cursor.downEntityId.as[ResourceId]
@@ -59,7 +77,7 @@ object CliWorkflowFileStepPlan {
         command      <- cursor.downField(Renku.command).as[Option[Command]]
         creators     <- cursor.downField(Schema.creator).as[List[CliPerson]]
         dateCreated  <- cursor.downField(Schema.dateCreated).as[DateCreated]
-        dateModified <- cursor.downField(Schema.dateModified).as[Option[DateModified]]
+        dateModified <- cursor.downField(Schema.dateModified).as[DateModified]
         keywords     <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
         parameters   <- cursor.downField(Renku.hasArguments).as[List[CliCommandParameter]]
         inputs       <- cursor.downField(Renku.hasInputs).as[List[CliCommandInput]]

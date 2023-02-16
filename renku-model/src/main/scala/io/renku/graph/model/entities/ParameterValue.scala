@@ -18,8 +18,9 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliParameterValue
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters
 import io.renku.graph.model.entities.StepPlanCommandParameter._
@@ -91,57 +92,40 @@ object ParameterValue {
         )
     }
 
+  def fromCli(cliParam: CliParameterValue, forPlan: StepPlan): ValidatedNel[String, ParameterValue] = {
+    def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+      forPlan
+        .findParameter(valueReferenceId)
+        .map(parameter => CommandParameterValue(resourceId, cliParam.value, parameter))
+
+    def maybeCommandInput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+      forPlan
+        .findInput(valueReferenceId)
+        .map(input => CommandInputValue(resourceId, Location.FileOrFolder(cliParam.value.value), input))
+
+    def maybeCommandOutput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
+      forPlan
+        .findOutput(valueReferenceId)
+        .map(output => CommandOutputValue(resourceId, Location.FileOrFolder(cliParam.value.value), output))
+
+    List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
+      .flatMap(_.apply(cliParam.id, cliParam.parameter)) match {
+      case Nil =>
+        s"ParameterValue points to a non-existing command parameter ${cliParam.parameter}".invalidNel
+      case value :: Nil => value.validNel
+      case _ =>
+        s"ParameterValue points to multiple command parameters with ${cliParam.parameter}".invalidNel
+    }
+  }
+
   def decoder(association: Association)(implicit dependencyLinks: DependencyLinks): JsonLDDecoder[ParameterValue] =
-    JsonLDDecoder.entity(parameterValueTypes) { cursor =>
-      def findPlan = dependencyLinks.findStepPlan(association.planId)
-
-      def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
-        findPlan
-          .flatMap(_.findParameter(valueReferenceId))
-          .map(parameter =>
-            cursor
-              .downField(schema / "value")
-              .as[ValueOverride]
-              .map(value => CommandParameterValue(resourceId, value, parameter))
-          )
-
-      def maybeCommandInput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
-        findPlan
-          .flatMap(_.findInput(valueReferenceId))
-          .map(input =>
-            cursor
-              .downField(schema / "value")
-              .as[Location.FileOrFolder]
-              .map(value => CommandInputValue(resourceId, value, input))
-          )
-
-      def maybeCommandOutput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
-        findPlan
-          .flatMap(_.findOutput(valueReferenceId))
-          .map(output =>
-            cursor
-              .downField(schema / "value")
-              .as[Location.FileOrFolder]
-              .map(value => CommandOutputValue(resourceId, value, output))
-          )
-
-      for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        valueReferenceId <- cursor.downField(schema / "valueReference").downEntityId.as[commandParameters.ResourceId]
-        parameterValue <-
-          List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
-            .flatMap(_.apply(resourceId, valueReferenceId)) match {
-            case Nil =>
-              DecodingFailure(s"ParameterValue points to a non-existing command parameter $valueReferenceId",
-                              Nil
-              ).asLeft
-            case value :: Nil => value
-            case _ =>
-              DecodingFailure(s"ParameterValue points to multiple command parameters with $valueReferenceId",
-                              Nil
-              ).asLeft
-          }
-      } yield parameterValue
+    CliParameterValue.jsonLDDecoder.emap { cliParamValue =>
+      dependencyLinks.findStepPlan(association.planId) match {
+        case Some(plan) =>
+          fromCli(cliParamValue, plan).toEither.leftMap(_.intercalate("; "))
+        case None =>
+          s"Cannot find a plan for parameter value: $cliParamValue".asLeft
+      }
     }
 
   lazy val ontology: Type = Type.Def(

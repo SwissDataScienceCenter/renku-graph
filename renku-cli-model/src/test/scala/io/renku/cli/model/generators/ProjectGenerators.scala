@@ -45,7 +45,7 @@ trait ProjectGenerators {
     keywords    <- RenkuTinyTypeGenerators.projectKeywords.toGeneratorOfList(max = 3)
     images     <- RenkuTinyTypeGenerators.imageUris.toGeneratorOfList(max = 3).map(uris => Image.projectImage(id, uris))
     plans      <- projectPlanGen(minCreated).toGeneratorOfList(max = 3)
-    activities <- ActivityGenerators.activityGen(minCreated).toGeneratorOfList(max = 1)
+    activities <- ActivityGenerators.activityGen(minCreated).toGeneratorOfList(max = 3).map(_.sortBy(_.startTime))
     datasets   <- DatasetGenerators.datasetGen.toGeneratorOfList(max = 3)
     agentVersion  <- RenkuTinyTypeGenerators.cliVersions.toGeneratorOfOptions
     schemaVersion <- RenkuTinyTypeGenerators.projectSchemaVersions.toGeneratorOfOptions

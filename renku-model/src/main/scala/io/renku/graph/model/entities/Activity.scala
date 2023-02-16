@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliActivity
 import io.renku.graph.model.activities.{EndTime, ResourceId, StartTime}
 import io.renku.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.{GraphClass, RenkuUrl}
@@ -57,6 +57,27 @@ object Activity {
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
 
+  def fromCli(cliActivity: CliActivity, dependencyLinks: DependencyLinks)(implicit
+      renkuUrl: RenkuUrl
+  ): ValidatedNel[String, Activity] = {
+    val usages      = cliActivity.usages.traverse(Usage.fromCli)
+    val generations = cliActivity.generations.traverse(Generation.fromCli)
+    val association = Association.fromCliCheckExistingPlan(cliActivity.association, dependencyLinks)
+    val plan = association.andThen(assoc =>
+      dependencyLinks
+        .findStepPlan(assoc.planId)
+        .toValidNel(s"No associated plan found for activity ${cliActivity.resourceId}")
+    )
+    val paramValues    = plan.andThen(p => cliActivity.parameters.traverse(ParameterValue.fromCli(_, p)))
+    val author         = Person.fromCli(cliActivity.personAgent.person)
+    val agent          = Agent.fromCli(cliActivity.softwareAgent.agent)
+    val validStartTime = plan.andThen(p => validateStartTime(cliActivity.resourceId, cliActivity.startTime, p))
+    val all = (author, agent, association, usages, generations, paramValues, validStartTime).mapN(Tuple7.apply)
+    all.andThen { case (auth, ag, assoc, usage, gens, params, _) =>
+      from(cliActivity.resourceId, cliActivity.startTime, cliActivity.endTime, auth, ag, assoc, usage, gens, params)
+    }
+  }
+
   def from(resourceId:  ResourceId,
            startTime:   StartTime,
            endTime:     EndTime,
@@ -87,6 +108,14 @@ object Activity {
     validateUsages(usages, parameters),
     validateGenerations(generations, parameters)
   ).sequence.void
+
+  private def validateStartTime(activityId: ResourceId,
+                                startTime:  StartTime,
+                                plan:       StepPlan
+  ): ValidatedNel[String, Unit] =
+    if (startTime < plan.dateCreated.value)
+      show"Activity $activityId date $startTime is older than plan ${plan.dateCreated}".invalidNel
+    else ().validNel
 
   private[Activity] def validateUsages(usages:     List[Usage],
                                        parameters: List[ParameterValue]
@@ -129,38 +158,8 @@ object Activity {
   }
 
   implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Activity] =
-    JsonLDDecoder.entity(entityTypes) { cursor =>
-      import io.renku.jsonld.JsonLDDecoder.decodeList
-
-      def checkValid(association: Association)(implicit id: ResourceId): StartTime => JsonLDDecoder.Result[Unit] =
-        startTime =>
-          dependencyLinks.findStepPlan(association.planId) match {
-            case Some(plan) if (startTime.value compareTo plan.dateCreated.value) < 0 =>
-              DecodingFailure(show"Activity $id date $startTime is older than plan ${plan.dateCreated}", Nil).asLeft
-            case _ => ().asRight
-          }
-
-      def checkSingle[T](prop: String)(implicit id: ResourceId): List[T] => JsonLDDecoder.Result[T] = {
-        case prop :: Nil => Right(prop)
-        case _           => Left(DecodingFailure(s"Activity $id without or with multiple ${prop}s", Nil))
-      }
-
-      for {
-        implicit0(resourceId: ResourceId) <- cursor.downEntityId.as[ResourceId]
-        generations                       <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
-        agent         <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= checkSingle("agent")
-        author        <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= checkSingle("author")
-        association   <- cursor.downField(prov / "qualifiedAssociation").as[Association]
-        usages        <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
-        startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime] flatTap checkValid(association)
-        endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
-        parameters    <- cursor.downField(renku / "parameter").as(decodeList(ParameterValue.decoder(association)))
-        activity <-
-          Activity
-            .from(resourceId, startedAtTime, endedAtTime, author, agent, association, usages, generations, parameters)
-            .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
-            .toEither
-      } yield activity
+    CliActivity.jsonLDDecoder.emap { cliActivity =>
+      fromCli(cliActivity, dependencyLinks).toEither.leftMap(_.intercalate("; "))
     }
 
   lazy val ontologyClass: Class = Class(prov / "Activity")
