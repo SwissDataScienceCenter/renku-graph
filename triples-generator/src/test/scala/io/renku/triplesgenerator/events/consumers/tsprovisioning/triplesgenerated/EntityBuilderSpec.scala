@@ -81,13 +81,13 @@ class EntityBuilderSpec
         .returning(rightT[Try, ProcessingRecoverableError](glProject.some))
 
       val modelProject = testProject.to[entities.Project]
-      val cliProject   = modelProject.toCliEntity
+      val cliProject   = testProject.to[CliProject]
 
       val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = consumers.Project(projectIds.generateOne, testProject.path),
-            payload = payloadJsonLD(cliProject)
+            payload = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
           )
         )
         .value
