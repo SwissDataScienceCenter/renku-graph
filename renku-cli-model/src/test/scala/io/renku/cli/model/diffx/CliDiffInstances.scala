@@ -42,6 +42,9 @@ trait CliDiffInstances extends ModelTinyTypesDiffInstances {
 
   implicit lazy val cliSoftwareAgentDiff: Diff[CliSoftwareAgent] = Diff.derived[CliSoftwareAgent]
 
+  implicit lazy val cliParameterValueValueDiff: Diff[CliParameterValue.Value] =
+    Diff.derived[CliParameterValue.Value]
+
   implicit lazy val cliParameterValueDiff: Diff[CliParameterValue] = Diff.derived[CliParameterValue]
 
   implicit lazy val cliCommandParameterDiff: Diff[CliCommandParameter] = Diff.derived[CliCommandParameter]

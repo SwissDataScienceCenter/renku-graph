@@ -18,6 +18,7 @@
 
 package io.renku.cli.model
 
+import io.circe.syntax._
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.ParameterValueGenerators
 import org.scalatest.matchers.should
@@ -43,6 +44,40 @@ class CliParameterValueSpec
     "work on multiple items" in {
       forAll(parameterValueGen, parameterValueGen) { (cliParam1, cliParam2) =>
         assertCompatibleCodec(cliParam1, cliParam2)
+      }
+    }
+  }
+
+  "asString" should {
+    "return the plain value as a string " in {
+      List("blabla".asJson -> "blabla", 124.asJson -> 124, true.asJson -> true, 12.04.asJson -> 12.04).foreach {
+        case (jsonValue, plainValue) =>
+          val jsonLDString =
+            s"""
+               |  {
+               |    "@id": "https://renku-kg-dev.dev.renku.ch/activities/2b254b7ac7f84eca9cfb7efbe50bfe13/parameter-value/4b26542029cc4bdcadb28ffd9a5c5b13",
+               |    "@type": [
+               |      "http://schema.org/PropertyValue",
+               |      "https://swissdatasciencecenter.github.io/renku-ontology#ParameterValue"
+               |    ],
+               |    "http://schema.org/value": [
+               |      {
+               |        "@value": $jsonValue
+               |      }
+               |    ],
+               |    "http://schema.org/valueReference": [
+               |      {
+               |        "@id": "https://renku-kg-dev.dev.renku.ch/plans/7410c66856dd4b63ba2811b0ec473056/inputs/2"
+               |      }
+               |    ]
+               |  }
+               |""".stripMargin
+
+          val result = io.renku.jsonld.parser
+            .parse(jsonLDString)
+            .flatMap(_.cursor.as[CliParameterValue])
+            .fold(throw _, identity)
+          result.value.asString shouldBe plainValue.toString
       }
     }
   }

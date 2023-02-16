@@ -96,17 +96,17 @@ object ParameterValue {
     def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
       forPlan
         .findParameter(valueReferenceId)
-        .map(parameter => CommandParameterValue(resourceId, cliParam.value, parameter))
+        .map(parameter => CommandParameterValue(resourceId, cliParam.value.asString, parameter))
 
     def maybeCommandInput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
       forPlan
         .findInput(valueReferenceId)
-        .map(input => CommandInputValue(resourceId, Location.FileOrFolder(cliParam.value.value), input))
+        .map(input => CommandInputValue(resourceId, Location.FileOrFolder(cliParam.value.asString), input))
 
     def maybeCommandOutput(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) =
       forPlan
         .findOutput(valueReferenceId)
-        .map(output => CommandOutputValue(resourceId, Location.FileOrFolder(cliParam.value.value), output))
+        .map(output => CommandOutputValue(resourceId, Location.FileOrFolder(cliParam.value.asString), output))
 
     List(maybeCommandParameter _, maybeCommandInput _, maybeCommandOutput _)
       .flatMap(_.apply(cliParam.id, cliParam.parameter)) match {

@@ -22,7 +22,6 @@ import cats.syntax.show._
 import CliConversionFunctions._
 import io.renku.cli.model._
 import io.renku.graph.model.{RenkuUrl, activities, agents, associations, commandParameters, entities, generations, parameterValues, testentities, usages}
-import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.jsonld.syntax._
 
 trait CliActivityConverters extends CliPlanConverters {
@@ -101,9 +100,9 @@ trait CliActivityConverters extends CliPlanConverters {
 
   def from(paramValue: entities.ParameterValue): CliParameterValue = paramValue match {
     case v: entities.ParameterValue.LocationParameterValue =>
-      CliParameterValue(v.resourceId, v.valueReference.resourceId, ValueOverride(v.value.value))
+      CliParameterValue(v.resourceId, v.valueReference.resourceId, CliParameterValue.Value(v.value.value))
     case v: entities.ParameterValue.CommandParameterValue =>
-      CliParameterValue(v.resourceId, v.valueReference.resourceId, v.value)
+      CliParameterValue(v.resourceId, v.valueReference.resourceId, CliParameterValue.Value(v.value.value))
   }
 
   def from(paramValue: testentities.ParameterValue)(implicit renkuUrl: RenkuUrl): CliParameterValue = {
@@ -112,15 +111,18 @@ trait CliActivityConverters extends CliPlanConverters {
       case p: testentities.ParameterValue.LocationParameterValue.CommandOutputValue =>
         CliParameterValue(id,
                           commandParameters.ResourceId(p.valueReference.asEntityId.show),
-                          ValueOverride(p.value.value)
+                          CliParameterValue.Value(p.value.value)
         )
       case p: testentities.ParameterValue.LocationParameterValue.CommandInputValue =>
         CliParameterValue(id,
                           commandParameters.ResourceId(p.valueReference.asEntityId.show),
-                          ValueOverride(p.value.value)
+                          CliParameterValue.Value(p.value.value)
         )
       case p: testentities.ParameterValue.CommandParameterValue =>
-        CliParameterValue(id, commandParameters.ResourceId(p.valueReference.asEntityId.show), p.value)
+        CliParameterValue(id,
+                          commandParameters.ResourceId(p.valueReference.asEntityId.show),
+                          CliParameterValue.Value(p.value.value)
+        )
     }
   }
 }
