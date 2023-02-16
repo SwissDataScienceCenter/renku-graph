@@ -30,7 +30,6 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities._
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.jsonld.JsonLDDecoder.decodeList
 import org.typelevel.log4cats.Logger
 import projectinfo.ProjectInfoFinder
 
@@ -71,7 +70,8 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
     EitherT.right[ProcessingRecoverableError] {
       for {
-        projects <- event.payload.cursor.as(decodeList(Project.decoder(projectInfo))).fold(raiseError(event), _.pure[F])
+        projects <-
+          event.payload.cursor.as(ProjectJsonLDDecoder.list(projectInfo)).fold(raiseError(event), _.pure[F])
         project <- projects match {
                      case project :: Nil => project.pure[F]
                      case other =>

@@ -26,6 +26,7 @@ import io.renku.graph.model.generations._
 import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import monocle.Lens
 
 final case class CliGeneration(
     resourceId:         ResourceId,
@@ -71,4 +72,12 @@ object CliGeneration {
 
   private def withActivity(activityId: activities.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
     _.downField(Prov.activity).downEntityId.as[activities.ResourceId].map(_ == activityId)
+
+  object Lenses {
+    val entity: Lens[CliGeneration, CliEntity] =
+      Lens[CliGeneration, CliEntity](_.entity)(e => _.copy(entity = e))
+
+    val entityPath: Lens[CliGeneration, EntityPath] =
+      entity.composeLens(CliEntity.Lenses.entityPath)
+  }
 }

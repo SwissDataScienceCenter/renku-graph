@@ -69,9 +69,7 @@ object Plan {
     }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
-    CliPlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
-      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type =
     Type.Def(

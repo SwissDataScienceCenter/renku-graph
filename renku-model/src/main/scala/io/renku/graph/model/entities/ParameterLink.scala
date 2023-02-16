@@ -69,7 +69,5 @@ object ParameterLink {
     }
 
   implicit def decoder: JsonLDDecoder[ParameterLink] =
-    CliParameterLink.jsonLDDecoder.emap { link =>
-      fromCli(link).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 }

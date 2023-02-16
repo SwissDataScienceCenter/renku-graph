@@ -18,10 +18,12 @@
 
 package io.renku.graph.model.tools
 
+import cats.data.{Validated, ValidatedNel}
+import cats.syntax.all._
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.renku.jsonld.{JsonLD, JsonLDDecoder}
-import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.matchers.{MatchResult, Matcher, should}
 import org.scalatest.{Assertion, Assertions}
 
 import scala.reflect.{ClassTag, classTag}
@@ -36,6 +38,27 @@ trait AdditionalMatchers extends DiffShouldMatcher {
           case a => Assertions.fail(s"Unexpected left value: $a")
         },
         b => b shouldMatchTo other
+      )
+  }
+
+  final implicit class ValidatedStringNelMatcherOps[A: Diff](self: ValidatedNel[String, A]) extends should.Matchers {
+    def shouldMatchToValid(right: A): Assertion =
+      self should matchToValid[A](right)
+  }
+
+  def matchToValid[A: Diff](right: A): Matcher[ValidatedNel[String, A]] = {
+    case Validated.Valid(left)   => AdditionalMatchers.diffMatcher(right).apply(left)
+    case Validated.Invalid(errs) => MatchResult(matches = false, errs.intercalate("; "), "")
+  }
+
+  def beInvalidWithMessageIncluding(substring: String, andMore: String*): Matcher[ValidatedNel[String, Any]] = {
+    case Validated.Valid(v) => MatchResult(matches = false, s"Expected an invalid value!", s"The value is: $v")
+    case Validated.Invalid(errs) if errs.exists(m => (andMore.toSet + substring).forall(s => m.contains(s))) =>
+      MatchResult(matches = true, "", "")
+    case Validated.Invalid(errs) =>
+      MatchResult(matches = false,
+                  s"Error messages don't contain the value '$substring': ${errs.intercalate("; ")}",
+                  ""
       )
   }
 

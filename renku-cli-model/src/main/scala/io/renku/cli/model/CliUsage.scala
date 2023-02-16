@@ -22,6 +22,7 @@ import io.renku.cli.model.Ontologies.Prov
 import io.renku.graph.model.usages._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import monocle.Lens
 
 final case class CliUsage(resourceId: ResourceId, entity: CliEntity) extends CliModel
 
@@ -45,4 +46,12 @@ object CliUsage {
         Prov.entity -> usage.entity.asJsonLD
       )
     }
+
+  object Lenses {
+    val entity: Lens[CliUsage, CliEntity] =
+      Lens[CliUsage, CliEntity](_.entity)(e => u => u.copy(entity = e))
+
+    val entityPath: Lens[CliUsage, EntityPath] =
+      entity.composeLens(CliEntity.Lenses.entityPath)
+  }
 }

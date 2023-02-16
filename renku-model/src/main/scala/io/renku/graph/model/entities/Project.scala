@@ -22,6 +22,7 @@ import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.images.{Image, ImageUri}
@@ -504,6 +505,10 @@ object Project {
 
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
+  @annotation.nowarn
+  def decoder(info: GitLabProjectInfo): JsonLDDecoder[Project] =
+    IntermediateShim.failingDecoder()
+
   implicit def functions[P <: Project](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): EntityFunctions[P] =
     new EntityFunctions[P] {
 
@@ -582,8 +587,10 @@ object Project {
       }
   }
 
-  def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
-    ProjectJsonLDDecoder(gitLabInfo)
+  def fromCli(cliProject: CliProject, allPersons: Set[CliPerson], gitLabInfo: GitLabProjectInfo)(implicit
+      renkuUrl: RenkuUrl
+  ): ValidatedNel[String, Project] =
+    CliProjectConverter.fromCli(cliProject, allPersons, gitLabInfo)
 
   object Ontology {
 

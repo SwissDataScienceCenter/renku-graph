@@ -157,10 +157,9 @@ object Activity {
     )
   }
 
+  @annotation.nowarn
   implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Activity] =
-    CliActivity.jsonLDDecoder.emap { cliActivity =>
-      fromCli(cliActivity, dependencyLinks).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontologyClass: Class = Class(prov / "Activity")
   lazy val ontology: Type = Type.Def(

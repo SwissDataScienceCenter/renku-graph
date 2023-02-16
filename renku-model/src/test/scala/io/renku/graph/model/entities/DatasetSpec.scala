@@ -55,15 +55,15 @@ class DatasetSpec
     with CliEntityConverterSyntax
     with DiffInstances {
 
-  "decode" should {
+  "fromCli" should {
 
-    "turn JsonLD Dataset entity into the Dataset object" in {
+    "turn CliDataset entity into the Dataset object" in {
 
       forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { testDs =>
         val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
         val cliDs   = testDs.to[CliDataset]
 
-        encodeAndDecodeToModel(cliDs) shouldMatchToRight List(modelDs)
+        entities.Dataset.fromCli(cliDs) shouldMatchToValid modelDs
       }
     }
 
@@ -75,7 +75,8 @@ class DatasetSpec
 
       val cliDs = modelDs.to[CliDataset].copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-      encodeAndDecodeToModel(cliDs).left.value.getMessage should include("Invalid dataset data")
+      val result = entities.Dataset.fromCli(cliDs)
+      result should beInvalidWithMessageIncluding("Invalid dataset data")
     }
 
     forAll {
@@ -89,7 +90,7 @@ class DatasetSpec
         ) -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
-      "turn JsonLD Dataset entity into the Dataset object " +
+      "turn CliDataset entity into the Dataset object " +
         s"when originalIdentifier on an $dsType dataset is different than its identifier" in {
 
           val testDs          = dsGen.decoupledFromProject.generateOne
@@ -97,9 +98,9 @@ class DatasetSpec
           val otherOriginalId = datasetOriginalIdentifiers.generateOne
           val cliDs           = testDs.to[CliDataset].copy(originalIdentifier = otherOriginalId.some)
 
-          val Right(decodedDs :: Nil) = encodeAndDecodeToModel(cliDs)
+          val result = entities.Dataset.fromCli(cliDs)
 
-          decodedDs shouldMatchTo modelDs.copy(provenance = modelDs.provenance match {
+          result shouldMatchToValid modelDs.copy(provenance = modelDs.provenance match {
             case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
               p.copy(originalIdentifier = otherOriginalId)
             case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal =>
@@ -124,9 +125,9 @@ class DatasetSpec
 
         assert(modelDs.parts.exists(_.dateCreated.instant isBefore modelDs.provenance.date.instant))
 
-        encodeAndDecodeToModel(cliDs) shouldBe List(
-          modelDs.copy(provenance = modelDs.provenance.copy(date = modelDs.parts.map(_.dateCreated).min))
-        ).asRight
+        entities.Dataset.fromCli(cliDs) shouldMatchToValid modelDs.copy(provenance =
+          modelDs.provenance.copy(date = modelDs.parts.map(_.dateCreated).min)
+        )
       }
 
     "treat DS with originalIdentifier but no derivedFrom as Internal -" +
@@ -144,7 +145,7 @@ class DatasetSpec
 
         val cliDs = testDs.to[CliDataset].copy(originalIdentifier = datasetOriginalIdentifiers.generateSome)
 
-        encodeAndDecodeToModel(cliDs) shouldBe List(modelDs).asRight
+        entities.Dataset.fromCli(cliDs) shouldMatchToValid modelDs
       }
 
     forAll {
@@ -172,10 +173,8 @@ class DatasetSpec
           cli.copy(datasetFiles = invalidFile :: cli.datasetFiles)
         }
 
-        val result = encodeAndDecodeToModel(cliDs)
-
-        result.left.value shouldBe a[DecodingFailure]
-        result.left.value.getMessage should endWith(
+        val result = entities.Dataset.fromCli(cliDs)
+        result should beInvalidWithMessageIncluding(
           s"Dataset ${modelDs.identification.identifier} " +
             s"Part ${invalidFile.entity.path} startTime ${invalidFile.dateCreated} is older than Dataset ${modelDs.provenance.date.instant}"
         )
@@ -210,7 +209,7 @@ class DatasetSpec
 
         val modelOlderFile = entities.DatasetPart.fromCli(olderFile).fold(err => fail(err.intercalate("; ")), identity)
         val expectedDs     = modelDs.copy(parts = modelOlderFile :: modelDs.parts)
-        encodeAndDecodeToModel(cliDs) shouldBe List(expectedDs).asRight
+        entities.Dataset.fromCli(cliDs) shouldMatchToValid expectedDs
       }
     }
 
@@ -225,7 +224,7 @@ class DatasetSpec
 
       val cliDs = testDs.to[CliDataset].copy(createdOrPublished = datasetCreatedOrPublished.generateOne)
 
-      encodeAndDecodeToModel(cliDs) shouldBe List(modelDs).asRight
+      entities.Dataset.fromCli(cliDs) shouldMatchToValid modelDs
     }
 
     "succeed if originalIdentifier on a modified dataset is different than its identifier" in {
@@ -240,7 +239,7 @@ class DatasetSpec
 
       assume(modelDs.identification.identifier.value != modelDs.provenance.originalIdentifier.value)
 
-      encodeAndDecodeToModel(testDs.to[CliDataset]) shouldBe List(modelDs).asRight
+      entities.Dataset.fromCli(testDs.to[CliDataset]) shouldMatchToValid modelDs
     }
 
     "fail if invalidationTime is older than the dataset" in {
@@ -253,10 +252,8 @@ class DatasetSpec
       val invalidationTime = timestamps(max = modelDs.provenance.date.instant).generateAs(InvalidationTime)
       val cliDs            = testDs.to[CliDataset].copy(invalidationTime = invalidationTime.some)
 
-      val result = encodeAndDecodeToModel(cliDs)
-
-      result.left.value shouldBe a[DecodingFailure]
-      result.left.value.getMessage should endWith(
+      val result = entities.Dataset.fromCli(cliDs)
+      result should beInvalidWithMessageIncluding(
         s"Dataset ${modelDs.identification.identifier} " +
           s"invalidationTime $invalidationTime is older than Dataset ${modelDs.provenance.date}"
       )

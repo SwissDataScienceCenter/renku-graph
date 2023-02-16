@@ -43,9 +43,7 @@ object Usage {
     }
 
   implicit lazy val decoder: JsonLDDecoder[Usage] =
-    CliUsage.jsonLDDecoder.emap { cliUsage =>
-      fromCli(cliUsage).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   def fromCli(cliUsage: CliUsage): ValidatedNel[String, Usage] =
     Usage(cliUsage.resourceId, Entity.fromCli(cliUsage.entity)).validNel

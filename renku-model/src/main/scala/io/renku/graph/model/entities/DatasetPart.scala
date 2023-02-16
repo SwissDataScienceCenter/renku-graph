@@ -86,9 +86,7 @@ object DatasetPart {
   }
 
   implicit lazy val decoder: JsonLDDecoder[DatasetPart] =
-    CliDatasetFile.jsonLDDecoder.emap { cliPart =>
-      fromCli(cliPart).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   val ontology: Type = Type.Def(
     Class(schema / "DigitalDocument", ParentClass(prov / "Entity")),

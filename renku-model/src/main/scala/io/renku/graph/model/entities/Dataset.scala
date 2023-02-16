@@ -428,7 +428,7 @@ object Dataset {
     def fromCli(dataset: CliDataset): AdditionalInfo =
       AdditionalInfo(
         dataset.description,
-        dataset.keywords,
+        dataset.keywords.sorted,
         dataset.images,
         dataset.license,
         dataset.version
@@ -463,9 +463,7 @@ object Dataset {
   }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Dataset[Provenance]] =
-    CliDataset.jsonLDDecoder.emap { cliDataset =>
-      fromCli(cliDataset).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   private def createProvenance(
       cliDS: CliDataset

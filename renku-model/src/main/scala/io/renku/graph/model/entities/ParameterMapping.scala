@@ -101,7 +101,5 @@ object ParameterMapping {
     }
 
   implicit def decoder: JsonLDDecoder[ParameterMapping] =
-    CliParameterMapping.jsonLDDecoder.emap { cliMapping =>
-      fromCli(cliMapping).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 }

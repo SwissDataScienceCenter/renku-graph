@@ -60,10 +60,9 @@ object Generation {
     }
   }
 
+  @annotation.nowarn
   def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
-    CliGeneration.decoderForActivity(activityId).emap { cliGen =>
-      fromCli(cliGen).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Generation"),

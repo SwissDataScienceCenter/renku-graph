@@ -109,9 +109,7 @@ object StepPlanCommandParameter {
     }
 
     implicit lazy val decoder: JsonLDDecoder[CommandParameter] =
-      CliCommandParameter.jsonLDDecoder.emap { cliParam =>
-        fromCli(cliParam).toEither.leftMap(_.intercalate("; "))
-      }
+      IntermediateShim.failingDecoder()
 
     lazy val ontology: Type = Type.Def(
       Class(renku / "CommandParameter", ParentClass(renku / "CommandParameterBase")),
@@ -242,9 +240,7 @@ object StepPlanCommandParameter {
     }
 
     implicit lazy val decoder: JsonLDDecoder[CommandInput] =
-      CliCommandInput.jsonLDDecoder.emap { cliInput =>
-        fromCli(cliInput).toEither.leftMap(_.intercalate("; "))
-      }
+      IntermediateShim.failingDecoder()
 
     private def createCommandInput(resourceId:          ResourceId,
                                    maybePosition:       Option[Position],
@@ -389,9 +385,7 @@ object StepPlanCommandParameter {
     }
 
     implicit lazy val decoder: JsonLDDecoder[CommandOutput] =
-      CliCommandOutput.jsonLDDecoder.emap { cliOutput =>
-        fromCli(cliOutput).toEither.leftMap(_.intercalate("; "))
-      }
+      IntermediateShim.failingDecoder()
 
     def fromCli(cliOutput: CliCommandOutput): ValidatedNel[String, CommandOutput] = {
       val defaultValue = OutputDefaultValue(

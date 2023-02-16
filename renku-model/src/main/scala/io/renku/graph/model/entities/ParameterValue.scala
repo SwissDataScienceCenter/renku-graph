@@ -118,15 +118,10 @@ object ParameterValue {
     }
   }
 
+  // todo: this can probably be removed?
+  @annotation.nowarn
   def decoder(association: Association)(implicit dependencyLinks: DependencyLinks): JsonLDDecoder[ParameterValue] =
-    CliParameterValue.jsonLDDecoder.emap { cliParamValue =>
-      dependencyLinks.findStepPlan(association.planId) match {
-        case Some(plan) =>
-          fromCli(cliParamValue, plan).toEither.leftMap(_.intercalate("; "))
-        case None =>
-          s"Cannot find a plan for parameter value: $cliParamValue".asLeft
-      }
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = Type.Def(
     Class(renku / "ParameterValue"),

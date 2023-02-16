@@ -201,9 +201,7 @@ object Person {
   }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
-    CliPerson.jsonLDDecoder.emap { cliPerson =>
-      fromCli(cliPerson).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   object Ontology {
 

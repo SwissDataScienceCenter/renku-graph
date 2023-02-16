@@ -98,10 +98,9 @@ object Association {
         .map(_ => assoc)
     }
 
+  @annotation.nowarn
   implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
-    CliAssociation.jsonLDDecoder.emap { cliAssoc =>
-      fromCliCheckExistingPlan(cliAssoc, dependencyLinks).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Association"),

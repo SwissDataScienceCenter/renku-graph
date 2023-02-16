@@ -92,13 +92,12 @@ object Entity {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Entity] =
-    CliEntity.jsonLDDecoder.map(fromCli)
+    IntermediateShim.failingDecoder()
 
+  // todo: this can probably be removed?
+  @annotation.nowarn
   def outputEntityDecoder(generationId: generations.ResourceId): JsonLDDecoder[OutputEntity] =
-    CliEntity.jsonLDDecoderForGeneration(generationId).map(fromCli).emap {
-      case oe: OutputEntity => Right(oe)
-      case e => Left(s"Invalid entity type! Expected output entity, but got: $e")
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Entity"),

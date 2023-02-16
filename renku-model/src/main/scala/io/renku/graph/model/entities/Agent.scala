@@ -44,9 +44,7 @@ object Agent {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Agent] =
-    CliSoftwareAgent.jsonLDDecoder.emap { cliAgent =>
-      fromCli(cliAgent).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   def fromCli(cliAgent: CliSoftwareAgent): ValidatedNel[String, Agent] =
     Agent(cliAgent.resourceId, cliAgent.name).validNel

@@ -63,10 +63,9 @@ object PublicationEvent {
       )
   }
 
+  @annotation.nowarn
   def decoder(datasetId: Dataset.Identification): JsonLDDecoder[PublicationEvent] =
-    CliPublicationEvent.decoder(datasetId.identifier, datasetId.resourceId).emap { cliEvent =>
-      fromCli(cliEvent).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   def fromCli(cliEvent: CliPublicationEvent): ValidatedNel[String, PublicationEvent] =
     PublicationEvent(
