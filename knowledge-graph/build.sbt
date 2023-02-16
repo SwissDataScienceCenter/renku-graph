@@ -24,7 +24,7 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.5"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.11"
+libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.12"
 
 // needed by widoco only - explicitly bumped up to work with rdf4j-queryparser-sparql (triples-store-client)
 // from 5.1.18 that widoco comes with
