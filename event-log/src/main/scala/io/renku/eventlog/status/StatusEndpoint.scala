@@ -20,7 +20,7 @@ package io.renku.eventlog.status
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.eventlog.events.producers.{EventProducersRegistry, EventProducerStatus}
+import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import io.renku.eventlog.events.producers.EventProducerStatus.Capacity
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
