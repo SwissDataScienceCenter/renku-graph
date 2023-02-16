@@ -540,10 +540,13 @@ Response body example:
   "subscriptions": [
     {
       "categoryName": "AWAITING_GENERATION",
-      "subscribers": {
+      "capacity": {
         "total": 5,
-        "busy": 1
+        "free":  1
       }
+    },
+    {
+      "categoryName": "PROJECT_SYNC"
     }
   ]
 }
