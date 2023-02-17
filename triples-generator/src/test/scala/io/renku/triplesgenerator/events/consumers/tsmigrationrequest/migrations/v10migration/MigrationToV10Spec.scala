@@ -30,13 +30,9 @@ import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
 import cats.MonadThrow
 import io.renku.generators.Generators.{exceptions, positiveInts}
-import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
-import io.renku.triplesstore._
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -124,39 +120,5 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         .returning(().pure[IO])
       ()
     }
-  }
-}
-
-class ProjectsFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
-
-  private val chunkSize = 50
-
-  "findProjects" should {
-
-    "find requested page of projects existing in the TS" in new TestCase {
-
-      val projects = anyProjectEntities
-        .generateList(min = chunkSize + 1, max = Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
-        .map(_.to[entities.Project])
-        .sortBy(_.path)
-
-      upload(to = projectsDataset, projects: _*)
-
-      val (page1, page2) = projects splitAt chunkSize
-      finder.findProjects(page = 1).unsafeRunSync() shouldBe page1.map(_.path)
-      finder.findProjects(page = 2).unsafeRunSync() shouldBe page2.map(_.path)
-      finder.findProjects(page = 3).unsafeRunSync() shouldBe Nil
-    }
-  }
-
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new PagedProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo))
   }
 }

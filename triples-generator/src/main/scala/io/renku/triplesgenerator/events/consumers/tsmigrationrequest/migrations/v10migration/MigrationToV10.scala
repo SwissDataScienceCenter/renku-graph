@@ -24,15 +24,12 @@ package v10migration
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.auto._
-import io.circe.Decoder
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.{Schemas, projects}
+import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 import tooling._
@@ -84,47 +81,4 @@ private[migrations] object MigrationToV10 {
     eventsSender      <- EventSender[F](EventLogUrl)
     executionRegister <- MigrationExecutionRegister[F]
   } yield new MigrationToV10(projectsFinder, eventsSender, executionRegister)
-}
-
-private trait PagedProjectsFinder[F[_]] {
-  def findProjects(page: Int): F[List[projects.Path]]
-}
-
-private object PagedProjectsFinder {
-
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)).map(new PagedProjectsFinderImpl(_))
-}
-
-private class PagedProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[F])
-    extends PagedProjectsFinder[F]
-    with Schemas {
-
-  import ResultsDecoder._
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-
-  private val chunkSize: Int = 50
-
-  override def findProjects(page: Int): F[List[projects.Path]] =
-    recordsFinder.findRecords(query(page))
-
-  private def query(page: Int) = SparqlQuery.of(
-    MigrationToV10.name.asRefined,
-    Prefixes of (schema -> "schema", renku -> "renku"),
-    s"""|SELECT DISTINCT ?path
-        |WHERE {
-        |  GRAPH ?id {
-        |    ?id a schema:Project;
-        |        renku:projectPath ?path
-        |  }
-        |}
-        |ORDER BY ?path
-        |LIMIT $chunkSize
-        |OFFSET ${(page - 1) * chunkSize}
-        |""".stripMargin
-  )
-
-  private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur => extract[projects.Path]("path")
-  }
 }
