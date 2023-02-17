@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
+package v10migration
 
 import cats.effect.IO
 import cats.syntax.all._

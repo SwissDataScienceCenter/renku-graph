@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 package migrations
+package v10migration
 
 import cats.data.EitherT
 import cats.effect.Async
@@ -48,7 +49,7 @@ private class MigrationToV10[F[_]: Async: Logger](
   import projectsFinder._
   import recoveryStrategy._
 
-  protected[migrations] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+  protected[v10migration] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     Stream
       .iterate(1)(_ + 1)
       .evalMap(findProjects)
@@ -75,10 +76,10 @@ private class MigrationToV10[F[_]: Async: Logger](
   }
 }
 
-private object MigrationToV10 {
+private[migrations] object MigrationToV10 {
   val name: Migration.Name = Migration.Name("Migration to V10")
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
     projectsFinder    <- PagedProjectsFinder[F]
     eventsSender      <- EventSender[F](EventLogUrl)
     executionRegister <- MigrationExecutionRegister[F]
@@ -124,7 +125,6 @@ private class PagedProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[F])
   )
 
   private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur =>
-      extract[projects.Path]("path")
+    implicit cur => extract[projects.Path]("path")
   }
 }
