@@ -32,6 +32,7 @@ import org.typelevel.log4cats.Logger
 trait EventProducersRegistry[F[_]] {
   def run(): F[Unit]
   def register(subscriptionRequest: Json): F[SubscriptionResult]
+  def getStatus: F[Set[EventProducerStatus]]
 }
 
 private[producers] class EventProducersRegistryImpl[F[_]: Parallel: Applicative](
@@ -52,6 +53,8 @@ private[producers] class EventProducersRegistryImpl[F[_]: Parallel: Applicative]
           case RejectedRegistration => UnsupportedPayload("No category supports this payload")
         }
     }
+
+  override def getStatus: F[Set[EventProducerStatus]] = categories.map(_.getStatus).toList.sequence.map(_.toSet)
 }
 
 object EventProducersRegistry {

@@ -294,7 +294,7 @@ class RestClientSpec
 
       stubFor {
         get("/resource")
-          .willReturn(ok("1").withFixedDelay((idleTimeout.toMillis + 200).toInt))
+          .willReturn(ok("1").withFixedDelay((idleTimeout.toMillis * 2).toInt))
       }
 
       val exception = intercept[ClientException] {

@@ -28,7 +28,7 @@ private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberU
                                                   subscriberId:      SubscriberId,
                                                   subscriberVersion: ServiceVersion
 ) extends SubscriptionInfo {
-  override val maybeCapacity: Option[Capacity] = None
+  override val maybeCapacity: Option[TotalCapacity] = None
 }
 
 private object MigratorSubscriptionInfo {

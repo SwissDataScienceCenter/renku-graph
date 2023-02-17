@@ -47,5 +47,10 @@ private[producers] object SubscriptionCategory {
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](name, SubscriptionPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](name, subscribers, eventsDistributor, deserializer)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](name,
+                                                               subscribers,
+                                                               eventsDistributor,
+                                                               deserializer,
+                                                               CapacityFinder.noOpCapacityFinder[F]
+  )
 }

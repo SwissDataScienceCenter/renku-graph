@@ -44,7 +44,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       (subscriberTracker.add _).expects(subscriptionInfo).returning(true.pure[IO])
 
-      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info(show"$categoryName: $subscriptionInfo added"))
     }
@@ -57,7 +57,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       (subscriberTracker.add _).expects(subscriptionInfo).returning(false.pure[IO])
 
-      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ()
 
       logger.expectNoLogs()
     }
@@ -80,7 +80,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
       val function = mockFunction[SubscriberUrl, IO[Unit]]
       function.expects(subscriberUrl).returning(IO.unit)
 
-      subscribers.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.runOnSubscriber(function).unsafeRunSync() shouldBe ()
     }
 
     "fail if the given function fails when run on available subscriber" in new TestCase {
@@ -147,7 +147,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
   "getTotalCapacity" should {
 
     "return totalCapacity fetched from the registry" in new TestCase {
-      val maybeCapacity = capacities.generateOption
+      val maybeCapacity = totalCapacities.generateOption
       (() => subscribersRegistry.getTotalCapacity)
         .expects()
         .returning(maybeCapacity)

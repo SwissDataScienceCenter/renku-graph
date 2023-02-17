@@ -18,16 +18,18 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.data.OptionT
 import cats.{MonadThrow, Semigroup}
+import cats.data.OptionT
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.eventlog.events.producers.SubscriptionCategory._
 import io.renku.events.CategoryName
 
-private trait SubscriptionCategory[F[_]] {
-  val name: CategoryName
+private trait `SubscriptionCategory`[F[_]] {
+  val categoryName: CategoryName
   def run(): F[Unit]
   def register(payload: Json): F[RegistrationResult]
+  def getStatus: F[EventProducerStatus]
 }
 
 private[producers] object SubscriptionCategory {
@@ -43,10 +45,11 @@ private[producers] object SubscriptionCategory {
 }
 
 private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo](
-    override val name: CategoryName,
-    subscribers:       Subscribers[F, SI],
-    eventsDistributor: EventsDistributor[F],
-    deserializer:      SubscriptionPayloadDeserializer[F, SI]
+    override val categoryName: CategoryName,
+    subscribers:               Subscribers[F, SI],
+    eventsDistributor:         EventsDistributor[F],
+    deserializer:              SubscriptionPayloadDeserializer[F, SI],
+    capacityFinder:            CapacityFinder[F]
 ) extends SubscriptionCategory[F] {
 
   override def run(): F[Unit] = eventsDistributor.run()
@@ -56,5 +59,14 @@ private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo]
       subscriptionInfo <- OptionT(deserializer deserialize payload)
       _                <- OptionT.liftF(subscribers add subscriptionInfo)
     } yield subscriptionInfo
-  }.map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
+  }.cata(default = RejectedRegistration, _ => AcceptedRegistration)
+
+  override def getStatus: F[EventProducerStatus] =
+    subscribers.getTotalCapacity match {
+      case None => EventProducerStatus(categoryName, maybeCapacity = None).pure[F]
+      case Some(total) =>
+        capacityFinder.findUsedCapacity.map(used =>
+          EventProducerStatus(categoryName, EventProducerStatus.Capacity(total, total - used).some)
+        )
+    }
 }

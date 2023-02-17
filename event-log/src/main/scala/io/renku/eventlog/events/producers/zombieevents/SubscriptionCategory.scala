@@ -52,11 +52,12 @@ private[producers] object SubscriptionCategory {
   } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
                                                                subscribers,
                                                                eventsDistributor,
-                                                               deserializer
+                                                               deserializer,
+                                                               CapacityFinder.noOpCapacityFinder[F]
   )
 }
 
 private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
                                        subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[Capacity]
+                                       maybeCapacity: Option[TotalCapacity]
 ) extends UrlAndIdSubscriptionInfo

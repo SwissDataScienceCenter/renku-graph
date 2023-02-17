@@ -51,7 +51,7 @@ private class UrlAndIdSubscriptionDeserializerSpec extends AnyWordSpec with shou
       }
 
     "return subscription info if the categoryName, subscriber URL, subscriber Id, and capacity are given and valid" in new TestCase {
-      val capacity            = capacities.generateOne
+      val capacity            = totalCapacities.generateOne
       val subscriptionPayload = subscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
 
       val payload = json"""{

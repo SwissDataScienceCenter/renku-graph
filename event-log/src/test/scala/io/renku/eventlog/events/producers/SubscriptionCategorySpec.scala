@@ -22,9 +22,10 @@ import Generators._
 import SubscriptionCategory._
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.renku.events.Generators.categoryNames
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -56,16 +57,13 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
   }
 
   "register" should {
-    "return the subscriber URL if the statuses are valid" in new TestCase {
-      val subscriptionInfo = subscriptionInfos.generateOne
-      val payload          = jsons.generateOne
-      (deserializer.deserialize _)
-        .expects(payload)
-        .returning(subscriptionInfo.some.pure[IO])
 
-      (subscribers.add _)
-        .expects(subscriptionInfo)
-        .returning(().pure[IO])
+    "return the subscriber URL if the statuses are valid" in new TestCase {
+
+      val payload          = jsons.generateOne
+      val subscriptionInfo = subscriptionInfos.generateOne
+      givenDeserialization(of = payload, returning = subscriptionInfo.some.pure[IO])
+      givenRegistration(of = subscriptionInfo, returning = ().pure[IO])
 
       subscriptionCategory.register(payload).unsafeRunSync() shouldBe AcceptedRegistration
     }
@@ -98,16 +96,55 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
     }
   }
 
+  "getStatus" should {
+
+    "return info about category with capacity when exists" in new TestCase {
+
+      val totalCapacity = totalCapacities.generateOne
+      (() => subscribers.getTotalCapacity).expects().returning(totalCapacity.some)
+
+      val usedCapacity = usedCapacities.generateOne
+      (() => capacityFinder.findUsedCapacity).expects().returning(usedCapacity.pure[IO])
+
+      subscriptionCategory.getStatus.unsafeRunSync() shouldBe EventProducerStatus(
+        categoryName,
+        EventProducerStatus.Capacity(totalCapacity, totalCapacity - usedCapacity).some
+      )
+    }
+
+    "return info about category without capacity when does not exist" in new TestCase {
+
+      (() => subscribers.getTotalCapacity).expects().returning(None)
+
+      subscriptionCategory.getStatus.unsafeRunSync() shouldBe EventProducerStatus(
+        categoryName,
+        maybeCapacity = None
+      )
+    }
+  }
+
   private trait TestCase {
-    val testCategoryName  = categoryNames.generateOne
+    val categoryName      = categoryNames.generateOne
     val subscribers       = mock[Subscribers[IO, TestSubscriptionInfo]]
     val eventsDistributor = mock[EventsDistributor[IO]]
     val deserializer      = mock[SubscriptionPayloadDeserializer[IO, TestSubscriptionInfo]]
+    val capacityFinder    = mock[CapacityFinder[IO]]
     val subscriptionCategory = new SubscriptionCategoryImpl[IO, TestSubscriptionInfo](
-      testCategoryName,
+      categoryName,
       subscribers,
       eventsDistributor,
-      deserializer
+      deserializer,
+      capacityFinder
     )
+
+    def givenDeserialization(of: Json, returning: IO[Option[TestSubscriptionInfo]]) =
+      (deserializer.deserialize _)
+        .expects(of)
+        .returning(returning)
+
+    def givenRegistration(of: TestSubscriptionInfo, returning: IO[Unit]) =
+      (subscribers.add _)
+        .expects(of)
+        .returning(returning)
   }
 }

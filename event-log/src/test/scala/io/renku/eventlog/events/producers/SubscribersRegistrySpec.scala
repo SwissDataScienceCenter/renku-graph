@@ -58,14 +58,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     "replaces the given subscriber in the registry " +
       "if there was one with the same URL although different id" in new TestCase {
 
-        val initialCapacity = capacities.generateOne
+        val initialCapacity = totalCapacities.generateOne
         registry.add(subscriptionInfo.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
         registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                         shouldBe subscriberUrl
 
         val infoSameUrlButOtherId = urlAndIdSubscriptionInfos.generateOne
           .copy(
             subscriberUrl = subscriberUrl,
-            maybeCapacity = capacities.generateDifferentThan(initialCapacity).some
+            maybeCapacity = totalCapacities.generateDifferentThan(initialCapacity).some
           )
         registry.add(infoSameUrlButOtherId).unsafeRunSync()               shouldBe false
         registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
@@ -100,7 +100,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       val sameSubscriptionButWithDifferentCapacity = subscriptionInfo.copy(
-        maybeCapacity = capacities.toGeneratorOfOptions.generateDifferentThan(subscriptionInfo.maybeCapacity)
+        maybeCapacity = totalCapacities.toGeneratorOfOptions.generateDifferentThan(subscriptionInfo.maybeCapacity)
       )
       registry.add(sameSubscriptionButWithDifferentCapacity).unsafeRunSync() shouldBe false
     }
@@ -238,14 +238,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     }
 
     "sum up all the subscribers' capacities if specified" in new TestCase {
-      val capacity1 = capacities.generateOne
+      val capacity1 = totalCapacities.generateOne
       registry.add(subscriptionInfo.copy(maybeCapacity = capacity1.some)).unsafeRunSync() shouldBe true
-      val capacity2 = capacities.generateOne
+      val capacity2 = totalCapacities.generateOne
       registry
         .add(urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = capacity2.some))
         .unsafeRunSync() shouldBe true
 
-      registry.getTotalCapacity shouldBe Capacity(capacity1.value + capacity2.value).some
+      registry.getTotalCapacity shouldBe TotalCapacity(capacity1.value + capacity2.value).some
     }
   }
 
