@@ -41,8 +41,8 @@ private trait MigrationStartTimeFinder[F[_]] {
 private object MigrationStartTimeFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationStartTimeFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    connectionConfig        <- MigrationsConnectionConfig[F]()
-  } yield new MigrationStartTimeFinderImpl[F](TSClient[F](connectionConfig))
+    tsClient                <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+  } yield new MigrationStartTimeFinderImpl[F](tsClient)
 }
 
 private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -61,8 +61,8 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
     }
 
   private lazy val startTimeQuery =
-    SparqlQuery.of(
-      "find v10 start time",
+    SparqlQuery.ofUnsafe(
+      show"${MigrationToV10.name} - find start time",
       Prefixes of renku -> "renku",
       s"""|SELECT ?time
           |WHERE {

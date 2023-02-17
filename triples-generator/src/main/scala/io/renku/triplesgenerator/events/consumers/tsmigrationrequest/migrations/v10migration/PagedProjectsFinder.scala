@@ -24,9 +24,9 @@ import cats.effect.{Async, Ref}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.{Schemas, projects}
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.graph.model.{projects, Schemas}
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 import tooling.RecordsFinder
 
@@ -35,14 +35,18 @@ private trait PagedProjectsFinder[F[_]] {
 }
 
 private object PagedProjectsFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
-    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationStartTimeFinder[F], Ref.of(1))
-      .mapN(new PagedProjectsFinderImpl(_, _, _))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] = for {
+    recordsFinder           <- ProjectsConnectionConfig[F]().map(RecordsFinder[F](_))
+    startTimeFinder         <- MigrationStartTimeFinder[F]
+    migratedProjectsChecker <- MigratedProjectsChecker[F]
+    initialPage             <- Ref.of(1)
+  } yield new PagedProjectsFinderImpl(recordsFinder, startTimeFinder, migratedProjectsChecker, initialPage)
 }
 
 private class PagedProjectsFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F],
-                                                   migrationDateFinder: MigrationStartTimeFinder[F],
-                                                   currentPage:         Ref[F, Int]
+                                                   migrationDateFinder:     MigrationStartTimeFinder[F],
+                                                   migratedProjectsChecker: MigratedProjectsChecker[F],
+                                                   currentPage:             Ref[F, Int]
 ) extends PagedProjectsFinder[F]
     with Schemas {
 
@@ -58,10 +62,12 @@ private class PagedProjectsFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[
 
   override def nextProjectsPage(): F[List[projects.Path]] =
     (findMigrationStartDate -> currentPage.getAndUpdate(_ + 1))
-      .flatMapN { case (startDate, page) => findRecords(query(page, startDate)) }
+      .mapN(query)
+      .flatMap(findRecords[projects.Path])
+      .flatMap(filterNotMigrated)
 
-  private def query(page: Int, startDate: Instant) = SparqlQuery.of(
-    MigrationToV10.name.asRefined,
+  private def query(startDate: Instant, page: Int) = SparqlQuery.ofUnsafe(
+    show"${MigrationToV10.name} - find projects",
     Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
     s"""|SELECT DISTINCT ?path
         |WHERE {
@@ -80,5 +86,16 @@ private class PagedProjectsFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[
 
   private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
     implicit cur => extract[projects.Path]("path")
+  }
+
+  private lazy val filterNotMigrated: List[projects.Path] => F[List[projects.Path]] = {
+    case Nil => List.empty[projects.Path].pure[F]
+    case nonEmpty =>
+      migratedProjectsChecker
+        .filterNotMigrated(nonEmpty)
+        .flatMap {
+          case Nil      => nextProjectsPage()
+          case nonEmpty => nonEmpty.pure[F]
+        }
   }
 }
