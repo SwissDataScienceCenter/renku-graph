@@ -19,8 +19,8 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package v10migration
 
-import cats.FlatMap
-import cats.effect.Async
+import cats.Monad
+import cats.effect.{Async, Ref}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
@@ -31,17 +31,18 @@ import org.typelevel.log4cats.Logger
 import tooling.RecordsFinder
 
 private trait PagedProjectsFinder[F[_]] {
-  def findProjects(page: Int): F[List[projects.Path]]
+  def nextProjectsPage(): F[List[projects.Path]]
 }
 
 private object PagedProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
-    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationStartTimeFinder[F])
-      .mapN(new PagedProjectsFinderImpl(_, _))
+    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationStartTimeFinder[F], Ref.of(1))
+      .mapN(new PagedProjectsFinderImpl(_, _, _))
 }
 
-private class PagedProjectsFinderImpl[F[_]: FlatMap](recordsFinder: RecordsFinder[F],
-                                                     migrationDateFinder: MigrationStartTimeFinder[F]
+private class PagedProjectsFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F],
+                                                   migrationDateFinder: MigrationStartTimeFinder[F],
+                                                   currentPage:         Ref[F, Int]
 ) extends PagedProjectsFinder[F]
     with Schemas {
 
@@ -53,11 +54,11 @@ private class PagedProjectsFinderImpl[F[_]: FlatMap](recordsFinder: RecordsFinde
 
   import java.time.Instant
 
-  private val chunkSize: Int = 50
+  private val pageSize: Int = 50
 
-  override def findProjects(page: Int): F[List[projects.Path]] =
-    findMigrationStartDate >>=
-      (startDate => findRecords(query(page, startDate)))
+  override def nextProjectsPage(): F[List[projects.Path]] =
+    (findMigrationStartDate -> currentPage.getAndUpdate(_ + 1))
+      .flatMapN { case (startDate, page) => findRecords(query(page, startDate)) }
 
   private def query(page: Int, startDate: Instant) = SparqlQuery.of(
     MigrationToV10.name.asRefined,
@@ -72,8 +73,8 @@ private class PagedProjectsFinderImpl[F[_]: FlatMap](recordsFinder: RecordsFinde
         |  }
         |}
         |ORDER BY ?path
-        |LIMIT $chunkSize
-        |OFFSET ${(page - 1) * chunkSize}
+        |LIMIT $pageSize
+        |OFFSET ${(page - 1) * pageSize}
         |""".stripMargin
   )
 

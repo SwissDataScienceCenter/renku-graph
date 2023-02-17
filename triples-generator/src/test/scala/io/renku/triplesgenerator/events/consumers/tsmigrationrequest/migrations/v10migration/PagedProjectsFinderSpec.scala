@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package v10migration
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
@@ -45,25 +45,25 @@ class PagedProjectsFinderSpec
     with ProjectsDataset
     with MockFactory {
 
-  private val chunkSize = 50
+  private val pageSize = 50
 
-  "findProjects" should {
+  "nextProjectsPage" should {
 
-    "find requested page of projects existing in the TS" in new TestCase {
+    "find page of projects existing in the TS" in new TestCase {
 
       givenMigrationDateFinding(returning = Instant.now().plusSeconds(60).pure[IO])
 
       val projects = anyProjectEntities
-        .generateList(min = chunkSize + 1, max = Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
+        .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
         .map(_.to[entities.Project])
         .sortBy(_.path)
 
       upload(to = projectsDataset, projects: _*)
 
-      val (page1, page2) = projects splitAt chunkSize
-      finder.findProjects(page = 1).unsafeRunSync() shouldBe page1.map(_.path)
-      finder.findProjects(page = 2).unsafeRunSync() shouldBe page2.map(_.path)
-      finder.findProjects(page = 3).unsafeRunSync() shouldBe Nil
+      val (page1, page2) = projects splitAt pageSize
+      finder.nextProjectsPage().unsafeRunSync() shouldBe page1.map(_.path)
+      finder.nextProjectsPage().unsafeRunSync() shouldBe page2.map(_.path)
+      finder.nextProjectsPage().unsafeRunSync() shouldBe Nil
     }
 
     "find only projects with creation date before the migration start date" in new TestCase {
@@ -99,7 +99,7 @@ class PagedProjectsFinderSpec
 
       upload(to = projectsDataset, oldProject, newProject)
 
-      finder.findProjects(page = 1).unsafeRunSync() shouldBe List(oldProject.path)
+      finder.nextProjectsPage().unsafeRunSync() shouldBe List(oldProject.path)
     }
   }
 
@@ -107,7 +107,8 @@ class PagedProjectsFinderSpec
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val migrationDateFinder = mock[MigrationStartTimeFinder[IO]]
-    val finder = new PagedProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo), migrationDateFinder)
+    val finder =
+      new PagedProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo), migrationDateFinder, Ref.unsafe(1))
 
     def givenMigrationDateFinding(returning: IO[Instant]) =
       (() => migrationDateFinder.findMigrationStartDate)

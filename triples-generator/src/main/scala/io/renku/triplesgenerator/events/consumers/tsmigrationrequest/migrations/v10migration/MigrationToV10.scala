@@ -49,7 +49,7 @@ private class MigrationToV10[F[_]: Async: Logger](
   protected[v10migration] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     Stream
       .iterate(1)(_ + 1)
-      .evalMap(findProjects)
+      .evalMap(_ => nextProjectsPage())
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
       .map(toCleanUpEvent)

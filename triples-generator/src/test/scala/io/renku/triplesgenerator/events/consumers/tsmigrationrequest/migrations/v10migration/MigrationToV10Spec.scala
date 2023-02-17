@@ -51,13 +51,12 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
     "find all projects that exists in the Default Graph but not in the Named Graphs dataset" in new TestCase {
 
-      val allProjects = projectPaths.generateList(min = chunkSize, max = chunkSize * 2)
+      val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
-      val projectsChunks = allProjects
-        .sliding(chunkSize, chunkSize)
+      val projectsPages = allProjects
+        .sliding(pageSize, pageSize)
         .toList
-      projectsChunks.zipWithIndex foreach givenProjectsChunkReturned
-      givenProjectsChunkReturned(List.empty[projects.Path] -> projectsChunks.size)
+      givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
 
       allProjects map toCleanUpRequestEvent foreach givenEventIsSent
 
@@ -69,8 +68,8 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
         val exception = exceptions.generateOne
 
-        (projectsFinder.findProjects _)
-          .expects(1)
+        (() => projectsFinder.nextProjectsPage())
+          .expects()
           .returning(exception.raiseError[IO, List[projects.Path]])
 
         migration.migrate().value.unsafeRunSync() shouldBe recoverableError.asLeft
@@ -78,7 +77,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
   }
 
   private trait TestCase {
-    val chunkSize = positiveInts(max = 100).generateOne.value
+    val pageSize = positiveInts(max = 100).generateOne.value
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -93,12 +92,12 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     }
     val migration = new MigrationToV10[IO](projectsFinder, eventSender, executionRegister, recoveryStrategy)
 
-    def givenProjectsChunkReturned: ((List[projects.Path], Int)) => Unit = { case (chunk, idx) =>
-      (projectsFinder.findProjects _)
-        .expects(idx + 1)
-        .returning(chunk.pure[IO])
-      ()
-    }
+    def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
+      pages foreach { page =>
+        (projectsFinder.nextProjectsPage _)
+          .expects()
+          .returning(page.pure[IO])
+      }
 
     def toCleanUpRequestEvent(projectPath: projects.Path) = projectPath -> EventRequestContent.NoPayload {
       json"""{

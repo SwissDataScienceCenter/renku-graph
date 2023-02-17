@@ -63,7 +63,7 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
   private lazy val startTimeQuery =
     SparqlQuery.of(
       "find v10 start time",
-      Prefixes.of(renku -> "renku"),
+      Prefixes of renku -> "renku",
       s"""|SELECT ?time
           |WHERE {
           |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:startTime ?time
@@ -79,7 +79,7 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
     val triple = Triple(MigrationToV10.name.asEntityId, renku / "startTime", instant.asTripleObject)
     SparqlQuery.of(
       "v10 start time",
-      s"INSERT DATA {\n${triple.asSparql.sparql}\n}"
+      s"INSERT DATA {${triple.asSparql.sparql}}"
     )
   }
 }
