@@ -19,22 +19,25 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.cli.model.CliPerson
+import io.renku.cli.model.{CliPerson, CliPersonResourceId}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.entities.Person.entityTypes
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{GraphClass, GraphModelGenerators, entities, persons}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EntitiesGenerators {
+class PersonSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with EntitiesGenerators
+    with AdditionalMatchers
+    with DiffInstances {
 
   "encode as entityId only for the Project Graph" should {
     implicit val graph: GraphClass = GraphClass.Project
@@ -45,11 +48,12 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
   }
 
-  "decode" should {
+  "fromCli" should {
 
-    "turn JsonLD Person entity into the Person object" in {
+    "turn CliPerson entity into the Person object" in {
       forAll(cliShapedPersons) { person: Person =>
-        person.to[CliPerson].asFlattenedJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
+        val cliPerson = person.to[CliPerson]
+        entities.Person.fromCli(cliPerson) shouldMatchToValid person.to[entities.Person]
       }
     }
 
@@ -58,37 +62,24 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
              personEmails,
              personNames
       ) { (invalidResourceId, email, name) =>
-        val jsonLDPerson = JsonLD.entity(
-          invalidResourceId.asEntityId,
-          entityTypes,
-          schema / "name"  -> name.asJsonLD,
-          schema / "email" -> email.asJsonLD
-        )
-
-        val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
-
-        failure shouldBe a[DecodingFailure]
-        failure.message shouldBe
+        val cliPerson = CliPerson(CliPersonResourceId(invalidResourceId.value), name, email.some, None)
+        val result    = entities.Person.fromCli(cliPerson)
+        result should beInvalidWithMessageIncluding(
           show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${Option.empty[persons.GitLabId]}, " +
-          show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}, affiliation = None"
+            show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}, affiliation = None"
+        )
       }
     }
 
     "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in {
       forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId], personNames) {
         (invalidResourceId, name) =>
-          val jsonLDPerson = JsonLD.entity(
-            invalidResourceId.asEntityId,
-            entityTypes,
-            schema / "name" -> name.asJsonLD
-          )
-
-          val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
-
-          failure shouldBe a[DecodingFailure]
-          failure.message shouldBe
+          val cliPerson = CliPerson(CliPersonResourceId(invalidResourceId.value), name, None, None)
+          val result    = entities.Person.fromCli(cliPerson)
+          result should beInvalidWithMessageIncluding(
             show"Invalid Person: ${invalidResourceId.asEntityId}, name = $name, gitLabId = ${Option.empty[persons.GitLabId]}, " +
-            show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}, affiliation = None"
+              show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}, affiliation = None"
+          )
       }
     }
   }

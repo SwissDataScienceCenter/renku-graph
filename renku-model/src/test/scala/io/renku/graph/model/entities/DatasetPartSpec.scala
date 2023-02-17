@@ -19,7 +19,6 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.{CliDataset, CliDatasetFile}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
@@ -39,19 +38,16 @@ class DatasetPartSpec
     with AdditionalMatchers
     with DiffInstances {
 
-  "decode" should {
-    "turn JsonLD DatasetPart entity into the DatasetPart object" in {
+  "fromCli" should {
+    "turn CliDatasetFile entity into the DatasetPart object" in {
       val startDate = timestampsNotInTheFuture.generateOne
       forAll(datasetPartEntities(startDate)) { datasetPart =>
-        datasetPart
-          .to[CliDatasetFile]
-          .asFlattenedJsonLD
-          .cursor
-          .as[List[entities.DatasetPart]] shouldMatchToRight List(datasetPart.to[entities.DatasetPart])
+        val cliPart = datasetPart.to[CliDatasetFile]
+        entities.DatasetPart.fromCli(cliPart) shouldMatchToValid datasetPart.to[entities.DatasetPart]
       }
     }
 
-    "turn JsonLD DatasetPart with InvalidationTime entity into the DatasetPart object" in {
+    "turn CliDatasetFile with InvalidationTime entity into the DatasetPart object" in {
       forAll(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject) { dataset =>
         val datasetPart      = datasetPartEntities(dataset.provenance.date.instant).generateOne
         val invalidationTime = invalidationTimes(datasetPart.dateCreated.value).generateOne
@@ -60,27 +56,23 @@ class DatasetPartSpec
           .invalidatePart(datasetPart, invalidationTime, cliShapedPersons)
           .fold(errors => fail(errors.intercalate("; ")), identity)
 
-        invalidatedDataset
-          .to[CliDataset]
-          .asFlattenedJsonLD
-          .cursor
-          .as[List[entities.DatasetPart]] shouldBe invalidatedDataset.parts.map(_.to[entities.DatasetPart]).asRight
+        val cliParts = invalidatedDataset.to[CliDataset].datasetFiles
+        cliParts.traverse(entities.DatasetPart.fromCli) shouldMatchToValid invalidatedDataset.parts.map(
+          _.to[entities.DatasetPart]
+        )
       }
     }
 
     "fail if invalidationTime is older than the part" in {
-      val datasetPart      = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[CliDatasetFile]
-      val invalidationTime = timestamps(max = datasetPart.dateCreated.value).generateAs(InvalidationTime)
+      val datasetPart_ = datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne
+        .to[CliDatasetFile]
+      val invalidationTime = timestamps(max = datasetPart_.dateCreated.value).generateAs(InvalidationTime)
+      val datasetPart      = datasetPart_.copy(invalidationTime = invalidationTime.some)
 
-      val result = datasetPart
-        .copy(invalidationTime = invalidationTime.some)
-        .asFlattenedJsonLD
-        .cursor
-        .as[List[entities.DatasetPart]]
-
-      result.left.value          shouldBe a[DecodingFailure]
-      result.left.value.getMessage should include
-      s"invalidationTime $invalidationTime is older than DatasetPart ${datasetPart.dateCreated.value}"
+      val result = entities.DatasetPart.fromCli(datasetPart)
+      result should beInvalidWithMessageIncluding(
+        s"invalidationTime $invalidationTime is older than DatasetPart ${datasetPart.dateCreated.value}"
+      )
     }
   }
 }

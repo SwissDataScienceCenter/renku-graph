@@ -24,6 +24,7 @@ import io.renku.cli.model.Ontologies.{Prov, Renku}
 import io.renku.graph.model.activities._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import monocle.{Lens, Traversal}
 
 final case class CliActivity(
     resourceId:    ResourceId,
@@ -87,4 +88,24 @@ object CliActivity {
         Renku.parameter           -> activity.parameters.asJsonLD
       )
     }
+
+  object Lenses {
+    val usages: Lens[CliActivity, List[CliUsage]] =
+      Lens[CliActivity, List[CliUsage]](_.usages)(usages => _.copy(usages = usages))
+
+    val generations: Lens[CliActivity, List[CliGeneration]] =
+      Lens[CliActivity, List[CliGeneration]](_.generations)(gens => _.copy(generations = gens))
+
+    val usagesEntities: Traversal[CliActivity, CliUsage] =
+      usages.composeTraversal(Traversal.fromTraverse[List, CliUsage])
+
+    val generationEntities: Traversal[CliActivity, CliGeneration] =
+      generations.composeTraversal(Traversal.fromTraverse[List, CliGeneration])
+
+    val usageEntityPaths: Traversal[CliActivity, EntityPath] =
+      usagesEntities.composeLens(CliUsage.Lenses.entityPath)
+
+    val generationEntityPaths: Traversal[CliActivity, EntityPath] =
+      generationEntities.composeLens(CliGeneration.Lenses.entityPath)
+  }
 }

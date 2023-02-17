@@ -23,7 +23,7 @@ import io.renku.graph.model.Schemas.{prov, renku}
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.generations
 import io.renku.jsonld.ontology._
-import io.renku.jsonld.{EntityTypes, JsonLDDecoder}
+import io.renku.jsonld.EntityTypes
 
 sealed trait Entity {
   val resourceId: ResourceId
@@ -90,15 +90,6 @@ object Entity {
         )
     }
   }
-
-  implicit lazy val decoder: JsonLDDecoder[Entity] =
-    CliEntity.jsonLDDecoder.map(fromCli)
-
-  def outputEntityDecoder(generationId: generations.ResourceId): JsonLDDecoder[OutputEntity] =
-    CliEntity.jsonLDDecoderForGeneration(generationId).map(fromCli).emap {
-      case oe: OutputEntity => Right(oe)
-      case e => Left(s"Invalid entity type! Expected output entity, but got: $e")
-    }
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Entity"),

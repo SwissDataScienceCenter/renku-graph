@@ -25,7 +25,7 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.commandParameters.{ResourceId => ParamResourceId}
 import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.parameterLinks.ResourceId
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 
@@ -66,10 +66,5 @@ object ParameterLink {
         Ontology.linkSource -> link.source.asJsonLD,
         Ontology.linkSink   -> link.sinks.toList.asJsonLD
       )
-    }
-
-  implicit def decoder: JsonLDDecoder[ParameterLink] =
-    CliParameterLink.jsonLDDecoder.emap { link =>
-      fromCli(link).toEither.leftMap(_.intercalate("; "))
     }
 }

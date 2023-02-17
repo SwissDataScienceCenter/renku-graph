@@ -23,6 +23,10 @@ import cats.syntax.all._
 import io.renku.cli.model.CliDatasetFile
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 
 final case class DatasetPart(
     resourceId:            PartResourceId,
@@ -66,11 +70,6 @@ object DatasetPart {
       case _ => ().validNel[String]
     }
 
-  import io.renku.graph.model.Schemas.{prov, renku, schema}
-  import io.renku.jsonld._
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-
   private val entityTypes = EntityTypes of (prov / "Entity", schema / "DigitalDocument")
 
   implicit lazy val encoder: JsonLDEncoder[DatasetPart] = JsonLDEncoder.instance { part =>
@@ -84,11 +83,6 @@ object DatasetPart {
       prov / "invalidatedAtTime" -> part.maybeInvalidationTime.asJsonLD
     )
   }
-
-  implicit lazy val decoder: JsonLDDecoder[DatasetPart] =
-    CliDatasetFile.jsonLDDecoder.emap { cliPart =>
-      fromCli(cliPart).toEither.leftMap(_.intercalate("; "))
-    }
 
   val ontology: Type = Type.Def(
     Class(schema / "DigitalDocument", ParentClass(prov / "Entity")),

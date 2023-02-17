@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.cli.model.CliUsage
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.usages.ResourceId
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 
@@ -40,11 +40,6 @@ object Usage {
         entityTypes,
         prov / "entity" -> entity.asJsonLD
       )
-    }
-
-  implicit lazy val decoder: JsonLDDecoder[Usage] =
-    CliUsage.jsonLDDecoder.emap { cliUsage =>
-      fromCli(cliUsage).toEither.leftMap(_.intercalate("; "))
     }
 
   def fromCli(cliUsage: CliUsage): ValidatedNel[String, Usage] =

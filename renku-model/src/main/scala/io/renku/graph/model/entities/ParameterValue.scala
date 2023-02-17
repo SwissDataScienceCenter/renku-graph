@@ -26,7 +26,6 @@ import io.renku.graph.model.commandParameters
 import io.renku.graph.model.entities.StepPlanCommandParameter._
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.parameterValues.{ResourceId, _}
-import io.renku.jsonld.JsonLDDecoder
 
 sealed trait ParameterValue extends Product with Serializable {
   type ValueReference <: CommandParameterBase
@@ -117,16 +116,6 @@ object ParameterValue {
         s"ParameterValue points to multiple command parameters with ${cliParam.parameter}".invalidNel
     }
   }
-
-  def decoder(association: Association)(implicit dependencyLinks: DependencyLinks): JsonLDDecoder[ParameterValue] =
-    CliParameterValue.jsonLDDecoder.emap { cliParamValue =>
-      dependencyLinks.findStepPlan(association.planId) match {
-        case Some(plan) =>
-          fromCli(cliParamValue, plan).toEither.leftMap(_.intercalate("; "))
-        case None =>
-          s"Cannot find a plan for parameter value: $cliParamValue".asLeft
-      }
-    }
 
   lazy val ontology: Type = Type.Def(
     Class(renku / "ParameterValue"),

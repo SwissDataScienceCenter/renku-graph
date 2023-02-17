@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.cli.model.CliSoftwareAgent
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.agents._
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 
 final case class Agent(resourceId: ResourceId, name: Name)
@@ -42,11 +42,6 @@ object Agent {
       schema / "name" -> agent.name.asJsonLD
     )
   }
-
-  implicit lazy val decoder: JsonLDDecoder[Agent] =
-    CliSoftwareAgent.jsonLDDecoder.emap { cliAgent =>
-      fromCli(cliAgent).toEither.leftMap(_.intercalate("; "))
-    }
 
   def fromCli(cliAgent: CliSoftwareAgent): ValidatedNel[String, Agent] =
     Agent(cliAgent.resourceId, cliAgent.name).validNel

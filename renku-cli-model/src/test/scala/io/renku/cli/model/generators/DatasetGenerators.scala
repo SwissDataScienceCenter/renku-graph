@@ -26,7 +26,7 @@ import org.scalacheck.Gen
 
 trait DatasetGenerators {
 
-  def datasetGen(implicit renkuUrl: RenkuUrl): Gen[CliDataset] =
+  def datasetWithEventsGen(implicit renkuUrl: RenkuUrl): Gen[CliDataset] =
     for {
       identifier         <- RenkuTinyTypeGenerators.datasetIdentifiers
       resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds(identifier)
@@ -48,6 +48,8 @@ trait DatasetGenerators {
       derivedFrom   <- RenkuTinyTypeGenerators.datasetDerivedFroms.toGeneratorOfOptions
       originalIdent <- RenkuTinyTypeGenerators.datasetOriginalIdentifiers.toGeneratorOfOptions
       invalidTime   <- RenkuTinyTypeGenerators.invalidationTimes(createdOrPublished.instant).toGeneratorOfOptions
+      pubEvents <-
+        PublicationEventGenerators.publicationEventGen(identifier, modifiedDate.value).toGeneratorOfList(max = 3)
     } yield CliDataset(
       resourceId = resourceId,
       identifier = identifier,
@@ -66,8 +68,11 @@ trait DatasetGenerators {
       derivedFrom = derivedFrom,
       originalIdentifier = originalIdent,
       invalidationTime = invalidTime,
-      publicationEvents = Nil
+      publicationEvents = pubEvents
     )
+
+  def datasetGen(implicit renkuUrl: RenkuUrl): Gen[CliDataset] =
+    datasetWithEventsGen.map(_.copy(publicationEvents = Nil))
 }
 
 object DatasetGenerators extends DatasetGenerators

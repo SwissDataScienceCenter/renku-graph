@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.cli.model.CliPerson
 import io.renku.graph.model._
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder, Property}
 import io.renku.jsonld.ontology._
 
 sealed trait Person extends PersonAlgebra with Product with Serializable {
@@ -199,11 +199,6 @@ object Person {
       schema / "additionalType" -> orcidSameAsAdditionalType.asJsonLD
     )
   }
-
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
-    CliPerson.jsonLDDecoder.emap { cliPerson =>
-      fromCli(cliPerson).toEither.leftMap(_.intercalate("; "))
-    }
 
   object Ontology {
 

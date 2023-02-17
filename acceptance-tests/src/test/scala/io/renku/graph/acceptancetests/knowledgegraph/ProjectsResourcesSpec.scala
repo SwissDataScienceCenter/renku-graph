@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
-import io.renku.graph.model.entities
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
@@ -82,7 +81,7 @@ class ProjectsResourcesSpec
       `data in the Triples Store`(parentProject, parentCommitId, accessToken)
 
       val commitId = commitIds.generateOne
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject.to[entities.Project]), commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject), commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
 

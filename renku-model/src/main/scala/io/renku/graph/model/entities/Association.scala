@@ -24,7 +24,7 @@ import io.renku.cli.model.CliAssociation
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.graph.model._
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 
@@ -96,11 +96,6 @@ object Association {
         .findStepPlan(assoc.planId)
         .toValidNel(show"Association ${assoc.resourceId} points to a non-existing Plan ${assoc.planId}")
         .map(_ => assoc)
-    }
-
-  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
-    CliAssociation.jsonLDDecoder.emap { cliAssoc =>
-      fromCliCheckExistingPlan(cliAssoc, dependencyLinks).toEither.leftMap(_.intercalate("; "))
     }
 
   lazy val ontology: Type = Type.Def(

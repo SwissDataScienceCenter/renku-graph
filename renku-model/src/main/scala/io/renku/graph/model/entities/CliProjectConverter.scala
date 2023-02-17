@@ -28,9 +28,8 @@ import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.JsonLDDecoder
 
-object ProjectJsonLDDecoder {
+private[entities] object CliProjectConverter {
 
   def fromCli(cliProject: CliProject, allPersons: Set[CliPerson], gitLabInfo: GitLabProjectInfo)(implicit
       renkuUrl: RenkuUrl
@@ -64,7 +63,7 @@ object ProjectJsonLDDecoder {
         keywords,
         cliProject.schemaVersion,
         persons.toSet ++ creator.toSet,
-        activities,
+        activities.sortBy(_.startTime),
         datasets,
         plans,
         cliProject.images
@@ -76,11 +75,6 @@ object ProjectJsonLDDecoder {
     override def findStepPlan(planId: plans.ResourceId): Option[StepPlan] =
       collectStepPlans(allPlans).find(_.resourceId == planId)
   }
-
-  def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
-    CliProject.projectAndPersonDecoder.emap { case (project, persons) =>
-      fromCli(project, persons.toSet, gitLabInfo).toEither.leftMap(_.intercalate("; "))
-    }
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,

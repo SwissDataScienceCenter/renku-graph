@@ -24,7 +24,9 @@ import io.renku.cli.model.{CliCommandInput, CliCommandOutput, CliCommandParamete
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entityModel.Location
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.ontology.{xsd => _, _}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 sealed trait StepPlanCommandParameter extends CommandParameterBase
 
@@ -35,10 +37,6 @@ sealed trait ExplicitParameter {
 }
 
 object StepPlanCommandParameter {
-
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
   sealed trait CommandParameter extends StepPlanCommandParameter {
     override type DefaultValue = ParameterDefaultValue
@@ -107,11 +105,6 @@ object StepPlanCommandParameter {
           schema / "defaultValue" -> defaultValue.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandParameter] =
-      CliCommandParameter.jsonLDDecoder.emap { cliParam =>
-        fromCli(cliParam).toEither.leftMap(_.intercalate("; "))
-      }
 
     lazy val ontology: Type = Type.Def(
       Class(renku / "CommandParameter", ParentClass(renku / "CommandParameterBase")),
@@ -240,11 +233,6 @@ object StepPlanCommandParameter {
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandInput] =
-      CliCommandInput.jsonLDDecoder.emap { cliInput =>
-        fromCli(cliInput).toEither.leftMap(_.intercalate("; "))
-      }
 
     private def createCommandInput(resourceId:          ResourceId,
                                    maybePosition:       Option[Position],
@@ -387,11 +375,6 @@ object StepPlanCommandParameter {
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandOutput] =
-      CliCommandOutput.jsonLDDecoder.emap { cliOutput =>
-        fromCli(cliOutput).toEither.leftMap(_.intercalate("; "))
-      }
 
     def fromCli(cliOutput: CliCommandOutput): ValidatedNel[String, CommandOutput] = {
       val defaultValue = OutputDefaultValue(

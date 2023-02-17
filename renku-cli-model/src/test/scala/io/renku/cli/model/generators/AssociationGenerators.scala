@@ -29,8 +29,8 @@ trait AssociationGenerators {
 
   def associatedPlanGen(planMinCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliAssociation.AssociatedPlan] =
     Gen.oneOf(
-      PlanGenerators.planGen(planMinCreated).map(CliAssociation.AssociatedPlan.apply),
-      PlanGenerators.workflowFilePlanGen(planMinCreated).map(CliAssociation.AssociatedPlan.apply)
+      PlanGenerators.stepPlanGen(planMinCreated).map(CliAssociation.AssociatedPlan.apply),
+      PlanGenerators.workflowFileStepPlanGen(planMinCreated).map(CliAssociation.AssociatedPlan.apply)
     )
 
   def associationGen(planMinCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliAssociation] =

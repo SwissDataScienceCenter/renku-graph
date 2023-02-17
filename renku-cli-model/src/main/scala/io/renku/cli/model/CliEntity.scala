@@ -25,6 +25,7 @@ import io.renku.graph.model.{entityModel, generations}
 import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{Cursor, EntityTypes, JsonLDDecoder, JsonLDEncoder}
+import monocle.Lens
 
 sealed trait CliEntity extends CliModel {
   def resourceId:    entityModel.ResourceId
@@ -93,4 +94,17 @@ object CliEntity {
       .map(_.contains(generationId))
 
   implicit def jsonLDEncoder: JsonLDEncoder[CliEntity] = JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
+
+  object Lenses {
+    val entityPath: Lens[CliEntity, EntityPath] =
+      Lens[CliEntity, EntityPath](_.path)(path => {
+        case Entity(e)     => CliEntity(e.copy(path = path))
+        case Collection(e) => CliEntity(e.copy(path = path))
+      })
+
+    val generationIds: Lens[CliEntity, List[generations.ResourceId]] =
+      Lens[CliEntity, List[generations.ResourceId]](_.generationIds)(ids =>
+        _.fold(e => CliEntity(e.copy(generationIds = ids)), e => CliEntity(e.copy(generationIds = ids)))
+      )
+  }
 }
