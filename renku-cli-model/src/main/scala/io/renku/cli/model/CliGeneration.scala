@@ -21,7 +21,7 @@ package io.renku.cli.model
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.Prov
-import io.renku.graph.model.activities
+import io.renku.graph.model.{activities, generations}
 import io.renku.graph.model.generations._
 import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld._
@@ -79,5 +79,8 @@ object CliGeneration {
 
     val entityPath: Lens[CliGeneration, EntityPath] =
       entity.composeLens(CliEntity.Lenses.entityPath)
+
+    val entityGenerationIds: Lens[CliGeneration, List[generations.ResourceId]] =
+      entity.composeLens(CliEntity.Lenses.generationIds)
   }
 }

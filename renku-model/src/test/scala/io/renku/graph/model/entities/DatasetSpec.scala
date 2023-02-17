@@ -20,13 +20,11 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import GraphModelGenerators.graphClasses
-import io.renku.cli.model
 import io.renku.cli.model.CliDataset
 import io.renku.cli.model.generators.DatasetFileGenerators.datasetFileGen
 import io.renku.graph.model.cli.CliEntityConverterSyntax
@@ -36,7 +34,7 @@ import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.tools.JsonLDTools._
+import io.renku.cli.model.tools.JsonLDTools._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import org.scalatest.EitherValues
@@ -257,61 +255,6 @@ class DatasetSpec
         s"Dataset ${modelDs.identification.identifier} " +
           s"invalidationTime $invalidationTime is older than Dataset ${modelDs.provenance.date}"
       )
-    }
-
-    "skip publicationEvents that belong to a different dataset" in {
-
-      val testDs = datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject.generateOne
-        .copy(publicationEventFactories = Nil)
-      val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
-
-      val otherDsPublicationEvent =
-        publicationEventFactories(modelDs.provenance.date.instant)
-          .generateOne(datasetEntities(provenanceNonModified(cliShapedPersons)).decoupledFromProject.generateOne)
-
-      val cliDs = testDs.to[CliDataset]
-
-      flattenedJsonLDFrom(
-        cliDs.asNestedJsonLD,
-        otherDsPublicationEvent.to[model.CliPublicationEvent].asNestedJsonLD :: cliDs.publicationEvents.map(
-          _.asNestedJsonLD
-        ): _*
-      ).cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(modelDs).asRight
-    }
-
-    forAll {
-      Table(
-        "DS type"          -> "ds",
-        "Internal"         -> datasetEntities(provenanceInternal(cliShapedPersons)),
-        "ImportedExternal" -> datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons)),
-        "ImportedInternalAncestorExternal" -> datasetEntities(
-          provenanceImportedInternalAncestorExternal(creatorsGen = cliShapedPersons)
-        ),
-        "ImportedInternalAncestorInternal" -> datasetEntities(
-          provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons)
-        ),
-        "Modified" -> datasetEntities(provenanceInternal(cliShapedPersons)).decoupledFromProject.generateOne
-          .createModification(creatorGen = cliShapedPersons)
-      )
-    } { (dsType, dsGenerator) =>
-      s"fail if no creators - case $dsType DS" in {
-
-        val testDs  = dsGenerator.decoupledFromProject.generateOne
-        val modelDs = testDs.to[entities.Dataset[entities.Dataset.Provenance]]
-
-        val noCreatorsJsonLD =
-          view(testDs.to[CliDataset].asNestedJsonLD)
-            .remove(entities.Dataset.entityTypes, entities.Dataset.Ontology.creator)
-            .value
-
-        val result =
-          flattenedJsonLDFrom(noCreatorsJsonLD).cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]]
-
-        result.left.value shouldBe a[DecodingFailure]
-        result.left.value.getMessage() should endWith(
-          s"No creators on dataset with id: ${modelDs.identification.identifier}"
-        )
-      }
     }
   }
 

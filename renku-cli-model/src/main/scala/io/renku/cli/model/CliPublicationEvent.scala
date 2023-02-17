@@ -38,6 +38,15 @@ object CliPublicationEvent {
 
   private val entityTypes = EntityTypes of Schema.PublicationEvent
 
+  private implicit val datasetEdgeEncoder: JsonLDEncoder[(About, datasets.ResourceId)] = JsonLDEncoder.instance {
+    case (about, datasetId) =>
+      JsonLD.entity(
+        about.asEntityId,
+        EntityTypes of Schema.URL,
+        Schema.url -> datasetId.asEntityId.asJsonLD
+      )
+  }
+
   implicit val encoder: JsonLDEncoder[CliPublicationEvent] = JsonLDEncoder.instance {
     case CliPublicationEvent(resourceId, about, datasetResourceId, maybeDescription, name, startDate) =>
       JsonLD.entity(
@@ -47,15 +56,6 @@ object CliPublicationEvent {
         Schema.description -> maybeDescription.asJsonLD,
         Schema.name        -> name.asJsonLD,
         Schema.startDate   -> startDate.asJsonLD
-      )
-  }
-
-  private implicit lazy val datasetEdgeEncoder: JsonLDEncoder[(About, datasets.ResourceId)] = JsonLDEncoder.instance {
-    case (about, datasetId) =>
-      JsonLD.entity(
-        about.asEntityId,
-        EntityTypes of Schema.URL,
-        Schema.url -> datasetId.asEntityId.asJsonLD
       )
   }
 

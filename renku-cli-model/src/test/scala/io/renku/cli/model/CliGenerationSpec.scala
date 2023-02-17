@@ -18,8 +18,11 @@
 
 package io.renku.cli.model
 
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.GenerationGenerators
+import io.renku.jsonld.JsonLDDecoder
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -28,7 +31,9 @@ class CliGenerationSpec
     extends AnyWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
+    with EitherValues
     with CliDiffInstances
+    with DiffShouldMatcher
     with JsonLDCodecMatchers {
 
   val generationGen = GenerationGenerators.generationGen()
@@ -43,6 +48,14 @@ class CliGenerationSpec
     "work on multiple items" in {
       forAll(generationGen, generationGen) { (cliGen1, cliGen2) =>
         assertCompatibleCodec(cliGen1, cliGen2)
+      }
+    }
+
+    "work for a specific activity only" in {
+      forAll(generationGen, generationGen) { (gen1, gen2) =>
+        val decoder = JsonLDDecoder.decodeList(CliGeneration.decoderForActivity(gen1.activityResourceId))
+        val result  = List(gen1, gen2).asFlattenedJsonLD.cursor.as[List[CliGeneration]](decoder)
+        result.value shouldMatchTo List(gen1)
       }
     }
   }

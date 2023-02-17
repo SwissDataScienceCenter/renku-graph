@@ -49,7 +49,7 @@ object CliPlan {
   lazy val allMappingParameterIds: CliCompositePlan => Set[commandParameters.ResourceId] = p =>
     p.mappings.map(_.resourceId).toSet
 
-  private val entityTypes: EntityTypes =
+  private[model] val entityTypes: EntityTypes =
     EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
   implicit def jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =

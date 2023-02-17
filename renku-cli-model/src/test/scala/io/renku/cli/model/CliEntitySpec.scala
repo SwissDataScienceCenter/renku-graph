@@ -18,10 +18,13 @@
 
 package io.renku.cli.model
 
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
+import io.renku.cli.model.CliModel._
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.EntityGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.jsonld.JsonLDDecoder
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -31,6 +34,7 @@ class CliEntitySpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
+    with DiffShouldMatcher
     with JsonLDCodecMatchers {
 
   private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
@@ -48,6 +52,17 @@ class CliEntitySpec
       forAll(singleEntityGen, singleEntityGen) { (cliEntity1, cliEntity2) =>
         assertCompatibleCodec(cliEntity1, cliEntity2)
       }
+    }
+
+    "work for only a specific generation id" in {
+      val entity1 :: entity2 :: _ =
+        EntityGenerators.entityGen.suchThat(_.generationIds.nonEmpty).toGeneratorOfList(min = 2).generateOne
+
+      val jsonLD = List(entity1, entity2).asFlattenedJsonLD
+
+      val decoder = JsonLDDecoder.decodeList(CliEntity.jsonLDDecoderForGeneration(entity1.generationIds.head))
+      val result  = jsonLD.cursor.as[List[CliEntity]](decoder)
+      result.toOption.get shouldMatchTo List(entity1)
     }
   }
 

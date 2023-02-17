@@ -42,7 +42,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
+import io.renku.cli.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._

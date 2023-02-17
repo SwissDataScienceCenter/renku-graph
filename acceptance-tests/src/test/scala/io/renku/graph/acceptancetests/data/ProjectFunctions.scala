@@ -24,7 +24,7 @@ import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.graph.model.cli.CliEntityConverterSyntax._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
-import io.renku.graph.model.tools.JsonLDTools.flattenedJsonLDFrom
+import io.renku.cli.model.tools.JsonLDTools.flattenedJsonLDFrom
 import io.renku.graph.model._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._

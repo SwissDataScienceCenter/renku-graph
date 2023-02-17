@@ -30,9 +30,9 @@ trait ProjectGenerators {
 
   def projectPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliProject.ProjectPlan] =
     Gen.frequency(
-      7 -> PlanGenerators.planGen(minCreated).map(CliProject.ProjectPlan.apply),
+      7 -> PlanGenerators.stepPlanGen(minCreated).map(CliProject.ProjectPlan.apply),
       1 -> PlanGenerators.compositePlanGen(minCreated).map(CliProject.ProjectPlan.apply),
-      1 -> PlanGenerators.workflowFilePlanGen(minCreated).map(CliProject.ProjectPlan.apply),
+      1 -> PlanGenerators.workflowFileStepPlanGen(minCreated).map(CliProject.ProjectPlan.apply),
       1 -> PlanGenerators.workflowFileCompositePlanGen(minCreated).map(CliProject.ProjectPlan.apply)
     )
 

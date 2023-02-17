@@ -101,5 +101,10 @@ object CliEntity {
         case Entity(e)     => CliEntity(e.copy(path = path))
         case Collection(e) => CliEntity(e.copy(path = path))
       })
+
+    val generationIds: Lens[CliEntity, List[generations.ResourceId]] =
+      Lens[CliEntity, List[generations.ResourceId]](_.generationIds)(ids =>
+        _.fold(e => CliEntity(e.copy(generationIds = ids)), e => CliEntity(e.copy(generationIds = ids)))
+      )
   }
 }

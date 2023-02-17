@@ -18,73 +18,56 @@
 
 package io.renku.graph.model.entities
 
-import cats.syntax.all._
-import io.renku.cli.model.{CliActivity, CliDatasetFile, CliEntity}
-import io.renku.cli.model.CliModel._
+import io.renku.cli.model.{CliActivity, CliEntity}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, projectCreatedDates}
+import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities.Entity.OutputEntity
 import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.entities
-import io.renku.jsonld.JsonLDDecoder._
+import io.renku.graph.model.tools.AdditionalMatchers
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import shapeless.HList
 
-class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class EntitySpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
   def activityGenerator(paramFactory: CommandParameterFactory): Gen[Activity] =
     projectCreatedDates().flatMap(date =>
       activityEntities(stepPlanEntities(planCommands, cliShapedPersons, paramFactory), cliShapedPersons)(date)
     )
 
-  "decode" should {
-    "turn JsonLD InputEntity entity into the Entity object " in {
+  "fromCli" should {
+    "turn CliInputEntity entity into the Entity object " in {
       forAll(inputEntities) { entity =>
-        entity
-          .to[CliEntity]
-          .asFlattenedJsonLD
-          .cursor
-          .as[List[entities.Entity]] shouldBe List(entity.to[entities.Entity.InputEntity]).asRight
+        val cliEntity   = entity.to[CliEntity]
+        val modelEntity = entity.to[entities.Entity.InputEntity]
+
+        entities.Entity.fromCli(cliEntity) shouldMatchTo modelEntity
       }
     }
 
-    "turn JsonLD Output entity into the Entity object " in {
+    "turn CliOutput entity into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
         val activity    = activityGenerator(commandOutput).generateOne
-        val datasetPart = datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne
+        val cliEntities = activity.to[CliActivity].generations.map(_.entity)
 
-        val Right(decodedEntities) =
-          HList(activity.to[CliActivity], datasetPart.to[CliDatasetFile]).asFlattenedJsonLD.cursor
-            .as[List[entities.Entity]]
+        val result = cliEntities.map(entities.Entity.fromCli)
 
-        decodedEntities should contain allElementsOf activity.generations.map(
+        result should contain allElementsOf activity.generations.map(
           _.entity.to[entities.Entity.OutputEntity]
         )
       }
     }
 
-    "turn JsonLD Output entity into the OutputEntity object for the given generation Id " in {
-      forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity     = activityGenerator(commandOutput).generateOne
-        val prodActivity = activity.to[entities.Activity]
-        val datasetPart  = datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne
-
-        val Right(decodedEntities) =
-          HList(activity.to[CliActivity], datasetPart.to[CliDatasetFile]).asFlattenedJsonLD.cursor
-            .as[List[entities.Entity.OutputEntity]](
-              decodeList(entities.Entity.outputEntityDecoder(prodActivity.generations.head.resourceId))
-            )
-
-        decodedEntities should contain allElementsOf prodActivity.generations.map(_.entity)
-      }
-    }
-
-    "turn JsonLD Output entity with multiple Generations into the Entity object " in {
+    "turn CliOutput entity with multiple Generations into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
         val testActivity = activityGenerator(commandOutput).generateOne
         val updatedActivity = testActivity.copy(generationFactories =
@@ -96,14 +79,9 @@ class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
           )
         )
 
-        val cliActivity = updatedActivity.to[CliActivity]
+        val result = updatedActivity.to[CliActivity].generations.map(_.entity).map(entities.Entity.fromCli)
 
-        val Right(decodedEntities) = cliActivity.asFlattenedJsonLD.cursor
-          .as[List[entities.Entity]]
-
-        decodedEntities should contain allElementsOf updatedActivity.generations.map(g =>
-          Entity.toEntity.apply(g.entity)
-        )
+        result should contain allElementsOf updatedActivity.generations.map(g => Entity.toEntity.apply(g.entity))
       }
     }
   }

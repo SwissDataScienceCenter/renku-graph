@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.tools
+package io.renku.cli.model.tools
 
-import io.renku.graph.model.tools.JsonLDTools.JsonLDElementView.{Filter, Update}
+import io.renku.cli.model.tools.JsonLDTools.JsonLDElementView.{Filter, Update}
 import io.renku.jsonld._
 
 object JsonLDTools {

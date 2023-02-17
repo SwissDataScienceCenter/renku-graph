@@ -42,11 +42,14 @@ sealed trait Plan extends Product with Serializable {
 
   type PlanGroup <: Plan
 
-  def fold[P](spnm: StepPlan.NonModified => P,
-              spm:  StepPlan.Modified => P,
-              cpnm: CompositePlan.NonModified => P,
-              cpm:  CompositePlan.Modified => P
-  ): P
+  final def fold[P](spnm: StepPlan.NonModified => P,
+                    spm:  StepPlan.Modified => P,
+                    cpnm: CompositePlan.NonModified => P,
+                    cpm:  CompositePlan.Modified => P
+  ): P = this match {
+    case sp: StepPlan      => sp.fold(spnm, spm)
+    case cp: CompositePlan => cp.fold(cpnm, cpm)
+  }
 }
 
 object Plan {
@@ -95,6 +98,8 @@ sealed trait StepPlan extends Plan with StepPlanAlg {
   val outputs:                  List[CommandOutput]
   val successCodes:             List[SuccessCode]
   override type PlanGroup = StepPlan
+
+  def fold[A](nm: StepPlan.NonModified => A, mm: StepPlan.Modified => A): A
 }
 
 sealed trait StepPlanAlg {
@@ -126,11 +131,7 @@ object StepPlan {
                                outputs:                  List[CommandOutput],
                                successCodes:             List[SuccessCode]
   ) extends StepPlan {
-    override def fold[P](spnm: StepPlan.NonModified => P,
-                         spm:  StepPlan.Modified => P,
-                         cpnm: CompositePlan.NonModified => P,
-                         cpm:  CompositePlan.Modified => P
-    ): P = spnm(this)
+    override def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spnm(this)
   }
 
   final case class Modified(resourceId:               ResourceId,
@@ -148,11 +149,7 @@ object StepPlan {
                             derivation:               Derivation,
                             maybeInvalidationTime:    Option[InvalidationTime]
   ) extends StepPlan {
-    override def fold[P](spnm: StepPlan.NonModified => P,
-                         spm:  StepPlan.Modified => P,
-                         cpnm: CompositePlan.NonModified => P,
-                         cpm:  CompositePlan.Modified => P
-    ): P = spm(this)
+    override def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spm(this)
   }
 
   def from(resourceId:               ResourceId,
@@ -315,10 +312,9 @@ object StepPlan {
         )
     }
 
+  @annotation.nowarn
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
-    CliStepPlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
-      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
-    }
+    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = {
     lazy val planClass = Class(renku / "Plan", ParentClass(Plan.ontology))
@@ -350,6 +346,8 @@ sealed trait CompositePlan extends Plan {
   def plans:    NonEmptyList[ResourceId]
   def mappings: List[ParameterMapping]
   def links:    List[ParameterLink]
+
+  def fold[A](nm: CompositePlan.NonModified => A, mm: CompositePlan.Modified => A): A
 }
 
 object CompositePlan {
@@ -365,11 +363,7 @@ object CompositePlan {
       mappings:         List[ParameterMapping],
       links:            List[ParameterLink]
   ) extends CompositePlan {
-    override def fold[P](spnm: StepPlan.NonModified => P,
-                         spm:  StepPlan.Modified => P,
-                         cpnm: CompositePlan.NonModified => P,
-                         cpm:  CompositePlan.Modified => P
-    ): P = cpnm(this)
+    override def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpnm(this)
   }
 
   final case class Modified(
@@ -385,11 +379,7 @@ object CompositePlan {
       maybeInvalidationTime: Option[InvalidationTime],
       derivation:            Plan.Derivation
   ) extends CompositePlan {
-    override def fold[P](spnm: StepPlan.NonModified => P,
-                         spm:  StepPlan.Modified => P,
-                         cpnm: CompositePlan.NonModified => P,
-                         cpm:  CompositePlan.Modified => P
-    ): P = cpm(this)
+    override def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpm(this)
   }
 
   def fromCli(cliPlan: CliCompositePlan)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, CompositePlan] = {
@@ -503,10 +493,9 @@ object CompositePlan {
       )
     }
 
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDEntityDecoder[CompositePlan] =
-    CliCompositePlan.jsonLDDecoderLenientTyped.emap { cliPlan =>
-      fromCli(cliPlan).toEither.leftMap(_.intercalate("; "))
-    }
+  @annotation.nowarn
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[CompositePlan] =
+    IntermediateShim.failingDecoder()
 
   def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {
     val selfMapping =

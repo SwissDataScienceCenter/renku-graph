@@ -18,34 +18,34 @@
 
 package io.renku.graph.model.entities
 
-import cats.syntax.all._
 import io.renku.cli.model.CliPublicationEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.graph.model.tools.AdditionalMatchers
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class PublicationEventSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
-  "decode" should {
+  "fromCli" should {
 
-    "turn JsonLD PublicationEvent entity into the PublicationEvent object" in {
+    "turn CLliPublicationEvent entity into the PublicationEvent object" in {
       val startDate = timestampsNotInTheFuture.generateOne
       val dataset   = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       forAll(publicationEventFactories(startDate)) { eventFactory: (Dataset[Dataset.Provenance] => PublicationEvent) =>
         val event = eventFactory(dataset)
-        implicit val eventDecoder: JsonLDDecoder[entities.PublicationEvent] = entities.PublicationEvent.decoder(
-          dataset.to[entities.Dataset[entities.Dataset.Provenance]].identification
-        )
 
-        event.to[CliPublicationEvent].asFlattenedJsonLD.cursor.as[List[entities.PublicationEvent]] shouldBe List(
-          event.to[entities.PublicationEvent]
-        ).asRight
+        val cliEvent = event.to[CliPublicationEvent]
+        entities.PublicationEvent.fromCli(cliEvent) shouldMatchToValid event.to[entities.PublicationEvent]
       }
     }
   }
