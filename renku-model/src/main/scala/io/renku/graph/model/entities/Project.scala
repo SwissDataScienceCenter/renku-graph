@@ -23,13 +23,11 @@ import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
-import io.renku.graph.model
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.graph.model._
-import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
@@ -54,7 +52,7 @@ sealed trait Project extends Product with Serializable {
 
   def fold[P](rnp:  RenkuProject.WithoutParent => P,
               rwp:  RenkuProject.WithParent => P,
-              nrnp: entities.NonRenkuProject.WithoutParent => P,
+              nrnp: NonRenkuProject.WithoutParent => P,
               nrwp: NonRenkuProject.WithParent => P
   ): P
 }
@@ -326,16 +324,16 @@ object RenkuProject {
       }
     }
 
-    protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
-      def findTopParent(derivedFrom: model.plans.DerivedFrom): ValidatedNel[String, Plan] =
-        findParentPlan(derivedFrom, plans).andThen { parentPlan =>
+    protected def updatePlansOriginalId(planList: List[Plan]): ValidatedNel[String, List[Plan]] = {
+      def findTopParent(derivedFrom: plans.DerivedFrom): ValidatedNel[String, Plan] =
+        findParentPlan(derivedFrom, planList).andThen { parentPlan =>
           getPlanDerivation
             .get(parentPlan)
             .map(derivation => findTopParent(derivation.derivedFrom))
             .getOrElse(parentPlan.validNel)
         }
 
-      plans.traverse { plan =>
+      planList.traverse { plan =>
         getPlanDerivation
           .get(plan)
           .map(derivation =>
@@ -347,17 +345,17 @@ object RenkuProject {
       }
     }
 
-    private def findParentPlan(derivedFrom: model.plans.DerivedFrom, plans: List[Plan]) =
-      Validated.fromOption(plans.find(_.resourceId.value == derivedFrom.value),
+    private def findParentPlan(derivedFrom: plans.DerivedFrom, planList: List[Plan]) =
+      Validated.fromOption(planList.find(_.resourceId.value == derivedFrom.value),
                            NonEmptyList.one(show"Cannot find parent plan $derivedFrom")
       )
 
-    protected def validatePlansDates(plans: List[Plan]): ValidatedNel[String, Unit] =
-      plans.traverse { plan =>
+    protected def validatePlansDates(planList: List[Plan]): ValidatedNel[String, Unit] =
+      planList.traverse { plan =>
         getPlanDerivation
           .get(plan)
           .map { derivation =>
-            findParentPlan(derivation.derivedFrom, plans)
+            findParentPlan(derivation.derivedFrom, planList)
               .andThen(parentPlan =>
                 Validated.condNel[String, Plan](
                   (plan.dateCreated.value compareTo parentPlan.dateCreated.value) >= 0,
@@ -504,10 +502,6 @@ object RenkuProject {
 object Project {
 
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
-
-  @annotation.nowarn
-  def decoder(info: GitLabProjectInfo): JsonLDDecoder[Project] =
-    IntermediateShim.failingDecoder()
 
   implicit def functions[P <: Project](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): EntityFunctions[P] =
     new EntityFunctions[P] {

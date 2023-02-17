@@ -25,7 +25,7 @@ import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.entities.Entity.OutputEntity
 import io.renku.graph.model.generations.ResourceId
 import io.renku.graph.model.activities
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Reverse}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -59,10 +59,6 @@ object Generation {
       )
     }
   }
-
-  @annotation.nowarn
-  def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
-    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Generation"),

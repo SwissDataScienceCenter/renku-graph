@@ -34,7 +34,6 @@ import io.renku.graph.model.images.Image
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.cli.model.tools.JsonLDTools._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import org.scalatest.EitherValues
@@ -415,8 +414,4 @@ class DatasetSpec
       )
     }
   }
-
-  private def encodeAndDecodeToModel(cliDs: CliDataset) =
-    flattenedJsonLDFrom(cliDs.asNestedJsonLD, cliDs.publicationEvents.map(_.asNestedJsonLD): _*).cursor
-      .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 }

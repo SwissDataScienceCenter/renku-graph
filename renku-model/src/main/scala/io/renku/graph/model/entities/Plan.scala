@@ -25,10 +25,10 @@ import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliCompositePlan, CliPlan, CliStepPlan}
 import io.renku.graph.model.entities.Plan.Derivation
-import io.renku.jsonld._
+import io.renku.graph.model.plans._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import plans.{Command, DateCreated, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 import scala.math.Ordering.Implicits._
 
@@ -70,9 +70,6 @@ object Plan {
       case p: StepPlan      => p.asJsonLD
       case p: CompositePlan => p.asJsonLD
     }
-
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
-    IntermediateShim.failingDecoder()
 
   lazy val ontology: Type =
     Type.Def(
@@ -312,10 +309,6 @@ object StepPlan {
         )
     }
 
-  @annotation.nowarn
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
-    IntermediateShim.failingDecoder()
-
   lazy val ontology: Type = {
     lazy val planClass = Class(renku / "Plan", ParentClass(Plan.ontology))
     Type.Def(
@@ -492,10 +485,6 @@ object CompositePlan {
           .getOrElse(Map(Ontology.topmostDerivedFrom -> plan.resourceId.asEntityId.asJsonLD))
       )
     }
-
-  @annotation.nowarn
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[CompositePlan] =
-    IntermediateShim.failingDecoder()
 
   def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {
     val selfMapping =

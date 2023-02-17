@@ -24,7 +24,9 @@ import io.renku.cli.model.{CliCommandInput, CliCommandOutput, CliCommandParamete
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entityModel.Location
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.ontology.{xsd => _, _}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 sealed trait StepPlanCommandParameter extends CommandParameterBase
 
@@ -35,10 +37,6 @@ sealed trait ExplicitParameter {
 }
 
 object StepPlanCommandParameter {
-
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
   sealed trait CommandParameter extends StepPlanCommandParameter {
     override type DefaultValue = ParameterDefaultValue
@@ -107,9 +105,6 @@ object StepPlanCommandParameter {
           schema / "defaultValue" -> defaultValue.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandParameter] =
-      IntermediateShim.failingDecoder()
 
     lazy val ontology: Type = Type.Def(
       Class(renku / "CommandParameter", ParentClass(renku / "CommandParameterBase")),
@@ -238,9 +233,6 @@ object StepPlanCommandParameter {
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandInput] =
-      IntermediateShim.failingDecoder()
 
     private def createCommandInput(resourceId:          ResourceId,
                                    maybePosition:       Option[Position],
@@ -383,9 +375,6 @@ object StepPlanCommandParameter {
           schema / "encodingFormat" -> maybeEncodingFormat.asJsonLD
         )
     }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandOutput] =
-      IntermediateShim.failingDecoder()
 
     def fromCli(cliOutput: CliCommandOutput): ValidatedNel[String, CommandOutput] = {
       val defaultValue = OutputDefaultValue(

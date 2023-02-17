@@ -24,7 +24,10 @@ import io.renku.cli.model.CliActivity
 import io.renku.graph.model.activities.{EndTime, ResourceId, StartTime}
 import io.renku.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.{GraphClass, RenkuUrl}
-import io.renku.jsonld.JsonLDEncoder
+import io.renku.graph.model.Schemas.{prov, renku}
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Reverse}
 
 final case class Activity(resourceId:  ResourceId,
                           startTime:   StartTime,
@@ -49,11 +52,6 @@ object Activity {
 
       override val encoder: GraphClass => JsonLDEncoder[Activity] = Activity.encoder(renkuUrl, gitLabApiUrl, _)
     }
-
-  import io.renku.graph.model.Schemas.{prov, renku}
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Reverse}
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
 
@@ -156,10 +154,6 @@ object Activity {
       renku / "parameter"           -> activity.parameters.asJsonLD
     )
   }
-
-  @annotation.nowarn
-  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Activity] =
-    IntermediateShim.failingDecoder()
 
   lazy val ontologyClass: Class = Class(prov / "Activity")
   lazy val ontology: Type = Type.Def(

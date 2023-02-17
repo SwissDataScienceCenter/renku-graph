@@ -23,9 +23,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.{GraphClass, entities, plans}
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{JsonLD, JsonLDDecoder}
+import io.renku.jsonld.JsonLD
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -137,12 +137,5 @@ class AssociationSpec
     )
 
     (association, agent, plan)
-  }
-
-  private def createDecoder(plan: entities.StepPlan): JsonLDDecoder[entities.Association] = {
-
-    implicit val dl: DependencyLinks = (planId: plans.ResourceId) => Option.when(planId == plan.resourceId)(plan)
-
-    entities.Association.decoder
   }
 }

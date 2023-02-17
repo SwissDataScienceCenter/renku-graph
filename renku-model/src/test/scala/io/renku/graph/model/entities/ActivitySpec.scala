@@ -192,15 +192,6 @@ class ActivitySpec
     }
   }
 
-  private def createDecoder(plan: StepPlan): JsonLDDecoder[entities.Activity] = {
-    val entitiesPlan = plan.to[entities.StepPlan]
-
-    implicit val dl: DependencyLinks = (planId: plans.ResourceId) =>
-      Option.when(planId == entitiesPlan.resourceId)(entitiesPlan)
-
-    entities.Activity.decoder
-  }
-
   private def createDependencyLinks(plan: entities.StepPlan): DependencyLinks =
     DependencyLinks(planId => Option.when(planId == plan.resourceId)(plan))
 

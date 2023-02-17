@@ -23,6 +23,10 @@ import cats.syntax.all._
 import io.renku.cli.model.CliPublicationEvent
 import io.renku.graph.model.datasets
 import io.renku.graph.model.publicationEvents._
+import io.renku.graph.model.Schemas.schema
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 
 final case class PublicationEvent(resourceId:        ResourceId,
                                   about:             About,
@@ -33,10 +37,6 @@ final case class PublicationEvent(resourceId:        ResourceId,
 )
 
 object PublicationEvent {
-  import io.renku.graph.model.Schemas.schema
-  import io.renku.jsonld._
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
 
   private val entityTypes = EntityTypes of schema / "PublicationEvent"
 
@@ -62,10 +62,6 @@ object PublicationEvent {
         schema / "url" -> datasetId.asEntityId.asJsonLD
       )
   }
-
-  @annotation.nowarn
-  def decoder(datasetId: Dataset.Identification): JsonLDDecoder[PublicationEvent] =
-    IntermediateShim.failingDecoder()
 
   def fromCli(cliEvent: CliPublicationEvent): ValidatedNel[String, PublicationEvent] =
     PublicationEvent(

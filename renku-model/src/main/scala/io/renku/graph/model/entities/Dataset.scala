@@ -27,11 +27,10 @@ import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.jsonld.JsonLDEncoder
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Property}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, Property}
 
 import java.time.Instant
 
@@ -461,9 +460,6 @@ object Dataset {
         )
     }
   }
-
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Dataset[Provenance]] =
-    IntermediateShim.failingDecoder()
 
   private def createProvenance(
       cliDS: CliDataset
