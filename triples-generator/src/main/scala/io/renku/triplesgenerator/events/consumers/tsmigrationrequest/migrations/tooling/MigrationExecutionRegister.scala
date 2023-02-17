@@ -86,16 +86,12 @@ private[migrations] object MigrationExecutionRegister {
     implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[MigrationExecution] =
       JsonLDEncoder.instance { entity =>
         JsonLD.entity(
-          EntityId.of((renkuUrl / "migration" / entity.migrationName.asUrlPart).toString),
+          entity.migrationName.asEntityId,
           EntityTypes of renku / "Migration",
           renku / "migrationName"  -> entity.migrationName.asJsonLD,
           renku / "serviceVersion" -> entity.serviceVersion.asJsonLD
         )
       }
-
-    private implicit class MigrationNameOps(name: Migration.Name) {
-      lazy val asUrlPart: String = name.show.replace(' ', '-')
-    }
   }
 
   implicit lazy val jsonDecoder: Decoder[List[MigrationExecution]] = { topCursor =>

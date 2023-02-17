@@ -36,12 +36,12 @@ private trait PagedProjectsFinder[F[_]] {
 
 private object PagedProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
-    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationDateFinder[F])
+    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationStartTimeFinder[F])
       .mapN(new PagedProjectsFinderImpl(_, _))
 }
 
 private class PagedProjectsFinderImpl[F[_]: FlatMap](recordsFinder: RecordsFinder[F],
-                                                     migrationDateFinder: MigrationDateFinder[F]
+                                                     migrationDateFinder: MigrationStartTimeFinder[F]
 ) extends PagedProjectsFinder[F]
     with Schemas {
 
