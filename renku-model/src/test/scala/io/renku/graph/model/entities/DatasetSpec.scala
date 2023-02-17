@@ -27,7 +27,6 @@ import io.renku.graph.model._
 import GraphModelGenerators.graphClasses
 import io.renku.cli.model.CliDataset
 import io.renku.cli.model.generators.DatasetFileGenerators.datasetFileGen
-import io.renku.graph.model.cli.CliEntityConverterSyntax
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.images.Image
@@ -49,7 +48,6 @@ class DatasetSpec
     with ScalaCheckPropertyChecks
     with AdditionalMatchers
     with EitherValues
-    with CliEntityConverterSyntax
     with DiffInstances {
 
   "fromCli" should {

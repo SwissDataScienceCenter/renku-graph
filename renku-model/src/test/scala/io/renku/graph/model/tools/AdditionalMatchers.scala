@@ -52,7 +52,7 @@ trait AdditionalMatchers extends DiffShouldMatcher {
   }
 
   def beInvalidWithMessageIncluding(substring: String, andMore: String*): Matcher[ValidatedNel[String, Any]] = {
-    case Validated.Valid(v) => MatchResult(matches = false, s"Expected an invalid value!", s"The value is: $v")
+    case Validated.Valid(v) => MatchResult(matches = false, s"Expected an invalid value, but got a valid: $v", "")
     case Validated.Invalid(errs) if errs.exists(m => (andMore.toSet + substring).forall(s => m.contains(s))) =>
       MatchResult(matches = true, "", "")
     case Validated.Invalid(errs) =>

@@ -66,7 +66,6 @@ class DatasetsResourcesSpec
         .generateOne
     val project =
       dataProjects(testProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
-    val modelProject = project.entitiesProject.to[entities.Project]
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
@@ -75,7 +74,7 @@ class DatasetsResourcesSpec
 
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(modelProject), commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")

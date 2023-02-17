@@ -19,16 +19,14 @@
 package io.renku.graph.acceptancetests.data
 
 import cats.syntax.all._
+import io.renku.cli.model.CliProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators._
-import io.renku.graph.model.cli.CliEntityConverterSyntax._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.replaceProjectCreator
-import io.renku.cli.model.tools.JsonLDTools.flattenedJsonLDFrom
 import io.renku.graph.model._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import monocle.Lens
 
 trait ProjectFunctions {
 
@@ -44,23 +42,11 @@ trait ProjectFunctions {
   def addMemberFrom(person: testentities.Person, gitLabId: persons.GitLabId): Project => Project =
     p => p.copy(members = p.members :+ toProjectMember(person, gitLabId))
 
-  private def memberGitLabId: Lens[ProjectMember, persons.GitLabId] =
-    Lens[ProjectMember, persons.GitLabId](_.gitLabId) { newGlId =>
-      {
-        case m: ProjectMember.ProjectMemberNoEmail   => m.copy(gitLabId = newGlId)
-        case m: ProjectMember.ProjectMemberWithEmail => m.copy(gitLabId = newGlId)
-      }
-    }
+  def toPayloadJsonLD(p: Project)(implicit renkuUrl: RenkuUrl): JsonLD =
+    toPayloadJsonLD(p.entitiesProject)
 
-  def toPayloadJsonLD(p: Project)(implicit renkuUrl: RenkuUrl): JsonLD = {
-    import io.renku.graph.model.testentities.ProjectOps
-    toPayloadJsonLD(new ProjectOps(p.entitiesProject).to[entities.Project])
-  }
-
-  val toPayloadJsonLD: entities.Project => JsonLD = p => {
-    val cliProject = p.toCliEntity
-    flattenedJsonLDFrom(cliProject.asJsonLD, cliProject.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
-  }
+  def toPayloadJsonLD(p: testentities.RenkuProject)(implicit renkuUrl: RenkuUrl): JsonLD =
+    p.to[CliProject].asJsonLD(CliProject.flatJsonLDEncoder)
 
   private def toProjectMember(p: testentities.Person, gitLabId: persons.GitLabId): ProjectMember =
     ProjectMember(p.name, persons.Username(p.name.show), gitLabId)

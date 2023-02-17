@@ -30,7 +30,7 @@ import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{removeMembers, renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.graph.model.{entities, testentities}
+import io.renku.graph.model.testentities
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.enablers.Retrying
@@ -74,7 +74,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(
         project,
         commitId,
-        toPayloadJsonLD(replace(newProjectVersion)(project.entitiesProject).to[entities.Project])
+        toPayloadJsonLD(replace(newProjectVersion)(project.entitiesProject))
       )
 
       And("a CLEAN_UP_REQUEST event is send to EL")

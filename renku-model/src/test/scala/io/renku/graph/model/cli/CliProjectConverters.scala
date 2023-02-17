@@ -21,36 +21,13 @@ package io.renku.graph.model.cli
 import cats.syntax.all._
 import io.renku.cli.model.CliProject
 import io.renku.graph.model.testentities.ModelOps
-import io.renku.graph.model.{RenkuUrl, entities, projects, testentities}
+import io.renku.graph.model.{RenkuUrl, projects, testentities}
 import io.renku.jsonld.syntax._
 
 trait CliProjectConverters extends CliActivityConverters with CliDatasetConverters {
 
-  def from(project: entities.Project): CliProject = project.fold(
-    renkuProject,
-    renkuProject,
-    nonRenkuProject,
-    nonRenkuProject
-  )
-
   def from(project: testentities.Project)(implicit renkuUrl: RenkuUrl): CliProject =
     project.fold(renkuProject, renkuProject, nonRenkuProject, nonRenkuProject)
-
-  private def renkuProject(p: entities.RenkuProject): CliProject =
-    CliProject(
-      p.resourceId,
-      p.name.some,
-      p.maybeDescription,
-      p.dateCreated,
-      p.maybeCreator.map(from),
-      p.keywords,
-      p.images,
-      p.plans.map(from(_, p.plans)).map(CliProject.ProjectPlan.apply),
-      p.datasets.map(from),
-      p.activities.map(from(_, p.plans)),
-      p.agent.some,
-      p.version.some
-    )
 
   private def renkuProject(p: testentities.RenkuProject)(implicit renkuUrl: RenkuUrl): CliProject =
     CliProject(
@@ -66,22 +43,6 @@ trait CliProjectConverters extends CliActivityConverters with CliDatasetConverte
       p.activities.map(from(_)),
       p.agent.some,
       p.version.some
-    )
-
-  private def nonRenkuProject(p: entities.NonRenkuProject): CliProject =
-    CliProject(
-      p.resourceId,
-      p.name.some,
-      p.maybeDescription,
-      p.dateCreated,
-      p.maybeCreator.map(from),
-      p.keywords,
-      p.images,
-      plans = Nil,
-      datasets = Nil,
-      activities = Nil,
-      agentVersion = None,
-      schemaVersion = None
     )
 
   def nonRenkuProject(p: testentities.NonRenkuProject)(implicit renkuUrl: RenkuUrl): CliProject =

@@ -99,27 +99,27 @@ class StepPlanCommandParameterSpec
 
     "turn cli data of LocationCommandOutput entity into the LocationCommandOutput object" in {
       forAll(locationCommandOutputObjects) { parameterFactory =>
-        val plan      = planGenerator(parameterFactory).generateOne
-        val cliInputs = plan.to[model.CliStepPlan].outputs
-        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
         result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
       }
     }
 
     "turn cli data of MappedCommandOutput entity into the MappedCommandOutput object" in {
       forAll(mappedCommandOutputObjects) { parameterFactory =>
-        val plan      = planGenerator(parameterFactory).generateOne
-        val cliInputs = plan.to[model.CliStepPlan].outputs
-        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
         result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
       }
     }
 
     "turn cli data of ImplicitCommandOutput entity into the ImplicitCommandOutput object" in {
       forAll(implicitCommandOutputObjects) { parameterFactory =>
-        val plan      = planGenerator(parameterFactory).generateOne
-        val cliInputs = plan.to[model.CliStepPlan].outputs
-        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
         result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
       }
     }

@@ -25,18 +25,16 @@ import cats.data.EitherT.rightT
 import cats.data.{EitherT, Kleisli}
 import cats.syntax.all._
 import cats.{Foldable, Functor}
-import io.renku.cli.model.CliProject
+import io.renku.cli.model.{CliDataset, CliProject}
 import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
-import io.renku.graph.model.cli.CliEntityConverterSyntax
 import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.testentities.ModelOps.toEntitiesInternal
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
@@ -61,7 +59,6 @@ class EntityBuilderSpec
     with EntitiesGenerators
     with should.Matchers
     with AdditionalMatchers
-    with CliEntityConverterSyntax
     with TryValues
     with EitherValues
     with DiffInstances {
@@ -106,7 +103,7 @@ class EntityBuilderSpec
         .returning(rightT[Try, ProcessingRecoverableError](glProject.some))
 
       val modelProject = testProject.to[entities.Project]
-      val cliProject   = modelProject.toCliEntity
+      val cliProject   = testProject.to[CliProject]
 
       val results = entityBuilder
         .buildEntity(
@@ -198,9 +195,7 @@ class EntityBuilderSpec
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = flattenedJsonLDFrom(project.to[entities.Project].toCliEntity.asJsonLD,
-                                          otherProject.to[entities.Project].toCliEntity.asJsonLD
-            )
+            payload = flattenedJsonLDFrom(project.to[CliProject].asJsonLD, otherProject.to[CliProject].asJsonLD)
           )
         )
         .value
@@ -220,7 +215,7 @@ class EntityBuilderSpec
       val results = entityBuilder.buildEntity {
         triplesGeneratedEvents.generateOne.copy(
           project = eventProject,
-          payload = payloadJsonLD(project.to[entities.Project].toCliEntity)
+          payload = payloadJsonLD(project.to[CliProject])
         )
       }.value
 
@@ -242,7 +237,7 @@ class EntityBuilderSpec
         val results = entityBuilder.buildEntity {
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = payloadJsonLD(modelProject.toCliEntity)
+            payload = payloadJsonLD(project.to[CliProject])
           )
         }.value
 
@@ -261,16 +256,17 @@ class EntityBuilderSpec
       val brokenDs = datasetEntities(provenanceInternal(cliShapedPersons))
         .withDateBefore(projects.DateCreated(project.dateCreated.value.minusSeconds(1)))
         .generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-      val brokenModelProject = project
-        .to[entities.RenkuProject.WithoutParent]
+        .to[CliDataset]
+
+      val brokenProject = project
+        .to[CliProject]
         .copy(datasets = List(brokenDs))
 
       val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = payloadJsonLD(brokenModelProject.toCliEntity)
+            payload = payloadJsonLD(brokenProject)
           )
         )
         .value

@@ -26,7 +26,7 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.{entities, events}
+import io.renku.graph.model.events
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
@@ -76,7 +76,7 @@ class CommitHistoryChangesSpec
       val projectWithNewData = generateNewActivitiesAndDataset(project.entitiesProject)
 
       gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
-      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(projectWithNewData.to[entities.Project]), newCommits)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(projectWithNewData), newCommits)
 
       webhookServiceClient
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
