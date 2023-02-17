@@ -16,17 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.v10migration
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package v10migration
 
+import cats.FlatMap
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.{Schemas, projects}
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecordsFinder
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
+import tooling.RecordsFinder
 
 private trait PagedProjectsFinder[F[_]] {
   def findProjects(page: Int): F[List[projects.Path]]
@@ -34,29 +36,39 @@ private trait PagedProjectsFinder[F[_]] {
 
 private object PagedProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PagedProjectsFinder[F]] =
-    ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)).map(new PagedProjectsFinderImpl(_))
+    (ProjectsConnectionConfig[F]().map(RecordsFinder[F](_)), MigrationDateFinder[F])
+      .mapN(new PagedProjectsFinderImpl(_, _))
 }
 
-private class PagedProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[F])
-    extends PagedProjectsFinder[F]
+private class PagedProjectsFinderImpl[F[_]: FlatMap](recordsFinder: RecordsFinder[F],
+                                                     migrationDateFinder: MigrationDateFinder[F]
+) extends PagedProjectsFinder[F]
     with Schemas {
 
   import ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
+  import io.renku.triplesstore.client.syntax._
+  import migrationDateFinder._
+  import recordsFinder._
+
+  import java.time.Instant
 
   private val chunkSize: Int = 50
 
   override def findProjects(page: Int): F[List[projects.Path]] =
-    recordsFinder.findRecords(query(page))
+    findMigrationStartDate >>=
+      (startDate => findRecords(query(page, startDate)))
 
-  private def query(page: Int) = SparqlQuery.of(
+  private def query(page: Int, startDate: Instant) = SparqlQuery.of(
     MigrationToV10.name.asRefined,
-    Prefixes of (schema -> "schema", renku -> "renku"),
+    Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
     s"""|SELECT DISTINCT ?path
         |WHERE {
         |  GRAPH ?id {
         |    ?id a schema:Project;
-        |        renku:projectPath ?path
+        |        renku:projectPath ?path;
+        |        schema:dateCreated ?created.
+        |    FILTER (?created <= ${startDate.asTripleObject.asSparql.sparql})
         |  }
         |}
         |ORDER BY ?path
