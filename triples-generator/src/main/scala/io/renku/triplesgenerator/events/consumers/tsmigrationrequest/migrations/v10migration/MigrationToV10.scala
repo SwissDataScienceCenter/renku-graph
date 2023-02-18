@@ -39,12 +39,15 @@ private class MigrationToV10[F[_]: Async: Logger](
     eventsSender:         EventSender[F],
     projectDonePersister: ProjectDonePersister[F],
     executionRegister:    MigrationExecutionRegister[F],
+    projectsDoneCleanUp:  ProjectsDoneCleanUp[F],
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](MigrationToV10.name, executionRegister, recoveryStrategy) {
 
   import eventsSender._
+  import executionRegister._
   import fs2._
   import projectDonePersister._
+  import projectsDoneCleanUp._
   import projectsFinder._
   import recoveryStrategy._
 
@@ -58,6 +61,8 @@ private class MigrationToV10[F[_]: Async: Logger](
       .evalTap(noteDone)
       .compile
       .drain
+      .flatMap(_ => registerExecution(name))
+      .flatMap(_ => cleanUp())
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(maybeRecoverableError[F, Unit])
   }
@@ -88,5 +93,6 @@ private[migrations] object MigrationToV10 {
     eventsSender         <- EventSender[F](EventLogUrl)
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
-  } yield new MigrationToV10(projectsFinder, eventsSender, projectDonePersister, executionRegister)
+    projectsDoneCleanUp  <- ProjectsDoneCleanUp[F]
+  } yield new MigrationToV10(projectsFinder, eventsSender, projectDonePersister, executionRegister, projectsDoneCleanUp)
 }

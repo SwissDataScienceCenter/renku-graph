@@ -38,7 +38,7 @@ private[migrations] trait MigrationExecutionRegister[F[_]] {
   def findExecution(migrationName:     Migration.Name): F[Option[ServiceVersion]]
 }
 
-private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private[migrations] class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     serviceVersion: ServiceVersion,
     storeConfig:    MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)

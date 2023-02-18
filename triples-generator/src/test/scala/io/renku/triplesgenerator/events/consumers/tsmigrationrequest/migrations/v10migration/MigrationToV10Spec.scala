@@ -50,8 +50,10 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
   "migrate" should {
 
     "go through all projects found in the TS, " +
-      "send the CLEAN_UP_REQUEST event to EL for each of them " +
-      "and keep a note of the project once an event is sent for it" in new TestCase {
+      "send the CLEAN_UP_REQUEST event to EL for each of them, " +
+      "keep a note of the project once an event is sent for it, " +
+      "explicitly run the post migration procedure " +
+      "and remove info about all migrated projects" in new TestCase {
 
         val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
@@ -63,6 +65,10 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         allProjects map toCleanUpRequestEvent foreach verifyEventWasSent
 
         allProjects foreach verifyProjectNotedDone
+
+        verifyMigrationExecutionRegistered
+
+        verifyPostMigrationCleanUpRun
 
         migration.migrate().value.unsafeRunSync() shouldBe ().asRight
       }
@@ -88,13 +94,20 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     private val eventSender          = mock[EventSender[IO]]
     private val projectDonePersister = mock[ProjectDonePersister[IO]]
     private val executionRegister    = mock[MigrationExecutionRegister[IO]]
+    private val projectsDoneCleanUp  = mock[ProjectsDoneCleanUp[IO]]
     val recoverableError             = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new MigrationToV10[IO](projectsFinder, eventSender,projectDonePersister, executionRegister, recoveryStrategy)
+    val migration = new MigrationToV10[IO](projectsFinder,
+                                           eventSender,
+                                           projectDonePersister,
+                                           executionRegister,
+                                           projectsDoneCleanUp,
+                                           recoveryStrategy
+    )
 
     def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
       pages foreach { page =>
@@ -127,6 +140,16 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     def verifyProjectNotedDone(path: projects.Path) =
       (projectDonePersister.noteDone _)
         .expects(path)
+        .returning(().pure[IO])
+
+    def verifyMigrationExecutionRegistered =
+      (executionRegister.registerExecution _)
+        .expects(MigrationToV10.name)
+        .returning(().pure[IO])
+
+    def verifyPostMigrationCleanUpRun =
+      (projectsDoneCleanUp.cleanUp _)
+        .expects()
         .returning(().pure[IO])
   }
 }
