@@ -23,8 +23,8 @@ package v10migration
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
@@ -47,27 +47,30 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     }
   }
 
-  "query" should {
+  "migrate" should {
 
-    "find all projects that exists in the Default Graph but not in the Named Graphs dataset" in new TestCase {
+    "go through all projects found in the TS, " +
+      "send the CLEAN_UP_REQUEST event to EL for each of them " +
+      "and keep a note of the project once an event is sent for it" in new TestCase {
 
-      val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
+        val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
-      val projectsPages = allProjects
-        .sliding(pageSize, pageSize)
-        .toList
-      givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
+        val projectsPages = allProjects
+          .sliding(pageSize, pageSize)
+          .toList
+        givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
 
-      allProjects map toCleanUpRequestEvent foreach givenEventIsSent
+        allProjects map toCleanUpRequestEvent foreach verifyEventWasSent
 
-      migration.migrate().value.unsafeRunSync() shouldBe ().asRight
-    }
+        allProjects foreach verifyProjectNotedDone
+
+        migration.migrate().value.unsafeRunSync() shouldBe ().asRight
+      }
 
     "return a Recoverable Error if in case of an exception while finding projects " +
       "the given strategy returns one" in new TestCase {
 
         val exception = exceptions.generateOne
-
         (() => projectsFinder.nextProjectsPage())
           .expects()
           .returning(exception.raiseError[IO, List[projects.Path]])
@@ -81,16 +84,17 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectsFinder            = mock[PagedProjectsFinder[IO]]
-    private val eventSender       = mock[EventSender[IO]]
-    private val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recoverableError          = processingRecoverableErrors.generateOne
+    val projectsFinder               = mock[PagedProjectsFinder[IO]]
+    private val eventSender          = mock[EventSender[IO]]
+    private val projectDonePersister = mock[ProjectDonePersister[IO]]
+    private val executionRegister    = mock[MigrationExecutionRegister[IO]]
+    val recoverableError             = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new MigrationToV10[IO](projectsFinder, eventSender, executionRegister, recoveryStrategy)
+    val migration = new MigrationToV10[IO](projectsFinder, eventSender,projectDonePersister, executionRegister, recoveryStrategy)
 
     def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
       pages foreach { page =>
@@ -108,7 +112,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       }"""
     }
 
-    lazy val givenEventIsSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
+    lazy val verifyEventWasSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(event,
@@ -119,5 +123,10 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         .returning(().pure[IO])
       ()
     }
+
+    def verifyProjectNotedDone(path: projects.Path) =
+      (projectDonePersister.noteDone _)
+        .expects(path)
+        .returning(().pure[IO])
   }
 }

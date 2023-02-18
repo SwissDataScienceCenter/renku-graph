@@ -25,8 +25,8 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
@@ -35,14 +35,16 @@ import org.typelevel.log4cats.Logger
 import tooling._
 
 private class MigrationToV10[F[_]: Async: Logger](
-    projectsFinder:    PagedProjectsFinder[F],
-    eventsSender:      EventSender[F],
-    executionRegister: MigrationExecutionRegister[F],
-    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    projectsFinder:       PagedProjectsFinder[F],
+    eventsSender:         EventSender[F],
+    projectDonePersister: ProjectDonePersister[F],
+    executionRegister:    MigrationExecutionRegister[F],
+    recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](MigrationToV10.name, executionRegister, recoveryStrategy) {
 
   import eventsSender._
   import fs2._
+  import projectDonePersister._
   import projectsFinder._
   import recoveryStrategy._
 
@@ -52,12 +54,17 @@ private class MigrationToV10[F[_]: Async: Logger](
       .evalMap(_ => nextProjectsPage())
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
-      .map(toCleanUpEvent)
-      .evalMap { case (payload, ctx) => sendEvent(payload, ctx) }
+      .evalTap(sendCleanUpEvent)
+      .evalTap(noteDone)
       .compile
       .drain
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(maybeRecoverableError[F, Unit])
+  }
+
+  private def sendCleanUpEvent(path: projects.Path) = {
+    val (payload, ctx) = toCleanUpEvent(path)
+    sendEvent(payload, ctx)
   }
 
   private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) = {
@@ -77,8 +84,9 @@ private[migrations] object MigrationToV10 {
   val name: Migration.Name = Migration.Name("Migration to V10")
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
-    projectsFinder    <- PagedProjectsFinder[F]
-    eventsSender      <- EventSender[F](EventLogUrl)
-    executionRegister <- MigrationExecutionRegister[F]
-  } yield new MigrationToV10(projectsFinder, eventsSender, executionRegister)
+    projectsFinder       <- PagedProjectsFinder[F]
+    eventsSender         <- EventSender[F](EventLogUrl)
+    projectDonePersister <- ProjectDonePersister[F]
+    executionRegister    <- MigrationExecutionRegister[F]
+  } yield new MigrationToV10(projectsFinder, eventsSender, projectDonePersister, executionRegister)
 }

@@ -26,8 +26,8 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.model.Triple
 import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
@@ -77,8 +77,8 @@ private class MigrationStartTimeFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
 
   private def startTimeTriple(instant: Instant) = {
     val triple = Triple(MigrationToV10.name.asEntityId, renku / "startTime", instant.asTripleObject)
-    SparqlQuery.of(
-      "v10 start time",
+    SparqlQuery.ofUnsafe(
+      show"${MigrationToV10.name} - store start time",
       s"INSERT DATA {${triple.asSparql.sparql}}"
     )
   }
