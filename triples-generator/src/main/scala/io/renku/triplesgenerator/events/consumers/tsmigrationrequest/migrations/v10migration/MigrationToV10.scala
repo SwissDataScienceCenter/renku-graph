@@ -53,15 +53,20 @@ private class MigrationToV10[F[_]: Async: Logger](
   import projectsFinder._
   import recoveryStrategy._
 
+  private val cleanUpEventCategory = CategoryName("CLEAN_UP_REQUEST")
+
   protected[v10migration] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     Stream
       .iterate(1)(_ + 1)
       .evalMap(_ => nextProjectsPage())
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
+      .evalTap(path => logInfo(show"processing project '$path'; waiting for free resources"))
       .evalTap(_ => envReadyToTakeEvent)
+      .evalTap(path => logInfo(show"sending $cleanUpEventCategory event for '$path'"))
       .evalTap(sendCleanUpEvent)
       .evalTap(noteDone)
+      .evalTap(path => logInfo(show"event sent for '$path'"))
       .compile
       .drain
       .flatMap(_ => registerExecution(name))
@@ -75,17 +80,18 @@ private class MigrationToV10[F[_]: Async: Logger](
     sendEvent(payload, ctx)
   }
 
-  private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) = {
-    val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
+  private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) =
     EventRequestContent.NoPayload {
       json"""{
-          "categoryName": $eventCategoryName,
+          "categoryName": $cleanUpEventCategory,
           "project": {
             "path": $path
           }
         }"""
-    } -> EventSender.EventContext(eventCategoryName, show"$categoryName: $name cannot send event for $path")
-  }
+    } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $path")
+
+  private def logInfo(message: String): F[Unit] =
+    Logger[F].info(show"${MigrationToV10.name} - $message")
 }
 
 private[migrations] object MigrationToV10 {
