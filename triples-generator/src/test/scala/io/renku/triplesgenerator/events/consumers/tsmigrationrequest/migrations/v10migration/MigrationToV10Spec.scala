@@ -50,6 +50,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
   "migrate" should {
 
     "go through all projects found in the TS, " +
+      "wait until the env has capacity to serve a new re-provisioning event, " +
       "send the CLEAN_UP_REQUEST event to EL for each of them, " +
       "keep a note of the project once an event is sent for it, " +
       "explicitly run the post migration procedure " +
@@ -61,6 +62,8 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .sliding(pageSize, pageSize)
           .toList
         givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
+
+        givenEnvHasCapabilitiesToTakeNextEvent
 
         allProjects map toCleanUpRequestEvent foreach verifyEventWasSent
 
@@ -91,6 +94,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectsFinder               = mock[PagedProjectsFinder[IO]]
+    private val envReadinessChecker  = mock[EnvReadinessChecker[IO]]
     private val eventSender          = mock[EventSender[IO]]
     private val projectDonePersister = mock[ProjectDonePersister[IO]]
     private val executionRegister    = mock[MigrationExecutionRegister[IO]]
@@ -102,6 +106,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       }
     }
     val migration = new MigrationToV10[IO](projectsFinder,
+                                           envReadinessChecker,
                                            eventSender,
                                            projectDonePersister,
                                            executionRegister,
@@ -115,6 +120,12 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .expects()
           .returning(page.pure[IO])
       }
+
+    def givenEnvHasCapabilitiesToTakeNextEvent =
+      (() => envReadinessChecker.envReadyToTakeEvent)
+        .expects()
+        .returning(().pure[IO])
+        .atLeastOnce()
 
     def toCleanUpRequestEvent(projectPath: projects.Path) = projectPath -> EventRequestContent.NoPayload {
       json"""{

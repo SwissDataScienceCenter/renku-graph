@@ -36,6 +36,7 @@ import tooling._
 
 private class MigrationToV10[F[_]: Async: Logger](
     projectsFinder:       PagedProjectsFinder[F],
+    envReadinessChecker:  EnvReadinessChecker[F],
     eventsSender:         EventSender[F],
     projectDonePersister: ProjectDonePersister[F],
     executionRegister:    MigrationExecutionRegister[F],
@@ -43,6 +44,7 @@ private class MigrationToV10[F[_]: Async: Logger](
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](MigrationToV10.name, executionRegister, recoveryStrategy) {
 
+  import envReadinessChecker._
   import eventsSender._
   import executionRegister._
   import fs2._
@@ -57,6 +59,7 @@ private class MigrationToV10[F[_]: Async: Logger](
       .evalMap(_ => nextProjectsPage())
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
+      .evalTap(_ => envReadyToTakeEvent)
       .evalTap(sendCleanUpEvent)
       .evalTap(noteDone)
       .compile
@@ -90,9 +93,16 @@ private[migrations] object MigrationToV10 {
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
     projectsFinder       <- PagedProjectsFinder[F]
+    envReadinessChecker  <- EnvReadinessChecker[F]
     eventsSender         <- EventSender[F](EventLogUrl)
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
     projectsDoneCleanUp  <- ProjectsDoneCleanUp[F]
-  } yield new MigrationToV10(projectsFinder, eventsSender, projectDonePersister, executionRegister, projectsDoneCleanUp)
+  } yield new MigrationToV10(projectsFinder,
+                             envReadinessChecker,
+                             eventsSender,
+                             projectDonePersister,
+                             executionRegister,
+                             projectsDoneCleanUp
+  )
 }
