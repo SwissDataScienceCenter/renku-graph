@@ -40,6 +40,18 @@ object Subscription {
   trait Subscriber extends Product {
     val url: SubscriberUrl
     val id:  SubscriberId
+
+    override def equals(obj: Any): Boolean = obj match {
+      case info: Subscriber => info.url == url
+      case _ => false
+    }
+
+    override def hashCode(): Int = url.hashCode()
+  }
+
+  trait DefinedCapacity {
+    self: Subscriber =>
+    val capacity: SubscriberCapacity
   }
 
   final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType

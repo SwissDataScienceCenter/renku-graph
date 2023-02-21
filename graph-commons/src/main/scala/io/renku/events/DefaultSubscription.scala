@@ -60,7 +60,8 @@ object DefaultSubscription {
     }
 
     final case class WithCapacity(url: SubscriberUrl, id: SubscriberId, capacity: SubscriberCapacity)
-        extends DefaultSubscriber {
+        extends DefaultSubscriber
+        with DefinedCapacity {
       override def fold[A](wocf: WithoutCapacity => A, wcf: WithCapacity => A): A = wcf(this)
     }
 

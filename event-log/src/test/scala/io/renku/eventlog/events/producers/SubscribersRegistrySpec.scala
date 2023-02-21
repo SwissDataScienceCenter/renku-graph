@@ -21,7 +21,7 @@ package io.renku.eventlog.events.producers
 import Generators._
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.events.Generators.{categoryNames, subscriberCapacities}
+import io.renku.events.Generators.{categoryNames, noCapacitySubscribers, subscriberCapacities}
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.interpreters.TestLogger
@@ -32,13 +32,20 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.OptionValues
 
 import java.lang.Thread.sleep
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration._
 
-class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with Eventually {
+class SubscribersRegistrySpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with should.Matchers
+    with Eventually
+    with OptionValues {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(30, Seconds)),
@@ -59,19 +66,19 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       "if there was one with the same URL although different id" in new TestCase {
 
         val initialCapacity = subscriberCapacities.generateOne
-        registry.add(subscriber.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
-        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                   shouldBe subscriber.url
+        registry.add(subscriber.copy(capacity = initialCapacity)).unsafeRunSync() shouldBe true
+        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()         shouldBe subscriber.url
 
         val sameUrlSubscriberButOtherId = testSubscribers.generateOne
           .copy(
             url = subscriber.url,
-            maybeCapacity = (subscriberCapacities generateDifferentThan initialCapacity).some
+            capacity = subscriberCapacities generateDifferentThan initialCapacity
           )
         registry.add(sameUrlSubscriberButOtherId).unsafeRunSync()         shouldBe false
         registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
         // this is to prove there's still one subscriber and the one with the new capacity
-        registry.getTotalCapacity shouldBe sameUrlSubscriberButOtherId.maybeCapacity
+        registry.getTotalCapacity.value shouldBe TotalCapacity(sameUrlSubscriberButOtherId.capacity.value)
       }
 
     "move the given subscriber from the busy state to available" in new TestCase {
@@ -100,7 +107,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
       val sameSubscriptionButWithDifferentCapacity = subscriber.copy(
-        maybeCapacity = subscriberCapacities.toGeneratorOfOptions.generateDifferentThan(subscriber.maybeCapacity)
+        capacity = subscriberCapacities.generateDifferentThan(subscriber.capacity)
       )
       registry.add(sameSubscriptionButWithDifferentCapacity).unsafeRunSync() shouldBe false
     }
@@ -231,8 +238,9 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     }
 
     "return None if all subscribers have no capacity specified" in new TestCase {
-      registry.add(subscriber.copy(maybeCapacity = None)).unsafeRunSync()                  shouldBe true
-      registry.add(testSubscribers.generateOne.copy(maybeCapacity = None)).unsafeRunSync() shouldBe true
+
+      registry.add(noCapacitySubscribers.generateOne).unsafeRunSync() shouldBe true
+      registry.add(noCapacitySubscribers.generateOne).unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe None
     }
@@ -240,11 +248,11 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     "sum up all the subscribers' capacities if specified" in new TestCase {
 
       val capacity1 = subscriberCapacities.generateOne
-      registry.add(subscriber.copy(maybeCapacity = capacity1.some)).unsafeRunSync() shouldBe true
+      registry.add(subscriber.copy(capacity = capacity1)).unsafeRunSync() shouldBe true
 
       val capacity2 = subscriberCapacities.generateOne
       registry
-        .add(testSubscribers.generateOne.copy(maybeCapacity = capacity2.some))
+        .add(testSubscribers.generateOne.copy(capacity = capacity2))
         .unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe TotalCapacity(capacity1.value + capacity2.value).some

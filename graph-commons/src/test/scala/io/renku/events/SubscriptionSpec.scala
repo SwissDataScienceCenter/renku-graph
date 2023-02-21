@@ -26,9 +26,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SubscriptionSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "equal" should {
+  "equals" should {
 
-    "return true if both infos have the same urls" in {
+    "return true if both subscribers have the same urls" in {
 
       val url = subscriberUrls.generateOne
       val id  = subscriberIds.generateOne
@@ -39,7 +39,7 @@ class SubscriptionSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
       }
     }
 
-    "return true if both infos have the same urls but different ids" in {
+    "return true if both subscribers have the same urls but different ids" in {
 
       val url        = subscriberUrls.generateOne
       val subscriber = subscribers.generateOne
@@ -53,7 +53,7 @@ class SubscriptionSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
         )
     }
 
-    "return false if both infos have different urls" in {
+    "return false if both subscribers have different urls" in {
 
       val url1       = subscriberUrls.generateOne
       val url2       = subscriberUrls.generateOne

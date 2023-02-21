@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.events.{CategoryName, Subscription}
-import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
@@ -147,7 +146,7 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
   override def getTotalCapacity: Option[TotalCapacity] =
     (availablePool.asScala.keySet ++ busyPool.asScala.keySet).toList
       .flatMap {
-        case s: DefaultSubscriber.WithCapacity => s.capacity.some
+        case s: Subscription.DefinedCapacity => s.capacity.some
         case _ => None
       } match {
       case Nil        => None

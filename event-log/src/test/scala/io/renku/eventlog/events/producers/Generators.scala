@@ -35,16 +35,15 @@ object Generators {
   val freeCapacities:  Gen[FreeCapacity]  = positiveInts() map (v => FreeCapacity(v.value))
   val usedCapacities:  Gen[UsedCapacity]  = positiveInts() map (v => UsedCapacity(v.value))
 
-  private[producers] final case class TestSubscriber(url:           SubscriberUrl,
-                                                     id:            SubscriberId,
-                                                     maybeCapacity: Option[SubscriberCapacity]
-  ) extends Subscription.Subscriber
+  private[producers] final case class TestSubscriber(url: SubscriberUrl, id: SubscriberId, capacity: SubscriberCapacity)
+      extends Subscription.Subscriber
+      with Subscription.DefinedCapacity
 
   private[producers] object TestSubscriber {
 
     implicit val encoder: Encoder[TestSubscriber] = Encoder.instance { case TestSubscriber(url, id, capacity) =>
       json"""{
-        "subscribers": {
+        "subscriber": {
           "url":      $url,
           "id":       $id,
           "capacity": $capacity
@@ -55,22 +54,22 @@ object Generators {
     implicit val decoder: Decoder[TestSubscriber] = Decoder.instance { cursor =>
       val subscriberNode = cursor.downField("subscriber")
       for {
-        url           <- subscriberNode.downField("url").as[SubscriberUrl]
-        id            <- subscriberNode.downField("id").as[SubscriberId]
-        maybeCapacity <- subscriberNode.downField("capacity").as[Option[SubscriberCapacity]]
-      } yield TestSubscriber(url, id, maybeCapacity)
+        url      <- subscriberNode.downField("url").as[SubscriberUrl]
+        id       <- subscriberNode.downField("id").as[SubscriberId]
+        capacity <- subscriberNode.downField("capacity").as[SubscriberCapacity]
+      } yield TestSubscriber(url, id, capacity)
     }
 
     implicit val show: Show[TestSubscriber] = Show.show { info =>
-      show"subscriber = ${info.url}, id = ${info.id}${info.maybeCapacity}"
+      show"subscriber = ${info.url}, id = ${info.id}, capacity = ${info.capacity}"
     }
   }
 
   private[producers] implicit val testSubscribers: Gen[TestSubscriber] = for {
-    url           <- subscriberUrls
-    id            <- subscriberIds
-    maybeCapacity <- subscriberCapacities.toGeneratorOfOptions
-  } yield TestSubscriber(url, id, maybeCapacity)
+    url      <- subscriberUrls
+    id       <- subscriberIds
+    capacity <- subscriberCapacities
+  } yield TestSubscriber(url, id, capacity)
 
   private[producers] implicit val sendingResults: Gen[EventsSender.SendingResult] =
     Gen.oneOf(EventsSender.SendingResult.all)

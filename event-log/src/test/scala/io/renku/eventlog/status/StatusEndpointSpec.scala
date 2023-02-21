@@ -47,8 +47,8 @@ class StatusEndpointSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       val response = endpoint.`GET /status`.unsafeRunSync()
 
-      response.status                                 shouldBe Status.Ok
-      response.contentType                            shouldBe `Content-Type`(application.json).some
+      response.status                                        shouldBe Status.Ok
+      response.contentType                                   shouldBe `Content-Type`(application.json).some
       response.as[eventlogapi.ServiceStatus].unsafeRunSync() shouldBe toApiStatus(statuses)
     }
 
@@ -76,11 +76,12 @@ class StatusEndpointSpec extends AnyWordSpec with should.Matchers with MockFacto
       statuses.map(toApiSubscriptionStatus)
     )
 
-  private lazy val toApiSubscriptionStatus: EventProducerStatus => eventlogapi.ServiceStatus.SubscriptionStatus = status =>
-    eventlogapi.ServiceStatus.SubscriptionStatus(
-      status.categoryName,
-      status.maybeCapacity.map(toApiCapacity)
-    )
+  private lazy val toApiSubscriptionStatus: EventProducerStatus => eventlogapi.ServiceStatus.SubscriptionStatus =
+    status =>
+      eventlogapi.ServiceStatus.SubscriptionStatus(
+        status.categoryName,
+        status.maybeCapacity.map(toApiCapacity)
+      )
 
   private lazy val toApiCapacity: EventProducerStatus.Capacity => eventlogapi.ServiceStatus.Capacity =
     capacity => eventlogapi.ServiceStatus.Capacity(capacity.total.value, capacity.free.value)
