@@ -21,11 +21,13 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.Subscription.SubscriberCapacity
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.Microservice
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -34,8 +36,13 @@ object SubscriptionFactory {
       _
   ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism[F](categoryName, payloadsComposerFactory)
-    _                     <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler               <- EventHandler(subscriptionMechanism)
+    subscriberCapacity <- GenerationProcessesNumber[F]().map(v => SubscriberCapacity(v.value))
+    subscriptionMechanism <-
+      SubscriptionMechanism(
+        categoryName,
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier, subscriberCapacity)
+      )
+    _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
+    handler <- EventHandler(subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

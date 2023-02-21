@@ -22,9 +22,10 @@ import EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import cats.MonadThrow
 import cats.effect.kernel.Concurrent
 import io.circe.Json
+import io.renku.events.Subscription
 import io.renku.http.ErrorMessage
-import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
+import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -42,8 +43,8 @@ class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
   import cats.syntax.all._
   import io.renku.http.InfoMessage
   import io.renku.http.InfoMessage._
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
+  import org.http4s.circe._
 
   override def addSubscription(request: Request[F]): F[Response[F]] = {
     for {
@@ -83,6 +84,7 @@ private object SubscriptionsEndpointImpl {
 
   private sealed trait BadRequestError extends Throwable
   private object BadRequestError {
+
     def apply(message: String): BadRequestError = new Exception(message) with BadRequestError
 
     def apply(cause: Throwable): BadRequestError = new Exception(cause) with BadRequestError
@@ -91,7 +93,7 @@ private object SubscriptionsEndpointImpl {
 
 object SubscriptionsEndpoint {
 
-  def apply[F[_]: Concurrent: Logger, T <: SubscriptionInfo](
+  def apply[F[_]: Concurrent: Logger, S <: Subscription.Subscriber](
       subscriptionCategoryRegistry: EventProducersRegistry[F]
   ): F[SubscriptionsEndpoint[F]] = MonadThrow[F].catchNonFatal {
     new SubscriptionsEndpointImpl[F](subscriptionCategoryRegistry)

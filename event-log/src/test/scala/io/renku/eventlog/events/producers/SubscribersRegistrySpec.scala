@@ -21,8 +21,8 @@ package io.renku.eventlog.events.producers
 import Generators._
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.events.Generators.categoryNames
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Generators.{categoryNames, subscriberCapacities}
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
@@ -49,58 +49,58 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "adds the given subscriber to the registry if it wasn't there yet" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
-      registry.add(subscriptionInfo).unsafeRunSync() shouldBe false
+      registry.add(subscriber).unsafeRunSync() shouldBe false
     }
 
     "replaces the given subscriber in the registry " +
       "if there was one with the same URL although different id" in new TestCase {
 
-        val initialCapacity = totalCapacities.generateOne
-        registry.add(subscriptionInfo.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
-        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                         shouldBe subscriberUrl
+        val initialCapacity = subscriberCapacities.generateOne
+        registry.add(subscriber.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
+        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                   shouldBe subscriber.url
 
-        val infoSameUrlButOtherId = urlAndIdSubscriptionInfos.generateOne
+        val sameUrlSubscriberButOtherId = testSubscribers.generateOne
           .copy(
-            subscriberUrl = subscriberUrl,
-            maybeCapacity = totalCapacities.generateDifferentThan(initialCapacity).some
+            url = subscriber.url,
+            maybeCapacity = (subscriberCapacities generateDifferentThan initialCapacity).some
           )
-        registry.add(infoSameUrlButOtherId).unsafeRunSync()               shouldBe false
-        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+        registry.add(sameUrlSubscriberButOtherId).unsafeRunSync()         shouldBe false
+        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
         // this is to prove there's still one subscriber and the one with the new capacity
-        registry.getTotalCapacity shouldBe infoSameUrlButOtherId.maybeCapacity
+        registry.getTotalCapacity shouldBe sameUrlSubscriberButOtherId.maybeCapacity
       }
 
     "move the given subscriber from the busy state to available" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
-      registry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ()
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.markBusy(subscriber.url).unsafeRunSync()                 shouldBe ()
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
     }
 
     "add the given subscriber if it was deleted" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
-      registry.delete(subscriberUrl).unsafeRunSync()                    shouldBe true
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.delete(subscriber.url).unsafeRunSync()                   shouldBe true
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
     }
 
     "don't add a subscriber twice even if it comes with different capacity" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
-      val sameSubscriptionButWithDifferentCapacity = subscriptionInfo.copy(
-        maybeCapacity = totalCapacities.toGeneratorOfOptions.generateDifferentThan(subscriptionInfo.maybeCapacity)
+      val sameSubscriptionButWithDifferentCapacity = subscriber.copy(
+        maybeCapacity = subscriberCapacities.toGeneratorOfOptions.generateDifferentThan(subscriber.maybeCapacity)
       )
       registry.add(sameSubscriptionButWithDifferentCapacity).unsafeRunSync() shouldBe false
     }
@@ -110,7 +110,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "not always return the same subscriber" in new TestCase {
 
-      val subscribers = urlAndIdSubscriptionInfos.generateNonEmptyList(min = 10, max = 20).toList
+      val subscribers = testSubscribers.generateNonEmptyList(min = 10, max = 20).toList
 
       subscribers.map(registry.add).sequence.unsafeRunSync()
 
@@ -126,18 +126,18 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
       override val busySleep = 10 seconds
 
-      val busySubscriber = urlAndIdSubscriptionInfos.generateOne
+      val busySubscriber = testSubscribers.generateOne
       registry.add(busySubscriber).unsafeRunSync()                      shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe busySubscriber.subscriberUrl
-      registry.markBusy(busySubscriber.subscriberUrl).unsafeRunSync()   shouldBe ((): Unit)
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe busySubscriber.url
+      registry.markBusy(busySubscriber.url).unsafeRunSync()             shouldBe ((): Unit)
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
       val subscribersFound = (1 to 10).foldLeft(Set.empty[SubscriberUrl]) { (returnedSubscribers, _) =>
         returnedSubscribers + registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()
       }
-      subscribersFound shouldBe Set(subscriberUrl)
+      subscribersFound shouldBe Set(subscriber.url)
     }
 
     "be able to queue callers when all subscribers are busy" in new TestCase {
@@ -155,7 +155,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
       Thread sleep 500
 
-      registry.add(subscriptionInfo).unsafeRunSync() shouldBe true
+      registry.add(subscriber).unsafeRunSync() shouldBe true
 
       eventually {
         collectedCallerIds.get(()) shouldBe callerIds
@@ -166,19 +166,19 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
   "delete" should {
 
     "do nothing if the subscriber is not there" in new TestCase {
-      registry.delete(subscriberUrl).unsafeRunSync() shouldBe false
-      registry.subscriberCount()                     shouldBe 0
+      registry.delete(subscriber.url).unsafeRunSync() shouldBe false
+      registry.subscriberCount()                      shouldBe 0
     }
 
     "remove the subscriber if it's busy" in new TestCase {
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
-      registry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      registry.subscriberCount()                       shouldBe 1
+      registry.markBusy(subscriber.url).unsafeRunSync() shouldBe ((): Unit)
+      registry.subscriberCount()                        shouldBe 1
 
-      registry.delete(subscriberUrl).unsafeRunSync() shouldBe true
-      registry.subscriberCount()                     shouldBe 0
+      registry.delete(subscriber.url).unsafeRunSync() shouldBe true
+      registry.subscriberCount()                      shouldBe 0
     }
   }
 
@@ -186,14 +186,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "make the subscriber temporarily unavailable" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
       val startTime = Instant.now()
-      registry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      registry.markBusy(subscriber.url).unsafeRunSync() shouldBe ((): Unit)
 
       // this will block until the busy subscriber becomes available again
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
       val endTime = Instant.now()
 
       (endTime.toEpochMilli - startTime.toEpochMilli) should be >= busySleep.toMillis
@@ -206,17 +206,17 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "extend unavailable time if the subscriber is already unavailable" in new TestCase {
 
-      registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.add(subscriber).unsafeRunSync()                          shouldBe true
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
 
       val startTime = Instant.now()
-      registry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      registry.markBusy(subscriber.url).unsafeRunSync() shouldBe ((): Unit)
 
       sleep((busySleep - (100 millis)).toMillis)
 
-      registry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      registry.markBusy(subscriber.url).unsafeRunSync() shouldBe ((): Unit)
 
-      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+      registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriber.url
       val endTime = Instant.now()
 
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > (busySleep - (100 millis) + busySleep).toMillis
@@ -231,18 +231,20 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     }
 
     "return None if all subscribers have no capacity specified" in new TestCase {
-      registry.add(subscriptionInfo.copy(maybeCapacity = None)).unsafeRunSync()                      shouldBe true
-      registry.add(urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = None)).unsafeRunSync() shouldBe true
+      registry.add(subscriber.copy(maybeCapacity = None)).unsafeRunSync()                  shouldBe true
+      registry.add(testSubscribers.generateOne.copy(maybeCapacity = None)).unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe None
     }
 
     "sum up all the subscribers' capacities if specified" in new TestCase {
-      val capacity1 = totalCapacities.generateOne
-      registry.add(subscriptionInfo.copy(maybeCapacity = capacity1.some)).unsafeRunSync() shouldBe true
-      val capacity2 = totalCapacities.generateOne
+
+      val capacity1 = subscriberCapacities.generateOne
+      registry.add(subscriber.copy(maybeCapacity = capacity1.some)).unsafeRunSync() shouldBe true
+
+      val capacity2 = subscriberCapacities.generateOne
       registry
-        .add(urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = capacity2.some))
+        .add(testSubscribers.generateOne.copy(maybeCapacity = capacity2.some))
         .unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe TotalCapacity(capacity1.value + capacity2.value).some
@@ -251,8 +253,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
   private trait TestCase {
 
-    val subscriptionInfo = urlAndIdSubscriptionInfos.generateOne
-    val subscriberUrl    = subscriptionInfo.subscriberUrl
+    val subscriber = testSubscribers.generateOne
 
     val categoryName    = categoryNames.generateOne
     val checkupInterval = 500 milliseconds
@@ -273,7 +274,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
             ref
           }
         }
-        .unsafeRunSync() shouldBe subscriberUrl
+        .unsafeRunSync() shouldBe subscriber.url
     }
   }
 }

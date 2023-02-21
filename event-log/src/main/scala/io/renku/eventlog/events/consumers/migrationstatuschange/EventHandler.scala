@@ -23,15 +23,15 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.ServiceVersion
+import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{MigrationMessage, MigrationStatus}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: Async: Logger](
@@ -69,7 +69,6 @@ private class EventHandler[F[_]: Async: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[EventHandler[F]] = for {
-    statusUpdater <- StatusUpdater[F]
-  } yield new EventHandler[F](statusUpdater)
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[EventHandler[F]] =
+    StatusUpdater[F].map(new EventHandler[F](_))
 }

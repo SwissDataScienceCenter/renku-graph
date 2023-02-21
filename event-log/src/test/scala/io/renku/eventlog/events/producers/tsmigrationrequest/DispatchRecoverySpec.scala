@@ -21,14 +21,14 @@ package tsmigrationrequest
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.eventlog._
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
-import io.renku.eventlog._
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.eventlog.events.producers.EventsSender.SendingResult.TemporarilyUnavailable
 import io.renku.eventlog.events.producers.Generators.sendingResults
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.subscriberUrls
+import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions

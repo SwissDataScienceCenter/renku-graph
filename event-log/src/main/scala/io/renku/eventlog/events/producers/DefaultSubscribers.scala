@@ -17,11 +17,20 @@
  */
 
 package io.renku.eventlog.events.producers
-package commitsync
 
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.events.CategoryName
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import org.typelevel.log4cats.Logger
 
-private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
-                                       subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[TotalCapacity]
-) extends UrlAndIdSubscriptionInfo
+private object DefaultSubscribers {
+
+  type DefaultSubscribers[F[_]] = Subscribers[F, DefaultSubscriber]
+
+  def apply[F[_]](implicit ev: DefaultSubscribers[F]): DefaultSubscribers[F] = ev
+
+  def apply[F[_]: Async: Logger: DefaultSubscriberTracker](categoryName: CategoryName): F[DefaultSubscribers[F]] =
+    SubscribersRegistry[F](categoryName)
+      .map(new SubscribersImpl[F, DefaultSubscriber](categoryName, _))
+}

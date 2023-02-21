@@ -23,27 +23,27 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.Generators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.Project
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, fixed, nonNegativeInts, positiveInts}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
 import skunk.{Session, ~}
+import skunk.implicits._
 
 class StatusChangerSpec
     extends AnyWordSpec

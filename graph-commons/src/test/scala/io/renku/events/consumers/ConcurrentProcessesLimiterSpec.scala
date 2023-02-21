@@ -24,8 +24,8 @@ import cats.effect.kernel.Deferred
 import cats.effect.std.Semaphore
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, positiveInts}
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory

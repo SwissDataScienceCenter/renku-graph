@@ -25,32 +25,35 @@ import cats.effect._
 import cats.syntax.all._
 import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.events.producers.awaitinggeneration.SubscriptionCategory.categoryName
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.CategoryName
+import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  val name: CategoryName = CategoryName("CLEAN_UP")
-
   def apply[F[
       _
-  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+  ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
       : F[SubscriptionCategory[F]] = for {
-    subscribers <- UrlAndIdSubscribers[F](name)
+    implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
                        eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id)
                      )
     dispatchRecovery <- DispatchRecovery[F]
     eventFinder      <- EventFinder[F]
-    eventsDistributor <-
-      EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
-    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](name, SubscriptionPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](name,
-                                                               subscribers,
-                                                               eventsDistributor,
-                                                               deserializer,
-                                                               CapacityFinder.noOpCapacityFinder[F]
+    eventsDistributor <- EventsDistributor(categoryName,
+                                           subscribers,
+                                           eventFinder,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent),
+                                           dispatchRecovery
+                         )
+  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](categoryName,
+                                                             subscribers,
+                                                             eventsDistributor,
+                                                             CapacityFinder.noOpCapacityFinder[F]
   )
 }

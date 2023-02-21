@@ -21,8 +21,7 @@ package io.renku.eventlog.events.producers
 import Generators._
 import TestCategoryEvent.testCategoryEvents
 import cats.syntax.all._
-import io.renku.events.Generators.categoryNames
-import io.renku.events.consumers.subscriptions._
+import io.renku.events.Generators.{categoryNames, subscriberUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger

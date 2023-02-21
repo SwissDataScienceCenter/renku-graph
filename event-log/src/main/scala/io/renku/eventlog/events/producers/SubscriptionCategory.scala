@@ -21,9 +21,9 @@ package io.renku.eventlog.events.producers
 import cats.{MonadThrow, Semigroup}
 import cats.data.OptionT
 import cats.syntax.all._
-import io.circe.Json
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.events.producers.SubscriptionCategory._
-import io.renku.events.CategoryName
+import io.renku.events.{CategoryName, Subscription}
 
 private trait `SubscriptionCategory`[F[_]] {
   val categoryName: CategoryName
@@ -44,22 +44,22 @@ private[producers] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo](
+private class SubscriptionCategoryImpl[F[_]: MonadThrow, S <: Subscription.Subscriber](
     override val categoryName: CategoryName,
-    subscribers:               Subscribers[F, SI],
+    subscribers:               Subscribers[F, S],
     eventsDistributor:         EventsDistributor[F],
-    deserializer:              SubscriptionPayloadDeserializer[F, SI],
     capacityFinder:            CapacityFinder[F]
-) extends SubscriptionCategory[F] {
+)(implicit decoder: Decoder[S])
+    extends SubscriptionCategory[F] {
 
   override def run(): F[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): F[RegistrationResult] = {
-    for {
-      subscriptionInfo <- OptionT(deserializer deserialize payload)
-      _                <- OptionT.liftF(subscribers add subscriptionInfo)
-    } yield subscriptionInfo
+  override def register(payload: Json): F[RegistrationResult] = OptionT {
+    (decodePayload(payload) map subscribers.add).sequence
   }.cata(default = RejectedRegistration, _ => AcceptedRegistration)
+
+  private lazy val decodePayload: Json => Option[S] =
+    _.as[S].fold(_ => Option.empty[S], _.some)
 
   override def getStatus: F[EventProducerStatus] =
     subscribers.getTotalCapacity match {

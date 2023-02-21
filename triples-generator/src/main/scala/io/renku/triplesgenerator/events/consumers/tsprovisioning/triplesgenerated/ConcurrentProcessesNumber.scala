@@ -16,24 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.awaitinggeneration
+package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated
 
 import cats.MonadThrow
 import io.renku.config.ConfigLoader
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.PositiveInt
 
-private[events] final class GenerationProcessesNumber private (val value: Int) extends AnyVal with IntTinyType
-private object GenerationProcessesNumber
-    extends TinyTypeFactory[GenerationProcessesNumber](new GenerationProcessesNumber(_))
-    with PositiveInt[GenerationProcessesNumber] {
+private[events] final class ConcurrentProcessesNumber private (val value: Int) extends AnyVal with IntTinyType
+private object ConcurrentProcessesNumber
+    extends TinyTypeFactory[ConcurrentProcessesNumber](new ConcurrentProcessesNumber(_))
+    with PositiveInt[ConcurrentProcessesNumber] {
 
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader
 
-  private implicit val configReader: ConfigReader[GenerationProcessesNumber] = intTinyTypeReader(this)
+  private implicit val configReader: ConfigReader[ConcurrentProcessesNumber] = intTinyTypeReader(this)
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[GenerationProcessesNumber] =
-    find[F, GenerationProcessesNumber]("generation-processes-number", config)
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ConcurrentProcessesNumber] =
+    find[F, ConcurrentProcessesNumber]("transformation-processes-number", config)
 }

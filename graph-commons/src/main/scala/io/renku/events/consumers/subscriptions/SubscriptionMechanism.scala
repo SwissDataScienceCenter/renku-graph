@@ -18,12 +18,13 @@
 
 package io.renku.events.consumers.subscriptions
 
+import cats.{Applicative, MonadThrow}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
-import io.renku.events.CategoryName
+import io.circe.Encoder
+import io.renku.events.{CategoryName, Subscription}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -35,13 +36,14 @@ trait SubscriptionMechanism[F[_]] {
   def run():               F[Unit]
 }
 
-private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
+private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger, SP <: Subscription](
     val categoryName:            CategoryName,
-    subscriptionPayloadComposer: SubscriptionPayloadComposer[F],
+    subscriptionPayloadComposer: SubscriptionPayloadComposer[F, SP],
     subscriptionSender:          SubscriptionSender[F],
     initialDelay:                FiniteDuration,
     renewDelay:                  FiniteDuration
-) extends SubscriptionMechanism[F] {
+)(implicit subscriptionPayloadEncoder: Encoder[SP])
+    extends SubscriptionMechanism[F] {
 
   import cats.effect.kernel.Ref
 
@@ -49,15 +51,12 @@ private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
 
   import applicative._
   import cats.syntax.all._
-  import io.circe.Json
+  import io.circe.syntax._
   import subscriptionPayloadComposer._
   import subscriptionSender._
 
   override def renewSubscription(): F[Unit] = {
-    for {
-      subscriptionPayload <- prepareSubscriptionPayload()
-      _                   <- postToEventLog(subscriptionPayload)
-    } yield ()
+    prepareSubscriptionPayload().map(_.asJson) >>= postToEventLog
   } recoverWith { case NonFatal(exception) =>
     Logger[F].error(exception)(s"$categoryName: Problem with notifying event-log") >>
       exception.raiseError[F, Unit]
@@ -72,7 +71,7 @@ private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
     for {
       _            <- ().pure[F]
       payload      <- prepareSubscriptionPayload()
-      postingError <- postToEventLog(payload).map(_ => false).recoverWith(logPostError)
+      postingError <- postToEventLog(payload.asJson).map(_ => false).recoverWith(logPostError)
       shouldLog    <- initOrError getAndSet postingError
       _            <- whenA(shouldLog && !postingError)(logInfo(payload))
       _            <- Temporal[F] sleep renewDelay
@@ -93,14 +92,10 @@ private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
     )
   }
 
-  private def logInfo(payload: Json) =
+  private def logInfo: Subscription => F[Unit] = { subscription =>
     Logger[F].info(
-      s"$categoryName: Subscribed for events with ${payload.subscriberUrl}, id = ${payload.subscriberId}"
+      show"$categoryName: Subscribed for events with ${subscription.subscriber.url}, id = ${subscription.subscriber.id}"
     )
-
-  private implicit class PayloadOps(json: Json) {
-    lazy val subscriberId:  String = json.hcursor.downField("subscriber").downField("id").as[String].getOrElse("")
-    lazy val subscriberUrl: String = json.hcursor.downField("subscriber").downField("url").as[String].getOrElse("")
   }
 }
 
@@ -110,20 +105,20 @@ object SubscriptionMechanism {
 
   import scala.concurrent.duration._
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger, S <: Subscription](
       categoryName:                       CategoryName,
-      subscriptionPayloadComposerFactory: Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]],
+      subscriptionPayloadComposerFactory: Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, S]],
       configuration:                      Config = ConfigFactory.load()
-  ): F[SubscriptionMechanism[F]] = for {
+  )(implicit subscriptionEncoder: Encoder[S]): F[SubscriptionMechanism[F]] = for {
     initialDelay                <- find[F, FiniteDuration]("event-subscription-initial-delay", configuration)
     renewDelay                  <- find[F, FiniteDuration]("event-subscription-renew-delay", configuration)
     subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)
     subscriptionSender          <- SubscriptionSender[F]
-  } yield new SubscriptionMechanismImpl[F](categoryName,
-                                           subscriptionPayloadComposer,
-                                           subscriptionSender,
-                                           initialDelay,
-                                           renewDelay
+  } yield new SubscriptionMechanismImpl[F, S](categoryName,
+                                              subscriptionPayloadComposer,
+                                              subscriptionSender,
+                                              initialDelay,
+                                              renewDelay
   )
 
   def noOpSubscriptionMechanism[F[_]: MonadThrow](category: CategoryName): SubscriptionMechanism[F] =

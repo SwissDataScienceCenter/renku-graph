@@ -28,7 +28,7 @@ import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.{DispatchRecovery, SubscriptionTypeSerializers}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion

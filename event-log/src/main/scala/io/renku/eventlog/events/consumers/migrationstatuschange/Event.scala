@@ -19,9 +19,9 @@
 package io.renku.eventlog.events.consumers.migrationstatuschange
 
 import io.renku.config.ServiceVersion
-import io.renku.eventlog.MigrationStatus.{Done, NonRecoverableFailure, RecoverableFailure}
 import io.renku.eventlog.{MigrationMessage, MigrationStatus}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.eventlog.MigrationStatus.{Done, NonRecoverableFailure, RecoverableFailure}
+import io.renku.events.Subscription.SubscriberUrl
 
 private trait Event extends Product with Serializable {
   type NewStatus <: MigrationStatus

@@ -28,12 +28,13 @@ import org.typelevel.log4cats.Logger
 
 private object MigrationSubscribers {
 
-  type MigrationSubscribers[F[_]] = Subscribers[F, MigratorSubscriptionInfo]
+  type MigrationSubscribers[F[_]] = Subscribers[F, MigrationSubscriber]
 
   def apply[F[_]](implicit subscribers: MigrationSubscribers[F]): MigrationSubscribers[F] = subscribers
 
-  def apply[F[_]: Async: SubscriberTracker: Logger](categoryName: CategoryName): F[MigrationSubscribers[F]] = for {
-    subscribersRegistry <- SubscribersRegistry[F](categoryName)
-    subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry))
-  } yield subscribers
+  def apply[F[_]: Async: MigrationSubscriberTracker: Logger](categoryName: CategoryName): F[MigrationSubscribers[F]] =
+    for {
+      subscribersRegistry <- SubscribersRegistry[F](categoryName)
+      subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry))
+    } yield subscribers
 }

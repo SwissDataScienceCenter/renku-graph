@@ -16,12 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.producers
-package membersync
+package io.renku.eventlog.events.producers.tsmigrationrequest
 
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import Generators._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
-                                       subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[TotalCapacity]
-) extends UrlAndIdSubscriptionInfo
+class MigrationSubscriberSpec extends AnyWordSpec with should.Matchers {
+
+  "show" should {
+
+    "return a String representation with the url, id and version" in {
+      val info = migrationSubscribers.generateOne
+      info.show shouldBe s"subscriber = ${info.url}, id = ${info.id}, version = ${info.version}"
+    }
+  }
+}

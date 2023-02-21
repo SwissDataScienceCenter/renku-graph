@@ -21,15 +21,15 @@ package io.renku.eventlog.events.consumers.migrationstatuschange
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event._
-import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
-import io.renku.events.consumers.subscriptions.subscriberUrls
+import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec

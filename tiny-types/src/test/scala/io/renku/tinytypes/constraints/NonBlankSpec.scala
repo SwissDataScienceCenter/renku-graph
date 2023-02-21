@@ -30,7 +30,7 @@ class NonBlankSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
     "be instantiatable when values are not blank" in {
       forAll(nonEmptyStrings()) { someValue =>
-        NonBlankString(someValue).toString shouldBe someValue.toString
+        NonBlankString(someValue).toString shouldBe someValue
       }
     }
 

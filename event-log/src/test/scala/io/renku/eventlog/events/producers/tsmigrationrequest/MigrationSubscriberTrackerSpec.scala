@@ -22,11 +22,12 @@ import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
 import io.renku.config.ServiceVersion
+import io.renku.eventlog._
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigtationTypeSerializers._
-import io.renku.eventlog._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberIds, subscriberUrls}
+import io.renku.events.Generators.{subscriberIds, subscriberUrls}
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.metrics.TestMetricsRegistry
@@ -40,7 +41,7 @@ import skunk.implicits._
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MICROS
 
-class SubscriberTrackerSpec
+class MigrationSubscriberTrackerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -53,36 +54,36 @@ class SubscriberTrackerSpec
       "if there's no row for the version " +
       "and the version -> url pair does not exists" in new TestCase {
 
-        (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+        (tracker add subscriber).unsafeRunSync() shouldBe true
 
-        findRows(subscriptionInfo.subscriberUrl) shouldBe List(
-          (subscriptionInfo.subscriberUrl, subscriptionInfo.subscriberVersion, New, ChangeDate(now), None)
+        findRows(subscriber.url) shouldBe List(
+          (subscriber.url, subscriber.version, New, ChangeDate(now), None)
         )
       }
 
     "do nothing if there's already a row for the version -> url pair" in new TestCase {
 
-      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+      (tracker add subscriber).unsafeRunSync() shouldBe true
 
-      val differentIdInfo = subscriptionInfo.copy(subscriberId = subscriberIds.generateOne)
+      val differentIdInfo = subscriber.copy(id = subscriberIds.generateOne)
       (tracker add differentIdInfo).unsafeRunSync() shouldBe true
 
-      findRows(subscriptionInfo.subscriberUrl) shouldBe List(
-        (subscriptionInfo.subscriberUrl, subscriptionInfo.subscriberVersion, New, ChangeDate(now), None)
+      findRows(subscriber.url) shouldBe List(
+        (subscriber.url, subscriber.version, New, ChangeDate(now), None)
       )
     }
 
     "insert a new row " +
       "if there's a different version for the same url" in new TestCase {
 
-        (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+        (tracker add subscriber).unsafeRunSync() shouldBe true
 
-        val differentVersionInfo = subscriptionInfo.copy(subscriberVersion = serviceVersions.generateOne)
+        val differentVersionInfo = subscriber.copy(version = serviceVersions.generateOne)
         (tracker add differentVersionInfo).unsafeRunSync() shouldBe true
 
-        findRows(subscriptionInfo.subscriberUrl) should contain theSameElementsAs List(
-          (subscriptionInfo.subscriberUrl, subscriptionInfo.subscriberVersion, New, ChangeDate(now), None),
-          (differentVersionInfo.subscriberUrl, differentVersionInfo.subscriberVersion, New, ChangeDate(now), None)
+        findRows(subscriber.url) should contain theSameElementsAs List(
+          (subscriber.url, subscriber.version, New, ChangeDate(now), None),
+          (differentVersionInfo.url, differentVersionInfo.version, New, ChangeDate(now), None)
         )
       }
 
@@ -91,7 +92,7 @@ class SubscriberTrackerSpec
       "but all the other same version urls are not in DONE" in new TestCase {
 
         val otherStatusesInfos = (MigrationStatus.all - Done) map { status =>
-          val sameVersionInfo = subscriptionInfo.copy(subscriberUrl = subscriberUrls.generateOne)
+          val sameVersionInfo = subscriber.copy(url = subscriberUrls.generateOne)
           (tracker add sameVersionInfo).unsafeRunSync() shouldBe true
 
           updateStatus(sameVersionInfo, status)
@@ -99,32 +100,30 @@ class SubscriberTrackerSpec
           status -> sameVersionInfo
         }
 
-        (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+        (tracker add subscriber).unsafeRunSync() shouldBe true
 
-        findRows(subscriptionInfo.subscriberUrl) shouldBe List(
-          (subscriptionInfo.subscriberUrl, subscriptionInfo.subscriberVersion, New, ChangeDate(now), None)
+        findRows(subscriber.url) shouldBe List(
+          (subscriber.url, subscriber.version, New, ChangeDate(now), None)
         )
         otherStatusesInfos.map { case (status, info) =>
-          findRows(info.subscriberUrl) shouldBe List(
-            (info.subscriberUrl, info.subscriberVersion, status, ChangeDate(now), None)
-          )
+          findRows(info.url) shouldBe List((info.url, info.version, status, ChangeDate(now), None))
         }
       }
 
     "do not add a new row " +
       "if there's at least one url for the version already in status DONE" in new TestCase {
 
-        val sameVersionInfoDone = subscriptionInfo.copy(subscriberUrl = subscriberUrls.generateOne)
+        val sameVersionInfoDone = subscriber.copy(url = subscriberUrls.generateOne)
         (tracker add sameVersionInfoDone).unsafeRunSync() shouldBe true
 
         updateStatus(sameVersionInfoDone, Done)
 
-        (tracker add subscriptionInfo).unsafeRunSync() shouldBe false
+        (tracker add subscriber).unsafeRunSync() shouldBe false
 
-        findRows(sameVersionInfoDone.subscriberUrl) shouldBe List(
-          (sameVersionInfoDone.subscriberUrl, sameVersionInfoDone.subscriberVersion, Done, ChangeDate(now), None)
+        findRows(sameVersionInfoDone.url) shouldBe List(
+          (sameVersionInfoDone.url, sameVersionInfoDone.version, Done, ChangeDate(now), None)
         )
-        findRows(subscriptionInfo.subscriberUrl) shouldBe Nil
+        findRows(subscriber.url) shouldBe Nil
       }
   }
 
@@ -133,36 +132,36 @@ class SubscriberTrackerSpec
     New :: Sent :: NonRecoverableFailure :: RecoverableFailure :: Nil foreach { status =>
       s"delete version -> url pair if exists and not in status $status" in new TestCase {
 
-        (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+        (tracker add subscriber).unsafeRunSync() shouldBe true
 
-        updateStatus(subscriptionInfo, status)
+        updateStatus(subscriber, status)
 
-        (tracker remove subscriptionInfo.subscriberUrl).unsafeRunSync() shouldBe true
+        (tracker remove subscriber.url).unsafeRunSync() shouldBe true
 
-        findRows(subscriptionInfo.subscriberUrl) shouldBe Nil
+        findRows(subscriber.url) shouldBe Nil
       }
     }
 
     "do not remove version -> url pairs with status DONE" in new TestCase {
 
-      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
-      updateStatus(subscriptionInfo, Done)
+      (tracker add subscriber).unsafeRunSync() shouldBe true
+      updateStatus(subscriber, Done)
 
-      val sameUrlDifferentVersion = subscriptionInfo.copy(subscriberVersion = serviceVersions.generateOne)
+      val sameUrlDifferentVersion = subscriber.copy(version = serviceVersions.generateOne)
       (tracker add sameUrlDifferentVersion).unsafeRunSync() shouldBe true
       updateStatus(sameUrlDifferentVersion, Done)
 
-      val sameUrlDifferentVersionNotDone1 = subscriptionInfo.copy(subscriberVersion = serviceVersions.generateOne)
+      val sameUrlDifferentVersionNotDone1 = subscriber.copy(version = serviceVersions.generateOne)
       (tracker add sameUrlDifferentVersionNotDone1).unsafeRunSync() shouldBe true
 
-      val sameUrlDifferentVersionNotDone2 = subscriptionInfo.copy(subscriberVersion = serviceVersions.generateOne)
+      val sameUrlDifferentVersionNotDone2 = subscriber.copy(version = serviceVersions.generateOne)
       (tracker add sameUrlDifferentVersionNotDone2).unsafeRunSync() shouldBe true
 
-      (tracker remove subscriptionInfo.subscriberUrl).unsafeRunSync() shouldBe true
+      (tracker remove subscriber.url).unsafeRunSync() shouldBe true
 
-      findRows(subscriptionInfo.subscriberUrl) should contain theSameElementsAs List(
-        (subscriptionInfo.subscriberUrl, subscriptionInfo.subscriberVersion, Done, ChangeDate(now), None),
-        (subscriptionInfo.subscriberUrl, sameUrlDifferentVersion.subscriberVersion, Done, ChangeDate(now), None)
+      findRows(subscriber.url) should contain theSameElementsAs List(
+        (subscriber.url, subscriber.version, Done, ChangeDate(now), None),
+        (subscriber.url, sameUrlDifferentVersion.version, Done, ChangeDate(now), None)
       )
     }
 
@@ -172,13 +171,13 @@ class SubscriberTrackerSpec
   }
 
   private trait TestCase {
-    val subscriptionInfo = migratorSubscriptionInfos.generateOne
-    val now              = Instant.now().truncatedTo(MICROS)
+    val subscriber = migrationSubscribers.generateOne
+    val now        = Instant.now().truncatedTo(MICROS)
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val currentTime = mockFunction[Instant]
-    val tracker     = new SubscriberTracker[IO](currentTime)
+    private val currentTime = mockFunction[Instant]
+    val tracker             = new MigrationSubscriberTracker[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
@@ -203,7 +202,7 @@ class SubscriberTrackerSpec
     }
   }
 
-  private def updateStatus(info: MigratorSubscriptionInfo, status: MigrationStatus): Unit = execute[Unit] {
+  private def updateStatus(info: MigrationSubscriber, status: MigrationStatus): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[MigrationStatus ~ SubscriberUrl ~ ServiceVersion] =
         sql"""UPDATE ts_migration
@@ -212,7 +211,7 @@ class SubscriberTrackerSpec
           """.command
       session
         .prepare(query)
-        .flatMap(_.execute(status ~ info.subscriberUrl ~ info.subscriberVersion))
+        .flatMap(_.execute(status ~ info.url ~ info.version))
         .void
     }
   }

@@ -18,33 +18,36 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
+import io.circe.literal._
+import io.circe.syntax._
 import io.renku.events.Generators.subscriberUrls
 import io.renku.events.Subscription.SubscriberId
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.MicroserviceIdentifier
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.TryValues
 
-import scala.util.Try
+class MigrationsSubscriptionSpec extends AnyWordSpec with should.Matchers {
 
-class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
+  "encoder" should {
 
-  "prepareSubscriptionPayload" should {
+    "produce json from SubscriptionPayload with subscriber with capacity" in {
 
-    s"return Payload containing the '$categoryName' Category name, found subscriberUrl, service id and version" in new TestCase {
-      composer.prepareSubscriptionPayload().success.value shouldBe MigrationsSubscription(
-        Subscriber(subscriberUrl, SubscriberId(serviceId), serviceVersion)
-      )
+      val subscriberUrl  = subscriberUrls.generateOne
+      val serviceId      = MicroserviceIdentifier.generate
+      val serviceVersion = serviceVersions.generateOne
+      val subscriptionPayload =
+        MigrationsSubscription(Subscriber(subscriberUrl, SubscriberId(serviceId), serviceVersion))
+
+      subscriptionPayload.asJson shouldBe json"""{
+        "categoryName": $categoryName,
+        "subscriber": {
+          "url":     $subscriberUrl,
+          "id":      $serviceId,
+          "version": $serviceVersion
+        }
+      }"""
     }
-  }
-
-  private trait TestCase {
-    val subscriberUrl  = subscriberUrls.generateOne
-    val serviceId      = MicroserviceIdentifier.generate
-    val serviceVersion = serviceVersions.generateOne
-    val composer       = new PayloadComposer[Try](subscriberUrl, serviceId, serviceVersion)
   }
 }

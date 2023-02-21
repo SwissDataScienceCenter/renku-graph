@@ -20,31 +20,42 @@ package io.renku.eventlog.events.producers
 
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{Microservice, TypeSerializers}
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
-private trait UrlAndIdSubscriberTracker[F[_]] extends SubscriberTracker[F, UrlAndIdSubscriptionInfo] {
-  def add(subscriptionInfo: UrlAndIdSubscriptionInfo): F[Boolean]
-  def remove(subscriberUrl: SubscriberUrl):            F[Boolean]
+private trait DefaultSubscriberTracker[F[_]] extends SubscriberTracker[F, DefaultSubscriber] {
+  def add(subscriber:       DefaultSubscriber): F[Boolean]
+  def remove(subscriberUrl: SubscriberUrl):     F[Boolean]
 }
 
-private class UrlAndIdSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+private object DefaultSubscriberTracker {
+
+  def apply[F[_]](implicit tracker: DefaultSubscriberTracker[F]): DefaultSubscriberTracker[F] = tracker
+
+  def create[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[DefaultSubscriberTracker[F]] = for {
+    microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
+    sourceUrl             <- microserviceUrlFinder.findBaseUrl()
+  } yield new DefaultSubscriberTrackerImpl[F](sourceUrl)
+}
+
+private class DefaultSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
     sourceUrl: MicroserviceBaseUrl
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
-    with UrlAndIdSubscriberTracker[F]
+    with DefaultSubscriberTracker[F]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: UrlAndIdSubscriptionInfo): F[Boolean] = SessionResource[F].useK {
+  override def add(subscriber: DefaultSubscriber): F[Boolean] = SessionResource[F].useK {
     measureExecutionTime(
-      SqlStatement(name = "subscriber - add")
+      SqlStatement
+        .named("subscriber - add")
         .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
           sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
                 VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
@@ -52,16 +63,15 @@ private class UrlAndIdSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResou
                 DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
                """.command
         )
-        .arguments(
-          subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl ~ subscriptionInfo.subscriberId
-        )
+        .arguments(subscriber.id ~ subscriber.url ~ sourceUrl ~ subscriber.id)
         .build
     ) map insertToTableResult
   }
 
   override def remove(subscriberUrl: SubscriberUrl): F[Boolean] = SessionResource[F].useK {
     measureExecutionTime(
-      SqlStatement(name = "subscriber - delete")
+      SqlStatement
+        .named("subscriber - delete")
         .command[SubscriberUrl ~ MicroserviceBaseUrl](
           sql"""DELETE FROM subscriber
                 WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
@@ -81,14 +91,4 @@ private class UrlAndIdSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResou
     case Completion.Insert(0 | 1) => true
     case _                        => false
   }
-}
-
-private object UrlAndIdSubscriberTracker {
-
-  def apply[F[_]](implicit tracker: UrlAndIdSubscriberTracker[F]): UrlAndIdSubscriberTracker[F] = tracker
-
-  def create[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[UrlAndIdSubscriberTracker[F]] = for {
-    microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
-    sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new UrlAndIdSubscriberTrackerImpl[F](sourceUrl)
 }
