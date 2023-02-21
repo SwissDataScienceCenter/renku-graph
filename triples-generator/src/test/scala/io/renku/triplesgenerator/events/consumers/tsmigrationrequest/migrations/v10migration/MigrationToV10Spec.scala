@@ -18,24 +18,21 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
+package v10migration
 
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
 import cats.MonadThrow
 import io.renku.generators.Generators.{exceptions, positiveInts}
-import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
-import io.renku.triplesstore._
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -50,30 +47,41 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     }
   }
 
-  "query" should {
+  "migrate" should {
 
-    "find all projects that exists in the Default Graph but not in the Named Graphs dataset" in new TestCase {
+    "go through all projects found in the TS, " +
+      "wait until the env has capacity to serve a new re-provisioning event, " +
+      "send the CLEAN_UP_REQUEST event to EL for each of them, " +
+      "keep a note of the project once an event is sent for it, " +
+      "explicitly run the post migration procedure " +
+      "and remove info about all migrated projects" in new TestCase {
 
-      val allProjects = projectPaths.generateList(min = chunkSize, max = chunkSize * 2)
+        val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
-      val projectsChunks = allProjects
-        .sliding(chunkSize, chunkSize)
-        .toList
-      projectsChunks.zipWithIndex foreach givenProjectsChunkReturned
-      givenProjectsChunkReturned(List.empty[projects.Path] -> projectsChunks.size)
+        val projectsPages = allProjects
+          .sliding(pageSize, pageSize)
+          .toList
+        givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
 
-      allProjects map toCleanUpRequestEvent foreach givenEventIsSent
+        givenEnvHasCapabilitiesToTakeNextEvent
 
-      migration.migrate().value.unsafeRunSync() shouldBe ().asRight
-    }
+        allProjects map toCleanUpRequestEvent foreach verifyEventWasSent
+
+        allProjects foreach verifyProjectNotedDone
+
+        verifyMigrationExecutionRegistered
+
+        verifyPostMigrationCleanUpRun
+
+        migration.migrate().value.unsafeRunSync() shouldBe ().asRight
+      }
 
     "return a Recoverable Error if in case of an exception while finding projects " +
       "the given strategy returns one" in new TestCase {
 
         val exception = exceptions.generateOne
-
-        (projectsFinder.findProjects _)
-          .expects(1)
+        (() => projectsFinder.nextProjectsPage())
+          .expects()
           .returning(exception.raiseError[IO, List[projects.Path]])
 
         migration.migrate().value.unsafeRunSync() shouldBe recoverableError.asLeft
@@ -81,27 +89,43 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
   }
 
   private trait TestCase {
-    val chunkSize = positiveInts(max = 100).generateOne.value
+    val pageSize = positiveInts(max = 100).generateOne.value
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectsFinder            = mock[PagedProjectsFinder[IO]]
-    private val eventSender       = mock[EventSender[IO]]
-    private val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recoverableError          = processingRecoverableErrors.generateOne
+    val projectsFinder               = mock[PagedProjectsFinder[IO]]
+    private val envReadinessChecker  = mock[EnvReadinessChecker[IO]]
+    private val eventSender          = mock[EventSender[IO]]
+    private val projectDonePersister = mock[ProjectDonePersister[IO]]
+    private val executionRegister    = mock[MigrationExecutionRegister[IO]]
+    private val projectsDoneCleanUp  = mock[ProjectsDoneCleanUp[IO]]
+    val recoverableError             = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new MigrationToV10[IO](projectsFinder, eventSender, executionRegister, recoveryStrategy)
+    val migration = new MigrationToV10[IO](projectsFinder,
+                                           envReadinessChecker,
+                                           eventSender,
+                                           projectDonePersister,
+                                           executionRegister,
+                                           projectsDoneCleanUp,
+                                           recoveryStrategy
+    )
 
-    def givenProjectsChunkReturned: ((List[projects.Path], Int)) => Unit = { case (chunk, idx) =>
-      (projectsFinder.findProjects _)
-        .expects(idx + 1)
-        .returning(chunk.pure[IO])
-      ()
-    }
+    def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
+      pages foreach { page =>
+        (projectsFinder.nextProjectsPage _)
+          .expects()
+          .returning(page.pure[IO])
+      }
+
+    def givenEnvHasCapabilitiesToTakeNextEvent =
+      (() => envReadinessChecker.envReadyToTakeEvent)
+        .expects()
+        .returning(().pure[IO])
+        .atLeastOnce()
 
     def toCleanUpRequestEvent(projectPath: projects.Path) = projectPath -> EventRequestContent.NoPayload {
       json"""{
@@ -112,7 +136,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       }"""
     }
 
-    lazy val givenEventIsSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
+    lazy val verifyEventWasSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(event,
@@ -123,39 +147,20 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         .returning(().pure[IO])
       ()
     }
-  }
-}
 
-class ProjectsFinderSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with InMemoryJenaForSpec
-    with ProjectsDataset {
+    def verifyProjectNotedDone(path: projects.Path) =
+      (projectDonePersister.noteDone _)
+        .expects(path)
+        .returning(().pure[IO])
 
-  private val chunkSize = 50
+    def verifyMigrationExecutionRegistered =
+      (executionRegister.registerExecution _)
+        .expects(MigrationToV10.name)
+        .returning(().pure[IO])
 
-  "findProjects" should {
-
-    "find requested page of projects existing in the TS" in new TestCase {
-
-      val projects = anyProjectEntities
-        .generateList(min = chunkSize + 1, max = Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
-        .map(_.to[entities.Project])
-        .sortBy(_.path)
-
-      upload(to = projectsDataset, projects: _*)
-
-      val (page1, page2) = projects splitAt chunkSize
-      finder.findProjects(page = 1).unsafeRunSync() shouldBe page1.map(_.path)
-      finder.findProjects(page = 2).unsafeRunSync() shouldBe page2.map(_.path)
-      finder.findProjects(page = 3).unsafeRunSync() shouldBe Nil
-    }
-  }
-
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new PagedProjectsFinderImpl[IO](RecordsFinder(projectsDSConnectionInfo))
+    def verifyPostMigrationCleanUpRun =
+      (projectsDoneCleanUp.cleanUp _)
+        .expects()
+        .returning(().pure[IO])
   }
 }

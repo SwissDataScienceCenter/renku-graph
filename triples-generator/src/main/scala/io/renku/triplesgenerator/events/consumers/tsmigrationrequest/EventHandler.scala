@@ -161,7 +161,7 @@ private[events] object EventHandler {
     tsStateChecker           <- TSStateChecker[F]
     migrationsRunner         <- MigrationsRunner[F](config)
     eventSender              <- EventSender[F](EventLogUrl)
-    concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
+    concurrentProcessLimiter <- ConcurrentProcessesLimiter(processesCount = 1)
   } yield new EventHandler[F](subscriberUrl,
                               serviceId,
                               serviceVersion,
