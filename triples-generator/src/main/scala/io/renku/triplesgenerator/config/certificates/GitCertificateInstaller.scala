@@ -25,7 +25,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait GitCertificateInstaller[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 object GitCertificateInstaller {
@@ -46,7 +46,7 @@ class GitCertificateInstallerImpl[F[_]: MonadThrow: Logger](
 
   import cats.syntax.all._
 
-  def run(): F[Unit] = findCertificate() flatMap {
+  def run: F[Unit] = findCertificate() flatMap {
     case None => ().pure[F]
     case Some(certificate) =>
       for {

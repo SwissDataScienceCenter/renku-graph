@@ -28,7 +28,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 trait GaugeResetScheduler[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class GaugeResetSchedulerImpl[F[_]: MonadThrow: Temporal: Logger, LabelValue](
@@ -36,7 +36,7 @@ class GaugeResetSchedulerImpl[F[_]: MonadThrow: Temporal: Logger, LabelValue](
     metricsSchedulerConfig: MetricsConfigProvider[F]
 ) extends GaugeResetScheduler[F] {
 
-  override def run(): F[Unit] = for {
+  override def run: F[Unit] = for {
     interval <- metricsSchedulerConfig.getInterval()
     _        <- resetGauges
     _        <- resetGaugesEvery(interval).foreverM[Unit]

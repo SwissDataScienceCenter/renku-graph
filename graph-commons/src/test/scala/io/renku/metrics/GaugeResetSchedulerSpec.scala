@@ -58,7 +58,7 @@ class GaugeResetSchedulerSpec
         gauge1.givenResetMethodToReturn add IO.unit
         gauge2.givenResetMethodToReturn add IO.unit
 
-        gaugeScheduler.run().start.unsafeRunAndForget()
+        gaugeScheduler.run.start.unsafeRunAndForget()
 
         sleep(2 * interval.toMillis + 1000)
 
@@ -78,7 +78,7 @@ class GaugeResetSchedulerSpec
       val exception2 = exceptions.generateOne
       gauge2.givenResetMethodToReturn add IO.raiseError(exception2)
 
-      gaugeScheduler.run().start.unsafeRunAndForget()
+      gaugeScheduler.run.start.unsafeRunAndForget()
 
       sleep(3 * interval.toMillis + 1000)
 

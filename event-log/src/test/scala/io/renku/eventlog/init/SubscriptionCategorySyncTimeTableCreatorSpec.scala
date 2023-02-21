@@ -43,7 +43,7 @@ class SubscriptionCategorySyncTimeTableCreatorSpec
 
       tableExists("subscription_category_sync_time") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("subscription_category_sync_time") shouldBe true
 
@@ -51,7 +51,7 @@ class SubscriptionCategorySyncTimeTableCreatorSpec
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'subscription_category_sync_time' table exists"))
 
@@ -61,7 +61,7 @@ class SubscriptionCategorySyncTimeTableCreatorSpec
 
       tableExists("subscription_category_sync_time") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("subscription_category_sync_time") shouldBe true
 

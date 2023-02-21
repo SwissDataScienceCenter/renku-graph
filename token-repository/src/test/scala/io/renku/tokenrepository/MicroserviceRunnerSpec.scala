@@ -51,7 +51,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
@@ -87,7 +87,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
@@ -104,7 +104,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      given(Runnable(httpServer.run)).fails(becauseOf = exception)
 
       intercept[Exception] {
         runner.run().unsafeRunSync()

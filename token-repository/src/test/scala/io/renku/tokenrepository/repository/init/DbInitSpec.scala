@@ -41,7 +41,7 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
 
   before {
     findAllTables() foreach dropTable
-    migrationsToRun.map(_.run()).sequence.unsafeRunSync()
+    migrationsToRun.map(_.run).sequence.unsafeRunSync()
   }
 
   private def findAllTables(): List[String] = execute {

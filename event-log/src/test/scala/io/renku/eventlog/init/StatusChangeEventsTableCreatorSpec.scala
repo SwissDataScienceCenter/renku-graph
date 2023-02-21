@@ -37,11 +37,11 @@ class StatusChangeEventsTableCreatorSpec extends AnyWordSpec with IOSpec with Db
 
     "create the 'status_change_events_queue' table if does not exist" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'status_change_events_queue' table created"))
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'status_change_events_queue' table created"),
                         Info("'status_change_events_queue' table exists")
@@ -50,7 +50,7 @@ class StatusChangeEventsTableCreatorSpec extends AnyWordSpec with IOSpec with Db
 
     "create indices for the date and event_type columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_date;".command)
       verifyTrue(sql"DROP INDEX idx_event_type;".command)

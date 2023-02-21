@@ -45,9 +45,9 @@ class MicroserviceRunnerSpec
 
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
-        given(httpServer).succeeds(returning = ExitCode.Success)
+        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
-        runner.run().unsafeRunSync() shouldBe ExitCode.Success
+        runner.run.unsafeRunSync() shouldBe ExitCode.Success
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -56,7 +56,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -67,7 +67,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -76,10 +76,10 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      given(Runnable(httpServer.run)).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
     }
   }

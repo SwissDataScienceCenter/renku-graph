@@ -37,7 +37,7 @@ private class PayloadTypeChangerImpl[F[_]: MonadCancelThrow: Logger: SessionReso
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkIfAlreadyMigrated >>= {
       case true =>
         Kleisli.liftF(Logger[F].info("event_payload.payload already in bytea type"))

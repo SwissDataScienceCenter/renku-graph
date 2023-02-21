@@ -32,7 +32,7 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 trait EventLogMetrics[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class EventLogMetricsImpl[F[_]: Temporal: Logger](
@@ -43,7 +43,7 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
     interval:                FiniteDuration = EventLogMetrics.interval
 ) extends EventLogMetrics[F] {
 
-  override def run(): F[Unit] = updateStatuses().foreverM[Unit]
+  override def run: F[Unit] = updateStatuses().foreverM[Unit]
 
   private def updateStatuses(): F[Unit] = for {
     _ <- Temporal[F] sleep interval

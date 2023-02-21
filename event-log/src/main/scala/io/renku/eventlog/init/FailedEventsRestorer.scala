@@ -47,7 +47,7 @@ private class FailedEventsRestorerImpl[F[_]: MonadCancelThrow: Logger: SessionRe
     discardingStatuses: List[EventStatus]
 ) extends FailedEventsRestorer[F] {
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     Kleisli[F, Session[F], Completion](_ execute updateQuery) flatMapF {
       case Completion.Update(count) => Logger[F].info(s"$count events restored for processing from '$failure'")
       case completion => Logger[F].info(s"Events restoration for processing from '$failure' did not work: $completion")

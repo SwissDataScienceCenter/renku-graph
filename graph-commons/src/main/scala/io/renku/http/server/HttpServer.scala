@@ -20,33 +20,36 @@ package io.renku.http.server
 
 import cats.data.Kleisli
 import cats.effect._
-import cats.syntax.all._
-import org.http4s.blaze.server._
+import org.http4s.ember.server._
 import org.http4s.{HttpApp, HttpRoutes, Request, Response}
+import com.comcast.ip4s._
+import org.http4s.server.Server
 
 trait HttpServer[F[_]] {
   val httpApp: HttpApp[F]
-  def run(): F[ExitCode]
+  def createServer: Resource[F, Server]
+
+  final def run(implicit F: Spawn[F]): F[ExitCode] = createServer.use(_ => Spawn[F].never[ExitCode])
 }
 
 object HttpServer {
-  def apply[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]): HttpServer[F] =
+  def apply[F[_]: Async](serverPort: Port, serviceRoutes: HttpRoutes[F]): HttpServer[F] =
     new HttpServerImpl[F](serverPort, serviceRoutes)
 }
 
-class HttpServerImpl[F[_]: Async](serverPort: Int, serviceRoutes: HttpRoutes[F]) extends HttpServer[F] {
+class HttpServerImpl[F[_]: Async](serverPort: Port, serviceRoutes: HttpRoutes[F]) extends HttpServer[F] {
 
   import QueryParameterTools.resourceNotFound
 
   lazy val httpApp: HttpApp[F] = serviceRoutes.orNotFound
 
-  def run(): F[ExitCode] = BlazeServerBuilder[F]
-    .bindHttp(serverPort, "0.0.0.0")
-    .withHttpApp(httpApp)
-    .serve
-    .compile
-    .drain
-    .as(ExitCode.Success)
+  def createServer: Resource[F, Server] =
+    EmberServerBuilder
+      .default[F]
+      .withHost(ipv4"0.0.0.0")
+      .withPort(serverPort)
+      .withHttpApp(httpApp)
+      .build
 
   private implicit class RoutesOps(routes: HttpRoutes[F]) {
     def orNotFound: Kleisli[F, Request[F], Response[F]] = Kleisli {

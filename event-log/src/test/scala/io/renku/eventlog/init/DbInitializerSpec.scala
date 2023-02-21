@@ -52,7 +52,7 @@ class DbInitializerSpec
           .expects(where((f: Boolean => Boolean) => !f(true) && !f(false)))
           .returning(IO.unit)
 
-        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+        dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
         logger.loggedOnly(Info("Event Log database initialization success"))
       }
@@ -79,7 +79,7 @@ class DbInitializerSpec
           .returning(IO.unit)
 
       }
-      dbInitializer.run().unsafeRunSync()
+      dbInitializer.run.unsafeRunSync()
 
       logger.loggedOnly(Error("Event Log database initialization failed: retrying 1 time(s)", exception),
                         Info("Event Log database initialization success")

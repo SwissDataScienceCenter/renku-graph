@@ -66,7 +66,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
   import tokenValidator._
   import tokensCreator._
 
-  override def run(): F[Unit] =
+  override def run: F[Unit] =
     Stream
       .repeatEval(findTokenWithoutDates)
       .unNoneTerminate

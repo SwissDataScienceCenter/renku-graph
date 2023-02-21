@@ -66,7 +66,7 @@ class MicroserviceRunnerSpec
         given(eventProducersRegistry).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
         given(eventsQueue).succeeds(returning = ())
-        given(httpServer).succeeds(returning = ExitCode.Success)
+        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunAndForget()
 
@@ -99,7 +99,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
@@ -116,7 +116,7 @@ class MicroserviceRunnerSpec
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      given(Runnable(httpServer.run)).fails(becauseOf = exception)
 
       intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
 
@@ -138,7 +138,7 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
@@ -160,7 +160,7 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
 
@@ -182,7 +182,7 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunAndForget() shouldBe ()
 
@@ -203,7 +203,7 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunAndForget() shouldBe ()
 
@@ -224,7 +224,7 @@ class MicroserviceRunnerSpec
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunAndForget()
 
@@ -263,7 +263,7 @@ class MicroserviceRunnerSpec
   private class Metrics extends EventLogMetrics[IO] {
     val counter = Ref.unsafe[IO, Int](0)
 
-    override def run(): IO[Unit] = keepGoing.foreverM
+    override def run: IO[Unit] = keepGoing.foreverM
 
     private def keepGoing =
       Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
@@ -272,7 +272,7 @@ class MicroserviceRunnerSpec
   private class Gauge extends GaugeResetScheduler[IO] {
     val counter = Ref.unsafe[IO, Int](0)
 
-    override def run(): IO[Unit] = keepGoing.foreverM
+    override def run: IO[Unit] = keepGoing.foreverM
 
     private def keepGoing =
       Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)

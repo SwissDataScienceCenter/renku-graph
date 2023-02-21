@@ -28,7 +28,13 @@ import scala.language.reflectiveCalls
 trait MockedRunnableCollaborators {
   self: Suite with MockFactory =>
 
-  private type Runnable[R] = { def run(): IO[R] }
+  private type Runnable[R] = { def run: IO[R] }
+
+  object Runnable {
+    def apply[R](f: => IO[R]): Runnable[R] = new {
+      def run = f
+    }
+  }
 
   def `given`[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
 
@@ -36,12 +42,12 @@ trait MockedRunnableCollaborators {
     import cats.syntax.all._
 
     def succeeds(returning: R): CallHandler0[IO[R]] =
-      (runnable.run _)
+      (() => runnable.run)
         .expects()
         .returning(returning.pure[IO])
 
     def fails(becauseOf: Exception): CallHandler0[IO[R]] =
-      (runnable.run _)
+      (() => runnable.run)
         .expects()
         .returning(becauseOf.raiseError[IO, R])
   }

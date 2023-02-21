@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph
 
 import cats.effect._
+import com.comcast.ip4s._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.http.server.HttpServer
@@ -27,6 +28,7 @@ import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -47,8 +49,8 @@ object Microservice extends IOMicroservice {
     kgMetrics                                    <- KGMetrics[IO]
     microserviceRoutes                           <- MicroserviceRoutes()
     exitCode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = HttpServer[IO](serverPort = 9004, routes)
-                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
+                  val httpServer = HttpServer[IO](serverPort = port"9004", routes)
+                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run
                 }
   } yield exitCode
 }
@@ -60,10 +62,13 @@ private class MicroserviceRunner(
     kgMetrics:         KGMetrics[IO]
 ) {
 
-  def run(): IO[ExitCode] = for {
-    _        <- certificateLoader.run()
-    _        <- sentryInitializer.run()
-    _        <- kgMetrics.run().start
-    exitCode <- httpServer.run()
-  } yield exitCode
+  def run: IO[ExitCode] =
+    createServer.useForever.as(ExitCode.Success)
+
+  def createServer: Resource[IO, Server] = for {
+    _      <- Resource.eval(certificateLoader.run)
+    _      <- Resource.eval(sentryInitializer.run)
+    _      <- Resource.eval(kgMetrics.run.start)
+    result <- httpServer.createServer
+  } yield result
 }

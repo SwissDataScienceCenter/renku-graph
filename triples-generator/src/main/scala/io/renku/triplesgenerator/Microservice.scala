@@ -20,10 +20,8 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import cats.syntax.all._
+import com.comcast.ip4s._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.entities.viewings
@@ -41,14 +39,15 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort:             Int Refined Positive = 9002
-  private implicit val logger: Logger[IO]           = ApplicationLogger
+  val ServicePort:             Port       = port"9002"
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   private def parseConfigArgs(args: List[String]): IO[Config] = IO {
     args.headOption match {
@@ -94,8 +93,8 @@ object Microservice extends IOMicroservice {
                     sentryInitializer,
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
-                    HttpServer[IO](serverPort = ServicePort.value, routes)
-                  ).run()
+                    HttpServer[IO](serverPort = ServicePort, routes)
+                  ).run
                 }
   } yield exitCode
 }
@@ -110,18 +109,21 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     httpServer:                      HttpServer[F]
 ) {
 
-  def run(): F[ExitCode] = {
+  def run: F[ExitCode] =
+    createServer.use(_ => Spawn[F].never[ExitCode])
+
+  def createServer: Resource[F, Server] = {
     for {
-      _        <- certificateLoader.run()
-      _        <- gitCertificateInstaller.run()
-      _        <- sentryInitializer.run()
-      _        <- cliVersionCompatibilityVerifier.run()
-      _        <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run())
-      exitCode <- httpServer.run()
-    } yield exitCode
+      _      <- Resource.eval(certificateLoader.run)
+      _      <- Resource.eval(gitCertificateInstaller.run)
+      _      <- Resource.eval(sentryInitializer.run)
+      _      <- Resource.eval(cliVersionCompatibilityVerifier.run)
+      _      <- Resource.eval(Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run))
+      server <- httpServer.createServer
+    } yield server
   } recoverWith logAndThrow
 
-  private lazy val logAndThrow: PartialFunction[Throwable, F[ExitCode]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, ExitCode])
+  private lazy val logAndThrow: PartialFunction[Throwable, Resource[F, Server]] = { case NonFatal(exception) =>
+    Resource.eval(Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, Server]))
   }
 }

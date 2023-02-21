@@ -50,7 +50,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
       createEventTable()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'project' table creation skipped"))
     }
@@ -72,7 +72,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
         tableExists("project") shouldBe false
 
-        tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+        tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
         tableExists("project") shouldBe true
 
@@ -90,7 +90,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
     "create indices for all the columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("project") shouldBe true
 
@@ -105,7 +105,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
       createEvent()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       fetchProjectData should have size 1
 
@@ -113,7 +113,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       fetchProjectData should have size 1
 

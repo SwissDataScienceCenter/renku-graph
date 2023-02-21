@@ -57,9 +57,9 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
-        given(httpServer).succeeds(returning = ExitCode.Success)
+        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
-        Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
+        Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync() shouldBe ExitCode.Success
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -68,7 +68,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -83,7 +83,7 @@ class MicroserviceRunnerSpec
       given(gitCertificateInstaller).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -99,7 +99,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -115,7 +115,7 @@ class MicroserviceRunnerSpec
       given(cliVersionCompatChecker) fails (becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -132,10 +132,10 @@ class MicroserviceRunnerSpec
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      given(Runnable(httpServer.run)).fails(becauseOf = exception)
 
       intercept[Exception] {
-        Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync()
+        Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -151,9 +151,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
-      Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
+      Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 

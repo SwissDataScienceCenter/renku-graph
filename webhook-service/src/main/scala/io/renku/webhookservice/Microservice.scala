@@ -26,6 +26,8 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
+import com.comcast.ip4s._
+import org.http4s.server.Server
 
 object Microservice extends IOMicroservice {
 
@@ -39,8 +41,8 @@ object Microservice extends IOMicroservice {
     sentryInitializer                         <- SentryInitializer[IO]
     microserviceRoutes                        <- MicroserviceRoutes[IO]
     exitCode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = HttpServer[IO](serverPort = 9001, routes)
-                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer).run()
+                  val httpServer = HttpServer[IO](port"9001", routes)
+                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer).run
                 }
   } yield exitCode
 }
@@ -50,9 +52,13 @@ class MicroserviceRunner(certificateLoader: CertificateLoader[IO],
                          httpServer:        HttpServer[IO]
 ) {
 
-  def run(): IO[ExitCode] = for {
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    result <- httpServer.run()
-  } yield result
+  def run: IO[ExitCode] =
+    createServer.useForever.as(ExitCode.Success)
+
+  def createServer: Resource[IO, Server] =
+    for {
+      _      <- Resource.eval(certificateLoader.run)
+      _      <- Resource.eval(sentryInitializer.run)
+      result <- httpServer.createServer
+    } yield result
 }

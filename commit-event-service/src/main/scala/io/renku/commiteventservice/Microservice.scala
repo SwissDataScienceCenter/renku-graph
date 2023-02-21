@@ -18,11 +18,8 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{ExitCode, IO, Spawn}
+import cats.effect.{ExitCode, IO, Resource, Spawn}
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers
@@ -34,11 +31,13 @@ import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import org.typelevel.log4cats.Logger
+import com.comcast.ip4s._
+import org.http4s.server.Server
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort:             Int Refined Positive = 9006
-  private implicit val logger: Logger[IO]           = ApplicationLogger
+  val ServicePort:             Port       = port"9006"
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
@@ -57,8 +56,8 @@ object Microservice extends IOMicroservice {
                                              certificateLoader,
                                              sentryInitializer,
                                              eventConsumersRegistry,
-                                             HttpServer[IO](serverPort = ServicePort.value, routes)
-                  ).run()
+                                             HttpServer[IO](serverPort = ServicePort, routes)
+                  ).run
                 }
   } yield exitcode
 }
@@ -70,10 +69,14 @@ class MicroserviceRunner[F[_]: Spawn: Logger](serviceReadinessChecker: ServiceRe
                                               httpServer:             HttpServer[F]
 ) {
 
-  def run(): F[ExitCode] = for {
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    _      <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run())
-    result <- httpServer.run()
-  } yield result
+  def run: F[ExitCode] =
+    createServer.use(_ => Spawn[F].never[ExitCode])
+
+  def createServer: Resource[F, Server] =
+    for {
+      _      <- Resource.eval(certificateLoader.run)
+      _      <- Resource.eval(sentryInitializer.run)
+      _      <- Resource.eval(Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run))
+      result <- httpServer.createServer
+    } yield result
 }

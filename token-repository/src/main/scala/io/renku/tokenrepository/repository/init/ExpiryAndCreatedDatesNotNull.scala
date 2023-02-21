@@ -32,7 +32,7 @@ private class ExpiryAndCreatedDatesNotNull[F[_]: MonadCancelThrow: Logger: Sessi
 
   import MigrationTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     ensureNotNullable("expiry_date") >> ensureNotNullable("created_at")
   }
 

@@ -34,7 +34,7 @@ private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sess
   import MigratorTools._
   import cats.syntax.all._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_delivery' table exists")
       case false => createTable()

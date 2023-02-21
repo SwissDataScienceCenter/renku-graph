@@ -38,7 +38,7 @@ class TSMigrationTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpe
 
       tableExists("ts_migration") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("ts_migration") shouldBe true
 
@@ -46,14 +46,14 @@ class TSMigrationTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpe
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'ts_migration' table exists"))
     }
 
     "create relevant indices and constraints" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("ts_migration") shouldBe true
 

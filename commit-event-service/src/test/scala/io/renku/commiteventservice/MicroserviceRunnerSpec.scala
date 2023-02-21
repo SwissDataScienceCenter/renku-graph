@@ -55,9 +55,9 @@ class MicroserviceRunnerSpec
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(httpServer).succeeds(returning = ExitCode.Success)
+        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
-        runner.run().unsafeRunSync() shouldBe ExitCode.Success
+        runner.run.unsafeRunSync() shouldBe ExitCode.Success
 
         eventually {
           eventConsumersRegistry.counter.get.unsafeRunSync() should be > 1
@@ -70,7 +70,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -81,7 +81,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        runner.run.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -91,9 +91,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      given(Runnable(httpServer.run)).fails(becauseOf = exception)
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
+      intercept[Exception](runner.run.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
@@ -103,9 +103,9 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      runner.run.unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 
@@ -127,7 +127,7 @@ class MicroserviceRunnerSpec
   private class EventsConsumersRegistryStub(maybeFail: Option[Exception] = None) extends EventConsumersRegistry[IO] {
     val counter = Ref.unsafe[IO, Int](0)
 
-    override def run(): IO[Unit] = maybeFail.map(_.raiseError[IO, Unit]).getOrElse(keepGoing.foreverM)
+    override def run: IO[Unit] = maybeFail.map(_.raiseError[IO, Unit]).getOrElse(keepGoing.foreverM)
 
     private def keepGoing = Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
 
