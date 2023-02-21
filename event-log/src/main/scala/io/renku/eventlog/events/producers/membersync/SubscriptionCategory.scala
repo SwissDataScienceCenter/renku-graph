@@ -23,7 +23,6 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.events.producers.awaitinggeneration.SubscriptionCategory.categoryName
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
 import io.renku.eventlog.events.producers.membersync.MemberSyncEventEncoder.encodeEvent
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers

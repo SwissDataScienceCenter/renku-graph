@@ -25,7 +25,6 @@ import cats.effect._
 import cats.syntax.all._
 import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.producers.awaitinggeneration.SubscriptionCategory.categoryName
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.DefaultSubscription.DefaultSubscriber

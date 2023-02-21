@@ -22,7 +22,10 @@ import Generators._
 import SubscriptionCategory._
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.literal._
 import io.circe.syntax._
+import io.circe.Encoder
+import io.renku.events.{CategoryName, Subscription}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
@@ -60,15 +63,28 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
 
   "register" should {
 
-    "return the subscriber URL if the statuses are valid" in new TestCase {
+    implicit def encoder[S <: Subscription.Subscriber](implicit sEncoder: Encoder[S]): Encoder[(CategoryName, S)] =
+      Encoder.instance { case (category, subscriber) =>
+        json"""{
+          "categoryName": $category
+        }""" deepMerge subscriber.asJson
+      }
+
+    "return Accepted if payload decoding and registration succeeds" in new TestCase {
 
       val subscriber = testSubscribers.generateOne
       givenRegistration(of = subscriber, returning = ().pure[IO])
 
-      subscriptionCategory.register(subscriber.asJson).unsafeRunSync() shouldBe AcceptedRegistration
+      subscriptionCategory.register((categoryName -> subscriber).asJson).unsafeRunSync() shouldBe AcceptedRegistration
     }
 
-    "return None if the payload does not contain the right supported statuses" in new TestCase {
+    "return Rejected if payload does not contain the same category name" in new TestCase {
+      subscriptionCategory
+        .register((categoryNames.generateOne -> testSubscribers.generateOne).asJson)
+        .unsafeRunSync() shouldBe RejectedRegistration
+    }
+
+    "return Rejected if payload cannot be decoded" in new TestCase {
       subscriptionCategory.register(jsons.generateOne).unsafeRunSync() shouldBe RejectedRegistration
     }
 
@@ -82,7 +98,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        subscriptionCategory.register(subscriber.asJson).unsafeRunSync()
+        subscriptionCategory.register((categoryName -> subscriber).asJson).unsafeRunSync()
       } shouldBe exception
     }
   }

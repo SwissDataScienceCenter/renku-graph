@@ -25,7 +25,6 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.events.producers.awaitinggeneration.SubscriptionCategory.categoryName
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.QueriesExecutionTimes

@@ -36,13 +36,13 @@ trait SubscriptionMechanism[F[_]] {
   def run():               F[Unit]
 }
 
-private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger, SP <: Subscription](
+private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger, S <: Subscription](
     val categoryName:            CategoryName,
-    subscriptionPayloadComposer: SubscriptionPayloadComposer[F, SP],
+    subscriptionPayloadComposer: SubscriptionPayloadComposer[F, S],
     subscriptionSender:          SubscriptionSender[F],
     initialDelay:                FiniteDuration,
     renewDelay:                  FiniteDuration
-)(implicit subscriptionPayloadEncoder: Encoder[SP])
+)(implicit subscriptionPayloadEncoder: Encoder[S])
     extends SubscriptionMechanism[F] {
 
   import cats.effect.kernel.Ref

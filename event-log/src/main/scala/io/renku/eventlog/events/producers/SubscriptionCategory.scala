@@ -25,7 +25,7 @@ import io.circe.{Decoder, Json}
 import io.renku.eventlog.events.producers.SubscriptionCategory._
 import io.renku.events.{CategoryName, Subscription}
 
-private trait `SubscriptionCategory`[F[_]] {
+private trait SubscriptionCategory[F[_]] {
   val categoryName: CategoryName
   def run(): F[Unit]
   def register(payload: Json): F[RegistrationResult]
@@ -55,10 +55,20 @@ private class SubscriptionCategoryImpl[F[_]: MonadThrow, S <: Subscription.Subsc
   override def run(): F[Unit] = eventsDistributor.run()
 
   override def register(payload: Json): F[RegistrationResult] = OptionT {
-    (decodePayload(payload) map subscribers.add).sequence
+    ((validateCategory andThenF decodeSubscriber)(payload) map subscribers.add).sequence
   }.cata(default = RejectedRegistration, _ => AcceptedRegistration)
 
-  private lazy val decodePayload: Json => Option[S] =
+  private lazy val validateCategory: Json => Option[Json] = json =>
+    json.hcursor
+      .downField("categoryName")
+      .as[CategoryName]
+      .toOption
+      .flatMap {
+        case `categoryName` => json.some
+        case _              => Option.empty[Json]
+      }
+
+  private lazy val decodeSubscriber: Json => Option[S] =
     _.as[S].fold(_ => Option.empty[S], _.some)
 
   override def getStatus: F[EventProducerStatus] =
