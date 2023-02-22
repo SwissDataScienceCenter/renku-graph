@@ -24,10 +24,11 @@ import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
+import io.renku.eventlog.events.producers.DefaultSubscriberTracker
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -35,12 +36,12 @@ private[producers] object SubscriptionCategory {
 
   def apply[F[
       _
-  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
+  ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[SubscriptionCategory[F]] = for {
-    subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventsFinder     <- EventFinder[F]
-    dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
-    eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
+    implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
+    eventsFinder                                  <- EventFinder[F]
+    dispatchRecovery                              <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
+    eventDelivery                                 <- EventDelivery.noOp[F, ZombieEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,
                                            eventsFinder,
@@ -48,16 +49,9 @@ private[producers] object SubscriptionCategory {
                                            EventEncoder(encodeEvent),
                                            dispatchRecovery
                          )
-    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](categoryName, SubscriptionPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
-                                                               subscribers,
-                                                               eventsDistributor,
-                                                               deserializer,
-                                                               CapacityFinder.noOpCapacityFinder[F]
+  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](categoryName,
+                                                             subscribers,
+                                                             eventsDistributor,
+                                                             CapacityFinder.noOpCapacityFinder[F]
   )
 }
-
-private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
-                                       subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[TotalCapacity]
-) extends UrlAndIdSubscriptionInfo

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.awaitinggeneration
+package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
@@ -31,31 +31,31 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class GenerationProcessesNumberSpec
+class ConcurrentProcessesNumberSpec
     extends AnyWordSpec
-    with ScalaCheckPropertyChecks
     with should.Matchers
+    with ScalaCheckPropertyChecks
     with TryValues {
 
   "apply" should {
 
-    "return a GenerationProcessesNumber if there's a value for 'generation-processes-number' in the config" in {
+    "return a GenerationProcessesNumber if there's a value for 'transformation-processes-number' in the config" in {
       forAll(positiveInts()) { value =>
         val config = ConfigFactory.parseMap(
-          Map("generation-processes-number" -> value.value).asJava
+          Map("transformation-processes-number" -> value.value).asJava
         )
 
-        GenerationProcessesNumber[Try](config).success.value shouldBe GenerationProcessesNumber(value.value)
+        ConcurrentProcessesNumber[Try](config).success.value shouldBe ConcurrentProcessesNumber(value.value)
       }
     }
 
-    "fail if there's no value for the 'generation-processes-number'" in {
-      GenerationProcessesNumber[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
+    "fail if there's no value for the 'transformation-processes-number'" in {
+      ConcurrentProcessesNumber[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
     }
 
     "fail if config value is invalid" in {
       val config = ConfigFactory.parseMap(
-        Map("generation-processes-number" -> nonBlankStrings().generateOne.value).asJava
+        Map("transformation-processes-number" -> nonBlankStrings().generateOne.value).asJava
       )
 
       RenkuUrlLoader[Try](config).failure.exception shouldBe an[ConfigLoadingException]

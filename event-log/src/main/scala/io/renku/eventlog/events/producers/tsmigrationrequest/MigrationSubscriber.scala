@@ -21,19 +21,25 @@ package tsmigrationrequest
 
 import cats.Show
 import cats.syntax.all._
+import io.circe.Decoder
 import io.renku.config.ServiceVersion
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.events.Subscription
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 
-private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberUrl,
-                                                  subscriberId:      SubscriberId,
-                                                  subscriberVersion: ServiceVersion
-) extends SubscriptionInfo {
-  override val maybeCapacity: Option[TotalCapacity] = None
-}
+private final case class MigrationSubscriber(url: SubscriberUrl, id: SubscriberId, version: ServiceVersion)
+    extends Subscription.Subscriber
 
-private object MigratorSubscriptionInfo {
-  implicit lazy val show: Show[MigratorSubscriptionInfo] = Show.show { info =>
-    import info._
-    show"subscriber = $subscriberUrl, id = $subscriberId, version = $subscriberVersion"
+private object MigrationSubscriber {
+  implicit lazy val show: Show[MigrationSubscriber] = Show.show { case MigrationSubscriber(url, id, version) =>
+    show"subscriber = $url, id = $id, version = $version"
+  }
+
+  implicit val decoder: Decoder[MigrationSubscriber] = Decoder.instance { cursor =>
+    val subscriberNode = cursor.downField("subscriber")
+    for {
+      url     <- subscriberNode.downField("url").as[SubscriberUrl]
+      id      <- subscriberNode.downField("id").as[SubscriberId]
+      version <- subscriberNode.downField("version").as[ServiceVersion]
+    } yield MigrationSubscriber(url, id, version)
   }
 }

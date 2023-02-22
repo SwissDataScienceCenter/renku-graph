@@ -26,9 +26,9 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.generators.Generators.Implicits._
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClientError.ClientException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error

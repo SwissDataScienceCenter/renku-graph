@@ -25,7 +25,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventStatus

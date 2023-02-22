@@ -21,7 +21,7 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._

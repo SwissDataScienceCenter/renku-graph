@@ -26,7 +26,7 @@ import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.DispatchRecovery
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventMessage

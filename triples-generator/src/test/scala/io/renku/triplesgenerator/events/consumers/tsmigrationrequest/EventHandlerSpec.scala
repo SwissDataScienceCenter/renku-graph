@@ -26,12 +26,13 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.ConcurrentProcessesLimiter
 import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.events.consumers.subscriptions.{SubscriptionMechanism, subscriberUrls}
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.Generators.subscriberUrls
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions

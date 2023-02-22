@@ -18,11 +18,12 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated
 
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.events.Subscription.SubscriberCapacity
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -36,10 +37,12 @@ object SubscriptionFactory {
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism(
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
+    subscriberCapacity <- ConcurrentProcessesNumber[F]().map(v => SubscriberCapacity(v.value))
+    subscriptionMechanism <-
+      SubscriptionMechanism(
+        categoryName,
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier, subscriberCapacity)
+      )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
     handler <- EventHandler(subscriptionMechanism)
   } yield handler -> subscriptionMechanism

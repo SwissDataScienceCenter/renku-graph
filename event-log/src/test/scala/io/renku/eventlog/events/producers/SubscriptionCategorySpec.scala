@@ -22,7 +22,10 @@ import Generators._
 import SubscriptionCategory._
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Json
+import io.circe.literal._
+import io.circe.syntax._
+import io.circe.Encoder
+import io.renku.events.{CategoryName, Subscription}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
@@ -36,6 +39,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
   "run" should {
 
     "return unit when event distributor run succeeds" in new TestCase {
+
       (eventsDistributor.run _)
         .expects()
         .returning(().pure[IO])
@@ -44,6 +48,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
     }
 
     "fail when event distributor returns an error" in new TestCase {
+
       val exception = exceptions.generateOne
       (eventsDistributor.run _)
         .expects()
@@ -58,40 +63,42 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
 
   "register" should {
 
-    "return the subscriber URL if the statuses are valid" in new TestCase {
+    implicit def encoder[S <: Subscription.Subscriber](implicit sEncoder: Encoder[S]): Encoder[(CategoryName, S)] =
+      Encoder.instance { case (category, subscriber) =>
+        json"""{
+          "categoryName": $category
+        }""" deepMerge subscriber.asJson
+      }
 
-      val payload          = jsons.generateOne
-      val subscriptionInfo = subscriptionInfos.generateOne
-      givenDeserialization(of = payload, returning = subscriptionInfo.some.pure[IO])
-      givenRegistration(of = subscriptionInfo, returning = ().pure[IO])
+    "return Accepted if payload decoding and registration succeeds" in new TestCase {
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe AcceptedRegistration
+      val subscriber = testSubscribers.generateOne
+      givenRegistration(of = subscriber, returning = ().pure[IO])
+
+      subscriptionCategory.register((categoryName -> subscriber).asJson).unsafeRunSync() shouldBe AcceptedRegistration
     }
 
-    "return None if the payload does not contain the right supported statuses" in new TestCase {
-      val payload = jsons.generateOne
-      (deserializer.deserialize _)
-        .expects(payload)
-        .returning(none.pure[IO])
+    "return Rejected if payload does not contain the same category name" in new TestCase {
+      subscriptionCategory
+        .register((categoryNames.generateOne -> testSubscribers.generateOne).asJson)
+        .unsafeRunSync() shouldBe RejectedRegistration
+    }
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe RejectedRegistration
+    "return Rejected if payload cannot be decoded" in new TestCase {
+      subscriptionCategory.register(jsons.generateOne).unsafeRunSync() shouldBe RejectedRegistration
     }
 
     "fail if adding the subscriber url fails" in new TestCase {
-      val subscriptionInfo = subscriptionInfos.generateOne
-      val exception        = exceptions.generateOne
-      val payload          = jsons.generateOne
 
-      (deserializer.deserialize _)
-        .expects(payload)
-        .returning(subscriptionInfo.some.pure[IO])
+      val subscriber = testSubscribers.generateOne
 
+      val exception = exceptions.generateOne
       (subscribers.add _)
-        .expects(subscriptionInfo)
+        .expects(subscriber)
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        subscriptionCategory.register(payload).unsafeRunSync()
+        subscriptionCategory.register((categoryName -> subscriber).asJson).unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -125,24 +132,17 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
 
   private trait TestCase {
     val categoryName      = categoryNames.generateOne
-    val subscribers       = mock[Subscribers[IO, TestSubscriptionInfo]]
+    val subscribers       = mock[Subscribers[IO, TestSubscriber]]
     val eventsDistributor = mock[EventsDistributor[IO]]
-    val deserializer      = mock[SubscriptionPayloadDeserializer[IO, TestSubscriptionInfo]]
     val capacityFinder    = mock[CapacityFinder[IO]]
-    val subscriptionCategory = new SubscriptionCategoryImpl[IO, TestSubscriptionInfo](
+    val subscriptionCategory = new SubscriptionCategoryImpl[IO, TestSubscriber](
       categoryName,
       subscribers,
       eventsDistributor,
-      deserializer,
       capacityFinder
     )
 
-    def givenDeserialization(of: Json, returning: IO[Option[TestSubscriptionInfo]]) =
-      (deserializer.deserialize _)
-        .expects(of)
-        .returning(returning)
-
-    def givenRegistration(of: TestSubscriptionInfo, returning: IO[Unit]) =
+    def givenRegistration(of: TestSubscriber, returning: IO[Unit]) =
       (subscribers.add _)
         .expects(of)
         .returning(returning)
