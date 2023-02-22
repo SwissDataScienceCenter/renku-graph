@@ -20,6 +20,7 @@ package io.renku.knowledgegraph
 
 import cats.MonadError
 import cats.effect.{ExitCode, IO}
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
@@ -30,6 +31,8 @@ import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.duration._
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
@@ -45,9 +48,9 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(kgMetrics).succeeds(returning = ())
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run.unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1.seconds).unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -56,7 +59,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -69,7 +72,7 @@ class MicroserviceRunnerSpec
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -79,10 +82,10 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(kgMetrics).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -92,9 +95,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(kgMetrics).fails(becauseOf = exception)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run.unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 
@@ -106,5 +109,18 @@ class MicroserviceRunnerSpec
     val httpServer        = mock[HttpServer[IO]]
     val kgMetrics         = mock[KGMetrics[IO]]
     val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics)
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 }

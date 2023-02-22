@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{ExitCode, IO, Resource, Spawn}
+import cats.effect.{Async, ExitCode, IO, Ref, Resource, Spawn}
 import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
@@ -29,9 +29,10 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
 import org.typelevel.log4cats.Logger
 import com.comcast.ip4s._
+import fs2.concurrent.{Signal, SignallingRef}
 import org.http4s.server.Server
 
 object Microservice extends IOMicroservice {
@@ -51,32 +52,33 @@ object Microservice extends IOMicroservice {
     eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
     microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+    termSignal              <- SignallingRef.of[IO, Boolean](false)
     exitcode <- microserviceRoutes.routes.use { routes =>
                   new MicroserviceRunner[IO](serviceReadinessChecker,
                                              certificateLoader,
                                              sentryInitializer,
                                              eventConsumersRegistry,
                                              HttpServer[IO](serverPort = ServicePort, routes)
-                  ).run
+                  ).run(termSignal)
                 }
   } yield exitcode
 }
 
-class MicroserviceRunner[F[_]: Spawn: Logger](serviceReadinessChecker: ServiceReadinessChecker[F],
+class MicroserviceRunner[F[_]: Async: Logger](serviceReadinessChecker: ServiceReadinessChecker[F],
                                               certificateLoader:      CertificateLoader[F],
                                               sentryInitializer:      SentryInitializer[F],
                                               eventConsumersRegistry: EventConsumersRegistry[F],
                                               httpServer:             HttpServer[F]
 ) {
 
-  def run: F[ExitCode] =
-    createServer.use(_ => Spawn[F].never[ExitCode])
+  def run(signal: Signal[F, Boolean]): F[ExitCode] =
+    Ref.of[F, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer: Resource[F, Server] =
     for {
       _      <- Resource.eval(certificateLoader.run)
       _      <- Resource.eval(sentryInitializer.run)
-      _      <- Resource.eval(Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run))
+      _      <- Spawn[F].background(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run)
       result <- httpServer.createServer
     } yield result
 }

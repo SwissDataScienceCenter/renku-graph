@@ -20,6 +20,7 @@ package io.renku.tokenrepository
 
 import cats.effect._
 import com.comcast.ip4s._
+import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
@@ -27,7 +28,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.IOMicroservice
+import io.renku.microservices.{IOMicroservice, ResourceUse}
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
@@ -54,6 +55,7 @@ object Microservice extends IOMicroservice {
         sentryInitializer                         <- SentryInitializer[IO]
         dbInitializer                             <- DbInitializer[IO]
         microserviceRoutes                        <- MicroserviceRoutes[IO]
+        termSignal                                <- SignallingRef.of[IO, Boolean](false)
         exitCode <- microserviceRoutes.routes.use { routes =>
                       new MicroserviceRunner(
                         certificateLoader,
@@ -61,7 +63,7 @@ object Microservice extends IOMicroservice {
                         dbInitializer,
                         HttpServer[IO](serverPort = port"9003", routes),
                         microserviceRoutes
-                      ).run()
+                      ).run(termSignal)
                     }
       } yield exitCode
     }
@@ -74,14 +76,15 @@ private class MicroserviceRunner(
     httpServer:         HttpServer[IO],
     microserviceRoutes: MicroserviceRoutes[IO]
 ) {
-  def run()(implicit logger: Logger[IO]): IO[ExitCode] =
-    createServer.use(_ => Logger[IO].info("Service started") *> IO.never[ExitCode])
+  def run(signal: Signal[IO, Boolean])(implicit L: Logger[IO]): IO[ExitCode] =
+    Ref.of[IO, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer(implicit logger: Logger[IO]): Resource[IO, Server] = for {
     _      <- Resource.eval(certificateLoader.run)
     _      <- Resource.eval(sentryInitializer.run)
     _      <- Resource.eval(kickOffDBInit())
     server <- httpServer.createServer
+    _      <- Resource.eval(Logger[IO].info("Service started"))
   } yield server
 
   private def kickOffDBInit()(implicit logger: Logger[IO]) = Spawn[IO].start(

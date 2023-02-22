@@ -19,6 +19,7 @@
 package io.renku.webhookservice
 
 import cats.effect._
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators
@@ -29,6 +30,8 @@ import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.duration._
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
@@ -45,9 +48,9 @@ class MicroserviceRunnerSpec
 
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
-        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+        given(httpServer).succeeds()
 
-        runner.run.unsafeRunSync() shouldBe ExitCode.Success
+        startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -56,7 +59,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -67,7 +70,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -76,10 +79,10 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -89,5 +92,18 @@ class MicroserviceRunnerSpec
     val sentryInitializer = mock[SentryInitializer[IO]]
     val httpServer        = mock[HttpServer[IO]]
     val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer)
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 }

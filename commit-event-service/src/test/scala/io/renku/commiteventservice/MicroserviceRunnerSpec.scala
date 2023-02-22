@@ -20,6 +20,7 @@ package io.renku.commiteventservice
 
 import cats.effect._
 import cats.syntax.all._
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.EventRequestContent
@@ -55,9 +56,9 @@ class MicroserviceRunnerSpec
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+        given(httpServer).succeeds()
 
-        runner.run.unsafeRunSync() shouldBe ExitCode.Success
+        startRunnerFor(2.second).unsafeRunSync() shouldBe ExitCode.Success
 
         eventually {
           eventConsumersRegistry.counter.get.unsafeRunSync() should be > 1
@@ -70,7 +71,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -81,7 +82,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -91,9 +92,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       val exception = exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
-      intercept[Exception](runner.run.unsafeRunSync()) shouldBe exception
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
@@ -103,9 +104,9 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run.unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 
@@ -122,6 +123,19 @@ class MicroserviceRunnerSpec
                                         eventConsumersRegistry,
                                         httpServer
     )
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 
   private class EventsConsumersRegistryStub(maybeFail: Option[Exception] = None) extends EventConsumersRegistry[IO] {
@@ -129,7 +143,7 @@ class MicroserviceRunnerSpec
 
     override def run: IO[Unit] = maybeFail.map(_.raiseError[IO, Unit]).getOrElse(keepGoing.foreverM)
 
-    private def keepGoing = Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+    private def keepGoing = Temporal[IO].delayBy(counter.update(_ + 1), 500 millis)
 
     override def handle(requestContent: EventRequestContent) = fail("Shouldn't be called")
     override def renewAllSubscriptions() = fail("Shouldn't be called")

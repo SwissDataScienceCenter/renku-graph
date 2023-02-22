@@ -20,6 +20,7 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import cats.syntax.all._
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
@@ -57,9 +58,9 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
-        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+        given(httpServer).succeeds()
 
-        Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync() shouldBe ExitCode.Success
+        startRunnerFor(1 second).unsafeRunSync() shouldBe ExitCode.Success
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -68,7 +69,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -83,7 +84,7 @@ class MicroserviceRunnerSpec
       given(gitCertificateInstaller).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -99,7 +100,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -115,7 +116,7 @@ class MicroserviceRunnerSpec
       given(cliVersionCompatChecker) fails (becauseOf = exception)
 
       intercept[Exception] {
-        runner.run.unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -132,10 +133,10 @@ class MicroserviceRunnerSpec
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync()
+        startRunnerFor(1 second).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -151,9 +152,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      Temporal[IO].andWait(runner.run, 1 second).unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1 second).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 
@@ -175,5 +176,18 @@ class MicroserviceRunnerSpec
                                         eventConsumersRegistry,
                                         httpServer
     )
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 }

@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import cats.effect._
 import cats.syntax.all._
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
@@ -66,14 +67,12 @@ class MicroserviceRunnerSpec
         given(eventProducersRegistry).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
         given(eventsQueue).succeeds(returning = ())
-        given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+        given(httpServer).succeeds()
 
-        runner.run().unsafeRunAndForget()
+        startRunnerFor(2.seconds).unsafeRunSync()
 
-        eventually {
-          metrics.counter.get.unsafeRunSync()        should be > 1
-          gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-        }
+        metrics.counter.get.unsafeRunSync()        should be > 1
+        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -81,7 +80,7 @@ class MicroserviceRunnerSpec
       val exception = exceptions.generateOne
       given(certificateLoader).fails(becauseOf = exception)
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
@@ -90,7 +89,7 @@ class MicroserviceRunnerSpec
       val exception = exceptions.generateOne
       given(sentryInitializer).fails(becauseOf = exception)
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if DB initialisation fails" in new TestCase {
@@ -99,9 +98,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1.seconds).unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "fail if starting the http server fails" in new TestCase {
@@ -116,14 +115,9 @@ class MicroserviceRunnerSpec
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
-
-      eventually {
-        metrics.counter.get.unsafeRunSync()        should be > 1
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if Event Producers Registry initialisation fails" in new TestCase {
@@ -138,9 +132,9 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(2.seconds).unsafeRunSync() shouldBe ExitCode.Success
 
       eventually {
         metrics.counter.get.unsafeRunSync()        should be > 1
@@ -160,9 +154,9 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(eventsQueue).succeeds(returning = ())
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(2.seconds).unsafeRunSync() shouldBe ExitCode.Success
 
       eventually {
         metrics.counter.get.unsafeRunSync()        should be > 1
@@ -182,9 +176,9 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunAndForget() shouldBe ()
+      startRunnerFor(2.seconds).unsafeRunAndForget() shouldBe ()
 
       eventually {
         gaugeScheduler.counter.get.unsafeRunSync() should be > 1
@@ -203,9 +197,9 @@ class MicroserviceRunnerSpec
       given(eventProducersRegistry).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).fails(becauseOf = exceptions.generateOne)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunAndForget() shouldBe ()
+      startRunnerFor(2.seconds).unsafeRunAndForget() shouldBe ()
 
       eventually {
         gaugeScheduler.counter.get.unsafeRunSync() should be > 1
@@ -224,9 +218,9 @@ class MicroserviceRunnerSpec
       given(eventConsumersRegistry).succeeds(returning = ())
       given(eventsQueue).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunAndForget()
+      startRunnerFor(3.seconds).unsafeRunAndForget()
 
       eventually {
         metrics.counter.get.unsafeRunSync() should be > 1
@@ -258,6 +252,19 @@ class MicroserviceRunnerSpec
       gaugeScheduler,
       httpServer
     )
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 
   private class Metrics extends EventLogMetrics[IO] {
@@ -266,7 +273,7 @@ class MicroserviceRunnerSpec
     override def run: IO[Unit] = keepGoing.foreverM
 
     private def keepGoing =
-      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+      Temporal[IO].delayBy(counter.update(_ + 1), 500 millis)
   }
 
   private class Gauge extends GaugeResetScheduler[IO] {
@@ -275,6 +282,6 @@ class MicroserviceRunnerSpec
     override def run: IO[Unit] = keepGoing.foreverM
 
     private def keepGoing =
-      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+      Temporal[IO].delayBy(counter.update(_ + 1), 500 millis)
   }
 }

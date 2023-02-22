@@ -20,6 +20,7 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import cats.syntax.all._
+import fs2.concurrent.{Signal, SignallingRef}
 import com.comcast.ip4s._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.certificates.CertificateLoader
@@ -32,7 +33,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -85,6 +86,7 @@ object Microservice extends IOMicroservice {
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
     microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
+    termSignal              <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
                     serviceReadinessChecker,
@@ -94,12 +96,12 @@ object Microservice extends IOMicroservice {
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
                     HttpServer[IO](serverPort = ServicePort, routes)
-                  ).run
+                  ).run(termSignal)
                 }
   } yield exitCode
 }
 
-private class MicroserviceRunner[F[_]: Spawn: Logger](
+private class MicroserviceRunner[F[_]: Async: Logger](
     serviceReadinessChecker:         ServiceReadinessChecker[F],
     certificateLoader:               CertificateLoader[F],
     gitCertificateInstaller:         GitCertificateInstaller[F],
@@ -109,8 +111,8 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     httpServer:                      HttpServer[F]
 ) {
 
-  def run: F[ExitCode] =
-    createServer.use(_ => Spawn[F].never[ExitCode])
+  def run(signal: Signal[F, Boolean]): F[ExitCode] =
+    Ref.of[F, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer: Resource[F, Server] = {
     for {
@@ -118,7 +120,7 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
       _      <- Resource.eval(gitCertificateInstaller.run)
       _      <- Resource.eval(sentryInitializer.run)
       _      <- Resource.eval(cliVersionCompatibilityVerifier.run)
-      _      <- Resource.eval(Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run))
+      _      <- Spawn[F].background(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run)
       server <- httpServer.createServer
     } yield server
   } recoverWith logAndThrow

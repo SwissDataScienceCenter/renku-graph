@@ -19,13 +19,14 @@
 package io.renku.webhookservice
 
 import cats.effect._
+import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.IOMicroservice
+import io.renku.microservices.{IOMicroservice, ResourceUse}
 import com.comcast.ip4s._
 import org.http4s.server.Server
 
@@ -40,9 +41,10 @@ object Microservice extends IOMicroservice {
     certificateLoader                         <- CertificateLoader[IO]
     sentryInitializer                         <- SentryInitializer[IO]
     microserviceRoutes                        <- MicroserviceRoutes[IO]
+    termSignal                                <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.routes.use { routes =>
                   val httpServer = HttpServer[IO](port"9001", routes)
-                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer).run
+                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer).run(termSignal)
                 }
   } yield exitCode
 }
@@ -52,8 +54,8 @@ class MicroserviceRunner(certificateLoader: CertificateLoader[IO],
                          httpServer:        HttpServer[IO]
 ) {
 
-  def run: IO[ExitCode] =
-    createServer.useForever.as(ExitCode.Success)
+  def run(signal: Signal[IO, Boolean]): IO[ExitCode] =
+    Ref.of[IO, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer: Resource[IO, Server] =
     for {

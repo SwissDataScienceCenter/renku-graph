@@ -20,6 +20,7 @@ package io.renku.tokenrepository
 
 import cats.effect._
 import cats.effect.unsafe.implicits.global
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
@@ -35,6 +36,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
 import scala.language.reflectiveCalls
 
 class MicroserviceRunnerSpec
@@ -51,9 +53,9 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(2.second).unsafeRunSync() shouldBe ExitCode.Success
 
       logger.loggedOnly(Info("Service started"))
 
@@ -66,7 +68,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -77,7 +79,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -87,9 +89,9 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
-      given(Runnable(httpServer.run)).succeeds(returning = ExitCode.Success)
+      given(httpServer).succeeds()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
 
       eventually {
         logger.logged(Error("DB initialization failed", exception), Info("Service started"))
@@ -104,10 +106,10 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(Runnable(httpServer.run)).fails(becauseOf = exception)
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -129,5 +131,18 @@ class MicroserviceRunnerSpec
     def verifyRoutesNotified = eventually {
       microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
     }
+
+    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        _    <- (IO.sleep(duration) *> term.set(true)).start
+        exit <- runner.run(term)
+      } yield exit
+
+    def startRunnerForever: IO[ExitCode] =
+      for {
+        term <- SignallingRef.of[IO, Boolean](false)
+        exit <- runner.run(term)
+      } yield exit
   }
 }

@@ -28,8 +28,6 @@ import org.http4s.server.Server
 trait HttpServer[F[_]] {
   val httpApp: HttpApp[F]
   def createServer: Resource[F, Server]
-
-  final def run(implicit F: Spawn[F]): F[ExitCode] = createServer.use(_ => Spawn[F].never[ExitCode])
 }
 
 object HttpServer {

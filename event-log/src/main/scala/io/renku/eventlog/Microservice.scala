@@ -22,6 +22,7 @@ import cats.effect._
 import cats.effect.kernel.Ref
 import cats.syntax.all._
 import com.comcast.ip4s._
+import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
@@ -37,7 +38,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
-import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
@@ -49,10 +50,14 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
-    exitCode            <- runMicroservice(sessionPoolResource)
+    termSignal          <- SignallingRef.of[IO, Boolean](false)
+    exitCode            <- runMicroservice(sessionPoolResource, termSignal)
   } yield exitCode
 
-  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
+  private def runMicroservice(
+      sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]],
+      termSignal:          SignallingRef[IO, Boolean]
+  ) =
     sessionPoolResource.use { implicit sessionResource =>
       for {
         implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistry[IO]()
@@ -103,13 +108,13 @@ object Microservice extends IOMicroservice {
                         eventConsumersRegistry,
                         metricsResetScheduler,
                         HttpServer[IO](serverPort = ServicePort, routes)
-                      ).run()
+                      ).run(termSignal)
                     }
       } yield exitCode
     }
 }
 
-private class MicroserviceRunner[F[_]: Spawn: Logger](
+private class MicroserviceRunner[F[_]: Spawn: Concurrent: Logger](
     serviceReadinessChecker: ServiceReadinessChecker[F],
     certificateLoader:       CertificateLoader[F],
     sentryInitializer:       SentryInitializer[F],
@@ -122,14 +127,14 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     httpServer:              HttpServer[F]
 ) {
 
-  def run(): F[ExitCode] =
-    createServer.use(_ => Spawn[F].never[ExitCode])
+  def run(signal: SignallingRef[F, Boolean]): F[ExitCode] =
+    Ref.of(ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer: Resource[F, Server] =
     for {
       _      <- Resource.eval(certificateLoader.run)
       _      <- Resource.eval(sentryInitializer.run)
-      _      <- Resource.eval(Spawn[F].start(dbInitializer.run >> startDBDependentProcesses()))
+      _      <- Spawn[F].background(dbInitializer.run >> startDBDependentProcesses())
       result <- httpServer.createServer
     } yield result
 

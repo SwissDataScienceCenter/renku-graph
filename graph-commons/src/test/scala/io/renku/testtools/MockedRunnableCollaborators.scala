@@ -18,7 +18,10 @@
 
 package io.renku.testtools
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
+import cats.syntax.all._
+import io.renku.http.server.HttpServer
+import org.http4s.server.Server
 import org.scalamock.handlers.CallHandler0
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Suite
@@ -28,26 +31,36 @@ import scala.language.reflectiveCalls
 trait MockedRunnableCollaborators {
   self: Suite with MockFactory =>
 
-  private type Runnable[R] = { def run: IO[R] }
-
-  object Runnable {
-    def apply[R](f: => IO[R]): Runnable[R] = new {
-      def run = f
-    }
-  }
+  type Runnable[R] = { def run: IO[R] }
 
   def `given`[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
 
-  class RunnableOps[R](runnable: Runnable[R]) {
-    import cats.syntax.all._
+  def `given`(server: HttpServer[IO]) = new HttpServerOps(server)
 
+  class HttpServerOps(value: HttpServer[IO]) {
+    @annotation.nowarn
+    def succeeds() =
+      (value.createServer _)
+        .expects()
+        .returning(Resource.pure(mock[Server]))
+
+    @annotation.nowarn
+    def fails(becauseOf: Exception) =
+      (value.createServer _)
+        .expects()
+        .returning(becauseOf.raiseError[Resource[IO, *], Server])
+  }
+
+  class RunnableOps[R](runnable: Runnable[R]) {
+    @annotation.nowarn
     def succeeds(returning: R): CallHandler0[IO[R]] =
-      (() => runnable.run)
+      (runnable.run _)
         .expects()
         .returning(returning.pure[IO])
 
+    @annotation.nowarn
     def fails(becauseOf: Exception): CallHandler0[IO[R]] =
-      (() => runnable.run)
+      (runnable.run _)
         .expects()
         .returning(becauseOf.raiseError[IO, R])
   }
