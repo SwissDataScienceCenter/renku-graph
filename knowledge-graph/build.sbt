@@ -31,6 +31,6 @@ libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.12"
 libraryDependencies += "net.sourceforge.owlapi" % "owlapi-distribution" % "5.5.0"
 
 // needed by widoco only
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.19.0"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.20.0"
 
 resolvers += "jitpack" at "https://jitpack.io"
