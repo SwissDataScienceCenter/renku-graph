@@ -20,32 +20,22 @@ name := "graph-commons"
 
 Test / fork := true
 
-val pureConfigVersion = "0.17.2"
-libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
-libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
-
-libraryDependencies += "eu.timepit"       %% "refined-pureconfig" % "0.10.1"
-libraryDependencies += "io.sentry"         % "sentry-logback"     % "6.14.0"
-libraryDependencies += "org.apache.lucene" % "lucene-queryparser" % "9.5.0"
-
-val http4sVersion           = "0.23.18"
-val http4sBlazeVersion      = "0.23.13"
-val http4sPrometheusVersion = "0.24.3"
-libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sBlazeVersion
-libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sBlazeVersion
-libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sPrometheusVersion
-libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
-
-libraryDependencies += "org.tpolecat"  %% "skunk-core"    % "0.5.1"
-libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.8"
-libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
+libraryDependencies ++=
+  Dependencies.pureconfig ++
+    Dependencies.refinedPureconfig ++
+    Dependencies.sentryLogback ++
+    Dependencies.luceneQueryParser ++
+    Dependencies.http4sClient ++
+    Dependencies.http4sServer ++
+    Dependencies.http4sCirce ++
+    Dependencies.http4sDsl ++
+    Dependencies.http4sPrometheus ++
+    Dependencies.skunk ++
+    Dependencies.catsEffect ++
+    Dependencies.log4Cats
 
 // Test dependencies
-val testContainersScalaVersion = "0.40.12"
-libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
-libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
-libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.35.0"                   % Test
-
-libraryDependencies += "org.scalamock" %% "scalamock" % "5.2.0" % Test
+libraryDependencies ++=
+  (Dependencies.testContainersPostgres ++
+    Dependencies.wiremock ++
+    Dependencies.scalamock).map(_ % Test)
