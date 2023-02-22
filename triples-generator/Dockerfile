@@ -31,7 +31,7 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     python3 -m pip install --ignore-installed 'packaging==21.3 '&& \
     python3 -m pip install --upgrade 'pip==22.3.1' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'renku==2.2.0' 'sentry-sdk==1.5.11'  && \
+    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@38aa53c3fa2a15976ff1cce68b5a21ca24df2078' 'sentry-sdk==1.5.11'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
