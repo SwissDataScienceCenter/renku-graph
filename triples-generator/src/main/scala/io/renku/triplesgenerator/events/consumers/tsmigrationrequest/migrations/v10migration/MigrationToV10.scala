@@ -25,8 +25,8 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
@@ -36,6 +36,7 @@ import tooling._
 
 private class MigrationToV10[F[_]: Async: Logger](
     projectsFinder:       PagedProjectsFinder[F],
+    progressFinder:       ProgressFinder[F],
     envReadinessChecker:  EnvReadinessChecker[F],
     eventsSender:         EventSender[F],
     projectDonePersister: ProjectDonePersister[F],
@@ -48,6 +49,7 @@ private class MigrationToV10[F[_]: Async: Logger](
   import eventsSender._
   import executionRegister._
   import fs2._
+  import progressFinder._
   import projectDonePersister._
   import projectsDoneCleanUp._
   import projectsFinder._
@@ -61,12 +63,13 @@ private class MigrationToV10[F[_]: Async: Logger](
       .evalMap(_ => nextProjectsPage())
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
-      .evalTap(path => logInfo(show"processing project '$path'; waiting for free resources"))
+      .evalMap(path => findProgressInfo.map(path -> _))
+      .evalTap { case (path, info) => logInfo(show"processing project '$path'; waiting for free resources", info) }
       .evalTap(_ => envReadyToTakeEvent)
-      .evalTap(path => logInfo(show"sending $cleanUpEventCategory event for '$path'"))
+      .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
       .evalTap(sendCleanUpEvent)
-      .evalTap(noteDone)
-      .evalTap(path => logInfo(show"event sent for '$path'"))
+      .evalTap { case (path, _) => noteDone(path) }
+      .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
       .compile
       .drain
       .flatMap(_ => registerExecution(name))
@@ -75,7 +78,7 @@ private class MigrationToV10[F[_]: Async: Logger](
       .recoverWith(maybeRecoverableError[F, Unit])
   }
 
-  private def sendCleanUpEvent(path: projects.Path) = {
+  private lazy val sendCleanUpEvent: ((projects.Path, String)) => F[Unit] = { case (path, _) =>
     val (payload, ctx) = toCleanUpEvent(path)
     sendEvent(payload, ctx)
   }
@@ -90,8 +93,8 @@ private class MigrationToV10[F[_]: Async: Logger](
         }"""
     } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $path")
 
-  private def logInfo(message: String): F[Unit] =
-    Logger[F].info(show"${MigrationToV10.name} - $message")
+  private def logInfo(message: String, progressInfo: String): F[Unit] =
+    Logger[F].info(show"${MigrationToV10.name} - $progressInfo - $message")
 }
 
 private[migrations] object MigrationToV10 {
@@ -99,12 +102,14 @@ private[migrations] object MigrationToV10 {
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
     projectsFinder       <- PagedProjectsFinder[F]
+    progressFinder       <- ProgressFinder[F]
     envReadinessChecker  <- EnvReadinessChecker[F]
     eventsSender         <- EventSender[F](EventLogUrl)
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
     projectsDoneCleanUp  <- ProjectsDoneCleanUp[F]
   } yield new MigrationToV10(projectsFinder,
+                             progressFinder,
                              envReadinessChecker,
                              eventsSender,
                              projectDonePersister,

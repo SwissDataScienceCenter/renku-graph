@@ -29,7 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
 import cats.MonadThrow
-import io.renku.generators.Generators.{exceptions, positiveInts}
+import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
@@ -63,6 +63,8 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .toList
         givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
 
+        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjects.size)
+
         givenEnvHasCapabilitiesToTakeNextEvent
 
         allProjects map toCleanUpRequestEvent foreach verifyEventWasSent
@@ -94,6 +96,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectsFinder               = mock[PagedProjectsFinder[IO]]
+    private val progressFinder       = mock[ProgressFinder[IO]]
     private val envReadinessChecker  = mock[EnvReadinessChecker[IO]]
     private val eventSender          = mock[EventSender[IO]]
     private val projectDonePersister = mock[ProjectDonePersister[IO]]
@@ -106,6 +109,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       }
     }
     val migration = new MigrationToV10[IO](projectsFinder,
+                                           progressFinder,
                                            envReadinessChecker,
                                            eventSender,
                                            projectDonePersister,
@@ -120,6 +124,12 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .expects()
           .returning(page.pure[IO])
       }
+
+    def givenProgressInfoFinding(returning: IO[String], times: Int) =
+      (() => progressFinder.findProgressInfo)
+        .expects()
+        .returning(returning)
+        .repeat(times)
 
     def givenEnvHasCapabilitiesToTakeNextEvent =
       (() => envReadinessChecker.envReadyToTakeEvent)
