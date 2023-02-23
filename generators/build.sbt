@@ -20,8 +20,8 @@ organization := "io.renku"
 name := "generators"
 
 libraryDependencies ++=
-  Dependencies.refined ++
+  (Dependencies.refined ++
     Dependencies.circeCore ++
     Dependencies.jsonld4s ++
     Dependencies.catsCore ++
-    Dependencies.scalacheck
+    Dependencies.scalacheck).map(_ % Test)
