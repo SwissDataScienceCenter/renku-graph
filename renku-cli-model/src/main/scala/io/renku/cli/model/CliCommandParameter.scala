@@ -37,7 +37,7 @@ object CliCommandParameter {
   private val entityTypes: EntityTypes = EntityTypes.of(Renku.CommandParameter, Renku.CommandParameterBase)
 
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
-    entityTypes == this.entityTypes
+    entityTypes contains this.entityTypes
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliCommandParameter] = JsonLDDecoder.entity(entityTypes) { cursor =>
     for {
