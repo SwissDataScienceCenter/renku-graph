@@ -23,6 +23,7 @@ import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.{Prov, Renku}
 import io.renku.graph.model.activities._
 import io.renku.jsonld._
+import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld.syntax._
 import monocle.{Lens, Traversal}
 
@@ -46,7 +47,7 @@ object CliActivity {
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId     <- cursor.downEntityId.as[ResourceId]
-        generations    <- cursor.downField(Prov.qualifiedGeneration).as[List[CliGeneration]]
+        generations    <- cursor.focusTop.as(decodeList(CliGeneration.decoderForActivity(resourceId)))
         softwareAgents <- cursor.downField(Prov.wasAssociatedWith).as[List[CliSoftwareAgent]]
         personAgents   <- cursor.downField(Prov.wasAssociatedWith).as[List[CliPerson]]
         softwareAgent <- softwareAgents match {
@@ -79,7 +80,7 @@ object CliActivity {
       JsonLD.entity(
         activity.resourceId.asEntityId,
         entityTypes,
-        Prov.qualifiedGeneration  -> activity.generations.asJsonLD,
+        Reverse.ofJsonLDsUnsafe(Prov.qualifiedGeneration -> activity.generations.asJsonLD),
         Prov.wasAssociatedWith    -> JsonLD.arr(activity.softwareAgent.asJsonLD, activity.personAgent.asJsonLD),
         Prov.qualifiedAssociation -> activity.association.asJsonLD,
         Prov.qualifiedUsage       -> activity.usages.asJsonLD,
