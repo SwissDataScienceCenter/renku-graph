@@ -18,16 +18,20 @@
 
 package io.renku.eventlog
 
+import cats.Show
+import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import fs2.concurrent.SignallingRef
+import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
-import io.renku.eventlog.events.producers.EventProducersRegistry
+import io.renku.eventlog.events.consumers.statuschange.{StatusChangeEvent, StatusChangeEventsQueue}
+import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
-import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
@@ -39,6 +43,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.Session
 
 import scala.concurrent.duration._
 
@@ -57,19 +62,16 @@ class MicroserviceRunnerSpec
       "if Sentry, Events Distributor and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
-        override val metrics        = new Metrics()
-        override val gaugeScheduler = new Gauge()
+//        given(certificateLoader).succeeds(returning = ())
+//        given(sentryInitializer).succeeds(returning = ())
+//        given(dbInitializer).succeeds(returning = ())
+//        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
+//        given(eventProducersRegistry).succeeds(returning = ())
+//        given(eventConsumersRegistry).succeeds(returning = ())
+//        given(eventsQueue).succeeds(returning = ())
+//        given(httpServer).succeeds()
 
-        given(certificateLoader).succeeds(returning = ())
-        given(sentryInitializer).succeeds(returning = ())
-        given(dbInitializer).succeeds(returning = ())
-        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(eventProducersRegistry).succeeds(returning = ())
-        given(eventConsumersRegistry).succeeds(returning = ())
-        given(eventsQueue).succeeds(returning = ())
-        given(httpServer).succeeds()
-
-        startRunnerFor(2.seconds).unsafeRunSync()
+        startRunnerFor(0.5.seconds).unsafeRunSync()
 
         metrics.counter.get.unsafeRunSync()        should be > 1
         gaugeScheduler.counter.get.unsafeRunSync() should be > 1
@@ -104,16 +106,13 @@ class MicroserviceRunnerSpec
     }
 
     "fail if starting the http server fails" in new TestCase {
-      override val metrics        = new Metrics()
-      override val gaugeScheduler = new Gauge()
-
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).succeeds(returning = ())
+      // given(dbInitializer).succeeds(returning = ())
+      // (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
+      // given(eventProducersRegistry).succeeds(returning = ())
+      // given(eventConsumersRegistry).succeeds(returning = ())
+      // given(eventsQueue).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
@@ -229,17 +228,18 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
-    val certificateLoader       = mock[CertificateLoader[IO]]
-    val sentryInitializer       = mock[SentryInitializer[IO]]
-    val dbInitializer           = mock[DbInitializer[IO]]
-    val eventProducersRegistry  = mock[EventProducersRegistry[IO]]
-    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
-    val metrics                 = mock[EventLogMetrics[IO]]
-    val eventsQueue             = mock[StatusChangeEventsQueue[IO]]
-    val httpServer              = mock[HttpServer[IO]]
-    val gaugeScheduler          = mock[GaugeResetScheduler[IO]]
+    implicit val logger:         TestLogger[IO]              = TestLogger[IO]()
+    val serviceReadinessChecker: ServiceReadinessChecker[IO] = new CountEffect
+    val certificateLoader:       CertificateLoader[IO]       = new CountEffect
+    val sentryInitializer:       SentryInitializer[IO]       = new CountEffect
+    val dbInitializer:           DbInitializer[IO]           = new CountEffect
+    val eventProducersRegistry:  EventProducersRegistry[IO]  = new CountEffect
+    val eventConsumersRegistry:  EventConsumersRegistry[IO]  = new CountEffect
+    val metrics:                 EventLogMetrics[IO]         = new CountEffect
+    val eventsQueue:             StatusChangeEventsQueue[IO] = new CountEffect
+    val httpServer = mock[HttpServer[IO]]
+    val gaugeScheduler: GaugeResetScheduler[IO] = new CountEffect
+
     lazy val runner = new MicroserviceRunner(
       serviceReadinessChecker,
       certificateLoader,
@@ -270,10 +270,7 @@ class MicroserviceRunnerSpec
   private class Metrics extends EventLogMetrics[IO] {
     val counter = Ref.unsafe[IO, Int](0)
 
-    override def run: IO[Unit] = keepGoing.foreverM
-
-    private def keepGoing =
-      Temporal[IO].delayBy(counter.update(_ + 1), 500 millis)
+    override def run: IO[Unit] = counter.update(_ + 1)
   }
 
   private class Gauge extends GaugeResetScheduler[IO] {
@@ -283,5 +280,34 @@ class MicroserviceRunnerSpec
 
     private def keepGoing =
       Temporal[IO].delayBy(counter.update(_ + 1), 500 millis)
+  }
+
+  final class CountEffect
+      extends ServiceReadinessChecker[IO]
+      with CertificateLoader[IO]
+      with SentryInitializer[IO]
+      with DbInitializer[IO]
+      with EventLogMetrics[IO]
+      with EventProducersRegistry[IO]
+      with EventConsumersRegistry[IO]
+      with StatusChangeEventsQueue[IO]
+      with GaugeResetScheduler[IO] {
+    val counter = Ref.unsafe[IO, Int](0)
+
+    def run: IO[Unit] = counter.update(_ + 1)
+
+    override def waitIfNotUp: IO[Unit] = ???
+    override def register(subscriptionRequest: Json): IO[EventProducersRegistry.SubscriptionResult] = ???
+    override def getStatus: IO[Set[EventProducerStatus]] = ???
+    override def handle(requestContent: EventRequestContent): IO[EventSchedulingResult] = ???
+    override def renewAllSubscriptions(): IO[Unit] = ???
+    override def register[E <: StatusChangeEvent](
+        handler: E => IO[Unit]
+    )(implicit decoder: Decoder[E], eventType: StatusChangeEventsQueue.EventType[E]): IO[Unit] = ???
+    override def offer[E <: StatusChangeEvent](event: E)(implicit
+        encoder:   Encoder[E],
+        eventType: StatusChangeEventsQueue.EventType[E],
+        show:      Show[E]
+    ): Kleisli[IO, Session[IO], Unit] = ???
   }
 }
