@@ -30,7 +30,6 @@ import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
 final case class CliProject(
-    id:            ResourceId,
     name:          Option[Name],
     description:   Option[Description],
     dateCreated:   DateCreated,
@@ -142,7 +141,6 @@ object CliProject {
   implicit val jsonLDDecoder: JsonLDEntityDecoder[CliProject] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        id            <- cursor.downEntityId.as[ResourceId]
         name          <- cursor.downField(Schema.name).as[Option[Name]]
         description   <- cursor.downField(Schema.description).as[Option[Description]]
         dateCreated   <- cursor.downField(Schema.dateCreated).as[DateCreated]
@@ -155,7 +153,6 @@ object CliProject {
         agentVersion  <- cursor.downField(Schema.agent).as[Option[CliVersion]]
         schemaVersion <- cursor.downField(Schema.schemaVersion).as[Option[SchemaVersion]]
       } yield CliProject(
-        id,
         name,
         description,
         dateCreated,
@@ -187,7 +184,7 @@ object CliProject {
   implicit def jsonLDEncoder: JsonLDEncoder[CliProject] =
     JsonLDEncoder.instance { project =>
       JsonLD.entity(
-        project.id.asEntityId,
+        EntityId.blank,
         entityTypes,
         Schema.agent         -> project.agentVersion.asJsonLD,
         Schema.creator       -> project.creator.asJsonLD,
