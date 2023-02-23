@@ -20,8 +20,8 @@ package io.renku.graph.model.cli
 
 import cats.syntax.all._
 import io.renku.cli.model.CliProject
+import io.renku.graph.model.{testentities, RenkuUrl}
 import io.renku.graph.model.testentities.ModelOps
-import io.renku.graph.model.{RenkuUrl, projects, testentities}
 import io.renku.jsonld.syntax._
 
 trait CliProjectConverters extends CliActivityConverters with CliDatasetConverters {
@@ -31,7 +31,6 @@ trait CliProjectConverters extends CliActivityConverters with CliDatasetConverte
 
   private def renkuProject(p: testentities.RenkuProject)(implicit renkuUrl: RenkuUrl): CliProject =
     CliProject(
-      projects.ResourceId(p.asEntityId),
       p.name.some,
       p.maybeDescription,
       p.dateCreated,
@@ -47,7 +46,6 @@ trait CliProjectConverters extends CliActivityConverters with CliDatasetConverte
 
   def nonRenkuProject(p: testentities.NonRenkuProject)(implicit renkuUrl: RenkuUrl): CliProject =
     CliProject(
-      projects.ResourceId(p.asEntityId),
       p.name.some,
       p.maybeDescription,
       p.dateCreated,

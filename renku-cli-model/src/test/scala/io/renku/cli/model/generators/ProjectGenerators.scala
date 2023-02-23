@@ -50,7 +50,6 @@ trait ProjectGenerators {
     agentVersion  <- RenkuTinyTypeGenerators.cliVersions.toGeneratorOfOptions
     schemaVersion <- RenkuTinyTypeGenerators.projectSchemaVersions.toGeneratorOfOptions
   } yield CliProject(
-    id,
     name,
     description,
     dateCreated,

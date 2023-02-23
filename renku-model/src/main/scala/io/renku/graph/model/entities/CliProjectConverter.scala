@@ -56,7 +56,6 @@ private[entities] object CliProjectConverter {
     all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
         gitLabInfo,
-        cliProject.id,
         dateCreated,
         descr,
         cliProject.agentVersion,
@@ -77,7 +76,6 @@ private[entities] object CliProjectConverter {
   }
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
-                         resourceId:       ResourceId,
                          dateCreated:      DateCreated,
                          maybeDescription: Option[Description],
                          maybeAgent:       Option[CliVersion],
@@ -93,7 +91,7 @@ private[entities] object CliProjectConverter {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
           .from(
-            resourceId,
+            ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
@@ -114,7 +112,7 @@ private[entities] object CliProjectConverter {
       case (Some(agent), Some(version), None) =>
         RenkuProject.WithoutParent
           .from(
-            resourceId,
+            ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
@@ -134,7 +132,7 @@ private[entities] object CliProjectConverter {
       case (None, None, Some(parentPath)) =>
         NonRenkuProject
           .WithParent(
-            resourceId,
+            ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
@@ -151,7 +149,7 @@ private[entities] object CliProjectConverter {
       case (None, None, None) =>
         NonRenkuProject
           .WithoutParent(
-            resourceId,
+            ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
