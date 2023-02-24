@@ -36,13 +36,16 @@ object SubscriptionFactory {
       _
   ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriberCapacity <- GenerationProcessesNumber[F]().map(v => SubscriberCapacity(v.value))
+    generationProcessesNumber <- GenerationProcessesNumber[F]()
     subscriptionMechanism <-
       SubscriptionMechanism(
         categoryName,
-        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier, subscriberCapacity)
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort,
+                                                  Microservice.Identifier,
+                                                  SubscriberCapacity(generationProcessesNumber.value)
+        )
       )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler(subscriptionMechanism)
+    handler <- EventHandler(subscriptionMechanism, generationProcessesNumber)
   } yield handler -> subscriptionMechanism
 }

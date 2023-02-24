@@ -24,8 +24,7 @@ import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect._
 import cats.syntax.all._
-import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{consumers, CategoryName, EventRequestContent}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -82,13 +81,12 @@ private object EventHandler {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      subscriptionMechanism: SubscriptionMechanism[F],
-      config:                Config = ConfigFactory.load()
+      subscriptionMechanism:     SubscriptionMechanism[F],
+      concurrentProcessesNumber: ConcurrentProcessesNumber
   ): F[EventHandler[F]] = for {
     tsReadinessChecker         <- TSReadinessForEventsChecker[F]
-    maxConcurrentProcesses     <- ConcurrentProcessesNumber[F](config)
     eventProcessor             <- EventProcessor[F]
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses.asRefined)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(concurrentProcessesNumber.asRefined)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
                               EventBodyDeserializer[F],

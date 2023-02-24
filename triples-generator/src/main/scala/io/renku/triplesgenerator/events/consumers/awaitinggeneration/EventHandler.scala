@@ -23,8 +23,7 @@ import cats.data.EitherT
 import cats.effect.{Async, Concurrent}
 import cats.effect.kernel.Deferred
 import cats.syntax.all._
-import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{consumers, CategoryName, EventRequestContent}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -74,11 +73,10 @@ object EventHandler {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
-      config:                Config = ConfigFactory.load()
+      generationProcesses: GenerationProcessesNumber,
   ): F[EventHandler[F]] = for {
     tsReadinessChecker       <- TSReadinessForEventsChecker[F]
     eventProcessor           <- EventProcessor[F]
-    generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(generationProcesses.asRefined)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
