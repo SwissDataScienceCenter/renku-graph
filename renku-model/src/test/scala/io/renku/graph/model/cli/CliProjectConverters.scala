@@ -20,7 +20,7 @@ package io.renku.graph.model.cli
 
 import cats.syntax.all._
 import io.renku.cli.model.CliProject
-import io.renku.graph.model.{testentities, RenkuUrl}
+import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.graph.model.testentities.ModelOps
 import io.renku.jsonld.syntax._
 
