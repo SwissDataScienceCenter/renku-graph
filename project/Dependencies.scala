@@ -18,7 +18,7 @@ object Dependencies {
     val refinedPureconfig      = "0.10.1"
     val circeCore              = "0.14.4"
     val circeOptics            = "0.14.1"
-    val jsonld4s               = "0.9.0"
+    val jsonld4s               = "0.10.0"
     val catsCore               = "2.9.0"
     val catsEffect             = "3.4.8"
     val monocle                = "2.1.0"
