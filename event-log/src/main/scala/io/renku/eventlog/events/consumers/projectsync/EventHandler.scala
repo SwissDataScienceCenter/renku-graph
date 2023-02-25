@@ -25,7 +25,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -35,10 +35,10 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: CategoryName,
                                                      projectInfoSynchronizer:    ProjectInfoSynchronizer[F],
                                                      subscriptionMechanism:      SubscriptionMechanism[F],
-                                                     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
+                                                     concurrentProcessesLimiter: ConcurrentProcessesExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess.withWaitingForCompletion[F](
       startProcessingEvent(request, _),
       releaseProcess = subscriptionMechanism.renewSubscription()
@@ -72,6 +72,6 @@ private object EventHandler {
   ): F[EventHandler[F]] = for {
     projectInfoSynchronizer    <- ProjectInfoSynchronizer[F]
     maxConcurrentProcesses     <- find[F, Int Refined Positive]("project-sync-max-concurrent-processes", config)
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter[F](processesCount = maxConcurrentProcesses)
+    concurrentProcessesLimiter <- ConcurrentProcessExecutor[F](processesCount = maxConcurrentProcesses)
   } yield new EventHandler[F](categoryName, projectInfoSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
 }

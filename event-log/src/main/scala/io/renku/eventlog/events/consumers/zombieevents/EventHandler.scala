@@ -27,7 +27,7 @@ import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
@@ -37,9 +37,9 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
     override val categoryName: CategoryName,
     zombieStatusCleaner:       ZombieStatusCleaner[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](startCleanZombieEvents(request))
 
   private def startCleanZombieEvents(request: EventRequestContent) = for {

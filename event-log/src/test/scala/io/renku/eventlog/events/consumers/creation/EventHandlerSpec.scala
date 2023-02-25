@@ -62,7 +62,7 @@ class EventHandlerSpec
         (eventPersister.storeNewEvent _).expects(event).returning(resultFactory(event).pure[IO])
 
         handler
-          .createHandlingProcess(requestContent(event.asJson))
+          .createHandlingDefinition(requestContent(event.asJson))
           .unsafeRunSync()
           .process
           .value
@@ -81,7 +81,7 @@ class EventHandlerSpec
 
       val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+      handler.createHandlingDefinition(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
       )
 
@@ -93,7 +93,7 @@ class EventHandlerSpec
 
       val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+      handler.createHandlingDefinition(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
       )
 
@@ -107,7 +107,7 @@ class EventHandlerSpec
 
         val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
-        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+        handler.createHandlingDefinition(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
           BadRequest
         )
 
@@ -122,7 +122,7 @@ class EventHandlerSpec
       (eventPersister.storeNewEvent _).expects(event).returning(exception.raiseError[IO, EventPersister.Result])
 
       handler
-        .createHandlingProcess(requestContent(event.asJson))
+        .createHandlingDefinition(requestContent(event.asJson))
         .unsafeRunSync()
         .process
         .value

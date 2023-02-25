@@ -25,13 +25,13 @@ import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model.{RenkuUrl, entities, projects}
+import io.renku.graph.model.{entities, projects, RenkuUrl}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.{JsonLD, Property}
+import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{logMessageCommon, CommitEvent}
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
-import io.renku.triplesgenerator.events.consumers.awaitinggeneration.{CommitEvent, logMessageCommon}
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.security.SecureRandom
@@ -46,7 +46,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 )(implicit renkuUrl: RenkuUrl)
     extends TriplesGenerator[F] {
 
-  import ammonite.ops.{Path, root}
+  import ammonite.ops.{root, Path}
   import file._
   import gitRepoUrlFinder._
   import io.renku.jsonld.syntax._

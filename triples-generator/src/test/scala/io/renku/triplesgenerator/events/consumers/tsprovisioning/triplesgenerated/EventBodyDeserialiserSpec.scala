@@ -90,6 +90,6 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with IOSpec with MockFactory
     val jsonld = jsonLDValues.generateOne
 
     val zip          = mock[Zip]
-    val deserializer = new EventBodyDeserializerImpl[IO](zip)
+    val deserializer = new EventDecoderImpl[IO](zip)
   }
 }

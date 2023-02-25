@@ -55,9 +55,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
           .returning(IO.unit)
 
         val eventJson = project.asJson(eventEncoder)
-        (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
+        (eventBodyDeserializer.decode _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
 
-        val handlingProcess = handler.createHandlingProcess(requestContent(eventJson)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(requestContent(eventJson)).unsafeRunSync()
 
         handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
 
@@ -80,9 +80,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       }"""
       val request   = requestContent(eventJson)
       val exception = exceptions.generateOne
-      (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(exception.raiseError[IO, CleanUpEvent])
+      (eventBodyDeserializer.decode _).expects(eventJson).returns(exception.raiseError[IO, CleanUpEvent])
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
     }
 
     s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
@@ -95,9 +95,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
         .returning(exception.raiseError[IO, Unit])
 
       val eventJson = project.asJson(eventEncoder)
-      (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
+      (eventBodyDeserializer.decode _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
 
-      val handlingProcess = handler.createHandlingProcess(requestContent(eventJson)).unsafeRunSync()
+      val handlingProcess = handler.createHandlingDefinition(requestContent(eventJson)).unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
 
@@ -118,7 +118,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
 
       val request = requestContent(project.asJson(eventEncoder))
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 
@@ -128,8 +128,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]
-    val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val eventBodyDeserializer      = mock[EventDecoder[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val handler = new EventHandler[IO](categoryName,
                                        tsReadinessChecker,

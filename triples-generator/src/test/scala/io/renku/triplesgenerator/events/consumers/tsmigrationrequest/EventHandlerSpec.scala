@@ -27,7 +27,7 @@ import io.circe.literal._
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.events.consumers.ConcurrentProcessesLimiter
+import io.renku.events.consumers.ConcurrentProcessExecutor
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.Generators.subscriberUrls
@@ -54,7 +54,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     "return ServiceUnavailable if TSState is ReProvisioning" in new TestCase {
       (() => tsStateChecker.checkTSState).expects().returning(TSState.ReProvisioning.pure[IO])
 
-      val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+      val process = handler.createHandlingDefinition(requestPayload(serviceVersion)).unsafeRunSync()
 
       process.process.merge.unsafeRunSync() shouldBe ServiceUnavailable("Re-provisioning running")
     }
@@ -63,7 +63,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val exception = exceptions.generateOne
       (() => tsStateChecker.checkTSState).expects().returning(exception.raiseError[IO, TSState])
 
-      val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+      val process = handler.createHandlingDefinition(requestPayload(serviceVersion)).unsafeRunSync()
 
       process.process.merge.unsafeRunSync() shouldBe SchedulingError(exception)
     }
@@ -85,7 +85,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
             .expects(statusChangePayload(status = "DONE"), expectedEventContext)
             .returning(().pure[IO])
 
-          val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+          val process = handler.createHandlingDefinition(requestPayload(serviceVersion)).unsafeRunSync()
 
           process.process.merge.unsafeRunSync() shouldBe Accepted
 
@@ -115,7 +115,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           )
           .returning(().pure[IO])
 
-        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(requestPayload(serviceVersion)).unsafeRunSync()
 
         handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
@@ -139,7 +139,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           .expects(capture(payloadCaptor), expectedEventContext)
           .returning(().pure[IO])
 
-        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(requestPayload(serviceVersion)).unsafeRunSync()
 
         handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
@@ -158,7 +158,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       givenTsStateGreen
 
       handler
-        .createHandlingProcess(EventRequestContent.NoPayload(json"""{"categoryName": ${categoryName.value}}"""))
+        .createHandlingDefinition(EventRequestContent.NoPayload(json"""{"categoryName": ${categoryName.value}}"""))
         .flatMap(_.process.merge)
         .unsafeRunSync() shouldBe BadRequest
     }
@@ -170,7 +170,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val requestedVersion = serviceVersions.generateOne
         handler
-          .createHandlingProcess(requestPayload(requestedVersion))
+          .createHandlingDefinition(requestPayload(requestedVersion))
           .flatMap(_.process.merge)
           .unsafeRunSync() shouldBe BadRequest
 
@@ -189,7 +189,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val migrationsRunner           = mock[MigrationsRunner[IO]]
     val eventSender                = mock[EventSender[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val handler = new EventHandler[IO](subscriberUrl,
                                        serviceId,

@@ -19,19 +19,15 @@
 package io.renku.commiteventservice.events.consumers.globalcommitsync
 
 import cats.NonEmptyParallel
-import cats.data.EitherT.fromEither
 import cats.effect._
-import cats.effect.kernel.Deferred
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -39,33 +35,26 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
-    override val categoryName:  CategoryName,
-    commitEventSynchronizer:    CommitsSynchronizer[F],
-    subscriptionMechanism:      SubscriptionMechanism[F],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    override val categoryName: CategoryName,
+    commitEventSynchronizer:   CommitsSynchronizer[F],
+    subscriptionMechanism:     SubscriptionMechanism[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   import commitEventSynchronizer._
-  import io.renku.graph.model.projects
-  import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess.withWaitingForCompletion[F](
-      process = startEventProcessing(request, _),
-      releaseProcess = subscriptionMechanism.renewSubscription()
+  protected override type Event = GlobalCommitSyncEvent
+
+  override def createHandlingDefinition(): EventHandlingProcess =
+    EventHandlingProcess(
+      _.event.as[GlobalCommitSyncEvent],
+      synchronizeEvents,
+      onRelease = subscriptionMechanism.renewSubscription()
     )
 
-  private def startEventProcessing(request: EventRequestContent, process: Deferred[F, Unit]) = for {
-    event <- fromEither[F](request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest))
-    result <-
-      Spawn[F]
-        .start((synchronizeEvents(event) recoverWith logError(event)) >> process.complete(()))
-        .toRightT
-        .map(_ => Accepted)
-        .semiflatTap(Logger[F] log event)
-        .leftSemiflatTap(Logger[F] log event)
-  } yield result
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
     for {
@@ -81,21 +70,14 @@ private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
     } yield Project(id, path)
 }
 
-private[events] object EventHandler {
-
-  import eu.timepit.refined.auto._
-  val processesLimit: Int Refined Positive = 1
+private object EventHandler {
 
   def apply[F[
       _
   ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F]
-  ): F[EventHandler[F]] = for {
-    concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
+  ): F[consumers.EventHandler[F]] = for {
     globalCommitEventSynchronizer <- CommitsSynchronizer[F]
-  } yield new EventHandler[F](categoryName,
-                              globalCommitEventSynchronizer,
-                              subscriptionMechanism,
-                              concurrentProcessesLimiter
-  )
+    processExecutor               <- ProcessExecutor.concurrent(1)
+  } yield new EventHandler[F](categoryName, globalCommitEventSynchronizer, subscriptionMechanism, processExecutor)
 }

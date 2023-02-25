@@ -92,7 +92,7 @@ class EventHandlerSpec
         case (subcategory, (event, eventRequestContent, waitForUpdate, eventAsString)) =>
           withClue(s"$subcategory -> ") {
             handler
-              .createHandlingProcess(eventRequestContent)
+              .createHandlingDefinition(eventRequestContent)
               .unsafeRunSync()
               .process
               .value
@@ -114,7 +114,7 @@ class EventHandlerSpec
         .generateOne
 
       handler
-        .createHandlingProcess(requestContent(event.asJson))
+        .createHandlingDefinition(requestContent(event.asJson))
         .unsafeRunSync()
         .process
         .value
@@ -136,7 +136,7 @@ class EventHandlerSpec
       }
 
       handler
-        .createHandlingProcess(request)
+        .createHandlingDefinition(request)
         .unsafeRunSync()
         .process
         .value

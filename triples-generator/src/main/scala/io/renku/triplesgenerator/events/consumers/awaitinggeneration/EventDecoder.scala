@@ -18,27 +18,29 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
-import cats.MonadThrow
 import cats.syntax.all._
-import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
+import io.circe.parser._
 import io.renku.events.consumers.Project
+import io.renku.events.EventRequestContent
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private trait EventBodyDeserializer[F[_]] {
-  def toCommitEvent(eventBody: EventBody): F[CommitEvent]
+private trait EventDecoder {
+  val decode: EventRequestContent => Either[Exception, CommitEvent]
 }
 
-private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeserializer[F] {
+private object EventDecoder extends EventDecoder {
 
-  override def toCommitEvent(eventBody: EventBody): F[CommitEvent] =
-    MonadThrow[F].fromEither {
-      parse(eventBody.value)
+  override lazy val decode: EventRequestContent => Either[Exception, CommitEvent] = {
+    case EventRequestContent.WithPayload(_, payload: String) =>
+      parse(payload)
         .flatMap(_.as[CommitEvent])
-        .leftMap(toMeaningfulError(eventBody))
-    }
+        .leftMap(toMeaningfulError(payload))
+    case _ =>
+      new Exception("Event without or invalid payload").asLeft
+  }
 
   private implicit val commitsDecoder: Decoder[CommitEvent] = cursor =>
     for {
@@ -47,12 +49,8 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
       projectPath <- cursor.downField("project").downField("path").as[Path]
     } yield CommitEvent(EventId(commitId.value), Project(projectId, projectPath), commitId)
 
-  private def toMeaningfulError(eventBody: EventBody): Error => Error = {
-    case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be deserialised: '$eventBody'")
-    case failure: ParsingFailure  => ParsingFailure(s"CommitEvent cannot be deserialised: '$eventBody'", failure)
+  private def toMeaningfulError(payload: String): Error => Error = {
+    case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be decoded: '$payload'")
+    case failure: ParsingFailure  => ParsingFailure(s"CommitEvent cannot be decoded: '$payload'", failure)
   }
-}
-
-private object EventBodyDeserializer {
-  def apply[F[_]: MonadThrow]: EventBodyDeserializer[F] = new EventBodyDeserializerImpl[F]
 }

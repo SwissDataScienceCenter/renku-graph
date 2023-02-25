@@ -35,7 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-class ConcurrentProcessesLimiterSpec
+class ConcurrentProcessesExecutorSpec
     extends AnyWordSpec
     with IOSpec
     with MockFactory
@@ -192,7 +192,7 @@ class ConcurrentProcessesLimiterSpec
     val semaphore      = mock[TestSemaphore]
 
     private val limiter = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
-    val withoutLimit    = ConcurrentProcessesLimiter.withoutLimit[IO]
+    val withoutLimit    = ConcurrentProcessExecutor.withoutLimit[IO]
 
     def resultWithoutLimit(result: EitherT[IO, EventSchedulingResult, Accepted]): EventHandlingProcess[IO] =
       EventHandlingProcess[IO](result).unsafeRunSync()

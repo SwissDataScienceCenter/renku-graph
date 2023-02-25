@@ -23,18 +23,18 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
+import io.renku.triplesgenerator.events.consumers.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.events.consumers.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -58,13 +58,14 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
     for {
+      _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
       implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
       uploadingResult                     <- generateAndUpdateStatus(event)
     } yield uploadingResult
   } flatMap logSummary recoverWith logError(event)
 
   private def logError(event: CommitEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"${logMessageCommon(event)}: commit Event processing failure")
+    Logger[F].error(exception)(s"${logMessageCommon(event)} processing failure")
   }
 
   private def generateAndUpdateStatus(

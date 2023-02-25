@@ -26,7 +26,7 @@ import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
@@ -34,9 +34,9 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: Concurrent: Logger](
     processor:                 EventProcessor[F],
     override val categoryName: CategoryName = categoryName
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
-  protected override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  protected override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](processEvent(request))
 
   private def processEvent(request: EventRequestContent): EitherT[F, EventSchedulingResult, Accepted] = for {

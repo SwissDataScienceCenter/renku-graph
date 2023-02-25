@@ -56,7 +56,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
         logger.loggedOnly(Info(s"${handler.categoryName}: projectPath = $projectPath -> $Accepted"))
       }
@@ -72,7 +72,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         }
       }""")
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
@@ -86,7 +86,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent(projectPath.asJson(eventEncoder))
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 

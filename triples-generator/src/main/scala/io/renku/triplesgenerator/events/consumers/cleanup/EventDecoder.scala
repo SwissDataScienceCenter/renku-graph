@@ -18,21 +18,21 @@
 
 package io.renku.triplesgenerator.events.consumers.cleanup
 
-import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Error, Json}
 import io.renku.events.consumers.Project
+import io.renku.events.EventRequestContent
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private trait EventBodyDeserializer[F[_]] {
-  def toCleanUpEvent(event: Json): F[CleanUpEvent]
+private trait EventDecoder {
+  def decode(request: EventRequestContent): Either[Exception, CleanUpEvent]
 }
 
-private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeserializer[F] {
+private object EventDecoder extends EventDecoder {
 
-  override def toCleanUpEvent(event: Json): F[CleanUpEvent] =
-    MonadThrow[F].fromEither(event.as[CleanUpEvent].leftMap(toMeaningfulError(event)))
+  def decode(request: EventRequestContent): Either[Exception, CleanUpEvent] =
+    request.event.as[CleanUpEvent].leftMap(toMeaningfulError(request.event))
 
   private implicit val commitsDecoder: Decoder[CleanUpEvent] = cursor =>
     for {
@@ -41,10 +41,6 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
     } yield CleanUpEvent(Project(projectId, projectPath))
 
   private def toMeaningfulError(event: Json): DecodingFailure => Error = { failure =>
-    failure.withMessage(s"CleanUpEvent cannot be deserialised: '$event'")
+    failure.withMessage(s"CleanUpEvent cannot be decoded: '$event'")
   }
-}
-
-private object EventBodyDeserializer {
-  def apply[F[_]: MonadThrow]: EventBodyDeserializer[F] = new EventBodyDeserializerImpl[F]
 }

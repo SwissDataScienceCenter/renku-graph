@@ -18,13 +18,8 @@
 
 package io.renku.events.consumers
 
-import cats.data.EitherT
-import cats.effect.Concurrent
-import cats.effect.kernel.Deferred
-import cats.syntax.all._
-import cats.{MonadThrow, Show}
+import cats.Show
 import io.renku.graph.model.projects
-import org.typelevel.log4cats.Logger
 
 final case class Project(id: projects.GitLabId, path: projects.Path)
 
@@ -34,7 +29,9 @@ object Project {
   }
 }
 
-sealed trait EventSchedulingResult extends Product with Serializable
+sealed trait EventSchedulingResult extends Product with Serializable {
+  def widen: EventSchedulingResult = this
+}
 
 object EventSchedulingResult {
   type Accepted = Accepted.type
@@ -53,50 +50,4 @@ object EventSchedulingResult {
     case ServiceUnavailable(reason) => s"ServiceUnavailable: $reason"
     case SchedulingError(_)         => "SchedulingError"
   }
-}
-
-import EventSchedulingResult._
-
-class EventHandlingProcess[F[_]: Concurrent] private (
-    deferred:                Deferred[F, Unit],
-    val process:             EitherT[F, EventSchedulingResult, Accepted],
-    val maybeReleaseProcess: Option[F[Unit]] = None
-) {
-  def waitToFinish(): F[Unit] = deferred.get
-}
-
-object EventHandlingProcess {
-
-  def withWaitingForCompletion[F[_]: Concurrent: Logger](
-      process:        Deferred[F, Unit] => EitherT[F, EventSchedulingResult, Accepted],
-      releaseProcess: F[Unit]
-  ): F[EventHandlingProcess[F]] =
-    Deferred[F, Unit].map(deferred =>
-      new EventHandlingProcess[F](
-        deferred,
-        EitherT(process(deferred).recoverWith(onLeftComplete(deferred)).value recoverWith onErrorComplete(deferred)),
-        releaseProcess.some
-      )
-    )
-
-  private def onLeftComplete[F[_]: MonadThrow: Logger](
-      deferred: Deferred[F, Unit]
-  ): PartialFunction[EventSchedulingResult, EitherT[F, EventSchedulingResult, Accepted]] = { case result =>
-    EitherT.left {
-      (deferred.complete(()) >> Logger[F].error(show"Failure during event scheduling: $result"))
-        .map(_ => result)
-    }
-  }
-
-  private def onErrorComplete[F[_]: MonadThrow: Logger](
-      deferred: Deferred[F, Unit]
-  ): PartialFunction[Throwable, F[Either[EventSchedulingResult, Accepted]]] = { case exception =>
-    (deferred.complete(()) >> Logger[F].error(exception)("Failure during event scheduling"))
-      .map(_ => EventSchedulingResult.SchedulingError(exception).asLeft[Accepted])
-  }
-
-  def apply[F[_]: Concurrent](process: EitherT[F, EventSchedulingResult, Accepted]): F[EventHandlingProcess[F]] = for {
-    deferred <- Deferred[F, Unit]
-    _        <- deferred.complete(())
-  } yield new EventHandlingProcess[F](deferred, process)
 }

@@ -53,7 +53,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         givenTsReady
 
-        (eventBodyDeserializer.toEvent _)
+        (eventBodyDeserializer.decode _)
           .expects(event.compoundEventId, event.project, zippedPayload)
           .returning(event.pure[IO])
 
@@ -63,7 +63,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
         handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
         handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
@@ -77,7 +77,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = EventRequestContent.NoPayload((event.compoundEventId, event.project).asJson)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
     }
 
     s"return $BadRequest if event payload is malformed" in new TestCase {
@@ -87,7 +87,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val request =
         EventRequestContent.WithPayload((event.compoundEventId, event.project).asJson, jsons.generateOne.noSpaces)
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe
+      handler.createHandlingDefinition(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe
         BadRequest.asLeft
     }
 
@@ -95,7 +95,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       givenTsReady
 
-      (eventBodyDeserializer.toEvent _)
+      (eventBodyDeserializer.decode _)
         .expects(event.compoundEventId, event.project, zippedPayload)
         .returning(event.pure[IO])
 
@@ -106,7 +106,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+      val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
       handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
@@ -126,7 +126,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 
@@ -138,8 +138,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]
-    val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val eventBodyDeserializer      = mock[EventDecoder[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val handler = new EventHandler[IO](categoryName,
                                        tsReadinessChecker,

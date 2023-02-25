@@ -35,13 +35,13 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName: CategoryName,
     eventPersister:            EventPersister[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
   import eventPersister._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](storeEvent(request))
 
   private def storeEvent(request: EventRequestContent) = for {

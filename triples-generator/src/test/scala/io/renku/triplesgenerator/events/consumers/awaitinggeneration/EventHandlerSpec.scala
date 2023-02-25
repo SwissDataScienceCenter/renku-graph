@@ -28,7 +28,7 @@ import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.notHappySchedulingResults
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -53,7 +53,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         givenTsReady
 
         val commitEvent = commitEvents.generateOne
-        (eventBodyDeserializer.toCommitEvent _)
+        (eventBodyDeserializer.decode _)
           .expects(eventBody)
           .returning(commitEvent.pure[IO])
 
@@ -63,7 +63,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
-        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
         handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
 
@@ -82,11 +82,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), eventBody.value)
 
-      (eventBodyDeserializer.toCommitEvent _)
+      (eventBodyDeserializer.decode _)
         .expects(eventBody)
         .returning(exceptions.generateOne.raiseError[IO, CommitEvent])
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
     }
 
     s"return $BadRequest if event body is not present" in new TestCase {
@@ -95,7 +95,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = EventRequestContent.NoPayload(compoundEventIds.generateOne.asJson(eventEncoder))
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
     }
 
     s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
@@ -103,7 +103,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       givenTsReady
 
       val commitEvent = commitEvents.generateOne
-      (eventBodyDeserializer.toCommitEvent _)
+      (eventBodyDeserializer.decode _)
         .expects(eventBody)
         .returning(commitEvent.pure[IO])
 
@@ -114,7 +114,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
-      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+      val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
 
@@ -138,7 +138,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       val commitEvent = commitEvents.generateOne
       val request     = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 
@@ -148,8 +148,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]
-    val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val eventBodyDeserializer      = mock[EventDecoder[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 

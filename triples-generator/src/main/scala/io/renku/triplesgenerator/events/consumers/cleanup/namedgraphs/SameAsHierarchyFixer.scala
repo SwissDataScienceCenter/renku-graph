@@ -24,12 +24,12 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.graph.model.{datasets, projects, GraphClass}
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.jsonld.{EntityId, NamedGraph}
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

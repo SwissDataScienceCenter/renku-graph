@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.Subscription.SubscriberCapacity
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -35,7 +36,7 @@ object SubscriptionFactory {
   def apply[F[
       _
   ]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     generationProcessesNumber <- GenerationProcessesNumber[F]()
     subscriptionMechanism <-
       SubscriptionMechanism(

@@ -26,7 +26,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ConcurrentProcessesLimiter
+import io.renku.events.consumers.ConcurrentProcessExecutor
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
@@ -59,7 +59,7 @@ class EventHandlerSpec
           .returning(().pure[IO])
 
         handler
-          .createHandlingProcess(requestContent(event.asJson))
+          .createHandlingDefinition(requestContent(event.asJson))
           .unsafeRunSync()
           .process
           .value
@@ -78,7 +78,7 @@ class EventHandlerSpec
         .returning(exception.raiseError[IO, Unit])
 
       val handlingProcess = handler
-        .createHandlingProcess(requestContent(event.asJson))
+        .createHandlingDefinition(requestContent(event.asJson))
         .unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
@@ -99,7 +99,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
+      handler.createHandlingDefinition(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
     }
   }
 
@@ -107,7 +107,7 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitEventSynchronizer    = mock[CommitsSynchronizer[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 

@@ -23,11 +23,11 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.entities.searchgraphs.DatasetsGraphCleaner
+import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.entities.ProjectIdentification
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

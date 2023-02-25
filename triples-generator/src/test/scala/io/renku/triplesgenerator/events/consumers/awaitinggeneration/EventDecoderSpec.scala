@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}
 
-class EventBodyDeserializerSpec extends AnyWordSpec with should.Matchers {
+class EventDecoderSpec extends AnyWordSpec with should.Matchers {
 
   "toCommitEvents" should {
 

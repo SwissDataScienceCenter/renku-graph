@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.events.consumers.ConcurrentProcessesLimiter
+import io.renku.events.consumers.ConcurrentProcessExecutor
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
@@ -55,7 +55,7 @@ class EventHandlerSpec
         (synchronizer.syncProjectInfo _).expects(event).returning(().pure[IO])
 
         handler
-          .createHandlingProcess(requestContent(event.asJson))
+          .createHandlingDefinition(requestContent(event.asJson))
           .unsafeRunSync()
           .process
           .value
@@ -70,7 +70,7 @@ class EventHandlerSpec
       (synchronizer.syncProjectInfo _).expects(event).returning(exception.raiseError[IO, Unit])
 
       val handlingProcess = handler
-        .createHandlingProcess(requestContent(event.asJson))
+        .createHandlingDefinition(requestContent(event.asJson))
         .unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
@@ -91,7 +91,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
+      handler.createHandlingDefinition(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
     }
   }
 
@@ -101,7 +101,7 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val synchronizer               = mock[ProjectInfoSynchronizer[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val handler = new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, concurrentProcessesLimiter)
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)

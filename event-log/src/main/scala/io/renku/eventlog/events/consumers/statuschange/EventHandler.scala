@@ -44,13 +44,13 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutio
     eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
     deliveryInfoRemover:       DeliveryInfoRemover[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
   private val applicative = Applicative[F]
   import EventHandler._
   import applicative.whenA
 
-  override def createHandlingProcess(
+  override def createHandlingDefinition(
       request: EventRequestContent
   ): F[EventHandlingProcess[F]] = EventHandlingProcess[F] {
     tryHandle(

@@ -25,8 +25,8 @@ import io.renku.graph.model.Schemas.{prov, rdf, renku}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 private object AddRenkuPlanWhereMissing {

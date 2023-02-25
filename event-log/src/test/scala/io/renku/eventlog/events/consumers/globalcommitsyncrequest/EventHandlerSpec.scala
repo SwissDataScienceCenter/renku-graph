@@ -59,7 +59,7 @@ class EventHandlerSpec
           .returning(().pure[IO])
 
         handler
-          .createHandlingProcess(requestContent((projectId -> projectPath).asJson))
+          .createHandlingDefinition(requestContent((projectId -> projectPath).asJson))
           .unsafeRunSync()
           .process
           .value
@@ -87,7 +87,7 @@ class EventHandlerSpec
         .returning(exception.raiseError[IO, Unit])
 
       handler
-        .createHandlingProcess(
+        .createHandlingDefinition(
           requestContent((projectId -> projectPath).asJson)
         )
         .unsafeRunSync()
@@ -113,7 +113,7 @@ class EventHandlerSpec
         }"""
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
+      handler.createHandlingDefinition(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }

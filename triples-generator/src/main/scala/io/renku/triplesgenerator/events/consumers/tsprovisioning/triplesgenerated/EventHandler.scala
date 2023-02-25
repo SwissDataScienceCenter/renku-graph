@@ -19,16 +19,12 @@
 package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.triplesgenerated
 
-import cats.{NonEmptyParallel, Parallel, Show}
-import cats.data.EitherT
-import cats.data.EitherT.fromEither
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect._
 import cats.syntax.all._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
-import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -36,44 +32,24 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
-private[events] class EventHandler[F[_]: Concurrent: Logger](
-    override val categoryName:  CategoryName,
-    tsReadinessChecker:         TSReadinessForEventsChecker[F],
-    eventBodyDeserializer:      EventBodyDeserializer[F],
-    subscriptionMechanism:      SubscriptionMechanism[F],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
-    eventProcessor:             EventProcessor[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    override val categoryName: CategoryName,
+    tsReadinessChecker:        TSReadinessForEventsChecker[F],
+    eventDecoder:              EventDecoder,
+    subscriptionMechanism:     SubscriptionMechanism[F],
+    processExecutor:           ProcessExecutor[F],
+    eventProcessor:            EventProcessor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import eventBodyDeserializer._
-  import eventProcessor._
-  import tsReadinessChecker._
+  protected override type Event = TriplesGeneratedEvent
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess.withWaitingForCompletion[F](
-      verifyTSReady >> startProcessingEvent(request, _),
-      releaseProcess = subscriptionMechanism.renewSubscription()
+  override def createHandlingDefinition(): EventHandlingProcess =
+    EventHandlingProcess(
+      eventDecoder.decode,
+      eventProcessor.process,
+      precondition = tsReadinessChecker.verifyTSReady,
+      onRelease = subscriptionMechanism.renewSubscription().some
     )
-
-  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
-    eventId <- fromEither(request.event.getEventId)
-    project <- fromEither(request.event.getProject)
-    payload <- request match {
-                 case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) => EitherT.rightT(payload)
-                 case _                                                               => EitherT.leftT(BadRequest)
-               }
-    event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
-    result <- Spawn[F]
-                .start((process(event) recoverWith logError(event)) >> processing.complete(()))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(eventId -> event.project))
-                .leftSemiflatTap(Logger[F].log(eventId -> event.project))
-  } yield result
-
-  private implicit lazy val eventInfoShow: Show[(CompoundEventId, Project)] = Show.show { case (eventId, project) =>
-    s"$eventId, projectPath = ${project.path}"
-  }
 }
 
 private object EventHandler {
@@ -83,15 +59,15 @@ private object EventHandler {
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism:     SubscriptionMechanism[F],
       concurrentProcessesNumber: ConcurrentProcessesNumber
-  ): F[EventHandler[F]] = for {
-    tsReadinessChecker         <- TSReadinessForEventsChecker[F]
-    eventProcessor             <- EventProcessor[F]
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(concurrentProcessesNumber.asRefined)
+  ): F[consumers.EventHandler[F]] = for {
+    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    eventProcessor     <- EventProcessor[F]
+    processExecutor    <- ProcessExecutor.concurrent(concurrentProcessesNumber.asRefined)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
-                              EventBodyDeserializer[F],
+                              EventDecoder(),
                               subscriptionMechanism,
-                              concurrentProcessesLimiter,
+                              processExecutor,
                               eventProcessor
   )
 }

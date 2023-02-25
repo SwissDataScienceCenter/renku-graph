@@ -21,10 +21,10 @@ package tsprovisioning
 package minprojectinfo
 
 import ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -33,8 +33,8 @@ import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
-import triplesuploading.TriplesUploadResult.{DeliverySuccess, NonRecoverableFailure, RecoverableFailure}
 import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
+import triplesuploading.TriplesUploadResult.{DeliverySuccess, NonRecoverableFailure, RecoverableFailure}
 
 import scala.util.control.NonFatal
 

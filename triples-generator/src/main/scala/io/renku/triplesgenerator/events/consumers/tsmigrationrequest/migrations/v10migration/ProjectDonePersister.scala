@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.model.{projects, RenkuUrl}
 import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 

@@ -36,7 +36,7 @@ class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
       val content = nonEmptyStrings().generateOne
       Zip
         .zip[IO](content)
-        .flatMap(byteArray => Zip.unzip[IO](byteArray))
+        .flatMap(byteArray => IO.fromEither(Zip.unzip(byteArray)))
         .unsafeRunSync() shouldBe content
     }
   }

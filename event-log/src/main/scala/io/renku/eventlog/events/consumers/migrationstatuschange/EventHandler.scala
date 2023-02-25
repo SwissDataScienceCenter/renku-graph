@@ -29,7 +29,7 @@ import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
@@ -37,11 +37,11 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: Async: Logger](
     statusUpdater:             StatusUpdater[F],
     override val categoryName: CategoryName = categoryName
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
   import statusUpdater._
 
-  protected override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  protected override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](processEvent(request))
 
   private def processEvent(request: EventRequestContent) = for {

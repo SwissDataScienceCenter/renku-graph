@@ -79,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
   }
 
   private trait TestCase {
-    val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val processesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val anyCategoryName  = categoryNames.generateOne
 
     val eventRequestContent = EventRequestContent.NoPayload(
@@ -92,7 +92,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
       new EventHandlerWithProcessLimiter[IO](processesLimiter) {
         override val categoryName: CategoryName = anyCategoryName
 
-        protected override def createHandlingProcess(request: EventRequestContent): IO[EventHandlingProcess[IO]] =
+        protected override def createHandlingDefinition(request: EventRequestContent): IO[EventHandlingProcess[IO]] =
           IO(process)
       }
   }

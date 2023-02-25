@@ -18,79 +18,93 @@
 
 package io.renku.events.consumers
 
+import cats.{MonadThrow, Show}
 import cats.data.EitherT
-import cats.data.EitherT._
+import cats.effect.{MonadCancelThrow, Resource}
 import cats.syntax.all._
-import cats.{Monad, MonadThrow, Show}
-import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.model.events.{CompoundEventId, EventId}
-import io.renku.graph.model.projects
-import io.renku.json.JsonOps.JsonExt
+import io.renku.events.consumers.EventSchedulingResult._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait EventHandler[F[_]] {
-  def tryHandling(request:                     EventRequestContent): F[EventSchedulingResult]
-  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
+  def tryHandling(request: EventRequestContent): F[EventSchedulingResult]
 }
 
-abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimiter: ConcurrentProcessesLimiter[F])
-    extends EventHandler[F] {
+abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
+    processExecutor: ProcessExecutor[F]
+) extends EventHandler[F] {
+
+  import EventDecodingTools._
 
   val categoryName: CategoryName
+  protected type Event
+  protected def createHandlingDefinition(): EventHandlingProcess
 
   final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
-    for {
-      _                    <- fromEither[F](request.event.validateCategoryName)
-      eventHandlingProcess <- right(createHandlingProcess(request))
-      result               <- right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
-    } yield result
-  }.merge
 
-  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
+    val processDefinition = createHandlingDefinition()
 
-  implicit class JsonOps(override val json: Json) extends JsonExt {
-
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    lazy val validateCategoryName: Either[EventSchedulingResult, Unit] =
-      (json.hcursor.downField("categoryName").as[CategoryName] flatMap checkCategoryName)
-        .leftMap(_ => UnsupportedEventType)
-        .void
-
-    lazy val getProject: Either[EventSchedulingResult, Project] = json.as[Project].leftMap(_ => BadRequest)
-
-    lazy val getEventId: Either[EventSchedulingResult, CompoundEventId] =
-      json.as[CompoundEventId].leftMap(_ => BadRequest)
-
-    lazy val getProjectPath: Either[EventSchedulingResult, projects.Path] =
-      json.hcursor.downField("project").downField("path").as[projects.Path].leftMap(_ => BadRequest)
-
-    private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
-      case name @ `categoryName` => Right(name)
-      case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
-    }
-
-    private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
-      for {
-        projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      } yield Project(projectId, projectPath)
-    }
-
-    private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>
-      for {
-        id        <- cursor.downField("id").as[EventId]
-        projectId <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      } yield CompoundEventId(id, projectId)
+    processDefinition.precondition >>= {
+      case Some(preconditionFailure) => preconditionFailure.pure[F]
+      case None =>
+        checkCategory(request).as(processDefinition.decode(request)) >>= {
+          case Left(_)      => BadRequest.widen.pure[F]
+          case Right(event) => process(event, processDefinition)
+        }
     }
   }
 
-  protected def logError[E](event: E)(implicit show: Show[E]): PartialFunction[Throwable, F[Unit]] = { case exception =>
-    Logger[F].error(exception)(show"$categoryName: $event failed")
+  private def checkCategory(request: EventRequestContent) =
+    (request.event.categoryName >>= checkCategoryName).pure[F].void
+
+  private def process(event: Event, processDefinition: EventHandlingProcess) = {
+    val processResource = Resource
+      .make(().pure[F])(_ => processDefinition.onRelease.getOrElse(().pure[F]))
+      .evalTap(_ => processDefinition.process(event))
+    processExecutor
+      .tryExecuting(processResource.use_)
+      .as(Accepted.widen)
+  }
+
+  case class EventHandlingProcess(
+      decode:       EventRequestContent => Either[Exception, Event],
+      process:      Event => F[Unit],
+      precondition: F[Option[EventSchedulingResult]],
+      onRelease:    Option[F[Unit]] = None
+  )
+
+  object EventHandlingProcess {
+
+    def apply(decode:    EventRequestContent => Either[Exception, Event],
+              process:   Event => F[Unit],
+              onRelease: F[Unit]
+    ): EventHandlingProcess = EventHandlingProcess(
+      decode,
+      process,
+      precondition = Option.empty[EventSchedulingResult].pure[F],
+      onRelease.some
+    )
+
+    def apply(decode:  EventRequestContent => Either[Exception, Event],
+              process: Event => F[Unit]
+    ): EventHandlingProcess = EventHandlingProcess(
+      decode,
+      process,
+      precondition = Option.empty[EventSchedulingResult].pure[F],
+      onRelease = None
+    )
+  }
+
+  private lazy val checkCategoryName: CategoryName => Either[EventSchedulingResult, CategoryName] = {
+    case name @ `categoryName` => name.asRight
+    case _                     => UnsupportedEventType.asLeft
+  }
+
+  protected def logError(event: Event)(implicit show: Show[Event]): PartialFunction[Throwable, F[Unit]] = {
+    case exception =>
+      Logger[F].error(exception)(show"$categoryName: $event failed")
   }
 
   protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {

@@ -24,7 +24,7 @@ import cats.effect.{Async, Ref}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.{Schemas, projects}
+import io.renku.graph.model.{projects, Schemas}
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger

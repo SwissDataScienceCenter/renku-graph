@@ -19,10 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.plans
 
 import eu.timepit.refined.auto._
+import io.renku.graph.model.{plans, projects, GraphClass}
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.entities.StepPlan
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, plans, projects}
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 

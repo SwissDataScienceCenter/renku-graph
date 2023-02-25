@@ -31,7 +31,7 @@ import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.notHappySchedulingResults
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
@@ -59,7 +59,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent(event.asJson)
 
-        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+        val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
         handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
 
@@ -81,7 +81,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent(event.asJson)
 
-      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+      val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
 
       handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
 
@@ -101,14 +101,14 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val request = requestContent(minProjectInfoEvents.generateOne.asJson)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
+      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
     val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]

@@ -23,13 +23,13 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.events.CommitId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
-import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, InvalidMessageBodyFailure, Request, Response, Status}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait CommitAuthorFinder[F[_]] {

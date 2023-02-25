@@ -23,7 +23,7 @@ import cats.syntax.all._
 import cats.FlatMap
 import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.model.{projects, RenkuUrl}
 import io.renku.graph.model.Schemas.renku
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes

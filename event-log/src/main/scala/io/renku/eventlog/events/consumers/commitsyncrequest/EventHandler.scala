@@ -33,13 +33,13 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName: CategoryName,
     commitSyncForcer:          CommitSyncForcer[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
 
   import commitSyncForcer._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+  override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](startForceCommitSync(request))
 
   private def startForceCommitSync(request: EventRequestContent) = for {
