@@ -20,14 +20,11 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.{Async, IO, Ref}
 import cats.syntax.all._
-import io.circe.syntax._
-import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.consumers.statuschange.Generators.projectEventsToNewEvents
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
-import io.renku.generators.Generators.Implicits._
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.TestMetricsRegistry

@@ -17,19 +17,24 @@
  */
 
 package io.renku.eventlog.events.consumers.statuschange
+package alleventstonew
 
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import cats.syntax.all._
+import cats.Show
+import io.circe.DecodingFailure
+import io.renku.events.EventRequestContent
+import io.renku.graph.model.events
 
-class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+private trait AllEventsToNew extends StatusChangeEvent
 
-  "ProjectEventsToNew" should {
+private case object AllEventsToNew extends AllEventsToNew {
+  override val silent: Boolean = false
 
-    "be serializable and deserializable to and from Json" in {
-      forAll(projectEventsToNewEvents) { event =>
-        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
-      }
+  val decoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
+    _.event.hcursor.downField("newStatus").as[events.EventStatus] >>= {
+      case events.EventStatus.New => Right(AllEventsToNew)
+      case status                 => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
     }
-  }
+
+  implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = ${events.EventStatus.New}")
 }

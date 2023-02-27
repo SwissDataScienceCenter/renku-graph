@@ -25,14 +25,12 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.eventlog.events.consumers.statuschange.Generators._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.Project
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}

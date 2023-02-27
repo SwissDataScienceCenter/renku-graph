@@ -16,20 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange
+package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import cats.MonadThrow
+import cats.data.Kleisli
+import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange._
+import skunk.Session
 
-class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+private class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
+    extends statuschange.DBUpdater[F, ProjectEventsToNew] {
 
-  "ProjectEventsToNew" should {
+  import ProjectEventsToNew._
 
-    "be serializable and deserializable to and from Json" in {
-      forAll(projectEventsToNewEvents) { event =>
-        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
-      }
-    }
-  }
+  override def updateDB(event: ProjectEventsToNew): UpdateResult[F] =
+    eventsQueue.offer[ProjectEventsToNew](event).map(_ => DBUpdateResults.ForProjects.empty)
+
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 }

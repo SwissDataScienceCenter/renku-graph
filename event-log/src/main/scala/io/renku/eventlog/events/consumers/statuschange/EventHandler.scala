@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{consumers, CategoryName, EventRequestContent}
 import io.renku.events.consumers._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -56,31 +56,19 @@ private object EventHandler {
   ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[consumers.EventHandler[F]] = for {
-    deliveryInfoRemover               <- DeliveryInfoRemover[F]
-    statusChanger                     <- StatusChanger[F]
-    rollbackToNew                     <- RollbackToNewHandler[F](statusChanger)
-    toTriplesGenerated                <- ToTriplesGeneratedHandler[F](deliveryInfoRemover, statusChanger)
-    rollbackToTriplesGenerated        <- RollbackToTriplesGeneratedHandler[F](statusChanger)
-    toTriplesStoreHandler             <- ToTriplesStoreHandler[F](deliveryInfoRemover, statusChanger)
-    toFailureHandler                  <- ToFailureHandler[F](deliveryInfoRemover, statusChanger)
-    toAwaitingDeletionHandler         <- ToAwaitingDeletionHandler[F](statusChanger)
-    rollbackToAwaitingDeletionHandler <- RollbackToAwaitingDeletionHandler[F](statusChanger)
-    redoProjectTransformationHandler  <- RedoProjectTransformationHandler[F](statusChanger, eventsQueue)
-    projectEventsToNewHandler         <- ProjectEventsToNewHandler[F](statusChanger, eventsQueue)
-    allEventsToNewHandler             <- AllEventsToNewHandler[F](statusChanger)
-  } yield new EventHandler[F](
-    categoryName,
-    childHandlers = List(
-      rollbackToNew,
-      toTriplesGenerated,
-      rollbackToTriplesGenerated,
-      toTriplesStoreHandler,
-      toFailureHandler,
-      toAwaitingDeletionHandler,
-      rollbackToAwaitingDeletionHandler,
-      redoProjectTransformationHandler,
-      projectEventsToNewHandler,
-      allEventsToNewHandler
-    )
-  )
+    deliveryInfoRemover <- DeliveryInfoRemover[F]
+    statusChanger       <- StatusChanger[F]
+    childHandlers <- List(
+                       rollbacktonew.Handler[F](statusChanger),
+                       totriplesgenerated.Handler[F](deliveryInfoRemover, statusChanger),
+                       rollbacktotriplesgenerated.Handler[F](statusChanger),
+                       totriplesstore.Handler[F](deliveryInfoRemover, statusChanger),
+                       tofailure.Handler[F](deliveryInfoRemover, statusChanger),
+                       toawaitingdeletion.Handler[F](statusChanger),
+                       rollbacktoawaitingdeletion.Handler[F](statusChanger),
+                       redoprojecttransformation.Handler[F](statusChanger, eventsQueue),
+                       projecteventstonew.Handler[F](statusChanger, eventsQueue),
+                       alleventstonew.Handler[F](statusChanger)
+                     ).sequence
+  } yield new EventHandler[F](categoryName, childHandlers)
 }

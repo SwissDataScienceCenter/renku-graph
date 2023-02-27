@@ -24,8 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
-import io.renku.eventlog.events.consumers.statuschange.Generators._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.Project
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -42,7 +40,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.{Session, ~}
+import skunk.{~, Session}
 import skunk.implicits._
 
 class StatusChangerSpec
