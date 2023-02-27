@@ -19,63 +19,9 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
-import cats.effect.kernel.Async
-import cats.syntax.all._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
-import io.renku.metrics.MetricsRegistry
-import org.typelevel.log4cats.Logger
 import skunk.Session
 
 private trait DBUpdater[F[_], E <: StatusChangeEvent] {
   def updateDB(event:   E): UpdateResult[F]
   def onRollback(event: E): Kleisli[F, Session[F], Unit]
-}
-
-private object DBUpdater {
-
-  type EventUpdaterFactory[F[_], E <: StatusChangeEvent] =
-    (StatusChangeEventsQueue[F], DeliveryInfoRemover[F]) => F[DBUpdater[F, E]]
-
-  implicit def factoryToTriplesGeneratorUpdater[F[_]: Async: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, ToTriplesGenerated] =
-    (_, infoRemover) => new ToTriplesGeneratedUpdater(infoRemover).pure[F].widen[DBUpdater[F, ToTriplesGenerated]]
-
-  implicit def factoryToTriplesStoreUpdater[F[_]: Async: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, ToTriplesStore] =
-    (_, infoRemover) => new ToTriplesStoreUpdater(infoRemover).pure[F].widen[DBUpdater[F, ToTriplesStore]]
-
-  implicit def factoryToFailureUpdater[F[_]: Async: Logger: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, ToFailure[ProcessingStatus, FailureStatus]] = (_, infoRemover) =>
-    new ToFailureUpdater(infoRemover).pure[F].widen[DBUpdater[F, ToFailure[ProcessingStatus, FailureStatus]]]
-
-  implicit def factoryRollbackToNewUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, RollbackToNew] =
-    (_, _) => new RollbackToNewUpdater[F]().pure[F].widen[DBUpdater[F, RollbackToNew]]
-
-  implicit def factoryRollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, RollbackToTriplesGenerated] = (_, _) =>
-    new RollbackToTriplesGeneratedUpdater[F]().pure[F].widen[DBUpdater[F, RollbackToTriplesGenerated]]
-
-  implicit def factoryToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, ToAwaitingDeletion] =
-    (_, _) => new ToAwaitingDeletionUpdater[F]().pure[F].widen[DBUpdater[F, ToAwaitingDeletion]]
-
-  implicit def factoryRollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, RollbackToAwaitingDeletion] =
-    (_, _) => new RollbackToAwaitingDeletionUpdater[F]().pure[F].widen[DBUpdater[F, RollbackToAwaitingDeletion]]
-
-  implicit def factoryRedoProjectTransformationHandler[F[_]: Async: Logger]
-      : EventUpdaterFactory[F, RedoProjectTransformation] =
-    (eventsQueue, _) =>
-      new RedoProjectTransformationHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, RedoProjectTransformation]]
-
-  implicit def factoryToProjectEventsNewHandler[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
-    (eventsQueue, _) => new ProjectEventsToNewHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, ProjectEventsToNew]]
-
-  implicit def factoryToAllEventsNewUpdater[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
-      : EventUpdaterFactory[F, AllEventsToNew] =
-    (_, _) => AllEventsToNewUpdater[F].widen[DBUpdater[F, AllEventsToNew]]
 }

@@ -21,11 +21,18 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import cats.MonadThrow
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.EventStatusGauges
 import skunk.Transaction
 
 private trait StatusChanger[F[_]] {
-  def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit]
+  def updateStatuses[E <: StatusChangeEvent](dbUpdater: DBUpdater[F, E])(event: E): F[Unit]
+}
+
+private object StatusChanger {
+  def apply[F[_]: MonadCancelThrow: SessionResource: EventStatusGauges]: F[StatusChanger[F]] =
+    MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](GaugesUpdater[F]))
 }
 
 private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
@@ -33,7 +40,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
 
   import gaugesUpdater._
 
-  override def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit] =
+  override def updateStatuses[E <: StatusChangeEvent](dbUpdater: DBUpdater[F, E])(event: E): F[Unit] =
     SessionResource[F].useWithTransactionK {
       Kleisli { case (transaction, session) =>
         {
@@ -43,7 +50,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
               dbUpdater
                 .updateDB(event)
                 .flatMapF(res => transaction.commit.map(_ => res))
-                .recoverWith(rollback(transaction)(savepoint)(event))
+                .recoverWith(rollback(transaction)(savepoint)(event)(dbUpdater))
             _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case _ => Kleisli.pure(()) }
           } yield ()
         } run session
@@ -51,7 +58,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
     }
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
-      implicit dbUpdater: DBUpdater[F, E]
+      dbUpdater: DBUpdater[F, E]
   ): PartialFunction[Throwable, UpdateResult[F]] = { case err =>
     Kleisli.liftF {
       for {

@@ -18,16 +18,44 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.MonadThrow
-import cats.data.Kleisli
+import cats.effect.Async
+import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
-import skunk.Session
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
+import io.renku.metrics.MetricsRegistry
+import org.typelevel.log4cats.Logger
 
-private class RedoProjectTransformationHandler[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
-    extends DBUpdater[F, RedoProjectTransformation] {
+private class RedoProjectTransformationHandler[F[_]: Async: Logger](
+    override val categoryName: CategoryName,
+    dbUpdater:                 DBUpdater[F, RedoProjectTransformation],
+    statusChanger:             StatusChanger[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  override def updateDB(event: RedoProjectTransformation): UpdateResult[F] =
-    eventsQueue.offer[RedoProjectTransformation](event).map(_ => DBUpdateResults.ForProjects.empty)
+  protected override type Event = RedoProjectTransformation
 
-  override def onRollback(event: RedoProjectTransformation): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = RedoProjectTransformation.decoder,
+      process = statusChanger.updateStatuses(dbUpdater)
+    )
+}
+
+private object RedoProjectTransformationHandler {
+
+  def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+      statusChanger: StatusChanger[F],
+      eventsQueue:   StatusChangeEventsQueue[F]
+  ): F[consumers.EventHandler[F]] = for {
+    redoProjectPoller <- RedoProjectTransformationPoller[F]
+    _ <- eventsQueue.register[RedoProjectTransformation](statusChanger.updateStatuses(redoProjectPoller)(_))
+    processExecutor <- ProcessExecutor.concurrent(5)
+  } yield new RedoProjectTransformationHandler[F](categoryName,
+                                                  new RedoProjectTransformationUpdater[F](eventsQueue),
+                                                  statusChanger,
+                                                  processExecutor
+  )
 }

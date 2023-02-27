@@ -18,46 +18,41 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.effect.Async
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private class ProjectEventsToNewHandler[F[_]: Async: Logger](
+private class ToTriplesStoreHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
-    dbUpdater:                 DBUpdater[F, ProjectEventsToNew],
+    dbUpdater:                 DBUpdater[F, ToTriplesStore],
     statusChanger:             StatusChanger[F],
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  protected override type Event = ProjectEventsToNew
+  protected override type Event = ToTriplesStore
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = ProjectEventsToNew.decoder,
+      decode = ToTriplesStore.decoder,
       process = statusChanger.updateStatuses(dbUpdater)
     )
 }
 
-private object ProjectEventsToNewHandler {
+private object ToTriplesStoreHandler {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes: AccessTokenFinder](
-      statusChanger: StatusChanger[F],
-      eventsQueue:   StatusChangeEventsQueue[F]
-  ): F[consumers.EventHandler[F]] = for {
-    projectsToNewPoller <- ProjectEventsToNewPoller[F]
-    _ <-
-      eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(projectsToNewPoller)(_))
-    processExecutor <- ProcessExecutor.concurrent(5)
-  } yield new ProjectEventsToNewHandler[F](categoryName,
-                                           new ProjectEventsToNewUpdater[F](eventsQueue),
-                                           statusChanger,
-                                           processExecutor
-  )
+  def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+      deliveryInfoRemover: DeliveryInfoRemover[F],
+      statusChanger:       StatusChanger[F]
+  ): F[consumers.EventHandler[F]] =
+    ProcessExecutor
+      .concurrent(5)
+      .map(
+        new ToTriplesStoreHandler[F](categoryName, new ToTriplesStoreUpdater[F](deliveryInfoRemover), statusChanger, _)
+      )
 }

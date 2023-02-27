@@ -46,8 +46,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = GlobalCommitSyncEvent
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       _.event.as[GlobalCommitSyncEvent],
       synchronizeEvents,
       onRelease = subscriptionMechanism.renewSubscription()

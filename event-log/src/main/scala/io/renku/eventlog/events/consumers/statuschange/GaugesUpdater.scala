@@ -28,6 +28,10 @@ private trait GaugesUpdater[F[_]] {
   def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit]
 }
 
+private object GaugesUpdater {
+  def apply[F[_]: Applicative: EventStatusGauges]: GaugesUpdater[F] = new GaugesUpdaterImpl[F]
+}
+
 private class GaugesUpdaterImpl[F[_]: Applicative: EventStatusGauges] extends GaugesUpdater[F] {
 
   override def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit] = dbUpdateResults match {

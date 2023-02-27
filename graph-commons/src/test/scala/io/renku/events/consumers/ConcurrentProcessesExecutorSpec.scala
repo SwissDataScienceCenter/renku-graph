@@ -194,13 +194,13 @@ class ConcurrentProcessesExecutorSpec
     private val limiter = new ConcurrentProcessesLimiterImpl[IO](processesCount, semaphore)
     val withoutLimit    = ConcurrentProcessExecutor.withoutLimit[IO]
 
-    def resultWithoutLimit(result: EitherT[IO, EventSchedulingResult, Accepted]): EventHandlingProcess[IO] =
-      EventHandlingProcess[IO](result).unsafeRunSync()
+    def resultWithoutLimit(result: EitherT[IO, EventSchedulingResult, Accepted]): EventHandlingDefinition[IO] =
+      EventHandlingDefinition[IO](result).unsafeRunSync()
 
     def tryExecuting(process:        Deferred[IO, Unit] => EitherT[IO, EventSchedulingResult, Accepted],
                      releaseProcess: IO[Unit]
     ): IO[EventSchedulingResult] = for {
-      handlerProcess <- EventHandlingProcess.withWaitingForCompletion[IO](process, releaseProcess)
+      handlerProcess <- EventHandlingDefinition.withWaitingForCompletion[IO](process, releaseProcess)
       result         <- limiter.tryExecuting(handlerProcess)
     } yield result
   }

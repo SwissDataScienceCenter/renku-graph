@@ -18,54 +18,44 @@
 
 package io.renku.eventlog.events.consumers.globalcommitsyncrequest
 
-import cats.Show
-import cats.data.EitherT.fromEither
-import cats.effect.Concurrent
+import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: Concurrent: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     globalCommitSyncForcer:    GlobalCommitSyncForcer[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessExecutor.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
   import globalCommitSyncForcer._
   import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingDefinition(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](startForceCommitSync(request))
+  protected override type Event = (projects.GitLabId, projects.Path)
 
-  private def startForceCommitSync(request: EventRequestContent) = for {
-    event @ (projectId, projectPath) <-
-      fromEither[F](
-        request.event.as[(projects.GitLabId, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-      )
-    result <- moveGlobalCommitSync(projectId, projectPath).toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event))
-                .leftSemiflatTap(Logger[F].log(event))
-  } yield result
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[(projects.GitLabId, projects.Path)],
+      process = startForceCommitSync
+    )
 
-  private implicit lazy val eventInfoToString: Show[(projects.GitLabId, projects.Path)] = Show.show {
-    case (projectId, projectPath) => show"projectId = $projectId, projectPath = $projectPath"
+  private def startForceCommitSync: Event => F[Unit] = { case (projectId, projectPath) =>
+    moveGlobalCommitSync(projectId, projectPath)
   }
 
-  private implicit val eventDecoder: Decoder[(projects.GitLabId, projects.Path)] = { cursor =>
-    for {
-      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-    } yield projectId -> projectPath
+  private implicit val eventDecoder: Decoder[Event] = { cursor =>
+    (cursor.downField("project").downField("id").as[projects.GitLabId] ->
+      cursor.downField("project").downField("path").as[projects.Path])
+      .mapN(_ -> _)
   }
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[EventHandler[F]] =
+  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
     GlobalCommitSyncForcer[F]().map(new EventHandler[F](categoryName, _))
 }

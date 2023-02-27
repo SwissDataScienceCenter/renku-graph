@@ -18,46 +18,38 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.effect.Async
+import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private class ProjectEventsToNewHandler[F[_]: Async: Logger](
+private class RollbackToNewHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
-    dbUpdater:                 DBUpdater[F, ProjectEventsToNew],
+    dbUpdater:                 DBUpdater[F, RollbackToNew],
     statusChanger:             StatusChanger[F],
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  protected override type Event = ProjectEventsToNew
+  protected override type Event = RollbackToNew
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = ProjectEventsToNew.decoder,
+      decode = RollbackToNew.decoder,
       process = statusChanger.updateStatuses(dbUpdater)
     )
 }
 
-private object ProjectEventsToNewHandler {
+private object RollbackToNewHandler {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes: AccessTokenFinder](
-      statusChanger: StatusChanger[F],
-      eventsQueue:   StatusChangeEventsQueue[F]
-  ): F[consumers.EventHandler[F]] = for {
-    projectsToNewPoller <- ProjectEventsToNewPoller[F]
-    _ <-
-      eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(projectsToNewPoller)(_))
-    processExecutor <- ProcessExecutor.concurrent(5)
-  } yield new ProjectEventsToNewHandler[F](categoryName,
-                                           new ProjectEventsToNewUpdater[F](eventsQueue),
-                                           statusChanger,
-                                           processExecutor
-  )
+  def apply[F[_]: Concurrent: Logger: MetricsRegistry: QueriesExecutionTimes](
+      statusChanger: StatusChanger[F]
+  ): F[consumers.EventHandler[F]] =
+    ProcessExecutor
+      .concurrent(5)
+      .map(new RollbackToNewHandler[F](categoryName, new RollbackToNewUpdater[F](), statusChanger, _))
 }

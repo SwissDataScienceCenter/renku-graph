@@ -29,58 +29,70 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventHandler[F[_]] {
+
+  val categoryName: CategoryName
+
   def tryHandling(request: EventRequestContent): F[EventSchedulingResult]
+
+  import EventDecodingTools._
+
+  protected lazy val checkCategory: EventRequestContent => Either[EventSchedulingResult, CategoryName] =
+    _.event.categoryName.leftMap(_ => UnsupportedEventType.widen) >>= checkCategoryName
+
+  private lazy val checkCategoryName: CategoryName => Either[EventSchedulingResult, CategoryName] = {
+    case name @ `categoryName` => name.asRight
+    case _                     => UnsupportedEventType.asLeft
+  }
+
 }
 
 abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
     processExecutor: ProcessExecutor[F]
 ) extends EventHandler[F] {
 
-  import EventDecodingTools._
-
-  val categoryName: CategoryName
   protected type Event
-  protected def createHandlingDefinition(): EventHandlingProcess
+  protected def createHandlingDefinition(): EventHandlingDefinition
 
   final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
 
-    val processDefinition = createHandlingDefinition()
+    val handlingDefinition = createHandlingDefinition()
 
-    processDefinition.precondition >>= {
+    handlingDefinition.precondition >>= {
       case Some(preconditionFailure) => preconditionFailure.pure[F]
       case None =>
-        checkCategory(request).as(processDefinition.decode(request)) >>= {
-          case Left(_)      => BadRequest.widen.pure[F]
-          case Right(event) => process(event, processDefinition)
-        }
+        (checkCategory(request) >> decodeEvent(request, handlingDefinition)
+          .map(process(_, handlingDefinition))).sequence
+          .map(_.merge)
     }
   }
 
-  private def checkCategory(request: EventRequestContent) =
-    (request.event.categoryName >>= checkCategoryName).pure[F].void
+  private def decodeEvent(request:           EventRequestContent,
+                          processDefinition: EventHandlingDefinition
+  ): Either[EventSchedulingResult, Event] =
+    (processDefinition decode request).leftMap(_ => BadRequest)
 
-  private def process(event: Event, processDefinition: EventHandlingProcess) = {
+  private def process(event: Event, processDefinition: EventHandlingDefinition) = {
     val processResource = Resource
       .make(().pure[F])(_ => processDefinition.onRelease.getOrElse(().pure[F]))
-      .evalTap(_ => processDefinition.process(event))
+      .evalTap(_ => processDefinition process event)
     processExecutor
       .tryExecuting(processResource.use_)
       .as(Accepted.widen)
   }
 
-  case class EventHandlingProcess(
+  case class EventHandlingDefinition(
       decode:       EventRequestContent => Either[Exception, Event],
       process:      Event => F[Unit],
       precondition: F[Option[EventSchedulingResult]],
       onRelease:    Option[F[Unit]] = None
   )
 
-  object EventHandlingProcess {
+  object EventHandlingDefinition {
 
     def apply(decode:    EventRequestContent => Either[Exception, Event],
               process:   Event => F[Unit],
               onRelease: F[Unit]
-    ): EventHandlingProcess = EventHandlingProcess(
+    ): EventHandlingDefinition = EventHandlingDefinition(
       decode,
       process,
       precondition = Option.empty[EventSchedulingResult].pure[F],
@@ -89,17 +101,12 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
 
     def apply(decode:  EventRequestContent => Either[Exception, Event],
               process: Event => F[Unit]
-    ): EventHandlingProcess = EventHandlingProcess(
+    ): EventHandlingDefinition = EventHandlingDefinition(
       decode,
       process,
       precondition = Option.empty[EventSchedulingResult].pure[F],
       onRelease = None
     )
-  }
-
-  private lazy val checkCategoryName: CategoryName => Either[EventSchedulingResult, CategoryName] = {
-    case name @ `categoryName` => name.asRight
-    case _                     => UnsupportedEventType.asLeft
   }
 
   protected def logError(event: Event)(implicit show: Show[Event]): PartialFunction[Throwable, F[Unit]] = {

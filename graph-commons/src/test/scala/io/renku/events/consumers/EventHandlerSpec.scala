@@ -40,7 +40,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
     s"return $Accepted if handler can support the request" in new TestCase {
 
       (for {
-        process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
+        process <- EventHandlingDefinition[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
         _ <- (processesLimiter.tryExecuting _)
                .expects(process)
                .returning(Accepted.pure[IO])
@@ -53,7 +53,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
     Set(BadRequest, SchedulingError(exceptions.generateOne)).foreach { result =>
       s"return $result if handler can support the request but an error occurs" in new TestCase {
         (for {
-          process <- EventHandlingProcess[IO](EitherT.leftT[IO, Accepted](result))
+          process <- EventHandlingDefinition[IO](EitherT.leftT[IO, Accepted](result))
           _ <- (processesLimiter.tryExecuting _)
                  .expects(process)
                  .returning(result.pure[IO])
@@ -71,7 +71,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
       {
         for {
-          process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
+          process <- EventHandlingDefinition[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
           result  <- handlerWithProcess(process).tryHandling(unsupportedEvent)
         } yield result
       }.unsafeRunSync() shouldBe UnsupportedEventType
@@ -88,11 +88,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =
+    def handlerWithProcess(process: EventHandlingDefinition[IO]): EventHandlerWithProcessLimiter[IO] =
       new EventHandlerWithProcessLimiter[IO](processesLimiter) {
         override val categoryName: CategoryName = anyCategoryName
 
-        protected override def createHandlingDefinition(request: EventRequestContent): IO[EventHandlingProcess[IO]] =
+        protected override def createHandlingDefinition(request: EventRequestContent): IO[EventHandlingDefinition[IO]] =
           IO(process)
       }
   }

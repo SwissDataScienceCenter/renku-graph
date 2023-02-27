@@ -43,8 +43,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = projects.Path
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       decode = _.event.getProjectPath,
       process = synchronizeMembers,
       precondition = verifyTSReady,

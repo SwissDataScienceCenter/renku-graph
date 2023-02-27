@@ -28,7 +28,7 @@ import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.notHappySchedulingResults
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingDefinition, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -183,7 +183,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       }"""
     }
 
-  private implicit class EventHandlingProcessOps(handlingProcessIO: IO[EventHandlingProcess[IO]]) {
+  private implicit class EventHandlingProcessOps(handlingProcessIO: IO[EventHandlingDefinition[IO]]) {
     def unsafeRunSyncProcess() =
       handlingProcessIO.unsafeRunSync().process.value.unsafeRunSync()
   }

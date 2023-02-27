@@ -18,10 +18,8 @@
 
 package io.renku.events.consumers
 
-import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Json}
 import io.renku.events.CategoryName
-import io.renku.events.consumers.EventSchedulingResult.UnsupportedEventType
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import io.renku.json.JsonOps.JsonExt
@@ -34,11 +32,10 @@ trait EventDecodingTools {
 
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    lazy val categoryName: Either[EventSchedulingResult, CategoryName] =
+    lazy val categoryName: Either[DecodingFailure, CategoryName] =
       json.hcursor
         .downField("categoryName")
         .as[CategoryName]
-        .leftMap(_ => UnsupportedEventType)
 
     lazy val getProject: Either[DecodingFailure, Project] = json.as[Project]
 

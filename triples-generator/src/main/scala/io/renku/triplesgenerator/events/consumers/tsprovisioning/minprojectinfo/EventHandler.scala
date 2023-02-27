@@ -44,8 +44,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = MinProjectInfoEvent
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       _.event.getProject.map(MinProjectInfoEvent(_)),
       eventProcessor.process,
       precondition = tsReadinessChecker.verifyTSReady,

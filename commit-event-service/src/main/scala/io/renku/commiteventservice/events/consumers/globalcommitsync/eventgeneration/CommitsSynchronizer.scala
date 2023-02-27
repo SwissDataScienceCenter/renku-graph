@@ -68,7 +68,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
 
   override def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit] = {
     Logger[F].info(show"$categoryName: $event accepted") >>
-      findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
+      findAccessToken(event.project.id) >>= { implicit mat =>
       fetchCommitStats(event.project.id) >>= {
         case maybeStats if outOfSync(event)(maybeStats) => createOrDeleteEvents(event)
         case _ =>

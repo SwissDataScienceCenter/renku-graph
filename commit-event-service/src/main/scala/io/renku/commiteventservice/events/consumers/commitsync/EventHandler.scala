@@ -18,13 +18,12 @@
 
 package io.renku.commiteventservice.events.consumers.commitsync
 
-import cats.MonadThrow
-import cats.effect.{Async, Concurrent, Spawn}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -33,7 +32,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     commitsSynchronizer:       CommitsSynchronizer[F],
     processExecutor:           ProcessExecutor[F]
@@ -43,8 +42,8 @@ private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 
   import commitsSynchronizer._
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       decode = _.event.as[CommitSyncEvent],
       process = synchronizeEvents
     )

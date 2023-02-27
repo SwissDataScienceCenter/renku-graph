@@ -30,7 +30,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlingProcessSpec
+class EventHandlingDefinitionSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
@@ -43,7 +43,7 @@ class EventHandlingProcessSpec
 
       val underlyingProcess = givenProcess(returning = EitherT.rightT[IO, EventSchedulingResult](Accepted))
 
-      val handlingProcess = EventHandlingProcess
+      val handlingProcess = EventHandlingDefinition
         .withWaitingForCompletion[IO](underlyingProcess, releaseProcess = ().pure[IO])
         .unsafeRunSync()
 
@@ -62,7 +62,7 @@ class EventHandlingProcessSpec
         returning = EitherT.leftT[IO, Accepted](EventSchedulingResult.SchedulingError(exceptions.generateOne))
       )
 
-      val handlingProcess = EventHandlingProcess
+      val handlingProcess = EventHandlingDefinition
         .withWaitingForCompletion[IO](underlyingProcess, releaseProcess = ().pure[IO])
         .unsafeRunSync()
 
@@ -81,7 +81,7 @@ class EventHandlingProcessSpec
         returning = EitherT.right[EventSchedulingResult](exceptions.generateOne.raiseError[IO, Accepted])
       )
 
-      val handlingProcess = EventHandlingProcess
+      val handlingProcess = EventHandlingDefinition
         .withWaitingForCompletion[IO](underlyingProcess, releaseProcess = ().pure[IO])
         .unsafeRunSync()
 
@@ -101,7 +101,7 @@ class EventHandlingProcessSpec
         returning = EitherT.right[EventSchedulingResult](exception.raiseError[IO, Accepted])
       )
 
-      val handlingProcess = EventHandlingProcess
+      val handlingProcess = EventHandlingDefinition
         .withWaitingForCompletion[IO](underlyingProcess, releaseProcess = ().pure[IO])
         .unsafeRunSync()
 
@@ -120,7 +120,7 @@ class EventHandlingProcessSpec
         .semiflatTap(_ => dfrd.complete(()))
     }
 
-    def givenProcessFinishedFlagSet(onCompletionOf: EventHandlingProcess[IO]): Unit =
+    def givenProcessFinishedFlagSet(onCompletionOf: EventHandlingDefinition[IO]): Unit =
       (onCompletionOf.waitToFinish() >> processFinished.set(true)).unsafeRunAndForget()
   }
 }

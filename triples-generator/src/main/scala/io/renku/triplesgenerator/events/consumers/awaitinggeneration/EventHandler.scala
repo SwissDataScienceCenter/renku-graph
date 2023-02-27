@@ -41,8 +41,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = CommitEvent
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       eventDecoder.decode,
       eventProcessor.process,
       precondition = tsReadinessChecker.verifyTSReady,

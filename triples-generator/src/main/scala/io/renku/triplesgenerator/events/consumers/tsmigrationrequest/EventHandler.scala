@@ -61,8 +61,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   import io.renku.events.consumers.EventDecodingTools._
   import tsStateChecker._
 
-  override def createHandlingDefinition(): EventHandlingProcess =
-    EventHandlingProcess(
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
       decode,
       _ => runMigrations(),
       precondition = verifyTSState,

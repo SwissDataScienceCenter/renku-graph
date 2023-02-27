@@ -39,7 +39,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class RedoProjectTransformationUpdaterSpec
+class RedoProjectTransformationPollerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -107,7 +107,7 @@ class RedoProjectTransformationUpdaterSpec
     implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val updater = new RedoProjectTransformationUpdaterImpl[IO]
+    val updater = new RedoProjectTransformationPollerImpl[IO]
   }
 
   private type EventCreationResult = (CompoundEventId, Project, EventDate)

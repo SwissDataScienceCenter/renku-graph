@@ -19,8 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.data.Kleisli
-import cats.effect.Temporal
-import cats.effect.kernel.Async
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}

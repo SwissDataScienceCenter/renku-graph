@@ -49,7 +49,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import scala.util.Random
 
-class ProjectEventsToNewUpdaterSpec
+class ProjectEventsToNewPollerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -233,7 +233,7 @@ class ProjectEventsToNewUpdaterSpec
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val projectCleaner = mock[ProjectCleaner[IO]]
-    val dbUpdater      = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, currentTime)
+    val dbUpdater      = new ProjectEventsToNewPollerImpl[IO](projectCleaner, currentTime)
     val now            = Instant.now()
 
     currentTime.expects().returning(now)
