@@ -19,8 +19,6 @@
 package io.renku.triplesgenerator
 
 import cats.effect._
-import cats.syntax.all._
-import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
@@ -29,22 +27,16 @@ import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.microservices.ServiceReadinessChecker
-import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
+import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceReadinessChecker, ServiceRunCounter}
+import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.MicroserviceRunnerSpec.CountEffect
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.init.CliVersionCompatibilityVerifier
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
 import scala.concurrent.duration._
 
-class MicroserviceRunnerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockedRunnableCollaborators
-    with MockFactory
-    with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "run" should {
 
@@ -52,21 +44,14 @@ class MicroserviceRunnerSpec
       "Sentry and TS datasets initialisations are fine " +
       "and subscription, re-provisioning and the http server start up" in new TestCase {
 
-        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(certificateLoader).succeeds(returning = ())
-        given(gitCertificateInstaller).succeeds(returning = ())
-        given(sentryInitializer).succeeds(returning = ())
-        given(cliVersionCompatChecker).succeeds(returning = ())
-        given(eventConsumersRegistry).succeeds(returning = ())
-        given(httpServer).succeeds()
-
-        startRunnerFor(1 second).unsafeRunSync() shouldBe ExitCode.Success
+        startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+        assertCalledAll.unsafeRunSync()
       }
 
     "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      given(certificateLoader).fails(becauseOf = exception)
+      certificateLoader.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -79,9 +64,8 @@ class MicroserviceRunnerSpec
 
     "fail if installing Certificate for Git fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(gitCertificateInstaller).fails(becauseOf = exception)
+      gitCertificateInstaller.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -94,10 +78,8 @@ class MicroserviceRunnerSpec
 
     "fail if Sentry initialization fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(sentryInitializer).fails(becauseOf = exception)
+      sentryInitializer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -109,11 +91,8 @@ class MicroserviceRunnerSpec
     }
 
     "fail if cli version compatibility fails" in new TestCase {
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(cliVersionCompatChecker) fails (becauseOf = exception)
+      cliVersionCompatChecker.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -126,17 +105,11 @@ class MicroserviceRunnerSpec
 
     "fail if starting the Http Server fails" in new TestCase {
 
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(cliVersionCompatChecker).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      httpServer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
-        startRunnerFor(1 second).unsafeRunSync()
+        startRunnerForever.unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -146,27 +119,28 @@ class MicroserviceRunnerSpec
 
     "return Success ExitCode even when running eventConsumersRegistry fails" in new TestCase {
 
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(cliVersionCompatChecker).succeeds(returning = ())
-      given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds()
+      eventConsumersRegistry.failWith(exceptions.generateOne).unsafeRunSync()
 
-      startRunnerFor(1 second).unsafeRunSync() shouldBe ExitCode.Success
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(eventConsumersRegistry).unsafeRunSync()
     }
   }
 
-  private trait TestCase {
+  private trait TestCase extends AbstractMicroserviceRunnerTest {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
-    val certificateLoader       = mock[CertificateLoader[IO]]
-    val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
-    val sentryInitializer       = mock[SentryInitializer[IO]]
-    val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
-    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
-    val httpServer              = mock[HttpServer[IO]]
+    val serviceReadinessChecker: ServiceReadinessChecker[IO] with CallCounter = new CountEffect(
+      "ServiceReadinessChecker"
+    )
+    val certificateLoader: CertificateLoader[IO] with CallCounter = new CountEffect("CertificateLoader")
+    val gitCertificateInstaller: GitCertificateInstaller[IO] with CallCounter = new CountEffect(
+      "GitCertificateInstaller"
+    )
+    val sentryInitializer: SentryInitializer[IO] with CallCounter = new CountEffect("SentryInitializer")
+    val cliVersionCompatChecker: CliVersionCompatibilityVerifier[IO] with CallCounter = new CountEffect(
+      "CliVersionCompatChecker"
+    )
+    val eventConsumersRegistry: EventConsumersRegistry[IO] with CallCounter = new CountEffect("EventConsumerRegistry")
+    val httpServer:             HttpServer[IO] with CallCounter             = new CountEffect("HttpServer")
 
     val runner = new MicroserviceRunner(serviceReadinessChecker,
                                         certificateLoader,
@@ -177,17 +151,20 @@ class MicroserviceRunnerSpec
                                         httpServer
     )
 
-    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        _    <- (IO.sleep(duration) *> term.set(true)).start
-        exit <- runner.run(term)
-      } yield exit
-
-    def startRunnerForever: IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        exit <- runner.run(term)
-      } yield exit
+    lazy val all: List[CallCounter] = List(
+      serviceReadinessChecker,
+      certificateLoader,
+      gitCertificateInstaller,
+      sentryInitializer,
+      eventConsumersRegistry,
+      httpServer
+    )
   }
+}
+
+object MicroserviceRunnerSpec {
+  class CountEffect(name: String)
+      extends ServiceRunCounter(name)
+      with GitCertificateInstaller[IO]
+      with CliVersionCompatibilityVerifier[IO]
 }

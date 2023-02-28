@@ -18,10 +18,8 @@
 
 package io.renku.testtools
 
-import cats.effect.{IO, Resource}
+import cats.effect.IO
 import cats.syntax.all._
-import io.renku.http.server.HttpServer
-import org.http4s.server.Server
 import org.scalamock.handlers.CallHandler0
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Suite
@@ -34,22 +32,6 @@ trait MockedRunnableCollaborators {
   type Runnable[R] = { def run: IO[R] }
 
   def `given`[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
-
-  def `given`(server: HttpServer[IO]) = new HttpServerOps(server)
-
-  class HttpServerOps(value: HttpServer[IO]) {
-    @annotation.nowarn
-    def succeeds() =
-      (value.createServer _)
-        .expects()
-        .returning(Resource.pure(mock[Server]))
-
-    @annotation.nowarn
-    def fails(becauseOf: Exception) =
-      (value.createServer _)
-        .expects()
-        .returning(becauseOf.raiseError[Resource[IO, *], Server])
-  }
 
   class RunnableOps[R](runnable: Runnable[R]) {
     @annotation.nowarn

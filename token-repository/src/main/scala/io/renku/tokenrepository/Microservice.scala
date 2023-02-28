@@ -75,11 +75,12 @@ private class MicroserviceRunner(
     dbInitializer:      DbInitializer[IO],
     httpServer:         HttpServer[IO],
     microserviceRoutes: MicroserviceRoutes[IO]
-) {
-  def run(signal: Signal[IO, Boolean])(implicit L: Logger[IO]): IO[ExitCode] =
+)(implicit L: Logger[IO]) {
+
+  def run(signal: Signal[IO, Boolean]): IO[ExitCode] =
     Ref.of[IO, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
-  def createServer(implicit logger: Logger[IO]): Resource[IO, Server] = for {
+  def createServer: Resource[IO, Server] = for {
     _      <- Resource.eval(certificateLoader.run)
     _      <- Resource.eval(sentryInitializer.run)
     _      <- Resource.eval(kickOffDBInit())
@@ -87,7 +88,7 @@ private class MicroserviceRunner(
     _      <- Resource.eval(Logger[IO].info("Service started"))
   } yield server
 
-  private def kickOffDBInit()(implicit logger: Logger[IO]) = Spawn[IO].start(
+  private def kickOffDBInit() = Spawn[IO].start(
     (dbInitializer.run >> microserviceRoutes.notifyDBReady()).recoverWith { case ex =>
       Logger[IO].error(ex)("DB initialization failed")
     }.void

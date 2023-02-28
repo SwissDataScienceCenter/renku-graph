@@ -22,7 +22,7 @@ import cats.effect._
 import cats.effect.kernel.Ref
 import cats.syntax.all._
 import com.comcast.ip4s._
-import fs2.concurrent.SignallingRef
+import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
@@ -127,7 +127,7 @@ private class MicroserviceRunner[F[_]: Spawn: Concurrent: Logger](
     httpServer:              HttpServer[F]
 ) {
 
-  def run(signal: SignallingRef[F, Boolean]): F[ExitCode] =
+  def run(signal: Signal[F, Boolean]): F[ExitCode] =
     Ref.of(ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
   def createServer: Resource[F, Server] =

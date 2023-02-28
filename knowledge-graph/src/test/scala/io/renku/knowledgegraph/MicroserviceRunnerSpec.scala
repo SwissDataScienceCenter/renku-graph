@@ -20,43 +20,33 @@ package io.renku.knowledgegraph
 
 import cats.MonadError
 import cats.effect.{ExitCode, IO}
-import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.http.server.HttpServer
+import io.renku.knowledgegraph.MicroserviceRunnerSpec.CountEffect
 import io.renku.knowledgegraph.metrics.KGMetrics
-import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
-import org.scalamock.scalatest.MockFactory
+import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceRunCounter}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
 import scala.concurrent.duration._
 
-class MicroserviceRunnerSpec
-    extends AnyWordSpec
-    with MockedRunnableCollaborators
-    with MockFactory
-    with should.Matchers
-    with IOSpec {
+class MicroserviceRunnerSpec extends AnyWordSpec with should.Matchers with IOSpec {
 
   "run" should {
 
     "return Success Exit Code if Sentry initializes and http server starts up" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(kgMetrics).succeeds(returning = ())
-      given(httpServer).succeeds()
-
-      startRunnerFor(1.seconds).unsafeRunSync() shouldBe ExitCode.Success
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAll.unsafeRunSync()
     }
 
     "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      given(certificateLoader).fails(becauseOf = exception)
+      certificateLoader.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -65,11 +55,8 @@ class MicroserviceRunnerSpec
 
     "fail if Sentry initialization fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (() => sentryInitializer.run)
-        .expects()
-        .returning(context.raiseError(exception))
+      sentryInitializer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -78,11 +65,8 @@ class MicroserviceRunnerSpec
 
     "fail if starting the http server fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(kgMetrics).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      httpServer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -91,36 +75,32 @@ class MicroserviceRunnerSpec
 
     "return Success ExitCode even if Knowledge Graph Metrics initialisation fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(kgMetrics).fails(becauseOf = exception)
-      given(httpServer).succeeds()
+      kgMetrics.failWith(exception).unsafeRunSync()
 
-      startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(kgMetrics).unsafeRunSync()
     }
   }
 
-  private trait TestCase {
+  private trait TestCase extends AbstractMicroserviceRunnerTest {
     val context = MonadError[IO, Throwable]
 
-    val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[SentryInitializer[IO]]
-    val httpServer        = mock[HttpServer[IO]]
-    val kgMetrics         = mock[KGMetrics[IO]]
-    val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics)
+    val certificateLoader: CertificateLoader[IO] with CallCounter = new CountEffect("CertificateLoader")
+    val sentryInitializer: SentryInitializer[IO] with CallCounter = new CountEffect("SentryInitializer")
+    val httpServer:        HttpServer[IO] with CallCounter        = new CountEffect("HttpServer")
+    val kgMetrics:         KGMetrics[IO] with CallCounter         = new CountEffect("KgMetrics")
+    val runner = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics)
 
-    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        _    <- (IO.sleep(duration) *> term.set(true)).start
-        exit <- runner.run(term)
-      } yield exit
-
-    def startRunnerForever: IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        exit <- runner.run(term)
-      } yield exit
+    val all: List[CallCounter] = List(
+      certificateLoader,
+      sentryInitializer,
+      httpServer,
+      kgMetrics
+    )
   }
+}
+
+object MicroserviceRunnerSpec {
+  class CountEffect(name: String) extends ServiceRunCounter(name) with KGMetrics[IO]
 }

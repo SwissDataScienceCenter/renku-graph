@@ -20,7 +20,6 @@ package io.renku.tokenrepository
 
 import cats.effect._
 import cats.effect.unsafe.implicits.global
-import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
@@ -28,44 +27,31 @@ import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.testtools.MockedRunnableCollaborators
+import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceRunCounter}
+import io.renku.tokenrepository.MicroserviceRunnerSpec.CountEffect
 import io.renku.tokenrepository.repository.init.DbInitializer
 import org.http4s.HttpRoutes
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
 import scala.concurrent.duration._
-import scala.language.reflectiveCalls
 
-class MicroserviceRunnerSpec
-    extends AnyWordSpec
-    with MockedRunnableCollaborators
-    with Eventually
-    with MockFactory
-    with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with should.Matchers {
 
   "run" should {
 
     "initialise Sentry, load certificate, initialise DB and start HTTP server" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      given(httpServer).succeeds()
-
-      startRunnerFor(2.second).unsafeRunSync() shouldBe ExitCode.Success
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
 
       logger.loggedOnly(Info("Service started"))
 
-      verifyRoutesNotified
+      assertCalledAll.unsafeRunSync()
     }
 
     "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      given(certificateLoader).fails(becauseOf = exception)
+      certificateLoader.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -74,9 +60,8 @@ class MicroserviceRunnerSpec
 
     "fail if Sentry initialization fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(sentryInitializer).fails(becauseOf = exception)
+      sentryInitializer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -85,64 +70,55 @@ class MicroserviceRunnerSpec
 
     "return Success ExitCode even if DB initialisation fails as the process is run in another thread" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(dbInitializer).fails(becauseOf = exception)
-      given(httpServer).succeeds()
+      dbInitializer.failWith(exception).unsafeRunSync()
 
-      startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(dbInitializer, microserviceRoutes).unsafeRunSync()
 
-      eventually {
-        logger.logged(Error("DB initialization failed", exception), Info("Service started"))
-      }
-
-      microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe false
+      logger.logged(Error("DB initialization failed", exception), Info("Service started"))
     }
 
     "fail if starting the http server fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      httpServer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
       } shouldBe exception
+
+      assertCalledAllBut(httpServer).unsafeRunSync()
     }
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[SentryInitializer[IO]]
-    val dbInitializer     = mock[DbInitializer[IO]]
-    val httpServer        = mock[HttpServer[IO]]
-    val microserviceRoutes = new MicroserviceRoutes[IO] {
-      val notifyDBCalled: Ref[IO, Boolean] = Ref.unsafe(false)
-      override def notifyDBReady() = notifyDBCalled.set(true)
-      override def routes          = Resource.pure(HttpRoutes.empty[IO])
-    }
+  private trait TestCase extends AbstractMicroserviceRunnerTest {
+    implicit val logger:    TestLogger[IO]                          = TestLogger[IO]()
+    val certificateLoader:  CertificateLoader[IO] with CallCounter  = new CountEffect("CertificateLoader")
+    val sentryInitializer:  SentryInitializer[IO] with CallCounter  = new CountEffect("SentryInitializer")
+    val dbInitializer:      DbInitializer[IO] with CallCounter      = new CountEffect("DbInitializer")
+    val httpServer:         HttpServer[IO] with CallCounter         = new CountEffect("HttpServer")
+    val microserviceRoutes: MicroserviceRoutes[IO] with CallCounter = new CountEffect("MicroServiceRoutes")
+
     val runner =
       new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer, microserviceRoutes)
 
-    def verifyRoutesNotified = eventually {
-      microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
-    }
+    val all: List[CallCounter] = List(
+      certificateLoader,
+      sentryInitializer,
+      dbInitializer,
+      httpServer,
+      microserviceRoutes
+    )
+  }
+}
 
-    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        _    <- (IO.sleep(duration) *> term.set(true)).start
-        exit <- runner.run(term)
-      } yield exit
-
-    def startRunnerForever: IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        exit <- runner.run(term)
-      } yield exit
+object MicroserviceRunnerSpec {
+  private class CountEffect(name: String)
+      extends ServiceRunCounter(name)
+      with DbInitializer[IO]
+      with MicroserviceRoutes[IO] {
+    override def notifyDBReady(): IO[Unit]                     = run
+    override def routes:          Resource[IO, HttpRoutes[IO]] = ???
   }
 }

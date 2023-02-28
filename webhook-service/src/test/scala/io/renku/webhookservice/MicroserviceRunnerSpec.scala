@@ -19,26 +19,19 @@
 package io.renku.webhookservice
 
 import cats.effect._
-import fs2.concurrent.SignallingRef
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.http.server.HttpServer
-import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
-import org.scalamock.scalatest.MockFactory
+import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceRunCounter}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
 import scala.concurrent.duration._
 
-class MicroserviceRunnerSpec
-    extends AnyWordSpec
-    with MockedRunnableCollaborators
-    with MockFactory
-    with should.Matchers
-    with IOSpec {
+class MicroserviceRunnerSpec extends AnyWordSpec with should.Matchers with IOSpec {
 
   "run" should {
 
@@ -46,17 +39,14 @@ class MicroserviceRunnerSpec
       "Sentry initialisation is fine and " +
       "Http Server start up" in new TestCase {
 
-        given(certificateLoader).succeeds(returning = ())
-        given(sentryInitializer).succeeds(returning = ())
-        given(httpServer).succeeds()
-
-        startRunnerFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+        startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+        assertCalledAll.unsafeRunSync()
       }
 
     "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      given(certificateLoader).fails(becauseOf = exception)
+      certificateLoader.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
@@ -65,45 +55,34 @@ class MicroserviceRunnerSpec
 
     "fail if Sentry initialization fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      given(sentryInitializer).fails(becauseOf = exception)
+      sentryInitializer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
       } shouldBe exception
+
+      assertCalledAllBut(sentryInitializer, httpServer).unsafeRunSync()
     }
 
     "fail if starting Http Server fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      httpServer.failWith(exception).unsafeRunSync()
 
       intercept[Exception] {
         startRunnerForever.unsafeRunSync()
       } shouldBe exception
+      assertCalledAllBut(httpServer).unsafeRunSync()
     }
   }
 
-  private trait TestCase {
-    val certificateLoader = mock[CertificateLoader[IO]]
-    val sentryInitializer = mock[SentryInitializer[IO]]
-    val httpServer        = mock[HttpServer[IO]]
-    val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer)
+  private trait TestCase extends AbstractMicroserviceRunnerTest {
+    val certificateLoader: CertificateLoader[IO] with CallCounter = new ServiceRunCounter("CertificateLoader")
+    val sentryInitializer: SentryInitializer[IO] with CallCounter = new ServiceRunCounter("SentryInitializer")
+    val httpServer:        HttpServer[IO] with CallCounter        = new ServiceRunCounter("HttpServer")
+    val runner = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer)
 
-    def startRunnerFor(duration: FiniteDuration): IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        _    <- (IO.sleep(duration) *> term.set(true)).start
-        exit <- runner.run(term)
-      } yield exit
-
-    def startRunnerForever: IO[ExitCode] =
-      for {
-        term <- SignallingRef.of[IO, Boolean](false)
-        exit <- runner.run(term)
-      } yield exit
+    lazy val all: List[CallCounter] = List(certificateLoader, sentryInitializer, httpServer)
   }
 }
