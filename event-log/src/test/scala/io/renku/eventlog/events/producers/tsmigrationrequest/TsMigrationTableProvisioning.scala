@@ -20,11 +20,11 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 
 import cats.data.Kleisli
 import io.renku.config.ServiceVersion
-import io.renku.eventlog.TSMigtationTypeSerializers._
 import io.renku.eventlog._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import skunk.implicits._
+import io.renku.eventlog.TSMigtationTypeSerializers._
+import io.renku.events.Subscription.SubscriberUrl
 import skunk.{Command, Query, ~}
+import skunk.implicits._
 
 trait TsMigrationTableProvisioning {
   self: InMemoryEventLogDb =>

@@ -24,8 +24,9 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -70,7 +71,7 @@ private[migrations] object QueryBasedMigration {
       eventProducer: projects.Path => EventData
   ): F[QueryBasedMigration[F]] = for {
     projectsFinder    <- ProjectsFinder[F](query)
-    eventSender       <- EventSender[F]
+    eventSender       <- EventSender[F](EventLogUrl)
     executionRegister <- MigrationExecutionRegister[F]
   } yield new QueryBasedMigration[F](name, projectsFinder, eventProducer, eventSender, executionRegister)
 }

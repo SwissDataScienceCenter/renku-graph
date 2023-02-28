@@ -19,7 +19,9 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliPublicationEvent
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.publicationEvents._
 import io.renku.graph.model.testentities.Dataset.Provenance
 
@@ -45,6 +47,9 @@ object PublicationEvent {
       publicationEvent.name,
       publicationEvent.startDate
     )
+
+  implicit def toCliPublicationEvent(implicit renkuUrl: RenkuUrl): PublicationEvent => CliPublicationEvent =
+    CliConverters.from(_)
 
   implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[PublicationEvent] =
     JsonLDEncoder.instance(_.to[entities.PublicationEvent].asJsonLD)

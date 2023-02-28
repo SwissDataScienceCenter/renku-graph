@@ -38,7 +38,8 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait TSClient[F[_]] {
-  def updateWithNoResult(updateQuery: SparqlQuery): F[Unit]
+  def updateWithNoResult(updateQuery:         SparqlQuery): F[Unit]
+  def queryExpecting[ResultType](selectQuery: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType]
 }
 
 object TSClient {
@@ -83,7 +84,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
 
-  def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
+  override def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
     updateWitMapping[Unit](updateQuery, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
@@ -91,7 +92,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
   ): F[ResultType] = runQuery(updateQuery, mapResponse, SparqlUpdate)
 
-  protected def queryExpecting[ResultType](
+  override def queryExpecting[ResultType](
       selectQuery: SparqlQuery
   )(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(

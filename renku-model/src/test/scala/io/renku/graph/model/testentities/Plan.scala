@@ -20,11 +20,14 @@ package io.renku.graph.model.testentities
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliPlan
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.plans._
+import monocle.Lens
 
 trait Plan extends PlanAlg {
   val id:               Identifier
@@ -36,6 +39,12 @@ trait Plan extends PlanAlg {
   type PlanGroup <: Plan
   type PlanGroupModified <: PlanGroup with Plan.Modified
   type PlanType <: PlanGroup
+
+  def fold[P](spnm: StepPlan.NonModified => P,
+              spm:  StepPlan.Modified => P,
+              cpnm: CompositePlan.NonModified => P,
+              cpm:  CompositePlan.Modified => P
+  ): P
 }
 
 trait PlanAlg { self: Plan =>
@@ -98,6 +107,9 @@ object Plan {
     case p: CompositePlan.Modified    => p.to[entities.Plan](CompositePlan.Modified.toEntitiesCompositePlan)
   }
 
+  implicit def toCliPlan[P <: Plan](implicit renkuUrl: RenkuUrl): P => CliPlan =
+    CliConverters.from(_)
+
   implicit def encoder[P <: Plan](implicit
       renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl,
@@ -110,4 +122,12 @@ object Plan {
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => plan.id.asEntityId)
+
+  object Lenses {
+    val creators: Lens[Plan, List[Person]] =
+      Lens[Plan, List[Person]](_.creators)(persons => {
+        case sp: StepPlan      => StepPlan.Lenses.creators.set(persons)(sp)
+        case cp: CompositePlan => CompositePlan.Lenses.creators.set(persons)(cp)
+      })
+  }
 }

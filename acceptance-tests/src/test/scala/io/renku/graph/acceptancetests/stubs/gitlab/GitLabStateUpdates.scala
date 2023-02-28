@@ -21,6 +21,7 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 import GitLabApiStub._
 import GitLabStateGenerators._
 import cats.Monoid
+import cats.syntax.all._
 import cats.data.NonEmptyList
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
@@ -28,6 +29,7 @@ import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.http.client.UserAccessToken
 import org.http4s.Uri
 
@@ -103,7 +105,8 @@ trait GitLabStateUpdates {
   def setupProject(project: Project, webhook: Uri, commits: CommitId*)(implicit renkuUrl: RenkuUrl): StateUpdate =
     addProject(project, webhook) >>
       addCommits(project.id, commits) >>
-      addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson))
+      addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson)) >>
+      addPersons((project.members appendList project.maybeCreator.toList).map(memberToPerson).toList)
 
   def addProjectAccessToken(projectId: projects.GitLabId, token: ProjectAccessTokenInfo): StateUpdate =
     state => state.copy(projectAccessTokens = state.projectAccessTokens.updated(projectId, token))
@@ -116,6 +119,13 @@ trait GitLabStateUpdates {
       person.maybeOrcidId,
       person.maybeAffiliation
     )
+
+  private lazy val memberToPerson: ProjectMember => Person = {
+    case m: ProjectMember.ProjectMemberNoEmail =>
+      Person(m.name, maybeGitLabId = m.gitLabId.some)
+    case m: ProjectMember.ProjectMemberWithEmail =>
+      Person(m.name, maybeEmail = m.email.some, maybeGitLabId = m.gitLabId.some)
+  }
 
   def removeProject(projectId: projects.GitLabId): StateUpdate =
     removeCommits(projectId) >>

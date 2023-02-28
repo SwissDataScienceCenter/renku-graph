@@ -18,12 +18,14 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, ValidatedNel}
+import cats.syntax.all._
+import io.renku.cli.model.CliParameterMapping
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -31,12 +33,12 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 /** A parameter for a [[CompositePlan]] that is mapping onto parameters of its enclosing plans. */
 final case class ParameterMapping(
     resourceId:       ResourceId,
-    defaultValue:     ParameterMapping.DefaultValue,
+    defaultValue:     Option[ParameterMapping.DefaultValue],
     maybeDescription: Option[Description],
     name:             Name,
     mappedParameter:  NonEmptyList[ResourceId]
 ) extends CommandParameterBase {
-  override type DefaultValue = ParameterMapping.DefaultValue
+  override type DefaultValue = Option[ParameterMapping.DefaultValue]
   // ParameterMappings do not have a prefix.
   override val maybePrefix: Option[Prefix] = None
 }
@@ -77,6 +79,15 @@ object ParameterMapping {
       )
   }
 
+  def fromCli(cliParamMapping: CliParameterMapping): ValidatedNel[String, ParameterMapping] =
+    ParameterMapping(
+      cliParamMapping.resourceId,
+      cliParamMapping.defaultValue.map(v => DefaultValue(v.value)),
+      cliParamMapping.description,
+      cliParamMapping.name,
+      cliParamMapping.mapsTo.map(_.fold(_.resourceId, _.resourceId, _.resourceId, _.resourceId))
+    ).validNel
+
   implicit def encoder: JsonLDEncoder[ParameterMapping] =
     JsonLDEncoder.instance { mapping =>
       JsonLD.entity(
@@ -87,16 +98,5 @@ object ParameterMapping {
         Ontology.defaultValue -> mapping.defaultValue.asJsonLD,
         Ontology.mapsTo       -> mapping.mappedParameter.toList.asJsonLD
       )
-    }
-
-  implicit def decoder: JsonLDDecoder[ParameterMapping] =
-    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
-      for {
-        id          <- cursor.downEntityId.as[ResourceId]
-        name        <- cursor.downField(Ontology.name).as[Name]
-        defaultVal  <- cursor.downField(Ontology.defaultValue).as[DefaultValue]
-        descr       <- cursor.downField(Ontology.description).as[Option[Description]]
-        mappedParam <- cursor.downField(Ontology.mapsTo).as[NonEmptyList[ResourceId]]
-      } yield ParameterMapping(id, defaultVal, descr, name, mappedParam)
     }
 }

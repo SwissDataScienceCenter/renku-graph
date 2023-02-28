@@ -19,13 +19,16 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliActivity
 import io.renku.graph.model._
 import io.renku.graph.model.activities.{EndTime, StartTime}
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entityModel._
 import io.renku.graph.model.testentities.Activity._
 import io.renku.graph.model.testentities.Entity.OutputEntity
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.UUID
+import monocle.Lens
 
 final case class Activity(id:                  Id,
                           startTime:           StartTime,
@@ -103,6 +106,9 @@ object Activity {
       activity.parameters.map(_.to[entities.ParameterValue])
     )
 
+  implicit def toCliActivity(implicit renkuUrl: RenkuUrl): Activity => CliActivity =
+    CliConverters.from(_)
+
   implicit def encoder(implicit
       renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl,
@@ -111,4 +117,18 @@ object Activity {
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance(entity => EntityId of renkuUrl / "activities" / entity.id)
+
+  object Lenses {
+    val association: Lens[Activity, Association] =
+      Lens[Activity, Association](_.association)(assoc => a => a.copy(associationFactory = _ => assoc))
+
+    val plan: Lens[Activity, StepPlan] =
+      association.composeLens(Association.Lenses.plan)
+
+    val planCreators: Lens[Activity, List[Person]] =
+      plan.composeLens(StepPlan.Lenses.creators)
+
+    val associationAgent: Lens[Activity, Either[Agent, Person]] =
+      association.composeLens(Association.Lenses.agent)
+  }
 }

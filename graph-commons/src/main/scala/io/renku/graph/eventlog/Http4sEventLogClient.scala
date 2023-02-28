@@ -22,15 +22,16 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.eventlog.EventLogClient.{EventPayload, Result, SearchCriteria}
-import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.graph.eventlog.Http4sEventLogClient.Implicits._
+import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.graph.model.events.{EventId, EventInfo}
+import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.client.RestClient
 import io.renku.tinytypes.TinyType
 import org.http4s.{QueryParamEncoder, Uri}
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
-import org.http4s.circe.CirceEntityCodec._
 import org.http4s.Uri.Path.SegmentEncoder
 import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
@@ -91,6 +92,20 @@ private[eventlog] final class Http4sEventLogClient[F[_]: Async: Logger](baseUri:
           .as(Result.failure(show"Unexpected response: $status"))
     }
   }
+
+  override def getStatus: F[Result[ServiceStatus]] =
+    send(GET(baseUri / "status")) {
+      case (Ok, _, resp) =>
+        resp.as[ServiceStatus].map(Result.success)
+      case (ServiceUnavailable, _, _) =>
+        Logger[F]
+          .info("The event-log service is currently not available")
+          .as(Result.unavailable)
+      case (status, req, _) =>
+        Logger[F]
+          .error(show"Unexpected response from event-log to request ${req.pathInfo.renderString}: $status")
+          .as(Result.failure(show"Unexpected response: $status"))
+    }
 }
 
 object Http4sEventLogClient {

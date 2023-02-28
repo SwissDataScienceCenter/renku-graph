@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice.hookcreation
 
-import cats.Applicative
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -27,8 +26,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.model.ProjectHookUrl
-import org.http4s.Status
-import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookCreator[F[_]] {
@@ -37,15 +34,15 @@ private trait ProjectHookCreator[F[_]] {
 
 private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookCreator[F] {
 
-  import cats.effect._
   import io.circe.Json
   import io.renku.http.client.RestClientError.UnauthorizedException
-  import org.http4s.Status.{Created, Unauthorized}
-  import org.http4s.{Request, Response}
+  import org.http4s.Status.{Created, Unauthorized, UnprocessableEntity}
+  import org.http4s.implicits._
+  import org.http4s.{Request, Response, Status}
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
     val uri = uri"projects" / projectHook.projectId.show / "hooks"
-    GitLabClient[F].post(uri, "create-hook", payload(projectHook))(mapResponse)(Some(accessToken))
+    GitLabClient[F].post(uri, "create-hook", payload(projectHook))(mapResponse(projectHook))(Some(accessToken))
   }
 
   private def payload(projectHook: ProjectHook) = Json.obj(
@@ -55,9 +52,23 @@ private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends 
     "token"       -> Json.fromString(projectHook.serializedHookToken.value)
   )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
-    case (Created, _, _)      => Applicative[F].unit
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+  private def mapResponse(hook: ProjectHook): PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (Created, _, _)      => ().pure[F]
+    case (Unauthorized, _, _) => UnauthorizedException.raiseError[F, Unit]
+    case (UnprocessableEntity, _, resp) =>
+      resp.as[String] >>= { msg =>
+        new Exception(
+          s"Hook creation for project ${hook.projectId} failed: $UnprocessableEntity, $msg. " +
+            s"Check in GitLab settings to allow requests to the local network from web hooks and services: " +
+            s"https://docs.gitlab.com/ee/security/webhooks.html#allow-webhook-and-service-requests-to-local-network"
+        )
+          .raiseError[F, Unit]
+      }
+    case (other, _, resp) =>
+      resp.as[String] >>= { msg =>
+        new Exception(s"Hook creation for project ${hook.projectId} failed: $other, $msg")
+          .raiseError[F, Unit]
+      }
   }
 }
 

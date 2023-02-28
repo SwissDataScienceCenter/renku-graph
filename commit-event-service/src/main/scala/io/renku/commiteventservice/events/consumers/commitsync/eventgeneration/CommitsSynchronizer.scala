@@ -24,12 +24,13 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.consumers.commitsync._
+import io.renku.commiteventservice.events.consumers.common._
 import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary._
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
-import io.renku.commiteventservice.events.consumers.common._
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -228,7 +229,7 @@ private[commitsync] object CommitsSynchronizer {
     commitInfoFinder    <- CommitInfoFinder[F]
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
-    eventSender         <- EventSender[F]
+    eventSender         <- EventSender[F](EventLogUrl)
   } yield new CommitsSynchronizerImpl[F](latestCommitFinder,
                                          eventDetailsFinder,
                                          commitInfoFinder,

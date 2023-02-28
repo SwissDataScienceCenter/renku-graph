@@ -19,7 +19,7 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, NonBlankTTJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, NonNegativeInt, Url}
@@ -59,19 +59,19 @@ object plans {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   final class Command private (val value: String) extends AnyVal with StringTinyType
   implicit object Command
       extends TinyTypeFactory[Command](new Command(_))
       with NonBlank[Command]
-      with TinyTypeJsonLDOps[Command]
+      with NonBlankTTJsonLDOps[Command]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
   implicit object Keyword
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
-      with TinyTypeJsonLDOps[Keyword]
+      with NonBlankTTJsonLDOps[Keyword]
 
   final class ProgrammingLanguage private (val value: String) extends AnyVal with StringTinyType
 
@@ -93,6 +93,13 @@ object plans {
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
+
+  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
+
+  implicit object DateModified
+      extends TinyTypeFactory[DateModified](new DateModified(_))
+      with InstantNotInTheFuture[DateModified]
+      with TinyTypeJsonLDOps[DateModified]
 
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom

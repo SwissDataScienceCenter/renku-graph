@@ -19,44 +19,78 @@
 package io.renku.events.consumers.subscriptions
 
 import cats.syntax.all._
-import io.circe.literal._
-import io.renku.events.Generators.categoryNames
+import eu.timepit.refined.auto._
+import io.renku.events.{DefaultSubscription, Subscription}
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import io.renku.events.Generators._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 
 import scala.util.Try
 
-class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "prepareSubscriptionPayload" should {
 
-    "return CategoryAndUrlPayload containing the given CategoryName and found subscriberUrl" in new TestCase {
+    "return SubscriptionPayload containing the given CategoryName and found subscriberUrl" in new TestCase {
+
       val microserviceUrl = microserviceBaseUrls.generateOne
       (urlFinder.findBaseUrl _)
         .expects()
         .returning(microserviceUrl.pure[Try])
 
-      composer.prepareSubscriptionPayload() shouldBe json"""{
-        "categoryName" : ${categoryName.value},
-        "subscriber": {
-          "url": ${(microserviceUrl / "events").value},
-          "id":  ${microserviceId.value}
-        }
-      }""".pure[Try]
+      val composer =
+        new DefaultSubscriptionPayloadComposer[Try](categoryName, urlFinder, microserviceId, maybeCapacity = None)
+
+      composer.prepareSubscriptionPayload().success.value shouldBe DefaultSubscription(
+        categoryName,
+        DefaultSubscriber(Subscription.SubscriberUrl(microserviceUrl, "events"),
+                          Subscription.SubscriberId(microserviceId)
+        )
+      )
+    }
+
+    "return SubscriptionPayload containing the given CategoryName, found subscriberUrl and the given capacity" in new TestCase {
+
+      val microserviceUrl = microserviceBaseUrls.generateOne
+      (urlFinder.findBaseUrl _)
+        .expects()
+        .returning(microserviceUrl.pure[Try])
+
+      val capacity = subscriberCapacities.generateOne
+
+      val composer = new DefaultSubscriptionPayloadComposer[Try](categoryName,
+                                                                 urlFinder,
+                                                                 microserviceId,
+                                                                 maybeCapacity = capacity.some
+      )
+
+      composer.prepareSubscriptionPayload().success.value shouldBe DefaultSubscription(
+        categoryName,
+        DefaultSubscriber(Subscription.SubscriberUrl(microserviceUrl, "events"),
+                          Subscription.SubscriberId(microserviceId),
+                          capacity
+        )
+      )
     }
 
     "fail if finding subscriberUrl fails" in new TestCase {
+
       val exception = exceptions.generateOne
       (urlFinder.findBaseUrl _)
         .expects()
         .returning(exception.raiseError[Try, MicroserviceBaseUrl])
 
-      composer.prepareSubscriptionPayload() shouldBe exception.raiseError[Try, CategoryAndUrlPayload]
+      new DefaultSubscriptionPayloadComposer[Try](categoryName, urlFinder, microserviceId, maybeCapacity = None)
+        .prepareSubscriptionPayload()
+        .failure
+        .exception shouldBe exception
     }
   }
 
@@ -64,6 +98,5 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
     val categoryName   = categoryNames.generateOne
     val microserviceId = MicroserviceIdentifier.generate
     val urlFinder      = mock[MicroserviceUrlFinder[Try]]
-    val composer       = new SubscriptionPayloadComposerImpl[Try](categoryName, urlFinder, microserviceId)
   }
 }

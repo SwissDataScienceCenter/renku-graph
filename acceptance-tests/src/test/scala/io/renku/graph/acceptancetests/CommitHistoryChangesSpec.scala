@@ -19,24 +19,22 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
+import data._
+import db.EventLog
+import flows.TSProvisioning
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.{Project, _}
-import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities.RenkuProject._
+import io.renku.graph.model.events
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, events}
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
-import io.renku.jsonld.syntax._
 import io.renku.webhookservice.model
+import knowledgegraph.{DatasetsApiEncoders, fullJson}
 import org.http4s.Status._
+import tooling.{AcceptanceSpec, ApplicationServices}
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
@@ -47,7 +45,6 @@ class CommitHistoryChangesSpec
     with TSProvisioning
     with DatasetsApiEncoders {
 
-  private implicit val graph: GraphClass = GraphClass.Default
   private val user = authUsers.generateOne
 
   Feature("Changes in the commit history to trigger re-provisioning") {
@@ -55,15 +52,15 @@ class CommitHistoryChangesSpec
     Scenario("A change in the commit history should trigger the re-provisioning process") {
 
       val project = dataProjects(
-        renkuProjectEntities(visibilityPublic).withDatasets(datasetEntities(provenanceInternal))
-      ).generateOne
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
+      ).map(addMemberWithId(user.id)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("there is data in the TS")
 
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commits.toList: _*)
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
 
       `data in the Triples Store`(project, commits, user.accessToken)
 
@@ -75,11 +72,11 @@ class CommitHistoryChangesSpec
 
       When("the commit history changes")
 
-      val newCommits  = commitIds.generateNonEmptyList(min = 3)
-      val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
+      val newCommits         = commitIds.generateNonEmptyList(min = 3)
+      val projectWithNewData = generateNewActivitiesAndDataset(project.entitiesProject)
 
       gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
-      mockCommitDataOnTripleGenerator(project, newEntities.asJsonLD, newCommits)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(projectWithNewData), newCommits)
 
       webhookServiceClient
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
@@ -94,12 +91,14 @@ class CommitHistoryChangesSpec
       }
 
       Then("the project should contain the new data")
-      assertProjectDataIsCorrect(project, newEntities, user.accessToken)
+      assertProjectDataIsCorrect(project, projectWithNewData, user.accessToken)
     }
 
     Scenario("Removing a project from GitLab should remove it from the knowledge-graph") {
 
-      val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
+      ).map(addMemberWithId(user.id)).generateOne
       val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("There is data in the triple store")
@@ -107,7 +106,7 @@ class CommitHistoryChangesSpec
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commits.toList: _*)
 
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
       `data in the Triples Store`(project, commits, user.accessToken)
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
@@ -134,7 +133,7 @@ class CommitHistoryChangesSpec
     }
   }
 
-  private def assertProjectDataIsCorrect(project: Project, projectEntities: RenkuProject, accessToken: AccessToken) = {
+  private def assertProjectDataIsCorrect(project: data.Project, testProject: RenkuProject, accessToken: AccessToken) = {
 
     val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
@@ -154,20 +153,21 @@ class CommitHistoryChangesSpec
 
     datasetsResponse._1 shouldBe Ok
     val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
-    foundDatasets should contain theSameElementsAs projectEntities.datasets.map(briefJson(_, project.path))
+    foundDatasets should contain theSameElementsAs testProject.datasets.map(briefJson(_, project.path))
   }
 
-  private def generateNewActivitiesAndDataset(projectEntities: RenkuProject) =
-    renkuProjectEntities(visibilityPublic).generateOne.copy(
-      version = projectEntities.version,
-      path = projectEntities.path,
-      name = projectEntities.name,
-      maybeDescription = projectEntities.maybeDescription,
-      agent = projectEntities.agent,
-      dateCreated = projectEntities.dateCreated,
-      maybeCreator = projectEntities.maybeCreator,
-      keywords = projectEntities.keywords,
-      members = projectEntities.members,
-      images = projectEntities.images
-    )
+  private def generateNewActivitiesAndDataset(projectEntities: RenkuProject): RenkuProject =
+    renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).generateOne
+      .copy(
+        version = projectEntities.version,
+        path = projectEntities.path,
+        name = projectEntities.name,
+        maybeDescription = projectEntities.maybeDescription,
+        agent = projectEntities.agent,
+        dateCreated = projectEntities.dateCreated,
+        maybeCreator = projectEntities.maybeCreator,
+        keywords = projectEntities.keywords,
+        members = projectEntities.members,
+        images = projectEntities.images
+      )
 }

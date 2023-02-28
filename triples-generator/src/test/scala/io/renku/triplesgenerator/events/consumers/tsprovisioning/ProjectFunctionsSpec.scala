@@ -188,7 +188,9 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         val originalImportedInternal =
           datasetEntities(provenanceImportedInternalAncestorInternal())(renkuUrl)(project.dateCreated).generateOne
         val projectWithAllDatasets =
-          project.addDatasets(originalImportedInternal, originalImportedInternal.invalidateNow).to[entities.Project]
+          project
+            .addDatasets(originalImportedInternal, originalImportedInternal.invalidateNow(personEntities))
+            .to[entities.Project]
 
         findInternallyImportedDatasets(projectWithAllDatasets) should contain theSameElementsAs List(
           importedInternalAncestorInternal,
@@ -209,7 +211,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val (original, modifiedBeforeInvalidation, modifiedInvalidated) =
         datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
-          case (orig, modified) => (orig, modified, modified.invalidateNow)
+          case (orig, modified) => (orig, modified, modified.invalidateNow(personEntities))
         }.generateOne
       val projectWithAllDatasets =
         project.addDatasets(original, modifiedBeforeInvalidation, modifiedInvalidated).to[entities.Project]
@@ -232,7 +234,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
           .generateOne
       val (beforeModification, modified, modificationInvalidated) =
         datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
-          case internal ::~ modified => (internal, modified, modified.invalidateNow)
+          case internal ::~ modified => (internal, modified, modified.invalidateNow(personEntities))
         }.generateOne
       val (beforeNotInvalidatedModification, notInvalidatedModification) =
         datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).generateOne

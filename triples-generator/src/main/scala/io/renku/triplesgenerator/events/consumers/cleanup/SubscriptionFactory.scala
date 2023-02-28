@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -31,10 +31,11 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism[F](
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
+    subscriptionMechanism <-
+      SubscriptionMechanism(
+        categoryName,
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
+      )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
     handler <- EventHandler(subscriptionMechanism)
   } yield handler -> subscriptionMechanism

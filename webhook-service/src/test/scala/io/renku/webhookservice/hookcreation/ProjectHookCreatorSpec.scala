@@ -26,18 +26,19 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.webhookservice.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import org.http4s.{Request, Response, Status, Uri}
 import org.http4s.Method.POST
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -53,7 +54,7 @@ class ProjectHookCreatorSpec
 
   "create" should {
 
-    "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
+    "send relevant Json payload " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
         (gitLabClient
@@ -64,41 +65,43 @@ class ProjectHookCreatorSpec
         hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe (): Unit
       }
 
-    "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
-      "and return Unit if the remote responds with CREATED" in new TestCase {
-        override val accessToken: AccessToken = userOAuthAccessTokens.generateOne
-
-        (gitLabClient
-          .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
-          .expects(uri, endpointName, toJson(projectHook), *, accessToken.some)
-          .returning(().pure[IO])
-
-        hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe ((): Unit)
-      }
-
-    // mapResponse tests
-
-    "return Unit when gitLabClient returns Created" in new TestCase {
+    "succeeds when gitLabClient returns Created" in new TestCase {
       mapResponse(Status.Created, Request(), Response()).unsafeRunSync() shouldBe (): Unit
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      override val accessToken = accessTokens.generateOne
-
       intercept[Exception] {
         mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
-    "return an Exception if remote client responds with status neither CREATED nor UNAUTHORIZED" in new TestCase {
+    "return an Exception with a hint for solving the problem if remote responds with UNPROCESSABLE_ENTITY (422)" in new TestCase {
 
-      override val accessToken = accessTokens.generateOne
+      val code    = Status.UnprocessableEntity
+      val message = nonEmptyStrings().generateOne
 
-      intercept[Exception] {
-        mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
+      val exception = intercept[Exception] {
+        mapResponse(code, Request(), Response().withEntity(message)).unsafeRunSync()
       }
+
+      exception.getMessage should include(s"$code, $message")
+      exception.getMessage should include(
+        "Check in GitLab settings to allow requests to the local network from web hooks and services"
+      )
     }
+
+    "return an Exception with a generic message " +
+      "if remote responds with status other than CREATED, UNAUTHORIZED or UNPROCESSABLE_ENTITY" in new TestCase {
+
+        val code    = Status.ImATeapot
+        val message = nonEmptyStrings().generateOne
+
+        val exception = intercept[Exception] {
+          mapResponse(code, Request(), Response().withEntity(message)).unsafeRunSync()
+        }
+
+        exception.getMessage should include(s"$code, $message")
+      }
   }
 
   private trait TestCase {
@@ -107,7 +110,7 @@ class ProjectHookCreatorSpec
     val uri         = uri"projects" / projectHook.projectId.show / "hooks"
     val endpointName: NES = "create-hook"
 
-    val accessToken: AccessToken = personalAccessTokens.generateOne
+    val accessToken = accessTokens.generateOne
 
     def toJson(projectHook: ProjectHook) =
       Json

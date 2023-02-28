@@ -21,26 +21,20 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 import cats.MonadThrow
 import cats.data.Kleisli
 import cats.syntax.all._
-import io.circe.Json
 import io.renku.config.ServiceVersion
 import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer
 import io.renku.microservices.MicroserviceIdentifier
 
 private class PayloadComposer[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,
                                                 serviceIdentifier: MicroserviceIdentifier,
                                                 serviceVersion:    ServiceVersion
-) extends SubscriptionPayloadComposer[F] {
-  import io.circe.literal._
+) extends SubscriptionPayloadComposer[F, MigrationsSubscription] {
 
-  override def prepareSubscriptionPayload(): F[Json] = json"""{
-    "categoryName": ${categoryName.value},
-    "subscriber": {
-      "url":     ${subscriberUrl.value},
-      "id":      ${serviceIdentifier.value},
-      "version": ${serviceVersion.value}
-    }
-  }""".pure[F]
+  override def prepareSubscriptionPayload(): F[MigrationsSubscription] = MigrationsSubscription(
+    Subscriber(subscriberUrl, SubscriberId(serviceIdentifier), serviceVersion)
+  ).pure[F]
 }
 
 private object PayloadComposer {
@@ -48,8 +42,8 @@ private object PayloadComposer {
   def payloadsComposerFactory[F[_]: MonadThrow](subscriberUrl:  SubscriberUrl,
                                                 serviceId:      MicroserviceIdentifier,
                                                 serviceVersion: ServiceVersion
-  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
-    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { _ =>
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, MigrationsSubscription]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, MigrationsSubscription]] { _ =>
       new PayloadComposer[F](subscriberUrl, serviceId, serviceVersion).pure[F].widen
     }
 }

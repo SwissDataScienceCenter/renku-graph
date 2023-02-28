@@ -19,129 +19,108 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.cli.model
+import io.renku.cli.model.CliStepPlan
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.entities.Generators._
+import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.entities
+import io.renku.graph.model.tools.AdditionalMatchers
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class StepPlanCommandParameterSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class StepPlanCommandParameterSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with AdditionalMatchers
+    with DiffInstances {
 
-  (GraphClass.Default :: GraphClass.Project :: Nil) foreach { implicit graphClass =>
-    show"StepPlanCommandParameter.decode graphClass=$graphClass" should {
+  def planGenerator(parameterFactory: CommandParameterFactory) =
+    projectCreatedDates().flatMap { date =>
+      stepPlanEntities(planCommands, cliShapedPersons, parameterFactory)(date)
+    }
 
-      "turn JsonLD of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {
-        forAll(explicitCommandParameterObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.parameters.head
+  "StepPlanCommandParameter.fromCli" should {
 
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandParameter]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandParameter]).asRight
-        }
-      }
-
-      "turn JsonLD of ImplicitCommandParameter entity into the ExplicitCommandParameter object" in {
-        forAll(implicitCommandParameterObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.parameters.head
-
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandParameter]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandParameter]).asRight
-        }
+    "turn cli data of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {
+      forAll(explicitCommandParameterObjects) { parameterFactory =>
+        val plan      = planGenerator(parameterFactory).generateOne
+        val cliParams = plan.to[CliStepPlan].parameters
+        val result    = cliParams.traverse(entities.StepPlanCommandParameter.CommandParameter.fromCli)
+        result shouldMatchToValid plan.parameters.map(_.to[entities.StepPlanCommandParameter.CommandParameter])
       }
     }
 
-    show"CommandInput.decode graphClass=$graphClass" should {
-
-      "turn JsonLD of LocationCommandInput entity into the LocationCommandInput object" in {
-        forAll(locationCommandInputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.inputs.head
-
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
-        }
+    "turn cli data of ImplicitCommandParameter entity into the ExplicitCommandParameter object" in {
+      forAll(implicitCommandParameterObjects) { parameterFactory =>
+        val plan      = planGenerator(parameterFactory).generateOne
+        val cliParams = plan.to[CliStepPlan].parameters
+        val result    = cliParams.traverse(entities.StepPlanCommandParameter.CommandParameter.fromCli)
+        result shouldMatchToValid plan.parameters.map(_.to[entities.StepPlanCommandParameter.CommandParameter])
       }
+    }
+  }
 
-      "turn JsonLD of MappedCommandInput entity into the MappedCommandInput object" in {
-        forAll(mappedCommandInputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.inputs.head
+  "CommandInput.fromCli" should {
 
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
-        }
-      }
-
-      "turn JsonLD of ImplicitCommandInput entity into the ImplicitCommandInput object" in {
-        forAll(implicitCommandInputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.inputs.head
-
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
-        }
+    "turn cli data of LocationCommandInput entity into the LocationCommandInput object" in {
+      forAll(locationCommandInputObjects) { parameterFactory =>
+        val plan      = planGenerator(parameterFactory).generateOne
+        val cliInputs = plan.to[model.CliStepPlan].inputs
+        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandInput.fromCli)
+        result shouldMatchToValid plan.inputs.map(_.to[entities.StepPlanCommandParameter.CommandInput])
       }
     }
 
-    show"CommandOutput.decode graphClass=$graphClass" should {
-
-      "turn JsonLD of LocationCommandOutput entity into the LocationCommandOutput object" in {
-        forAll(locationCommandOutputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.outputs.head
-
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
-        }
+    "turn cli data of MappedCommandInput entity into the MappedCommandInput object" in {
+      forAll(mappedCommandInputObjects) { parameterFactory =>
+        val plan      = planGenerator(parameterFactory).generateOne
+        val cliInputs = plan.to[model.CliStepPlan].inputs
+        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandInput.fromCli)
+        result shouldMatchToValid plan.inputs.map(_.to[entities.StepPlanCommandParameter.CommandInput])
       }
+    }
 
-      "turn JsonLD of MappedCommandOutput entity into the MappedCommandOutput object" in {
-        forAll(mappedCommandOutputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.outputs.head
-
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
-        }
+    "turn cli data of ImplicitCommandInput entity into the ImplicitCommandInput object" in {
+      forAll(implicitCommandInputObjects) { parameterFactory =>
+        val plan      = planGenerator(parameterFactory).generateOne
+        val cliInputs = plan.to[model.CliStepPlan].inputs
+        val result    = cliInputs.traverse(entities.StepPlanCommandParameter.CommandInput.fromCli)
+        result shouldMatchToValid plan.inputs.map(_.to[entities.StepPlanCommandParameter.CommandInput])
       }
+    }
+  }
 
-      "turn JsonLD of ImplicitCommandOutput entity into the ImplicitCommandOutput object" in {
-        forAll(implicitCommandOutputObjects) { parameterFactory =>
-          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
-          val parameter = plan.outputs.head
+  show"CommandOutput.fromCli" should {
 
-          plan.asJsonLD.flatten
-            .fold(throw _, identity)
-            .cursor
-            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
-            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
-        }
+    "turn cli data of LocationCommandOutput entity into the LocationCommandOutput object" in {
+      forAll(locationCommandOutputObjects) { parameterFactory =>
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
+      }
+    }
+
+    "turn cli data of MappedCommandOutput entity into the MappedCommandOutput object" in {
+      forAll(mappedCommandOutputObjects) { parameterFactory =>
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
+      }
+    }
+
+    "turn cli data of ImplicitCommandOutput entity into the ImplicitCommandOutput object" in {
+      forAll(implicitCommandOutputObjects) { parameterFactory =>
+        val plan       = planGenerator(parameterFactory).generateOne
+        val cliOutputs = plan.to[model.CliStepPlan].outputs
+        val result     = cliOutputs.traverse(entities.StepPlanCommandParameter.CommandOutput.fromCli)
+        result shouldMatchToValid plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput])
       }
     }
   }

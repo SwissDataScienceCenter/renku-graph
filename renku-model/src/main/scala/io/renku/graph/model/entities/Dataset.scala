@@ -20,13 +20,17 @@ package io.renku.graph.model.entities
 
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.{CliDataset, CliDatasetProvenance}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.images.Image
-import io.renku.jsonld.JsonLDEncoder
+import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Property}
+import io.renku.jsonld.JsonLDEncoder._
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 
 import java.time.Instant
 
@@ -46,15 +50,10 @@ object Dataset {
 
     override val findAllPersons: Dataset[P] => Set[Person] = _.provenance.creators.toList.toSet
 
-    override val encoder: GraphClass => JsonLDEncoder[Dataset[P]] = Dataset.encoder(renkuUrl, gitLabApiUrl, _)
+    override val encoder: GraphClass => JsonLDEncoder[Dataset[P]] = { gc =>
+      Dataset.encoder(renkuUrl, gitLabApiUrl, gc, Dataset.Provenance.encoder(renkuUrl, gitLabApiUrl, gc))
+    }
   }
-
-  import io.renku.graph.model.Schemas.{prov, renku, schema}
-  import io.renku.jsonld.JsonLDDecoder._
-  import io.renku.jsonld.JsonLDEncoder._
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Property}
 
   def from[P <: Provenance](identification:    Identification,
                             provenance:        P,
@@ -66,6 +65,28 @@ object Dataset {
     validate(publicationEvents, identification)
   ).sequence.map { _ =>
     Dataset(identification, provenance, additionalInfo, parts, publicationEvents)
+  }
+
+  def fromCli(cliDataset: CliDataset)(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Dataset[Provenance]] = {
+    val pubEvents = cliDataset.publicationEvents.traverse(PublicationEvent.fromCli)
+    val parts     = cliDataset.datasetFiles.traverse(DatasetPart.fromCli)
+
+    def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
+                          parts:                       List[DatasetPart]
+    ): Provenance = provenanceAndFixableFailure match {
+      case (prov: Provenance.Internal, Some(Provenance.FixableFailure.MissingDerivedFrom)) =>
+        prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
+      case (prov, _) => prov
+    }
+
+    val all =
+      (parts, createProvenance(cliDataset), pubEvents).mapN { (files, provenance, events) =>
+        (fixProvenanceDate(provenance, files), files, events)
+      }
+
+    all.andThen { case (prov, parts, events) =>
+      from(Identification.fromCli(cliDataset), prov, AdditionalInfo.fromCli(cliDataset), parts, events)
+    }
   }
 
   private def validateDates[P <: Provenance](parts:          List[DatasetPart],
@@ -130,19 +151,12 @@ object Dataset {
         )
     }
 
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[Identification] = JsonLDDecoder.entity(entityTypes) {
-      cursor =>
-        for {
-          resourceId <- cursor.downEntityId.as[ResourceId]
-          identifier <- cursor.downField(schema / "identifier").as[Identifier]
-          title      <- cursor.downField(schema / "name").as[Title]
-          name       <- cursor.downField(renku / "slug").as[Name]
-        } yield Identification(resourceId, identifier, title, name)
-    }
+    def fromCli(dataset: CliDataset): Identification =
+      Identification(dataset.resourceId, dataset.identifier, dataset.title, dataset.name)
   }
 
   sealed trait Provenance extends Product with Serializable {
-    type D <: Date
+    type D <: CreatedOrPublished
     val topmostSameAs:      TopmostSameAs
     val originalIdentifier: OriginalIdentifier
     val topmostDerivedFrom: TopmostDerivedFrom
@@ -152,7 +166,17 @@ object Dataset {
 
   object Provenance {
 
-    implicit object Internal
+    implicit object Internal {
+      private[Dataset] object FromCli {
+        def unapply(cli: CliDataset): Option[NonEmptyList[Person] => Internal] =
+          cli.provenance match {
+            case CliDatasetProvenance(dateCreated: DateCreated, _, None, None, _, None) =>
+              Some(creators => Internal(cli.resourceId, cli.identifier, dateCreated, creators.sortBy(_.name)))
+            case _ => None
+          }
+      }
+    }
+
     final case class Internal(resourceId: ResourceId,
                               identifier: Identifier,
                               date:       DateCreated,
@@ -164,7 +188,20 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
-    implicit object ImportedExternal
+    implicit object ImportedExternal {
+      private[Dataset] object FromCli {
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedExternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(datePublished: DatePublished, _, Some(sameAs: ExternalSameAs), None, _, None)
+                if cliData.originalIdEqualCurrentId =>
+              Some(creators =>
+                ImportedExternal(cliData.resourceId, cliData.identifier, sameAs, datePublished, creators.sortBy(_.name))
+              )
+            case _ => None
+          }
+      }
+    }
+
     final case class ImportedExternal(resourceId: ResourceId,
                                       identifier: Identifier,
                                       sameAs:     ExternalSameAs,
@@ -190,6 +227,32 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
     }
 
+    object ImportedInternalAncestorExternal {
+      private[Dataset] object FromCli {
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorExternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(datePublished: DatePublished,
+                                      _,
+                                      Some(sameAs: InternalSameAs),
+                                      None,
+                                      maybeOriginalId,
+                                      None
+                ) =>
+              Some(creators =>
+                ImportedInternalAncestorExternal(
+                  cliData.resourceId,
+                  cliData.identifier,
+                  sameAs,
+                  TopmostSameAs(sameAs),
+                  maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
+                  datePublished,
+                  creators.sortBy(_.name)
+                )
+              )
+            case _ => None
+          }
+      }
+    }
     final case class ImportedInternalAncestorExternal(resourceId:         ResourceId,
                                                       identifier:         Identifier,
                                                       sameAs:             InternalSameAs,
@@ -201,6 +264,32 @@ object Dataset {
       override type D = DatePublished
     }
 
+    object ImportedInternalAncestorInternal {
+      private[Dataset] object FromCli {
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => ImportedInternalAncestorInternal] =
+          cliData.provenance match {
+            case CliDatasetProvenance(dateCreated: DateCreated,
+                                      _,
+                                      Some(sameAs: InternalSameAs),
+                                      None,
+                                      maybeOriginalId,
+                                      None
+                ) =>
+              Some(creators =>
+                ImportedInternalAncestorInternal(
+                  cliData.resourceId,
+                  cliData.identifier,
+                  sameAs,
+                  TopmostSameAs(sameAs),
+                  maybeOriginalId getOrElse OriginalIdentifier(cliData.identifier),
+                  dateCreated,
+                  creators.sortBy(_.name)
+                )
+              )
+            case _ => None
+          }
+      }
+    }
     final case class ImportedInternalAncestorInternal(resourceId:         ResourceId,
                                                       identifier:         Identifier,
                                                       sameAs:             InternalSameAs,
@@ -212,6 +301,31 @@ object Dataset {
       override type D = DateCreated
     }
 
+    object Modified {
+      private[Dataset] object FromCli {
+        def unapply(cliData: CliDataset): Option[NonEmptyList[Person] => Modified] =
+          cliData.provenance match {
+            case CliDatasetProvenance(_,
+                                      dateModified,
+                                      None,
+                                      Some(derivedFrom),
+                                      Some(originalId),
+                                      maybeInvalidationTime
+                ) =>
+              Some(creators =>
+                Modified(cliData.resourceId,
+                         derivedFrom,
+                         TopmostDerivedFrom(derivedFrom),
+                         originalId,
+                         DateCreated(dateModified.value),
+                         creators,
+                         maybeInvalidationTime
+                )
+              )
+            case _ => None
+          }
+      }
+    }
     final case class Modified(resourceId:            ResourceId,
                               derivedFrom:           DerivedFrom,
                               topmostDerivedFrom:    TopmostDerivedFrom,
@@ -229,7 +343,7 @@ object Dataset {
       case object MissingDerivedFrom extends FixableFailure
     }
 
-    private[Dataset] implicit def encoder(implicit
+    implicit def encoder(implicit
         renkuUrl: RenkuUrl,
         glApiUrl: GitLabApiUrl,
         graph:    GraphClass
@@ -287,125 +401,7 @@ object Dataset {
           prov / "invalidatedAtTime"   -> maybeInvalidationTime.asJsonLD
         )
     }
-
-    private[Dataset] def decoder(
-        identification: Identification
-    )(implicit renkuUrl: RenkuUrl): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
-      JsonLDDecoder.entity(entityTypes) { cursor =>
-        import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-
-        def failIfNoCreators(creators: List[Person]) = Either.fromOption(
-          NonEmptyList.fromList(creators),
-          DecodingFailure(s"No creators on dataset with id: ${identification.identifier}", Nil)
-        )
-
-        for {
-          creators           <- cursor.downField(schema / "creator").as[List[Person]] >>= failIfNoCreators
-          maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
-          maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
-          maybeInternalSameAs <- cursor
-                                   .downField(schema / "sameAs")
-                                   .as[InternalSameAs]
-                                   .map(Option.apply)
-                                   .leftFlatMap(_ => Option.empty[InternalSameAs].asRight)
-          maybeExternalSameAs <- cursor
-                                   .downField(schema / "sameAs")
-                                   .as[ExternalSameAs]
-                                   .map(Option.apply)
-                                   .leftFlatMap(_ => Option.empty[ExternalSameAs].asRight)
-          maybeDerivedFrom <-
-            cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
-          maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[OriginalIdentifier]]
-          maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-          provenanceAndFixableFailure <- createProvenance(identification, creators)(maybeDateCreated,
-                                                                                    maybeDatePublished,
-                                                                                    maybeInternalSameAs,
-                                                                                    maybeExternalSameAs,
-                                                                                    maybeDerivedFrom,
-                                                                                    maybeOriginalIdentifier,
-                                                                                    maybeInvalidationTime
-                                         )
-        } yield provenanceAndFixableFailure
-      }
-
-    private def createProvenance(id: Identification, creators: NonEmptyList[Person]): (Option[DateCreated],
-                                                                                       Option[DatePublished],
-                                                                                       Option[InternalSameAs],
-                                                                                       Option[ExternalSameAs],
-                                                                                       Option[DerivedFrom],
-                                                                                       Option[OriginalIdentifier],
-                                                                                       Option[InvalidationTime]
-    ) => Result[(Provenance, Option[FixableFailure])] = {
-      case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (Internal(id.resourceId, id.identifier, dateCreated, creators.sortBy(_.name)) -> None).asRight
-      case (Some(dateCreated), None, None, None, None, Some(_), None) =>
-        (Internal(id.resourceId,
-                  id.identifier,
-                  dateCreated,
-                  creators.sortBy(_.name)
-        ) -> FixableFailure.MissingDerivedFrom.some).asRight
-      case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators.sortBy(_.name)) -> None).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None) =>
-        (ImportedInternalAncestorInternal(
-          id.resourceId,
-          id.identifier,
-          sameAs,
-          TopmostSameAs(sameAs),
-          maybeOriginalId getOrElse OriginalIdentifier(id.identifier),
-          dateCreated,
-          creators.sortBy(_.name)
-        ) -> None).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None) =>
-        (ImportedInternalAncestorExternal(
-          id.resourceId,
-          id.identifier,
-          sameAs,
-          TopmostSameAs(sameAs),
-          maybeOriginalId getOrElse OriginalIdentifier(id.identifier),
-          datePublished,
-          creators.sortBy(_.name)
-        ) -> None).asRight
-      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(originalId), maybeInvalidationTime) =>
-        (Modified(id.resourceId,
-                  derivedFrom,
-                  TopmostDerivedFrom(derivedFrom),
-                  originalId,
-                  dateCreated,
-                  creators,
-                  maybeInvalidationTime
-        ) -> None).asRight
-      case (maybeDateCreated,
-            maybeDatePublished,
-            maybeInternalSameAs,
-            maybeExternalSameAs,
-            maybeDerivedFrom,
-            maybeOriginalIdentifier,
-            maybeInvalidationTime
-          ) =>
-        DecodingFailure(
-          "Invalid dataset data " +
-            s"identifier: ${id.identifier}, " +
-            s"dateCreated: $maybeDateCreated, " +
-            s"datePublished: $maybeDatePublished, " +
-            s"internalSameAs: $maybeInternalSameAs, " +
-            s"externalSameAs: $maybeExternalSameAs, " +
-            s"derivedFrom: $maybeDerivedFrom, " +
-            s"originalIdentifier: $maybeOriginalIdentifier, " +
-            s"maybeInvalidationTime: $maybeInvalidationTime",
-          Nil
-        ).asLeft
-    }
-
-    private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name)
   }
-
-  private def originalIdEqualCurrentId(maybeOriginalIdentifier: Option[OriginalIdentifier],
-                                       identification:          Identification
-  ): Boolean =
-    maybeOriginalIdentifier.isEmpty || maybeOriginalIdentifier.exists(_.value == identification.identifier.value)
 
   final case class AdditionalInfo(
       maybeDescription: Option[Description],
@@ -428,25 +424,23 @@ object Dataset {
         )
     }
 
-    private[Dataset] implicit lazy val decoder: JsonLDDecoder[AdditionalInfo] = JsonLDDecoder.entity(entityTypes) {
-      cursor =>
-        import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-        for {
-          maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-          keywords     <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten).map(_.sorted)
-          images       <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
-          maybeLicense <- cursor.downField(schema / "license").as[Option[License]]
-          maybeVersion <- cursor.downField(schema / "version").as[Option[Version]]
-        } yield AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
-    }
+    def fromCli(dataset: CliDataset): AdditionalInfo =
+      AdditionalInfo(
+        dataset.description,
+        dataset.keywords.sorted,
+        dataset.images,
+        dataset.license,
+        dataset.version
+      )
   }
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
 
   implicit def encoder[P <: Provenance](implicit
-      renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl,
-      graph:        GraphClass
+      renkuUrl:          RenkuUrl,
+      gitLabApiUrl:      GitLabApiUrl,
+      graph:             GraphClass,
+      provenanceEncoder: Provenance => Map[Property, JsonLD]
   ): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
       def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)
@@ -467,37 +461,36 @@ object Dataset {
     }
   }
 
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Dataset[Provenance]] =
-    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-      import Dataset.Provenance.FixableFailure
-      import Dataset.Provenance.FixableFailure.MissingDerivedFrom
+  private def createProvenance(
+      cliDS: CliDataset
+  )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, (Provenance, Option[FixableFailure])] = {
 
-      def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
-                            parts:                       List[DatasetPart]
-      ): Provenance = provenanceAndFixableFailure match {
-        case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
-          prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
-        case (prov, _) => prov
-      }
+    val creators: ValidatedNel[String, NonEmptyList[Person]] = cliDS.creators.traverse(Person.fromCli)
 
-      for {
-        identification              <- cursor.as[Identification]
-        provenanceAndFixableFailure <- cursor.as(Provenance.decoder(identification))
-        additionalInfo              <- cursor.as[AdditionalInfo]
-        parts                       <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-        publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
-        dataset <-
-          Dataset
-            .from(identification,
-                  fixProvenanceDate(provenanceAndFixableFailure, parts),
-                  additionalInfo,
-                  parts,
-                  publicationEvents
-            )
-            .toEither
-            .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-      } yield dataset
+    cliDS match {
+      case Internal.FromCli(p) =>
+        if (cliDS.originalIdNotEqualCurrentId) creators.map(p).map(_ -> FixableFailure.MissingDerivedFrom.some)
+        else creators.map(p).map(_ -> None)
+
+      case ImportedExternal.FromCli(p) => creators.map(p).map(_ -> None)
+
+      case ImportedInternalAncestorInternal.FromCli(p) => creators.map(p).map(_ -> None)
+
+      case ImportedInternalAncestorExternal.FromCli(p) => creators.map(p).map(_ -> None)
+
+      case Modified.FromCli(p) => creators.map(p).map(_ -> None)
+
+      case _ =>
+        ("Invalid dataset data: " +
+          s"identifier: ${cliDS.identifier}, " +
+          show"createdOrPublished: ${cliDS.createdOrPublished}, " +
+          s"dateModified: ${cliDS.dateModified}, " +
+          s"sameAs: ${cliDS.sameAs}, " +
+          s"derivedFrom: ${cliDS.derivedFrom}, " +
+          s"originalIdentifier: ${cliDS.originalIdentifier}, " +
+          s"maybeInvalidationTime: ${cliDS.invalidationTime}").invalidNel
     }
+  }
 
   object Ontology {
 

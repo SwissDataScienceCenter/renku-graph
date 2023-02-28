@@ -23,8 +23,8 @@ import cats.syntax.all._
 import io.renku.jsonld.ontology.xsd
 import io.renku.jsonld.{EntityId, Property}
 import io.renku.triplesstore.client.model.{Quad, Triple, TripleObject}
-import org.apache.jena.atlas.lib.EscapeStr
 import org.apache.jena.util.URIref
+import org.eclipse.rdf4j.query.parser.sparql.SPARQLQueries
 
 trait SparqlEncoder[T] extends (T => Fragment)
 
@@ -38,7 +38,7 @@ object SparqlEncoder {
     SparqlEncoder.instance(Fragment(_))
 
   private def stringLiteralEncoder: SparqlEncoder[String] =
-    SparqlEncoder.instance(v => Fragment(s"'${EscapeStr.stringEsc(v)}'"))
+    SparqlEncoder.instance(v => Fragment(s"'${SPARQLQueries.escape(v)}'"))
 
   private def iriEncoder: SparqlEncoder[String] =
     SparqlEncoder.instance(v => Fragment(s"<${URIref.encode(v)}>"))
@@ -67,11 +67,11 @@ object SparqlEncoder {
     private val stringObjectEncoder: SparqlEncoder[TripleObject.String] = stringLiteralEncoder.contramap(_.value)
     private val instantObjectEncoder: SparqlEncoder[TripleObject.Instant] =
       SparqlEncoder.instance(v =>
-        Fragment(s"'${EscapeStr.stringEsc(v.value.toString)}'^^${propertySparqlEncoder(xsd / "dateTime").sparql}")
+        Fragment(s"'${SPARQLQueries.escape(v.value.toString)}'^^${propertySparqlEncoder(xsd / "dateTime").sparql}")
       )
     private val localDateObjectEncoder: SparqlEncoder[TripleObject.LocalDate] =
       SparqlEncoder.instance(v =>
-        Fragment(s"'${EscapeStr.stringEsc(v.value.toString)}'^^${propertySparqlEncoder(xsd / "date").sparql}")
+        Fragment(s"'${SPARQLQueries.escape(v.value.toString)}'^^${propertySparqlEncoder(xsd / "date").sparql}")
       )
     private val iriObjectEncoder: SparqlEncoder[TripleObject.Iri] = entityIdSparqlEncoder.contramap(_.value)
     implicit def tripleObjectSparqlEncoder[T <: TripleObject]: SparqlEncoder[T] = SparqlEncoder.instance {

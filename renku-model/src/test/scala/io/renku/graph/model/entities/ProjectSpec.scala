@@ -18,12 +18,13 @@
 
 package io.renku.graph.model.entities
 
-import PlanLens._
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
-import com.softwaremill.diffx.scalatest.DiffShouldMatcher
-import io.circe.DecodingFailure
+import eu.timepit.refined.auto._
 import io.circe.syntax._
+import io.renku.cli.model.CliModel._
+import io.renku.cli.model.CliPlan.{allMappingParameterIds, allStepParameterIds}
+import io.renku.cli.model._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -32,24 +33,24 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.persons.Name
-import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
+import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
-import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
+import io.renku.graph.model.testentities.{CompositePlan, ModelOps}
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import monocle.Lens
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.{LocalDate, ZoneOffset}
-import scala.util.Random
 
 class ProjectSpec
     extends AnyWordSpec
@@ -57,7 +58,8 @@ class ProjectSpec
     with EntitiesGenerators
     with ModelOps
     with ScalaCheckPropertyChecks
-    with DiffShouldMatcher
+    with AdditionalMatchers
+    with EitherValues
     with DiffInstances {
 
   "ProjectMember.add" should {
@@ -74,191 +76,152 @@ class ProjectSpec
     }
   }
 
-  "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
+  "fromCli" should {
 
-    "turn JsonLD Project entity without parent into the Project object" in new TestCase {
+    "turn CliProject entity without parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
         val creator            = projectMembersWithEmail.generateOne
         val member1            = projectMembersNoEmail.generateOne
         val member2            = projectMembersWithEmail.generateOne
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
-        val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity1, plan1) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-        val (activity2, plan2) =
-          activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
-        val (activity3, plan3) = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1 = datasetWith(
-          NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
-        )(info.dateCreated)
-        val dataset2 = datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
-          info.dateCreated
-        )
+        val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
+        val activity1          = activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val activity2          = activityWith(cliShapedPersons.generateOne)(info.dateCreated)
+        val activity3 = activityWithAssociationAgent(creator.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val dataset1  = datasetWith(member3.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val dataset2: testentities.Dataset[testentities.Dataset.Provenance] =
+          datasetWith(cliShapedPersons.generateOne)(info.dateCreated)
 
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          None,
-          info.dateCreated,
-          activity1 :: activity2 :: activity3 :: Nil,
-          dataset1 :: dataset2 :: Nil,
-          plan1 :: plan2 :: plan3 :: Nil
-        )
+        val testProject: testentities.Project =
+          createRenkuProject(info, cliVersion, schemaVersion)
+            .asInstanceOf[testentities.RenkuProject.WithoutParent]
+            .copy(
+              activities = activity1 :: activity2 :: activity3 :: Nil,
+              datasets = dataset1 :: dataset2 :: Nil
+            )
+
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity1.author, member2)
-        val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
+        val mergedMember3 = dataset1.provenance.creators
+          .find(byEmail(member3))
+          .map(merge(_, member3))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
 
-        val expectedActivities =
-          (activity1.copy(author = mergedMember2) ::
-            activity2 ::
-            replaceAgent(activity3, mergedCreator) :: Nil)
+        val expectedActivities: List[testentities.Activity] =
+          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
             .sortBy(_.startTime)
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))).getOrElse(Nil).head shouldMatchTo
-          entities.RenkuProject.WithoutParent(
-            resourceId,
-            info.path,
-            info.name,
-            info.maybeDescription,
-            cliVersion,
-            info.dateCreated,
-            maybeCreator = mergedCreator.some,
-            info.visibility,
-            info.keywords,
-            members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
-            schemaVersion,
-            expectedActivities,
-            addTo(dataset1,
-                  mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
-            ) :: dataset2 :: Nil,
-            plan1 :: plan2 :: plan3 :: Nil,
-            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+
+        val decoded = Project.fromCli(cliProject, allPersons, info)
+        decoded shouldMatchToValid testProject
+          .to[entities.Project]
+          .asInstanceOf[entities.RenkuProject.WithoutParent]
+          .copy(
+            activities = expectedActivities.map(_.to[entities.Activity]),
+            maybeCreator = mergedCreator.to[entities.Person].some,
+            datasets = List(
+              addTo(dataset1, NonEmptyList.one(mergedMember3))
+                .to[entities.Dataset[entities.Dataset.Provenance]],
+              dataset2
+                .to[entities.Dataset[entities.Dataset.Provenance]]
+            ),
+            members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person])
           )
       }
     }
 
-    "turn JsonLD Project entity with parent into the Project object" in new TestCase {
+    "turn CliProject entity with parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome))) { projectInfo =>
         val creator            = projectMembersWithEmail.generateOne
         val member1            = projectMembersNoEmail.generateOne
         val member2            = projectMembersWithEmail.generateOne
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
-        val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity1, plan1) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-        val (activity2, plan2) =
-          activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
-        val (activity3, plan3) = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1 = datasetWith(
-          NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
-        )(info.dateCreated)
-        val dataset2 =
-          datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
-            info.dateCreated
-          )
+        val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
+        val activity1          = activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val activity2          = activityWith(cliShapedPersons.generateOne)(info.dateCreated)
+        val activity3          = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
+        val dataset1           = datasetWith(member3.toTestPerson.copy(maybeGitLabId = None))(info.dateCreated)
+        val dataset2           = datasetWith(cliShapedPersons.generateOne)(info.dateCreated)
 
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          maybeCreator = None,
-          info.dateCreated,
-          activity1 :: activity2 :: activity3 :: Nil,
-          dataset1 :: dataset2 :: Nil,
-          plan1 :: plan2 :: plan3 :: Nil
-        )
+        val testProject: testentities.Project =
+          createRenkuProject(info, cliVersion, schemaVersion)
+            .asInstanceOf[testentities.RenkuProject.WithParent]
+            .copy(
+              activities = activity1 :: activity2 :: activity3 :: Nil,
+              datasets = dataset1 :: dataset2 :: Nil
+            )
+
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity1.author, member2)
-        val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
+        val mergedMember3 = dataset1.provenance.creators
+          .find(byEmail(member3))
+          .map(merge(_, member3))
+          .getOrElse(fail(show"No dataset1 creator with ${member3.email}"))
 
-        val expectedActivities = (activity1.copy(author = mergedMember2) ::
-          activity2 ::
-          replaceAgent(activity3, mergedCreator) :: Nil)
-          .sortBy(_.startTime)
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-          entities.RenkuProject.WithParent(
-            resourceId,
-            info.path,
-            info.name,
-            info.maybeDescription,
-            cliVersion,
-            info.dateCreated,
-            mergedCreator.some,
-            info.visibility,
-            info.keywords,
-            members = Set(member1.toPerson.some, mergedMember2.some, mergedMember3).flatten,
-            schemaVersion,
-            expectedActivities,
-            addTo(dataset1,
-                  mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
-            ) :: dataset2 :: Nil,
-            plan1 :: plan2 :: plan3 :: Nil,
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
-            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
+        val expectedActivities: List[testentities.Activity] =
+          (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
+            .sortBy(_.startTime)
+
+        val decoded = Project.fromCli(cliProject, allPersons, info)
+
+        decoded shouldMatchToValid testProject
+          .to[entities.Project]
+          .asInstanceOf[entities.RenkuProject.WithParent]
+          .copy(
+            members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person]),
+            maybeCreator = mergedCreator.to[entities.Person].some,
+            activities = expectedActivities.map(_.to[entities.Activity]),
+            datasets = List(
+              addTo(dataset1, NonEmptyList.one(mergedMember3)).to[entities.Dataset[entities.Dataset.Provenance]],
+              dataset2.to[entities.Dataset[entities.Dataset.Provenance]]
+            )
           )
-        ).asRight
       }
     }
 
-    "turn non-renku JsonLD Project entity without parent into the NonRenkuProject object" in {
+    "turn non-renku CliProject entity without parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
-        val creator    = projectMembersWithEmail.generateOne
-        val members    = projectMembers.generateSet()
-        val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
-        val resourceId = projects.ResourceId(info.path)
+        val creator = projectMembersWithEmail.generateOne
+        val members = projectMembers.generateSet()
+        val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val testProject: testentities.Project = createNonRenkuProject(info)
 
-        val jsonLD = minimalCliLikeJsonLD(resourceId)
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-          entities.NonRenkuProject.WithoutParent(
-            resourceId,
-            info.path,
-            info.name,
-            info.maybeDescription,
-            info.dateCreated,
-            creator.some.map(_.toPerson),
-            info.visibility,
-            info.keywords,
-            members.map(_.toPerson),
-            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
-          )
-        ).asRight
+        Project.fromCli(cliProject, allPersons, info) shouldMatchToValid
+          testProject
+            .to[entities.Project]
+            .asInstanceOf[entities.NonRenkuProject.WithoutParent]
+            .copy(
+              members = members.map(_.toPerson),
+              maybeCreator = creator.toPerson.some
+            )
       }
     }
 
-    "turn non-renku JsonLD Project entity with parent into the NonRenkuProject object" in {
+    "turn non-renku CliProject entity with parent into the NonRenkuProject object" in {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome))) { projectInfo =>
-        val creator    = projectMembersWithEmail.generateOne
-        val members    = projectMembers.generateSet()
-        val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
-        val resourceId = projects.ResourceId(info.path)
+        val creator = projectMembersWithEmail.generateOne
+        val members = projectMembers.generateSet()
+        val info    = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val testProject: testentities.Project = createNonRenkuProject(info)
 
-        val jsonLD = minimalCliLikeJsonLD(resourceId)
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
-        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-          entities.NonRenkuProject.WithParent(
-            resourceId,
-            info.path,
-            info.name,
-            info.maybeDescription,
-            info.dateCreated,
-            creator.some.map(_.toPerson),
-            info.visibility,
-            info.keywords,
-            members.map(_.toPerson),
-            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project"))),
-            ModelOps.convertImageUris(resourceId.asEntityId)(info.avatarUrl.toList)
-          )
-        ).asRight
+        Project.fromCli(cliProject, allPersons, info) shouldMatchToValid
+          testProject
+            .to[entities.Project]
+            .asInstanceOf[entities.NonRenkuProject.WithParent]
+            .copy(members = members.map(_.toPerson), maybeCreator = creator.toPerson.some)
       }
     }
 
@@ -275,38 +238,41 @@ class ProjectSpec
         val member2 = projectMembersWithEmail.generateOne
 
         val projectInfo        = info.copy(maybeCreator = creator.some, members = Set(member2))
-        val resourceId         = projects.ResourceId(projectInfo.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-        val (activity, plan) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(projectInfo.dateCreated)
-          .bimap(identity, PlanLens.planCreators.set(List(creatorAsCliPerson)))
+        val creatorAsCliPerson = creator.toTestPerson.copy(maybeGitLabId = None)
+        val activity =
+          testentities.Activity.Lenses.planCreators.set(List(creatorAsCliPerson))(
+            activityWith(member2.toTestPerson.copy(maybeGitLabId = None))(projectInfo.dateCreated)
+          )
 
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          projectInfo.maybeDescription,
-          projectInfo.keywords,
-          creatorAsCliPerson.some,
-          projectInfo.dateCreated,
-          activities = activity :: Nil,
-          plans = plan :: Nil
-        )
+        val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+          .asInstanceOf[testentities.RenkuProject]
+          .fold(_.copy(activities = activity :: Nil), _.copy(activities = activity :: Nil))
+          .asInstanceOf[testentities.Project]
+
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
         val mergedMember2 = merge(activity.author, member2)
 
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+        val actual =
+          Project.fromCli(cliProject, allPersons, projectInfo).fold(errs => fail(errs.intercalate("; ")), identity)
 
-        actual.maybeCreator shouldBe mergedCreator.some
-        actual.members      shouldBe Set(mergedMember2)
-        actual.activities   shouldBe ActivityLens.activityAuthor.set(mergedMember2)(activity) :: Nil
-        actual.plans        shouldBe PlanLens.planCreators.set(List(mergedCreator))(plan) :: Nil
+        actual.maybeCreator shouldBe mergedCreator.to[entities.Person].some
+        actual.members      shouldBe Set(mergedMember2.to[entities.Person])
+        actual.activities shouldBe ActivityLens.activityAuthor.set(mergedMember2.to[entities.Person])(
+          activity.to[entities.Activity]
+        ) :: Nil
+        actual.plans shouldBe PlanLens.planCreators.set(List(mergedCreator.to[entities.Person]))(
+          activity.plan.to[entities.Plan]
+        ) :: Nil
       }
 
       s"update Plans' originalResourceId for project $projectType" in new TestCase {
 
-        val resourceId                = projects.ResourceId(info.path)
-        val activity                  = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+        val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+          info.dateCreated
+        ).generateOne
         val plan                      = activity.plan
         val entitiesPlan              = plan.to[entities.Plan]
         val planModification1         = plan.createModification()
@@ -314,59 +280,24 @@ class ProjectSpec
         val planModification2         = planModification1.createModification()
         val entitiesPlanModification2 = planModification2.to[entities.StepPlan.Modified]
 
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          maybeCreator = None,
-          info.dateCreated,
-          activities = activity.to[entities.Activity] :: Nil,
-          plans = entitiesPlan :: entitiesPlanModification1 :: entitiesPlanModification2 :: Nil
-        )
+        val testProject = createRenkuProject(info, cliVersion, schemaVersion)
+          .asInstanceOf[testentities.RenkuProject]
+          .fold(
+            _.copy(activities = activity :: Nil, unlinkedPlans = planModification1 :: planModification2 :: Nil),
+            _.copy(activities = activity :: Nil, unlinkedPlans = planModification1 :: planModification2 :: Nil)
+          )
+          .asInstanceOf[testentities.Project]
 
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+        val cliProject = testProject.to[CliProject]
+        val allPersons = cliProject.collectAllPersons
 
-        val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = actual.plans
+        val results = Project.fromCli(cliProject, allPersons, info).toEither
+
+        val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = results.value.plans
         actualPlan1 shouldBe entitiesPlan
         actualPlan2 shouldBe entitiesPlanModification1
         actualPlan3 shouldBe (modifiedPlanDerivation >>> planDerivationOriginalId)
           .set(entitiesPlan.resourceId)(entitiesPlanModification2)
-      }
-
-      s"update Plans' dateCreated if there are Activities created before the Plan for project $projectType" in new TestCase {
-
-        val resourceId = projects.ResourceId(info.path)
-        val activity = {
-          val a = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
-          a.replaceStartTime(
-            timestamps(min = info.dateCreated.value, max = a.plan.dateCreated.value.minusSeconds(1))
-              .generateAs(activities.StartTime)
-          )
-        }
-        val entitiesActivity = activity.to[entities.Activity]
-        val plan             = activity.plan
-        val entitiesPlan     = plan.to[entities.Plan]
-
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          info.maybeDescription,
-          info.keywords,
-          maybeCreator = None,
-          info.dateCreated,
-          activities = entitiesActivity :: Nil,
-          plans = entitiesPlan :: Nil
-        )
-
-        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
-
-        actual.plans shouldBe List(
-          planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan)
-        )
-        actual.activities shouldBe List(entitiesActivity)
       }
     }
 
@@ -400,20 +331,17 @@ class ProjectSpec
       }
     }
 
-    "validate composite plans in a project failing to find referenced entities" in {
+    "fail composite plans validation in case of missing referenced entities" in {
+
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
 
-      val invalidPlanGen =
-        for {
-          cp <- compositePlanNonEmptyMappings
-                  .mapF(
-                    _.map(_.asInstanceOf[CompositePlan.NonModified])
-                  )
-          step <- stepPlanGenFactory
-        } yield cp.copy(plans = NonEmptyList.one(step))
+      val invalidPlanGen = for {
+        cp   <- compositePlanNonEmptyMappings(personEntities).mapF(_.map(_.asInstanceOf[CompositePlan.NonModified]))
+        step <- stepPlanGenFactory(personEntities)
+      } yield cp.copy(plans = NonEmptyList.one(step))
 
       val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
 
@@ -432,180 +360,162 @@ class ProjectSpec
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
-      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
-        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities)))
 
-      forAll(projectGen) { project =>
+      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities(personGen = cliShapedPersons)
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities(cliShapedPersons, _))))
+
+      forAll(projectGen) { (project: testentities.RenkuProject) =>
         validate(project.to[entities.Project].plans)
           .leftMap(_.toList.intercalate("; "))
           .fold(fail(_), identity)
 
-        val decoded = project.asJsonLD.flatten
-          .fold(fail(_), identity)
-          .cursor
-          .as[List[entities.CompositePlan]]
+        val cliCompositePlans = project
+          .to[CliProject]
+          .plans
+          .collect {
+            case CliProject.ProjectPlan.Composite(plan)             => CliPlan(plan)
+            case CliProject.ProjectPlan.WorkflowFileComposite(plan) => CliPlan(plan.asCliCompositePlan)
+          }
+        val plans = cliCompositePlans.traverse(entities.Plan.fromCli)
 
-        decoded shouldBe Right(project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan]))
+        plans shouldMatchToValid project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan])
       }
     }
 
-    "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanNonEmptyMappings.generateOne
+    "fail composite plan validation in case there are references pointing outside of this composite plan" in {
+
+      val testPlan: testentities.CompositePlan = compositePlanNonEmptyMappings(cliShapedPersons).generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
-      // find a plan belonging to some mapped parameter
-      val mappedPlanId = testPlan.mappings.head.mappedParam.head.planId
+      val testCliPlan = testPlan.to[CliCompositePlan]
+
+      // find a parameter id that is mapped
+      val mappedParameterId =
+        testCliPlan.mappings.headOption
+          .map(_.mapsTo.head.fold(_.resourceId, _.resourceId, _.resourceId, _.resourceId))
+          .getOrElse(fail("Cannot find any mapping"))
 
       // remove this plan from the children plan list
-      val invalidPlan =
-        testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
+      val invalidCliPlan =
+        testCliPlan.copy(plans =
+          NonEmptyList.fromListUnsafe(
+            testCliPlan.plans.filterNot(_.fold(allStepParameterIds, allMappingParameterIds).contains(mappedParameterId))
+          )
+        )
 
-      // for convenience decode it all into a list
-      val decodeAll = invalidPlan.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[entities.Plan]]
+      val decoded = Plan
+        .fromCli(CliPlan(invalidCliPlan))
+        .map(_ :: Nil)
+        .toEither
+        .fold(errs => fail(errs.intercalate("; ")), identity)
 
       val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
         def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
           this.validateCompositePlanData(plans)
       }
 
-      validate(decodeAll.toOption.get).isInvalid shouldBe true
+      validate(decoded).isInvalid shouldBe true
     }
 
-    "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
+    "return Invalid if there's a modified Plan pointing to a non-existing parent" in new TestCase {
 
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        maybeCreator = None,
-        projectInfo.dateCreated,
-        activities = Nil,
-        datasets = Nil,
-        plans = Nil
-      )
+      val info = gitLabProjectInfos.generateOne
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+        info.dateCreated
+      ).generateOne
 
-      val Left(error) = JsonLD
-        .arr(jsonLD,
-             JsonLD.entity(personResourceIds.generateOne.asEntityId,
-                           entities.Person.entityTypes,
-                           Map.empty[Property, JsonLD]
-             )
-        )
-        .flatten
-        .fold(throw _, identity)
-        .cursor
-        .as(decodeList(entities.Project.decoder(projectInfo)))
-
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
-    }
-
-    "return a DecodingFailure if there's a modified Plan pointing to a non-existing parent" in new TestCase {
-
-      val info       = gitLabProjectInfos.generateOne
-      val resourceId = projects.ResourceId(info.path)
-      val activity   = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
-      val (plan, planModification) = {
+      val planModification = {
         val p = activity.plan
         val modification = p
           .createModification()
-          .to[entities.StepPlan.Modified]
-          .copy(derivation =
-            entities.Plan.Derivation(plans.DerivedFrom(planResourceIds.generateOne.value), planResourceIds.generateOne)
+          .copy(
+            parent = stepPlanEntities().generateOne
           )
-        p.to[entities.Plan] -> modification
+        modification
       }
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        info.maybeDescription,
-        info.keywords,
-        maybeCreator = None,
-        info.dateCreated,
-        activities = activity.to[entities.Activity] :: Nil,
-        plans = plan :: planModification :: Nil
-      )
+      val testProject = createRenkuProject(info, cliVersion, schemaVersion)
+        .fold(_.copy(
+                activities = activity :: Nil,
+                unlinkedPlans = planModification :: Nil
+              ),
+              _.copy(
+                activities = activity :: Nil,
+                unlinkedPlans = planModification :: Nil
+              )
+        )
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
-
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should include(s"Cannot find parent plan ${planModification.derivation.derivedFrom}")
+      val result = Project.fromCli(cliProject, allPersons, info)
+      result should beInvalidWithMessageIncluding(s"Cannot find parent plan ${planModification.parent.id.asEntityId}")
     }
 
-    "return a DecodingFailure if there's a modified Plan with the date from before the parent date" in new TestCase {
+    "return Invalid if there's a modified Plan with the date from before the parent date" in new TestCase {
 
-      val info       = gitLabProjectInfos.generateOne
-      val resourceId = projects.ResourceId(info.path)
-      val activity   = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
-      val (plan, planModification) = {
+      val info = gitLabProjectInfos.generateOne
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
+        info.dateCreated
+      ).generateOne
+      val planModification = {
         val p = activity.plan
         val modification = p
           .createModification()
-          .to[entities.StepPlan.Modified]
           .copy(dateCreated =
             timestamps(info.dateCreated.value, p.dateCreated.value.minusSeconds(1)).generateAs(plans.DateCreated)
           )
-        p.to[entities.Plan] -> modification
+        modification
       }
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        info.maybeDescription,
-        info.keywords,
-        maybeCreator = None,
-        info.dateCreated,
-        activities = activity.to[entities.Activity] :: Nil,
-        plans = plan :: planModification :: Nil
+      val testProject = createRenkuProject(info, cliVersion, schemaVersion)
+        .fold(_.copy(
+                activities = activity :: Nil,
+                unlinkedPlans = planModification :: Nil
+              ),
+              _.copy(
+                activities = activity :: Nil,
+                unlinkedPlans = planModification :: Nil
+              )
+        )
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      val result = Project.fromCli(cliProject, allPersons, info)
+      result should beInvalidWithMessageIncluding(
+        show"Plan ${planModification.id.asEntityId} is older than it's parent ${planModification.parent.id.asEntityId}"
       )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
-
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should include(
-        show"Plan ${planModification.resourceId} is older than it's parent ${planModification.derivation.derivedFrom}"
-      )
     }
 
-    "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in new TestCase {
+    "return Invalid when there's a Dataset entity that cannot be decoded" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-        projectInfo.dateCreated,
-        datasets = datasetEntities(provenanceInternal)
-          .withDateBefore(projectInfo.dateCreated)
-          .generateFixedSizeList(1)
-          .map(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]].copy())
-      )
 
-      val Left(error) = jsonLD.flatten
-        .fold(throw _, identity)
-        .cursor
-        .as(decodeList(entities.Project.decoder(projectInfo)))
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
 
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should (include("Dataset") and include("is older than project"))
+      val cliProject = testProject
+        .to[CliProject]
+        .copy(datasets =
+          datasetEntities(provenanceInternal(cliShapedPersons))
+            .withDateBefore(projectInfo.dateCreated)
+            .generateFixedSizeList(1)
+            .map(_.to[CliDataset])
+        )
+      val allPersons = cliProject.collectAllPersons
+
+      val result = Project.fromCli(cliProject, allPersons, projectInfo)
+      result should beInvalidWithMessageIncluding("Dataset", "is older than project")
     }
 
-    "return a DecodingFailure when there's an Activity entity created before project creation" in new TestCase {
+    "return Invalid when there's an Activity entity created before project creation" in new TestCase {
+
       val projectInfo       = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId        = projects.ResourceId(projectInfo.path)
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
-        stepPlanEntities().map(_.replacePlanDateCreated(plans.DateCreated(dateBeforeProject)))
+        stepPlanEntities(planCommands, cliShapedPersons).map(
+          _.replacePlanDateCreated(plans.DateCreated(dateBeforeProject))
+        ),
+        cliShapedPersons
       ).map(
         _.replaceStartTime(
           timestamps(min = dateBeforeProject, max = projectInfo.dateCreated.value).generateAs[activities.StartTime]
@@ -613,137 +523,113 @@ class ProjectSpec
       ).run(projects.DateCreated(dateBeforeProject))
         .generateOne
       val entitiesActivity = activity.to[entities.Activity]
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-        projectInfo.dateCreated,
-        activities = entitiesActivity :: Nil,
-        plans = activity.plan.to[entities.Plan] :: Nil
-      )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should include(
+      val cliProject = testProject
+        .to[CliProject]
+        .copy(activities = activity.to[CliActivity] :: Nil,
+              plans = CliProject.ProjectPlan(activity.plan.to[CliPlan]) :: Nil
+        )
+      val allPersons = cliProject.collectAllPersons
+
+      val result = Project.fromCli(cliProject, allPersons, projectInfo)
+      result should beInvalidWithMessageIncluding(
         s"Activity ${entitiesActivity.resourceId} " +
           s"date ${activity.startTime} is older than project ${projectInfo.dateCreated}"
       )
     }
 
-    "return a DecodingFailure when there's an internal Dataset entity created before project without parent" in new TestCase {
-      val projectInfo     = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId      = projects.ResourceId(projectInfo.path)
-      val dataset         = datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne
+    "return Invalid when there's an internal Dataset entity created before project without parent" in new TestCase {
+
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val dataset =
+        datasetEntities(provenanceInternal(cliShapedPersons)).withDateBefore(projectInfo.dateCreated).generateOne
       val entitiesDataset = dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-        projectInfo.dateCreated,
-        datasets = entitiesDataset :: Nil
-      )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+      val cliProject = testProject
+        .to[CliProject]
+        .copy(
+          datasets = dataset.to[CliDataset] :: Nil
+        )
+      val allPersons = cliProject.collectAllPersons
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      val result = Project.fromCli(cliProject, allPersons, projectInfo)
+      result should beInvalidWithMessageIncluding(
         s"Dataset ${entitiesDataset.resourceId} " +
           s"date ${dataset.provenance.date} is older than project ${projectInfo.dateCreated}"
       )
     }
 
-    "return a DecodingFailure when there's a Plan entity created before project without parent" in new TestCase {
+    "return Invalid when there's a Plan entity created before project without parent" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
-      val plan = stepPlanEntities()(planCommands)(projectInfo.dateCreated).generateOne
+      val plan = stepPlanEntities(planCommands, cliShapedPersons)(projectInfo.dateCreated).generateOne
         .replacePlanDateCreated(timestamps(max = projectInfo.dateCreated.value).generateAs[plans.DateCreated])
       val entitiesPlan = plan.to[entities.Plan]
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-        projectInfo.dateCreated,
-        plans = entitiesPlan :: Nil
-      )
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+      val cliProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .to[CliProject]
+        .copy(plans = CliProject.ProjectPlan(plan.to[CliPlan]) :: Nil)
+      val allPersons = cliProject.collectAllPersons
 
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      val result = Project.fromCli(cliProject, allPersons, projectInfo)
+
+      result should beInvalidWithMessageIncluding(
         s"Plan ${entitiesPlan.resourceId} " +
           s"date ${entitiesPlan.dateCreated} is older than project ${projectInfo.dateCreated}"
       )
     }
 
-    "decode project when there's an internal or modified Dataset entity created before project with parent" in new TestCase {
+    "convert project when there's an internal or modified Dataset entity created before project with parent" in new TestCase {
+
       val parentPath  = projectPaths.generateOne
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentPath.some)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
-      val dataset1 =
-        datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne.copy(parts = Nil)
-      val (dataset2, dateset2Modified) = datasetAndModificationEntities(provenanceInternal).map {
-        case (orig, modified) =>
-          val newOrigDate = timestamps(max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
-          val newModificationDate =
-            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
-          (
-            orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
-            modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
-          )
-      }.generateOne
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        maybeCreator = None,
-        dateCreated = projectInfo.dateCreated,
-        datasets = List(dataset1, dataset2, dateset2Modified).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
-      )
-
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
-          projectInfo.maybeDescription,
-          cliVersion,
-          projectInfo.dateCreated,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
-          projectInfo.keywords,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          List(dataset1, dataset2, dateset2Modified).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          plans = Nil,
-          projects.ResourceId(parentPath),
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+      val dataset1 = datasetEntities(provenanceInternal(cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+        .copy(parts = Nil)
+      val (dataset2, dataset2Modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                                        modificationCreatorGen = cliShapedPersons
+      ).map { case (orig, modified) =>
+        val newOrigDate = timestamps(max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+        val newModificationDate =
+          timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+        (
+          orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
+          modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
         )
-      ).asRight
+      }.generateOne
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithParent]
+        .copy(
+          datasets = List(dataset1, dataset2, dataset2Modified)
+        )
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson)
+        )
     }
 
-    "return a DecodingFailure when there's a modified Dataset entity created before project without parent" in new TestCase {
+    "return Invalid when there's a modified Dataset entity created before project without parent" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
       val (dataset, modifiedDataset) =
-        datasetAndModificationEntities(provenanceImportedExternal).map { case (orig, modified) =>
+        datasetAndModificationEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons),
+                                       modificationCreatorGen = cliShapedPersons
+        ).map { case (orig, modified) =>
           val newOrigDate = timestamps(max = projectInfo.dateCreated.value)
             .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
             .generateAs[datasets.DatePublished]
           val newModificationDate =
-            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value).generateAs[datasets.DateCreated]
+            timestamps(min = newOrigDate.instant, max = projectInfo.dateCreated.value)
+              .generateAs[datasets.DateCreated]
           (
             orig.copy(provenance = orig.provenance.copy(date = newOrigDate), parts = Nil),
             modified.copy(provenance = modified.provenance.copy(date = newModificationDate), parts = Nil)
@@ -751,94 +637,69 @@ class ProjectSpec
         }.generateOne
       val entitiesModifiedDataset = modifiedDataset.to[entities.Dataset[entities.Dataset.Provenance.Modified]]
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-        projectInfo.dateCreated,
-        datasets =
-          dataset.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]] :: entitiesModifiedDataset :: Nil
-      )
+      val cliProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .to[CliProject]
+        .copy(datasets = List(dataset, modifiedDataset).map(_.to[CliDataset]))
+      val allPersons = cliProject.collectAllPersons
 
-      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
-
-      error shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(
+      val result = Project.fromCli(cliProject, allPersons, projectInfo)
+      result should beInvalidWithMessageIncluding(
         s"Dataset ${entitiesModifiedDataset.resourceId} " +
           s"date ${entitiesModifiedDataset.provenance.date} is older than project ${projectInfo.dateCreated}"
       )
     }
 
-    "decode project when there's a Dataset (neither internal nor modified) created before project creation" in new TestCase {
-      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
-      val resourceId  = projects.ResourceId(projectInfo.path)
-      val dataset1    = datasetEntities(provenanceImportedExternal).withDateBefore(projectInfo.dateCreated).generateOne
-      val dataset2 =
-        datasetEntities(provenanceImportedInternalAncestorExternal).withDateBefore(projectInfo.dateCreated).generateOne
-      val dataset3 =
-        datasetEntities(provenanceImportedInternalAncestorInternal())
-          .withDateBefore(projectInfo.dateCreated)
-          .generateOne
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        maybeCreator = None,
-        projectInfo.dateCreated,
-        datasets = List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
-      )
+    "convert project when there's a Dataset (neither internal nor modified) created before project creation" in new TestCase {
 
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithoutParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
-          projectInfo.maybeDescription,
-          cliVersion,
-          projectInfo.dateCreated,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
-          projectInfo.keywords,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
-          plans = Nil,
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val dataset1 = datasetEntities(provenanceImportedExternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+      val dataset2 = datasetEntities(provenanceImportedInternalAncestorExternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+      val dataset3 = datasetEntities(provenanceImportedInternalAncestorInternal(creatorsGen = cliShapedPersons))
+        .withDateBefore(projectInfo.dateCreated)
+        .generateOne
+
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithoutParent]
+        .copy(datasets = List(dataset1, dataset2, dataset3))
+
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithoutParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson)
         )
-      ).asRight
     }
 
-    "return a DecodingFailure when there's a modified Dataset that is derived from a non-existing dataset" in new TestCase {
+    "return Invalid when there's a modified Dataset that is derived from a non-existing dataset" in new TestCase {
       Set(
         gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
         gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
       ) foreach { projectInfo =>
-        val resourceId = projects.ResourceId(projectInfo.path)
-        val (original, modified) =
-          datasetAndModificationEntities(provenanceInternal, projectInfo.dateCreated).generateOne
-        val (_, broken) = datasetAndModificationEntities(provenanceInternal, projectInfo.dateCreated).generateOne
+        val (original, modified) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                                  projectInfo.dateCreated,
+                                                                  modificationCreatorGen = cliShapedPersons
+        ).generateOne
+        val (_, broken) = datasetAndModificationEntities(provenanceInternal(cliShapedPersons),
+                                                         projectInfo.dateCreated,
+                                                         modificationCreatorGen = cliShapedPersons
+        ).generateOne
 
-        val jsonLD = cliLikeJsonLD(
-          resourceId,
-          cliVersion,
-          schemaVersion,
-          projectInfo.maybeDescription,
-          projectInfo.keywords,
-          projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
-          projectInfo.dateCreated,
-          datasets = List(original, modified, broken).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
-        )
+        val cliProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+          .to[CliProject]
+          .copy(
+            datasets = List(original, modified, broken).map(_.to[CliDataset])
+          )
+        val allPersons = cliProject.collectAllPersons
 
-        val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
-
-        error shouldBe a[DecodingFailure]
-        error.getMessage() should endWith(
+        val result = Project.fromCli(cliProject, allPersons, projectInfo)
+        result should beInvalidWithMessageIncluding(
           show"Dataset ${broken.identification.identifier} is derived from non-existing dataset ${broken.provenance.derivedFrom}"
         )
       }
@@ -849,74 +710,54 @@ class ProjectSpec
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
       val projectInfo  = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
-      val resourceId   = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        projectInfo.maybeDescription,
-        projectInfo.keywords,
-        maybeCreator = None,
-        cliDate
-      )
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithoutParent]
+        .copy(dateCreated = cliDate)
 
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithoutParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
-          projectInfo.maybeDescription,
-          cliVersion,
-          earliestDate,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
-          projectInfo.keywords,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          datasets = Nil,
-          plans = Nil,
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithoutParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
+          dateCreated = earliestDate
         )
-      ).asRight
     }
 
-    "favor the CLI description and keywords over the gitlab values" in new TestCase {
+    "favour the CLI description and keywords over the gitlab values" in new TestCase {
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
-      val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
-                                                            dateCreated = gitlabDate,
-                                                            maybeDescription = projectDescriptions.generateSome,
-                                                            keywords = projectKeywords.generateSet(min = 1)
+      val projectInfo = gitLabProjectInfos.generateOne.copy(
+        maybeParentPath = None,
+        dateCreated = gitlabDate,
+        maybeDescription = projectDescriptions.generateSome,
+        keywords = projectKeywords.generateSet(min = 1)
       )
       val description = projectDescriptions.generateSome
       val keywords    = projectKeywords.generateSet(min = 1)
-      val resourceId  = projects.ResourceId(projectInfo.path)
 
-      val jsonLD =
-        cliLikeJsonLD(resourceId, cliVersion, schemaVersion, description, keywords, maybeCreator = None, cliDate)
-
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithoutParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
-          description,
-          cliVersion,
-          earliestDate,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
-          keywords,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          datasets = Nil,
-          plans = Nil,
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithoutParent]
+        .copy(
+          maybeDescription = description,
+          keywords = keywords,
+          dateCreated = cliDate,
+          maybeCreator = None
         )
-      ).asRight
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithoutParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
+          dateCreated = earliestDate
+        )
     }
 
     "fallback to GitLab's description and/or keywords if they are absent in the CLI payload" in new TestCase {
@@ -929,37 +770,22 @@ class ProjectSpec
         maybeDescription = projectDescriptions.generateSome,
         keywords = projectKeywords.generateSet(min = 1)
       )
-      val resourceId = projects.ResourceId(projectInfo.path)
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithoutParent]
+        .copy(maybeDescription = None, keywords = Set.empty, maybeCreator = None, dateCreated = cliDate)
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        maybeDescription = None,
-        keywords = Set.empty,
-        maybeCreator = None,
-        cliDate
-      )
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
 
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithoutParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
-          projectInfo.maybeDescription,
-          cliVersion,
-          earliestDate,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
-          projectInfo.keywords,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          datasets = Nil,
-          plans = Nil,
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithoutParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
+          dateCreated = earliestDate,
+          maybeDescription = projectInfo.maybeDescription,
+          keywords = projectInfo.keywords
         )
-      ).asRight
     }
 
     "return no description and/or keywords if they are absent in both the CLI payload and gitlab" in new TestCase {
@@ -971,37 +797,28 @@ class ProjectSpec
                                                             maybeDescription = projectDescriptions.generateNone,
                                                             keywords = Set.empty
       )
-      val resourceId = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(
-        resourceId,
-        cliVersion,
-        schemaVersion,
-        maybeDescription = None,
-        keywords = Set.empty,
-        maybeCreator = None,
-        cliDate
-      )
-
-      jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.RenkuProject.WithoutParent(
-          resourceId,
-          projectInfo.path,
-          projectInfo.name,
+      val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
+        .asInstanceOf[testentities.RenkuProject.WithoutParent]
+        .copy(
           maybeDescription = None,
-          cliVersion,
-          earliestDate,
-          projectInfo.maybeCreator.map(_.toPerson),
-          projectInfo.visibility,
           keywords = Set.empty,
-          projectInfo.members.map(_.toPerson),
-          schemaVersion,
-          activities = Nil,
-          datasets = Nil,
-          plans = Nil,
-          convertImageUris(resourceId.asEntityId)(projectInfo.avatarUrl.toList)
+          maybeCreator = None,
+          dateCreated = cliDate
         )
-      ).asRight
+
+      val cliProject = testProject.to[CliProject]
+      val allPersons = cliProject.collectAllPersons
+
+      Project.fromCli(cliProject, allPersons, projectInfo) shouldMatchToValid testProject
+        .to[entities.RenkuProject.WithoutParent]
+        .copy(
+          members = projectInfo.members.map(_.toPerson),
+          maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
+          dateCreated = earliestDate,
+          maybeDescription = None,
+          keywords = Set.empty
+        )
     }
   }
 
@@ -1228,74 +1045,118 @@ class ProjectSpec
     val schemaVersion = projectSchemaVersions.generateOne
   }
 
-  private def cliLikeJsonLD(resourceId:       projects.ResourceId,
-                            cliVersion:       CliVersion,
-                            schemaVersion:    SchemaVersion,
-                            maybeDescription: Option[Description],
-                            keywords:         Set[Keyword],
-                            maybeCreator:     Option[entities.Person],
-                            dateCreated:      DateCreated,
-                            activities:       List[entities.Activity] = Nil,
-                            datasets:         List[entities.Dataset[entities.Dataset.Provenance]] = Nil,
-                            plans:            List[entities.Plan] = Nil
-  )(implicit graph: GraphClass): JsonLD = {
+  private def createRenkuProjectFromPath(
+      parentPath:    projects.Path,
+      cliVersion:    CliVersion,
+      schemaVersion: SchemaVersion
+  ) =
+    testentities.RenkuProject.WithoutParent(
+      path = parentPath,
+      name = projectNames.generateOne,
+      maybeDescription = None,
+      agent = cliVersion,
+      dateCreated = projectCreatedDates().generateOne,
+      maybeCreator = None,
+      visibility = projects.Visibility.Public,
+      keywords = Set.empty,
+      members = Set.empty,
+      version = schemaVersion,
+      activities = Nil,
+      datasets = Nil,
+      unlinkedPlans = Nil,
+      images = Nil,
+      forksCount = ForksCount(1)
+    )
 
-    val descriptionJsonLD = maybeDescription match {
-      case Some(desc) => desc.asJsonLD
+  private def createRenkuProject(info: GitLabProjectInfo, cliVersion: CliVersion, schemaVersion: SchemaVersion) =
+    info.maybeParentPath match {
+      case Some(parentPath) =>
+        testentities.RenkuProject.WithParent(
+          path = info.path,
+          name = info.name,
+          maybeDescription = info.maybeDescription,
+          agent = cliVersion,
+          dateCreated = info.dateCreated,
+          maybeCreator = None,
+          visibility = info.visibility,
+          forksCount = ForksCount(1),
+          keywords = info.keywords,
+          members = Set.empty,
+          version = schemaVersion,
+          activities = Nil,
+          datasets = Nil,
+          unlinkedPlans = Nil,
+          images = info.avatarUrl.toList,
+          createCompositePlans = Nil,
+          parent = createRenkuProjectFromPath(parentPath, cliVersion, schemaVersion)
+        )
       case None =>
-        if (Random.nextBoolean()) blankStrings().generateOne.asJsonLD
-        else maybeDescription.asJsonLD
+        testentities.RenkuProject.WithoutParent(
+          path = info.path,
+          name = info.name,
+          maybeDescription = info.maybeDescription,
+          agent = cliVersion,
+          dateCreated = info.dateCreated,
+          maybeCreator = None,
+          visibility = info.visibility,
+          forksCount = ForksCount(1),
+          keywords = info.keywords,
+          members = Set.empty,
+          version = schemaVersion,
+          activities = Nil,
+          datasets = Nil,
+          unlinkedPlans = Nil,
+          images = info.avatarUrl.toList,
+          createCompositePlans = Nil
+        )
     }
-    JsonLD
-      .arr(
-        JsonLD.entity(
-          resourceId.asEntityId,
-          EntityTypes of (prov / "Location", schema / "Project"),
-          schema / "agent"         -> cliVersion.asJsonLD,
-          schema / "schemaVersion" -> schemaVersion.asJsonLD,
-          schema / "description"   -> descriptionJsonLD,
-          schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
-          schema / "creator"       -> maybeCreator.asJsonLD,
-          schema / "dateCreated"   -> dateCreated.asJsonLD,
-          renku / "hasActivity"    -> activities.asJsonLD,
-          renku / "hasDataset"     -> datasets.asJsonLD,
-          renku / "hasPlan"        -> plans.asJsonLD
-        ) :: datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
-      )
-      .flatten
-      .fold(throw _, identity)
-  }
 
-  private def minimalCliLikeJsonLD(resourceId: projects.ResourceId) =
-    JsonLD
-      .entity(
-        resourceId.asEntityId,
-        EntityTypes.of(prov / "Location", schema / "Project"),
-        Map.empty[Property, JsonLD]
-      )
-      .flatten
-      .fold(throw _, identity)
+  private def createNonRenkuProjectFromPath(parentPath: projects.Path) =
+    testentities.NonRenkuProject.WithoutParent(
+      path = parentPath,
+      name = projectNames.generateOne,
+      maybeDescription = None,
+      dateCreated = projectCreatedDates().generateOne,
+      maybeCreator = None,
+      visibility = projects.Visibility.Public,
+      forksCount = ForksCount(1),
+      keywords = Set.empty,
+      members = Set.empty,
+      images = Nil
+    )
+
+  private def createNonRenkuProject(info: GitLabProjectInfo) =
+    info.maybeParentPath match {
+      case Some(parentPath) =>
+        testentities.NonRenkuProject.WithParent(
+          path = info.path,
+          name = info.name,
+          maybeDescription = info.maybeDescription,
+          dateCreated = info.dateCreated,
+          maybeCreator = None,
+          visibility = info.visibility,
+          forksCount = ForksCount(1),
+          keywords = info.keywords,
+          members = Set.empty,
+          images = info.avatarUrl.toList,
+          parent = createNonRenkuProjectFromPath(parentPath)
+        )
+      case None =>
+        testentities.NonRenkuProject.WithoutParent(
+          path = info.path,
+          name = info.name,
+          maybeDescription = info.maybeDescription,
+          dateCreated = info.dateCreated,
+          maybeCreator = None,
+          visibility = info.visibility,
+          forksCount = ForksCount(1),
+          keywords = info.keywords,
+          members = Set.empty,
+          images = info.avatarUrl.toList
+        )
+    }
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
-
-    def toCLIPayloadPerson(name: Name): entities.Person = gitLabPerson match {
-      case _: ProjectMemberNoEmail =>
-        personEntities.generateOne
-          .copy(
-            name = name,
-            maybeEmail = None,
-            maybeGitLabId = None
-          )
-          .to[entities.Person]
-      case member: ProjectMemberWithEmail =>
-        personEntities.generateOne
-          .copy(
-            name = name,
-            maybeEmail = member.email.some,
-            maybeGitLabId = None
-          )
-          .to[entities.Person]
-    }
 
     lazy val toPerson: entities.Person = gitLabPerson match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
@@ -1316,59 +1177,83 @@ class ProjectSpec
         )
     }
 
-    def chooseSomeName =
-      if (Random.nextBoolean()) gitLabPerson.name
-      else persons.Name(gitLabPerson.username.value)
+    lazy val toTestPerson: testentities.Person = gitLabPerson match {
+      case ProjectMemberNoEmail(_, username, gitLabId) =>
+        testentities.Person(
+          persons.Name(username.value),
+          maybeEmail = None,
+          gitLabId.some,
+          maybeOrcidId = None,
+          maybeAffiliation = None
+        )
+      case ProjectMemberWithEmail(_, username, gitLabId, email) =>
+        testentities.Person(persons.Name(username.value),
+                            email.some,
+                            gitLabId.some,
+                            maybeOrcidId = None,
+                            maybeAffiliation = None
+        )
+    }
   }
 
-  private def activityWith(author: entities.Person): projects.DateCreated => (entities.Activity, entities.StepPlan) =
+  private implicit class CliProjectOps(self: CliProject) {
+    def collectAllPersons: Set[CliPerson] =
+      self.asFlattenedJsonLD.cursor.as[List[CliPerson]].fold(throw _, _.toSet)
+  }
+
+  private def activityWith(
+      author: testentities.Person
+  ): projects.DateCreated => testentities.Activity =
     dateCreated => {
-      val activity = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
-      activity.to[entities.Activity].copy(author = author) -> activity.plan.to[entities.StepPlan]
+      val activity =
+        activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()), cliShapedPersons)(
+          dateCreated
+        ).generateOne
+      activity.copy(author = author)
     }
 
   private def activityWithAssociationAgent(
-      agent: entities.Person
-  ): projects.DateCreated => (entities.Activity, entities.StepPlan) =
+      agent: testentities.Person
+  ): projects.DateCreated => testentities.Activity =
     dateCreated => {
-      val activity         = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
-      val entitiesActivity = activity.to[entities.Activity]
-      val entitiesPlan     = activity.plan.to[entities.StepPlan]
-      entitiesActivity.copy(association =
-        entities.Association.WithPersonAgent(entitiesActivity.association.resourceId, agent, entitiesPlan.resourceId)
-      ) -> entitiesPlan
+      val activity = activityEntities(stepPlanEntities(planCommands, cliShapedPersons).map(_.removeCreators()),
+                                      cliShapedPersons
+      )(dateCreated).generateOne
+
+      activity.copy(associationFactory = a => testentities.Association.WithPersonAgent(a, agent, activity.plan))
     }
 
   private def datasetWith(
-      creators: NonEmptyList[entities.Person]
-  ): projects.DateCreated => entities.Dataset[entities.Dataset.Provenance] = dateCreated => {
-    val ds = datasetEntities(provenanceNonModified)(renkuUrl)(dateCreated).generateOne
-      .to[entities.Dataset[entities.Dataset.Provenance]]
-    addTo(ds, creators)
+      creator: testentities.Person,
+      other:   testentities.Person*
+  ): projects.DateCreated => testentities.Dataset[testentities.Dataset.Provenance] = dateCreated => {
+    val ds = datasetEntities(provenanceNonModified(cliShapedPersons))(renkuUrl)(dateCreated).generateOne
+
+    addTo(ds, NonEmptyList.of(creator, other: _*))
   }
 
   private def addTo(
-      dataset:  entities.Dataset[entities.Dataset.Provenance],
-      creators: NonEmptyList[entities.Person]
-  ): entities.Dataset[entities.Dataset.Provenance] =
+      dataset:  testentities.Dataset[testentities.Dataset.Provenance],
+      creators: NonEmptyList[testentities.Person]
+  ): testentities.Dataset[testentities.Dataset.Provenance] =
     dataset.copy(provenance = dataset.provenance match {
-      case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators.sortBy(_.name))
-      case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators.sortBy(_.name))
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators.sortBy(_.name))
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators.sortBy(_.name))
-      case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.Internal         => p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedExternal => p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedInternalAncestorInternal =>
+        p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.ImportedInternalAncestorExternal =>
+        p.copy(creators = creators.sortBy(_.name))
+      case p: testentities.Dataset.Provenance.Modified => p.copy(creators = creators.sortBy(_.name))
     })
 
-  private def replaceAgent(activity: entities.Activity, newAgent: entities.Person): entities.Activity =
-    ActivityLens.activityAssociationAgent.modify(_.map(_ => newAgent))(activity)
+  private def replaceAgent(activity: testentities.Activity, newAgent: testentities.Person): testentities.Activity =
+    testentities.Activity.Lenses.associationAgent.set(Right(newAgent))(activity)
 
-  private def byEmail(member: ProjectMemberWithEmail): entities.Person => Boolean =
-    _.maybeEmail.contains(member.email)
+  private def byEmail(member: ProjectMemberWithEmail): testentities.Person => Boolean =
+    _.maybeEmail.exists(_ == member.email)
 
-  private def merge(person: entities.Person, member: ProjectMemberWithEmail): entities.Person =
-    person
-      .add(member.gitLabId)
-      .copy(name = member.name, maybeEmail = member.email.some)
+  private def merge(person: testentities.Person, member: ProjectMemberWithEmail): testentities.Person =
+    person.copy(maybeGitLabId = member.gitLabId.some, name = member.name, maybeEmail = member.email.some)
 
   private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Path]] =
     Lens[GitLabProjectInfo, Option[projects.Path]](_.maybeParentPath)(mpp => _.copy(maybeParentPath = mpp))

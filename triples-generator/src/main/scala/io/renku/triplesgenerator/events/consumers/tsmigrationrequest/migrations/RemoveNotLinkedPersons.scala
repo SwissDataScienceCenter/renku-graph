@@ -35,7 +35,7 @@ private object RemoveNotLinkedPersons {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Removed not linked Persons")
+  private lazy val name = Migration.Name("removed not linked persons")
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
     Prefixes of schema -> "schema",

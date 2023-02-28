@@ -22,13 +22,16 @@ import cats.Applicative
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
+import io.circe.Encoder
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{persons, projects}
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
-import org.http4s.{EntityEncoder, HttpApp, HttpRoutes, Response}
+import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, Request, Response}
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 private[gitlab] trait Http4sDslUtils {
@@ -68,6 +71,18 @@ private[gitlab] trait Http4sDslUtils {
     import dsl._
 
     payload.map(Ok(_)).getOrElse(Response.notFound[F].pure[F])
+  }
+
+  def OkWithTotalHeader[F[_]: Applicative, A](
+      req: Request[F]
+  )(entities: List[A])(implicit enc: Encoder[A]): F[Response[F]] = {
+    val dsl = new Http4sDsl[F] {}
+    import dsl._
+
+    val perPage    = req.params.getOrElse("per_page", "20").toInt
+    val totalPages = (entities.size / perPage) + (if (entities.size % perPage == 0) 0 else 1)
+
+    Ok(entities).map(_.withHeaders(Header.Raw(ci"X-Total-Pages", totalPages.toString)))
   }
 
   def enableLogging[F[_]: Async: Logger](app: HttpApp[F]): HttpApp[F] = {

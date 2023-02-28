@@ -20,11 +20,14 @@ package io.renku.graph.model.testentities
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.cli.model.CliCompositePlan
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl, entities, plans}
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name}
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
+import monocle.Lens
 
 sealed trait CompositePlan extends Plan {
   override type PlanGroup         = CompositePlan
@@ -47,6 +50,23 @@ sealed trait CompositePlan extends Plan {
   def modify(f: PlanType => PlanType): PlanType
 
   final def widen: Plan = this
+
+  final def recursivePlans: List[Plan] =
+    plans.toList.flatMap {
+      case cp: CompositePlan => cp :: cp.recursivePlans
+      case sp: StepPlan      => List(sp)
+    }
+
+  def fold[P](
+      cpnm: CompositePlan.NonModified => P,
+      cpm:  CompositePlan.Modified => P
+  ): P
+
+  final def fold[P](spnm: StepPlan.NonModified => P,
+                    spm:  StepPlan.Modified => P,
+                    cpnm: CompositePlan.NonModified => P,
+                    cpm:  CompositePlan.Modified => P
+  ): P = fold(cpnm, cpm)
 }
 
 object CompositePlan {
@@ -63,6 +83,8 @@ object CompositePlan {
       links:            List[ParameterLink]
   ) extends CompositePlan {
     override type PlanType = NonModified
+
+    def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpnm(this)
 
     def modify(f: NonModified => NonModified): NonModified =
       f(this)
@@ -123,6 +145,9 @@ object CompositePlan {
             )
           )
           .fold(errors => sys.error(errors.intercalate("; ")), _.asInstanceOf[entities.CompositePlan.NonModified])
+
+    implicit def toCliCompositePlan[P <: NonModified](implicit renkuUrl: RenkuUrl): P => CliCompositePlan =
+      CliConverters.from(_)
   }
 
   case class Modified(
@@ -140,6 +165,8 @@ object CompositePlan {
       with Plan.Modified {
     override type PlanType   = Modified
     override type ParentType = CompositePlan
+
+    def fold[P](cpnm: CompositePlan.NonModified => P, cpm: CompositePlan.Modified => P): P = cpm(this)
 
     lazy val topmostParent: CompositePlan = parent match {
       case p: NonModified => p
@@ -227,12 +254,18 @@ object CompositePlan {
             )
           )
           .fold(errors => sys.error(errors.intercalate("; ")), _.asInstanceOf[entities.CompositePlan.Modified])
+
+    def toCliCompositePlan(implicit renkuUrl: RenkuUrl): Modified => CliCompositePlan =
+      CliConverters.from(_)
   }
 
   implicit def toEntitiesCompositePlan(implicit renkuUrl: RenkuUrl): CompositePlan => entities.CompositePlan = {
     case p: NonModified => NonModified.toEntitiesCompositePlan(renkuUrl)(p)
     case p: Modified    => Modified.toEntitiesCompositePlan(renkuUrl)(p)
   }
+
+  implicit def toCliCompositePlan(implicit renkuUrl: RenkuUrl): CompositePlan => CliCompositePlan =
+    CliConverters.from(_)
 
   // maybe just use the project encoder on the production entities
   implicit def jsonLDEncoder(implicit
@@ -245,4 +278,11 @@ object CompositePlan {
       val children = cp.plans.map(_.asJsonLD)
       (cp.to[entities.CompositePlan].asJsonLD :: children).asJsonLD
     }
+
+  object Lenses {
+    val creators: Lens[CompositePlan, List[Person]] =
+      Lens[CompositePlan, List[Person]](_.fold(_.creators, _.creators))(creators =>
+        plan => plan.fold(_.copy(creators = creators), _.copy(creators = creators))
+      )
+  }
 }

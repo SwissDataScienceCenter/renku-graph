@@ -84,15 +84,15 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
       HttpRoutes.of {
         case GET -> Root / UserGitLabId(id) =>
           query(findPersonById(id)).flatMap(OkOrNotFound(_))
-        case GET -> Root / UserGitLabId(id) / "projects" =>
+        case req @ GET -> Root / UserGitLabId(id) / "projects" =>
           maybeAuthedReq match {
             case Some(AuthedUser(userId, _)) =>
-              if (id == userId) query(projectsFor(id.some)).flatMap(Ok(_))
-              else Ok(List.empty[Project])
+              if (id == userId) query(projectsFor(id.some)).flatMap(OkWithTotalHeader(req))
+              else OkWithTotalHeader(req)(List.empty[Project])
             case Some(AuthedProject(projectId, _)) =>
-              query(findProjectById(projectId)).map(_.toList).flatMap(Ok(_))
+              query(findProjectById(projectId)).map(_.toList).flatMap(OkWithTotalHeader(req))
             case None =>
-              query(projectsFor(id.some)).flatMap(Ok(_))
+              query(projectsFor(id.some)).flatMap(OkWithTotalHeader(req))
           }
       }
     }
@@ -108,7 +108,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
         case GET -> Root / ProjectPath(path) / ("users" | "members") =>
           query(findProjectByPath(path, maybeAuthedReq))
-            .map(_.toList.flatMap(_.entitiesProject.members.toList))
+            .map(_.toList.flatMap(_.members.toList))
             .flatMap(Ok(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" =>

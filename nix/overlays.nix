@@ -2,10 +2,10 @@
   # Fix the version of Jena explicitely (nixpkgs-22.05 comes with 4.3.1)
   jena = self: super: {
     apache-jena-fuseki = super.apache-jena-fuseki.overrideAttrs (old: rec {
-      version = "4.6.1";
+      version = "4.7.0";
       src = super.fetchurl {
         url = "https://dlcdn.apache.org/jena/binaries/apache-jena-fuseki-${version}.tar.gz";
-        sha256 = "sha256-LUaNpYcegMxd7WX3DCvgb2Hxsre4EHp7GkASzJfwaM0=";
+        sha256 = "sha256-rIp2oUzR8en248c7UFcf1bN6R91BzgUOoJtpBkaa/ig=";
       };
     });
   };

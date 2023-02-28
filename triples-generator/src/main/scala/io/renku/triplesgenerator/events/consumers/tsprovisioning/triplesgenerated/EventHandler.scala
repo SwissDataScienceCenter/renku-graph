@@ -19,19 +19,16 @@
 package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.triplesgenerated
 
+import cats.{NonEmptyParallel, Parallel, Show}
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect._
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel, Show}
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
-import io.renku.config.ConfigLoader
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -81,8 +78,6 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private object EventHandler {
-  import ConfigLoader.find
-  import eu.timepit.refined.pureconfig._
 
   def apply[F[
       _
@@ -91,9 +86,9 @@ private object EventHandler {
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     tsReadinessChecker         <- TSReadinessForEventsChecker[F]
-    maxConcurrentProcesses     <- find[F, Int Refined Positive]("transformation-processes-number", config)
+    maxConcurrentProcesses     <- ConcurrentProcessesNumber[F](config)
     eventProcessor             <- EventProcessor[F]
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses.asRefined)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
                               EventBodyDeserializer[F],

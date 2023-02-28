@@ -62,7 +62,7 @@ object model {
         identifier:          datasets.Identifier,
         name:                datasets.Name,
         visibility:          projects.Visibility,
-        date:                datasets.Date,
+        date:                datasets.CreatedOrPublished,
         creators:            List[persons.Name],
         keywords:            List[datasets.Keyword],
         maybeDescription:    Option[datasets.Description],
@@ -70,7 +70,7 @@ object model {
         exemplarProjectPath: projects.Path
     ) extends Entity {
       override type Name = datasets.Name
-      override type Date = datasets.Date
+      override type Date = datasets.CreatedOrPublished
     }
 
     final case class Workflow(

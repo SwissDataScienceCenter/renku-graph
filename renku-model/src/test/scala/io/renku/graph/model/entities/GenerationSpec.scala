@@ -18,39 +18,45 @@
 
 package io.renku.graph.model.entities
 
-import cats.syntax.all._
+import io.renku.cli.model.CliGeneration
+import io.renku.cli.model.generators.GenerationGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities}
-import io.renku.jsonld.JsonLD
-import io.renku.jsonld.JsonLDDecoder._
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.entities
+import io.renku.graph.model.tools.AdditionalMatchers
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class GenerationSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
-  "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
+  "fromCli" should {
+    "fail on input entities" in {
+      val cliGeneration = GenerationGenerators.generationGen(activityResourceIdGen).generateOne
+      val invalidGen    = CliGeneration.Lenses.entityGenerationIds.set(Nil)(cliGeneration)
+      val result        = entities.Generation.fromCli(invalidGen)
+      result should beInvalidWithMessageIncluding(
+        "Expected output entity for a Generation, but got: InputEntity"
+      )
+    }
 
-    "turn JsonLD Generation entity into the Generation object " in {
+    "turn valid CliGeneration into Generation object" in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity1 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
-        val activity2 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
+        val testActivity =
+          activityEntities(stepPlanEntities(planCommands, cliShapedPersons, commandOutput), cliShapedPersons)(
+            projectCreatedDates().generateOne
+          ).generateOne
 
-        JsonLD
-          .arr(activity1.asJsonLD, activity2.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Generation]](
-            decodeList(entities.Generation.decoder(activity1.resourceId))
-          ) shouldBe activity1.generations.asRight
+        val generation    = testActivity.generations.head
+        val cliGeneration = generation.to[CliGeneration]
+        entities.Generation.fromCli(cliGeneration) shouldMatchToValid generation.to[entities.Generation]
       }
     }
   }

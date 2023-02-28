@@ -22,9 +22,9 @@ package awaitinggeneration
 import Generators.sendingResults
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.consumers.subscriptions._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.Generators._
+import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.events.EventMessage

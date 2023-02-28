@@ -119,7 +119,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private lazy val criterias: Gen[Criteria] = for {
     maybeQuery    <- nonEmptyStrings().toGeneratorOf(Filters.Query).toGeneratorOfOptions
-    sortingBy     <- sortBys(Criteria.Sorting)
+    sortingBy     <- sortBys(Criteria.Sort)
     paging        <- pagingRequests
     maybeAuthUser <- authUsers.toGeneratorOfOptions
   } yield Criteria(Filters(maybeQuery), sortingBy, paging, maybeAuthUser)

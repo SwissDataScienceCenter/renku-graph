@@ -20,14 +20,18 @@ package io.renku.events.consumers.subscriptions
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.literal._
-import io.renku.events.Generators.categoryNames
+import io.circe.syntax._
+import io.renku.events.{CategoryName, Subscription}
+import io.renku.events.Generators._
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.generators.Generators.exceptions
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
+import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -49,18 +53,20 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
   "notifyAvailability" should {
 
     "send subscription for events" in new TestCase {
-      val payload = jsons.generateOne
+
+      val payload = payloads.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> IO.unit)
 
-      subscriber.renewSubscription().unsafeRunSync() shouldBe ((): Unit)
+      subscriber.renewSubscription().unsafeRunSync() shouldBe ()
     }
 
     "fail if composing the subscription payload fails" in new TestCase {
+
       val exception = exceptions.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(
-        exception.raiseError[IO, Json]
+        exception.raiseError[IO, TestSubscriptionPayload]
       )
 
       intercept[Exception] {
@@ -69,11 +75,12 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
     }
 
     "fail if posting the subscription payload fails" in new TestCase {
-      val payload = jsons.generateOne
+
+      val payload = payloads.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       val exception = exceptions.generateOne
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         subscriber.renewSubscription().unsafeRunSync()
@@ -85,23 +92,17 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
 
     "send/resend subscription for events" in new TestCase {
 
-      val subscriberId  = subscriberIds.generateOne
-      val subscriberUrl = subscriberUrls.generateOne
-      val payload = jsons.generateOne.deepMerge(json"""{
-        "subscriber": {
-          "id": ${subscriberId.value},
-          "url": ${subscriberUrl.value}
-        }
-      }""")
+      val payload = payloads.generateOne
+
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> IO.unit)
 
       subscriber.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
+          Info(s"$categoryName: Subscribed for events with ${payload.subscriber.url}, id = ${payload.subscriber.id}")
         )
       }
     }
@@ -110,46 +111,32 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
 
       val exception = exceptions.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(
-        exception.raiseError[IO, Json]
+        exception.raiseError[IO, TestSubscriptionPayload]
       )
-      val subscriberId  = subscriberIds.generateOne
-      val subscriberUrl = subscriberUrls.generateOne
-      val payload = jsons.generateOne.deepMerge(json"""{
-        "subscriber": {
-          "id": ${subscriberId.value},
-          "url": ${subscriberUrl.value}
-        }
-      }""")
+      val payload = payloads.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> IO.unit)
 
       subscriber.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: Composing subscription payload failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
+          Info(s"$categoryName: Subscribed for events with ${payload.subscriber.url}, id = ${payload.subscriber.id}")
         )
       }
     }
 
     "log an error and retry if sending subscription payload fails" in new TestCase {
 
-      val subscriberId  = subscriberIds.generateOne
-      val subscriberUrl = subscriberUrls.generateOne
-      val payload = jsons.generateOne.deepMerge(json"""{
-        "subscriber": {
-          "id": ${subscriberId.value},
-          "url": ${subscriberUrl.value}
-        }
-      }""")
+      val payload = payloads.generateOne
       payloadComposer.`expected prepareSubscriptionPayload default response`.set(payload.pure[IO])
 
       val exception = exceptions.generateOne
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
-      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload.asJson -> IO.unit)
 
       subscriber.run().unsafeRunAndForget()
 
@@ -157,7 +144,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
         logger.loggedOnly(
           Error(s"$categoryName: Subscribing for events failed", exception),
           Error(s"$categoryName: Subscribing for events failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
+          Info(s"$categoryName: Subscribed for events with ${payload.subscriber.url}, id = ${payload.subscriber.id}")
         )
       }
     }
@@ -166,11 +153,11 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
 
-    val payloadComposer = new SubscriptionPayloadComposer[IO] {
-      val `expected prepareSubscriptionPayload responses`        = new ConcurrentLinkedQueue[IO[Json]]()
-      val `expected prepareSubscriptionPayload default response` = new AtomicReference[IO[Json]]()
+    val payloadComposer = new SubscriptionPayloadComposer[IO, TestSubscriptionPayload] {
+      val `expected prepareSubscriptionPayload responses` = new ConcurrentLinkedQueue[IO[TestSubscriptionPayload]]()
+      val `expected prepareSubscriptionPayload default response` = new AtomicReference[IO[TestSubscriptionPayload]]()
 
-      override def prepareSubscriptionPayload(): IO[Json] =
+      override def prepareSubscriptionPayload(): IO[TestSubscriptionPayload] =
         Option(`expected prepareSubscriptionPayload responses`.poll())
           .getOrElse(`expected prepareSubscriptionPayload default response`.get())
     }
@@ -188,11 +175,33 @@ class SubscriptionMechanismSpec extends AnyWordSpec with IOSpec with Eventually 
     }
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val subscriber = new SubscriptionMechanismImpl(categoryName,
-                                                   payloadComposer,
-                                                   subscriptionSender,
-                                                   initialDelay = 5 millis,
-                                                   renewDelay = 500 millis
+    val subscriber = new SubscriptionMechanismImpl[IO, TestSubscriptionPayload](categoryName,
+                                                                                payloadComposer,
+                                                                                subscriptionSender,
+                                                                                initialDelay = 5 millis,
+                                                                                renewDelay = 500 millis
     )
+  }
+
+  private lazy val payloads: Gen[TestSubscriptionPayload] =
+    (categoryNames, subscriberUrls, subscriberIds).mapN((category, url, id) =>
+      TestSubscriptionPayload(category, TestSubscriber(url, id))
+    )
+}
+
+private final case class TestSubscriber(url: SubscriberUrl, id: SubscriberId) extends Subscription.Subscriber
+private final case class TestSubscriptionPayload(categoryName: CategoryName, subscriber: TestSubscriber)
+    extends Subscription
+
+private object TestSubscriptionPayload {
+  implicit val encoder: Encoder[TestSubscriptionPayload] = Encoder.instance {
+    case TestSubscriptionPayload(category, TestSubscriber(url, id)) =>
+      json"""{
+        "categoryName": $category,
+        "subscriber":   {
+          "url": $url,
+          "id":  $id
+        }
+      }"""
   }
 }

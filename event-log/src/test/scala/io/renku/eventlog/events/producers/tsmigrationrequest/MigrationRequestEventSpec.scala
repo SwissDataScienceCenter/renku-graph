@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.consumers.subscriptions.subscriberUrls
+import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import org.scalacheck.Gen

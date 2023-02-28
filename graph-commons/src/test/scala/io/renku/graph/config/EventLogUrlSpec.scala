@@ -24,11 +24,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class EventLogUrlSpec extends AnyWordSpec with should.Matchers {
+class EventLogUrlSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "apply" should {
 
@@ -44,13 +45,11 @@ class EventLogUrlSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      EventLogUrl[Try](config) shouldBe Success(EventLogUrl(url))
+      EventLogUrl[Try](config).success.value shouldBe EventLogUrl(url)
     }
 
     "fail if there's no 'services.event-log.url' entry" in {
-      val Failure(exception) = EventLogUrl[Try](ConfigFactory.empty())
-
-      exception shouldBe an[ConfigLoadingException]
+      EventLogUrl[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
     }
   }
 }

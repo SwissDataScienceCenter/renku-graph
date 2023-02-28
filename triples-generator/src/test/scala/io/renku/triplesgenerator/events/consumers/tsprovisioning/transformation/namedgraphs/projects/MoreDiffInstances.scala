@@ -23,7 +23,5 @@ import io.renku.graph.model.entities.DiffInstances
 
 trait MoreDiffInstances extends DiffInstances {
 
-  implicit val projectMutableDataDiff: Diff[ProjectMutableData] =
-    Diff.derived[ProjectMutableData]
-
+  implicit val projectMutableDataDiff: Diff[ProjectMutableData] = Diff.derived[ProjectMutableData]
 }

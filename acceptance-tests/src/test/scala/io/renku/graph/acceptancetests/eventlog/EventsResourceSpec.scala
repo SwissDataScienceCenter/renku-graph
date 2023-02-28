@@ -16,41 +16,38 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.eventlog
+package io.renku.graph.acceptancetests
+package eventlog
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
+import data.Project.Statistics.CommitsCount
+import data._
+import flows.TSProvisioning
 import io.circe.{Decoder, Json}
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
-import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, renkuProjectEntities}
-import io.renku.graph.model.testentities.personEntities
-import io.renku.graph.model.{GraphClass, events}
+import io.renku.graph.model.testentities.cliShapedPersons
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, removeMembers, renkuProjectEntities}
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.server.security.model.AuthUser
-import io.renku.jsonld.syntax._
 import org.http4s.Status._
+import tooling.{AcceptanceSpec, ApplicationServices}
 
-class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSData with TSProvisioning {
-
-  private implicit val graph: GraphClass = GraphClass.Default
+class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 
     Scenario("As a user I would like to see all events from the project with the given path") {
-      val commits: NonEmptyList[events.CommitId] = commitIds.generateNonEmptyList(max = 6)
-      val user:    AuthUser                      = authUsers.generateOne
+
+      val commits = commitIds.generateNonEmptyList(max = 6)
+      val user    = authUsers.generateOne
       val project = dataProjects(
-        renkuProjectEntities(anyVisibility)
-          .map(_.copy(maybeCreator = personEntities(user.id.some).generateOne.some)),
+        renkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).modify(removeMembers()),
         CommitsCount(commits.size)
-      ).generateOne
+      ).map(replaceCreatorFrom(cliShapedPersons.generateOne, user.id))
+        .map(addMemberWithId(user.id))
+        .generateOne
 
       Given("there are no events for the given project in EL")
       val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
@@ -60,7 +57,7 @@ class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TS
       And("the resource returns OK with an empty array")
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commits.toList: _*)
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
 
       When("new events are added to the store")
       `data in the Triples Store`(project, commits, user.accessToken)

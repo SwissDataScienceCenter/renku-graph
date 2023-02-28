@@ -22,13 +22,12 @@ import PlanLens.{getPlanDerivation, setPlanDerivation}
 import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
-import io.renku.graph.model
-import io.renku.graph.model._
+import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.graph.model._
 import io.renku.jsonld.ontology.{ObjectProperty, _}
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
@@ -50,6 +49,12 @@ sealed trait Project extends Product with Serializable {
   val plans:      List[Plan]
   lazy val namespaces:     List[Namespace]       = path.toNamespaces
   lazy val identification: ProjectIdentification = ProjectIdentification(resourceId, path)
+
+  def fold[P](rnp:  RenkuProject.WithoutParent => P,
+              rwp:  RenkuProject.WithParent => P,
+              nrnp: NonRenkuProject.WithoutParent => P,
+              nrwp: NonRenkuProject.WithParent => P
+  ): P
 }
 
 sealed trait NonRenkuProject extends Project with Product with Serializable {
@@ -75,7 +80,13 @@ object NonRenkuProject {
                                  keywords:         Set[Keyword],
                                  members:          Set[Person],
                                  images:           List[Image]
-  ) extends NonRenkuProject
+  ) extends NonRenkuProject {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = nrnp(this)
+  }
 
   final case class WithParent(resourceId:       ResourceId,
                               path:             Path,
@@ -89,7 +100,13 @@ object NonRenkuProject {
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends NonRenkuProject
-      with Parent
+      with Parent {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = nrwp(this)
+  }
 }
 
 sealed trait RenkuProject extends Project with Product with Serializable {
@@ -117,7 +134,13 @@ object RenkuProject {
                                  datasets:         List[Dataset[Dataset.Provenance]],
                                  plans:            List[Plan],
                                  images:           List[Image]
-  ) extends RenkuProject
+  ) extends RenkuProject {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = rnp(this)
+  }
 
   object WithoutParent extends ProjectFactory {
 
@@ -140,7 +163,7 @@ object RenkuProject {
       validateDates(dateCreated, activities, datasets, plans),
       validatePlansDates(plans),
       validateDatasets(datasets),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities))
+      updatePlansOriginalId(plans)
     ).mapN { (_, _, _, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
@@ -221,7 +244,13 @@ object RenkuProject {
                               parentResourceId: ResourceId,
                               images:           List[Image]
   ) extends RenkuProject
-      with Parent
+      with Parent {
+    override def fold[P](rnp:  RenkuProject.WithoutParent => P,
+                         rwp:  RenkuProject.WithParent => P,
+                         nrnp: entities.NonRenkuProject.WithoutParent => P,
+                         nrwp: NonRenkuProject.WithParent => P
+    ): P = rwp(this)
+  }
 
   object WithParent extends ProjectFactory {
 
@@ -244,7 +273,7 @@ object RenkuProject {
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
       validatePlansDates(plans),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities)),
+      updatePlansOriginalId(plans),
       validateCompositePlanData(plans)
     ) mapN { (_, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
@@ -295,16 +324,16 @@ object RenkuProject {
       }
     }
 
-    protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
-      def findTopParent(derivedFrom: model.plans.DerivedFrom): ValidatedNel[String, Plan] =
-        findParentPlan(derivedFrom, plans).andThen { parentPlan =>
+    protected def updatePlansOriginalId(planList: List[Plan]): ValidatedNel[String, List[Plan]] = {
+      def findTopParent(derivedFrom: plans.DerivedFrom): ValidatedNel[String, Plan] =
+        findParentPlan(derivedFrom, planList).andThen { parentPlan =>
           getPlanDerivation
             .get(parentPlan)
             .map(derivation => findTopParent(derivation.derivedFrom))
             .getOrElse(parentPlan.validNel)
         }
 
-      plans.traverse { plan =>
+      planList.traverse { plan =>
         getPlanDerivation
           .get(plan)
           .map(derivation =>
@@ -316,42 +345,17 @@ object RenkuProject {
       }
     }
 
-    // The Plan dateCreated is updated only because of a bug on CLI which can produce Activities with dates before the Plan
-    // Though CLI fixed the issue for new projects, there still might be old ones affected with the issue.
-    // CLI is going to add a migration which will fix the old projects so this update won't be needed.
-    // See https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
-    protected def updatePlansDateCreated(plans: List[Plan], activities: List[Activity]): List[Plan] = {
-
-      def findMinActivityDate(planId: model.plans.ResourceId): Option[model.activities.StartTime] =
-        activities.collect {
-          case a if a.association.planId == planId => a.startTime
-        } match {
-          case Nil   => None
-          case dates => dates.min.some
-        }
-
-      plans
-        .map(p =>
-          findMinActivityDate(p.resourceId) match {
-            case None                                                                                => p
-            case Some(minActivityDate) if (p.dateCreated.value compareTo minActivityDate.value) <= 0 => p
-            case Some(minActivityDate) =>
-              PlanLens.planDateCreated.set(model.plans.DateCreated(minActivityDate.value))(p)
-          }
-        )
-    }
-
-    private def findParentPlan(derivedFrom: model.plans.DerivedFrom, plans: List[Plan]) =
-      Validated.fromOption(plans.find(_.resourceId.value == derivedFrom.value),
+    private def findParentPlan(derivedFrom: plans.DerivedFrom, planList: List[Plan]) =
+      Validated.fromOption(planList.find(_.resourceId.value == derivedFrom.value),
                            NonEmptyList.one(show"Cannot find parent plan $derivedFrom")
       )
 
-    protected def validatePlansDates(plans: List[Plan]): ValidatedNel[String, Unit] =
-      plans.traverse { plan =>
+    protected def validatePlansDates(planList: List[Plan]): ValidatedNel[String, Unit] =
+      planList.traverse { plan =>
         getPlanDerivation
           .get(plan)
           .map { derivation =>
-            findParentPlan(derivation.derivedFrom, plans)
+            findParentPlan(derivation.derivedFrom, planList)
               .andThen(parentPlan =>
                 Validated.condNel[String, Plan](
                   (plan.dateCreated.value compareTo parentPlan.dateCreated.value) >= 0,
@@ -577,8 +581,10 @@ object Project {
       }
   }
 
-  def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
-    ProjectJsonLDDecoder(gitLabInfo)
+  def fromCli(cliProject: CliProject, allPersons: Set[CliPerson], gitLabInfo: GitLabProjectInfo)(implicit
+      renkuUrl: RenkuUrl
+  ): ValidatedNel[String, Project] =
+    CliProjectConverter.fromCli(cliProject, allPersons, gitLabInfo)
 
   object Ontology {
 

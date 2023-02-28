@@ -19,17 +19,18 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
+import data.{addMemberWithId, dataProjects}
+import flows.TSProvisioning
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
+import io.renku.graph.model.testentities.{cliShapedPersons, removeMembers}
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.scalatest.concurrent.Eventually
+import testing.AcceptanceTestPatience
+import tooling.{AcceptanceSpec, ApplicationServices}
 
 class FastTractEventRouteSpec
     extends AcceptanceSpec
@@ -42,12 +43,15 @@ class FastTractEventRouteSpec
 
     Scenario("Project with no events in the TS") {
 
-      val user     = authUsers.generateOne
-      val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
-      val commitId = commitIds.generateOne
+      val user = authUsers.generateOne
+      val project = dataProjects(
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
+      ).map(addMemberWithId(user.id)).generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       gitLabStub.addAuthenticated(user)
+
+      val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
 
       And("Triples are failing on generation")
@@ -66,9 +70,9 @@ class FastTractEventRouteSpec
 
       Then("the project data should exist in the KG")
       eventually {
-        val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}")
-        projectDetailsResponse.status                                        shouldBe Ok
-        projectDetailsResponse.jsonBody.hcursor.downField("path").as[String] shouldBe project.path.show.asRight
+        val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}")
+        response.status                                        shouldBe Ok
+        response.jsonBody.hcursor.downField("path").as[String] shouldBe project.path.show.asRight
       }
     }
   }

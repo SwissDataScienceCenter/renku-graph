@@ -27,8 +27,8 @@ import io.renku.graph.model.GraphModelGenerators.projectResourceIds
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -50,13 +50,18 @@ class SearchInfoFetcherSpec
       // other project DS
       insert(projectsDataset, searchInfoObjectsGen.generateOne.asQuads)
 
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map { info =>
-        info.copy(creators = info.creators.sortBy(_.name),
-                  keywords = info.keywords.sorted,
-                  images = info.images.sortBy(_.position),
-                  links = info.links.sortBy(_.projectId)
-        )
-      }
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
+    }
+
+    "work if there are ',' in names" in new TestCase {
+
+      val infos = searchInfoObjectsGen(withLinkTo = projectId)
+        .map(_.copy(creators = personInfos.map(_.copy(name = "name, surname")).generateNonEmptyList(max = 1)))
+        .generateFixedSizeList(ofSize = 1)
+
+      insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
+
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
     }
 
     "return nothing if no Datasets for the Project" in new TestCase {
@@ -75,4 +80,10 @@ class SearchInfoFetcherSpec
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val fetcher = new SearchInfoFetcherImpl[IO](projectsDSConnectionInfo)
   }
+
+  private def orderValues(info: SearchInfo) = info.copy(creators = info.creators.sortBy(_.name),
+                                                        keywords = info.keywords.sorted,
+                                                        images = info.images.sortBy(_.position),
+                                                        links = info.links.sortBy(_.projectId)
+  )
 }

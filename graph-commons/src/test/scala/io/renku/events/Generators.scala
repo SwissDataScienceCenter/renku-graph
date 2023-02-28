@@ -19,12 +19,16 @@
 package io.renku.events
 
 import io.renku.events
+import io.renku.generators.Generators.{httpUrls, jsons, nonBlankStrings, nonEmptyStrings, positiveInts}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonBlankStrings, nonEmptyStrings}
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
+import Subscription._
+import cats.syntax.all._
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import io.renku.microservices.MicroserviceIdentifier
 
 object Generators {
 
@@ -54,4 +58,21 @@ object Generators {
     event   <- jsons
     payload <- zippedContents
   } yield events.EventRequestContent.WithPayload(event, payload)
+
+  implicit val subscriberIds:  Gen[SubscriberId]  = Gen.uuid map (_ => SubscriberId(MicroserviceIdentifier.generate))
+  implicit val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+  implicit val subscriberCapacities: Gen[SubscriberCapacity] = positiveInts().map(v => SubscriberCapacity(v.value))
+
+  val noCapacitySubscribers: Gen[DefaultSubscriber.WithoutCapacity] =
+    (subscriberUrls, subscriberIds).mapN(DefaultSubscriber.WithoutCapacity.apply)
+  val capacitySubscribers: Gen[DefaultSubscriber.WithCapacity] =
+    (subscriberUrls, subscriberIds, subscriberCapacities).mapN(DefaultSubscriber.WithCapacity.apply)
+  val subscribers: Gen[DefaultSubscriber] = Gen.oneOf(noCapacitySubscribers, capacitySubscribers)
+
+  val noCapacitySubscriptionPayloads: Gen[DefaultSubscription] =
+    (categoryNames, noCapacitySubscribers).mapN(DefaultSubscription.apply)
+  val capacitySubscriptionPayloads: Gen[DefaultSubscription] =
+    (categoryNames, capacitySubscribers).mapN(DefaultSubscription.apply)
+  val subscriptionPayloads: Gen[DefaultSubscription] =
+    Gen.oneOf(noCapacitySubscriptionPayloads, capacitySubscriptionPayloads)
 }

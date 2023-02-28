@@ -38,7 +38,7 @@ import io.renku.http.client._
 import io.renku.http.rest.Links.{Href, Link, Rel}
 import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
-import io.renku.http.rest.{Links, SortBy, paging}
+import io.renku.http.rest.{Links, SortBy, Sorting, paging}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
@@ -189,10 +189,10 @@ object CommonGraphGenerators {
 
   implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
 
-  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] = for {
+  def sortBys[T <: SortBy](sortBy: T): Gen[Sorting[T]] = for {
     property  <- Gen.oneOf(sortBy.properties.toList)
     direction <- sortingDirections
-  } yield sortBy.By(property, direction)
+  } yield Sorting(sortBy.By(property, direction))
 
   object TestSort extends SortBy {
     type PropertyType = TestProperty
@@ -203,7 +203,7 @@ object CommonGraphGenerators {
     override val properties: Set[TestProperty] = Set(Name, Email)
   }
 
-  def testSortBys: Gen[TestSort.By] = sortBys(TestSort)
+  def testSortBys: Gen[Sorting[TestSort.type]] = sortBys(TestSort)
 
   implicit val pages: Gen[paging.model.Page] = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
   implicit val perPages: Gen[paging.model.PerPage] =

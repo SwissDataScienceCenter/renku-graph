@@ -26,10 +26,12 @@ import cats.syntax.all._
 import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
-import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
+import io.renku.eventlog.events.producers.DefaultSubscriberTracker
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.CategoryName
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import io.renku.graph.model.events.EventStatus
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -39,11 +41,11 @@ private[producers] object SubscriptionCategory {
 
   def apply[F[
       _
-  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+  ]: Async: Parallel: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
       : F[producers.SubscriptionCategory[F]] = for {
-    implicit0(subscribers: UrlAndIdSubscribers[F]) <- UrlAndIdSubscribers[F](categoryName)
-    eventFetcher                                   <- EventFinder[F]
-    dispatchRecovery                               <- DispatchRecovery[F]
+    implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
+    eventFetcher                                  <- EventFinder[F]
+    dispatchRecovery                              <- DispatchRecovery[F]
     eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
                        eventDeliveryIdExtractor = (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id)
                      )
@@ -54,13 +56,12 @@ private[producers] object SubscriptionCategory {
                                            EventEncoder(encodeEvent, encodePayload),
                                            dispatchRecovery
                          )
-    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](
-                      categoryName,
-                      SubscriptionPayload.apply
-                    )
-  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
-                                                               subscribers,
-                                                               eventsDistributor,
-                                                               deserializer
+  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](categoryName,
+                                                             subscribers,
+                                                             eventsDistributor,
+                                                             CapacityFinder.queryBased(capacityFindingQuery)
   )
+
+  private[awaitinggeneration] val capacityFindingQuery =
+    s"SELECT COUNT(event_id) FROM event WHERE status='${EventStatus.GeneratingTriples.value}'"
 }

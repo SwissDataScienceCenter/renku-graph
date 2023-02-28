@@ -18,31 +18,26 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
-import cats.syntax.all._
-import io.circe.literal._
-import io.renku.events.consumers.subscriptions.subscriberUrls
+import io.renku.events.Generators.subscriberUrls
+import io.renku.events.Subscription.SubscriberId
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 
 import scala.util.Try
 
-class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "prepareSubscriptionPayload" should {
 
-    "return Payload containing the given CategoryName, found subscriberUrl and capacity" in new TestCase {
-      composer.prepareSubscriptionPayload() shouldBe json"""{
-        "categoryName" : ${categoryName.value},
-        "subscriber": {
-          "url":     ${subscriberUrl.value},
-          "id":      ${serviceId.value},
-          "version": ${serviceVersion.value}
-        }
-      }""".pure[Try]
+    s"return Payload containing the '$categoryName' Category name, found subscriberUrl, service id and version" in new TestCase {
+      composer.prepareSubscriptionPayload().success.value shouldBe MigrationsSubscription(
+        Subscriber(subscriberUrl, SubscriberId(serviceId), serviceVersion)
+      )
     }
   }
 

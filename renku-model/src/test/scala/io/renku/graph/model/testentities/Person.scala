@@ -19,7 +19,9 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliPerson
 import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId}
 
@@ -64,6 +66,8 @@ object Person {
                                    maybeAffiliation
       )
   }
+
+  implicit def toCliPerson(implicit renkuUrl: RenkuUrl): Person => CliPerson = CliConverters.from(_)
 
   implicit def toMaybeEntitiesPersonWithGitLabId(implicit
       renkuUrl: RenkuUrl

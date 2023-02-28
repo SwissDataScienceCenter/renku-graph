@@ -29,6 +29,7 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.logging.ExecutionTimeRecorder
@@ -44,7 +45,7 @@ import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
   def searchForDatasets(maybePhrase: Option[Phrase],
-                        sort:        Sort.By,
+                        sort:        Sorting[Sort.type],
                         paging:      PagingRequest,
                         maybeUser:   Option[AuthUser]
   ): F[Response[F]]
@@ -66,7 +67,7 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
   private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
   def searchForDatasets(maybePhrase: Option[Phrase],
-                        sort:        Sort.By,
+                        sort:        Sorting[Sort.type],
                         paging:      PagingRequest,
                         maybeUser:   Option[AuthUser]
   ): F[Response[F]] = measureExecutionTime {
@@ -77,8 +78,12 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
       .recoverWith(httpResult(maybePhrase))
   } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
 
-  private def requestedUrl(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest): renku.ResourceUrl =
-    (renkuApiUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+  private def requestedUrl(
+      maybePhrase: Option[Phrase],
+      sort:        Sorting[Sort.type],
+      paging:      PagingRequest
+  ): renku.ResourceUrl =
+    (renkuApiUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) && (Sort.sort.parameterName -> sort.sortBy.toList) && (query.parameterName -> maybePhrase)
 
   private def httpResult(
       maybePhrase: Option[Phrase]
@@ -137,6 +142,8 @@ object Endpoint {
     final case object DateProperty          extends SearchProperty("date")
     final case object DatePublishedProperty extends SearchProperty("datePublished")
     final case object ProjectsCountProperty extends SearchProperty("projectsCount")
+
+    val default = Sorting(Sort.By(TitleProperty, io.renku.http.rest.SortBy.Direction.Asc))
 
     override lazy val properties: Set[SearchProperty] = Set(
       TitleProperty,

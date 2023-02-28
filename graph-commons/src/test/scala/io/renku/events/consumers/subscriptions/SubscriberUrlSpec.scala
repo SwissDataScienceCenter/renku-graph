@@ -18,6 +18,7 @@
 
 package io.renku.events.consumers.subscriptions
 
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}

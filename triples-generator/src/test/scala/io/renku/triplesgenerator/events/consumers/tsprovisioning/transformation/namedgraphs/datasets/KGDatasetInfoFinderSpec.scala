@@ -324,7 +324,7 @@ class KGDatasetInfoFinderSpec
           .forkOnce()
           .generateOne
 
-      val forkWithInvalidatedDS = fork1.addDatasets(ds.invalidateNow)
+      val forkWithInvalidatedDS = fork1.addDatasets(ds.invalidateNow(personEntities))
 
       val (_, (_, forkWithModification)) = project.forkOnce().bimap(identity, _.addDataset(ds.createModification()))
 

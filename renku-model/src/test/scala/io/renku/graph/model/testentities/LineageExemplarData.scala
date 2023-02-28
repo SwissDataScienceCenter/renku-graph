@@ -25,14 +25,15 @@ import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.IOStream
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.plans.Command
-import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput._
-import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput.{ImplicitCommandOutput, LocationCommandOutput, MappedCommandOutput}
-import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities.Entity.InputEntity
 import io.renku.graph.model.testentities.ParameterValue.CommandParameterValue
 import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.testentities.StepPlan.CommandParameters
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput._
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput.{ImplicitCommandOutput, LocationCommandOutput, MappedCommandOutput}
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.jsonld.syntax.JsonEncoderOps
+import org.scalacheck.Gen
 
 /** ====================== Exemplar data visualization ====================== zhbikes folder clean_data \ / run plan 1 \
  * zhbikes folder   clean_data
@@ -64,7 +65,8 @@ object LineageExemplarData {
   )
 
   def apply(
-      project: RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
+      project:   RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne,
+      personGen: Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): ExemplarData = {
 
     val zhbikesFolder = Location.Folder("data/zhbikes")
@@ -77,7 +79,7 @@ object LineageExemplarData {
     val gridPlot      = Location.File("figs/grid_plot.png")
 
     val zhbikesDataset = {
-      val rawDataset = datasetEntities(provenanceInternal).toGeneratorFor(project).generateOne
+      val rawDataset = datasetEntities(provenanceInternal(personGen)).toGeneratorFor(project).generateOne
 
       def datasetPart(location: Location) = {
         val rawPart = datasetPartEntities(rawDataset.provenance.date.instant).generateOne
@@ -97,7 +99,7 @@ object LineageExemplarData {
     val plan1 = Plan.of(
       plans.Name("plan1"),
       Command("python").some,
-      planDatesCreated(after = project.dateCreated).generateOne,
+      planCreatedDates(after = project.dateCreated).generateOne,
       creators = Nil,
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
@@ -106,7 +108,7 @@ object LineageExemplarData {
     )
 
     val activity1Plan1 = ExecutionPlanner
-      .of(plan1, activityStartTimes(after = plan1.dateCreated).generateOne, personEntities.generateOne, project)
+      .of(plan1, activityStartTimes(after = plan1.dateCreated).generateOne, personGen.generateOne, project)
       .planInputParameterValuesFromChecksum(
         cleanData     -> entityChecksums.generateOne,
         zhbikesFolder -> entityChecksums.generateOne
@@ -117,7 +119,7 @@ object LineageExemplarData {
     val plan2 = Plan.of(
       plans.Name("plan2"),
       Command("python").some,
-      planDatesCreated(after = activity1Plan1.startTime).generateOne,
+      planCreatedDates(after = activity1Plan1.startTime).generateOne,
       creators = Nil,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
@@ -128,7 +130,7 @@ object LineageExemplarData {
     )
 
     val activity2Plan2 = ExecutionPlanner
-      .of(plan2, activityStartTimes(after = plan2.dateCreated).generateOne, personEntities.generateOne, project)
+      .of(plan2, activityStartTimes(after = plan2.dateCreated).generateOne, personGen.generateOne, project)
       .planInputParameterValuesFromChecksum(
         plotData -> entityChecksums.generateOne
       )
@@ -141,7 +143,7 @@ object LineageExemplarData {
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
     val activity3Plan1 = ExecutionPlanner
-      .of(plan1, activityStartTimes(after = activity2Plan2.startTime).generateOne, personEntities.generateOne, project)
+      .of(plan1, activityStartTimes(after = activity2Plan2.startTime).generateOne, personGen.generateOne, project)
       .planInputParameterValuesFromChecksum(
         cleanData -> activity1Plan1
           .findUsagesChecksum(cleanData)
@@ -152,7 +154,7 @@ object LineageExemplarData {
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
     val activity4Plan2 = ExecutionPlanner
-      .of(plan2, activityStartTimes(after = activity3Plan1.startTime).generateOne, personEntities.generateOne, project)
+      .of(plan2, activityStartTimes(after = activity3Plan1.startTime).generateOne, personGen.generateOne, project)
       .planInputParameterValuesFromChecksum(
         plotData -> activity2Plan2
           .findUsagesChecksum(plotData)

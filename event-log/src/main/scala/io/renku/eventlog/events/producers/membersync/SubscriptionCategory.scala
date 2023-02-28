@@ -25,18 +25,20 @@ import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers._
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
 import io.renku.eventlog.events.producers.membersync.MemberSyncEventEncoder.encodeEvent
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
+  def apply[F[_]: Async: SessionResource: DefaultSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[producers.SubscriptionCategory[F]] = for {
-    subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventFinder      <- EventFinder[F]
-    dispatchRecovery <- LoggingDispatchRecovery[F, MemberSyncEvent](categoryName)
-    eventDelivery    <- EventDelivery.noOp[F, MemberSyncEvent]
+    implicit0(subscribers: DefaultSubscribers[F]) <- DefaultSubscribers[F](categoryName)
+    eventFinder                                   <- EventFinder[F]
+    dispatchRecovery                              <- LoggingDispatchRecovery[F, MemberSyncEvent](categoryName)
+    eventDelivery                                 <- EventDelivery.noOp[F, MemberSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,
                                            eventFinder,
@@ -44,10 +46,9 @@ private[producers] object SubscriptionCategory {
                                            EventEncoder(encodeEvent),
                                            dispatchRecovery
                          )
-    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](categoryName, SubscriptionPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
-                                                               subscribers,
-                                                               eventsDistributor,
-                                                               deserializer
+  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](categoryName,
+                                                             subscribers,
+                                                             eventsDistributor,
+                                                             CapacityFinder.noOpCapacityFinder[F]
   )
 }

@@ -20,6 +20,8 @@ package io.renku.graph.model.testentities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import io.renku.cli.model.CliParameterLink
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.{RenkuUrl, commandParameters, entities, parameterLinks}
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
@@ -59,6 +61,9 @@ object ParameterLink {
       source = commandParameters.ResourceId(p.source.asEntityId.show),
       sinks = p.sinks.map(s => commandParameters.ResourceId(s.asEntityId.show))
     )
+
+  implicit def toCliParameterLink(implicit renkuUrl: RenkuUrl): ParameterLink => CliParameterLink =
+    CliConverters.from(_)
 
   implicit def jsonLDEncoder: JsonLDEncoder[ParameterLink] =
     JsonLDEncoder.instance(toEntitiesParameterLink(_).asJsonLD)

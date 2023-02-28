@@ -48,7 +48,7 @@ class HierarchyOnInvalidationUpdaterSpec extends AnyWordSpec with MockFactory wi
 
       val (beforeModification, modification, modificationInvalidated) =
         datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
-          case internal ::~ modified => (internal, modified, modified.invalidateNow)
+          case internal ::~ modified => (internal, modified, modified.invalidateNow(personEntities))
         }.generateOne
 
       val entitiesProject = project
@@ -121,7 +121,7 @@ class HierarchyOnInvalidationUpdaterSpec extends AnyWordSpec with MockFactory wi
 
       val (beforeModification, modification, modificationInvalidated) =
         datasetAndModificationEntities(provenanceInternal, projectDateCreated = project.dateCreated).map {
-          case internal ::~ modified => (internal, modified, modified.invalidateNow)
+          case internal ::~ modified => (internal, modified, modified.invalidateNow(personEntities))
         }.generateOne
 
       val entitiesProject = project
