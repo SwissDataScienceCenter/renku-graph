@@ -38,7 +38,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.CompositePlanProvision.{Context, Result}
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.{AllProjects, MigrationExecutionRegister, RecoverableErrorsRecovery, RegisteredMigration}
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling._
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -105,10 +105,9 @@ private[migrations] class CompositePlanProvision[F[_]: Sync: Logger](
 object CompositePlanProvision {
   def create[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[CompositePlanProvision[F]] =
     for {
-      allProjects <- AllProjects.create[F]
-      eventSender <- EventSender[F]
-      eventLogUrl <- EventLogUrl()
-      elClient = EventLogClient(eventLogUrl)
+      allProjects       <- AllProjects.create[F]
+      eventSender       <- EventSender[F](EventLogUrl)
+      elClient          <- EventLogClient[F]
       executionRegister <- MigrationExecutionRegister[F]
       name = Migration.Name("CompositePlanProvision")
     } yield new CompositePlanProvision[F](name, allProjects, eventSender, elClient, executionRegister)

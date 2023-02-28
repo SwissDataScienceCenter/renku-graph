@@ -34,6 +34,7 @@ import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
+import org.scalacheck.Gen
 
 trait ModelOps extends Dataset.ProvenanceOps {
 
@@ -80,12 +81,14 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def to[T](implicit convert: P => T): T = convert(project)
 
-    def forkOnce(): (P, RenkuProject.WithParent) = {
-      val (parent, childGen) = fork(times = 1)
+    def forkOnce(creatorsGen: Gen[Person] = personEntities(withGitLabId)): (P, RenkuProject.WithParent) = {
+      val (parent, childGen) = fork(times = 1, creatorsGen)
       parent -> childGen.head
     }
 
-    def fork(times: Int Refined Positive): (P, NonEmptyList[RenkuProject.WithParent]) = {
+    def fork(times:       Int Refined Positive,
+             creatorsGen: Gen[Person] = personEntities(withGitLabId)
+    ): (P, NonEmptyList[RenkuProject.WithParent]) = {
       val parent = project match {
         case proj: RenkuProject.WithParent =>
           proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value))).asInstanceOf[P]
@@ -94,13 +97,17 @@ trait ModelOps extends Dataset.ProvenanceOps {
             .copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
             .asInstanceOf[P]
       }
-      parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
-        newChildGen(parent).generateOne :: childrenGens
+      parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent, creatorsGen).generateOne))(
+        (childrenGens, _) => newChildGen(parent).generateOne :: childrenGens
       )
     }
 
-    private def newChildGen(parentProject: RenkuProject) =
-      renkuProjectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
+    private def newChildGen(parentProject: RenkuProject, creatorsGen: Gen[Person] = personEntities(withGitLabId)) =
+      renkuProjectEntities(
+        fixed(parentProject.visibility),
+        projectDateCreatedGen = projectCreatedDates(parentProject.dateCreated.value),
+        creatorGen = creatorsGen
+      ).map(child =>
         RenkuProject.WithParent(
           child.path,
           child.name,
@@ -197,13 +204,16 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def to[T](implicit convert: P => T): T = convert(project)
 
-    def forkOnce(): (NonRenkuProject, NonRenkuProject.WithParent) = {
-      val (parent, childGen) = fork(times = 1)
+    def forkOnce(
+        creatorGen: Gen[Person] = personEntities(withGitLabId)
+    ): (NonRenkuProject, NonRenkuProject.WithParent) = {
+      val (parent, childGen) = fork(times = 1, creatorGen = creatorGen)
       parent -> childGen.head
     }
 
     def fork(
-        times: Int Refined Positive
+        times:      Int Refined Positive,
+        creatorGen: Gen[Person] = personEntities(withGitLabId)
     ): (NonRenkuProject, NonEmptyList[NonRenkuProject.WithParent]) = {
       val parent = project match {
         case proj: NonRenkuProject.WithParent =>
@@ -211,13 +221,16 @@ trait ModelOps extends Dataset.ProvenanceOps {
         case proj: NonRenkuProject.WithoutParent =>
           proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
       }
-      parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
-        newChildGen(parent).generateOne :: childrenGens
-      )
+      parent -> (1 until times.value).foldLeft(
+        NonEmptyList.one(newChildGen(parent, creatorGen = creatorGen).generateOne)
+      )((childrenGens, _) => newChildGen(parent).generateOne :: childrenGens)
     }
 
-    private def newChildGen(parentProject: NonRenkuProject) =
-      nonRenkuProjectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
+    private def newChildGen(parentProject: NonRenkuProject, creatorGen: Gen[Person] = personEntities(withGitLabId)) =
+      nonRenkuProjectEntities(fixed(parentProject.visibility),
+                              minDateCreated = parentProject.dateCreated,
+                              creatorGen = creatorGen
+      ).map(child =>
         NonRenkuProject.WithParent(
           child.path,
           child.name,
@@ -242,7 +255,9 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def widen[T <: Dataset.Provenance](implicit ev: P <:< T): Dataset[T] = dataset.asInstanceOf[Dataset[T]]
 
-    def invalidate(time: InvalidationTime): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] = {
+    def invalidate(time:       InvalidationTime,
+                   creatorGen: Gen[Person]
+    ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] = {
       val newIdentifier = datasetIdentifiers.generateOne
       dataset.provenance.date match {
         case dateCreated: DateCreated =>
@@ -256,7 +271,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
-                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+                (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             ),
@@ -272,7 +287,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
-                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+                (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             )
@@ -280,17 +295,21 @@ trait ModelOps extends Dataset.ProvenanceOps {
       }
     }
 
-    def invalidateNow: Dataset[Dataset.Provenance.Modified] = invalidateUnsafe(InvalidationTime.now)
+    def invalidateNow(creatorGen: Gen[Person]): Dataset[Dataset.Provenance.Modified] =
+      invalidateUnsafe(InvalidationTime.now, creatorGen)
 
-    def invalidateUnsafe(time: InvalidationTime): Dataset[Dataset.Provenance.Modified] =
-      invalidate(time).fold(errors => throw new IllegalArgumentException(errors.intercalate(", ")), identity)
+    def invalidateUnsafe(time: InvalidationTime, creatorGen: Gen[Person]): Dataset[Dataset.Provenance.Modified] =
+      invalidate(time, creatorGen).fold(errors => throw new IllegalArgumentException(errors.intercalate(", ")),
+                                        identity
+      )
 
-    def invalidatePartNow(part: DatasetPart): Dataset[Provenance.Modified] =
-      invalidatePart(part, InvalidationTime.now)
+    def invalidatePartNow(part: DatasetPart, creatorGen: Gen[Person]): Dataset[Provenance.Modified] =
+      invalidatePart(part, InvalidationTime.now, creatorGen)
         .fold(errors => throw new IllegalArgumentException(errors.intercalate("; ")), identity)
 
-    def invalidatePart(part: DatasetPart,
-                       time: InvalidationTime
+    def invalidatePart(part:       DatasetPart,
+                       time:       InvalidationTime,
+                       creatorGen: Gen[Person]
     ): ValidatedNel[String, Dataset[Dataset.Provenance.Modified]] =
       dataset.parts
         .find(_ == part)
@@ -306,7 +325,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
               dataset.provenance.topmostDerivedFrom,
               dataset.provenance.originalIdentifier,
               datasets.DateCreated(time.value),
-              (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
+              (creatorGen.generateOne :: dataset.provenance.creators).sortBy(_.name),
               maybeInvalidationTime = None
             ),
             parts = dataset.parts.filterNot(_ == part) ::: invalidatedPart :: Nil
@@ -314,9 +333,10 @@ trait ModelOps extends Dataset.ProvenanceOps {
         }
 
     def createModification(
-        modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
+        modifier:   Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity,
+        creatorGen: Gen[Person] = personEntities
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
+      (projectDate => modifiedDatasetEntities(dataset, projectDate, creatorGen)).modify(modifier)
 
     def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
 
@@ -442,8 +462,13 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
   implicit val creatorUsernameUpdaterInternal
-      : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
-    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
+      : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal =
+    creatorUsernameUpdaterInternal()
+
+  def creatorUsernameUpdaterInternal(
+      creatorGen: Gen[Person] = personEntities
+  ): (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
+    prov.copy(creators = (creatorGen.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorInternal

@@ -22,9 +22,9 @@ import Generators._
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import io.renku.events.Generators.categoryNames
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.generators.Generators.Implicits._
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
@@ -39,25 +39,25 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
     "adds the given subscriber to the registry and logs info when it was added" in new TestCase {
 
       (subscribersRegistry.add _)
-        .expects(subscriptionInfo)
+        .expects(subscriber)
         .returning(true.pure[IO])
 
-      (subscriberTracker.add _).expects(subscriptionInfo).returning(true.pure[IO])
+      (subscriberTracker.add _).expects(subscriber).returning(true.pure[IO])
 
-      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriber).unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(Info(show"$categoryName: $subscriptionInfo added"))
+      logger.loggedOnly(Info(show"$categoryName: $subscriber added"))
     }
 
     "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
 
       (subscribersRegistry.add _)
-        .expects(subscriptionInfo)
+        .expects(subscriber)
         .returning(false.pure[IO])
 
-      (subscriberTracker.add _).expects(subscriptionInfo).returning(false.pure[IO])
+      (subscriberTracker.add _).expects(subscriber).returning(false.pure[IO])
 
-      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriber).unsafeRunSync() shouldBe ()
 
       logger.expectNoLogs()
     }
@@ -71,16 +71,16 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       (() => subscriberUrlReference.get)
         .expects()
-        .returning(subscriberUrl.pure[IO])
+        .returning(subscriber.url.pure[IO])
 
       (subscribersRegistry.findAvailableSubscriber _)
         .expects()
         .returning(subscriberUrlReference.pure[IO])
 
       val function = mockFunction[SubscriberUrl, IO[Unit]]
-      function.expects(subscriberUrl).returning(IO.unit)
+      function.expects(subscriber.url).returning(IO.unit)
 
-      subscribers.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.runOnSubscriber(function).unsafeRunSync() shouldBe ()
     }
 
     "fail if the given function fails when run on available subscriber" in new TestCase {
@@ -89,7 +89,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       (() => subscriberUrlReference.get)
         .expects()
-        .returning(subscriberUrl.pure[IO])
+        .returning(subscriber.url.pure[IO])
 
       (subscribersRegistry.findAvailableSubscriber _)
         .expects()
@@ -97,7 +97,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       val exception = exceptions.generateOne
       val function  = mockFunction[SubscriberUrl, IO[Unit]]
-      function.expects(subscriberUrl).returning(exception.raiseError[IO, Unit])
+      function.expects(subscriber.url).returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         subscribers.runOnSubscriber(function).unsafeRunSync()
@@ -109,24 +109,24 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
     "completely remove a subscriber from the registry" in new TestCase {
       (subscribersRegistry.delete _)
-        .expects(subscriberUrl)
+        .expects(subscriber.url)
         .returning(true.pure[IO])
 
-      (subscriberTracker.remove _).expects(subscriberUrl).returning(true.pure[IO])
+      (subscriberTracker.remove _).expects(subscriber.url).returning(true.pure[IO])
 
-      subscribers.delete(subscriberUrl).unsafeRunSync()
+      subscribers.delete(subscriber.url).unsafeRunSync()
 
-      logger.loggedOnly(Info(show"$categoryName: $subscriberUrl gone - deleting"))
+      logger.loggedOnly(Info(show"$categoryName: ${subscriber.url} gone - deleting"))
     }
 
     "not log if nothing was deleted" in new TestCase {
       (subscribersRegistry.delete _)
-        .expects(subscriberUrl)
+        .expects(subscriber.url)
         .returning(false.pure[IO])
 
-      (subscriberTracker.remove _).expects(subscriberUrl).returning(false.pure[IO])
+      (subscriberTracker.remove _).expects(subscriber.url).returning(false.pure[IO])
 
-      subscribers.delete(subscriberUrl).unsafeRunSync()
+      subscribers.delete(subscriber.url).unsafeRunSync()
 
       logger.expectNoLogs()
     }
@@ -135,10 +135,10 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
   "markBusy" should {
     "put on hold selected subscriber" in new TestCase {
       (subscribersRegistry.markBusy _)
-        .expects(subscriberUrl)
+        .expects(subscriber.url)
         .returning(IO.unit)
 
-      subscribers.markBusy(subscriberUrl).unsafeRunSync()
+      subscribers.markBusy(subscriber.url).unsafeRunSync()
 
       logger.expectNoLogs()
     }
@@ -147,7 +147,7 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
   "getTotalCapacity" should {
 
     "return totalCapacity fetched from the registry" in new TestCase {
-      val maybeCapacity = capacities.generateOption
+      val maybeCapacity = totalCapacities.generateOption
       (() => subscribersRegistry.getTotalCapacity)
         .expects()
         .returning(maybeCapacity)
@@ -157,14 +157,13 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
   }
 
   private trait TestCase {
-    val categoryName     = categoryNames.generateOne
-    val subscriptionInfo = subscriptionInfos.generateOne
-    val subscriberUrl    = subscriptionInfo.subscriberUrl
+    val categoryName = categoryNames.generateOne
+    val subscriber   = testSubscribers.generateOne
 
     val subscribersRegistry = mock[SubscribersRegistry[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    implicit val subscriberTracker: SubscriberTracker[IO, TestSubscriptionInfo] =
-      mock[SubscriberTracker[IO, TestSubscriptionInfo]]
+    implicit val subscriberTracker: SubscriberTracker[IO, TestSubscriber] =
+      mock[SubscriberTracker[IO, TestSubscriber]]
     val subscribers = new SubscribersImpl(categoryName, subscribersRegistry)
   }
 }

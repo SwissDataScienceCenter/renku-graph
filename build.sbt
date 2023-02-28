@@ -39,6 +39,7 @@ lazy val root = project
     triplesStoreClient,
     tinyTypes,
     renkuModelTinyTypes,
+    renkuCliModel,
     renkuModel,
     graphCommons,
     eventLog,
@@ -46,6 +47,7 @@ lazy val root = project
     webhookService,
     commitEventService,
     entitiesSearch,
+    entitiesViewsCollector,
     triplesGenerator,
     knowledgeGraph
   )
@@ -77,13 +79,24 @@ lazy val renkuModelTinyTypes = project
   .settings(commonSettings)
   .dependsOn(tinyTypes % "compile->compile; test->test")
 
+lazy val renkuCliModel = project
+  .in(file("renku-cli-model"))
+  .withId("renku-cli-model")
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(commonSettings)
+  .dependsOn(
+    tinyTypes           % "compile->compile; test->test",
+    renkuModelTinyTypes % "compile->compile; test->test"
+  )
+
 lazy val renkuModel = project
   .in(file("renku-model"))
   .withId("renku-model")
   .settings(commonSettings)
   .dependsOn(
     tinyTypes           % "compile->compile; test->test",
-    renkuModelTinyTypes % "compile->compile; test->test"
+    renkuModelTinyTypes % "compile->compile; test->test",
+    renkuCliModel       % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -131,13 +144,21 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val entitiesViewsCollector = project
+  .in(file("entities-views-collector"))
+  .withId("entities-views-collector")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val triplesGenerator = project
   .in(file("triples-generator"))
   .withId("triples-generator")
   .settings(commonSettings)
   .dependsOn(
     graphCommons % "compile->compile; test->test",
-    entitiesSearch
+    entitiesSearch,
+    entitiesViewsCollector
   )
   .enablePlugins(
     JavaAppPackaging,

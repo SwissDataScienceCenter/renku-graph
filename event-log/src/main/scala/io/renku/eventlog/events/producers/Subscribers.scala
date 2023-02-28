@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.events.producers
 
+import cats.{Applicative, MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow, Show}
-import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.{CategoryName, Subscription}
+import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
-private trait Subscribers[F[_], -SI <: SubscriptionInfo] {
-  def add(subscriptionInfo: SI): F[Unit]
+private trait Subscribers[F[_], -S <: Subscription.Subscriber] {
+  def add(subscriber: S): F[Unit]
 
   def delete(subscriberUrl: SubscriberUrl): F[Unit]
 
@@ -34,24 +34,32 @@ private trait Subscribers[F[_], -SI <: SubscriptionInfo] {
 
   def runOnSubscriber(f: SubscriberUrl => F[Unit]): F[Unit]
 
-  def getTotalCapacity: Option[Capacity]
+  def getTotalCapacity: Option[TotalCapacity]
 }
 
-private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] private[producers] (
+private object Subscribers {
+
+  def apply[F[_]: Async: Logger, S <: Subscription.Subscriber, ST <: SubscriberTracker[F, S]](
+      categoryName: CategoryName
+  )(implicit subscriberTracker: ST, show: Show[S]): F[Subscribers[F, S]] = for {
+    subscribersRegistry <- SubscribersRegistry(categoryName)
+    subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl[F, S](categoryName, subscribersRegistry))
+  } yield subscribers
+}
+
+private class SubscribersImpl[F[_]: MonadThrow: Logger, S <: Subscription.Subscriber] private[producers] (
     categoryName:        CategoryName,
     subscribersRegistry: SubscribersRegistry[F]
-)(implicit
-    subscriberTracker: SubscriberTracker[F, SI],
-    show:              Show[SI]
-) extends Subscribers[F, SI] {
+)(implicit subscriberTracker: SubscriberTracker[F, S], show: Show[S])
+    extends Subscribers[F, S] {
 
   private val applicative = Applicative[F]
   import applicative._
 
-  override def add(subscriptionInfo: SI): F[Unit] = for {
-    wasAdded <- subscribersRegistry add subscriptionInfo
-    _        <- subscriberTracker add subscriptionInfo
-    _        <- whenA(wasAdded)(Logger[F].info(show"$categoryName: $subscriptionInfo added"))
+  override def add(subscriber: S): F[Unit] = for {
+    wasAdded <- subscribersRegistry add subscriber
+    _        <- subscriberTracker add subscriber
+    _        <- whenA(wasAdded)(Logger[F].info(show"$categoryName: $subscriber added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): F[Unit] = for {
@@ -69,15 +77,5 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] 
     _                      <- f(subscriberUrl)
   } yield ()
 
-  def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
-}
-
-private object Subscribers {
-
-  def apply[F[_]: Async: Logger, SI <: SubscriptionInfo, ST <: SubscriberTracker[F, SI]](
-      categoryName: CategoryName
-  )(implicit subscriberTracker: ST, show: Show[SI]): F[Subscribers[F, SI]] = for {
-    subscribersRegistry <- SubscribersRegistry(categoryName)
-    subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl[F, SI](categoryName, subscribersRegistry))
-  } yield subscribers
+  def getTotalCapacity: Option[TotalCapacity] = subscribersRegistry.getTotalCapacity
 }

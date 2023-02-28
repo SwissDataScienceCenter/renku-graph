@@ -19,6 +19,7 @@
 package io.renku.graph.model
 
 import Schemas._
+import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
@@ -61,7 +62,7 @@ object datasets {
   implicit object OriginalIdentifier
       extends TinyTypeFactory[OriginalIdentifier](new OriginalIdentifier(_))
       with DatasetIdentifierFactory[OriginalIdentifier]
-      with TinyTypeJsonLDOps[OriginalIdentifier]
+      with NonBlankTTJsonLDOps[OriginalIdentifier]
       with NonBlank[OriginalIdentifier]
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
@@ -74,25 +75,25 @@ object datasets {
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
       with NonBlank[Description]
-      with TinyTypeJsonLDOps[Description]
+      with NonBlankTTJsonLDOps[Description]
 
   final class License private (val value: String) extends AnyVal with StringTinyType
   implicit object License
       extends TinyTypeFactory[License](new License(_))
       with NonBlank[License]
-      with TinyTypeJsonLDOps[License]
+      with NonBlankTTJsonLDOps[License]
 
   final class Version private (val value: String) extends AnyVal with StringTinyType
   implicit object Version
       extends TinyTypeFactory[Version](new Version(_))
       with NonBlank[Version]
-      with TinyTypeJsonLDOps[Version]
+      with NonBlankTTJsonLDOps[Version]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
   implicit object Keyword
       extends TinyTypeFactory[Keyword](new Keyword(_))
       with NonBlank[Keyword]
-      with TinyTypeJsonLDOps[Keyword]
+      with NonBlankTTJsonLDOps[Keyword]
 
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation
@@ -236,32 +237,46 @@ object datasets {
       with UrlConstraint[PartResourceId]
       with EntityIdJsonLDOps[PartResourceId]
 
-  sealed trait Date extends Any with TinyType {
+  sealed trait CreatedOrPublished extends Any with TinyType {
     def instant: Instant
   }
-
-  object Date {
-    implicit val encoder: Encoder[Date] = Encoder.instance {
+  object CreatedOrPublished {
+    implicit val encoder: Encoder[CreatedOrPublished] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson
     }
+
+    implicit val show: Show[CreatedOrPublished] =
+      Show.show {
+        case d: DateCreated   => d.show
+        case d: DatePublished => d.show
+      }
   }
 
-  final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
+  final class DateCreated private (val value: Instant) extends AnyVal with CreatedOrPublished with InstantTinyType {
     override def instant: Instant = value
   }
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
       with InstantNotInTheFuture[DateCreated]
-      with TinyTypeJsonLDOps[DateCreated]
+      with TinyTypeJsonLDOps[DateCreated] {
+    implicit override lazy val show: Show[DateCreated] =
+      Show.show(d => s"DateCreated(${d.value})")
+  }
 
-  final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
+  final class DatePublished private (val value: LocalDate)
+      extends AnyVal
+      with CreatedOrPublished
+      with LocalDateTinyType {
     override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
   }
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
       with LocalDateNotInTheFuture[DatePublished]
-      with TinyTypeJsonLDOps[DatePublished]
+      with TinyTypeJsonLDOps[DatePublished] {
+    implicit override lazy val show: Show[DatePublished] =
+      Show.show(d => s"DatePublished(${d.value})")
+  }
 
   final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateModified
@@ -269,7 +284,7 @@ object datasets {
       with InstantNotInTheFuture[DateModified]
       with TinyTypeJsonLDOps[DateModified] {
 
-    def apply(date: datasets.Date): DateModified = DateModified(date.instant)
+    def apply(date: datasets.CreatedOrPublished): DateModified = DateModified(date.instant)
   }
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType

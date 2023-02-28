@@ -20,7 +20,8 @@ package io.renku.http.rest
 
 import cats.Show
 import cats.syntax.all._
-import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
+import io.renku.triplesstore.client.model.OrderBy
+import org.http4s.dsl.impl.OptionalMultiQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder}
 
 trait SortBy {
@@ -61,7 +62,7 @@ trait SortBy {
   private implicit val sortParameterDecoder: QueryParamDecoder[By] =
     value => from(value.value).leftMap(_.getMessage).leftMap(ParseFailure(_, "")).toValidatedNel
 
-  object sort extends OptionalValidatingQueryParamDecoderMatcher[By]("sort") {
+  object sort extends OptionalMultiQueryParamDecoderMatcher[By]("sort") {
     val parameterName: String = "sort"
     def errorMessage(propertyName: String): String =
       s"'$propertyName' is not a valid $parameterName property. Allowed properties: ${properties.mkString(", ")}"
@@ -72,17 +73,20 @@ object SortBy {
 
   sealed abstract class Direction(val name: String) extends Product with Serializable {
     override lazy val toString: String = name
+    def toOrderByDirection:     OrderBy.Direction
   }
 
   object Direction {
 
     final case object Asc extends Direction("ASC") {
-      implicit lazy val ascShow: Show[Asc] = Show.show(asc => show"${asc.name}")
+      implicit lazy val ascShow: Show[Asc]         = Show.show(asc => show"${asc.name}")
+      val toOrderByDirection:    OrderBy.Direction = OrderBy.Direction.Asc
     }
     type Asc = Asc.type
 
     final case object Desc extends Direction("DESC") {
-      implicit lazy val descShow: Show[Desc] = Show.show(desc => show"${desc.name}")
+      implicit lazy val descShow: Show[Desc]        = Show.show(desc => show"${desc.name}")
+      val toOrderByDirection:     OrderBy.Direction = OrderBy.Direction.Desc
     }
     type Desc = Desc.type
 

@@ -63,6 +63,17 @@ object SparqlQuery {
       body:     String
   ): SparqlQuery = SparqlQuery(name, prefixes map (p => Prefix(p.value)), body, maybePagingRequest = None)
 
+  def ofUnsafe(
+      name: String,
+      body: String
+  ): SparqlQuery = of(Refined.unsafeApply(name), body)
+
+  def ofUnsafe(
+      name:     String,
+      prefixes: Set[Prefix],
+      body:     String
+  ): SparqlQuery = of(Refined.unsafeApply(name), prefixes, body)
+
   def apply(
       name:     String Refined NonEmpty,
       prefixes: Set[String Refined NonEmpty],

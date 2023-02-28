@@ -28,7 +28,7 @@ import io.renku.graph.model.{datasets, persons, projects}
 private final case class SearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                     name:               datasets.Name,
                                     visibility:         projects.Visibility,
-                                    createdOrPublished: datasets.Date,
+                                    createdOrPublished: datasets.CreatedOrPublished,
                                     maybeDateModified:  Option[datasets.DateModified],
                                     creators:           NonEmptyList[PersonInfo],
                                     keywords:           List[datasets.Keyword],

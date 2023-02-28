@@ -24,6 +24,9 @@ import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import commandParameters.Position
 import entityModel.Location
+import io.renku.cli.model.CliStepPlan
+import io.renku.graph.model.cli.CliConverters
+import monocle.Lens
 import plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
 trait StepPlan extends Plan {
@@ -43,6 +46,14 @@ trait StepPlan extends Plan {
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
 
   final def widen: Plan = this
+
+  def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P
+
+  final def fold[P](spnm: StepPlan.NonModified => P,
+                    spm:  StepPlan.Modified => P,
+                    cpnm: CompositePlan.NonModified => P,
+                    cpm:  CompositePlan.Modified => P
+  ): P = fold(spnm, spm)
 }
 
 object StepPlan {
@@ -65,6 +76,8 @@ object StepPlan {
       with NonModifiedAlg {
 
     override type PlanType = StepPlan.NonModified
+
+    def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spnm(this)
   }
 
   object NonModified {
@@ -83,6 +96,9 @@ object StepPlan {
         plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput]),
         plan.successCodes
       )
+
+    implicit def toCliStepPlan(implicit renkuUrl: RenkuUrl): NonModified => CliStepPlan =
+      CliConverters.from(_)
   }
 
   trait NonModifiedAlg extends PlanAlg {
@@ -158,6 +174,8 @@ object StepPlan {
     override type ParentType = StepPlan
     override type PlanType   = StepPlan.Modified
 
+    def fold[P](spnm: StepPlan.NonModified => P, spm: StepPlan.Modified => P): P = spm(this)
+
     lazy val topmostParent: StepPlan = parent match {
       case p: NonModified => p
       case p: Modified    => p.topmostParent
@@ -191,6 +209,9 @@ object StepPlan {
           maybeInvalidationTime
         )
       }
+
+    implicit def toCliStepPlan[P <: Modified](implicit renkuUrl: RenkuUrl): P => CliStepPlan =
+      CliConverters.from(_)
   }
 
   trait ModifiedAlg extends PlanAlg {
@@ -239,7 +260,7 @@ object StepPlan {
           }
         }
 
-    private lazy val checkIfNotInvalidated: ValidatedNel[String, Unit] = this match {
+    private def checkIfNotInvalidated: ValidatedNel[String, Unit] = this match {
       case _: HavingInvalidationTime =>
         Validated.invalidNel(show"Plan with id: $id is invalidated and cannot be invalidated again")
       case _ => Validated.valid(())
@@ -283,6 +304,9 @@ object StepPlan {
     case p: StepPlan.Modified    => StepPlan.Modified.toEntitiesStepPlan(renkuUrl)(p)
   }
 
+  implicit def toCliStepPlan(implicit renkuUrl: RenkuUrl): StepPlan => CliStepPlan =
+    CliConverters.from(_)
+
   object CommandParameters {
 
     type CommandParameterFactory = Position => StepPlan => CommandParameterBase
@@ -295,4 +319,11 @@ object StepPlan {
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
+
+  object Lenses {
+    val creators: Lens[StepPlan, List[Person]] =
+      Lens[StepPlan, List[Person]](_.fold(_.creators, _.creators))(creators =>
+        plan => plan.fold(_.copy(creators = creators), _.copy(creators = creators))
+      )
+  }
 }

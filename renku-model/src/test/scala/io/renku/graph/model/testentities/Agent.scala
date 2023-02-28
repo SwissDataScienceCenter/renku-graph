@@ -19,7 +19,9 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliSoftwareAgent
 import io.renku.graph.model.agents.Name
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.versions.CliVersion
 import io.renku.graph.model.{agents, entities}
 
@@ -32,6 +34,9 @@ object Agent {
 
   implicit lazy val toEntitiesAgent: Agent => entities.Agent = agent =>
     entities.Agent(agents.ResourceId(agent.asEntityId.show), Name(s"renku ${agent.cliVersion}"))
+
+  implicit def toCliAgent: Agent => CliSoftwareAgent =
+    CliConverters.from(_)
 
   implicit lazy val encoder: JsonLDEncoder[Agent] = JsonLDEncoder.instance {
     _.to[entities.Agent].asJsonLD

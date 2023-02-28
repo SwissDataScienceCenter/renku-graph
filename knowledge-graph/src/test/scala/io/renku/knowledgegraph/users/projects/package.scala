@@ -41,15 +41,25 @@ package object projects {
     anyProjectEntities.map(_.to[model.Project.Activated])
 
   private[projects] val notActivatedProjects: Gen[model.Project.NotActivated] = for {
-    id           <- projectIds
-    path         <- projectPaths
-    name         <- projectNames
-    visibility   <- projectVisibilities
-    dateCreated  <- projectCreatedDates()
-    maybeCreator <- personEntities(withGitLabId).toGeneratorOfOptions.map(_.map(_.name))
-    keywords     <- projectKeywords.toGeneratorOfList()
-    maybeDesc    <- projectDescriptions.toGeneratorOfOptions
-  } yield model.Project.NotActivated(id, name, path, visibility, dateCreated, maybeCreator, keywords, maybeDesc)
+    id             <- projectIds
+    path           <- projectPaths
+    name           <- projectNames
+    visibility     <- projectVisibilities
+    dateCreated    <- projectCreatedDates()
+    maybeCreatorId <- personGitLabIds.toGeneratorOfOptions
+    maybeCreator   <- maybeCreatorId.map(_ => personNames.toGeneratorOfSomes).getOrElse(personNames.toGeneratorOfNones)
+    keywords       <- projectKeywords.toGeneratorOfList()
+    maybeDesc      <- projectDescriptions.toGeneratorOfOptions
+  } yield model.Project.NotActivated(id,
+                                     name,
+                                     path,
+                                     visibility,
+                                     dateCreated,
+                                     maybeCreatorId,
+                                     maybeCreator,
+                                     keywords,
+                                     maybeDesc
+  )
 
   private[projects] val modelProjects: Gen[model.Project] = Gen.oneOf(activatedProjects, notActivatedProjects)
 

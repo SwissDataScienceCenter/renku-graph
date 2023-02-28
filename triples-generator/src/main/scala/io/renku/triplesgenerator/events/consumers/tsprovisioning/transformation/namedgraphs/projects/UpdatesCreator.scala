@@ -165,10 +165,19 @@ private object UpdatesCreator extends UpdatesCreator {
       SparqlQuery.of(
         name = "transformation - delete project images",
         Prefixes.of(schema -> "schema"),
-        s"""
-           |DELETE { Graph $resource { $resource schema:image ?img } }
-           |WHERE  { Graph $resource { $resource schema:image ?img } }
-           |""".stripMargin
+        s"""|DELETE {
+            |  GRAPH $resource {
+            |    $resource schema:image ?img.
+            |    ?img ?p ?s
+            |  } 
+            |}
+            |WHERE  {
+            |  GRAPH $resource {
+            |    $resource schema:image ?img.
+            |    ?img ?p ?s
+            |  }
+            |}
+            |""".stripMargin
       )
     }
 

@@ -21,18 +21,20 @@ package tsmigrationrequest
 
 import cats.data.EitherT
 import cats.data.EitherT.{left, leftT, rightT}
-import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent}
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.circe.Json
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, ServiceUnavailable}
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, ServiceUnavailable}
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.Subscription.SubscriberUrl
+import io.renku.events.producers.EventSender
+import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -159,8 +161,8 @@ private[events] object EventHandler {
   ): F[EventHandler[F]] = for {
     tsStateChecker           <- TSStateChecker[F]
     migrationsRunner         <- MigrationsRunner[F](config)
-    eventSender              <- EventSender[F]
-    concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
+    eventSender              <- EventSender[F](EventLogUrl)
+    concurrentProcessLimiter <- ConcurrentProcessesLimiter(processesCount = 1)
   } yield new EventHandler[F](subscriberUrl,
                               serviceId,
                               serviceVersion,

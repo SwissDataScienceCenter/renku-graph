@@ -19,12 +19,12 @@
 package io.renku.eventlog.events.producers
 
 import EventsSender.SendingResult
+import cats.{Applicative, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, Show}
 import io.renku.control.Throttler
 import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException}
@@ -53,9 +53,9 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
   import applicative.whenA
   import categoryEventEncoder._
   import cats.syntax.all._
+  import org.http4s.{Request, Response, Status}
   import org.http4s.Method.POST
   import org.http4s.Status._
-  import org.http4s.{Request, Response, Status}
 
   override def sendEvent(subscriberUrl: SubscriberUrl, event: CategoryEvent): F[SendingResult] = {
     for {

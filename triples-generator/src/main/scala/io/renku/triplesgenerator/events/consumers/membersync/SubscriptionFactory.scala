@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.membersync
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.triplesgenerator.Microservice
@@ -33,10 +33,11 @@ object SubscriptionFactory {
 
   def apply[F[_]: Async: Logger: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism(
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
+    subscriptionMechanism <-
+      SubscriptionMechanism(
+        categoryName,
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
+      )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
     handler <- EventHandler[F]
   } yield handler -> subscriptionMechanism

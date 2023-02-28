@@ -25,20 +25,19 @@ import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.::~
+import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GraphClass, publicationEvents, testentities}
-import io.renku.http.client.AccessToken
+import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
-import io.renku.jsonld.syntax._
+import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
 
@@ -54,24 +53,28 @@ class DatasetsResourcesSpec
   private val creator = authUsers.generateOne
   private val user    = authUsers.generateOne
 
-  private implicit val graph: GraphClass = GraphClass.Default
-
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
-    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testEntitiesProject) = renkuProjectEntities(visibilityPublic)
-      .map(_.copy(maybeCreator = personEntities(creator.id.some).generateOne.some))
-      .addDataset(datasetEntities(provenanceInternal))
-      .addDatasetAndModification(datasetEntities(provenanceInternal))
-      .generateOne
-    val project = dataProjects(testEntitiesProject).generateOne
+
+    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testProject) =
+      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
+        .addDatasetAndModification(
+          datasetEntities(provenanceInternal(cliShapedPersons)),
+          creatorGen = cliShapedPersons
+        )
+        .generateOne
+    val project =
+      dataProjects(testProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
+
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
-      // mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
@@ -103,7 +106,6 @@ class DatasetsResourcesSpec
 
       When("user is authenticated")
       gitLabStub.addAuthenticated(user)
-      // `GET <gitlabApi>/user returning OK`(user)
 
       val datasetUsedInProjectLink = foundDatasetDetails.hcursor
         .downField("usedIn")
@@ -173,80 +175,96 @@ class DatasetsResourcesSpec
 
     Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
 
-      val (_, testEntitiesPrivateProject) = renkuProjectEntities(fixed(Visibility.Private))
-        .map(_.copy(maybeCreator = personEntities(creator.id.some).generateOne.some))
-        .addDataset(datasetEntities(provenanceInternal))
+      val (_, testPrivateProject) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
-      val privateProject = dataProjects(testEntitiesPrivateProject).generateOne
+      val privateProject =
+        dataProjects(testPrivateProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
 
-      Given("there's a non-public project in KG")
+      Given("there's a private project in KG")
       val commitId = commitIds.generateOne
       gitLabStub.addAuthenticated(creator, user)
       gitLabStub.setupProject(privateProject, commitId)
-      mockCommitDataOnTripleGenerator(privateProject, testEntitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(privateProject, toPayloadJsonLD(privateProject), commitId)
       `data in the Triples Store`(privateProject, commitId, creator.accessToken)
 
       When("there's an authenticated user who is not a member of the project")
       And("he fetches project's details")
-      val projectDatasetsResponseForNonMember =
+      val response =
         knowledgeGraphClient.GET(s"knowledge-graph/projects/${privateProject.path}/datasets", user.accessToken)
 
       Then("he should get NOT_FOUND response")
-      projectDatasetsResponseForNonMember.status shouldBe NotFound
+      response.status shouldBe NotFound
     }
   }
 
   Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
     Scenario("As a user I would like to be able to search for datasets by free-text search") {
+
       gitLabStub.addAuthenticated(creator)
+
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val (dataset1, project1) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+      val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
-      val (dataset2, project2) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(text)))
+      val project1 = dataProjects(testProject1).generateOne
+
+      val (dataset2, testProject2) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeDescContaining(text)))
         .generateOne
-      val (dataset3, project3) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(text)))
+      val project2 = dataProjects(testProject2).generateOne
+      val (dataset3, testProject3) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(
+          datasetEntities(provenanceInternal(cliShapedPersons))
+            .modify(_.makeCreatorNameContaining(text)(creatorUsernameUpdaterInternal(cliShapedPersons)))
+        )
         .generateOne
-      val (dataset4, project4 ::~ project4Fork) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(text)))
-        .forkOnce()
+      val project3 = dataProjects(testProject3).generateOne
+      val (dataset4, testProject4 ::~ testProject4Fork) =
+        renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeKeywordsContaining(text)))
+          .forkOnce(creatorGen = cliShapedPersons)
+          .generateOne
+          .bimap(identity, _.bimap(removeMembers(), removeMembers()))
+      val project4     = dataProjects(testProject4).generateOne
+      val project4Fork = dataProjects(testProject4Fork).generateOne
+      val (dataset5WithoutText, testProject5) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
-      val (dataset5WithoutText, project5) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal))
+      val project5 = dataProjects(testProject5).generateOne
+      val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
-      val (_, project6Private) = renkuProjectEntities(visibilityNonPublic)
-        .map(_.copy(maybeCreator = personEntities(creator.id.some).generateOne.some))
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+      val project6Private = dataProjects(testProject6Private)
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
+        .map(addMemberWithId(user.id))
         .generateOne
+
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
 
-      val dataProject1     = pushToStore(project1, creator.accessToken)
-      val dataProject2     = pushToStore(project2, creator.accessToken)
-      val dataProject3     = pushToStore(project3, creator.accessToken)
-      val dataProject4     = pushToStore(project4, creator.accessToken)
-      val dataProject4Fork = pushToStore(project4Fork, creator.accessToken)
-      val dataProject5     = pushToStore(project5, creator.accessToken)
-      val dataProject6     = pushToStore(project6Private, creator.accessToken)
-
-      `wait for events to be processed`(dataProject1.id)
-      `wait for events to be processed`(dataProject2.id)
-      `wait for events to be processed`(dataProject3.id)
-      `wait for events to be processed`(dataProject4.id)
-      `wait for events to be processed`(dataProject4Fork.id)
-      `wait for events to be processed`(dataProject5.id)
-      `wait for events to be processed`(dataProject6.id)
+      pushToStore(project1, creator)
+      pushToStore(project2, creator)
+      pushToStore(project3, creator)
+      pushToStore(project4, creator)
+      pushToStore(project4Fork, creator)
+      pushToStore(project5, creator)
+      pushToStore(project6Private, creator)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
-      val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
+      val dsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
 
       Then("he should get OK response with some matching datasets")
-      datasetsSearchResponse.status shouldBe Ok
+      dsSearchResponse.status shouldBe Ok
 
-      val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
+      val Right(foundDatasets) = dsSearchResponse.jsonBody.as[List[Json]]
       foundDatasets should {
         contain theSameElementsAs List(
           searchResultJson(dataset1, 1, project1.path, foundDatasets),
@@ -353,28 +371,36 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val (dataset1, project1) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+      val (dataset1, testProject1) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .generateOne
+      val project1 = dataProjects(testProject1)
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .generateOne
 
-      val (_, project2Private) = renkuProjectEntities(fixed(Visibility.Private))
-        .map(_.copy(maybeCreator = personEntities(creator.id.some).generateOne.some))
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+      val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+        .generateOne
+      val project2Private = dataProjects(testProject2Private)
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
         .generateOne
 
-      val (dataset3PrivateWithAccess, project3PrivateWithAccess) = renkuProjectEntities(fixed(Visibility.Private))
-        .map(
-          _.copy(maybeCreator = personEntities(creator.id.some).generateOne.some,
-                 members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-          )
-        )
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
+      val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
+        renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+          .modify(removeMembers())
+          .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
+          .generateOne
+      val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
+        .map(addMemberWithId(user.id))
         .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
-      pushToStore(project1, creator.accessToken)
-      pushToStore(project2Private, creator.accessToken)
-      pushToStore(project3PrivateWithAccess, creator.accessToken)
+      pushToStore(project1, creator)
+      pushToStore(project2Private, creator)
+      pushToStore(project3PrivateWithAccess, creator)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse =
@@ -390,32 +416,34 @@ class DatasetsResourcesSpec
       )
     }
 
-    def pushToStore(project: testentities.RenkuProject, accessToken: AccessToken): Project = {
-      val dataProject = dataProjects(project).generateOne
-      val commitId    = commitIds.generateOne
-      gitLabStub.setupProject(dataProject, commitId)
-      mockCommitDataOnTripleGenerator(dataProject, project.asJsonLD, commitId)
-      `data in the Triples Store`(dataProject, commitId, accessToken)
-      dataProject
+    def pushToStore(project: data.Project, authUser: AuthUser) = {
+
+      val commitId = commitIds.generateOne
+      gitLabStub.setupProject(project, commitId)
+
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
+
+      `data in the Triples Store`(project, commitId, authUser.accessToken)
     }
   }
 
   Feature("GET knowledge-graph/datasets/:id to find dataset details") {
 
     Scenario(
-      "As an unauthenticated and unauthorised user I should be able to see details of dataset on a public project"
+      "As an unauthenticated and unauthorised user I should be able to see details of a dataset on a public project"
     ) {
-      val (dataset, testEntitiesProject) = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceInternal))
+      val (dataset, testProject) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
-      val project = dataProjects(testEntitiesProject).generateOne
+      val project = dataProjects(testProject).generateOne
 
       Given("some data in the Triples Store")
-      val commitId = commitIds.generateOne
       gitLabStub.addAuthenticated(creator)
+      val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches dataset details with GET knowledge-graph/datasets/:id")
@@ -430,16 +458,15 @@ class DatasetsResourcesSpec
       "As an authenticated and authorised user I should be able to see details of a dataset on a private project " +
         "and not see them if either not authorised or not authenticated"
     ) {
-      val (dataset, testEntitiesProject) = renkuProjectEntities(fixed(Visibility.Private))
-        .map(
-          _.copy(maybeCreator = personEntities(creator.id.some).generateOne.some,
-                 members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-          )
-        )
-        .addDataset(datasetEntities(provenanceInternal))
+      val (dataset, testProject) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
-      val project = dataProjects(testEntitiesProject).generateOne
+      val project = dataProjects(testProject)
+        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
+        .map(addMemberWithId(user.id))
+        .generateOne
 
       Given("I am authenticated")
       gitLabStub.addAuthenticated(creator, user)
@@ -447,7 +474,7 @@ class DatasetsResourcesSpec
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
       `wait for events to be processed`(project.id)
 

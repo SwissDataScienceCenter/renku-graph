@@ -23,7 +23,7 @@ import EventsSender.SendingResult
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -37,10 +37,11 @@ object SubscriptionFactory {
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism(
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
+    subscriptionMechanism <-
+      SubscriptionMechanism(
+        categoryName,
+        defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
+      )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
     handler <- EventHandler[F](subscriptionMechanism)
   } yield handler -> subscriptionMechanism

@@ -18,22 +18,27 @@
 
 package io.renku.graph.model.entities
 
-import cats.syntax.all._
+import io.renku.cli.model.CliSoftwareAgent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.tools.AdditionalMatchers
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AgentSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class AgentSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
-  "decode" should {
+  "fromCli" should {
 
-    "turn JsonLD Agent entity into the Agent object" in {
+    "turn CLiSoftwareAgent entity into the Agent object" in {
       forAll { agent: Agent =>
-        agent.asJsonLD.cursor.as[entities.Agent] shouldBe agent.to[entities.Agent].asRight
+        entities.Agent.fromCli(agent.to[CliSoftwareAgent]) shouldMatchToValid agent.to[entities.Agent]
       }
     }
   }

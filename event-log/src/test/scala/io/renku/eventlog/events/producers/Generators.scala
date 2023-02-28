@@ -20,42 +20,62 @@ package io.renku.eventlog.events.producers
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions._
+import io.circe.{Decoder, Encoder}
+import io.circe.literal._
+import io.renku.events.Generators._
+import io.renku.events.Subscription
+import io.renku.events.Subscription._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import org.scalacheck.Gen
 
-private object Generators {
+object Generators {
 
-  val capacities: Gen[Capacity] = positiveInts() map (v => Capacity(v.value))
+  val totalCapacities: Gen[TotalCapacity] = positiveInts() map (v => TotalCapacity(v.value))
+  val freeCapacities:  Gen[FreeCapacity]  = positiveInts() map (v => FreeCapacity(v.value))
+  val usedCapacities:  Gen[UsedCapacity]  = positiveInts() map (v => UsedCapacity(v.value))
 
-  final case class TestUrlAndIdSubscriptionInfo(subscriberUrl: SubscriberUrl,
-                                                subscriberId:  SubscriberId,
-                                                maybeCapacity: Option[Capacity]
-  ) extends UrlAndIdSubscriptionInfo
+  private[producers] final case class TestSubscriber(url: SubscriberUrl, id: SubscriberId, capacity: SubscriberCapacity)
+      extends Subscription.Subscriber
+      with Subscription.DefinedCapacity
 
-  final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl,
-                                        subscriberId:  SubscriberId,
-                                        maybeCapacity: Option[Capacity]
-  ) extends SubscriptionInfo
+  private[producers] object TestSubscriber {
 
-  object TestSubscriptionInfo {
-    implicit val show: Show[TestSubscriptionInfo] = Show.show { info =>
-      show"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}${info.maybeCapacity}"
+    implicit val encoder: Encoder[TestSubscriber] = Encoder.instance { case TestSubscriber(url, id, capacity) =>
+      json"""{
+        "subscriber": {
+          "url":      $url,
+          "id":       $id,
+          "capacity": $capacity
+        }
+      }"""
+    }
+
+    implicit val decoder: Decoder[TestSubscriber] = Decoder.instance { cursor =>
+      val subscriberNode = cursor.downField("subscriber")
+      for {
+        url      <- subscriberNode.downField("url").as[SubscriberUrl]
+        id       <- subscriberNode.downField("id").as[SubscriberId]
+        capacity <- subscriberNode.downField("capacity").as[SubscriberCapacity]
+      } yield TestSubscriber(url, id, capacity)
+    }
+
+    implicit val show: Show[TestSubscriber] = Show.show { info =>
+      show"subscriber = ${info.url}, id = ${info.id}, capacity = ${info.capacity}"
     }
   }
 
-  implicit val urlAndIdSubscriptionInfos: Gen[TestUrlAndIdSubscriptionInfo] = for {
-    url           <- subscriberUrls
-    id            <- subscriberIds
-    maybeCapacity <- capacities.toGeneratorOfOptions
-  } yield TestUrlAndIdSubscriptionInfo(url, id, maybeCapacity)
+  private[producers] implicit val testSubscribers: Gen[TestSubscriber] = for {
+    url      <- subscriberUrls
+    id       <- subscriberIds
+    capacity <- subscriberCapacities
+  } yield TestSubscriber(url, id, capacity)
 
-  implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
-    url           <- subscriberUrls
-    id            <- subscriberIds
-    maybeCapacity <- capacities.toGeneratorOfOptions
-  } yield TestSubscriptionInfo(url, id, maybeCapacity)
+  private[producers] implicit val sendingResults: Gen[EventsSender.SendingResult] =
+    Gen.oneOf(EventsSender.SendingResult.all)
 
-  implicit val sendingResults: Gen[EventsSender.SendingResult] = Gen.oneOf(EventsSender.SendingResult.all)
+  implicit val eventProducerStatuses: Gen[EventProducerStatus] = for {
+    categoryName <- categoryNames
+    capacity     <- (totalCapacities -> freeCapacities).mapN(EventProducerStatus.Capacity).toGeneratorOfOptions
+  } yield EventProducerStatus(categoryName, capacity)
 }

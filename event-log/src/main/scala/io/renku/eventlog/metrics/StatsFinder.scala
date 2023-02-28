@@ -61,10 +61,11 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
   private def countEventsPerCategoryName = measureExecutionTime {
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
     SqlStatement(name = "category name events count")
-      .select[EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ // MEMBER_SYNC
-                EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ LastSyncedDate ~ // COMMIT_SYNC
-                LastSyncedDate, // PROJECT_SYNC
-              (CategoryName, Long)
+      .select[
+        EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ // MEMBER_SYNC
+          EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ LastSyncedDate ~ // COMMIT_SYNC
+          LastSyncedDate, // PROJECT_SYNC
+        (CategoryName, Long)
       ](
         sql"""
           SELECT all_counts.category_name, SUM(all_counts.count)

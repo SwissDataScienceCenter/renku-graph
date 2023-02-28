@@ -32,6 +32,7 @@ import org.typelevel.log4cats.Logger
 trait EventProducersRegistry[F[_]] {
   def run(): F[Unit]
   def register(subscriptionRequest: Json): F[SubscriptionResult]
+  def getStatus: F[Set[EventProducerStatus]]
 }
 
 private[producers] class EventProducersRegistryImpl[F[_]: Parallel: Applicative](
@@ -52,6 +53,8 @@ private[producers] class EventProducersRegistryImpl[F[_]: Parallel: Applicative]
           case RejectedRegistration => UnsupportedPayload("No category supports this payload")
         }
     }
+
+  override def getStatus: F[Set[EventProducerStatus]] = categories.map(_.getStatus).toList.sequence.map(_.toSet)
 }
 
 object EventProducersRegistry {
@@ -62,17 +65,17 @@ object EventProducersRegistry {
 
   def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
       : F[EventProducersRegistry[F]] = for {
-    implicit0(st: UrlAndIdSubscriberTracker[F]) <- UrlAndIdSubscriberTracker.create[F]
-    awaitingGenerationCategory                  <- awaitinggeneration.SubscriptionCategory[F]
-    memberSyncCategory                          <- membersync.SubscriptionCategory[F]
-    commitSyncCategory                          <- commitsync.SubscriptionCategory[F]
-    globalCommitSyncCategory                    <- globalcommitsync.SubscriptionCategory[F]
-    projectSyncCategory                         <- projectsync.SubscriptionCategory[F]
-    triplesGeneratedCategory                    <- triplesgenerated.SubscriptionCategory[F]
-    cleanUpEventCategory                        <- cleanup.SubscriptionCategory[F]
-    zombieEventsCategory                        <- zombieevents.SubscriptionCategory[F]
-    tsMigrationCategory                         <- tsmigrationrequest.SubscriptionCategory[F]
-    minProjectInfoCategory                      <- minprojectinfo.SubscriptionCategory[F]
+    implicit0(st: DefaultSubscriberTracker[F]) <- DefaultSubscriberTracker.create[F]
+    awaitingGenerationCategory                 <- awaitinggeneration.SubscriptionCategory[F]
+    memberSyncCategory                         <- membersync.SubscriptionCategory[F]
+    commitSyncCategory                         <- commitsync.SubscriptionCategory[F]
+    globalCommitSyncCategory                   <- globalcommitsync.SubscriptionCategory[F]
+    projectSyncCategory                        <- projectsync.SubscriptionCategory[F]
+    triplesGeneratedCategory                   <- triplesgenerated.SubscriptionCategory[F]
+    cleanUpEventCategory                       <- cleanup.SubscriptionCategory[F]
+    zombieEventsCategory                       <- zombieevents.SubscriptionCategory[F]
+    tsMigrationCategory                        <- tsmigrationrequest.SubscriptionCategory[F]
+    minProjectInfoCategory                     <- minprojectinfo.SubscriptionCategory[F]
   } yield new EventProducersRegistryImpl(
     Set(
       awaitingGenerationCategory,

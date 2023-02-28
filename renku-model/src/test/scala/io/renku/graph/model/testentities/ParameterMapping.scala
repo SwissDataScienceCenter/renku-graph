@@ -20,10 +20,12 @@ package io.renku.graph.model.testentities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.graph.model.{RenkuUrl, commandParameters, entities, plans}
+import io.renku.cli.model.CliParameterMapping
+import io.renku.graph.model._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.commandParameters.{Description, Name}
-import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
 import io.renku.tinytypes.constraints.UUID
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -31,11 +33,11 @@ final case class ParameterMapping(
     id:           ParameterMapping.Identifier,
     name:         Name,
     description:  Option[Description],
-    defaultValue: String,
+    defaultValue: Option[String],
     planId:       plans.Identifier,
     mappedParam:  NonEmptyList[CommandParameterBase]
 ) extends CommandParameterBase {
-  override type DefaultValue = String
+  override type DefaultValue = Option[String]
   override val maybePrefix: Option[commandParameters.Prefix] = None
 }
 
@@ -51,11 +53,14 @@ object ParameterMapping {
   def toEntitiesParameterMapping(m: ParameterMapping)(implicit renkuUrl: RenkuUrl): entities.ParameterMapping =
     entities.ParameterMapping(
       resourceId = commandParameters.ResourceId(m.id.asEntityId.show),
-      defaultValue = entities.ParameterMapping.DefaultValue(m.defaultValue),
+      defaultValue = m.defaultValue.map(entities.ParameterMapping.DefaultValue),
       maybeDescription = m.description,
       name = m.name,
       mappedParameter = m.mappedParam.map(c => commandParameters.ResourceId(c.asEntityId.show))
     )
+
+  implicit def toCliParameterMapping(implicit renkuUrl: RenkuUrl): ParameterMapping => CliParameterMapping =
+    CliConverters.from(_)
 
   implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ParameterMapping] =
     JsonLDEncoder.instance(toEntitiesParameterMapping(_).asJsonLD)

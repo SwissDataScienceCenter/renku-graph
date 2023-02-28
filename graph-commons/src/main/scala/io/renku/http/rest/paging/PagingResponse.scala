@@ -27,6 +27,13 @@ import io.renku.tinytypes.constraints.UrlOps
 import org.http4s.Header
 
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
+
+  def flatMapResults[F[_]: MonadThrow](f: List[Result] => F[List[Result]]): F[PagingResponse[Result]] =
+    f(results) >>= {
+      case r if r.size == results.size => new PagingResponse[Result](r, pagingInfo).pure[F]
+      case _ => new Exception("Paging response mapping changed page size").raiseError[F, PagingResponse[Result]]
+    }
+
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
 }
 
@@ -43,17 +50,12 @@ object PagingResponse {
     results match {
       case Nil => from(results, pagingRequest, total)
       case notEmpty =>
-        notEmpty
+        val page = notEmpty
           .sliding(pagingRequest.perPage.value, pagingRequest.perPage.value)
           .toList
           .get(pagingRequest.page.value - 1)
-          .map(_.pure[F])
-          .getOrElse(
-            new IllegalArgumentException(
-              s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
-            ).raiseError[F, List[Result]]
-          )
-          .flatMap(from(_, pagingRequest, total))
+          .getOrElse(Nil)
+        from(page, pagingRequest, total)
     }
   }
 
@@ -83,10 +85,10 @@ object PagingResponse {
 
   implicit class ResponseOps[Result](response: PagingResponse[Result]) {
 
-    import io.circe.syntax._
     import io.circe.{Encoder, Json}
-    import org.http4s.circe.jsonEncoderOf
+    import io.circe.syntax._
     import org.http4s.{EntityEncoder, Response, Status}
+    import org.http4s.circe.jsonEncoderOf
 
     def updateResults[F[_]: MonadThrow](newResults: List[Result]): F[PagingResponse[Result]] =
       if (response.results.size == newResults.size)

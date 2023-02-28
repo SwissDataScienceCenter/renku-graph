@@ -29,6 +29,7 @@ import io.renku.eventlog.events.EventsEndpoint.Criteria
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.model.{PerPage, Total}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
@@ -133,10 +134,12 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: Q
         GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_id, prj.project_path
       """
 
-      private val orderBy: Criteria.Sorting.By => Fragment[Void] = {
-        case Criteria.Sorting.By(Criteria.Sorting.EventDate, dir) => sql"""
-          ORDER BY evt.event_date #${dir.name.toUpperCase}, evt.event_id
-        """
+      private val orderBy: Sorting[Criteria.Sort.type] => Fragment[Void] = sorting => {
+        val sortSql = sorting.sortBy.map { case Criteria.Sort.By(Criteria.Sort.EventDate, dir) =>
+          sql"evt.event_date #${dir.name.toUpperCase}"
+        } :+ sql"evt.event_id"
+
+        sql" ORDER BY " ~> sortSql.reduceLeft(_ ~> sql", " ~> _)
       }
 
       private def paginate: Fragment[Int ~ PerPage] = sql"""

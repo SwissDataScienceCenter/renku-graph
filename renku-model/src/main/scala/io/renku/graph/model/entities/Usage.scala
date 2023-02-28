@@ -18,9 +18,12 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.ValidatedNel
+import cats.syntax.all._
+import io.renku.cli.model.CliUsage
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.usages.ResourceId
-import io.renku.jsonld._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 
@@ -39,12 +42,8 @@ object Usage {
       )
     }
 
-  implicit lazy val decoder: JsonLDDecoder[Usage] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    for {
-      resourceId <- cursor.downEntityId.as[ResourceId]
-      entity     <- cursor.downField(prov / "entity").as[Entity]
-    } yield Usage(resourceId, entity)
-  }
+  def fromCli(cliUsage: CliUsage): ValidatedNel[String, Usage] =
+    Usage(cliUsage.resourceId, Entity.fromCli(cliUsage.entity)).validNel
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Usage"),

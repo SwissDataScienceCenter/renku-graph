@@ -19,33 +19,28 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
+import data._
+import flows.TSProvisioning
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
-import io.renku.graph.model.testentities.RenkuProject
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
+import io.renku.graph.model.testentities.cliShapedPersons
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{removeMembers, renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.graph.model.{GraphClass, testentities}
-import io.renku.http.client.AccessToken
-import io.renku.http.server.security.model.AuthUser
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.testentities
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.enablers.Retrying
 import org.scalatest.time.{Minutes, Seconds, Span}
+import tooling.{AcceptanceSpec, ApplicationServices}
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
-class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
-
-  private implicit val graph: GraphClass = GraphClass.Default
+class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("Project re-provisioning") {
 
@@ -55,12 +50,13 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
 
       Given("there's data for the project in the TS")
 
-      val project  = dataProjects(testEntitiesProject).generateOne
-      val commitId = commitIds.generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
 
       gitLabStub.addAuthenticated(user)
+
+      val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
-      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
 
       `data in the Triples Store`(project, commitId, accessToken)
 
@@ -78,14 +74,14 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(
         project,
         commitId,
-        replace(newProjectVersion)(project.entitiesProject).asJsonLD
+        toPayloadJsonLD(replace(newProjectVersion)(project.entitiesProject))
       )
 
       And("a CLEAN_UP_REQUEST event is send to EL")
       eventLogClient.sendEvent(json"""{
         "categoryName": "CLEAN_UP_REQUEST",
         "project": {
-          "path": ${project.entitiesProject.path.value}
+          "path": ${project.path}
         }
       }""")
 
@@ -107,12 +103,13 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
   }
 
   private object TestData {
+    val user        = authUsers.generateOne
+    val accessToken = user.accessToken
 
-    val user:        AuthUser    = authUsers.generateOne
-    val accessToken: AccessToken = user.accessToken
-
-    val testEntitiesProject: RenkuProject = renkuProjectEntities(visibilityPublic).generateOne
-      .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
+    val testProject =
+      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
+        .modify(removeMembers())
+        .generateOne
   }
 
   private def replace(version: SchemaVersion): testentities.RenkuProject => testentities.RenkuProject = {

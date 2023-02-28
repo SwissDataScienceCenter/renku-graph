@@ -18,91 +18,70 @@
 
 package io.renku.graph.model.entities
 
-import cats.syntax.all._
+import io.renku.cli.model.{CliActivity, CliEntity}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, projectCreatedDates}
+import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.entities.Generators._
+import io.renku.graph.model.testentities.Entity.OutputEntity
+import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities, generations}
-import io.renku.jsonld.JsonLD
-import io.renku.jsonld.JsonLDDecoder._
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.entities
+import io.renku.graph.model.tools.AdditionalMatchers
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EntitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class EntitySpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
-  "decode" should {
-    implicit val graph: GraphClass = GraphClass.Default
+  def activityGenerator(paramFactory: CommandParameterFactory): Gen[Activity] =
+    projectCreatedDates().flatMap(date =>
+      activityEntities(stepPlanEntities(planCommands, cliShapedPersons, paramFactory), cliShapedPersons)(date)
+    )
 
-    "turn JsonLD InputEntity entity into the Entity object " in {
+  "fromCli" should {
+    "turn CliInputEntity entity into the Entity object " in {
       forAll(inputEntities) { entity =>
-        entity.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Entity]] shouldBe List(entity.to[entities.Entity.InputEntity]).asRight
+        val cliEntity   = entity.to[CliEntity]
+        val modelEntity = entity.to[entities.Entity.InputEntity]
+
+        entities.Entity.fromCli(cliEntity) shouldMatchTo modelEntity
       }
     }
 
-    "turn JsonLD Output entity into the Entity object " in {
+    "turn CliOutput entity into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity    = activityGenerator(commandOutput).generateOne
+        val cliEntities = activity.to[CliActivity].generations.map(_.entity)
 
-        val Right(decodedEntities) = JsonLD
-          .arr(activity.asJsonLD, datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Entity]]
+        val result = cliEntities.map(entities.Entity.fromCli)
 
-        decodedEntities should contain allElementsOf activity.generations.map(
+        result should contain allElementsOf activity.generations.map(
           _.entity.to[entities.Entity.OutputEntity]
         )
       }
     }
 
-    "turn JsonLD Output entity into the OutputEntity object for the given generation Id " in {
+    "turn CliOutput entity with multiple Generations into the Entity object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
-
-        val Right(decodedEntities) = JsonLD
-          .arr(activity.asJsonLD, datasetPartEntities(datasetCreatedDates().generateOne.value).generateOne.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Entity.OutputEntity]](
-            decodeList(entities.Entity.outputEntityDecoder(activity.generations.head.resourceId))
+        val testActivity = activityGenerator(commandOutput).generateOne
+        val updatedActivity = testActivity.copy(generationFactories =
+          testActivity.generationFactories :+ (act =>
+            Generation(Generation.Id.generate,
+                       act,
+                       gen => OutputEntity(entityLocations.generateOne, entityChecksums.generateOne, gen)
+            )
           )
+        )
 
-        decodedEntities should contain allElementsOf activity.generations.map(_.entity)
-      }
-    }
+        val result = updatedActivity.to[CliActivity].generations.map(_.entity).map(entities.Entity.fromCli)
 
-    "turn JsonLD Output entity with multiple Generations into the Entity object " in {
-      forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
-          .to[entities.Activity]
-
-        val updateGenerations = activity.generations.map { generation =>
-          val updatedEntity = generation.entity.copy(generationResourceIds =
-            generation.entity.generationResourceIds ::: generations.ResourceId(
-              (renkuUrl / Generation.Id.generate).show
-            ) :: Nil
-          )
-          generation.copy(entity = updatedEntity)
-        }
-        val updatedActivity = activity.copy(generations = updateGenerations)
-
-        val Right(decodedEntities) = JsonLD
-          .arr(updatedActivity.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Entity]]
-
-        decodedEntities should contain allElementsOf updatedActivity.generations.map(_.entity)
+        result should contain allElementsOf updatedActivity.generations.map(g => Entity.toEntity.apply(g.entity))
       }
     }
   }

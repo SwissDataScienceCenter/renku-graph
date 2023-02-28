@@ -18,23 +18,23 @@
 
 package io.renku.events.producers
 
+import cats.{Applicative, Eval}
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import cats.{Applicative, Eval}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
-import io.renku.events.producers.EventSender.EventContext
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.config.EventLogUrl
+import io.renku.events.producers.EventSender.EventContext
+import io.renku.graph.config.{EventConsumerUrl, EventConsumerUrlFactory}
 import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.metrics.MetricsRegistry
+import org.http4s._
 import org.http4s.Method.POST
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
-import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -48,8 +48,19 @@ trait EventSender[F[_]] {
   ): F[Unit]
 }
 
+object EventSender {
+  def apply[F[_]: Async: Logger: MetricsRegistry](
+      consumerUrlFactory: EventConsumerUrlFactory
+  ): F[EventSender[F]] = for {
+    consumerUrl     <- consumerUrlFactory()
+    sentEventsGauge <- SentEventsGauge[F]
+  } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onErrorSleep = 15 seconds)
+
+  final case class EventContext(categoryName: CategoryName, errorMessage: String)
+}
+
 class EventSenderImpl[F[_]: Async: Logger](
-    eventLogUrl:            EventLogUrl,
+    eventConsumerUrl:       EventConsumerUrl,
     sentEventsGauge:        SentEventsGauge[F],
     onErrorSleep:           FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
@@ -66,7 +77,7 @@ class EventSenderImpl[F[_]: Async: Logger](
   import applicative.whenA
 
   override def sendEvent(eventContent: EventRequestContent.NoPayload, context: EventContext): F[Unit] = for {
-    uri            <- validateUri(s"$eventLogUrl/events")
+    uri            <- validateUri(s"$eventConsumerUrl/events")
     request        <- createRequest(uri, eventContent)
     responseStatus <- sendWithRetry(request, context)
     _              <- whenA(responseStatus == Accepted)(sentEventsGauge.increment(context.categoryName))
@@ -75,7 +86,7 @@ class EventSenderImpl[F[_]: Async: Logger](
   override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType],
                                       context:      EventContext
   )(implicit partEncoder: RestClient.PartEncoder[PayloadType]): F[Unit] = for {
-    uri            <- validateUri(s"$eventLogUrl/events")
+    uri            <- validateUri(s"$eventConsumerUrl/events")
     request        <- createRequest(uri, eventContent)
     responseStatus <- sendWithRetry(request, context)
     _              <- whenA(responseStatus == Accepted)(sentEventsGauge.increment(context.categoryName))
@@ -114,13 +125,4 @@ class EventSenderImpl[F[_]: Async: Logger](
     case (Accepted, _, _) => Accepted.pure[F]
     case (NotFound, _, _) => NotFound.pure[F]
   }
-}
-
-object EventSender {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventSender[F]] = for {
-    eventLogUrl     <- EventLogUrl[F]()
-    sentEventsGauge <- SentEventsGauge[F]
-  } yield new EventSenderImpl(eventLogUrl, sentEventsGauge, onErrorSleep = 15 seconds)
-
-  final case class EventContext(categoryName: CategoryName, errorMessage: String)
 }

@@ -19,14 +19,14 @@
 package io.renku.eventlog.events.producers
 package awaitinggeneration
 
-import UrlAndIdSubscribers.UrlAndIdSubscribers
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.graph.model.EventContentGenerators._
-import io.renku.generators.Generators.Implicits._
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventDate
 import org.scalacheck.Gen
@@ -308,7 +308,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
   }
 
   private trait TestCase {
-    implicit val subscribers: UrlAndIdSubscribers[Try] = mock[Subscribers[Try, UrlAndIdSubscriptionInfo]]
+
+    implicit val subscribers: DefaultSubscribers[Try] = mock[DefaultSubscribers[Try]]
     lazy val projectPrioritisation = new ProjectPrioritisationImpl[Try]
 
     def `given no totalCapacity` =
@@ -320,7 +321,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
     def `given totalCapacity`(capacity: Int) =
       (() => subscribers.getTotalCapacity)
         .expects()
-        .returning(Capacity(capacity).some)
+        .returning(TotalCapacity(capacity).some)
         .atLeastOnce()
   }
 

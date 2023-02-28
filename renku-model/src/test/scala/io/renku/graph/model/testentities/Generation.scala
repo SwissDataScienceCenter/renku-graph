@@ -21,7 +21,9 @@ package io.renku.graph.model.testentities
 import Entity.OutputEntity
 import Generation.Id
 import cats.syntax.all._
+import io.renku.cli.model.CliGeneration
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.{activities, entities, generations}
 import io.renku.tinytypes.constraints.UUID
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -48,6 +50,9 @@ object Generation {
         activities.ResourceId(generation.activity.asEntityId.show),
         generation.entity.to[entities.Entity.OutputEntity]
       )
+
+  implicit def toCliGeneration(implicit renkuUrl: RenkuUrl): Generation => CliGeneration =
+    CliConverters.from(_)
 
   def factory(entityFactory: Generation => OutputEntity): Activity => Generation =
     activity => Generation(Id.generate, activity, entityFactory)

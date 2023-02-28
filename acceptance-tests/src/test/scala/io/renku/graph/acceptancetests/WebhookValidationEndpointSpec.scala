@@ -18,12 +18,11 @@
 
 package io.renku.graph.acceptancetests
 
-import cats.syntax.all._
 import io.circe.syntax.EncoderOps
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
-import io.renku.graph.acceptancetests.data.dataProjects
+import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
@@ -34,8 +33,13 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
   Feature("Existence of a Graph Services hook can be validated") {
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
-      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
-      val user    = authUsers.generateOne
+
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount.zero
+        ).generateOne
+      val user = authUsers.generateOne
+
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -51,8 +55,12 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
-      val user    = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount.zero
+        ).generateOne
+      val user = authUsers.generateOne
+
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -68,12 +76,13 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val user = authUsers.generateOne
-      val project = dataProjects(
-        renkuProjectEntities(visibilityNonPublic).map(
-          _.copy(maybeCreator = personEntities(user.id.some).generateOne.some)
-        )
-      ).generateOne
+      val user    = authUsers.generateOne
+      val creator = cliShapedPersons.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityNonPublic, creatorGen = cliShapedPersons).modify(removeMembers()))
+          .map(replaceCreatorFrom(creator, user.id))
+          .map(addMemberFrom(creator, user.id))
+          .generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)

@@ -26,6 +26,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.producers.EventSender
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -95,6 +96,6 @@ private object ProjectInfoSynchronizer {
       : F[ProjectInfoSynchronizer[F]] = for {
     gitLabProjectFetcher <- GitLabProjectFetcher[F]
     projectRemover       <- ProjectRemover[F]
-    eventSender          <- EventSender[F]
+    eventSender          <- EventSender[F](EventLogUrl)
   } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender)
 }

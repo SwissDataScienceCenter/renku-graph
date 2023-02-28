@@ -21,14 +21,15 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
+import io.renku.eventlog.{ChangeDate, InMemoryEventLogDbSpec, MigrationStatus}
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{ChangeDate, InMemoryEventLogDbSpec, MigrationStatus}
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
+import io.renku.events.Generators.subscriberUrls
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.CommonGraphGenerators.serviceVersions
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.Implicits._
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -36,9 +37,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.{Duration, Instant}
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit.MICROS
-import java.time.{Duration, Instant}
 
 class EventFinderSpec
     extends AnyWordSpec

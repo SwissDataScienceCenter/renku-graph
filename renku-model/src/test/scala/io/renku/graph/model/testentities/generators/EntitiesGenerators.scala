@@ -25,10 +25,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.persons.{Email, GitLabId}
-import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
-
-import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators {
   type ProjectBasedGenFactory[A] = Kleisli[Gen, projects.DateCreated, A]
@@ -71,17 +68,14 @@ trait EntitiesGenerators
   implicit val gitLabUrl:    GitLabUrl    = Instances.gitLabUrl
   implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl
 
-  def invalidationTimes(min: InstantTinyType): Gen[InvalidationTime] = invalidationTimes(min.value)
-
-  def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
-    timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
-
   lazy val withGitLabId:    Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfSomes
   lazy val withoutGitLabId: Gen[Option[GitLabId]] = fixed(Option.empty[GitLabId])
   lazy val withEmail:       Gen[Option[Email]]    = personEmails.toGeneratorOfSomes
   lazy val withoutEmail:    Gen[Option[Email]]    = personEmails.toGeneratorOfNones
 
   implicit lazy val personEntities: Gen[Person] = personEntities()
+
+  val cliShapedPersons: Gen[Person] = personEntities(withoutGitLabId)
 
   def personEntities(
       maybeGitLabIds: Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfOptions,

@@ -77,7 +77,8 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
       "Could not resolve host: renkulab.io",
-      "Failed to connect to renkulab.io port 443: Host is unreachable"
+      "Failed to connect to renkulab.io port 443: Host is unreachable",
+      "remote: default backend - 404"
     ) foreach { error =>
       s"return LogWorthyRecoverableError if command fails with a message containing '$error'" in new TestCase {
         val errorMessage = sentenceContaining(error).generateOne

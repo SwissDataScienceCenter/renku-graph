@@ -19,10 +19,10 @@
 package io.renku.graph.model.testentities
 package generators
 
-import cats.syntax.all._
 import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
 import cats.data.{Kleisli, NonEmptyList}
+import cats.syntax.all._
 import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, PlanGenFactory, ProjectBasedGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, positiveInts}
@@ -41,7 +41,7 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   val activityIds: Gen[Activity.Id] = noDashUuid.toGeneratorOf(Activity.Id)
 
   def planDatesCreatedK: Kleisli[Gen, InstantTinyType, plans.DateCreated] =
-    Kleisli(planDatesCreated)
+    Kleisli(planCreatedDates)
 
   lazy val generationIds: Gen[Generation.Id] = noDashUuid.toGeneratorOf(Generation.Id)
 
@@ -63,17 +63,18 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   lazy val parameterValueOverrides: Gen[ValueOverride] =
     nonBlankStrings().map(v => ValueOverride(v.value))
 
-  def activityEntities(planGen: StepPlanGenFactory): ActivityGenFactory =
-    Kleisli(executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe()))
+  def activityEntities(planGen: StepPlanGenFactory, authorGen: Gen[Person] = personEntities): ActivityGenFactory =
+    Kleisli(executionPlanners(planGen, _: projects.DateCreated, authorGen).map(_.buildProvenanceUnsafe()))
 
   def planEntities(
+      creatorGen:         Gen[Person],
       parameterFactories: CommandParameterFactory*
   )(implicit planCommandsGen: Gen[Command]): PlanGenFactory =
     Kleisli { dateCreated =>
       Gen.recursive[Plan] { recurse =>
-        val spGen = stepPlanEntities(parameterFactories: _*)(planCommandsGen).run(dateCreated).map(_.widen)
+        val spGen = stepPlanEntities(planCommandsGen, creatorGen, parameterFactories: _*).run(dateCreated).map(_.widen)
         val cpGen =
-          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 6)))
+          compositePlanEntities(creatorGen, Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 6)))
             .run(dateCreated)
             .map(_.widen)
 
@@ -81,29 +82,56 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
       }
     }
 
-  def planEntitiesList(min: Int = 3, max: Int = 6, parameterFactories: List[CommandParameterFactory])(implicit
+  def planEntitiesList(min:                Int = 3,
+                       max:                Int = 6,
+                       parameterFactories: List[CommandParameterFactory],
+                       creatorGen:         Gen[Person]
+  )(implicit
       planCommandsGen: Gen[Command]
   ): ProjectBasedGenFactory[List[Plan]] =
-    planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
+    planEntities(creatorGen, parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
 
   def stepPlanEntities(
       parameterFactories: CommandParameterFactory*
-  )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory = Kleisli(projectDateCreated =>
+  )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory =
+    stepPlanEntities(planCommandsGen, personEntities, parameterFactories: _*)
+
+  def stepPlanEntities(
+      planCommandsGen:    Gen[Command],
+      creatorsGen:        Gen[Person],
+      parameterFactories: CommandParameterFactory*
+  ): StepPlanGenFactory = Kleisli { projectDateCreated =>
     for {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
-      dateCreated  <- planDatesCreated(after = projectDateCreated)
+      dateCreated  <- planCreatedDates(after = projectDateCreated)
+      creators     <- creatorsGen.toGeneratorOfList(max = 2)
+    } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
+  }
+
+  def stepPlanEntities(
+      planDateCreatedGen: Gen[plans.DateCreated],
+      parameterFactories: Seq[CommandParameterFactory] = Seq.empty[CommandParameterFactory]
+  )(implicit
+      planCommandsGen: Gen[Command]
+  ): StepPlanGenFactory = Kleisli(_ =>
+    for {
+      name         <- planNames
+      maybeCommand <- planCommandsGen.toGeneratorOfOptions
+      dateCreated  <- planDateCreatedGen
       creators     <- personEntities.toGeneratorOfList(max = 2)
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
   )
 
-  def compositePlanEntities(childGen: ProjectBasedGenFactory[List[Plan]]): CompositePlanGenFactory =
+  def compositePlanEntities(creatorGen: Gen[Person],
+                            childGen:   ProjectBasedGenFactory[List[Plan]]
+  ): CompositePlanGenFactory =
     (planDatesCreatedK, childGen).flatMapN { (dateCreated, childPlans) =>
       for {
         id       <- ProjectBasedGenFactory.liftF(planIdentifiers)
         name     <- ProjectBasedGenFactory.liftF(planNames)
-        creators <- ProjectBasedGenFactory.liftF(personEntities.toGeneratorOfList(max = 3))
-        descr    <- ProjectBasedGenFactory.liftF(Gen.some(planDescriptions))
+        creators <- ProjectBasedGenFactory.liftF(creatorGen.toGeneratorOfList(max = 3))
+        descr    <- ProjectBasedGenFactory.liftF(planDescriptions.toGeneratorOfSomes)
         kw       <- ProjectBasedGenFactory.liftF(planKeywords.toGeneratorOfList())
         cp = CompositePlan.NonModified(
                id = id,
@@ -152,13 +180,13 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
             for {
               id          <- noDashUuid.map(ParameterMapping.Identifier(_))
               mappingName <- commandParameterNames
-              defval      <- parameterDefaultValues
+              maybeDefVal <- parameterDefaultValues.toGeneratorOfOptions
               descr       <- Gen.some(commandParameterDescription)
             } yield ParameterMapping(
               id = id,
               name = mappingName,
               description = descr,
-              defaultValue = defval.value,
+              defaultValue = maybeDefVal.map(_.value),
               planId = parent.id,
               mappedParam = NonEmptyList.one(target)
             )
@@ -172,13 +200,13 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
             for {
               id          <- noDashUuid.map(ParameterMapping.Identifier(_))
               mappingName <- commandParameterNames
-              defval      <- parameterDefaultValues
+              maybeDefVal <- parameterDefaultValues.toGeneratorOfOptions
               descr       <- Gen.some(commandParameterDescription)
             } yield ParameterMapping(
               id = id,
               name = mappingName,
               description = descr,
-              defaultValue = defval.value,
+              defaultValue = maybeDefVal.map(_.value),
               planId = parent.id,
               mappedParam = NonEmptyList.one(targetMapping)
             )
@@ -220,17 +248,19 @@ trait ActivityGenerators extends RenkuTinyTypeGenerators {
   def executionPlanners(planGen: StepPlanGenFactory, project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
 
-  def executionPlanners(planGen: StepPlanGenFactory, projectDateCreated: projects.DateCreated): Gen[ExecutionPlanner] =
-    for {
-      plan       <- planGen.run(projectDateCreated)
-      author     <- personEntities
-      cliVersion <- cliVersions
-    } yield ExecutionPlanner.of(plan,
-                                activityStartTimes(plan.dateCreated).generateOne,
-                                author,
-                                cliVersion,
-                                projectDateCreated
-    )
+  def executionPlanners(planGen:            StepPlanGenFactory,
+                        projectDateCreated: projects.DateCreated,
+                        authorGen:          Gen[Person] = personEntities
+  ): Gen[ExecutionPlanner] = for {
+    plan       <- planGen.run(projectDateCreated)
+    author     <- authorGen
+    cliVersion <- cliVersions
+  } yield ExecutionPlanner.of(plan,
+                              activityStartTimes(plan.dateCreated).generateOne,
+                              author,
+                              cliVersion,
+                              projectDateCreated
+  )
 
   def executionPlannersDecoupledFromProject(planGen: StepPlanGenFactory): Gen[ExecutionPlanner] =
     executionPlanners(planGen, projectCreatedDates().generateOne)

@@ -23,7 +23,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions._
+import io.renku.events.Generators._
+import io.renku.events.Subscription._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.ServiceHealthChecker

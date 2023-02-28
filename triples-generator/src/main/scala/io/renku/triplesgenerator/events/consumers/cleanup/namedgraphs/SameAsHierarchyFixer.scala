@@ -120,12 +120,12 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     }
   }
 
-  private case class DirectDescendantInfo(graphId:       EntityId,
-                                          dsId:          datasets.ResourceId,
-                                          topmostSameAs: TopmostSameAs,
-                                          sameAs:        SameAs,
-                                          date:          Date,
-                                          modified:      Boolean
+  private case class DirectDescendantInfo(graphId:            EntityId,
+                                          dsId:               datasets.ResourceId,
+                                          topmostSameAs:      TopmostSameAs,
+                                          sameAs:             SameAs,
+                                          createdOrPublished: CreatedOrPublished,
+                                          modified:           Boolean
   )
 
   private def collectDirectDescendants(dsInfo: DSInfo): Nested[F, List, DirectDescendantInfo] = Nested {

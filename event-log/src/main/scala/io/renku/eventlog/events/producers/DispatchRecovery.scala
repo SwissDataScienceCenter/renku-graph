@@ -19,10 +19,10 @@
 package io.renku.eventlog.events.producers
 
 import EventsSender.SendingResult
-import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import cats.syntax.all._
 import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

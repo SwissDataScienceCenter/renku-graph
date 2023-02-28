@@ -24,11 +24,12 @@ import io.renku.commiteventservice.events.consumers.common.{Author, CommitInfo, 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
 
   "CommitInfo Decoder" should {
 
@@ -113,7 +114,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
     "fail if there are blanks for author username and email" in {
       val commitInfo = commitInfos.generateOne
 
-      val Left(exception) = json"""{
+      val result = json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${blankStrings().generateOne},
         "author_email":    ${blankStrings().generateOne},
@@ -124,15 +125,15 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "parent_ids":      ${commitInfo.parents.map(_.value)}
       }""".as[CommitInfo]
 
-      exception.getMessage() shouldBe "Neither author name nor email"
+      result.left.value.getMessage() should include("Neither author name nor email")
     }
 
     "fail if there are blanks for committer username and email" in {
       val commitInfo = commitInfos.generateOne
 
-      val Left(exception) = json"""{
+      val result = json"""{
         "id":              ${commitInfo.id.value},
-        "author_name":     ${usernames.generateOne.value},
+        "author_name":     ${personUsernames.generateOne.value},
         "author_email":    ${personEmails.generateOne.value},
         "committer_name":  ${blankStrings().generateOne},
         "committer_email": ${blankStrings().generateOne},
@@ -141,7 +142,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "parent_ids":      ${commitInfo.parents.map(_.value)}
       }""".as[CommitInfo]
 
-      exception.getMessage() shouldBe "Neither committer name nor email"
+      result.left.value.getMessage() should include("Neither committer name nor email")
     }
   }
 }

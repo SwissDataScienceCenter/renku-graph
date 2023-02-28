@@ -23,3 +23,8 @@ import io.renku.graph.model.plans
 trait DependencyLinks {
   def findStepPlan(planId: plans.ResourceId): Option[StepPlan]
 }
+
+object DependencyLinks {
+  def apply(f: plans.ResourceId => Option[StepPlan]): DependencyLinks =
+    (planId: plans.ResourceId) => f(planId)
+}

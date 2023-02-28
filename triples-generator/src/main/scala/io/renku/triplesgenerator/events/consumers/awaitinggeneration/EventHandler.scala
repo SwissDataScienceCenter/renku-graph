@@ -20,15 +20,14 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent}
+import cats.effect.kernel.Deferred
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventBody
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
@@ -80,7 +79,7 @@ object EventHandler {
     tsReadinessChecker       <- TSReadinessForEventsChecker[F]
     eventProcessor           <- EventProcessor[F]
     generationProcesses      <- GenerationProcessesNumber[F](config)
-    concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
+    concurrentProcessLimiter <- ConcurrentProcessesLimiter(generationProcesses.asRefined)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
                               eventProcessor,

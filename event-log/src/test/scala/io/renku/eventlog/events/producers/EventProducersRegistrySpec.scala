@@ -24,8 +24,10 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.CategoryName
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
+import Generators._
+import io.renku.events.Generators.categoryNames
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -48,6 +50,7 @@ private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with Mo
       }
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration, failingRun)
       val registry   = new EventProducersRegistryImpl[IO](categories)
+
       intercept[Exception] {
         registry.run().unsafeRunSync()
       } shouldBe exception
@@ -60,17 +63,20 @@ private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with Mo
       val categories =
         Set[SubscriptionCategory[IO]](new SuccessfulRegistration {}, SubscriptionCategoryWithoutRegistration)
       val registry = new EventProducersRegistryImpl[IO](categories)
+
       registry.register(payload).unsafeRunSync() shouldBe SuccessfulSubscription
     }
 
     "return a request error when there are no categories" in new TestCase {
       val registry = new EventProducersRegistryImpl[IO](Set.empty)
+
       registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
     "return a request error when no category can handle the payload" in new TestCase {
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
       val registry   = new EventProducersRegistryImpl[IO](categories)
+
       registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
@@ -81,21 +87,37 @@ private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with Mo
       }
       val categories = Set[SubscriptionCategory[IO]](failingRegistration, SubscriptionCategoryWithoutRegistration)
       val registry   = new EventProducersRegistryImpl[IO](categories)
+
       intercept[Exception] {
         registry.register(payload).unsafeRunSync()
       } shouldBe exception
     }
   }
 
+  "getStatus" should {
+
+    "collect statuses from all the registered producers" in new TestCase {
+
+      val subscription1 = new TestSubscriptionCategory {}
+      val subscription2 = new TestSubscriptionCategory {}
+      val categories    = Set[SubscriptionCategory[IO]](subscription1, subscription2)
+      val registry      = new EventProducersRegistryImpl[IO](categories)
+
+      registry.getStatus shouldBe Set(subscription1, subscription2).map(_.getStatus)
+    }
+  }
+
   trait TestCase {
     trait TestSubscriptionCategory extends SubscriptionCategory[IO] {
 
-      override val name: CategoryName = CategoryName(nonBlankStrings().generateOne.value)
+      override val categoryName: CategoryName = categoryNames.generateOne
 
       override def run(): IO[Unit] = ().pure[IO]
 
       override def register(payload: Json): IO[RegistrationResult] =
         RejectedRegistration.pure[IO]
+
+      override lazy val getStatus: IO[EventProducerStatus] = eventProducerStatuses.generateOne.pure[IO]
     }
 
     object SubscriptionCategoryWithoutRegistration extends TestSubscriptionCategory {}

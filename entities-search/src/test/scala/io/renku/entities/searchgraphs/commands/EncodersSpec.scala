@@ -121,7 +121,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  private def createdOrPublishedToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.Date => Quad = {
+  private def createdOrPublishedToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.CreatedOrPublished => Quad = {
     case d: datasets.DateCreated =>
       DatasetsQuad(topmostSameAs, SearchInfoOntology.dateCreatedProperty.id, d.asObject)
     case d: datasets.DatePublished =>

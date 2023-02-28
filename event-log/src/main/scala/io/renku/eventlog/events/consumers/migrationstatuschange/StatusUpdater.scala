@@ -22,12 +22,12 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Sent
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 
 import java.time.Instant
 

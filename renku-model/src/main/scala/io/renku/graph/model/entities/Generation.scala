@@ -18,14 +18,14 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.CliGeneration
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.entities.Entity.OutputEntity
 import io.renku.graph.model.generations.ResourceId
-import io.renku.graph.model.{activities, generations}
-import io.renku.jsonld.JsonLDDecoder.decodeList
-import io.renku.jsonld._
+import io.renku.graph.model.activities
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder, Reverse}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax.JsonEncoderOps
 
@@ -45,21 +45,20 @@ object Generation {
       )
     }
 
-  private def withActivity(activityId: activities.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
-    _.downField(prov / "activity").downEntityId.as[activities.ResourceId].map(_ == activityId)
-
-  def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
-    JsonLDDecoder.entity(entityTypes, withActivity(activityId)) { cursor =>
-      for {
-        resourceId         <- cursor.downEntityId.as[generations.ResourceId]
-        activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
-        entity <- cursor.focusTop
-                    .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId))) >>= {
-                    case entity :: Nil => entity.asRight
-                    case _ => DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil).asLeft
-                  }
-      } yield Generation(resourceId, activityResourceId, entity)
+  def fromCli(cliGen: CliGeneration): ValidatedNel[String, Generation] = {
+    val entity =
+      Entity.fromCli(cliGen.entity) match {
+        case e: Entity.OutputEntity => e.validNel
+        case e => Validated.invalidNel(s"Expected output entity for a Generation, but got: $e")
+      }
+    entity.map { e =>
+      Generation(
+        cliGen.resourceId,
+        cliGen.activityResourceId,
+        e
+      )
     }
+  }
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Generation"),

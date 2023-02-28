@@ -16,54 +16,56 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.knowledgegraph
+package io.renku.graph.acceptancetests
+package knowledgegraph
 
 import cats.syntax.all._
+import data._
+import flows.TSProvisioning
 import io.circe.Json
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
-import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
-import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.http.client.UrlEncoder._
-import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
+import tooling.{AcceptanceSpec, ApplicationServices}
 
-class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
-
-  private implicit val graph: GraphClass = GraphClass.Default
+class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET knowledge-graph/entities") {
 
     val user = authUsers.generateOne
 
     val commonPhrase = nonBlankStrings(minLength = 5).generateOne
-    val testEntitiesProject =
-      renkuProjectEntities(visibilityPublic)
+    val testProject =
+      renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(replaceProjectName(sentenceContaining(commonPhrase).generateAs[projects.Name]))
+        .modify(removeMembers())
         .modify(
           replaceProjectCreator(
-            personEntities(withGitLabId)
+            cliShapedPersons
               .map(replacePersonName(sentenceContaining(commonPhrase).generateAs[persons.Name]))
               .generateSome
           )
         )
         .withActivities(
           activityEntities(
-            stepPlanEntities().map(_.replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name]))
+            stepPlanEntities(planCommands, cliShapedPersons).map(
+              _.replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name])
+            ),
+            authorGen = cliShapedPersons
           )
         )
         .withDatasets(
-          datasetEntities(provenanceInternal)
+          datasetEntities(provenanceInternal(cliShapedPersons))
             .modify(replaceDSName(sentenceContaining(commonPhrase).generateAs[datasets.Name]))
         )
         .generateOne
-    val project = dataProjects(testEntitiesProject).generateOne
+    val project = dataProjects(testProject).generateOne
 
     Scenario("As a user I would like to be able to do cross-entity search by calling a REST endpoint") {
 
@@ -71,7 +73,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
-      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, user.accessToken)
 
       When("the user calls the GET knowledge-graph/entities")

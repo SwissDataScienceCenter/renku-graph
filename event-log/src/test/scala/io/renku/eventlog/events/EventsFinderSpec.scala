@@ -30,7 +30,7 @@ import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.CompoundEventId
-import io.renku.http.rest.SortBy
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.metrics.TestMetricsRegistry
@@ -143,7 +143,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagedResults = eventsFinder
         .findEvents(
           Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
-                   Sorting.By(Sorting.EventDate, SortBy.Direction.Asc),
+                   Sorting(Sort.By(Sort.EventDate, SortBy.Direction.Asc)),
                    pagingRequest
           )
         )
@@ -155,9 +155,10 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val ascPagedResults = eventsFinder
         .findEvents(
-          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
-                   Sorting.By(Sorting.EventDate, SortBy.Direction.Desc),
-                   pagingRequest
+          Criteria(
+            Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
+            Sorting(Sort.By(Sort.EventDate, SortBy.Direction.Desc)),
+            pagingRequest
           )
         )
         .unsafeRunSync()

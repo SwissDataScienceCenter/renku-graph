@@ -19,6 +19,8 @@
 package io.renku.graph.model
 package testentities
 
+import io.renku.cli.model.CliProject
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
@@ -72,6 +74,9 @@ object Project {
       toEntitiesNonRenkuProjectWithParent(renkuUrl),
       toEntitiesNonRenkuProjectWithoutParent(renkuUrl)
     )
+
+  implicit def toCliProject(implicit renkuUrl: RenkuUrl): Project => CliProject =
+    CliConverters.from(_)
 
   implicit def toProjectIdentification(implicit renkuUrl: RenkuUrl): Project => entities.ProjectIdentification =
     project => entities.ProjectIdentification(projects.ResourceId(project.asEntityId), project.path)

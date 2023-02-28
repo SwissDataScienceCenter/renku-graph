@@ -19,6 +19,8 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.cli.model.CliDatasetFile
+import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartId, PartSource}
 import io.renku.graph.model.{datasets, entities}
 
@@ -56,6 +58,9 @@ object DatasetPart {
         None
       )
   }
+
+  implicit def toCliDatasetFile(implicit renkuUrl: RenkuUrl): DatasetPart => CliDatasetFile =
+    CliConverters.from(_)
 
   implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[DatasetPart] =
     JsonLDEncoder.instance(_.to[entities.DatasetPart].asJsonLD)

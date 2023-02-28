@@ -19,16 +19,12 @@
 organization := "io.renku"
 name := "tiny-types"
 
-libraryDependencies += "eu.timepit" %% "refined" % "0.10.1"
-
-val circeVersion       = "0.14.3"
-val circeOpticsVersion = "0.14.1"
-libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
-libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
-libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
-libraryDependencies += "io.circe" %% "circe-optics"  % circeOpticsVersion
-libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
-
-val catsVersion = "2.9.0"
-libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
-libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
+libraryDependencies ++=
+  Dependencies.refined ++
+    Dependencies.circeCore ++
+    Dependencies.circeLiteral ++
+    Dependencies.circeGeneric ++
+    Dependencies.circeOptics ++
+    Dependencies.circeParser ++
+    Dependencies.catsCore ++
+    Dependencies.catsFree
