@@ -34,7 +34,7 @@ private class ConcurrentProcessExecutor[F[_]: Concurrent: Logger](semaphore: Sem
         .start {
           Resource
             .make(().pure[F])(_ => semaphore.release)
-            .evalTap(_ => process.handleErrorWith(err => Logger[F].error(err)("Scheduled process failed")))
+            .evalTap(_ => process.handleErrorWith(Logger[F].error(_)("Scheduled process failed")))
             .use_
         }
         .as(Accepted)

@@ -22,7 +22,7 @@ import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.events.EventStatus._
 import org.typelevel.log4cats.Logger
@@ -46,7 +46,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger: EventStatusGauges](
       case Updated => updateGauges(event)
       case _       => ().pure[F]
     }
-  } recoverWith { case exception => Logger[F].logError(event, exception) }
+  } recoverWith { case exception =>
+    Logger[F].error(exception)(show"$categoryName: $event -> Failure")
+  }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case ZombieEvent(_, projectPath, GeneratingTriples) =>

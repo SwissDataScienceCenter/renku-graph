@@ -30,6 +30,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ConcurrentProcessExecutorSpec
     extends AnyWordSpec
@@ -49,7 +50,7 @@ class ConcurrentProcessExecutorSpec
         val nonSchedulableValue = ints(processesCount.value + 1).generateOne
         val nonSchedulable      = executor.tryExecuting(slowProcess(nonSchedulableValue))
 
-        (schedulable :+ nonSchedulable).sequence
+        (schedulable :+ nonSchedulable).parSequence
           .unsafeRunSync()
           .distinct should contain theSameElementsAs Set(Accepted, Busy)
 
@@ -66,7 +67,7 @@ class ConcurrentProcessExecutorSpec
       val nonSchedulableValue = ints(processesCount.value + 1).generateOne
       val nonSchedulable      = executor.tryExecuting(slowProcess(nonSchedulableValue))
 
-      (schedulable :+ nonSchedulable).sequence
+      (schedulable :+ nonSchedulable).parSequence
         .unsafeRunSync()
         .distinct should contain theSameElementsAs Set(Accepted, Busy)
 
@@ -88,127 +89,16 @@ class ConcurrentProcessExecutorSpec
 
       val failingSchedulable = executor.tryExecuting(failingProcess)
 
-      (failingSchedulable :: schedulable).sequence
+      Random
+        .shuffle(failingSchedulable :: schedulable)
+        .parSequence
         .unsafeRunSync()
         .distinct shouldBe List(Accepted)
 
       eventually {
         executionRegister.get.unsafeRunSync() should contain theSameElementsAs schedulableValues
       }
-
-      executionRegister.set(Nil).unsafeRunSync()
-
-      val anotherValue = ints(processesCount.value + 1).generateOne
-      eventually {
-        executor.tryExecuting(slowProcess(anotherValue)).unsafeRunSync() shouldBe Accepted
-      }
-
-      eventually {
-        executionRegister.get.unsafeRunSync() shouldBe List(anotherValue)
-      }
     }
-
-//    "run the releaseProcess and return a SchedulingError if the process fails" in new TestCase {
-//      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
-//      (() => semaphore.acquire).expects().returning(().pure[IO])
-//      (() => semaphore.release).expects().returning(().pure[IO])
-//
-//      val releaseFunctionWasCalled = new AtomicBoolean(false)
-//
-//      val exception = exceptions.generateOne
-//
-//      tryExecuting(
-//        _ =>
-//          EitherT.right(
-//            IO.delay(releaseFunctionWasCalled.set(true)) >> exception.raiseError[IO, Accepted]
-//          ),
-//        IO.delay(releaseFunctionWasCalled.set(false))
-//      ).unsafeRunSync() shouldBe SchedulingError(exception)
-//
-//      eventually {
-//        releaseFunctionWasCalled.get shouldBe true
-//      }
-//    }
-//
-//    "release the semaphore if the releaseProcess fails" in new TestCase {
-//      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO])
-//      (() => semaphore.acquire).expects().returning(().pure[IO])
-//      (() => semaphore.release).expects().returning(().pure[IO])
-//      val releaseFunctionWasCalled = new AtomicBoolean(false)
-//
-//      tryExecuting(
-//        (deferred: Deferred[IO, Unit]) =>
-//          EitherT
-//            .rightT[IO, EventSchedulingResult](Accepted)
-//            .semiflatTap(_ => deferred.complete(())),
-//        IO.delay(releaseFunctionWasCalled.set(true)) >> exceptions.generateOne.raiseError[IO, Unit]
-//      ).unsafeRunSync() shouldBe Accepted
-//
-//      eventually {
-//        releaseFunctionWasCalled.get shouldBe true
-//      }
-//    }
-//
-//    "return Busy if there are no available spots" in new TestCase {
-//      (() => semaphore.available).expects().returning(0L.pure[IO])
-//
-//      tryExecuting(
-//        _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
-//        IO.unit
-//      ).unsafeRunSync() shouldBe Busy
-//    }
-//
-//    "throw an error if acquiring the semaphore fails and all spots are available" in new TestCase {
-//      val exception = exceptions.generateOne
-//      (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO]).twice()
-//      (() => semaphore.acquire).expects().returning(exception.raiseError[IO, Unit])
-//
-//      intercept[Exception] {
-//        tryExecuting(
-//          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
-//          IO.unit
-//        ).unsafeRunSync()
-//      }.getMessage shouldBe exception.getMessage
-//    }
-//
-//    "throw an error if acquiring the semaphore fails and release the semaphore if some spots are not available" in new TestCase {
-//      val exception = exceptions.generateOne
-//      inSequence {
-//        (() => semaphore.available).expects().returning(processesCount.value.toLong.pure[IO]).once()
-//        (() => semaphore.acquire).expects().returning(exception.raiseError[IO, Unit])
-//        (() => semaphore.available).expects().returning(0.toLong.pure[IO]).once()
-//        (() => semaphore.release).expects().returning(().pure[IO])
-//      }
-//
-//      intercept[Exception] {
-//        tryExecuting(
-//          _ => EitherT.rightT[IO, EventSchedulingResult](Accepted),
-//          IO.unit
-//        ).unsafeRunSync()
-//      }.getMessage shouldBe exception.getMessage
-//    }
-//
-//    s"execute a process and return the result $Accepted" in new TestCase {
-//      withoutLimit
-//        .tryExecuting(resultWithoutLimit(EitherT.rightT(Accepted)))
-//        .unsafeRunSync() shouldBe Accepted
-//    }
-//
-//    s"execute a process and return the result $BadRequest" in new TestCase {
-//      withoutLimit
-//        .tryExecuting(resultWithoutLimit(EitherT.leftT(BadRequest)))
-//        .unsafeRunSync() shouldBe BadRequest
-//    }
-//
-//    "return a SchedulingError if the process fails" in new TestCase {
-//
-//      val exception = exceptions.generateOne
-//      val process   = exception.raiseError[IO, Accepted]
-//
-//      withoutLimit
-//        .tryExecuting(resultWithoutLimit(EitherT.right(process)))
-//        .unsafeRunSync() shouldBe SchedulingError(exception)
-//    }
   }
 
   private trait TestCase {

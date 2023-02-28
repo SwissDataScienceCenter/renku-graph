@@ -18,15 +18,11 @@
 
 package io.renku.events.consumers
 
-import cats.{MonadThrow, Show}
-import cats.data.EitherT
 import cats.effect.{MonadCancelThrow, Resource}
 import cats.syntax.all._
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventSchedulingResult._
 import org.typelevel.log4cats.Logger
-
-import scala.util.control.NonFatal
 
 trait EventHandler[F[_]] {
 
@@ -43,7 +39,6 @@ trait EventHandler[F[_]] {
     case name @ `categoryName` => name.asRight
     case _                     => UnsupportedEventType.asLeft
   }
-
 }
 
 abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
@@ -77,7 +72,6 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
       .evalTap(_ => processDefinition process event)
     processExecutor
       .tryExecuting(processResource.use_)
-      .as(Accepted.widen)
   }
 
   case class EventHandlingDefinition(
@@ -107,45 +101,5 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
       precondition = Option.empty[EventSchedulingResult].pure[F],
       onRelease = None
     )
-  }
-
-  protected def logError(event: Event)(implicit show: Show[Event]): PartialFunction[Throwable, F[Unit]] = {
-    case exception =>
-      Logger[F].error(exception)(show"$categoryName: $event failed")
-  }
-
-  protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {
-
-    def log[EventInfo](eventInfo: EventInfo)(result: EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
-      result match {
-        case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
-        case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
-        case _                                  => ME.unit
-      }
-
-    def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit show: Show[EventInfo]): F[Unit] =
-      logger.info(show"$categoryName: $eventInfo -> $message")
-
-    def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit show: Show[EventInfo]): F[Unit] =
-      logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
-  }
-
-  protected implicit class EitherTOps[T](operation: F[T])(implicit ME: MonadThrow[F]) {
-
-    def toRightT(recoverTo: EventSchedulingResult): EitherT[F, EventSchedulingResult, T] = EitherT {
-      operation.map(_.asRight[EventSchedulingResult]) recover as(recoverTo)
-    }
-
-    lazy val toRightT: EitherT[F, EventSchedulingResult, T] = EitherT {
-      operation.map(_.asRight[EventSchedulingResult]) recover asSchedulingError
-    }
-
-    private def as(result: EventSchedulingResult): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
-      case NonFatal(_) => Left(result)
-    }
-
-    private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
-      case NonFatal(exception) => Left(SchedulingError(exception))
-    }
   }
 }
