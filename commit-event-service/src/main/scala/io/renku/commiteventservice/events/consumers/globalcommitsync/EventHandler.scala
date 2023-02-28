@@ -42,32 +42,24 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import commitEventSynchronizer._
-
   protected override type Event = GlobalCommitSyncEvent
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      _.event.as[GlobalCommitSyncEvent],
-      synchronizeEvents,
+      decode = _.event.as[GlobalCommitSyncEvent],
+      process = commitEventSynchronizer.synchronizeEvents,
       onRelease = subscriptionMechanism.renewSubscription()
     )
 
-  import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
+  import EventDecodingTools._
 
   private implicit val eventDecoder: Decoder[GlobalCommitSyncEvent] = cursor =>
     for {
-      project        <- cursor.downField("project").as[Project]
+      project        <- cursor.value.getProject
       commitsCount   <- cursor.downField("commits").downField("count").as[CommitsCount]
       latestCommitId <- cursor.downField("commits").downField("latest").as[CommitId]
     } yield GlobalCommitSyncEvent(project, CommitsInfo(commitsCount, latestCommitId))
-
-  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
-    for {
-      id   <- cursor.downField("id").as[projects.GitLabId]
-      path <- cursor.downField("path").as[projects.Path]
-    } yield Project(id, path)
 }
 
 private object EventHandler {

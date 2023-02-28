@@ -40,37 +40,31 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = CommitSyncEvent
 
-  import commitsSynchronizer._
-
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[CommitSyncEvent],
-      process = synchronizeEvents
+      process = commitsSynchronizer.synchronizeEvents
     )
 
-  import io.renku.graph.model.projects
   import io.renku.tinytypes.json.TinyTypeDecoders._
+  import EventDecodingTools._
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
     cursor.downField("id").as[Option[CommitId]] >>= {
       case Some(id) =>
         for {
-          project    <- cursor.downField("project").as[Project]
+          project    <- cursor.value.getProject
           lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
         } yield FullCommitSyncEvent(id, project, lastSynced)
       case None =>
-        cursor.downField("project").as[Project].map(MinimalCommitSyncEvent)
+        cursor.value.getProject.map(MinimalCommitSyncEvent)
     }
-
-  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
-    (cursor.downField("id").as[projects.GitLabId], cursor.downField("path").as[projects.Path])
-      .mapN(Project.apply)
 }
 
 private object EventHandler {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
       : F[consumers.EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]
-    processExecutor         <- ProcessExecutor.concurrent(5)
+    processExecutor         <- ProcessExecutor.concurrent(10)
   } yield new EventHandler[F](categoryName, commitEventSynchronizer, processExecutor)
 }

@@ -20,118 +20,76 @@ package io.renku.commiteventservice.events.consumers.commitsync
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.commiteventservice.events.consumers.commitsync.Generators._
 import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "handle" should {
+  "handlingDefinition.decode" should {
 
-    "decode an event from the request, " +
-      "schedule commit synchronization " +
-      s"and return $Accepted - full commit sync event case" in new TestCase {
+    "decode the full version of the event from the request" in new TestCase {
 
-        val event = fullCommitSyncEvents.generateOne
+      val event = fullCommitSyncEvents.generateOne
 
-        (commitsSynchronizer.synchronizeEvents _)
-          .expects(event)
-          .returning(().pure[IO])
+      handler
+        .createHandlingDefinition()
+        .decode(requestContent(event.asJson)) shouldBe event.asRight
+    }
 
-        handler
-          .createHandlingDefinition(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
-        )
+    "decode the minimal version of the event from the request" in new TestCase {
 
-        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-      }
+      val event = minimalCommitSyncEvents.generateOne
 
-    "decode an event from the request, " +
-      "schedule commit synchronization " +
-      s"and return $Accepted - minimal commit sync event case" in new TestCase {
+      handler
+        .createHandlingDefinition()
+        .decode(requestContent(event.asJson)) shouldBe event.asRight
+    }
+  }
 
-        val event = minimalCommitSyncEvents.generateOne
+  "handlingDefinition.process" should {
 
-        (commitsSynchronizer.synchronizeEvents _)
-          .expects(event)
-          .returning(().pure[IO])
-
-        handler
-          .createHandlingDefinition(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
-        )
-
-        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-      }
-
-    s"return $Accepted and log an error if scheduling event synchronization fails" in new TestCase {
+    "be the synchronizer.synchronizeEvents" in new TestCase {
 
       val event = commitSyncEvents.generateOne
 
       (commitsSynchronizer.synchronizeEvents _)
         .expects(event)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(().pure[IO])
 
       handler
-        .createHandlingDefinition(requestContent(event.asJson))
-        .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Right(Accepted)
-
-      logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
-
-      eventually {
-        logger.getMessages(Error).map(_.message) should contain only s"${logMessageCommon(event)} -> Failure"
-      }
+        .createHandlingDefinition()
+        .process(event)
+        .unsafeRunSync() shouldBe ()
     }
+  }
 
-    s"return $BadRequest if event is malformed" in new TestCase {
+  "createHandlingDefinition" should {
 
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": ${categoryName.value}
-        }"""
-      }
+    "not define onRelease and precondition" in new TestCase {
 
-      handler.createHandlingDefinition(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
+      val definition = handler.createHandlingDefinition()
 
-      logger.expectNoLogs()
+      definition.onRelease    shouldBe None
+      definition.precondition shouldBe None.pure[IO]
     }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger()
     val commitsSynchronizer = mock[CommitsSynchronizer[IO]]
-    val handler             = new EventHandler[IO](categoryName, commitsSynchronizer)
+    val handler             = new EventHandler[IO](categoryName, commitsSynchronizer, mock[ProcessExecutor[IO]])
 
     def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }
@@ -139,18 +97,18 @@ class EventHandlerSpec
   private implicit def eventEncoder[E <: CommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
     case FullCommitSyncEvent(id, project, lastSynced) => json"""{
         "categoryName": "COMMIT_SYNC",
-        "id":           ${id.value},
+        "id": $id,
         "project": {
-          "id":         ${project.id.value},
-          "path":       ${project.path.value}
+          "id":   ${project.id},
+          "path": ${project.path}
         },
-        "lastSynced":   ${lastSynced.value}
+        "lastSynced": $lastSynced
       }"""
     case MinimalCommitSyncEvent(project) => json"""{
         "categoryName": "COMMIT_SYNC",
         "project": {
-          "id":         ${project.id.value},
-          "path":       ${project.path.value}
+          "id":         ${project.id},
+          "path":       ${project.path}
         }
       }"""
   }
