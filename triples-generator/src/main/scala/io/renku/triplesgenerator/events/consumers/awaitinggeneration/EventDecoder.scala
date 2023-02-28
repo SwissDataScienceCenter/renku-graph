@@ -21,10 +21,8 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Error, ParsingFailure}
 import io.circe.parser._
-import io.renku.events.consumers.Project
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.events._
-import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private trait EventDecoder {
@@ -32,6 +30,8 @@ private trait EventDecoder {
 }
 
 private object EventDecoder extends EventDecoder {
+
+  import io.renku.events.consumers.EventDecodingTools._
 
   override lazy val decode: EventRequestContent => Either[Exception, CommitEvent] = {
     case EventRequestContent.WithPayload(_, payload: String) =>
@@ -44,10 +44,9 @@ private object EventDecoder extends EventDecoder {
 
   private implicit val commitsDecoder: Decoder[CommitEvent] = cursor =>
     for {
-      commitId    <- cursor.downField("id").as[CommitId]
-      projectId   <- cursor.downField("project").downField("id").as[GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[Path]
-    } yield CommitEvent(EventId(commitId.value), Project(projectId, projectPath), commitId)
+      commitId <- cursor.downField("id").as[CommitId]
+      project  <- cursor.value.getProject
+    } yield CommitEvent(EventId(commitId.value), project, commitId)
 
   private def toMeaningfulError(payload: String): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"CommitEvent cannot be decoded: '$payload'")

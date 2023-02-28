@@ -77,10 +77,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     "do the renewSubscription" in new TestCase {
 
-      handler
-        .createHandlingDefinition()
-        .onRelease
-        .foreach(_.unsafeRunSync())
+      handler.createHandlingDefinition().onRelease.foreach(_.unsafeRunSync())
 
       renewSubscriptionCalled.get.unsafeRunSync() shouldBe true
     }
@@ -89,8 +86,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val synchronizer                  = mock[CommitsSynchronizer[IO]]
-    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
     private val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
     (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
     val handler = new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, mock[ProcessExecutor[IO]])

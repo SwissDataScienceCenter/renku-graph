@@ -18,41 +18,43 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
-import cats.syntax.all._
 import io.circe._
 import io.renku.events.consumers.Project
+import io.renku.events.EventRequestContent
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.jsons
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventBody, EventId}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 
-import scala.util.{Failure, Try}
-
-class EventDecoderSpec extends AnyWordSpec with should.Matchers {
+class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
   "toCommitEvents" should {
 
     "produce a CommitEvent if the Json string can be successfully deserialized" in new TestCase {
-      deserializer.toCommitEvent(commitEvent) shouldBe CommitEvent(
-        EventId(commitId.value),
-        Project(projectId, projectPath),
-        commitId
-      ).pure[Try]
+      EventDecoder
+        .decode(EventRequestContent.WithPayload(jsons.generateOne, eventBody))
+        .value shouldBe CommitEvent(EventId(commitId.value), Project(projectId, projectPath), commitId)
     }
 
     "fail if parsing fails" in new TestCase {
-      val Failure(ParsingFailure(message, underlying)) = deserializer.toCommitEvent(EventBody("{"))
 
-      message    shouldBe "CommitEvent cannot be deserialised: '{'"
-      underlying shouldBe a[ParsingFailure]
+      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, EventBody("{")))
+
+      result.left.value                                         shouldBe a[ParsingFailure]
+      result.left.value.getMessage                              shouldBe "CommitEvent cannot be deserialised: '{'"
+      result.left.value.asInstanceOf[ParsingFailure].underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserializer.toCommitEvent(EventBody("{}"))
 
-      message shouldBe "CommitEvent cannot be deserialised: '{}'"
+      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, EventBody("{}")))
+
+      result.left.value                                       shouldBe a[DecodingFailure]
+      result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be deserialised: '{}'"
     }
   }
 
@@ -61,9 +63,7 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers {
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val deserializer = new EventBodyDeserializerImpl[Try]
-
-    def commitEvent: EventBody = EventBody {
+    lazy val eventBody: EventBody = EventBody {
       Json
         .obj(
           "id"      -> Json.fromString(commitId.value),

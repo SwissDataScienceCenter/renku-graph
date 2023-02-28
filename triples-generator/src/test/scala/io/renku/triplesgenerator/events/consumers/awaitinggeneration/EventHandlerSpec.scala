@@ -18,23 +18,13 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
-import cats.data.EitherT
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
-import io.circe.literal._
-import io.circe.syntax._
-import io.circe.{Encoder, Json}
-import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ConsumersModelGenerators.notHappySchedulingResults
-import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessExecutor, EventHandlingDefinition, EventSchedulingResult}
+import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
-import io.renku.graph.model.events.CompoundEventId
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
@@ -44,147 +34,62 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "createHandlingProcess" should {
+  "handlingDefinition.decode" should {
 
-    "decode an event from the request, " +
-      "schedule triples generation " +
-      s"and return $Accepted if event processor accepted the event" in new TestCase {
-
-        givenTsReady
-
-        val commitEvent = commitEvents.generateOne
-        (eventBodyDeserializer.decode _)
-          .expects(eventBody)
-          .returning(commitEvent.pure[IO])
-
-        (eventProcessor.process _)
-          .expects(commitEvent)
-          .returning(().pure[IO])
-
-        val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
-
-        val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
-
-        handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
-
-        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
-
-        logger.loggedOnly(
-          Info(
-            show"$categoryName: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
-          )
-        )
-      }
-
-    s"return $BadRequest if event body is not correct" in new TestCase {
-
-      givenTsReady
-
-      val request = requestContent(compoundEventIds.generateOne.asJson(eventEncoder), eventBody.value)
-
-      (eventBodyDeserializer.decode _)
-        .expects(eventBody)
-        .returning(exceptions.generateOne.raiseError[IO, CommitEvent])
-
-      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+    "be the eventDecoder.decode" in new TestCase {
+      handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
     }
+  }
 
-    s"return $BadRequest if event body is not present" in new TestCase {
+  "handlingDefinition.process" should {
 
-      givenTsReady
+    "be the EventProcessor.process" in new TestCase {
 
-      val request = EventRequestContent.NoPayload(compoundEventIds.generateOne.asJson(eventEncoder))
+      val event = commitEvents.generateOne
 
-      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      (eventProcessor.process _).expects(event).returns(().pure[IO])
+
+      handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
+  }
 
-    s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
+  "handlingDefinition.onRelease" should {
 
-      givenTsReady
-
-      val commitEvent = commitEvents.generateOne
-      (eventBodyDeserializer.decode _)
-        .expects(eventBody)
-        .returning(commitEvent.pure[IO])
-
-      val exception = exceptions.generateOne
-      (eventProcessor.process _)
-        .expects(commitEvent)
-        .returning(exception.raiseError[IO, Unit])
-
-      val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
-
-      val handlingProcess = handler.createHandlingDefinition(request).unsafeRunSync()
-
-      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
-
-      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(
-        Info(
-          show"$categoryName: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
-        ),
-        Error(show"$categoryName: $commitEvent failed", exception)
-      )
+    "be the TSReadinessForEventsChecker.verifyTSReady" in new TestCase {
+      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe readinessCheckerResult
     }
+  }
 
-    "return failure if returned from the TS readiness check" in new TestCase {
+  "handlingDefinition.precondition" should {
 
-      val readinessState = notHappySchedulingResults.generateLeft[Accepted]
-      (() => tsReadinessChecker.verifyTSReady)
-        .expects()
-        .returning(EitherT(readinessState.pure[IO]))
+    "be the SubscriptionMechanism.renewSubscription" in new TestCase {
 
-      val commitEvent = commitEvents.generateOne
-      val request     = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
+      handler.createHandlingDefinition().onRelease.foreach(_.unsafeRunSync())
 
-      handler.createHandlingDefinition(request).unsafeRunSyncProcess() shouldBe readinessState
+      renewSubscriptionCalled.get.unsafeRunSync() shouldBe true
     }
   }
 
   private trait TestCase {
 
-    val eventBody = eventBodies.generateOne
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
-    val eventProcessor             = mock[EventProcessor[IO]]
-    val eventBodyDeserializer      = mock[EventDecoder[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
-    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val tsReadinessChecker = mock[TSReadinessForEventsChecker[IO]]
+    val readinessCheckerResult     = eventSchedulingResults.generateSome
+    (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
 
-    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
+    val eventProcessor = mock[EventProcessor[IO]]
+
+    private val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
+    (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
     val handler = new EventHandler[IO](categoryName,
                                        tsReadinessChecker,
                                        eventProcessor,
-                                       eventBodyDeserializer,
+                                       EventDecoder,
                                        subscriptionMechanism,
-                                       concurrentProcessesLimiter
+                                       mock[ProcessExecutor[IO]]
     )
-
-    def requestContent(event: Json, payload: String): EventRequestContent.WithPayload[String] =
-      EventRequestContent.WithPayload(event, payload)
-
-    def givenTsReady =
-      (() => tsReadinessChecker.verifyTSReady)
-        .expects()
-        .returning(EitherT(Accepted.asRight[EventSchedulingResult].pure[IO]))
-  }
-
-  private implicit lazy val eventEncoder: Encoder[CompoundEventId] =
-    Encoder.instance[CompoundEventId] { eventId =>
-      json"""{
-        "categoryName": "AWAITING_GENERATION",
-        "id":           ${eventId.id.value},
-        "project": {
-          "id" :        ${eventId.projectId.value}
-        }
-      }"""
-    }
-
-  private implicit class EventHandlingProcessOps(handlingProcessIO: IO[EventHandlingDefinition[IO]]) {
-    def unsafeRunSyncProcess() =
-      handlingProcessIO.unsafeRunSync().process.value.unsafeRunSync()
   }
 }
