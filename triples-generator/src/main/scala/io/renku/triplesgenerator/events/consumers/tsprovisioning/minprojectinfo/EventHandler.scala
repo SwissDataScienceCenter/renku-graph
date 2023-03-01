@@ -34,10 +34,10 @@ import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
-    processExecutor:           ProcessExecutor[F],
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     subscriptionMechanism:     SubscriptionMechanism[F],
-    eventProcessor:            EventProcessor[F]
+    eventProcessor:            EventProcessor[F],
+    processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   import io.renku.events.consumers.EventDecodingTools._
@@ -66,9 +66,9 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[consumers.EventHandler[F]] = for {
-    processesCount     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
-    processExecutor    <- ProcessExecutor.concurrent(processesCount)
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F]
-  } yield new EventHandler[F](categoryName, processExecutor, tsReadinessChecker, subscriptionMechanism, eventProcessor)
+    processesCount     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
+    processExecutor    <- ProcessExecutor.concurrent(processesCount)
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, subscriptionMechanism, eventProcessor, processExecutor)
 }

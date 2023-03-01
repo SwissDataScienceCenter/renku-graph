@@ -58,13 +58,14 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import uploader._
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
-    findAccessToken(event.project.path) >>= { implicit accessToken =>
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      findAccessToken(event.project.path) >>= { implicit accessToken =>
       measureExecutionTime(transformAndUpload(event)) >>= logSummary(event)
     }
   } recoverWith logError(event)
 
   private def logError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(show"$categoryName: processing failure: $event")
+    Logger[F].error(exception)(show"$categoryName: $event processing failure")
   }
 
   private def transformAndUpload(
