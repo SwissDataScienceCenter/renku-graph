@@ -26,27 +26,26 @@ import io.renku.jsonld.parser
 import io.renku.jsonld.parser.ParsingFailure
 
 private trait EventDecoder {
-  def decode(request: EventRequestContent): Either[Exception, TriplesGeneratedEvent]
+  val decode: EventRequestContent => Either[Exception, TriplesGeneratedEvent]
 }
 
 private object EventDecoder {
-  def apply(): EventDecoder = new EventDecoderImpl()
+  private val instance = new EventDecoderImpl()
+  def apply(): EventDecoder = instance
 }
 
 private class EventDecoderImpl(zip: Zip = Zip) extends EventDecoder {
 
   import io.renku.events.consumers.EventDecodingTools._
 
-  def decode(request: EventRequestContent): Either[Exception, TriplesGeneratedEvent] = for {
-    eventId <- request.event.getEventId
-    project <- request.event.getProject
-    payload <- request match {
-                 case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) => payload.asRight
-                 case _ => new Exception(show"Event $eventId without or invalid payload").asLeft
-               }
-    unzipped <- zip.unzip(payload.value)
-    payload <- parser.parse(unzipped).leftMap { error =>
-                 ParsingFailure(s"Event $eventId cannot be decoded", error)
-               }
-  } yield TriplesGeneratedEvent(eventId.id, project, payload)
+  lazy val decode: EventRequestContent => Either[Exception, TriplesGeneratedEvent] = {
+    case req @ EventRequestContent.WithPayload(_, payload: ZippedEventPayload) =>
+      for {
+        eventId  <- req.event.getEventId
+        project  <- req.event.getProject
+        unzipped <- zip.unzip(payload.value)
+        payload  <- parser.parse(unzipped).leftMap(error => ParsingFailure(s"Event $eventId cannot be decoded", error))
+      } yield TriplesGeneratedEvent(eventId.id, project, payload)
+    case _ => new Exception("Event without or invalid payload").asLeft
+  }
 }

@@ -37,8 +37,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     eventDecoder:              EventDecoder,
     subscriptionMechanism:     SubscriptionMechanism[F],
-    processExecutor:           ProcessExecutor[F],
-    eventProcessor:            EventProcessor[F]
+    eventProcessor:            EventProcessor[F],
+    processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = TriplesGeneratedEvent
@@ -67,7 +67,7 @@ private object EventHandler {
                               tsReadinessChecker,
                               EventDecoder(),
                               subscriptionMechanism,
-                              processExecutor,
-                              eventProcessor
+                              eventProcessor,
+                              processExecutor
   )
 }
