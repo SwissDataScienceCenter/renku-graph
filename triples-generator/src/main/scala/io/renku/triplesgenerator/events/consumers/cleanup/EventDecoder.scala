@@ -19,26 +19,19 @@
 package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, Error, Json}
-import io.renku.events.consumers.Project
+import io.circe.{DecodingFailure, Error, Json}
 import io.renku.events.EventRequestContent
-import io.renku.graph.model.projects.{GitLabId, Path}
-import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private trait EventDecoder {
-  def decode(request: EventRequestContent): Either[Exception, CleanUpEvent]
+  val decode: EventRequestContent => Either[Exception, CleanUpEvent]
 }
 
 private object EventDecoder extends EventDecoder {
 
-  def decode(request: EventRequestContent): Either[Exception, CleanUpEvent] =
-    request.event.as[CleanUpEvent].leftMap(toMeaningfulError(request.event))
+  import io.renku.events.consumers.EventDecodingTools._
 
-  private implicit val commitsDecoder: Decoder[CleanUpEvent] = cursor =>
-    for {
-      projectId   <- cursor.downField("project").downField("id").as[GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[Path]
-    } yield CleanUpEvent(Project(projectId, projectPath))
+  lazy val decode: EventRequestContent => Either[Exception, CleanUpEvent] = req =>
+    req.event.getProject.map(CleanUpEvent).leftMap(toMeaningfulError(req.event))
 
   private def toMeaningfulError(event: Json): DecodingFailure => Error = { failure =>
     failure.withMessage(s"CleanUpEvent cannot be decoded: '$event'")

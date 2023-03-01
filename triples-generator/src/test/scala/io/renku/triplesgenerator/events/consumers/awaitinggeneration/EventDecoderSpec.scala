@@ -21,11 +21,10 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import io.circe._
 import io.circe.literal._
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.Project
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventId
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -33,15 +32,28 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
-  "toCommitEvents" should {
+  "decode" should {
 
-    "produce a CommitEvent if the Json string can be successfully deserialized" in new TestCase {
+    "produce a CommitEvent if the Json string can be successfully deserialized" in {
+
+      val commitId = commitIds.generateOne
+      val project  = consumerProjects.generateOne
+      lazy val eventBody: String =
+        json"""{
+        "id": $commitId,
+        "parents": ${commitIds.generateList()},
+        "project": {
+          "id":   ${project.id},
+          "path": ${project.path}
+        }
+      }""".noSpaces
+
       EventDecoder
         .decode(EventRequestContent.WithPayload(jsons.generateOne, eventBody))
-        .value shouldBe CommitEvent(EventId(commitId.value), Project(projectId, projectPath), commitId)
+        .value shouldBe CommitEvent(EventId(commitId.value), project, commitId)
     }
 
-    "fail if parsing fails" in new TestCase {
+    "fail if parsing fails" in {
 
       val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{"))
 
@@ -50,27 +62,12 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
       result.left.value.asInstanceOf[ParsingFailure].underlying shouldBe a[ParsingFailure]
     }
 
-    "fail if decoding fails" in new TestCase {
+    "fail if decoding fails" in {
 
       val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{}"))
 
       result.left.value                                       shouldBe a[DecodingFailure]
       result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be decoded: '{}'"
     }
-  }
-
-  private trait TestCase {
-    val commitId    = commitIds.generateOne
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
-
-    lazy val eventBody: String = json"""{
-      "id": $commitId,
-      "parents": ${commitIds.generateList()},
-      "project": {
-        "id":   $projectId,
-        "path": $projectPath
-      }
-    }""".noSpaces
   }
 }
