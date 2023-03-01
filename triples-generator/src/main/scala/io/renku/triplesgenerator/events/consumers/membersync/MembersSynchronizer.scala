@@ -47,12 +47,13 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
 
   override def synchronizeMembers(path: projects.Path): F[Unit] = {
     for {
+      _                                   <- Logger[F].info(show"$categoryName: $path accepted")
       implicit0(mat: Option[AccessToken]) <- findAccessToken(path)
       membersInGL                         <- glMembersFinder.findProjectMembers(path)
       _                                   <- syncMembers(path, kgSynchronizer.syncMembers(_, membersInGL))
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $path FAILED")
+    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $path failed")
   }
 
   private def syncMembers(path: projects.Path, sync: projects.Path => F[SyncSummary]) =

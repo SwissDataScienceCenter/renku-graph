@@ -52,14 +52,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     }
   }
 
-  "handlingDefinition.onRelease" should {
+  "handlingDefinition.precondition" should {
 
     "be the TSReadinessForEventsChecker.verifyTSReady" in new TestCase {
       handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe readinessCheckerResult
     }
   }
 
-  "handlingDefinition.precondition" should {
+  "handlingDefinition.onRelease" should {
 
     "be the SubscriptionMechanism.renewSubscription" in new TestCase {
 
