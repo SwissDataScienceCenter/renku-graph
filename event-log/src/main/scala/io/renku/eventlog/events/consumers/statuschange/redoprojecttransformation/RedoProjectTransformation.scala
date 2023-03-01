@@ -28,11 +28,11 @@ import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class RedoProjectTransformation(projectPath: projects.Path) extends StatusChangeEvent {
+private[statuschange] final case class RedoProjectTransformation(projectPath: projects.Path) extends StatusChangeEvent {
   override val silent: Boolean = false
 }
 
-private object RedoProjectTransformation {
+private[statuschange] object RedoProjectTransformation {
 
   val decoder: EventRequestContent => Either[DecodingFailure, RedoProjectTransformation] = { request =>
     for {

@@ -27,14 +27,15 @@ import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class ToTriplesStore(eventId:        CompoundEventId,
-                                        projectPath:    projects.Path,
-                                        processingTime: EventProcessingTime
+private[statuschange] final case class ToTriplesStore(
+    eventId:        CompoundEventId,
+    projectPath:    projects.Path,
+    processingTime: EventProcessingTime
 ) extends StatusChangeEvent {
   override val silent: Boolean = false
 }
 
-private object ToTriplesStore {
+private[statuschange] object ToTriplesStore {
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToTriplesStore] = { request =>
     for {

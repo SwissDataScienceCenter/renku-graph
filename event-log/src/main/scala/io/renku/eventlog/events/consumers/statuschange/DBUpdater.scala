@@ -21,7 +21,7 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.data.Kleisli
 import skunk.Session
 
-private trait DBUpdater[F[_], E <: StatusChangeEvent] {
+private[statuschange] trait DBUpdater[F[_], E <: StatusChangeEvent] {
   def updateDB(event:   E): UpdateResult[F]
   def onRollback(event: E): Kleisli[F, Session[F], Unit]
 }

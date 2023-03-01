@@ -18,15 +18,23 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDbSpec
+import cats.effect.{Async, IO, Ref}
+import cats.syntax.all._
+import io.circe.syntax._
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.generators.Generators.Implicits._
+import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
+import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.generators.Generators
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
+import natchez.Trace.Implicits.noop
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.Session
 
 class StatusChangeEventsQueueSpec
     extends AnyWordSpec
@@ -36,108 +44,107 @@ class StatusChangeEventsQueueSpec
     with Eventually
     with IntegrationPatience {
 
-  it should fail("implement me, please")
-//  "run" should {
-//
-//    "keep dequeuing items from the status_change_events_queue" in new TestCase {
-//
-//      val event = projectEventsToNewEvents.generateOne
-//
-//      sessionResource.useK(queue offer event).unsafeRunSync()
-//
-//      queue.run().unsafeRunAndForget()
-//
-//      queue.register(eventHandler).unsafeRunSync()
-//
-//      eventually {
-//        dequeuedEvents.get.unsafeRunSync() shouldBe List(event)
-//      }
-//
-//      val nextEvent = projectEventsToNewEvents.generateOne
-//      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
-//
-//      eventually {
-//        dequeuedEvents.get.unsafeRunSync() shouldBe List(event, nextEvent)
-//      }
-//    }
-//
-//    "be dequeueing the oldest events first" in new TestCase {
-//      val event = projectEventsToNewEvents.generateOne
-//      sessionResource.useK(queue offer event).unsafeRunSync()
-//
-//      val nextEvent = projectEventsToNewEvents.generateOne
-//      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
-//
-//      queue.register(eventHandler).unsafeRunSync()
-//
-//      queue.run().unsafeRunAndForget()
-//
-//      eventually {
-//        dequeuedEvents.get.unsafeRunSync() shouldBe List(event, nextEvent)
-//      }
-//    }
-//
-//    "log error and continue dequeueing next events if handler fails during processing event" in new TestCase {
-//      val event = projectEventsToNewEvents.generateOne
-//      sessionResource.useK(queue offer event).unsafeRunSync()
-//      val nextEvent = projectEventsToNewEvents.generateOne
-//      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
-//
-//      val exception = exceptions.generateOne
-//      val failingHandler: ProjectEventsToNew => IO[Unit] = {
-//        case `event` => exception.raiseError[IO, Unit]
-//        case other   => dequeuedEvents.update(_ ::: other :: Nil)
-//      }
-//
-//      queue.register(failingHandler).unsafeRunSync()
-//
-//      queue.run().unsafeRunAndForget()
-//
-//      eventually {
-//        logger.loggedOnly(
-//          Error(
-//            show"$categoryName processing event ${event.asJson.noSpaces} of type ${ProjectEventsToNew.eventType} failed",
-//            exception
-//          )
-//        )
-//        dequeuedEvents.get.unsafeRunSync() shouldBe List(nextEvent)
-//      }
-//    }
-//
-//    "continue if there are general problems with dequeueing" in {
-//      implicit val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
-//        Session.single[IO](
-//          host = dbConfig.host.value,
-//          port = positiveInts().generateOne.value,
-//          user = nonEmptyStrings().generateOne,
-//          database = nonEmptyStrings().generateOne,
-//          password = Some(nonEmptyStrings().generateOne)
-//        )
-//      )
-//      implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
-//      implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-//      implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-//      val queue =
-//        new StatusChangeEventsQueueImpl[IO]()(implicitly[Async[IO]], logger, failingSessionResource, queriesExecTimes)
-//
-//      val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
-//      queue.register(handler).unsafeRunSync()
-//
-//      queue.run().unsafeRunAndForget()
-//
-//      eventually {
-//        logger
-//          .getMessages(Error)
-//          .map(_.message)
-//          .count(_ contains show"$categoryName processing events from the queue failed") should be > 1
-//      }
-//    }
-//  }
+  "run" should {
+
+    "keep dequeuing items from the status_change_events_queue" in new TestCase {
+
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+
+      sessionResource.useK(queue offer event).unsafeRunSync()
+
+      queue.run().unsafeRunAndForget()
+
+      queue.register(eventHandler).unsafeRunSync()
+
+      eventually {
+        dequeuedEvents.get.unsafeRunSync() shouldBe List(event)
+      }
+
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
+
+      eventually {
+        dequeuedEvents.get.unsafeRunSync() shouldBe List(event, nextEvent)
+      }
+    }
+
+    "be dequeueing the oldest events first" in new TestCase {
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+      sessionResource.useK(queue offer event).unsafeRunSync()
+
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
+
+      queue.register(eventHandler).unsafeRunSync()
+
+      queue.run().unsafeRunAndForget()
+
+      eventually {
+        dequeuedEvents.get.unsafeRunSync() shouldBe List(event, nextEvent)
+      }
+    }
+
+    "log error and continue dequeueing next events if handler fails during processing event" in new TestCase {
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+      sessionResource.useK(queue offer event).unsafeRunSync()
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
+      sessionResource.useK(queue offer nextEvent).unsafeRunSync()
+
+      val exception = Generators.exceptions.generateOne
+      val failingHandler: ProjectEventsToNew => IO[Unit] = {
+        case `event` => IO.raiseError(exception)
+        case other   => dequeuedEvents.update(_ ::: other :: Nil)
+      }
+
+      queue.register(failingHandler).unsafeRunSync()
+
+      queue.run().unsafeRunAndForget()
+
+      eventually {
+        logger.loggedOnly(
+          TestLogger.Level.Error(
+            show"$categoryName processing event ${event.asJson.noSpaces} of type ${ProjectEventsToNew.eventType} failed",
+            exception
+          )
+        )
+        dequeuedEvents.get.unsafeRunSync() shouldBe List(nextEvent)
+      }
+    }
+
+    "continue if there are general problems with dequeueing" in {
+      implicit val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
+        Session.single[IO](
+          host = dbConfig.host.value,
+          port = Generators.positiveInts().generateOne.value,
+          user = Generators.nonEmptyStrings().generateOne,
+          database = Generators.nonEmptyStrings().generateOne,
+          password = Some(Generators.nonEmptyStrings().generateOne)
+        )
+      )
+      implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
+      implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+      implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+      val queue =
+        new StatusChangeEventsQueueImpl[IO]()(implicitly[Async[IO]], logger, failingSessionResource, queriesExecTimes)
+
+      val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
+      queue.register(handler).unsafeRunSync()
+
+      queue.run().unsafeRunAndForget()
+
+      eventually {
+        logger
+          .getMessages(TestLogger.Level.Error)
+          .map(_.message)
+          .count(_ contains show"$categoryName processing events from the queue failed") should be > 1
+      }
+    }
+  }
 
   private trait TestCase {
 
-    // val dequeuedEvents: Ref[IO, List[ProjectEventsToNew]] = Ref.unsafe[IO, List[ProjectEventsToNew]](List.empty)
-    // val eventHandler:   ProjectEventsToNew => IO[Unit]    = e => dequeuedEvents.update(_ ::: e :: Nil)
+    val dequeuedEvents: Ref[IO, List[ProjectEventsToNew]] = Ref.unsafe[IO, List[ProjectEventsToNew]](List.empty)
+    val eventHandler:   ProjectEventsToNew => IO[Unit]    = e => dequeuedEvents.update(_ ::: e :: Nil)
 
     implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]

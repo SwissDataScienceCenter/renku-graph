@@ -35,7 +35,7 @@ private object StatusChanger {
     MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](GaugesUpdater[F]))
 }
 
-private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
+private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
     extends StatusChanger[F] {
 
   import gaugesUpdater._

@@ -28,11 +28,12 @@ import io.renku.graph.model.events.CompoundEventId
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent {
+private[statuschange] final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path)
+    extends StatusChangeEvent {
   override val silent: Boolean = true
 }
 
-private object RollbackToNew {
+private[statuschange] object RollbackToNew {
 
   val decoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = { request =>
     for {

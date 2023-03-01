@@ -27,12 +27,12 @@ import io.renku.graph.model.events.CompoundEventId
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path)
+private[statuschange] final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path)
     extends StatusChangeEvent {
   override val silent: Boolean = false
 }
 
-private object ToAwaitingDeletion {
+private[statuschange] object ToAwaitingDeletion {
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { request =>
     for {

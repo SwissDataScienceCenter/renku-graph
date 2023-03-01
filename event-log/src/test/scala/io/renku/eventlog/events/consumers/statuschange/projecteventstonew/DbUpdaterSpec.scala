@@ -22,7 +22,7 @@ import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Encoder
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue, StatusChangeGenerators}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
@@ -56,7 +56,7 @@ class DbUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
   }
 
   private trait TestCase {
-    val event   = projectEventsToNewEvents.generateOne
+    val event   = StatusChangeGenerators.projectEventsToNewEvents.generateOne
     val session = mock[Session[Try]]
 
     val queue   = mock[StatusChangeEventsQueue[Try]]

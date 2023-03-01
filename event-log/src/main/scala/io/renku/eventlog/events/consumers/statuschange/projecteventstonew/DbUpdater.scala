@@ -24,7 +24,7 @@ import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange._
 import skunk.Session
 
-private class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
+private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
     extends statuschange.DBUpdater[F, ProjectEventsToNew] {
 
   import ProjectEventsToNew._

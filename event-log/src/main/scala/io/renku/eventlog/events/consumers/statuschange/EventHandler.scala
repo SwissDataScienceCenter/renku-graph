@@ -22,14 +22,14 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.events.consumers._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+private[statuschange] class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
     override val categoryName: CategoryName,
     childHandlers:             List[consumers.EventHandler[F]] = Nil
 ) extends consumers.EventHandler[F] {
@@ -49,7 +49,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutio
       .map(_.merge)
 }
 
-private object EventHandler {
+private[statuschange] object EventHandler {
 
   def apply[F[
       _

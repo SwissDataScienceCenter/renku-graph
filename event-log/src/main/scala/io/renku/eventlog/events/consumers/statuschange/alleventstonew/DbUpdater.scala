@@ -42,7 +42,7 @@ import projecteventstonew.ProjectEventsToNew
 import skunk._
 import skunk.implicits._
 
-private class DbUpdater[F[_]: Async: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     eventSender: EventSender[F]
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, AllEventsToNew]
@@ -102,7 +102,7 @@ private class DbUpdater[F[_]: Async: QueriesExecutionTimes](
   }
 }
 
-private object DbUpdater {
+private[statuschange] object DbUpdater {
   def apply[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]: F[DbUpdater[F]] =
     EventSender[F](EventLogUrl).map(new DbUpdater(_))
 }

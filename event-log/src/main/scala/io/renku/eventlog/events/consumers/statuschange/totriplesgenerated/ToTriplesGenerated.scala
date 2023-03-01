@@ -27,7 +27,7 @@ import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, Zipped
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class ToTriplesGenerated(eventId:        CompoundEventId,
+private[statuschange] final case class ToTriplesGenerated(eventId:        CompoundEventId,
                                             projectPath:    projects.Path,
                                             processingTime: EventProcessingTime,
                                             payload:        ZippedEventPayload
@@ -35,7 +35,7 @@ private final case class ToTriplesGenerated(eventId:        CompoundEventId,
   override val silent: Boolean = false
 }
 
-private object ToTriplesGenerated {
+private[statuschange] object ToTriplesGenerated {
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
     case EventRequestContent.WithPayload(event, payload: ZippedEventPayload) =>

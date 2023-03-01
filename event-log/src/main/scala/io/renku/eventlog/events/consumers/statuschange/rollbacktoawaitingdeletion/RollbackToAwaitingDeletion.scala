@@ -27,11 +27,11 @@ import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-private final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent {
+private[statuschange] final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent {
   override val silent: Boolean = true
 }
 
-private object RollbackToAwaitingDeletion {
+private[statuschange] object RollbackToAwaitingDeletion {
 
   val decoder: EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
     for {

@@ -20,10 +20,10 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.Show
 
-private trait StatusChangeEvent extends Product with Serializable {
+private[statuschange] trait StatusChangeEvent extends Product with Serializable {
   val silent: Boolean
 }
 
-private object StatusChangeEvent {
+private[statuschange] object StatusChangeEvent {
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
 }

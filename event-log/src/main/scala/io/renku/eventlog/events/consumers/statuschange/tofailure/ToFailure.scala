@@ -31,18 +31,19 @@ import io.renku.tinytypes.json.TinyTypeDecoders._
 
 import java.time.Duration
 
-private final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:             CompoundEventId,
-                                                                                projectPath:         projects.Path,
-                                                                                message:             EventMessage,
-                                                                                currentStatus:       C,
-                                                                                newStatus:           N,
-                                                                                maybeExecutionDelay: Option[Duration]
+private[statuschange] final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](
+    eventId:             CompoundEventId,
+    projectPath:         projects.Path,
+    message:             EventMessage,
+    currentStatus:       C,
+    newStatus:           N,
+    maybeExecutionDelay: Option[Duration]
 )(implicit ev: AllowedCombination[C, N])
     extends StatusChangeEvent {
   override val silent: Boolean = false
 }
 
-private object ToFailure {
+private[statuschange] object ToFailure {
 
   sealed trait AllowedCombination[C <: ProcessingStatus, N <: FailureStatus]
 

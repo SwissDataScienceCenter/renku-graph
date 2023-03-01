@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.events.consumers.statuschange._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger

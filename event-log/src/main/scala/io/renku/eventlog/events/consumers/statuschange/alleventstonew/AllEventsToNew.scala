@@ -25,9 +25,9 @@ import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.events
 
-private trait AllEventsToNew extends StatusChangeEvent
+private[statuschange] trait AllEventsToNew extends StatusChangeEvent
 
-private case object AllEventsToNew extends AllEventsToNew {
+private[statuschange] case object AllEventsToNew extends AllEventsToNew {
   override val silent: Boolean = false
 
   val decoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
