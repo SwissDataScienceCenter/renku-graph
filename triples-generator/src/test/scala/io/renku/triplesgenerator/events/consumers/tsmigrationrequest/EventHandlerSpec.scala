@@ -19,29 +19,29 @@
 package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 
-//import TSStateChecker.TSState
-//import cats.data.EitherT.{leftT, liftF, rightT}
-//import cats.effect.IO
-//import cats.syntax.all._
-//import io.circe.literal._
-//import io.renku.config.ServiceVersion
-//import io.renku.data.ErrorMessage
-//import io.renku.events.{CategoryName, EventRequestContent}
-//import io.renku.events.consumers.ConcurrentProcessExecutor
-//import io.renku.events.consumers.EventSchedulingResult._
-//import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-//import io.renku.events.Generators.subscriberUrls
-//import io.renku.events.producers.EventSender
-//import io.renku.events.producers.EventSender.EventContext
-//import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
-//import io.renku.generators.Generators.Implicits._
-//import io.renku.generators.Generators.exceptions
-//import io.renku.interpreters.TestLogger
-//import io.renku.interpreters.TestLogger.Level.Info
-//import io.renku.json.JsonOps._
-//import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
-//import org.scalacheck.Gen
-//import org.scalamock.matchers.ArgCapture.CaptureOne
+import TSStateChecker.TSState
+import cats.data.EitherT.{leftT, liftF, rightT}
+import cats.effect.IO
+import cats.syntax.all._
+import io.circe.literal._
+import io.renku.config.ServiceVersion
+import io.renku.data.ErrorMessage
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.consumers.{ConcurrentProcessExecutor, ProcessExecutor}
+import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.Generators.subscriberUrls
+import io.renku.events.producers.EventSender
+import io.renku.events.producers.EventSender.EventContext
+import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.json.JsonOps._
+import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import org.scalacheck.Gen
+import org.scalamock.matchers.ArgCapture.CaptureOne
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -179,56 +179,56 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 //        )
 //      }
 //  }
-//
-//  private trait TestCase {
-//
-//    val subscriberUrl              = subscriberUrls.generateOne
-//    val serviceId                  = microserviceIdentifiers.generateOne
-//    val serviceVersion             = serviceVersions.generateOne
-//    val tsStateChecker             = mock[TSStateChecker[IO]]
-//    val migrationsRunner           = mock[MigrationsRunner[IO]]
-//    val eventSender                = mock[EventSender[IO]]
-//    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-//    val concurrentProcessesLimiter = mock[ConcurrentProcessesExecutor[IO]]
-//    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-//    val handler = new EventHandler[IO](subscriberUrl,
-//                                       serviceId,
-//                                       serviceVersion,
-//                                       tsStateChecker,
-//                                       migrationsRunner,
-//                                       eventSender,
-//                                       subscriptionMechanism,
-//                                       concurrentProcessesLimiter
-//    )
-//
-//    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
-//
-//    def statusChangePayload(status: String, maybeMessage: Option[String] = None) =
-//      EventRequestContent.NoPayload(json"""{
-//        "categoryName": "MIGRATION_STATUS_CHANGE",
-//        "subscriber": {
-//          "url":     ${subscriberUrl.value},
-//          "id":      ${serviceId.value},
-//          "version": ${serviceVersion.value}
-//        },
-//        "newStatus": $status
-//      }
-//      """ addIfDefined ("message" -> maybeMessage))
-//
-//    def requestPayload(version: ServiceVersion) = EventRequestContent.NoPayload(json"""{
-//      "categoryName": "TS_MIGRATION_REQUEST",
-//      "subscriber": {
-//        "version": ${version.value}
-//      }
-//    }
-//    """)
-//
-//    def givenTsStateGreen =
-//      (() => tsStateChecker.checkTSState)
-//        .expects()
-//        .returning(Gen.oneOf(TSState.Ready, TSState.MissingDatasets).generateOne.pure[IO])
-//  }
-//
-//  private lazy val expectedEventContext =
-//    EventContext(CategoryName("MIGRATION_STATUS_CHANGE"), show"$categoryName: sending status change event failed")
+
+  private trait TestCase {
+
+    val subscriberUrl  = subscriberUrls.generateOne
+    val serviceId      = microserviceIdentifiers.generateOne
+    val serviceVersion = serviceVersions.generateOne
+
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tsStateChecker        = mock[TSStateChecker[IO]]
+    val migrationsRunner      = mock[MigrationsRunner[IO]]
+    val eventSender           = mock[EventSender[IO]]
+    val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val handler = new EventHandler[IO](subscriberUrl,
+                                       serviceId,
+                                       serviceVersion,
+                                       tsStateChecker,
+                                       migrationsRunner,
+                                       eventSender,
+                                       subscriptionMechanism,
+                                       mock[ProcessExecutor[IO]]
+    )
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
+
+    def statusChangePayload(status: String, maybeMessage: Option[String] = None) =
+      EventRequestContent.NoPayload(json"""{
+        "categoryName": "MIGRATION_STATUS_CHANGE",
+        "subscriber": {
+          "url":     ${subscriberUrl.value},
+          "id":      ${serviceId.value},
+          "version": ${serviceVersion.value}
+        },
+        "newStatus": $status
+      }
+      """ addIfDefined ("message" -> maybeMessage))
+
+    def requestPayload(version: ServiceVersion) = EventRequestContent.NoPayload(json"""{
+      "categoryName": "TS_MIGRATION_REQUEST",
+      "subscriber": {
+        "version": ${version.value}
+      }
+    }
+    """)
+
+    def givenTsStateGreen =
+      (() => tsStateChecker.checkTSState)
+        .expects()
+        .returning(Gen.oneOf(TSState.Ready, TSState.MissingDatasets).generateOne.pure[IO])
+  }
+
+  private lazy val expectedEventContext =
+    EventContext(CategoryName("MIGRATION_STATUS_CHANGE"), show"$categoryName: sending status change event failed")
 }

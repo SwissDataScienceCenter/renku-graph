@@ -97,9 +97,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     EventRequestContent.NoPayload(json"""{
         "categoryName": "MIGRATION_STATUS_CHANGE",
         "subscriber": {
-          "url":     ${subscriberUrl.value},
-          "id":      ${serviceId.value},
-          "version": ${serviceVersion.value}
+          "url":     $subscriberUrl,
+          "id":      $serviceId,
+          "version": $serviceVersion
         },
         "newStatus": $status
       }
