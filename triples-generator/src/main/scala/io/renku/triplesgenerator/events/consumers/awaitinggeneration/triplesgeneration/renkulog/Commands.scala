@@ -24,7 +24,7 @@ import cats.data.EitherT
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
-import io.renku.graph.model.{projects, GitLabUrl}
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.model.events.CommitId
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._

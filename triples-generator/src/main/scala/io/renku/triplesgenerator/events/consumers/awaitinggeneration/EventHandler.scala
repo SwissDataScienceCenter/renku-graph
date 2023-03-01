@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.tokenrepository.AccessTokenFinder

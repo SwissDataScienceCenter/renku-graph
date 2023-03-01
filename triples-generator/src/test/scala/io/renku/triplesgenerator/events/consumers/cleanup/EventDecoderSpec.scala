@@ -50,7 +50,7 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
 
     "fail if decoding fails" in {
 
-      val event = jsons.generateOne
+      val event  = jsons.generateOne
       val result = EventDecoder.decode(EventRequestContent.NoPayload(event))
 
       result.left.value                                       shouldBe a[DecodingFailure]

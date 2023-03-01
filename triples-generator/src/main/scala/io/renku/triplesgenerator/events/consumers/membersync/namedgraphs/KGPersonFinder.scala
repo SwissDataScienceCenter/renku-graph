@@ -21,7 +21,7 @@ package namedgraphs
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.{persons, GraphClass}
+import io.renku.graph.model.{GraphClass, persons}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{GitLabId, ResourceId}

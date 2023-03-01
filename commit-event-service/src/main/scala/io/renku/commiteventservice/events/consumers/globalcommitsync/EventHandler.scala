@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.events.CommitId

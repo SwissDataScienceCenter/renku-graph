@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.{persons, projects, GraphClass}
+import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{DateCreated, Description, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset

@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.graph.model.{persons, projects, GraphClass}
+import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.graph.model.datasets.{DateCreated, Description, InternalSameAs, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore._

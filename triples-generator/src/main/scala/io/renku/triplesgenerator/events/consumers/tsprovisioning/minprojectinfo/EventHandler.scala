@@ -22,7 +22,7 @@ package tsprovisioning.minprojectinfo
 import cats.{NonEmptyParallel, Parallel}
 import cats.effect._
 import cats.syntax.all._
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.tokenrepository.AccessTokenFinder

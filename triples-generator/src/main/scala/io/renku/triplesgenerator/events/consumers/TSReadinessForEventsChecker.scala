@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import TSStateChecker.TSState.{MissingDatasets, Ready, ReProvisioning}
+import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
