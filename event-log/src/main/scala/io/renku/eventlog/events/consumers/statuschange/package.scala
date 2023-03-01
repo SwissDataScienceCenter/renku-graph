@@ -25,5 +25,6 @@ import skunk.Session
 package object statuschange {
   val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
 
-  private[statuschange] type UpdateResult[F[_]] = Kleisli[F, Session[F], DBUpdateResults]
+  private[statuschange] type UpdateResult[F[_]]   = Kleisli[F, Session[F], DBUpdateResults]
+  private[statuschange] type RollbackResult[F[_]] = Kleisli[F, Session[F], Unit]
 }

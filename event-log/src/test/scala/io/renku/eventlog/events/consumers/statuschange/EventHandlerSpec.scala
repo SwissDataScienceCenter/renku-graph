@@ -19,21 +19,53 @@
 package io.renku.eventlog.events.consumers
 package statuschange
 
+import cats.Show
+import cats.effect.{Deferred, IO}
+import cats.syntax.all._
+import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
+import io.renku.eventlog.events.consumers.statuschange.alleventstonew.AllEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation.RedoProjectTransformation
+import io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion.RollbackToAwaitingDeletion
+import io.renku.eventlog.events.consumers.statuschange.rollbacktonew.RollbackToNew
+import io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated.RollbackToTriplesGenerated
+import io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion.ToAwaitingDeletion
+import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure
+import io.renku.eventlog.events.consumers.statuschange.totriplesgenerated.ToTriplesGenerated
+import io.renku.eventlog.events.consumers.statuschange.totriplesstore.ToTriplesStore
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.{ProcessExecutor, Project}
+import io.renku.events.consumers.EventDecodingTools._
+import io.renku.events.producers.EventSender
+import io.renku.interpreters.TestLogger
+import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EventHandlerSpec
     extends AnyWordSpec
     with IOSpec
     with MockFactory
     with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+    with ScalaCheckPropertyChecks {
 
-  it should fail("implement me, please")
+  "createHandlingDefinition.decode" should {
+
+    "decode valid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      forAll(StatusChangeGenerators.statusChangeEvents) { event =>
+        val decoded = definition.decode(EventRequestContent(event.asJson))
+        decoded shouldBe Right(event)
+      }
+    }
+
+  }
 
 //  "handle" should {
 //
@@ -128,123 +160,126 @@ class EventHandlerSpec
 //    }
 //  }
 
-//  private trait TestCase {
-//
-//    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
-//    private implicit val metricsRegistry:  MetricsRegistry[IO]       = TestMetricsRegistry[IO]
-//    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-//    private val statusChanger       = mock[StatusChanger[IO]]
-//    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-//    private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
-//    val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover)
-//
-//    def stubUpdateStatuses[E <: StatusChangeEvent](
-//        updateResult: IO[Unit]
-//    )(implicit show: Show[E]): E => (E, Deferred[IO, Unit], String) =
-//      event => {
-//        val waitForUpdate = Deferred.unsafe[IO, Unit]
-//        (statusChanger
-//          .updateStatuses[E](_: E)(_: DBUpdater[IO, E]))
-//          .expects(event, *)
-//          .onCall(_ =>
-//            updateResult
-//              .flatTap(_ => waitForUpdate.complete(()))
-//              .recoverWith(_ => waitForUpdate.complete(()).void >> updateResult)
-//          )
-//        (event, waitForUpdate, event.show)
-//      }
-//
-//    def toRequestContent[E <: StatusChangeEvent](
-//        f: E => EventRequestContent
-//    ): ((E, Deferred[IO, Unit], String)) => (E, EventRequestContent, Deferred[IO, Unit], String) = {
-//      case (event, waitForUpdate, eventShow) => (event, f(event), waitForUpdate, eventShow)
-//    }
-//  }
-//
-//  private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-//    case StatusChangeEvent.AllEventsToNew => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "newStatus":    "NEW"
-//    }"""
-//    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "TRIPLES_GENERATED",
-//      "processingTime": ${processingTime.value}
-//    }"""
-//    case StatusChangeEvent.ToTriplesStore(eventId, path, processingTime) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "TRIPLES_STORE",
-//      "processingTime": ${processingTime.value}
-//    }"""
-//    case StatusChangeEvent.ToFailure(eventId, path, message, _, newStatus, maybeExecutionDelay) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    ${newStatus.value},
-//      "message":      ${message.value}
-//    }""" addIfDefined ("executionDelay" -> maybeExecutionDelay)
-//    case StatusChangeEvent.RollbackToNew(eventId, path) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "NEW"
-//    }"""
-//    case StatusChangeEvent.RollbackToTriplesGenerated(eventId, path) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "TRIPLES_GENERATED"
-//    }"""
-//    case StatusChangeEvent.ToAwaitingDeletion(eventId, path) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "id":           ${eventId.id.value},
-//      "project": {
-//        "id":         ${eventId.projectId.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "AWAITING_DELETION"
-//    }"""
-//    case StatusChangeEvent.RollbackToAwaitingDeletion(Project(id, path)) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "project": {
-//        "id":         ${id.value},
-//        "path":       ${path.value}
-//      },
-//      "newStatus":    "AWAITING_DELETION"
-//    }"""
-//    case StatusChangeEvent.ProjectEventsToNew(project) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "project": {
-//        "id":         ${project.id.value},
-//        "path":       ${project.path.value}
-//      },
-//      "newStatus":    "NEW"
-//    }"""
-//    case StatusChangeEvent.RedoProjectTransformation(projectPath) => json"""{
-//      "categoryName": "EVENTS_STATUS_CHANGE",
-//      "project": {
-//        "path": ${projectPath.value}
-//      },
-//      "newStatus": "TRIPLES_GENERATED"
-//    }"""
-//  }
+  private trait TestCase {
+
+    implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
+    private implicit val metricsRegistry:  MetricsRegistry[IO]       = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    private val statusChanger       = mock[StatusChanger[IO]]
+    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
+    private val eventSender         = mock[EventSender[IO]]
+
+    val handler =
+      new EventHandler2[IO](ProcessExecutor.sequential, statusChanger, eventSender, eventsQueue, deliveryInfoRemover)
+
+    def stubUpdateStatuses[E <: StatusChangeEvent](
+        updateResult: IO[Unit]
+    )(implicit show: Show[E]): E => (E, Deferred[IO, Unit], String) =
+      event => {
+        val waitForUpdate = Deferred.unsafe[IO, Unit]
+        (statusChanger
+          .updateStatuses[E](_: DBUpdater[IO, E])(_: E))
+          .expects(*, *)
+          .onCall(_ =>
+            updateResult
+              .flatTap(_ => waitForUpdate.complete(()))
+              .recoverWith(_ => waitForUpdate.complete(()).void >> updateResult)
+          )
+        (event, waitForUpdate, event.show)
+      }
+
+    def toRequestContent[E <: StatusChangeEvent](
+        f: E => EventRequestContent
+    ): ((E, Deferred[IO, Unit], String)) => (E, EventRequestContent, Deferred[IO, Unit], String) = {
+      case (event, waitForUpdate, eventShow) => (event, f(event), waitForUpdate, eventShow)
+    }
+  }
+
+  implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
+    case AllEventsToNew => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "newStatus":    "NEW"
+    }"""
+    case ToTriplesGenerated(eventId, path, processingTime, _) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "TRIPLES_GENERATED",
+      "processingTime": ${processingTime.value}
+    }"""
+    case ToTriplesStore(eventId, path, processingTime) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "TRIPLES_STORE",
+      "processingTime": ${processingTime.value}
+    }"""
+    case ToFailure(eventId, path, message, _, newStatus, maybeExecutionDelay) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    ${newStatus.value},
+      "message":      ${message.value}
+    }""".addIfDefined("executionDelay" -> maybeExecutionDelay)
+    case RollbackToNew(eventId, path) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "NEW"
+    }"""
+    case RollbackToTriplesGenerated(eventId, path) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "TRIPLES_GENERATED"
+    }"""
+    case ToAwaitingDeletion(eventId, path) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "id":           ${eventId.id.value},
+      "project": {
+        "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "AWAITING_DELETION"
+    }"""
+    case RollbackToAwaitingDeletion(Project(id, path)) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "id":         ${id.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "AWAITING_DELETION"
+    }"""
+    case ProjectEventsToNew(project) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "id":         ${project.id.value},
+        "path":       ${project.path.value}
+      },
+      "newStatus":    "NEW"
+    }"""
+    case RedoProjectTransformation(projectPath) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "path": ${projectPath.value}
+      },
+      "newStatus": "TRIPLES_GENERATED"
+    }"""
+  }
 }

@@ -39,7 +39,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class DbUpdater[F[_]: Async: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     deliveryInfoRemover: DeliveryInfoRemover[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))

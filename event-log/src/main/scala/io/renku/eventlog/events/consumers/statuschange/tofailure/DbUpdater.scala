@@ -31,7 +31,7 @@ import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, Executio
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
-import skunk.{~, Session}
+import skunk.{Session, ~}
 import skunk.SqlState.DeadlockDetected
 import skunk.data.Completion
 import skunk.implicits._
@@ -39,7 +39,7 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 import scala.concurrent.duration._
 
-private class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes](
     deliveryInfoRemover: DeliveryInfoRemover[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))

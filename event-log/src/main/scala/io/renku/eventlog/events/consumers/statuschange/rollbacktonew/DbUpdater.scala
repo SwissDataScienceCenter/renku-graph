@@ -35,7 +35,7 @@ import skunk.~
 
 import java.time.Instant
 
-private class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, RollbackToNew] {
