@@ -16,18 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.awaitinggeneration
+package io.renku.triplesgenerator.events.consumers
+package awaitinggeneration
 
+import EventProcessingGenerators._
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
-import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

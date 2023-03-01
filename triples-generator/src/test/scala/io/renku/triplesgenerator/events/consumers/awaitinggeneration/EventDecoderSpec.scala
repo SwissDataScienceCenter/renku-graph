@@ -19,16 +19,17 @@
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import io.circe._
-import io.renku.events.consumers.Project
+import io.circe.literal._
 import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{EventBody, EventId}
+import io.renku.graph.model.events.EventId
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 
 class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
@@ -42,19 +43,19 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
 
     "fail if parsing fails" in new TestCase {
 
-      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, EventBody("{")))
+      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{"))
 
       result.left.value                                         shouldBe a[ParsingFailure]
-      result.left.value.getMessage                              shouldBe "CommitEvent cannot be deserialised: '{'"
+      result.left.value.getMessage                              shouldBe "CommitEvent cannot be decoded: '{'"
       result.left.value.asInstanceOf[ParsingFailure].underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
 
-      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, EventBody("{}")))
+      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{}"))
 
       result.left.value                                       shouldBe a[DecodingFailure]
-      result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be deserialised: '{}'"
+      result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be decoded: '{}'"
     }
   }
 
@@ -63,17 +64,13 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    lazy val eventBody: EventBody = EventBody {
-      Json
-        .obj(
-          "id"      -> Json.fromString(commitId.value),
-          "parents" -> Json.arr(commitIds.generateList().map(_.value).map(Json.fromString): _*),
-          "project" -> Json.obj(
-            "id"   -> Json.fromInt(projectId.value),
-            "path" -> Json.fromString(projectPath.value)
-          )
-        )
-        .noSpaces
-    }
+    lazy val eventBody: String = json"""{
+      "id": $commitId,
+      "parents": ${commitIds.generateList()},
+      "project": {
+        "id":   $projectId,
+        "path": $projectPath
+      }
+    }""".noSpaces
   }
 }
