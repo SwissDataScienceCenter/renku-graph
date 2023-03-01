@@ -25,9 +25,11 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.consumers.creation.{Event => CategoryEvent}
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
+import io.renku.events.consumers.EventDecodingTools._
 import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -37,14 +39,10 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   protected override type Event = CategoryEvent
 
-  import eventPersister._
-  import io.renku.graph.model.projects
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[Event],
-      process = storeNewEvent(_).void
+      process = eventPersister.storeNewEvent(_).void
     )
 
   private implicit val eventDecoder: Decoder[Event] = cursor =>
@@ -52,7 +50,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       case None | Some(EventStatus.New) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[Project]
+          project   <- cursor.value.getProject
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -60,7 +58,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       case Some(EventStatus.Skipped) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[Project]
+          project   <- cursor.value.getProject
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -78,12 +76,6 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
         case Some(message) => message.asRight
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
-
-  implicit val projectDecoder: Decoder[Project] = cursor =>
-    for {
-      id   <- cursor.downField("id").as[projects.GitLabId]
-      path <- cursor.downField("path").as[projects.Path]
-    } yield Project(id, path)
 }
 
 private object EventHandler {

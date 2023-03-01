@@ -22,9 +22,9 @@ import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private trait CleanUpRequestEvent extends Product with Serializable
+private[cleanuprequest] trait CleanUpRequestEvent extends Product with Serializable
 
-private object CleanUpRequestEvent {
+private[cleanuprequest] object CleanUpRequestEvent {
   def apply(projectId: projects.GitLabId, projectPath: projects.Path): CleanUpRequestEvent =
     CleanUpRequestEvent.Full(projectId, projectPath)
   def apply(projectPath: projects.Path): CleanUpRequestEvent =

@@ -24,24 +24,21 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
-import io.renku.events.consumers.Project
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
-import io.renku.generators.Generators.{exceptions, fixed, nonNegativeInts, positiveInts}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonNegativeInts
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventId, EventStatus}
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.testtools.IOSpec
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.{~, Session}
 import skunk.implicits._
+import skunk.{Session, ~}
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -51,52 +48,53 @@ class StatusChangerSpec
     with should.Matchers
     with MockFactory {
 
-  "updateStatuses" should {
-
-    "succeeds if db update completes" in new MockedTestCase {
-
-      val updateResults = updateResultsGen(event).generateOne
-
-      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
-      (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
-
-      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
-    }
-
-    "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
-
-      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
-
-      val event: StatusChangeEvent = ToTriplesGenerated(eventId,
-                                                        projectPaths.generateOne,
-                                                        eventProcessingTimes.generateOne,
-                                                        zippedEventPayloads.generateOne
-      )
-
-      intercept[Exception] {
-        statusChanger.updateStatuses(event).unsafeRunSync()
-      }
-
-      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllEventDeliveries       shouldBe Nil
-    }
-
-    "succeed if updating the gauge fails" in new MockedTestCase {
-
-      val exception = exceptions.generateOne
-
-      val updateResults = updateResultsGen(event).generateOne
-      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
-      (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
-
-      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
-    }
-  }
+  it should fail("implement me, please")
+//  "updateStatuses" should {
+//
+//    "succeeds if db update completes" in new MockedTestCase {
+//
+//      val updateResults = updateResultsGen(event).generateOne
+//
+//      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
+//      (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
+//
+//      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
+//    }
+//
+//    "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
+//
+//      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
+//      findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
+//
+//      val event: StatusChangeEvent = ToTriplesGenerated(eventId,
+//                                                        projectPaths.generateOne,
+//                                                        eventProcessingTimes.generateOne,
+//                                                        zippedEventPayloads.generateOne
+//      )
+//
+//      intercept[Exception] {
+//        statusChanger.updateStatuses(event).unsafeRunSync()
+//      }
+//
+//      findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
+//      findAllEventDeliveries       shouldBe Nil
+//    }
+//
+//    "succeed if updating the gauge fails" in new MockedTestCase {
+//
+//      val exception = exceptions.generateOne
+//
+//      val updateResults = updateResultsGen(event).generateOne
+//      (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
+//      (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
+//
+//      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
+//    }
+//  }
 
   private trait MockedTestCase {
 
-    val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, rollbackToNewEvents).generateOne
+    //   val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, rollbackToNewEvents).generateOne
 
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
 
@@ -166,28 +164,28 @@ class StatusChangerSpec
     val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }
 
-  private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AllEventsToNew                           => fixed(DBUpdateResults.ForAllProjects)
-    case ProjectEventsToNew(_)                    => fixed(DBUpdateResults.ForProjects.empty)
-    case RedoProjectTransformation(_)             => fixed(DBUpdateResults.ForProjects.empty)
-    case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
-    case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
-    case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
-      fixed(
-        DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
-      )
-    case RollbackToNew(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
-    case RollbackToTriplesGenerated(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
-    case ToAwaitingDeletion(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
-    case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
-      val updatedRows = positiveInts(max = 40).generateOne
-      fixed(
-        DBUpdateResults.ForProjects(projectPath, Map(Deleting -> -updatedRows, AwaitingDeletion -> updatedRows))
-      )
-  }
+//  private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
+//    case AllEventsToNew                           => fixed(DBUpdateResults.ForAllProjects)
+//    case ProjectEventsToNew(_)                    => fixed(DBUpdateResults.ForProjects.empty)
+//    case RedoProjectTransformation(_)             => fixed(DBUpdateResults.ForProjects.empty)
+//    case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
+//    case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
+//    case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
+//      fixed(
+//        DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
+//      )
+//    case RollbackToNew(_, projectPath) =>
+//      fixed(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
+//    case RollbackToTriplesGenerated(_, projectPath) =>
+//      fixed(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
+//    case ToAwaitingDeletion(_, projectPath) =>
+//      fixed(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
+//    case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
+//      val updatedRows = positiveInts(max = 40).generateOne
+//      fixed(
+//        DBUpdateResults.ForProjects(projectPath, Map(Deleting -> -updatedRows, AwaitingDeletion -> updatedRows))
+//      )
+//  }
 
   private def genUpdateResult(forProject: projects.Path) = for {
     statuses <- eventStatuses.toGeneratorOfSet()

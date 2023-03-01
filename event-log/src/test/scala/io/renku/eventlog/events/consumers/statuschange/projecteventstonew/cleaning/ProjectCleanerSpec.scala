@@ -26,6 +26,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.eventlog.events.consumers.statuschange.categoryName
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates

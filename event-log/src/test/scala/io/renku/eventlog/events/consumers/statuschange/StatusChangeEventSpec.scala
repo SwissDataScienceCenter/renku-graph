@@ -27,9 +27,10 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
   "ProjectEventsToNew" should {
 
     "be serializable and deserializable to and from Json" in {
-      forAll(projectEventsToNewEvents) { event =>
-        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
-      }
+      fail("implement me, please")
+//      forAll(projectEventsToNewEvents) { event =>
+//        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
+//      }
     }
   }
 }

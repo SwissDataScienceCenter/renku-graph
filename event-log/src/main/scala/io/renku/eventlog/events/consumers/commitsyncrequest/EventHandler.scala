@@ -20,40 +20,28 @@ package io.renku.eventlog.events.consumers.commitsyncrequest
 
 import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
-import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
-import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
+import EventDecodingTools._
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     commitSyncForcer:          CommitSyncForcer[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
-  protected override type Event = (projects.GitLabId, projects.Path)
+  protected override type Event = Project
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.as[Event],
+      decode = _.event.getProject,
       process = startForceCommitSync
     )
 
-  import commitSyncForcer._
-  import io.renku.graph.model.projects
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-
-  private lazy val startForceCommitSync: Event => F[Unit] = { case (projectId, projectPath) =>
-    forceCommitSync(projectId, projectPath)
-  }
-
-  private implicit val eventDecoder: Decoder[Event] = { cursor =>
-    for {
-      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-    } yield projectId -> projectPath
+  private lazy val startForceCommitSync: Event => F[Unit] = { case Project(projectId, projectPath) =>
+    commitSyncForcer.forceCommitSync(projectId, projectPath)
   }
 }
 
