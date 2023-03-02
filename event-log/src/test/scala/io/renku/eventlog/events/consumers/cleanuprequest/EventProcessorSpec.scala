@@ -22,13 +22,15 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
-class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "process" should {
 
@@ -38,7 +40,7 @@ class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFacto
 
       (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[Try])
 
-      processor.process(CleanUpRequestEvent(projectId, projectPath)) shouldBe ().pure[Try]
+      processor.process(CleanUpRequestEvent(projectId, projectPath)).success.value shouldBe ()
     }
 
     "offer project id and path to the queue if a Partial event is given " +
@@ -50,21 +52,20 @@ class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFacto
 
         (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[Try])
 
-        processor.process(CleanUpRequestEvent(projectPath)) shouldBe ().pure[Try]
+        processor.process(CleanUpRequestEvent(projectPath)).success.value shouldBe ()
       }
 
-    "fail for a Partial event when projectId cannot be found in the project table" in new TestCase {
+    "log a warning for a Partial event when projectId cannot be found in the project table" in new TestCase {
       val projectPath = projectPaths.generateOne
 
       (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.GitLabId].pure[Try])
 
-      val Failure(exception) = processor.process(CleanUpRequestEvent(projectPath))
-
-      exception.getMessage shouldBe show"Cannot find projectId for $projectPath"
+      processor.process(CleanUpRequestEvent(projectPath)).success.value shouldBe ()
     }
   }
 
   private trait TestCase {
+    implicit val logger: TestLogger[Try] = TestLogger()
     val projectIdFinder = mock[ProjectIdFinder[Try]]
     val eventsQueue     = mock[CleanUpEventsQueue[Try]]
     val processor       = new EventProcessorImpl(projectIdFinder, eventsQueue)

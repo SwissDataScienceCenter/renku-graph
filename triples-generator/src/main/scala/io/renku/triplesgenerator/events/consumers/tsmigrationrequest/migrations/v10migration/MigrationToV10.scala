@@ -86,11 +86,11 @@ private class MigrationToV10[F[_]: Async: Logger](
   private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) =
     EventRequestContent.NoPayload {
       json"""{
-          "categoryName": $cleanUpEventCategory,
-          "project": {
-            "path": $path
-          }
-        }"""
+        "categoryName": $cleanUpEventCategory,
+        "project": {
+          "path": $path
+        }
+      }"""
     } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $path")
 
   private def logInfo(message: String, progressInfo: String): F[Unit] =

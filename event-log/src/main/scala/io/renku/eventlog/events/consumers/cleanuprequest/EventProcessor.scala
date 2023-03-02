@@ -23,20 +23,22 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import org.typelevel.log4cats.Logger
 
 private trait EventProcessor[F[_]] {
   def process(event: CleanUpRequestEvent): F[Unit]
 }
 
 private object EventProcessor {
-  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: Logger]: F[EventProcessor[F]] = for {
     projectIdFinder <- ProjectIdFinder[F]
     queue           <- CleanUpEventsQueue[F]
   } yield new EventProcessorImpl[F](projectIdFinder, queue)
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow](projectIdFinder: ProjectIdFinder[F], queue: CleanUpEventsQueue[F])
-    extends EventProcessor[F] {
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](projectIdFinder: ProjectIdFinder[F],
+                                                           queue: CleanUpEventsQueue[F]
+) extends EventProcessor[F] {
 
   import projectIdFinder._
 
@@ -45,7 +47,7 @@ private class EventProcessorImpl[F[_]: MonadThrow](projectIdFinder: ProjectIdFin
     case CleanUpRequestEvent.Partial(path) =>
       findProjectId(path) >>= {
         case Some(id) => queue.offer(id, path)
-        case None     => new Exception(show"Cannot find projectId for $path").raiseError
+        case None     => Logger[F].warn(show"Cannot find projectId for $path")
       }
   }
 }
