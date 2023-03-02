@@ -21,16 +21,23 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
 import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.Schemas._
 import io.renku.graph.model.versions.RenkuVersionPair
 import io.renku.jsonld.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
-trait RenkuVersionPairUpdater[F[_]] {
+private[migrations] trait RenkuVersionPairUpdater[F[_]] {
   def update(versionPair: RenkuVersionPair): F[Unit]
+}
+
+private[migrations] object RenkuVersionPairUpdater {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      migrationsDSConfig: MigrationsConnectionConfig
+  )(implicit renkuUrl: RenkuUrl): RenkuVersionPairUpdater[F] =
+    new RenkuVersionPairUpdaterImpl[F](migrationsDSConfig)
 }
 
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
