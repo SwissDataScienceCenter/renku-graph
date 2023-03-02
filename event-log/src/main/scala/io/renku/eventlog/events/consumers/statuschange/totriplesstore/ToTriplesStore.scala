@@ -20,10 +20,11 @@ package io.renku.eventlog.events.consumers.statuschange
 package totriplesstore
 
 import cats.Show
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.{events, projects}
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime}
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -36,6 +37,19 @@ private[statuschange] final case class ToTriplesStore(
 }
 
 private[statuschange] object ToTriplesStore {
+  def unapply(raw: RawStatusChangeEvent): Option[ToTriplesStore] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            Some(processingTime),
+            None,
+            None,
+            EventStatus.TriplesStore
+          ) =>
+        ToTriplesStore(CompoundEventId(id, pid), path, processingTime).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToTriplesStore] = { request =>
     for {

@@ -20,19 +20,43 @@ package io.renku.eventlog.events.consumers.statuschange
 package rollbacktotriplesgenerated
 
 import cats.Show
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.{events, projects}
-import io.renku.graph.model.events.CompoundEventId
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class RollbackToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
     extends StatusChangeEvent {
   override val silent: Boolean = true
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      Some(eventId.id),
+      Some(RawStatusChangeEvent.Project(eventId.projectId.some, projectPath)),
+      None,
+      None,
+      None,
+      EventStatus.TriplesGenerated
+    )
 }
 
 private[statuschange] object RollbackToTriplesGenerated {
+  def unapply(raw: RawStatusChangeEvent): Option[RollbackToTriplesGenerated] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            None,
+            None,
+            None,
+            EventStatus.TriplesGenerated
+          ) =>
+        RollbackToTriplesGenerated(CompoundEventId(id, pid), path).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { request =>
     for {

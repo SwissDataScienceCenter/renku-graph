@@ -24,8 +24,12 @@ import cats.Show
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.events
+import io.renku.graph.model.events.EventStatus
 
-private[statuschange] trait AllEventsToNew extends StatusChangeEvent
+private[statuschange] trait AllEventsToNew extends StatusChangeEvent {
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(None, None, None, None, None, EventStatus.New)
+}
 
 private[statuschange] case object AllEventsToNew extends AllEventsToNew {
   override val silent: Boolean = false
@@ -37,4 +41,10 @@ private[statuschange] case object AllEventsToNew extends AllEventsToNew {
     }
 
   implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = ${events.EventStatus.New}")
+
+  def unapply(raw: RawStatusChangeEvent): Option[AllEventsToNew] =
+    raw match {
+      case RawStatusChangeEvent(_, None, _, _, _, EventStatus.New) => AllEventsToNew.some
+      case _                                                       => None
+    }
 }

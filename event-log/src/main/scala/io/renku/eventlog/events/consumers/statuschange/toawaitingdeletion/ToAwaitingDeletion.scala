@@ -20,19 +20,43 @@ package io.renku.eventlog.events.consumers.statuschange
 package toawaitingdeletion
 
 import cats.Show
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.{events, projects}
-import io.renku.graph.model.events.CompoundEventId
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path)
     extends StatusChangeEvent {
   override val silent: Boolean = false
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      Some(eventId.id),
+      Some(RawStatusChangeEvent.Project(eventId.projectId.some, projectPath)),
+      None,
+      None,
+      None,
+      EventStatus.AwaitingDeletion
+    )
 }
 
 private[statuschange] object ToAwaitingDeletion {
+  def unapply(raw: RawStatusChangeEvent): Option[ToAwaitingDeletion] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            None,
+            None,
+            None,
+            EventStatus.AwaitingDeletion
+          ) =>
+        ToAwaitingDeletion(CompoundEventId(id, pid), path).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { request =>
     for {

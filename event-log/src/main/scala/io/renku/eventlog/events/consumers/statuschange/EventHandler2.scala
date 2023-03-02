@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.Async
-import io.circe.DecodingFailure
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.events.consumers.statuschange.alleventstonew.AllEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation.RedoProjectTransformation
@@ -34,6 +34,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -79,12 +80,26 @@ class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
   )
 
   private val eventDecoder: EventRequestContent => Either[DecodingFailure, StatusChangeEvent] = req =>
-    subEventDecoders.tail.foldLeft(subEventDecoders.head(req)) { (res, f) =>
-      res match {
-        case Left(_)      => f(req)
-        case r @ Right(_) => r
+    Decoder[RawStatusChangeEvent]
+      .emap {
+        case RollbackToNew(e) => Right(e)
+        case ToTriplesGenerated(f) =>
+          req match {
+            case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) =>
+              Right(f(payload))
+            case _ => Left("Missing event payload")
+          }
+        case RollbackToTriplesGenerated(e) => Right(e)
+        case ToTriplesStore(e)             => Right(e)
+        case ToFailure(e)                  => Right(e)
+        case ToAwaitingDeletion(e)         => Right(e)
+        case RollbackToAwaitingDeletion(e) => Right(e)
+        case RedoProjectTransformation(e)  => Right(e)
+        case ProjectEventsToNew(e)         => Right(e)
+        case AllEventsToNew(e)             => Right(e)
+        case _                             => Left("Cannot read event")
       }
-    }
+      .apply(req.event.hcursor)
 
   private def dbUpdaterFor(event: StatusChangeEvent): (UpdateResult[F], RollbackResult[F]) =
     event match {
@@ -92,39 +107,39 @@ class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
         val updater = new alleventstonew.DbUpdater[F](eventSender)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ ProjectEventsToNew(_) =>
+      case ev: ProjectEventsToNew =>
         val updater = new projecteventstonew.DbUpdater[F](eventsQueue)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ RedoProjectTransformation(_) =>
+      case ev: RedoProjectTransformation =>
         val updater = new redoprojecttransformation.DbUpdater[F](eventsQueue)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ RollbackToAwaitingDeletion(_) =>
+      case ev: RollbackToAwaitingDeletion =>
         val updater = new rollbacktoawaitingdeletion.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ RollbackToNew(_, _) =>
+      case ev: RollbackToNew =>
         val updater = new rollbacktonew.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ RollbackToTriplesGenerated(_, _) =>
+      case ev: RollbackToTriplesGenerated =>
         val updater = new rollbacktotriplesgenerated.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ ToAwaitingDeletion(_, _) =>
+      case ev: ToAwaitingDeletion =>
         val updater = new toawaitingdeletion.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ ToFailure(_, _, _, _, _, _) =>
+      case ev: ToFailure[_, _] =>
         val updater = new tofailure.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ ToTriplesGenerated(_, _, _, _) =>
+      case ev: ToTriplesGenerated =>
         val updater = new totriplesgenerated.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev @ ToTriplesStore(_, _, _) =>
+      case ev: ToTriplesStore =>
         val updater = new totriplesstore.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
 

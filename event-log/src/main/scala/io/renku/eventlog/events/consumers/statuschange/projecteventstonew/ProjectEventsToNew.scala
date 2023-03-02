@@ -26,12 +26,23 @@ import io.circe.literal._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent
 import io.renku.events.consumers.Project
 import io.renku.events.EventRequestContent
+import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent {
   override val silent: Boolean = false
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      None,
+      Some(RawStatusChangeEvent.Project(project.id.some, project.path)),
+      None,
+      None,
+      None,
+      EventStatus.New
+    )
 }
 
 private[statuschange] object ProjectEventsToNew {
@@ -46,6 +57,20 @@ private[statuschange] object ProjectEventsToNew {
            }
     } yield ProjectEventsToNew(Project(projectId, projectPath))
   }
+
+  def unapply(raw: RawStatusChangeEvent): Option[ProjectEventsToNew] =
+    raw match {
+      case RawStatusChangeEvent(
+            None,
+            Some(RawStatusChangeEvent.Project(Some(id), path)),
+            None,
+            None,
+            None,
+            EventStatus.New
+          ) =>
+        ProjectEventsToNew(Project(id, path)).some
+      case _ => None
+    }
 
   implicit lazy val encoder: Encoder[ProjectEventsToNew] = Encoder.instance {
     case ProjectEventsToNew(Project(id, path)) => json"""{

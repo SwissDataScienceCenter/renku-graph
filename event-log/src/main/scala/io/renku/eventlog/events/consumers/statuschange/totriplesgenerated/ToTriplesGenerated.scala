@@ -20,22 +20,46 @@ package io.renku.eventlog.events.consumers.statuschange
 package totriplesgenerated
 
 import cats.Show
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.{events, projects}
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class ToTriplesGenerated(eventId:        CompoundEventId,
-                                            projectPath:    projects.Path,
-                                            processingTime: EventProcessingTime,
-                                            payload:        ZippedEventPayload
+                                                          projectPath:    projects.Path,
+                                                          processingTime: EventProcessingTime,
+                                                          payload:        ZippedEventPayload
 ) extends StatusChangeEvent {
   override val silent: Boolean = false
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      Some(eventId.id),
+      Some(RawStatusChangeEvent.Project(eventId.projectId.some, projectPath)),
+      Some(processingTime),
+      None,
+      None,
+      EventStatus.TriplesGenerated
+    )
 }
 
 private[statuschange] object ToTriplesGenerated {
+  def unapply(raw: RawStatusChangeEvent): Option[ZippedEventPayload => ToTriplesGenerated] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            Some(processingTime),
+            None,
+            None,
+            EventStatus.TriplesGenerated
+          ) =>
+        (payload => ToTriplesGenerated(CompoundEventId(id, pid), path, processingTime, payload)).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
     case EventRequestContent.WithPayload(event, payload: ZippedEventPayload) =>

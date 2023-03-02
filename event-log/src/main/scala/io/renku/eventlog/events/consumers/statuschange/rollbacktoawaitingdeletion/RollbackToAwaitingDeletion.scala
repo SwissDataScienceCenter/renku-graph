@@ -20,18 +20,44 @@ package io.renku.eventlog.events.consumers.statuschange
 package rollbacktoawaitingdeletion
 
 import cats.Show
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.consumers.Project
 import io.renku.events.EventRequestContent
+import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent {
   override val silent: Boolean = true
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      None,
+      Some(RawStatusChangeEvent.Project(project.id.some, project.path)),
+      None,
+      None,
+      None,
+      EventStatus.AwaitingDeletion
+    )
 }
 
 private[statuschange] object RollbackToAwaitingDeletion {
+
+  def unapply(raw: RawStatusChangeEvent): Option[RollbackToAwaitingDeletion] =
+    raw match {
+      case RawStatusChangeEvent(
+            None,
+            Some(RawStatusChangeEvent.Project(Some(id), path)),
+            None,
+            None,
+            None,
+            EventStatus.AwaitingDeletion
+          ) =>
+        RollbackToAwaitingDeletion(Project(id, path)).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
     for {

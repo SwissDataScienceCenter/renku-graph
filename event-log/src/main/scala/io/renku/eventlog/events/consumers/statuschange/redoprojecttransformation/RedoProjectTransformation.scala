@@ -24,15 +24,40 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.circe.literal._
 import io.renku.events.EventRequestContent
+import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class RedoProjectTransformation(projectPath: projects.Path) extends StatusChangeEvent {
   override val silent: Boolean = false
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      None,
+      Some(RawStatusChangeEvent.Project(None, projectPath)),
+      None,
+      None,
+      None,
+      EventStatus.TriplesGenerated
+    )
 }
 
 private[statuschange] object RedoProjectTransformation {
+
+  def unapply(raw: RawStatusChangeEvent): Option[RedoProjectTransformation] =
+    raw match {
+      case RawStatusChangeEvent(
+            None,
+            Some(RawStatusChangeEvent.Project(None, path)),
+            None,
+            None,
+            None,
+            EventStatus.TriplesGenerated
+          ) =>
+        RedoProjectTransformation(path).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, RedoProjectTransformation] = { request =>
     for {

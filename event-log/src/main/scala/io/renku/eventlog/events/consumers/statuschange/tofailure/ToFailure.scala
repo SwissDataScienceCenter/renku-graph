@@ -32,15 +32,30 @@ import io.renku.tinytypes.json.TinyTypeDecoders._
 import java.time.Duration
 
 private[statuschange] final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](
-    eventId:             CompoundEventId,
-    projectPath:         projects.Path,
-    message:             EventMessage,
-    currentStatus:       C,
+    eventId:     CompoundEventId,
+    projectPath: projects.Path,
+    message:     EventMessage,
+    //  currentStatus:       C,
     newStatus:           N,
     maybeExecutionDelay: Option[Duration]
 )(implicit ev: AllowedCombination[C, N])
     extends StatusChangeEvent {
   override val silent: Boolean = false
+
+  def currentStatus = newStatus match {
+    case TransformationRecoverableFailure | TransformationNonRecoverableFailure => TransformingTriples
+    case GenerationRecoverableFailure | GenerationNonRecoverableFailure         => GeneratingTriples
+  }
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      Some(eventId.id),
+      Some(RawStatusChangeEvent.Project(eventId.projectId.some, projectPath)),
+      None,
+      Some(message),
+      maybeExecutionDelay,
+      newStatus
+    )
 }
 
 private[statuschange] object ToFailure {
@@ -58,6 +73,33 @@ private[statuschange] object ToFailure {
 
   implicit object TransformationToRecoverableFailure
       extends AllowedCombination[TransformingTriples, TransformationRecoverableFailure]
+
+  def unapply(raw: RawStatusChangeEvent): Option[ToFailure[ProcessingStatus, FailureStatus]] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            None,
+            Some(message),
+            executionDelay,
+            status
+          ) =>
+        status match {
+          case s: GenerationRecoverableFailure =>
+            ToFailure(CompoundEventId(id, pid), path, message, GeneratingTriples, s, executionDelay).some
+          case s: GenerationNonRecoverableFailure =>
+            ToFailure(CompoundEventId(id, pid), path, message, GeneratingTriples, s, executionDelay).some
+
+          case s: TransformationRecoverableFailure =>
+            ToFailure(CompoundEventId(id, pid), path, message, TransformingTriples, s, executionDelay).some
+          case s: TransformationNonRecoverableFailure =>
+            ToFailure(CompoundEventId(id, pid), path, message, TransformingTriples, s, executionDelay).some
+
+          case _ => None
+        }
+
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = { request =>
     for {
@@ -110,5 +152,6 @@ private[statuschange] object ToFailure {
   implicit lazy val show: Show[ToFailure[ProcessingStatus, FailureStatus]] = Show.show {
     case ToFailure(eventId, projectPath, _, _, newStatus, _) =>
       s"$eventId, projectPath = $projectPath, status = $newStatus - update"
+    case tf => tf.toString
   }
 }

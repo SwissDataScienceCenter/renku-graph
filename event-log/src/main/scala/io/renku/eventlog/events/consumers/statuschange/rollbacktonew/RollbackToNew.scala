@@ -24,16 +24,40 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.{events, projects}
-import io.renku.graph.model.events.CompoundEventId
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private[statuschange] final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path)
     extends StatusChangeEvent {
   override val silent: Boolean = true
+
+  def toRaw: RawStatusChangeEvent =
+    RawStatusChangeEvent(
+      Some(eventId.id),
+      Some(RawStatusChangeEvent.Project(eventId.projectId.some, projectPath)),
+      None,
+      None,
+      None,
+      EventStatus.New
+    )
 }
 
 private[statuschange] object RollbackToNew {
+
+  def unapply(raw: RawStatusChangeEvent): Option[RollbackToNew] =
+    raw match {
+      case RawStatusChangeEvent(
+            Some(id),
+            Some(RawStatusChangeEvent.Project(Some(pid), path)),
+            None,
+            None,
+            None,
+            EventStatus.New
+          ) =>
+        RollbackToNew(CompoundEventId(id, pid), path).some
+      case _ => None
+    }
 
   val decoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = { request =>
     for {
