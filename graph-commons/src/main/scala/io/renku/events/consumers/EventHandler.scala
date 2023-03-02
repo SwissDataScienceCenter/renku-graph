@@ -64,7 +64,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
   private def decodeEvent(request:           EventRequestContent,
                           processDefinition: EventHandlingDefinition
   ): Either[EventSchedulingResult, Event] =
-    (processDefinition decode request).leftMap(_ => BadRequest)
+    (processDefinition decode request).leftMap(err => BadRequest(err.getMessage))
 
   private def process(event: Event, processDefinition: EventHandlingDefinition) = {
     val processResource = Resource

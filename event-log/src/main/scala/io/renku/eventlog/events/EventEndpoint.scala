@@ -28,8 +28,8 @@ import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
-import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.http.InfoMessage._
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
@@ -62,7 +62,7 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
     case EventSchedulingResult.Accepted                   => Accepted(InfoMessage("Event accepted"))
     case EventSchedulingResult.Busy                       => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType       => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest                 => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.BadRequest(reason)         => BadRequest(ErrorMessage(reason))
     case EventSchedulingResult.ServiceUnavailable(reason) => ServiceUnavailable(ErrorMessage(reason))
     case EventSchedulingResult.SchedulingError(_) => InternalServerError(ErrorMessage("Failed to schedule event"))
   }

@@ -24,8 +24,9 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.generators.Generators.Implicits._
+import io.renku.events.consumers.ConsumersModelGenerators.badRequests
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -66,6 +67,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
   "renewAllSubscriptions" should {
 
     "call the renewSubscription on all the subscriptionMechanism" in new TestCase {
+
       (subscriptionMechanism0.renewSubscription _)
         .expects()
         .returning(IO.unit)
@@ -78,7 +80,9 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
   }
 
   "handle" should {
+
     s"return $Accepted if one of the handlers accepts the given payload" in new TestCase {
+
       (handler0.tryHandling _)
         .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
@@ -105,11 +109,13 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
     }
 
     s"return $BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
+
+      val badRequest = badRequests.generateOne
       (handler0.tryHandling _)
         .expects(requestContent)
-        .returning(EventSchedulingResult.BadRequest.pure[IO])
+        .returning(badRequest.pure[IO])
 
-      registry.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      registry.handle(requestContent).unsafeRunSync() shouldBe badRequest
     }
 
     s"return $Busy if the handler returns $Busy" in new TestCase {
@@ -122,7 +128,8 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
 
     }
 
-    s"return ${EventSchedulingResult.SchedulingError} if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
+    s"return $SchedulingError if the handler returns $SchedulingError" in new TestCase {
+
       val exception = exceptions.generateOne
       (handler0.tryHandling _)
         .expects(requestContent)
@@ -146,6 +153,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
   }
 
   private trait TestCase {
+
     val requestContent = eventRequestContents.generateOne
 
     val handler0 = mock[EventHandler[IO]]
@@ -154,7 +162,9 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
     val subscriptionMechanism0 = mock[SubscriptionMechanism[IO]]
     val subscriptionMechanism1 = mock[SubscriptionMechanism[IO]]
 
-    val registry =
-      new EventConsumersRegistryImpl[IO](List(handler0, handler1), List(subscriptionMechanism0, subscriptionMechanism1))
+    val registry = new EventConsumersRegistryImpl[IO](
+      List(handler0, handler1),
+      List(subscriptionMechanism0, subscriptionMechanism1)
+    )
   }
 }

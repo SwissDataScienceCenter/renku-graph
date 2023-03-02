@@ -53,12 +53,13 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
 
     "return BadRequest in case decoding fails" in new TestCase {
 
-      override val precondition: IO[Option[EventSchedulingResult]]             = None.pure[IO]
-      override val decode:       EventRequestContent => Either[Exception, Int] = _ => exceptions.generateOne.asLeft
+      override val precondition: IO[Option[EventSchedulingResult]] = None.pure[IO]
+      val exception = exceptions.generateOne
+      override val decode: EventRequestContent => Either[Exception, Int] = _ => exception.asLeft
 
       val request = json"""{"categoryName": $category}"""
 
-      handler.tryHandling(EventRequestContent(request)).unsafeRunSync() shouldBe BadRequest
+      handler.tryHandling(EventRequestContent(request)).unsafeRunSync() shouldBe BadRequest(exception.getMessage)
     }
 
     "return result the process executor returns in case the event gets scheduled" in new TestCase {

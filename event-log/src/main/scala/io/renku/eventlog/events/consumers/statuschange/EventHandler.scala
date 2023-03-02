@@ -39,9 +39,9 @@ private[statuschange] class EventHandler[F[_]: Async: Logger: MetricsRegistry: Q
       .map { _ =>
         childHandlers.foldLeft(UnsupportedEventType.widen.pure[F]) { case (previousHandlingResult, nextHandler) =>
           previousHandlingResult >>= {
-            case r @ Accepted                      => r.widen.pure[F]
-            case BadRequest | UnsupportedEventType => nextHandler.tryHandling(request)
-            case r                                 => r.pure[F]
+            case r @ Accepted                         => r.widen.pure[F]
+            case BadRequest(_) | UnsupportedEventType => nextHandler.tryHandling(request)
+            case r                                    => r.pure[F]
           }
         }
       }

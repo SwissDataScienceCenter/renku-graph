@@ -121,7 +121,7 @@ class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsum
     case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
     case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.BadRequest(reason)   => BadRequest(ErrorMessage(reason))
     case EventSchedulingResult.ServiceUnavailable(reason) =>
       Logger[F].error(s"Service needed for event processing unavailable: $reason") >>
         ServiceUnavailable(InfoMessage(reason))
