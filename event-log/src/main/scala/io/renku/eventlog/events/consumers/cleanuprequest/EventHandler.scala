@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
