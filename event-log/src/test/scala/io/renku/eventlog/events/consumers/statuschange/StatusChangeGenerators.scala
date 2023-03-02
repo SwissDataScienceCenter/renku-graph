@@ -30,27 +30,28 @@ import java.time.{Duration => JDuration}
 
 object StatusChangeGenerators {
 
-  val projectEventsToNewEvents = ConsumersModelGenerators.consumerProjects.map(ProjectEventsToNew(_))
+  val projectEventsToNewEvents: Gen[ProjectEventsToNew] =
+    ConsumersModelGenerators.consumerProjects.map(ProjectEventsToNew(_))
 
-  lazy val rollbackToAwaitingDeletionEvents =
+  lazy val rollbackToAwaitingDeletionEvents: Gen[RollbackToAwaitingDeletion] =
     ConsumersModelGenerators.consumerProjects.map(RollbackToAwaitingDeletion.apply)
 
-  lazy val rollbackToNewEvents = for {
+  lazy val rollbackToNewEvents: Gen[RollbackToNew] = for {
     id      <- EventsGenerators.eventIds
     project <- ConsumersModelGenerators.consumerProjects
   } yield RollbackToNew(id, project)
 
-  lazy val rollbackToTriplesGeneratedEvents = for {
+  lazy val rollbackToTriplesGeneratedEvents: Gen[RollbackToTriplesGenerated] = for {
     id      <- EventsGenerators.eventIds
     project <- ConsumersModelGenerators.consumerProjects
   } yield RollbackToTriplesGenerated(id, project)
 
-  lazy val toAwaitingDeletionEvents = for {
+  lazy val toAwaitingDeletionEvents: Gen[ToAwaitingDeletion] = for {
     id      <- EventsGenerators.eventIds
     project <- ConsumersModelGenerators.consumerProjects
   } yield ToAwaitingDeletion(id, project)
 
-  lazy val toFailureEvents = for {
+  lazy val toFailureEvents: Gen[ToFailure] = for {
     eventId        <- EventsGenerators.compoundEventIds
     projectPath    <- projectPaths
     message        <- EventContentGenerators.eventMessages
@@ -64,18 +65,26 @@ object StatusChangeGenerators {
 
   private def executionDelays: Gen[JDuration] = Gen.choose(0L, 10L).map(JDuration.ofSeconds)
 
-  lazy val toTriplesGeneratedEvents = for {
+  lazy val toTriplesGeneratedEvents: Gen[ToTriplesGenerated] = for {
     id             <- EventsGenerators.eventIds
     project        <- ConsumersModelGenerators.consumerProjects
     processingTime <- EventsGenerators.eventProcessingTimes
     payload        <- EventsGenerators.zippedEventPayloads
   } yield ToTriplesGenerated(id, project, processingTime, payload)
 
-  lazy val toTripleStoreEvents = for {
+  lazy val toTripleStoreEvents: Gen[ToTriplesStore] = for {
     id             <- EventsGenerators.eventIds
     project        <- ConsumersModelGenerators.consumerProjects
     processingTime <- EventsGenerators.eventProcessingTimes
   } yield ToTriplesStore(id, project, processingTime)
+
+  val redoProjectTransformationEvents: Gen[RedoProjectTransformation] =
+    for {
+      path <- projectPaths
+    } yield RedoProjectTransformation(path)
+
+  val allEventsToNewEvents: Gen[AllEventsToNew.type] =
+    Gen.const(AllEventsToNew)
 
   def statusChangeEvents: Gen[StatusChangeEvent] =
     Gen.oneOf(
@@ -86,7 +95,8 @@ object StatusChangeGenerators {
       rollbackToTriplesGeneratedEvents,
       rollbackToNewEvents,
       rollbackToAwaitingDeletionEvents,
-      projectEventsToNewEvents
-      // TODO add missing!
+      projectEventsToNewEvents,
+      redoProjectTransformationEvents,
+      allEventsToNewEvents
     )
 }

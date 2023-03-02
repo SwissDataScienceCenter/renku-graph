@@ -191,20 +191,11 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "NEW"
+  "subCategory": "RollbackToNew"
 }
 ```
 
 #### Changing status of the specified event from processing statuses to failure statuses
-
-**Allowed combinations**
-
-| Processing status    | Failure status                         |
-| -------------------- | -------------------------------------- |
-| GENERATING_TRIPLES   | GENERATION_NON_RECOVERABLE_FAILURE     |
-| GENERATING_TRIPLES   | GENERATION_RECOVERABLE_FAILURE         |
-| TRANSFORMING_TRIPLES | TRANSFORMATION_NON_RECOVERABLE_FAILURE |
-| TRANSFORMING_TRIPLES | TRANSFORMATION_RECOVERABLE_FAILURE     |
 
 **Multipart Request**
 
@@ -219,7 +210,7 @@ the new status.
     "path": "namespace/project-name"
   },
   "message":   "<failure message>",
-  "newStatus": "<failure status>"
+  "subCategory": "ToFailure"
 }
 ```
 

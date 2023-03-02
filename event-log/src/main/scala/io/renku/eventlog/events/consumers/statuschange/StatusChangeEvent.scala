@@ -22,6 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.extras.Configuration
+import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
@@ -35,13 +36,12 @@ sealed trait StatusChangeEvent extends Product {
   val silent: Boolean
 
   def widen: StatusChangeEvent = this
+
+  def subCategoryName: String = productPrefix
 }
 
 object StatusChangeEvent {
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
-
-  implicit val decodingConfig: Configuration =
-    Configuration.default.withDiscriminator("subCategory").withDefaults
 
   final case class ProjectPath(path: projects.Path)
   object ProjectPath {
@@ -54,8 +54,9 @@ object StatusChangeEvent {
 
     implicit val show: Show[AllEventsToNew.type] = Show.fromToString
 
-    implicit val jsonDecoder: Decoder[AllEventsToNew.type] = deriveDecoder[AllEventsToNew.type]
-    implicit val jsonEncoder: Encoder[AllEventsToNew.type] = deriveEncoder[AllEventsToNew.type]
+    implicit val jsonDecoder: Decoder[AllEventsToNew.type] = specificDecoder[AllEventsToNew.type]
+    implicit val jsonEncoder: Encoder[AllEventsToNew.type] = specificEncoder[AllEventsToNew.type]
+
   }
 
   final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent {
@@ -68,14 +69,18 @@ object StatusChangeEvent {
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { case ProjectEventsToNew(project) =>
       show"$project, status = $New"
     }
-    implicit val jsonDecoder: Decoder[ProjectEventsToNew] = deriveDecoder[ProjectEventsToNew]
-    implicit val jsonEncoder: Encoder[ProjectEventsToNew] = deriveEncoder[ProjectEventsToNew]
+
+    implicit val jsonDecoder: Decoder[ProjectEventsToNew] = specificDecoder[ProjectEventsToNew]
+    implicit val jsonEncoder: Encoder[ProjectEventsToNew] = specificEncoder[ProjectEventsToNew]
   }
 
   final case class RedoProjectTransformation(project: ProjectPath) extends StatusChangeEvent {
     override val silent: Boolean = false
   }
   object RedoProjectTransformation {
+    def apply(path: projects.Path): RedoProjectTransformation =
+      RedoProjectTransformation(ProjectPath(path))
+
     implicit lazy val eventType: StatusChangeEventsQueue.EventType[RedoProjectTransformation] =
       StatusChangeEventsQueue.EventType("REDO_PROJECT_TRANSFORMATION")
 
@@ -83,16 +88,16 @@ object StatusChangeEvent {
       s"projectPath = $projectPath, status = $ToTriplesGenerated - redo"
     }
 
-    implicit val jsonDecoder: Decoder[RedoProjectTransformation] = deriveDecoder[RedoProjectTransformation]
-    implicit val jsonEncoder: Encoder[RedoProjectTransformation] = deriveEncoder[RedoProjectTransformation]
+    implicit val jsonDecoder: Decoder[RedoProjectTransformation] = specificDecoder[RedoProjectTransformation]
+    implicit val jsonEncoder: Encoder[RedoProjectTransformation] = specificEncoder[RedoProjectTransformation]
   }
 
   final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent {
     override val silent: Boolean = true
   }
   object RollbackToAwaitingDeletion {
-    implicit val jsonDecoder: Decoder[RollbackToAwaitingDeletion] = deriveDecoder[RollbackToAwaitingDeletion]
-    implicit val jsonEncoder: Encoder[RollbackToAwaitingDeletion] = deriveEncoder[RollbackToAwaitingDeletion]
+    implicit val jsonDecoder: Decoder[RollbackToAwaitingDeletion] = specificDecoder[RollbackToAwaitingDeletion]
+    implicit val jsonEncoder: Encoder[RollbackToAwaitingDeletion] = specificEncoder[RollbackToAwaitingDeletion]
   }
 
   final case class RollbackToNew(id: EventId, project: Project) extends StatusChangeEvent {
@@ -100,8 +105,8 @@ object StatusChangeEvent {
     val eventId:         CompoundEventId = CompoundEventId(id, project.id)
   }
   object RollbackToNew {
-    implicit val jsonDecoder: Decoder[RollbackToNew] = deriveDecoder[RollbackToNew]
-    implicit val jsonEncoder: Encoder[RollbackToNew] = deriveEncoder[RollbackToNew]
+    implicit val jsonDecoder: Decoder[RollbackToNew] = specificDecoder[RollbackToNew]
+    implicit val jsonEncoder: Encoder[RollbackToNew] = specificEncoder[RollbackToNew]
   }
 
   final case class RollbackToTriplesGenerated(id: EventId, project: Project) extends StatusChangeEvent {
@@ -109,8 +114,8 @@ object StatusChangeEvent {
     val eventId:         CompoundEventId = CompoundEventId(id, project.id)
   }
   object RollbackToTriplesGenerated {
-    implicit val jsonDecoder: Decoder[RollbackToTriplesGenerated] = deriveDecoder[RollbackToTriplesGenerated]
-    implicit val jsonEncoder: Encoder[RollbackToTriplesGenerated] = deriveEncoder[RollbackToTriplesGenerated]
+    implicit val jsonDecoder: Decoder[RollbackToTriplesGenerated] = specificDecoder[RollbackToTriplesGenerated]
+    implicit val jsonEncoder: Encoder[RollbackToTriplesGenerated] = specificEncoder[RollbackToTriplesGenerated]
   }
 
   final case class ToAwaitingDeletion(id: EventId, project: Project) extends StatusChangeEvent {
@@ -118,26 +123,22 @@ object StatusChangeEvent {
     val eventId:         CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToAwaitingDeletion {
-    implicit val jsonDecoder: Decoder[ToAwaitingDeletion] = deriveDecoder[ToAwaitingDeletion]
-    implicit val jsonEncoder: Encoder[ToAwaitingDeletion] = deriveEncoder[ToAwaitingDeletion]
+    implicit val jsonDecoder: Decoder[ToAwaitingDeletion] = specificDecoder[ToAwaitingDeletion]
+    implicit val jsonEncoder: Encoder[ToAwaitingDeletion] = specificEncoder[ToAwaitingDeletion]
   }
 
-  final case class ToTriplesGenerated(id:             EventId,
-                                      project:        Project,
-                                      processingTime: EventProcessingTime,
-                                      payload:        ZippedEventPayload = ZippedEventPayload(new Array[Byte](0))
+  final case class ToTriplesGenerated(
+      id:             EventId,
+      project:        Project,
+      processingTime: EventProcessingTime,
+      payload:        ZippedEventPayload = ZippedEventPayload.empty
   ) extends StatusChangeEvent {
     override val silent: Boolean         = false
     val eventId:         CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToTriplesGenerated {
-    private implicit val dummyPayloadDecoder: Decoder[ZippedEventPayload] =
-      Decoder.instance(_ => Right(ZippedEventPayload(new Array[Byte](0))))
-    private implicit val dummyPayloadEncoder: Encoder[ZippedEventPayload] =
-      Encoder.instance(_ => Json.Null)
-
-    implicit val jsonDecoder: Decoder[ToTriplesGenerated] = deriveDecoder[ToTriplesGenerated]
-    implicit val jsonEncoder: Encoder[ToTriplesGenerated] = deriveEncoder[ToTriplesGenerated]
+    implicit val jsonDecoder: Decoder[ToTriplesGenerated] = specificDecoder[ToTriplesGenerated]
+    implicit val jsonEncoder: Encoder[ToTriplesGenerated] = specificEncoder[ToTriplesGenerated]
   }
 
   final case class ToTriplesStore(
@@ -149,16 +150,16 @@ object StatusChangeEvent {
     val eventId:         CompoundEventId = CompoundEventId(id, project.id)
   }
   object ToTriplesStore {
-    implicit val jsonDecoder: Decoder[ToTriplesStore] = deriveDecoder[ToTriplesStore]
-    implicit val jsonEncoder: Encoder[ToTriplesStore] = deriveEncoder[ToTriplesStore]
+    implicit val jsonDecoder: Decoder[ToTriplesStore] = specificDecoder[ToTriplesStore]
+    implicit val jsonEncoder: Encoder[ToTriplesStore] = specificEncoder[ToTriplesStore]
   }
 
   final case class ToFailure(
-      id:                  EventId,
-      project:             Project,
-      message:             EventMessage,
-      newStatus:           FailureStatus,
-      maybeExecutionDelay: Option[JDuration]
+      id:             EventId,
+      project:        Project,
+      message:        EventMessage,
+      newStatus:      FailureStatus,
+      executionDelay: Option[JDuration]
   ) extends StatusChangeEvent {
     override val silent: Boolean = false
 
@@ -170,10 +171,73 @@ object StatusChangeEvent {
     }
   }
   object ToFailure {
-    implicit val jsonDecoder: Decoder[ToFailure] = deriveDecoder[ToFailure]
-    implicit val jsonEncoder: Encoder[ToFailure] = deriveEncoder[ToFailure]
+    implicit val jsonDecoder: Decoder[ToFailure] = specificDecoder[ToFailure]
+    implicit val jsonEncoder: Encoder[ToFailure] = specificEncoder[ToFailure]
   }
 
-  implicit val jsonDecoder: Decoder[StatusChangeEvent] = deriveDecoder[StatusChangeEvent]
-  implicit val jsonEncoder: Encoder[StatusChangeEvent] = deriveEncoder[StatusChangeEvent]
+  private object JsonCodec {
+    implicit val decodingConfig: Configuration =
+      Configuration.default.withDiscriminator("subCategory").withDefaults
+
+    private implicit val dummyPayloadDecoder: Decoder[ZippedEventPayload] =
+      Decoder.instance(_ => Right(ZippedEventPayload.empty))
+    private implicit val dummyPayloadEncoder: Encoder[ZippedEventPayload] =
+      Encoder.instance(_ => Json.Null)
+
+    implicit val toFailureJsonDecoder: Decoder[ToFailure] = deriveDecoder[ToFailure]
+    implicit val toFailureJsonEncoder: Encoder[ToFailure] = deriveEncoder[ToFailure]
+
+    implicit val toTriplesStoreJsonDecoder: Decoder[ToTriplesStore] = deriveDecoder[ToTriplesStore]
+    implicit val toTriplesStoreJsonEncoder: Encoder[ToTriplesStore] = deriveEncoder[ToTriplesStore]
+
+    private case class PartialTriplesGenerated(id: EventId, project: Project, processingTime: EventProcessingTime)
+    implicit val toTriplesGeneratedJsonDecoder: Decoder[ToTriplesGenerated] =
+      deriveDecoder[PartialTriplesGenerated].map { case PartialTriplesGenerated(id, project, time) =>
+        ToTriplesGenerated(id, project, time, ZippedEventPayload.empty)
+      }
+
+    implicit val toTriplesGeneratedJsonEncoder: Encoder[ToTriplesGenerated] = deriveEncoder[ToTriplesGenerated]
+
+    implicit val toAwaitingDeletionJsonDecoder: Decoder[ToAwaitingDeletion] = deriveDecoder[ToAwaitingDeletion]
+    implicit val toAwaitingDeletionJsonEncoder: Encoder[ToAwaitingDeletion] = deriveEncoder[ToAwaitingDeletion]
+
+    implicit val rollbackToTriplesGeneratedJsonDecoder: Decoder[RollbackToTriplesGenerated] =
+      deriveDecoder[RollbackToTriplesGenerated]
+    implicit val rollbackToTriplesGeneratedJsonEncoder: Encoder[RollbackToTriplesGenerated] =
+      deriveEncoder[RollbackToTriplesGenerated]
+
+    implicit val rollbackToNewJsonDecoder: Decoder[RollbackToNew] = deriveDecoder[RollbackToNew]
+    implicit val rollbackToNewJsonEncoder: Encoder[RollbackToNew] = deriveEncoder[RollbackToNew]
+
+    implicit val rollbackToAwaitingDeletionJsonDecoder: Decoder[RollbackToAwaitingDeletion] =
+      deriveDecoder[RollbackToAwaitingDeletion]
+    implicit val rollbackToAwaitingDeletionJsonEncoder: Encoder[RollbackToAwaitingDeletion] =
+      deriveEncoder[RollbackToAwaitingDeletion]
+
+    implicit val redoProjectTransformationJsonDecoder: Decoder[RedoProjectTransformation] =
+      deriveDecoder[RedoProjectTransformation]
+    implicit val redoProjectTransformationJsonEncoder: Encoder[RedoProjectTransformation] =
+      deriveEncoder[RedoProjectTransformation]
+
+    implicit val projectEventsToNewJsonDecoder: Decoder[ProjectEventsToNew] = deriveDecoder[ProjectEventsToNew]
+    implicit val projectEventsToNewJsonEncoder: Encoder[ProjectEventsToNew] = deriveEncoder[ProjectEventsToNew]
+
+    implicit val allEventsToNewJsonDecoder: Decoder[AllEventsToNew.type] = deriveDecoder[AllEventsToNew.type]
+    implicit val allEventsToNewJsonEncoder: Encoder[AllEventsToNew.type] = deriveEncoder[AllEventsToNew.type]
+
+    val jsonDecoder: Decoder[StatusChangeEvent] = deriveConfiguredDecoder[StatusChangeEvent]
+    val jsonEncoder: Encoder[StatusChangeEvent] = deriveConfiguredEncoder[StatusChangeEvent].mapJsonObject { obj =>
+      // not a deep remove here, since it's not necessary
+      obj.filter(_._2 != Json.Null)
+    }
+  }
+
+  implicit val jsonDecoder: Decoder[StatusChangeEvent] = JsonCodec.jsonDecoder
+  implicit val jsonEncoder: Encoder[StatusChangeEvent] = JsonCodec.jsonEncoder
+
+  private def specificDecoder[A <: StatusChangeEvent]: Decoder[A] =
+    JsonCodec.jsonDecoder.emap(ev => ev.asInstanceOf[A].asRight)
+
+  private def specificEncoder[A <: StatusChangeEvent]: Encoder[A] =
+    JsonCodec.jsonEncoder.contramap(_.widen)
 }

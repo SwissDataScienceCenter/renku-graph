@@ -34,6 +34,6 @@ object SubscriptionFactory {
   ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
-    handler <- EventHandler2[F](eventsQueue)
+    handler <- EventHandler[F](eventsQueue)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

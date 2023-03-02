@@ -43,18 +43,25 @@ class EventHandlerSpec
     with should.Matchers
     with ScalaCheckPropertyChecks {
 
+  def eventRequestContent(event: StatusChangeEvent): EventRequestContent = event match {
+    case e: StatusChangeEvent.ToTriplesGenerated =>
+      EventRequestContent.WithPayload(event.asJson, e.payload)
+    case _ => EventRequestContent.NoPayload(event.asJson)
+  }
+
   "createHandlingDefinition.decode" should {
 
     "decode valid event data" in new TestCase {
       val definition = handler.createHandlingDefinition()
       forAll(StatusChangeGenerators.statusChangeEvents) { event =>
-        val decoded = definition.decode(EventRequestContent(event.asJson))
+        val decoded = definition.decode(eventRequestContent(event))
         decoded shouldBe Right(event)
       }
     }
 
   }
 
+  // TODO complete!
 //  "handle" should {
 //
 //    "decode a valid event and pass it to the events updater" in new TestCase {

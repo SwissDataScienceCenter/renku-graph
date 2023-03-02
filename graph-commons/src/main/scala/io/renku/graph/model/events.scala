@@ -98,7 +98,9 @@ object events {
       with ByteArrayTinyType
       with ZippedContent
 
-  implicit object ZippedEventPayload extends TinyTypeFactory[ZippedEventPayload](new ZippedEventPayload(_))
+  implicit object ZippedEventPayload extends TinyTypeFactory[ZippedEventPayload](new ZippedEventPayload(_)) {
+    val empty: ZippedEventPayload = ZippedEventPayload(new Array[Byte](0))
+  }
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
 

@@ -146,7 +146,7 @@ trait PlanGenerators {
       childPlans       <- workflowFileStepPlanGen(minCreated).toGeneratorOfNonEmptyList(max = 3)
       links            <- CommandParameterGenerators.parameterLinkGen.toGeneratorOfList(max = 3)
       mappings         <- CommandParameterGenerators.parameterMappingGen.toGeneratorOfList(max = 3)
-      path             <- Generators.relativePaths().map(entityModel.Location.FileOrFolder.apply) // TODO
+      path             <- Generators.relativePaths().map(entityModel.Location.FileOrFolder.apply)
     } yield CliWorkflowFileCompositePlan(
       id,
       name,
