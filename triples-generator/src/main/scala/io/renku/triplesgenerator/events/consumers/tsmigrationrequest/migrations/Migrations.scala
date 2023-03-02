@@ -41,6 +41,7 @@ private[tsmigrationrequest] object Migrations {
     fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
     addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
     migrationToV10                 <- v10migration.MigrationToV10[F]
+    v10VersionSetter               <- V10VersionUpdater[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -49,7 +50,8 @@ private[tsmigrationrequest] object Migrations {
                     compositePlan,
                     fixMultipleProjectCreatedDates,
                     addRenkuPlanWhereMissing,
-                    migrationToV10
+                    migrationToV10,
+                    v10VersionSetter
                   )
   } yield migrations
 
