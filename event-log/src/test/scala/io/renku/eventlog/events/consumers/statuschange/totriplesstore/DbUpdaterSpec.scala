@@ -21,16 +21,18 @@ package io.renku.eventlog.events.consumers.statuschange.totriplesstore
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.ConsumersModelGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import io.renku.graph.model.events._
+import io.renku.graph.model.EventsGenerators
+import io.renku.graph.model.EventsGenerators.eventProcessingTimes
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -68,13 +70,13 @@ class DbUpdaterSpec
       val event = addEvent(TransformingTriples, eventDate)
 
       val statusChangeEvent =
-        ToTriplesStore(CompoundEventId(event._1, projectId), projectPath, eventProcessingTimes.generateOne)
+        ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
 
       (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
       sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
         .ForProjects(
-          projectPath,
+          project.path,
           statusesToUpdate
             .map(_ -> -1)
             .toMap +
@@ -82,7 +84,7 @@ class DbUpdaterSpec
             (TriplesStore        -> (eventsToUpdate.size + 1 /* for the event */ ))
         )
 
-      findFullEvent(CompoundEventId(event._1, projectId))
+      findFullEvent(CompoundEventId(event._1, project.id))
         .map { case (_, status, _, maybePayload, processingTimes) =>
           status        shouldBe TriplesStore
           maybePayload  shouldBe a[Some[_]]
@@ -91,7 +93,7 @@ class DbUpdaterSpec
         .getOrElse(fail("No event found for main event"))
 
       eventsToUpdate.map { case (eventId, status, _, originalPayload, originalProcessingTimes) =>
-        findFullEvent(CompoundEventId(eventId, projectId))
+        findFullEvent(CompoundEventId(eventId, project.id))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
             status               shouldBe TriplesStore
             maybeMessage         shouldBe None
@@ -102,7 +104,7 @@ class DbUpdaterSpec
       }
 
       eventsToSkip.map { case (eventId, originalStatus, originalMessage, originalPayload, originalProcessingTimes) =>
-        findFullEvent(CompoundEventId(eventId, projectId))
+        findFullEvent(CompoundEventId(eventId, project.id))
           .map { case (_, status, maybeMessage, maybePayload, processingTimes) =>
             status               shouldBe originalStatus
             maybeMessage         shouldBe originalMessage
@@ -119,17 +121,17 @@ class DbUpdaterSpec
       val event2    = addEvent(TriplesGenerated, eventDate)
 
       val statusChangeEvent =
-        ToTriplesStore(CompoundEventId(event1._1, projectId), projectPath, eventProcessingTimes.generateOne)
+        ToTriplesStore(event1._1, project, eventProcessingTimes.generateOne)
 
       (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
       sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
         .ForProjects(
-          projectPath,
+          project.path,
           statusCount = Map(TransformingTriples -> -1, TriplesStore -> 1)
         )
 
-      findFullEvent(CompoundEventId(event1._1, projectId))
+      findFullEvent(CompoundEventId(event1._1, project.id))
         .map { case (_, status, _, maybePayload, processingTimes) =>
           status        shouldBe TriplesStore
           maybePayload  shouldBe a[Some[_]]
@@ -137,7 +139,7 @@ class DbUpdaterSpec
         }
         .getOrElse(fail("No event found for main event"))
 
-      findFullEvent(CompoundEventId(event2._1, projectId)).map(_._2) shouldBe TriplesGenerated.some
+      findFullEvent(CompoundEventId(event2._1, project.id)).map(_._2) shouldBe TriplesGenerated.some
     }
 
     (EventStatus.all - TransformingTriples) foreach { invalidStatus =>
@@ -150,7 +152,7 @@ class DbUpdaterSpec
         )._1
 
         val statusChangeEvent =
-          ToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTimes.generateOne)
+          ToTriplesStore(eventId, project, eventProcessingTimes.generateOne)
 
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -158,8 +160,8 @@ class DbUpdaterSpec
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
-        findFullEvent(CompoundEventId(eventId, projectId)).map(_._2)         shouldBe invalidStatus.some
-        findFullEvent(CompoundEventId(ancestorEventId, projectId)).map(_._2) shouldBe TransformingTriples.some
+        findFullEvent(CompoundEventId(eventId, project.id)).map(_._2)         shouldBe invalidStatus.some
+        findFullEvent(CompoundEventId(ancestorEventId, project.id)).map(_._2) shouldBe TransformingTriples.some
       }
     }
   }
@@ -167,7 +169,7 @@ class DbUpdaterSpec
   "onRollback" should {
 
     "clean the delivery info for the event" in new TestCase {
-      val event = ToTriplesStore(compoundEventIds.generateOne, projectPath, eventProcessingTimes.generateOne)
+      val event = ToTriplesStore(EventsGenerators.eventIds.generateOne, project, eventProcessingTimes.generateOne)
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
 
@@ -177,8 +179,7 @@ class DbUpdaterSpec
 
   private trait TestCase {
 
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val project = ConsumersModelGenerators.consumerProjects.generateOne
 
     val currentTime         = mockFunction[Instant]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
@@ -192,7 +193,7 @@ class DbUpdaterSpec
     def addEvent(status:    EventStatus,
                  eventDate: EventDate
     ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, projectId, projectPath)
+      storeGeneratedEvent(status, eventDate, project.id, project.path)
 
     def findFullEvent(
         eventId: CompoundEventId

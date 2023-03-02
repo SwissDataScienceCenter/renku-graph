@@ -27,7 +27,8 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange._
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesStore
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus._
@@ -76,7 +77,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesStore -> 1))
+            .ForProjects(event.project.path, Map(TransformingTriples -> -1, TriplesStore -> 1))
             .pure[F]
         case Completion.Update(0) => Monoid[DBUpdateResults.ForProjects].empty.pure[F]
         case completion =>
@@ -144,7 +145,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
             .mapResult { oldStatuses =>
               val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
               val incrementedStatuses = TriplesStore -> oldStatuses.size
-              DBUpdateResults.ForProjects(event.projectPath, decrementedStatuses + incrementedStatuses)
+              DBUpdateResults.ForProjects(event.project.path, decrementedStatuses + incrementedStatuses)
             }
         }
     }

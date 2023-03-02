@@ -19,22 +19,17 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.Async
+import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.eventlog.events.consumers.statuschange.alleventstonew.AllEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation.RedoProjectTransformation
-import io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion.RollbackToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.rollbacktonew.RollbackToNew
-import io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated.RollbackToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion.ToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure
-import io.renku.eventlog.events.consumers.statuschange.totriplesgenerated.ToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.totriplesstore.ToTriplesStore
-import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -65,86 +60,87 @@ class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
         dbUpdaterFor(event)._2
     }
 
-  // note that order matters, the first decoder succeeding will win
-  private val subEventDecoders: List[EventRequestContent => Either[DecodingFailure, StatusChangeEvent]] = List(
-    RollbackToNew.decoder,
-    ToTriplesGenerated.decoder,
-    RollbackToTriplesGenerated.decoder,
-    ToTriplesStore.decoder,
-    ToFailure.decoder,
-    ToAwaitingDeletion.decoder,
-    RollbackToAwaitingDeletion.decoder,
-    RedoProjectTransformation.decoder,
-    ProjectEventsToNew.decoder,
-    AllEventsToNew.decoder
-  )
-
   private val eventDecoder: EventRequestContent => Either[DecodingFailure, StatusChangeEvent] = req =>
-    Decoder[RawStatusChangeEvent]
+    Decoder[StatusChangeEvent]
       .emap {
-        case RollbackToNew(e) => Right(e)
-        case ToTriplesGenerated(f) =>
+        case e: StatusChangeEvent.ToTriplesGenerated =>
           req match {
             case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) =>
-              Right(f(payload))
-            case _ => Left("Missing event payload")
+              e.copy(payload = payload).asRight
+            case _ =>
+              Left(s"Missing event payload for: $e")
           }
-        case RollbackToTriplesGenerated(e) => Right(e)
-        case ToTriplesStore(e)             => Right(e)
-        case ToFailure(e)                  => Right(e)
-        case ToAwaitingDeletion(e)         => Right(e)
-        case RollbackToAwaitingDeletion(e) => Right(e)
-        case RedoProjectTransformation(e)  => Right(e)
-        case ProjectEventsToNew(e)         => Right(e)
-        case AllEventsToNew(e)             => Right(e)
-        case _                             => Left("Cannot read event")
+        case e => e.asRight
       }
       .apply(req.event.hcursor)
 
   private def dbUpdaterFor(event: StatusChangeEvent): (UpdateResult[F], RollbackResult[F]) =
     event match {
-      case ev: AllEventsToNew =>
+      case ev: StatusChangeEvent.AllEventsToNew.type =>
         val updater = new alleventstonew.DbUpdater[F](eventSender)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: ProjectEventsToNew =>
+      case ev: StatusChangeEvent.ProjectEventsToNew =>
         val updater = new projecteventstonew.DbUpdater[F](eventsQueue)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: RedoProjectTransformation =>
+      case ev: StatusChangeEvent.RedoProjectTransformation =>
         val updater = new redoprojecttransformation.DbUpdater[F](eventsQueue)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: RollbackToAwaitingDeletion =>
+      case ev: StatusChangeEvent.RollbackToAwaitingDeletion =>
         val updater = new rollbacktoawaitingdeletion.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: RollbackToNew =>
+      case ev: StatusChangeEvent.RollbackToNew =>
         val updater = new rollbacktonew.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: RollbackToTriplesGenerated =>
+      case ev: StatusChangeEvent.RollbackToTriplesGenerated =>
         val updater = new rollbacktotriplesgenerated.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: ToAwaitingDeletion =>
+      case ev: StatusChangeEvent.ToAwaitingDeletion =>
         val updater = new toawaitingdeletion.DbUpdater[F]()
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: ToFailure[_, _] =>
+      case ev: StatusChangeEvent.ToFailure =>
         val updater = new tofailure.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: ToTriplesGenerated =>
+      case ev: StatusChangeEvent.ToTriplesGenerated =>
         val updater = new totriplesgenerated.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
 
-      case ev: ToTriplesStore =>
+      case ev: StatusChangeEvent.ToTriplesStore =>
         val updater = new totriplesstore.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
-
-      // the list must be kept in sync wth subEventDecoders, one slight disadvantage
-      // could make a sealed trait in theory
     }
+}
 
+object EventHandler2 {
+  def apply[F[
+      _
+  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+      eventsQueue: StatusChangeEventsQueue[F]
+  ): F[consumers.EventHandler[F]] = for {
+    deliveryInfoRemover       <- DeliveryInfoRemover[F]
+    statusChanger             <- StatusChanger[F]
+    redoDequeuedEventHandler  <- redoprojecttransformation.DequeuedEventHandler[F]
+    toNewDequeuedEventHandler <- projecteventstonew.DequeuedEventHandler[F]
+    _ <- eventsQueue.register(
+           statusChanger.updateStatuses(redoDequeuedEventHandler)(_: StatusChangeEvent.RedoProjectTransformation)
+         )
+    _ <- eventsQueue.register(
+           statusChanger.updateStatuses(toNewDequeuedEventHandler)(_: StatusChangeEvent.ProjectEventsToNew)
+         )
+    eventSender     <- EventSender[F](EventLogUrl)
+    processExecutor <- ProcessExecutor.concurrent(150)
+  } yield new EventHandler2[F](
+    processExecutor,
+    statusChanger,
+    eventSender,
+    eventsQueue,
+    deliveryInfoRemover
+  )
 }

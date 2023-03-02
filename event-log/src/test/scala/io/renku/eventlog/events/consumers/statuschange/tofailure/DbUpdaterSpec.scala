@@ -18,20 +18,20 @@
 
 package io.renku.eventlog.events.consumers.statuschange.tofailure
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import io.renku.graph.model.events._
-import EventStatus._
-import cats.data.Kleisli
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
-import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure.AllowedCombination
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.ConsumersModelGenerators
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -53,15 +53,15 @@ class DbUpdaterSpec
 
     "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
       Set(
-        createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure, None),
-        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, Duration.ofHours(100).some)
+        createFailureEvent(GenerationNonRecoverableFailure, None),
+        createFailureEvent(GenerationRecoverableFailure, Duration.ofHours(100).some)
       ) foreach { statusChangeEvent =>
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          projectPath,
+          project.path,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
         )
 
@@ -82,35 +82,34 @@ class DbUpdaterSpec
       "as well as all the older events which are TRIPLES_GENERATED status to TRANSFORMATION_RECOVERABLE_FAILURE" in new TestCase {
         val latestEventDate = eventDates.generateOne
         val statusChangeEvent = ToFailure(
-          addEvent(compoundEventIds.generateOne.copy(projectId = projectId), TransformingTriples, latestEventDate),
-          projectPath,
+          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), TransformingTriples, latestEventDate).id,
+          project,
           eventMessages.generateOne,
-          TransformingTriples,
           TransformationRecoverableFailure,
           None
         )
 
         val eventToUpdate = addEvent(
-          compoundEventIds.generateOne.copy(projectId = projectId),
+          compoundEventIds.generateOne.copy(projectId = project.id),
           TriplesGenerated,
           timestamps(max = latestEventDate.value).generateAs(EventDate)
         )
 
         val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             status,
             timestamps(max = latestEventDate.value).generateAs(EventDate)
           ) -> status
         } + {
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             TriplesGenerated,
             timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
           ) -> TriplesGenerated
         } + {
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             TriplesGenerated,
             latestEventDate
           ) -> TriplesGenerated
@@ -121,7 +120,7 @@ class DbUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          projectPath,
+          project.path,
           Map(TriplesGenerated -> -1, statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 2)
         )
 
@@ -140,35 +139,34 @@ class DbUpdaterSpec
       "as well as all the older events which are TRIPLES_GENERATED status to NEW" in new TestCase {
         val latestEventDate = eventDates.generateOne
         val statusChangeEvent = ToFailure(
-          addEvent(compoundEventIds.generateOne.copy(projectId = projectId), TransformingTriples, latestEventDate),
-          projectPath,
+          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), TransformingTriples, latestEventDate).id,
+          project,
           eventMessages.generateOne,
-          TransformingTriples,
           TransformationNonRecoverableFailure,
           None
         )
 
         val eventToUpdate = addEvent(
-          compoundEventIds.generateOne.copy(projectId = projectId),
+          compoundEventIds.generateOne.copy(projectId = project.id),
           TriplesGenerated,
           timestamps(max = latestEventDate.value).generateAs(EventDate)
         )
 
         val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             status,
             timestamps(max = latestEventDate.value).generateAs(EventDate)
           ) -> status
         } + {
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             TriplesGenerated,
             timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
           ) -> TriplesGenerated
         } + {
           addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             TriplesGenerated,
             latestEventDate
           ) -> TriplesGenerated
@@ -179,7 +177,7 @@ class DbUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          projectPath,
+          project.path,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
         )
 
@@ -198,19 +196,20 @@ class DbUpdaterSpec
       s"do nothing if the given event is in $invalidStatus" in new TestCase {
 
         val latestEventDate = eventDates.generateOne
-        val eventId = addEvent(compoundEventIds.generateOne.copy(projectId = projectId), invalidStatus, latestEventDate)
+        val eventId =
+          addEvent(compoundEventIds.generateOne.copy(projectId = project.id), invalidStatus, latestEventDate)
         val message = eventMessages.generateOne
 
         Set(
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure, None),
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure, None),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure, None),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure, None)
+          ToFailure(eventId.id, project, message, GenerationNonRecoverableFailure, None),
+          ToFailure(eventId.id, project, message, GenerationRecoverableFailure, None),
+          ToFailure(eventId.id, project, message, TransformationNonRecoverableFailure, None),
+          ToFailure(eventId.id, project, message, TransformationRecoverableFailure, None)
         ) foreach { statusChangeEvent =>
           (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
           val ancestorEventId = addEvent(
-            compoundEventIds.generateOne.copy(projectId = projectId),
+            compoundEventIds.generateOne.copy(projectId = project.id),
             TriplesGenerated,
             timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate)
           )
@@ -228,10 +227,9 @@ class DbUpdaterSpec
 
   "onRollback" should {
     "clean the delivery info for the event" in new TestCase {
-      val event = ToFailure(compoundEventIds.generateOne,
-                            projectPath,
+      val event = ToFailure(eventIds.generateOne,
+                            ConsumersModelGenerators.consumerProjects.generateOne,
                             eventMessages.generateOne,
-                            GeneratingTriples,
                             GenerationNonRecoverableFailure,
                             None
       )
@@ -246,8 +244,7 @@ class DbUpdaterSpec
 
   private trait TestCase {
 
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val project = ConsumersModelGenerators.consumerProjects.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val currentTime         = mockFunction[Instant]
@@ -259,20 +256,22 @@ class DbUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus:  C,
-                                                                      newStatus:      N,
-                                                                      executionDelay: Option[Duration]
-    )(implicit evidence: AllowedCombination[C, N]): ToFailure[C, N] =
-      ToFailure(addEvent(currentStatus),
-                projectPath,
+    def createFailureEvent(newStatus: FailureStatus, executionDelay: Option[Duration]): ToFailure = {
+      val currentStatus = newStatus match {
+        case GenerationNonRecoverableFailure | GenerationRecoverableFailure         => GeneratingTriples
+        case TransformationNonRecoverableFailure | TransformationRecoverableFailure => TransformingTriples
+      }
+      val compoundId = addEvent(currentStatus)
+      ToFailure(compoundId.id,
+                project.copy(id = compoundId.projectId),
                 eventMessages.generateOne,
-                currentStatus,
                 newStatus,
                 executionDelay
       )
+    }
 
-    def addEvent[S <: ProcessingStatus](status: S): CompoundEventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, projectId)
+    def addEvent(status: ProcessingStatus): CompoundEventId = {
+      val eventId = CompoundEventId(eventIds.generateOne, project.id)
       addEvent(eventId, status)
       eventId
     }
@@ -287,7 +286,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         eventDate,
         eventBodies.generateOne,
-        projectPath = projectPath
+        projectPath = project.path
       )
       eventId
     }

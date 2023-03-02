@@ -22,8 +22,9 @@ import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Encoder
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue, StatusChangeGenerators}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue, StatusChangeGenerators}
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

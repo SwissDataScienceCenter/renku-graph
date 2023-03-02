@@ -25,7 +25,8 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange._
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
@@ -43,20 +44,20 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
     deliveryInfoRemover: DeliveryInfoRemover[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
-    with statuschange.DBUpdater[F, ToFailure[ProcessingStatus, FailureStatus]] {
+    with statuschange.DBUpdater[F, ToFailure] {
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToFailure[ProcessingStatus, FailureStatus]) = deleteDelivery(event.eventId)
+  override def onRollback(event: ToFailure) = deleteDelivery(event.eventId)
 
-  override def updateDB(event: ToFailure[ProcessingStatus, FailureStatus]): UpdateResult[F] = for {
+  override def updateDB(event: ToFailure): UpdateResult[F] = for {
     _                     <- deleteDelivery(event.eventId)
     eventUpdateResult     <- updateEvent(event)
     ancestorsUpdateResult <- maybeUpdateAncestors(event, eventUpdateResult)
   } yield ancestorsUpdateResult combine eventUpdateResult
 
   private def updateEvent(
-      event: ToFailure[ProcessingStatus, FailureStatus]
+      event: ToFailure
   ): Kleisli[F, Session[F], DBUpdateResults.ForProjects] = measureExecutionTime {
     SqlStatement
       .named(s"to_${event.newStatus.value.toLowerCase} - status update")
@@ -82,7 +83,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.projectPath, Map(event.currentStatus -> -1, event.newStatus -> 1))
+            .ForProjects(event.project.path, Map(event.currentStatus -> -1, event.newStatus -> 1))
             .pure[F]
         case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F]
         case completion =>
@@ -92,7 +93,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
   }.recoverWith(retryUpdating(event))
 
   private def retryUpdating(
-      event: ToFailure[ProcessingStatus, FailureStatus]
+      event: ToFailure
   ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
     Kleisli.liftF[F, Session[F], Unit] {
       Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
@@ -100,16 +101,15 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
     } >> updateEvent(event)
   }
 
-  private def maybeUpdateAncestors(event:         ToFailure[ProcessingStatus, FailureStatus],
-                                   updateResults: DBUpdateResults.ForProjects
-  ) = updateResults -> event.newStatus match {
-    case (results @ DBUpdateResults.ForProjects.empty, _) => Kleisli.pure(results)
-    case (_, TransformationNonRecoverableFailure)         => updateAncestorsStatus(event, New)
-    case (_, TransformationRecoverableFailure) => updateAncestorsStatus(event, TransformationRecoverableFailure)
-    case _                                     => Kleisli.pure(DBUpdateResults.ForProjects.empty)
-  }
+  private def maybeUpdateAncestors(event: ToFailure, updateResults: DBUpdateResults.ForProjects) =
+    updateResults -> event.newStatus match {
+      case (results @ DBUpdateResults.ForProjects.empty, _) => Kleisli.pure(results)
+      case (_, TransformationNonRecoverableFailure)         => updateAncestorsStatus(event, New)
+      case (_, TransformationRecoverableFailure) => updateAncestorsStatus(event, TransformationRecoverableFailure)
+      case _                                     => Kleisli.pure(DBUpdateResults.ForProjects.empty)
+    }
 
-  private def updateAncestorsStatus(event: ToFailure[ProcessingStatus, FailureStatus], newStatus: EventStatus) =
+  private def updateAncestorsStatus(event: ToFailure, newStatus: EventStatus) =
     measureExecutionTime {
       SqlStatement
         .named(s"to_${event.newStatus.value.toLowerCase} - ancestors update")
@@ -144,7 +144,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
         )
         .build(_.toList)
         .mapResult { ids =>
-          DBUpdateResults.ForProjects(event.projectPath, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
+          DBUpdateResults.ForProjects(event.project.path, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
         }
     }
 }

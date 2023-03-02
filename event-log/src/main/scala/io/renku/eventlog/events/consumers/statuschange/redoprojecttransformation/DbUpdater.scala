@@ -20,12 +20,17 @@ package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformatio
 
 import cats.MonadThrow
 import cats.data.Kleisli
+import io.circe.Encoder
 import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange._
 import skunk.Session
 
 private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
     extends statuschange.DBUpdater[F, RedoProjectTransformation] {
+
+  implicit lazy val eventQueueMessageEncoder: Encoder[RedoProjectTransformation] =
+    Encoder[StatusChangeEvent].contramap(identity)
 
   override def updateDB(event: RedoProjectTransformation): UpdateResult[F] =
     eventsQueue.offer[RedoProjectTransformation](event).map(_ => DBUpdateResults.ForProjects.empty)

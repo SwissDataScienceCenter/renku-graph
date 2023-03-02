@@ -19,16 +19,17 @@
 package io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion
 
 import cats.effect.IO
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import EventStatus._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.Project
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory

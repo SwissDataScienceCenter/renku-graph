@@ -20,14 +20,17 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 
 import cats.MonadThrow
 import cats.data.Kleisli
+import io.circe.Encoder
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange._
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEvent, StatusChangeEventsQueue, UpdateResult}
 import skunk.Session
 
 private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
     extends statuschange.DBUpdater[F, ProjectEventsToNew] {
 
-  import ProjectEventsToNew._
+  implicit val eventsQueueMessageEncoder: Encoder[ProjectEventsToNew] =
+    Encoder[StatusChangeEvent].contramap(identity)
 
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] =
     eventsQueue.offer[ProjectEventsToNew](event).map(_ => DBUpdateResults.ForProjects.empty)

@@ -24,8 +24,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
 import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}

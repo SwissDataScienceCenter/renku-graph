@@ -18,19 +18,12 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion.RollbackToAwaitingDeletion
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.{ConsumersModelGenerators, Project}
-import io.renku.eventlog.events.consumers.statuschange.rollbacktonew.RollbackToNew
-import io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated.RollbackToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion.ToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure
-import io.renku.eventlog.events.consumers.statuschange.totriplesgenerated.ToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.totriplesstore.ToTriplesStore
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{EventContentGenerators, EventsGenerators}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure, TransformationNonRecoverableFailure, TransformationRecoverableFailure}
+import io.renku.graph.model.{EventContentGenerators, EventsGenerators}
 import org.scalacheck.Gen
 
 import java.time.{Duration => JDuration}
@@ -39,77 +32,50 @@ object StatusChangeGenerators {
 
   val projectEventsToNewEvents = ConsumersModelGenerators.consumerProjects.map(ProjectEventsToNew(_))
 
-  lazy val rollbackToAwaitingDeletionEvents = for {
-    projectId   <- projectIds
-    projectPath <- projectPaths
-  } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
+  lazy val rollbackToAwaitingDeletionEvents =
+    ConsumersModelGenerators.consumerProjects.map(RollbackToAwaitingDeletion.apply)
 
   lazy val rollbackToNewEvents = for {
-    eventId     <- EventsGenerators.compoundEventIds
-    projectPath <- projectPaths
-  } yield RollbackToNew(eventId, projectPath)
+    id      <- EventsGenerators.eventIds
+    project <- ConsumersModelGenerators.consumerProjects
+  } yield RollbackToNew(id, project)
 
   lazy val rollbackToTriplesGeneratedEvents = for {
-    eventId     <- EventsGenerators.compoundEventIds
-    projectPath <- projectPaths
-  } yield RollbackToTriplesGenerated(eventId, projectPath)
+    id      <- EventsGenerators.eventIds
+    project <- ConsumersModelGenerators.consumerProjects
+  } yield RollbackToTriplesGenerated(id, project)
 
   lazy val toAwaitingDeletionEvents = for {
-    eventId     <- EventsGenerators.compoundEventIds
-    projectPath <- projectPaths
-  } yield ToAwaitingDeletion(eventId, projectPath)
+    id      <- EventsGenerators.eventIds
+    project <- ConsumersModelGenerators.consumerProjects
+  } yield ToAwaitingDeletion(id, project)
 
   lazy val toFailureEvents = for {
     eventId        <- EventsGenerators.compoundEventIds
     projectPath    <- projectPaths
     message        <- EventContentGenerators.eventMessages
     executionDelay <- executionDelays.toGeneratorOfOptions
-    event <- Gen.oneOf(
-               ToFailure(eventId,
-                         projectPath,
-                         message,
-                         EventStatus.GeneratingTriples,
-                         EventStatus.GenerationRecoverableFailure,
-                         executionDelay
-               ),
-               ToFailure(eventId,
-                         projectPath,
-                         message,
-                         EventStatus.GeneratingTriples,
-                         EventStatus.GenerationNonRecoverableFailure,
-                         maybeExecutionDelay = None
-               ),
-               ToFailure(eventId,
-                         projectPath,
-                         message,
-                         EventStatus.TransformingTriples,
-                         EventStatus.TransformationRecoverableFailure,
-                         executionDelay
-               ),
-               ToFailure(eventId,
-                         projectPath,
-                         message,
-                         EventStatus.TransformingTriples,
-                         EventStatus.TransformationNonRecoverableFailure,
-                         maybeExecutionDelay = None
+    failure <- Gen.oneOf(GenerationRecoverableFailure,
+                         GenerationNonRecoverableFailure,
+                         TransformationRecoverableFailure,
+                         TransformationNonRecoverableFailure
                )
-             )
-  } yield event
+  } yield ToFailure(eventId.id, Project(eventId.projectId, projectPath), message, failure, executionDelay)
 
   private def executionDelays: Gen[JDuration] = Gen.choose(0L, 10L).map(JDuration.ofSeconds)
 
   lazy val toTriplesGeneratedEvents = for {
-    eventId        <- EventsGenerators.compoundEventIds
-    projectPath    <- projectPaths
+    id             <- EventsGenerators.eventIds
+    project        <- ConsumersModelGenerators.consumerProjects
     processingTime <- EventsGenerators.eventProcessingTimes
     payload        <- EventsGenerators.zippedEventPayloads
-  } yield ToTriplesGenerated(eventId, projectPath, processingTime, payload)
+  } yield ToTriplesGenerated(id, project, processingTime, payload)
 
   lazy val toTripleStoreEvents = for {
-    eventId        <- EventsGenerators.compoundEventIds
-    projectPath    <- projectPaths
+    id             <- EventsGenerators.eventIds
+    project        <- ConsumersModelGenerators.consumerProjects
     processingTime <- EventsGenerators.eventProcessingTimes
-  } yield ToTriplesStore(eventId, projectPath, processingTime)
+  } yield ToTriplesStore(id, project, processingTime)
 
   def statusChangeEvents: Gen[StatusChangeEvent] =
     Gen.oneOf(

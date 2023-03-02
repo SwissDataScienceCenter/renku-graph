@@ -22,14 +22,15 @@ package alleventstonew
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.{categoryName, DBUpdateResults}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, categoryName}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -40,7 +41,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import projecteventstonew.ProjectEventsToNew
 
 import scala.util.Random
 

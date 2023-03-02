@@ -19,7 +19,10 @@
 package io.renku.events.consumers
 
 import cats.Show
+import io.circe.{Decoder, Encoder}
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.renku.graph.model.projects
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 final case class Project(id: projects.GitLabId, path: projects.Path)
 
@@ -27,6 +30,9 @@ object Project {
   implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
     s"projectId = $id, projectPath = $path"
   }
+
+  implicit val jsonDecoder: Decoder[Project] = deriveDecoder[Project]
+  implicit val jsonEncoder: Encoder[Project] = deriveEncoder[Project]
 }
 
 sealed trait EventSchedulingResult extends Product with Serializable {

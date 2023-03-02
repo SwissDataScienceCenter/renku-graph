@@ -21,22 +21,23 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.events.producers.{minprojectinfo, SubscriptionDataProvisioning}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
+import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.CategoryName
+import io.renku.events.Generators.{categoryNames, subscriberIds, subscriberUrls}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
-import io.renku.events.Generators.{categoryNames, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
-import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
-import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.TestMetricsRegistry
@@ -233,7 +234,7 @@ class ProjectEventsToNewPollerSpec
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val projectCleaner = mock[ProjectCleaner[IO]]
-    val dbUpdater      = new DequeuedEventHandlerImpl[IO](projectCleaner, currentTime)
+    val dbUpdater      = new DequeuedEventHandler.DequeuedEventHandlerImpl[IO](projectCleaner, currentTime)
     val now            = Instant.now()
 
     currentTime.expects().returning(now)

@@ -19,19 +19,20 @@
 package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation
 
 import cats.effect.IO
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{ProjectPath, RedoProjectTransformation}
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -62,7 +63,7 @@ class DequeuedEventHandlerSpec
 
         findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesStore, New)
 
-        val event = RedoProjectTransformation(project.path)
+        val event = RedoProjectTransformation(ProjectPath(project.path))
         sessionResource
           .useK(updater updateDB event)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
@@ -94,7 +95,7 @@ class DequeuedEventHandlerSpec
         findSyncTime(project.id, producers.minprojectinfo.categoryName).isEmpty shouldBe false
 
         sessionResource
-          .useK(updater updateDB RedoProjectTransformation(project.path))
+          .useK(updater updateDB RedoProjectTransformation(ProjectPath(project.path)))
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
         findEventStatuses(project) shouldBe List(Skipped, GenerationNonRecoverableFailure, New)

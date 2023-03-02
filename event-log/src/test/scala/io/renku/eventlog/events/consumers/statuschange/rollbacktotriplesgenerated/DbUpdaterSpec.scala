@@ -18,16 +18,18 @@
 
 package io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated
 
+import cats.effect.IO
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import EventStatus._
-import cats.effect.IO
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -53,7 +55,7 @@ class DbUpdaterSpec
       val otherEventId = addEvent(TransformingTriples)
 
       sessionResource
-        .useK(dbUpdater updateDB RollbackToTriplesGenerated(CompoundEventId(eventId, projectId), projectPath))
+        .useK(dbUpdater updateDB RollbackToTriplesGenerated(eventId, project))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
         Map(TransformingTriples -> -1, TriplesGenerated -> 1)
@@ -69,7 +71,7 @@ class DbUpdaterSpec
       val eventId       = addEvent(invalidStatus)
 
       sessionResource
-        .useK(dbUpdater updateDB RollbackToTriplesGenerated(CompoundEventId(eventId, projectId), projectPath))
+        .useK(dbUpdater updateDB RollbackToTriplesGenerated(eventId, project))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
       findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(invalidStatus)
@@ -80,6 +82,7 @@ class DbUpdaterSpec
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
+    val project     = Project(projectId, projectPath)
 
     val currentTime = mockFunction[Instant]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]

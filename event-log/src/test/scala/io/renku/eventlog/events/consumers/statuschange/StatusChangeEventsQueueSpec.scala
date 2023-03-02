@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.generators.Generators.Implicits._
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.generators.Generators
 import io.renku.interpreters.TestLogger

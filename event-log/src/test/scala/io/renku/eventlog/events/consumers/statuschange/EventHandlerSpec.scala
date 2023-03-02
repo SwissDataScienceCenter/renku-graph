@@ -22,23 +22,11 @@ package statuschange
 import cats.Show
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
-import io.circe.Encoder
-import io.circe.literal._
 import io.circe.syntax._
-import io.renku.eventlog.events.consumers.statuschange.alleventstonew.AllEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation.RedoProjectTransformation
-import io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion.RollbackToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.rollbacktonew.RollbackToNew
-import io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated.RollbackToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion.ToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure
-import io.renku.eventlog.events.consumers.statuschange.totriplesgenerated.ToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.totriplesstore.ToTriplesStore
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.{ProcessExecutor, Project}
-import io.renku.events.consumers.EventDecodingTools._
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.producers.EventSender
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
@@ -196,90 +184,90 @@ class EventHandlerSpec
     }
   }
 
-  implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-    case AllEventsToNew => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "newStatus":    "NEW"
-    }"""
-    case ToTriplesGenerated(eventId, path, processingTime, _) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "TRIPLES_GENERATED",
-      "processingTime": ${processingTime.value}
-    }"""
-    case ToTriplesStore(eventId, path, processingTime) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "TRIPLES_STORE",
-      "processingTime": ${processingTime.value}
-    }"""
-    case ToFailure(eventId, path, message, _, newStatus, maybeExecutionDelay) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    ${newStatus.value},
-      "message":      ${message.value}
-    }""".addIfDefined("executionDelay" -> maybeExecutionDelay)
-    case RollbackToNew(eventId, path) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "NEW"
-    }"""
-    case RollbackToTriplesGenerated(eventId, path) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "TRIPLES_GENERATED"
-    }"""
-    case ToAwaitingDeletion(eventId, path) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "id":           ${eventId.id.value},
-      "project": {
-        "id":         ${eventId.projectId.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "AWAITING_DELETION"
-    }"""
-    case RollbackToAwaitingDeletion(Project(id, path)) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "project": {
-        "id":         ${id.value},
-        "path":       ${path.value}
-      },
-      "newStatus":    "AWAITING_DELETION"
-    }"""
-    case ProjectEventsToNew(project) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "project": {
-        "id":         ${project.id.value},
-        "path":       ${project.path.value}
-      },
-      "newStatus":    "NEW"
-    }"""
-    case RedoProjectTransformation(projectPath) => json"""{
-      "categoryName": "EVENTS_STATUS_CHANGE",
-      "project": {
-        "path": ${projectPath.value}
-      },
-      "newStatus": "TRIPLES_GENERATED"
-    }"""
-  }
+//  implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
+//    case AllEventsToNew => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "newStatus":    "NEW"
+//    }"""
+//    case ToTriplesGenerated(eventId, path, processingTime, _) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "TRIPLES_GENERATED",
+//      "processingTime": ${processingTime.value}
+//    }"""
+//    case ToTriplesStore(eventId, path, processingTime) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "TRIPLES_STORE",
+//      "processingTime": ${processingTime.value}
+//    }"""
+//    case ToFailure(eventId, path, message, _, newStatus, maybeExecutionDelay) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    ${newStatus.value},
+//      "message":      ${message.value}
+//    }""".addIfDefined("executionDelay" -> maybeExecutionDelay)
+//    case RollbackToNew(eventId, path) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "NEW"
+//    }"""
+//    case RollbackToTriplesGenerated(eventId, path) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "TRIPLES_GENERATED"
+//    }"""
+//    case ToAwaitingDeletion(eventId, path) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "id":           ${eventId.id.value},
+//      "project": {
+//        "id":         ${eventId.projectId.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "AWAITING_DELETION"
+//    }"""
+//    case RollbackToAwaitingDeletion(Project(id, path)) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "project": {
+//        "id":         ${id.value},
+//        "path":       ${path.value}
+//      },
+//      "newStatus":    "AWAITING_DELETION"
+//    }"""
+//    case ProjectEventsToNew(project) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "project": {
+//        "id":         ${project.id.value},
+//        "path":       ${project.path.value}
+//      },
+//      "newStatus":    "NEW"
+//    }"""
+//    case RedoProjectTransformation(projectPath) => json"""{
+//      "categoryName": "EVENTS_STATUS_CHANGE",
+//      "project": {
+//        "path": ${projectPath.value}
+//      },
+//      "newStatus": "TRIPLES_GENERATED"
+//    }"""
+//  }
 }

@@ -27,7 +27,8 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange._
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus._
@@ -79,7 +80,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
+            .ForProjects(event.project.path, Map(GeneratingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
         case Completion.Update(0) =>
           Monoid[DBUpdateResults.ForProjects].empty.pure[F]
@@ -150,7 +151,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
         val incrementedStatuses =
           TriplesGenerated -> (idsAndStatuses.size - idsAndStatuses.count(_._2 == EventStatus.AwaitingDeletion))
         idsAndStatuses -> DBUpdateResults.ForProjects(
-          event.projectPath,
+          event.project.path,
           decrementedStatuses + incrementedStatuses
         )
       }
@@ -213,7 +214,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def removeAwaitingDeletionEvents(eventsWindow: List[(EventId, EventStatus)], event: ToTriplesGenerated) =
     eventsWindow.collect { case (id, AwaitingDeletion) => id } match {
-      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map()))
+      case Nil => Kleisli.pure(DBUpdateResults.ForProjects(event.project.path, Map()))
       case eventIdsToRemove =>
         measureExecutionTime {
           SqlStatement(name = "to_triples_generated - awaiting_deletions removal")

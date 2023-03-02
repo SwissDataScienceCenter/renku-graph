@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.Decoder
+import io.circe.{Decoder, Encoder}
 import io.circe.Decoder.decodeString
 import io.renku.data.ErrorMessage
 import io.renku.graph.model.events.EventInfo.ProjectIds
@@ -119,6 +119,7 @@ object events {
   object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank[EventMessage] {
 
     implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
+    implicit val encoder: Encoder[EventMessage] = Encoder.encodeString.contramap(_.value)
 
     def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
   }
@@ -214,6 +215,21 @@ object events {
     }
 
     sealed trait FailureStatus extends EventStatus
+    object FailureStatus {
+      def fromString(str: String): Either[String, FailureStatus] = str.toUpperCase match {
+        case GenerationRecoverableFailure.value        => GenerationRecoverableFailure.asRight
+        case GenerationNonRecoverableFailure.value     => GenerationNonRecoverableFailure.asRight
+        case TransformationRecoverableFailure.value    => TransformationRecoverableFailure.asRight
+        case TransformationNonRecoverableFailure.value => TransformationNonRecoverableFailure.asRight
+        case _                                         => Left(s"Invalid failure status: $str")
+      }
+
+      implicit val jsonDecoder: Decoder[FailureStatus] =
+        Decoder.decodeString.emap(fromString)
+
+      implicit val jsonEncoder: Encoder[FailureStatus] =
+        Encoder.encodeString.contramap(_.value)
+    }
 
     type GenerationRecoverableFailure = GenerationRecoverableFailure.type
     final case object GenerationRecoverableFailure extends FailureStatus {

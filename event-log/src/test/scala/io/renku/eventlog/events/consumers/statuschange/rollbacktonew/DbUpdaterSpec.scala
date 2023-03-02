@@ -19,15 +19,17 @@
 package io.renku.eventlog.events.consumers.statuschange.rollbacktonew
 
 import cats.effect.IO
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToNew
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import EventStatus._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -53,7 +55,7 @@ class DbUpdaterSpec
       val otherEventId = addEvent(GeneratingTriples)
 
       sessionResource
-        .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
+        .useK(dbUpdater.updateDB(RollbackToNew(eventId, Project(projectId, projectPath))))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
         Map(GeneratingTriples -> -1, New -> 1)
@@ -69,7 +71,7 @@ class DbUpdaterSpec
       val eventId       = addEvent(invalidStatus)
 
       sessionResource
-        .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
+        .useK(dbUpdater.updateDB(RollbackToNew(eventId, Project(projectId, projectPath))))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
       findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(invalidStatus)

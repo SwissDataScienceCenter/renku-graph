@@ -24,8 +24,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
 import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{TransformingTriples, TriplesGenerated}
@@ -56,7 +57,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
+            .ForProjects(event.project.path, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
             .widen[DBUpdateResults]
         case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F].widen[DBUpdateResults]

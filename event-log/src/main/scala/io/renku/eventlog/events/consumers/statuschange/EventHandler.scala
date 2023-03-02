@@ -20,12 +20,10 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.events.consumers._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -51,24 +49,24 @@ private[statuschange] class EventHandler[F[_]: Async: Logger: MetricsRegistry: Q
 
 private[statuschange] object EventHandler {
 
-  def apply[F[
-      _
-  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
-      eventsQueue: StatusChangeEventsQueue[F]
-  ): F[consumers.EventHandler[F]] = for {
-    deliveryInfoRemover <- DeliveryInfoRemover[F]
-    statusChanger       <- StatusChanger[F]
-    childHandlers <- List(
-                       rollbacktonew.Handler[F](statusChanger),
-                       totriplesgenerated.Handler[F](deliveryInfoRemover, statusChanger),
-                       rollbacktotriplesgenerated.Handler[F](statusChanger),
-                       totriplesstore.Handler[F](deliveryInfoRemover, statusChanger),
-                       tofailure.Handler[F](deliveryInfoRemover, statusChanger),
-                       toawaitingdeletion.Handler[F](statusChanger),
-                       rollbacktoawaitingdeletion.Handler[F](statusChanger),
-                       redoprojecttransformation.Handler[F](statusChanger, eventsQueue),
-                       projecteventstonew.Handler[F](statusChanger, eventsQueue),
-                       alleventstonew.Handler[F](statusChanger)
-                     ).sequence
-  } yield new EventHandler[F](categoryName, childHandlers)
+//  def apply[F[
+//      _
+//  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+//      eventsQueue: StatusChangeEventsQueue[F]
+//  ): F[consumers.EventHandler[F]] = for {
+//    deliveryInfoRemover <- DeliveryInfoRemover[F]
+//    statusChanger       <- StatusChanger[F]
+//    childHandlers <- List(
+//                       rollbacktonew.Handler[F](statusChanger),
+//                       totriplesgenerated.Handler[F](deliveryInfoRemover, statusChanger),
+//                       rollbacktotriplesgenerated.Handler[F](statusChanger),
+//                       totriplesstore.Handler[F](deliveryInfoRemover, statusChanger),
+//                       tofailure.Handler[F](deliveryInfoRemover, statusChanger),
+//                       toawaitingdeletion.Handler[F](statusChanger),
+//                       rollbacktoawaitingdeletion.Handler[F](statusChanger),
+//                       redoprojecttransformation.Handler[F](statusChanger, eventsQueue),
+//                       projecteventstonew.Handler[F](statusChanger, eventsQueue),
+//                       alleventstonew.Handler[F](statusChanger)
+//                     ).sequence
+//  } yield new EventHandler[F](categoryName, childHandlers)
 }

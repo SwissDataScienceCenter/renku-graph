@@ -23,14 +23,15 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdater, DBUpdateResults, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 import java.time.Instant
 
-private trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
+trait DequeuedEventHandler[F[_]] extends DBUpdater[F, RedoProjectTransformation]
 
-private object DequeuedEventHandler {
+object DequeuedEventHandler {
   def apply[F[_]: Async: QueriesExecutionTimes]: F[DequeuedEventHandler[F]] =
     new DequeuedEventHandlerImpl[F]().pure.widen
 }
@@ -46,14 +47,14 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
   import io.renku.graph.model.events.{CompoundEventId, EventId, ExecutionDate}
   import io.renku.graph.model.events.EventStatus.{TriplesGenerated, TriplesStore}
   import io.renku.graph.model.projects
-  import skunk.{~, Session}
+  import skunk.{Session, ~}
   import skunk.data.Completion
   import skunk.implicits._
 
   override def updateDB(event: RedoProjectTransformation): UpdateResult[F] =
-    findLatestSuccessfulEvent(event.projectPath) >>= {
-      case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.projectPath)
-      case None          => triggerMinProjectInfoEvent(event.projectPath) map (_ => DBUpdateResults.ForProjects.empty)
+    findLatestSuccessfulEvent(event.project.path) >>= {
+      case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.project.path)
+      case None          => triggerMinProjectInfoEvent(event.project.path) map (_ => DBUpdateResults.ForProjects.empty)
     }
 
   private def findLatestSuccessfulEvent(path: projects.Path) = measureExecutionTime {

@@ -19,15 +19,16 @@
 package io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion
 
 import cats.effect.IO
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToAwaitingDeletion
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.consumers.ConsumersModelGenerators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds, eventStatuses}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import EventStatus._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -52,26 +53,30 @@ class DbUpdaterSpec
       val eventId        = addEvent(eventOldStatus)
 
       sessionResource
-        .useK(dbUpdater updateDB ToAwaitingDeletion(CompoundEventId(eventId, projectId), projectPath))
+        .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, project))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        projectPath,
+        project.path,
         Map(eventOldStatus -> -1, AwaitingDeletion -> 1)
       )
 
-      findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
+      findEvent(CompoundEventId(eventId, project.id)).map(_._2) shouldBe Some(AwaitingDeletion)
     }
 
     "do nothing if there's no event specified in the event" in new TestCase {
       sessionResource
-        .useK(dbUpdater updateDB ToAwaitingDeletion(compoundEventIds.generateOne, projectPaths.generateOne))
+        .useK(
+          dbUpdater updateDB ToAwaitingDeletion(
+            eventIds.generateOne,
+            ConsumersModelGenerators.consumerProjects.generateOne
+          )
+        )
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
     }
   }
 
   private trait TestCase {
 
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val project = ConsumersModelGenerators.consumerProjects.generateOne
 
     val currentTime = mockFunction[Instant]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
@@ -82,7 +87,7 @@ class DbUpdaterSpec
     currentTime.expects().returning(now).anyNumberOfTimes()
 
     def addEvent(status: EventStatus): EventId = {
-      val eventId = CompoundEventId(eventIds.generateOne, projectId)
+      val eventId = CompoundEventId(eventIds.generateOne, project.id)
 
       storeEvent(
         eventId,
@@ -90,7 +95,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         timestampsNotInTheFuture.generateAs(EventDate),
         eventBodies.generateOne,
-        projectPath = projectPath
+        projectPath = project.path
       )
       eventId.id
     }

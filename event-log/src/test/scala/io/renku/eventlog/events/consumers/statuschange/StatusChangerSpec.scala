@@ -24,16 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.alleventstonew.AllEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation.RedoProjectTransformation
-import io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion.RollbackToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.rollbacktonew.RollbackToNew
-import io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated.RollbackToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.toawaitingdeletion.ToAwaitingDeletion
-import io.renku.eventlog.events.consumers.statuschange.tofailure.ToFailure
-import io.renku.eventlog.events.consumers.statuschange.totriplesgenerated.ToTriplesGenerated
-import io.renku.eventlog.events.consumers.statuschange.totriplesstore.ToTriplesStore
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -78,8 +69,8 @@ class StatusChangerSpec
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
       findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
 
-      val event: StatusChangeEvent = ToTriplesGenerated(eventId,
-                                                        projectPaths.generateOne,
+      val event: StatusChangeEvent = ToTriplesGenerated(eventId.id,
+                                                        Project(eventId.projectId, projectPaths.generateOne),
                                                         eventProcessingTimes.generateOne,
                                                         zippedEventPayloads.generateOne
       )
@@ -183,28 +174,28 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AllEventsToNew                           => Gen.const(DBUpdateResults.ForAllProjects)
-    case ProjectEventsToNew(_)                    => Gen.const(DBUpdateResults.ForProjects.empty)
-    case RedoProjectTransformation(_)             => Gen.const(DBUpdateResults.ForProjects.empty)
-    case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
-    case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
-    case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
+    case AllEventsToNew                       => Gen.const(DBUpdateResults.ForAllProjects)
+    case ProjectEventsToNew(_)                => Gen.const(DBUpdateResults.ForProjects.empty)
+    case RedoProjectTransformation(_)         => Gen.const(DBUpdateResults.ForProjects.empty)
+    case ToTriplesGenerated(_, project, _, _) => genUpdateResult(project.path)
+    case ToTriplesStore(_, project, _)        => genUpdateResult(project.path)
+    case ev @ ToFailure(_, project, _, newStatus, _) =>
       Gen.const(
-        DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
+        DBUpdateResults.ForProjects(project.path, Map(ev.currentStatus -> -1, newStatus -> 1))
       )
-    case RollbackToNew(_, projectPath) =>
+    case RollbackToNew(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(projectPath, Map(EventStatus.GeneratingTriples -> -1, EventStatus.New -> 1))
+        DBUpdateResults.ForProjects(project.path, Map(EventStatus.GeneratingTriples -> -1, EventStatus.New -> 1))
       )
-    case RollbackToTriplesGenerated(_, projectPath) =>
+    case RollbackToTriplesGenerated(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(projectPath,
+        DBUpdateResults.ForProjects(project.path,
                                     Map(EventStatus.TransformingTriples -> -1, EventStatus.TriplesGenerated -> 1)
         )
       )
-    case ToAwaitingDeletion(_, projectPath) =>
+    case ToAwaitingDeletion(_, project) =>
       Gen.const(
-        DBUpdateResults.ForProjects(projectPath,
+        DBUpdateResults.ForProjects(project.path,
                                     Map(eventStatuses.generateOne -> -1, EventStatus.AwaitingDeletion -> 1)
         )
       )
