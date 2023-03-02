@@ -29,7 +29,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.versions.SchemaVersion
-import io.renku.graph.model.{entities, testentities}
+import io.renku.graph.model.testentities
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
 import org.scalatest.enablers.Retrying
@@ -71,7 +71,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(
         project,
         commitId,
-        toPayloadJsonLD(testProjectWithNewSchemaVersion.to[entities.Project])
+        toPayloadJsonLD(testProjectWithNewSchemaVersion)
       )
 
       When("The compatibility matrix is updated, TG version changed and TG is restarted")

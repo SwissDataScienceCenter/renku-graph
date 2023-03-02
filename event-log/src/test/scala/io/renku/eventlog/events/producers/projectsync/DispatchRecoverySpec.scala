@@ -23,9 +23,9 @@ import Generators.sendingResults
 import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions.subscriberUrls
-import io.renku.generators.Generators.Implicits._
+import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.LastSyncedDate

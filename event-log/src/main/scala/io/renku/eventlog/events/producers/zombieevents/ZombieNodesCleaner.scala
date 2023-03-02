@@ -22,12 +22,12 @@ import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.db.implicits._
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{Microservice, TypeSerializers}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import org.typelevel.log4cats.Logger

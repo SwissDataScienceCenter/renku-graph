@@ -29,7 +29,7 @@ import java.time.Instant
 
 trait PlanGenerators {
 
-  def planGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliStepPlan] =
+  def stepPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliStepPlan] =
     for {
       id               <- planResourceIds
       name             <- planNames
@@ -63,7 +63,7 @@ trait PlanGenerators {
     )
 
   def compositePlanChildPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliPlan] = {
-    val plan = planGen(minCreated).map(CliPlan.apply)
+    val plan = stepPlanGen(minCreated).map(CliPlan.apply)
     val cp   = compositePlanGen(minCreated).map(CliPlan.apply)
     Gen.frequency(1 -> cp, 9 -> plan)
   }
@@ -97,14 +97,14 @@ trait PlanGenerators {
       mappings
     )
 
-  def workflowFilePlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileStepPlan] =
+  def workflowFileStepPlanGen(minCreated: Instant)(implicit renkuUrl: RenkuUrl): Gen[CliWorkflowFileStepPlan] =
     for {
       id               <- planResourceIds
       name             <- planNames
       descr            <- planDescriptions.toGeneratorOfOptions
       creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
       dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
-      dateModified     <- planModifiedDates(after = dateCreated).toGeneratorOfOptions
+      dateModified     <- planModifiedDates(after = dateCreated)
       keywords         <- planKeywords.toGeneratorOfList(max = 3)
       command          <- planCommands.toGeneratorOfOptions
       parameters       <- CommandParameterGenerators.commandParameterGen.toGeneratorOfList(max = 3)
@@ -139,10 +139,11 @@ trait PlanGenerators {
       description      <- planDescriptions.toGeneratorOfOptions
       creators         <- PersonGenerators.cliPersonGen.toGeneratorOfList(max = 3)
       dateCreated      <- planCreatedDates(plans.DateCreated(minCreated))
+      dateModified     <- planModifiedDates(after = dateCreated)
       keywords         <- planKeywords.toGeneratorOfList(max = 3)
       derivedFrom      <- planDerivedFroms.toGeneratorOfOptions
       invalidationTime <- invalidationTimes(minCreated.minusMillis(1000)).toGeneratorOfOptions
-      childPlans       <- workflowFilePlanGen(minCreated).toGeneratorOfNonEmptyList(max = 3)
+      childPlans       <- workflowFileStepPlanGen(minCreated).toGeneratorOfNonEmptyList(max = 3)
       links            <- CommandParameterGenerators.parameterLinkGen.toGeneratorOfList(max = 3)
       mappings         <- CommandParameterGenerators.parameterMappingGen.toGeneratorOfList(max = 3)
       path             <- Generators.relativePaths().map(entityModel.Location.FileOrFolder.apply) // TODO
@@ -152,6 +153,7 @@ trait PlanGenerators {
       description,
       creators,
       dateCreated,
+      dateModified,
       keywords,
       derivedFrom,
       invalidationTime,

@@ -39,10 +39,10 @@ object CliCommandInput {
   private val entityTypes: EntityTypes = EntityTypes of (Renku.CommandInput, Renku.CommandParameterBase)
 
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
-    entityTypes == this.entityTypes
+    entityTypes contains this.entityTypes
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliCommandInput] =
-    JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
+    JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         position         <- cursor.downField(Renku.position).as[Option[Position]]

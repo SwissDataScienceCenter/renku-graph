@@ -20,6 +20,8 @@ package io.renku.graph.model.diffx
 
 import cats.data.NonEmptyList
 import com.softwaremill.diffx.Diff
+import io.circe.Json
+import io.renku.jsonld.JsonLD
 import io.renku.tinytypes._
 
 trait TinyTypeDiffInstances {
@@ -59,6 +61,12 @@ trait TinyTypeDiffInstances {
 
   implicit def relativePathTinyType[A <: RelativePathTinyType]: Diff[A] =
     Diff.diffForString.contramap(_.value)
+
+  implicit def jsonDiff: Diff[Json] =
+    Diff.diffForString.contramap(_.spaces2)
+
+  implicit def jsonLDDiff: Diff[JsonLD] =
+    jsonDiff.contramap(_.toJson)
 }
 
 object TinyTypeDiffInstances extends TinyTypeDiffInstances

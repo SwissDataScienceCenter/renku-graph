@@ -24,10 +24,10 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{Microservice, TypeSerializers}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}

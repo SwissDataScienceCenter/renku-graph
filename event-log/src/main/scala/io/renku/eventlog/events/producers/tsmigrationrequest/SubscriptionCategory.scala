@@ -32,11 +32,11 @@ private[producers] object SubscriptionCategory {
 
   def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[producers.SubscriptionCategory[F]] = for {
-    implicit0(st: SubscriberTracker[F]) <- SubscriberTracker[F]
-    subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
-    eventFinder      <- EventFinder[F]
-    dispatchRecovery <- DispatchRecovery[F]
-    eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
+    implicit0(st: MigrationSubscriberTracker[F]) <- MigrationSubscriberTracker[F]
+    subscribers                                  <- MigrationSubscribers[F](categoryName)
+    eventFinder                                  <- EventFinder[F]
+    dispatchRecovery                             <- DispatchRecovery[F]
+    eventDelivery                                <- EventDelivery.noOp[F, MigrationRequestEvent]
     distributor <- EventsDistributor[F, MigrationRequestEvent](
                      categoryName,
                      subscribers,
@@ -45,6 +45,5 @@ private[producers] object SubscriptionCategory {
                      EventEncoder(MigrationRequestEvent.encodeEvent),
                      dispatchRecovery
                    )
-    deserializer <- SubscriptionPayloadDeserializer[F]
-  } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
+  } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, CapacityFinder.noOpCapacityFinder[F])
 }

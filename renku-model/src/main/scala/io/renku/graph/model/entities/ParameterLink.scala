@@ -18,12 +18,14 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, ValidatedNel}
+import cats.syntax.all._
+import io.renku.cli.model.CliParameterLink
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.commandParameters.{ResourceId => ParamResourceId}
 import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.parameterLinks.ResourceId
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 
@@ -49,6 +51,13 @@ object ParameterLink {
     )
   }
 
+  def fromCli(cliLink: CliParameterLink): ValidatedNel[String, ParameterLink] =
+    ParameterLink(
+      cliLink.id,
+      cliLink.source.resourceId,
+      cliLink.sinks.map(_.resourceId)
+    ).validNel
+
   implicit def encoder: JsonLDEncoder[ParameterLink] =
     JsonLDEncoder.instance { link =>
       JsonLD.entity(
@@ -57,14 +66,5 @@ object ParameterLink {
         Ontology.linkSource -> link.source.asJsonLD,
         Ontology.linkSink   -> link.sinks.toList.asJsonLD
       )
-    }
-
-  implicit def decoder: JsonLDDecoder[ParameterLink] =
-    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
-      for {
-        id     <- cursor.downEntityId.as[ResourceId]
-        source <- cursor.downField(Ontology.linkSource).as[ParamResourceId]
-        sinks  <- cursor.downField(Ontology.linkSink).as[NonEmptyList[ParamResourceId]]
-      } yield ParameterLink(id, source, sinks)
     }
 }

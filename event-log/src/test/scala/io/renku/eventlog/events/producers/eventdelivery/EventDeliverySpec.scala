@@ -23,7 +23,7 @@ import TestCompoundIdEvent.testCompoundIdEvent
 import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.subscriptions._
+import io.renku.events.Generators._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators._

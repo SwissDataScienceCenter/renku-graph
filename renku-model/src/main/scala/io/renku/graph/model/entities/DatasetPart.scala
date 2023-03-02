@@ -20,10 +20,13 @@ package io.renku.graph.model.entities
 
 import cats.data.ValidatedNel
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.CliDatasetFile
 import io.renku.graph.model.InvalidationTime
 import io.renku.graph.model.datasets.{DateCreated, PartExternal, PartResourceId, PartSource}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 
 final case class DatasetPart(
     resourceId:            PartResourceId,
@@ -67,11 +70,6 @@ object DatasetPart {
       case _ => ().validNel[String]
     }
 
-  import io.renku.graph.model.Schemas.{prov, renku, schema}
-  import io.renku.jsonld._
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-
   private val entityTypes = EntityTypes of (prov / "Entity", schema / "DigitalDocument")
 
   implicit lazy val encoder: JsonLDEncoder[DatasetPart] = JsonLDEncoder.instance { part =>
@@ -84,21 +82,6 @@ object DatasetPart {
       renku / "source"           -> part.maybeSource.asJsonLD,
       prov / "invalidatedAtTime" -> part.maybeInvalidationTime.asJsonLD
     )
-  }
-
-  implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-    for {
-      resourceId            <- cursor.downEntityId.as[PartResourceId]
-      external              <- cursor.downField(renku / "external").as[PartExternal]
-      entity                <- cursor.downField(prov / "entity").as[Entity]
-      dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
-      maybeSource           <- cursor.downField(renku / "source").as[Option[PartSource]]
-      maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-      part <- DatasetPart
-                .from(resourceId, external, entity, dateCreated, maybeSource, maybeInvalidationTime)
-                .toEither
-                .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-    } yield part
   }
 
   val ontology: Type = Type.Def(

@@ -71,7 +71,7 @@ class ZombieEventDetectionSpec
       renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
     ).map(addMemberWithId(user.id)).generateOne
 
-    val commitId  = commitIds.generateOne
+    val commitId = commitIds.generateOne
     Given("Triples generation is successful")
     `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 

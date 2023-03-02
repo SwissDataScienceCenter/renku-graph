@@ -30,7 +30,6 @@ import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
 final case class CliProject(
-    id:            ResourceId,
     name:          Option[Name],
     description:   Option[Description],
     dateCreated:   DateCreated,
@@ -139,10 +138,9 @@ object CliProject {
 
   private val entityTypes: EntityTypes = EntityTypes.of(Schema.Project, Prov.Location)
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliProject] =
+  implicit val jsonLDDecoder: JsonLDEntityDecoder[CliProject] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       for {
-        id            <- cursor.downEntityId.as[ResourceId]
         name          <- cursor.downField(Schema.name).as[Option[Name]]
         description   <- cursor.downField(Schema.description).as[Option[Description]]
         dateCreated   <- cursor.downField(Schema.dateCreated).as[DateCreated]
@@ -151,11 +149,10 @@ object CliProject {
         images        <- cursor.downField(Schema.image).as[List[Image]].map(_.sortBy(_.position))
         plans         <- cursor.downField(Renku.hasPlan).as[List[ProjectPlan]]
         datasets      <- cursor.downField(Renku.hasDataset).as[List[CliDataset]]
-        activities    <- cursor.downField(Renku.hasActivity).as[List[CliActivity]]
+        activities    <- cursor.downField(Renku.hasActivity).as[List[CliActivity]].map(_.sortBy(_.startTime))
         agentVersion  <- cursor.downField(Schema.agent).as[Option[CliVersion]]
         schemaVersion <- cursor.downField(Schema.schemaVersion).as[Option[SchemaVersion]]
       } yield CliProject(
-        id,
         name,
         description,
         dateCreated,
@@ -170,10 +167,24 @@ object CliProject {
       )
     }
 
+  /** Decodes a project and also collects all `Person` entities in the given json, potentially 
+   * unrelated to the project. 
+   */
+  val projectAndPersonDecoder: JsonLDDecoder[(CliProject, List[CliPerson])] =
+    JsonLDDecoder.entity(entityTypes) { cursor =>
+      val pr = cursor.as[CliProject]
+      val pe = cursor.focusTop
+        .as[List[CliPerson]]
+        .leftMap(failure =>
+          DecodingFailure(s"Finding Person entities for project ${pr.map(_.name)} failed: ${failure.getMessage()}", Nil)
+        )
+      (pr, pe).mapN(Tuple2.apply)
+    }
+
   implicit def jsonLDEncoder: JsonLDEncoder[CliProject] =
     JsonLDEncoder.instance { project =>
       JsonLD.entity(
-        project.id.asEntityId,
+        EntityId.blank,
         entityTypes,
         Schema.agent         -> project.agentVersion.asJsonLD,
         Schema.creator       -> project.creator.asJsonLD,

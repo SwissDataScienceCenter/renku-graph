@@ -31,14 +31,31 @@ final case class CliWorkflowFileCompositePlan(
     description:      Option[Description],
     creators:         List[CliPerson],
     dateCreated:      DateCreated,
+    dateModified:     DateModified,
     keywords:         List[Keyword],
     derivedFrom:      Option[DerivedFrom],
     invalidationTime: Option[InvalidationTime],
     plans:            NonEmptyList[CliWorkflowFileStepPlan],
     links:            List[CliParameterLink],
     mappings:         List[CliParameterMapping],
-    path:             entityModel.Location.FileOrFolder // TODO clarify what this property really is
-) extends CliModel
+    path:             entityModel.Location.FileOrFolder
+) extends CliModel {
+  def asCliCompositePlan: CliCompositePlan =
+    CliCompositePlan(
+      id,
+      name,
+      description,
+      creators,
+      dateCreated,
+      dateModified,
+      keywords,
+      derivedFrom,
+      invalidationTime,
+      plans.map(p => CliPlan(p.asCliStepPlan)),
+      links,
+      mappings
+    )
+}
 
 object CliWorkflowFileCompositePlan {
 
@@ -48,7 +65,7 @@ object CliWorkflowFileCompositePlan {
   private[model] def matchingEntityTypes(entityTypes: EntityTypes): Boolean =
     entityTypes == this.entityTypes
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliWorkflowFileCompositePlan] =
+  implicit def jsonLDDecoder: JsonLDEntityDecoder[CliWorkflowFileCompositePlan] =
     JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(matchingEntityTypes)) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
@@ -56,6 +73,7 @@ object CliWorkflowFileCompositePlan {
         description      <- cursor.downField(Schema.description).as[Option[Description]]
         creators         <- cursor.downField(Schema.creator).as[List[CliPerson]]
         dateCreated      <- cursor.downField(Schema.dateCreated).as[DateCreated]
+        dateModified     <- cursor.downField(Schema.dateModified).as[DateModified]
         keywords         <- cursor.downField(Schema.keywords).as[List[Option[Keyword]]].map(_.flatten)
         derivedFrom      <- cursor.downField(Prov.wasDerivedFrom).as(JsonLDDecoder.decodeOption(DerivedFrom.ttDecoder))
         invalidationTime <- cursor.downField(Prov.invalidatedAtTime).as[Option[InvalidationTime]]
@@ -69,6 +87,7 @@ object CliWorkflowFileCompositePlan {
         description,
         creators,
         dateCreated,
+        dateModified,
         keywords,
         derivedFrom,
         invalidationTime,
@@ -88,6 +107,7 @@ object CliWorkflowFileCompositePlan {
         Schema.description     -> plan.description.asJsonLD,
         Schema.creator         -> plan.creators.asJsonLD,
         Schema.dateCreated     -> plan.dateCreated.asJsonLD,
+        Schema.dateModified    -> plan.dateModified.asJsonLD,
         Schema.keywords        -> plan.keywords.asJsonLD,
         Prov.wasDerivedFrom    -> plan.derivedFrom.asJsonLD,
         Prov.invalidatedAtTime -> plan.invalidationTime.asJsonLD,

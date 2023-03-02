@@ -21,8 +21,8 @@ package io.renku.eventlog.events.producers
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.events.CategoryName
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.{CategoryName, Subscription}
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
@@ -33,12 +33,12 @@ import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 private trait SubscribersRegistry[F[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): F[Boolean]
+  def add(subscriber: Subscription.Subscriber): F[Boolean]
   def findAvailableSubscriber(): F[Deferred[F, SubscriberUrl]]
   def delete(subscriberUrl:   SubscriberUrl): F[Boolean]
   def markBusy(subscriberUrl: SubscriberUrl): F[Unit]
   def subscriberCount(): Int
-  def getTotalCapacity:  Option[Capacity]
+  def getTotalCapacity:  Option[TotalCapacity]
 }
 
 private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
@@ -49,20 +49,20 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
     checkupInterval:             FiniteDuration
 ) extends SubscribersRegistry[F] {
 
-  val monadThrow = MonadThrow[F]
+  private val monadThrow = MonadThrow[F]
 
   import SubscribersRegistry._
   import monadThrow._
 
-  private val availablePool = new ConcurrentHashMap[SubscriptionInfo, Unit]()
-  private val busyPool      = new ConcurrentHashMap[SubscriptionInfo, CheckupTime]()
+  private val availablePool = new ConcurrentHashMap[Subscription.Subscriber, Unit]()
+  private val busyPool      = new ConcurrentHashMap[Subscription.Subscriber, CheckupTime]()
 
-  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = for {
-    _        <- MonadThrow[F].catchNonFatal(busyPool remove subscriptionInfo)
-    exists   <- MonadThrow[F].catchNonFatal(Option(availablePool.get(subscriptionInfo)).nonEmpty)
-    _        <- whenA(exists)(MonadThrow[F].catchNonFatal(availablePool.remove(subscriptionInfo)))
-    wasAdded <- MonadThrow[F].catchNonFatal(Option(availablePool.put(subscriptionInfo, ())).isEmpty)
-    _        <- whenA(wasAdded)(notifyCallerAboutAvailability(subscriptionInfo.subscriberUrl))
+  override def add(subscriber: Subscription.Subscriber): F[Boolean] = for {
+    _        <- MonadThrow[F].catchNonFatal(busyPool remove subscriber)
+    exists   <- MonadThrow[F].catchNonFatal(Option(availablePool.get(subscriber)).nonEmpty)
+    _        <- whenA(exists)(MonadThrow[F].catchNonFatal(availablePool.remove(subscriber)))
+    wasAdded <- MonadThrow[F].catchNonFatal(Option(availablePool.put(subscriber, ())).isEmpty)
+    _        <- whenA(wasAdded)(notifyCallerAboutAvailability(subscriber.url))
   } yield !exists && wasAdded
 
   private def notifyCallerAboutAvailability(subscriberUrl: SubscriberUrl): F[Unit] = for {
@@ -89,7 +89,7 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
   private def maybeSubscriberUrl = Random
     .shuffle(availablePool.keySet().asScala.toList)
     .headOption
-    .map(_.subscriberUrl)
+    .map(_.url)
 
   private def makeCallerToWait(subscriberUrlReference: Deferred[F, SubscriberUrl]) = for {
     _ <- logNoFreeSubscribersInfo
@@ -123,29 +123,34 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
     _                        <- bringToAvailable(subscribersDueForCheckup)
   } yield ()
 
-  private def findSubscribersDueForCheckup: F[List[SubscriptionInfo]] = catchNonFatal {
+  private def findSubscribersDueForCheckup: F[List[Subscription.Subscriber]] = catchNonFatal {
     busyPool.asScala.toList
       .filter(isDueForCheckup)
       .map { case (info, _) => info }
   }
 
-  private val isDueForCheckup: PartialFunction[(SubscriptionInfo, CheckupTime), Boolean] = { case (_, checkupTime) =>
-    (checkupTime.value compareTo now()) <= 0
+  private val isDueForCheckup: PartialFunction[(Subscription.Subscriber, CheckupTime), Boolean] = {
+    case (_, checkupTime) => (checkupTime.value compareTo now()) <= 0
   }
 
-  private def bringToAvailable(subscribers: List[SubscriptionInfo]): F[Unit] =
+  private def bringToAvailable(subscribers: List[Subscription.Subscriber]): F[Unit] =
     subscribers.map(add).sequence.void
 
-  private def find(subscriberUrl: SubscriberUrl, in: ConcurrentHashMap[SubscriptionInfo, _]): Option[SubscriptionInfo] =
+  private def find(subscriberUrl: SubscriberUrl,
+                   in:            ConcurrentHashMap[Subscription.Subscriber, _]
+  ): Option[Subscription.Subscriber] =
     in.asScala
-      .find { case (info, _) => info.subscriberUrl == subscriberUrl }
+      .find { case (info, _) => info.url == subscriberUrl }
       .map { case (info, _) => info }
 
-  override def getTotalCapacity: Option[Capacity] =
+  override def getTotalCapacity: Option[TotalCapacity] =
     (availablePool.asScala.keySet ++ busyPool.asScala.keySet).toList
-      .flatMap(_.maybeCapacity) match {
+      .flatMap {
+        case s: Subscription.DefinedCapacity => s.capacity.some
+        case _ => None
+      } match {
       case Nil        => None
-      case capacities => Some(Capacity(capacities.map(_.value).sum))
+      case capacities => Some(TotalCapacity(capacities.map(_.value).sum))
     }
 }
 

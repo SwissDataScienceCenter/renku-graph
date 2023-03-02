@@ -23,25 +23,34 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
+import io.circe.literal._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.jsons
 import io.renku.graph.eventlog.EventLogClient.{Result, SearchCriteria}
 import io.renku.graph.eventlog.Http4sEventLogClientSpec.JsonEncoders._
+import io.renku.graph.model._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
-import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
 import io.renku.http.client.UrlEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Uri
+import org.http4s.{Status, Uri}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
 
 import java.time.temporal.ChronoUnit
 
-class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
+class Http4sEventLogClientSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with should.Matchers
+    with EitherValues {
 
   implicit val logger: Logger[IO] = TestLogger()
 
@@ -169,6 +178,45 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
         case Result.Success(None) => ()
         case _                    => fail(s"unexpected result: $result")
       }
+    }
+  }
+
+  "getStatus" should {
+
+    "return Status for Ok" in {
+
+      val subscriptionCategoryName = categoryNames.generateOne
+      val payload = json"""{
+        "subscriptions": [
+          {
+            "categoryName": $subscriptionCategoryName
+          }
+        ]
+      }"""
+
+      stubFor {
+        get(s"/status")
+          .willReturn(
+            okJson(payload.noSpaces)
+          )
+      }
+
+      client.getStatus.unsafeRunSync().toEither.value shouldBe eventlogapi.ServiceStatus(
+        Set(eventlogapi.ServiceStatus.SubscriptionStatus(subscriptionCategoryName, maybeCapacity = None))
+      )
+    }
+
+    "fail for InternalServerError" in {
+
+      val status = Status.InternalServerError
+      stubFor {
+        get(s"/status")
+          .willReturn(
+            aResponse().withStatus(status.code).withBody(jsons.generateOne.spaces2)
+          )
+      }
+
+      client.getStatus.unsafeRunSync().toEither.left.value shouldBe Result.failure(show"Unexpected response: $status")
     }
   }
 

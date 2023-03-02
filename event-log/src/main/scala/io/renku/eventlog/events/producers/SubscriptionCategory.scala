@@ -18,16 +18,18 @@
 
 package io.renku.eventlog.events.producers
 
-import cats.data.OptionT
 import cats.{MonadThrow, Semigroup}
-import io.circe.Json
+import cats.data.OptionT
+import cats.syntax.all._
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.events.producers.SubscriptionCategory._
-import io.renku.events.CategoryName
+import io.renku.events.{CategoryName, Subscription}
 
 private trait SubscriptionCategory[F[_]] {
-  val name: CategoryName
+  val categoryName: CategoryName
   def run(): F[Unit]
   def register(payload: Json): F[RegistrationResult]
+  def getStatus: F[EventProducerStatus]
 }
 
 private[producers] object SubscriptionCategory {
@@ -42,19 +44,39 @@ private[producers] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo](
-    override val name: CategoryName,
-    subscribers:       Subscribers[F, SI],
-    eventsDistributor: EventsDistributor[F],
-    deserializer:      SubscriptionPayloadDeserializer[F, SI]
-) extends SubscriptionCategory[F] {
+private class SubscriptionCategoryImpl[F[_]: MonadThrow, S <: Subscription.Subscriber](
+    override val categoryName: CategoryName,
+    subscribers:               Subscribers[F, S],
+    eventsDistributor:         EventsDistributor[F],
+    capacityFinder:            CapacityFinder[F]
+)(implicit decoder: Decoder[S])
+    extends SubscriptionCategory[F] {
 
   override def run(): F[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): F[RegistrationResult] = {
-    for {
-      subscriptionInfo <- OptionT(deserializer deserialize payload)
-      _                <- OptionT.liftF(subscribers add subscriptionInfo)
-    } yield subscriptionInfo
-  }.map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
+  override def register(payload: Json): F[RegistrationResult] = OptionT {
+    ((validateCategory andThenF decodeSubscriber)(payload) map subscribers.add).sequence
+  }.cata(default = RejectedRegistration, _ => AcceptedRegistration)
+
+  private lazy val validateCategory: Json => Option[Json] = json =>
+    json.hcursor
+      .downField("categoryName")
+      .as[CategoryName]
+      .toOption
+      .flatMap {
+        case `categoryName` => json.some
+        case _              => Option.empty[Json]
+      }
+
+  private lazy val decodeSubscriber: Json => Option[S] =
+    _.as[S].fold(_ => Option.empty[S], _.some)
+
+  override def getStatus: F[EventProducerStatus] =
+    subscribers.getTotalCapacity match {
+      case None => EventProducerStatus(categoryName, maybeCapacity = None).pure[F]
+      case Some(total) =>
+        capacityFinder.findUsedCapacity.map(used =>
+          EventProducerStatus(categoryName, EventProducerStatus.Capacity(total, total - used).some)
+        )
+    }
 }

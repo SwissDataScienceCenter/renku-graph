@@ -206,7 +206,8 @@ private object Commands {
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
       "Could not resolve host:",
-      "Host is unreachable"
+      "Host is unreachable",
+      "remote: default backend - 404"
     )
     private val malformedRepositoryErrors = Set(
       "the remote end hung up unexpectedly",

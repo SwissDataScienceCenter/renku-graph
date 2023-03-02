@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.renku.cli.model.CliActivity
+import io.renku.cli.model.CliParameterValue
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
@@ -27,9 +27,7 @@ import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParam
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.graph.model.{entities, plans}
-import io.renku.jsonld.JsonLDDecoder._
-import monocle.Lens
+import io.renku.graph.model.entities
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -51,8 +49,8 @@ class ParameterValueSpec
       cliShapedPersons
     )
 
-  "decode" should {
-    "turn JsonLD VariableParameterValue entity into the VariableParameterValue object " in {
+  "fromCli" should {
+    "turn cli VariableParameterValue entity into the VariableParameterValue object " in {
       forAll(nonEmptyStrings().toGeneratorOf(ParameterDefaultValue), parameterValueOverrides) {
         (defaultValue, valueOverride) =>
           val activity =
@@ -60,37 +58,31 @@ class ParameterValueSpec
               .planParameterValues(defaultValue -> valueOverride)
               .buildProvenanceUnsafe()
           val entitiesActivity = activity.to[entities.Activity]
-          implicit val dl: DependencyLinks = createDependencyLinks(activity.plan.to[entities.StepPlan])
 
-          val parameterValues = activity
-            .to[CliActivity]
-            .asFlattenedJsonLD
-            .cursor
-            .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
-            .fold(throw _, identity)
+          val result =
+            activity.parameters.traverse(p =>
+              entities.ParameterValue.fromCli(p.to[CliParameterValue], activity.plan.to[entities.StepPlan])
+            )
 
-          parameterValues shouldBe entitiesActivity.parameters
-          parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandParameterValue])
+          result shouldMatchToValid entitiesActivity.parameters
+          entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandParameterValue])
       }
     }
 
-    "turn JsonLD InputParameterValue entity into the InputParameterValue object " in {
+    "turn cli InputParameterValue entity into the InputParameterValue object " in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlannerGen(CommandInput.fromLocation(location)).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
         val entitiesActivity = activity.to[entities.Activity]
-        implicit val dl: DependencyLinks = createDependencyLinks(activity.plan.to[entities.StepPlan])
 
-        val parameterValues = activity
-          .to[CliActivity]
-          .asFlattenedJsonLD
-          .cursor
-          .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
-          .fold(throw _, identity)
+        val result =
+          activity.parameters.traverse(p =>
+            entities.ParameterValue.fromCli(p.to[CliParameterValue], activity.plan.to[entities.StepPlan])
+          )
 
-        parameterValues shouldBe entitiesActivity.parameters
-        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandInputValue])
+        result shouldMatchToValid entitiesActivity.parameters
+        entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandInputValue])
       }
     }
 
@@ -99,17 +91,14 @@ class ParameterValueSpec
         val activity = executionPlannerGen(CommandOutput.fromLocation(location)).generateOne
           .buildProvenanceUnsafe()
         val entitiesActivity = activity.to[entities.Activity]
-        implicit val dl: DependencyLinks = createDependencyLinks(activity.plan.to[entities.StepPlan])
 
-        val parameterValues = activity
-          .to[CliActivity]
-          .asFlattenedJsonLD
-          .cursor
-          .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
-          .fold(throw _, identity)
+        val result =
+          activity.parameters.traverse(p =>
+            entities.ParameterValue.fromCli(p.to[CliParameterValue], activity.plan.to[entities.StepPlan])
+          )
 
-        parameterValues shouldBe entitiesActivity.parameters
-        parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandOutputValue])
+        result shouldMatchToValid entitiesActivity.parameters
+        entitiesActivity.parameters.foreach(_ shouldBe a[entities.ParameterValue.CommandOutputValue])
       }
     }
 
@@ -120,16 +109,14 @@ class ParameterValueSpec
         .planParameterValues(defaultValue -> valueOverride)
         .buildProvenanceUnsafe()
       val entitiesActivity = activity.to[entities.Activity]
-      implicit val dl: DependencyLinks =
-        createDependencyLinks(planParametersLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
+      val unrelatedPlan    = stepPlanEntities().apply(projectCreatedDates().generateOne).generateOne
 
-      val results = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .cursor
-        .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
+      val result =
+        activity.parameters.traverse(p =>
+          entities.ParameterValue.fromCli(p.to[CliParameterValue], unrelatedPlan.to[entities.StepPlan])
+        )
 
-      results.left.value.message should endWith(
+      result should beInvalidWithMessageIncluding(
         s"ParameterValue points to a non-existing command parameter ${entitiesActivity.parameters.head.valueReference.resourceId}"
       )
     }
@@ -140,17 +127,14 @@ class ParameterValueSpec
       val activity = executionPlannerGen(CommandInput.fromLocation(location)).generateOne
         .planInputParameterValuesFromChecksum(location -> checksum)
         .buildProvenanceUnsafe()
-      val entitiesActivity = activity.to[entities.Activity]
-      implicit val dl: DependencyLinks =
-        createDependencyLinks(planInputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
+      val unrelatedPlan = stepPlanEntities().apply(projectCreatedDates().generateOne).generateOne
 
-      val results = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .cursor
-        .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
+      val result =
+        activity.parameters.traverse(p =>
+          entities.ParameterValue.fromCli(p.to[CliParameterValue], unrelatedPlan.to[entities.StepPlan])
+        )
 
-      results.left.value.message should endWith(
+      result should beInvalidWithMessageIncluding(
         s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].inputs.map(_.resourceId).head}"
       )
     }
@@ -159,48 +143,16 @@ class ParameterValueSpec
       val location = entityLocations.generateOne
       val activity = executionPlannerGen(CommandOutput.fromLocation(location)).generateOne
         .buildProvenanceUnsafe()
-      val entitiesActivity = activity.to[entities.Activity]
-      implicit val dl: DependencyLinks =
-        createDependencyLinks(planOutputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
+      val unrelatedPlan = stepPlanEntities().apply(projectCreatedDates().generateOne).generateOne
 
-      val results = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .cursor
-        .as(decodeList(entities.ParameterValue.decoder(entitiesActivity.association)))
+      val result =
+        activity.parameters.traverse(p =>
+          entities.ParameterValue.fromCli(p.to[CliParameterValue], unrelatedPlan.to[entities.StepPlan])
+        )
 
-      results.left.value.message should endWith(
+      result should beInvalidWithMessageIncluding(
         s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].outputs.map(_.resourceId).head}"
       )
     }
-  }
-
-  private lazy val planParametersLens
-      : Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandParameter]] =
-    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandParameter]](_.parameters) { params =>
-      {
-        case plan: entities.StepPlan.NonModified => plan.copy(parameters = params)
-        case plan: entities.StepPlan.Modified    => plan.copy(parameters = params)
-      }
-    }
-
-  private lazy val planInputsLens: Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandInput]] =
-    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandInput]](_.inputs) { inputs =>
-      {
-        case plan: entities.StepPlan.NonModified => plan.copy(inputs = inputs)
-        case plan: entities.StepPlan.Modified    => plan.copy(inputs = inputs)
-      }
-    }
-
-  private lazy val planOutputsLens: Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandOutput]] =
-    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandOutput]](_.outputs) { outputs =>
-      {
-        case plan: entities.StepPlan.NonModified => plan.copy(outputs = outputs)
-        case plan: entities.StepPlan.Modified    => plan.copy(outputs = outputs)
-      }
-    }
-
-  private def createDependencyLinks(plan: entities.StepPlan) = new DependencyLinks {
-    override def findStepPlan(planId: plans.ResourceId) = plan.some
   }
 }

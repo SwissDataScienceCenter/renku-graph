@@ -27,18 +27,38 @@ import io.renku.jsonld._
 final case class CliParameterValue(
     id:        ResourceId,
     parameter: commandParameters.ResourceId,
-    value:     ValueOverride
+    value:     CliParameterValue.Value
 ) extends CliModel
 
 object CliParameterValue {
   private val entityTypes = EntityTypes.of(Schema.PropertyValue, Renku.ParameterValue)
+
+  final case class Value(json: JsonLD) {
+    def asString: String =
+      json.cursor
+        .as[String]
+        .orElse(json.cursor.as[Boolean].map(_.toString))
+        .orElse(json.cursor.as[BigDecimal].map(_.bigDecimal.toString))
+        .getOrElse(json.toJson.noSpaces)
+  }
+  object Value {
+    def apply(str:  String):  Value = Value(JsonLD.fromString(str))
+    def apply(bool: Boolean): Value = Value(JsonLD.fromBoolean(bool))
+    def apply(n:    Long):    Value = Value(JsonLD.fromLong(n))
+
+    implicit val jsonLDDecoder: JsonLDDecoder[Value] =
+      JsonLDDecoder.instance(c => Right(Value(c.jsonLD)))
+
+    implicit val jsonLDEncoder: JsonLDEncoder[Value] =
+      JsonLDEncoder.instance(_.json)
+  }
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliParameterValue] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
         valueReferenceId <- cursor.downField(Schema.valueReference).downEntityId.as[commandParameters.ResourceId]
-        parameterValue   <- cursor.downField(Schema.value).as[ValueOverride]
+        parameterValue   <- cursor.downField(Schema.value).as[Value]
       } yield CliParameterValue(resourceId, valueReferenceId, parameterValue)
     }
 

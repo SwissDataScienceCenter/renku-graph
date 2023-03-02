@@ -38,6 +38,15 @@ object CliPublicationEvent {
 
   private val entityTypes = EntityTypes of Schema.PublicationEvent
 
+  private implicit val datasetEdgeEncoder: JsonLDEncoder[(About, datasets.ResourceId)] = JsonLDEncoder.instance {
+    case (about, datasetId) =>
+      JsonLD.entity(
+        about.asEntityId,
+        EntityTypes of Schema.URL,
+        Schema.url -> datasetId.asEntityId.asJsonLD
+      )
+  }
+
   implicit val encoder: JsonLDEncoder[CliPublicationEvent] = JsonLDEncoder.instance {
     case CliPublicationEvent(resourceId, about, datasetResourceId, maybeDescription, name, startDate) =>
       JsonLD.entity(
@@ -50,27 +59,24 @@ object CliPublicationEvent {
       )
   }
 
-  private implicit lazy val datasetEdgeEncoder: JsonLDEncoder[(About, datasets.ResourceId)] = JsonLDEncoder.instance {
-    case (about, datasetId) =>
-      JsonLD.entity(
-        about.asEntityId,
-        EntityTypes of Schema.URL,
-        Schema.url -> datasetId.asEntityId.asJsonLD
-      )
-  }
-
   private def forDataset(datasetId: datasets.Identifier): Cursor => JsonLDDecoder.Result[Boolean] =
     _.downField(Schema.about).as[EntityId].map(_.show endsWith datasetId.show)
 
   def decoder(dataset: CliDataset): JsonLDDecoder[CliPublicationEvent] =
-    JsonLDDecoder.entity(entityTypes, forDataset(dataset.identifier)) { cursor =>
+    decoder(dataset.identifier, dataset.resourceId)
+
+  def decoder(
+      datasetIdentifier: datasets.Identifier,
+      datasetId:         datasets.ResourceId
+  ): JsonLDDecoder[CliPublicationEvent] =
+    JsonLDDecoder.entity(entityTypes, forDataset(datasetIdentifier)) { cursor =>
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
-        about            <- cursor.downField(Schema.about).as(datasetEdgeDecoder(dataset.resourceId))
+        about            <- cursor.downField(Schema.about).as(datasetEdgeDecoder(datasetId))
         maybeDescription <- cursor.downField(Schema.description).as[Option[Description]]
         name             <- cursor.downField(Schema.name).as[Name]
         startDate        <- cursor.downField(Schema.startDate).as[StartDate]
-      } yield CliPublicationEvent(resourceId, about, dataset.resourceId, maybeDescription, name, startDate)
+      } yield CliPublicationEvent(resourceId, about, datasetId, maybeDescription, name, startDate)
     }
 
   private def datasetEdgeDecoder(datasetId: datasets.ResourceId): JsonLDDecoder[About] =

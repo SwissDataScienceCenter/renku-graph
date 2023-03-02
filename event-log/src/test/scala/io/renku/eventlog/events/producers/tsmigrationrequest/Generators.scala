@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.events.producers.tsmigrationrequest
 
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
+import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit val migratorSubscriptionInfos: Gen[MigratorSubscriptionInfo] = for {
+  implicit val migrationSubscribers: Gen[MigrationSubscriber] = for {
     url     <- subscriberUrls
     id      <- subscriberIds
     version <- serviceVersions
-  } yield MigratorSubscriptionInfo(url, id, version)
+  } yield MigrationSubscriber(url, id, version)
 }

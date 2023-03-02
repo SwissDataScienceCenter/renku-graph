@@ -23,7 +23,9 @@ import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.{Prov, Renku}
 import io.renku.graph.model.activities._
 import io.renku.jsonld._
+import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld.syntax._
+import monocle.{Lens, Traversal}
 
 final case class CliActivity(
     resourceId:    ResourceId,
@@ -45,7 +47,7 @@ object CliActivity {
     JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
         resourceId     <- cursor.downEntityId.as[ResourceId]
-        generations    <- cursor.downField(Prov.qualifiedGeneration).as[List[CliGeneration]]
+        generations    <- cursor.focusTop.as(decodeList(CliGeneration.decoderForActivity(resourceId)))
         softwareAgents <- cursor.downField(Prov.wasAssociatedWith).as[List[CliSoftwareAgent]]
         personAgents   <- cursor.downField(Prov.wasAssociatedWith).as[List[CliPerson]]
         softwareAgent <- softwareAgents match {
@@ -78,7 +80,7 @@ object CliActivity {
       JsonLD.entity(
         activity.resourceId.asEntityId,
         entityTypes,
-        Prov.qualifiedGeneration  -> activity.generations.asJsonLD,
+        Reverse.ofJsonLDsUnsafe(Prov.qualifiedGeneration -> activity.generations.asJsonLD),
         Prov.wasAssociatedWith    -> JsonLD.arr(activity.softwareAgent.asJsonLD, activity.personAgent.asJsonLD),
         Prov.qualifiedAssociation -> activity.association.asJsonLD,
         Prov.qualifiedUsage       -> activity.usages.asJsonLD,
@@ -87,4 +89,24 @@ object CliActivity {
         Renku.parameter           -> activity.parameters.asJsonLD
       )
     }
+
+  object Lenses {
+    val usages: Lens[CliActivity, List[CliUsage]] =
+      Lens[CliActivity, List[CliUsage]](_.usages)(usages => _.copy(usages = usages))
+
+    val generations: Lens[CliActivity, List[CliGeneration]] =
+      Lens[CliActivity, List[CliGeneration]](_.generations)(gens => _.copy(generations = gens))
+
+    val usagesEntities: Traversal[CliActivity, CliUsage] =
+      usages.composeTraversal(Traversal.fromTraverse[List, CliUsage])
+
+    val generationEntities: Traversal[CliActivity, CliGeneration] =
+      generations.composeTraversal(Traversal.fromTraverse[List, CliGeneration])
+
+    val usageEntityPaths: Traversal[CliActivity, EntityPath] =
+      usagesEntities.composeLens(CliUsage.Lenses.entityPath)
+
+    val generationEntityPaths: Traversal[CliActivity, EntityPath] =
+      generationEntities.composeLens(CliGeneration.Lenses.entityPath)
+  }
 }

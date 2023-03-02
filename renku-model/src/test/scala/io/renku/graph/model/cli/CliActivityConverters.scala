@@ -19,25 +19,11 @@
 package io.renku.graph.model.cli
 
 import cats.syntax.show._
-import CliConversionFunctions._
 import io.renku.cli.model._
-import io.renku.graph.model.{RenkuUrl, activities, agents, associations, commandParameters, entities, generations, parameterValues, testentities, usages}
-import io.renku.graph.model.parameterValues.ValueOverride
+import io.renku.graph.model._
 import io.renku.jsonld.syntax._
 
 trait CliActivityConverters extends CliPlanConverters {
-
-  def from(a: entities.Activity, plans: List[entities.Plan]): CliActivity = CliActivity(
-    a.resourceId,
-    a.startTime,
-    a.endTime,
-    CliAgent.Software(from(a.agent)),
-    CliAgent.Person(from(a.author)),
-    from(a.association, plans),
-    a.usages.map(from),
-    a.generations.map(from),
-    a.parameters.map(from)
-  )
 
   def from(a: testentities.Activity)(implicit renkuUrl: RenkuUrl): CliActivity = CliActivity(
     activities.ResourceId(a.asEntityId.show),
@@ -51,21 +37,8 @@ trait CliActivityConverters extends CliPlanConverters {
     a.parameters.map(from)
   )
 
-  def from(a: entities.Agent): CliSoftwareAgent = CliSoftwareAgent(a.resourceId, a.name)
-
-  def from(a: testentities.Agent)(implicit renkuUrl: RenkuUrl): CliSoftwareAgent =
+  def from(a: testentities.Agent): CliSoftwareAgent =
     CliSoftwareAgent(agents.ResourceId(a.asEntityId.show), agents.Name(s"renku ${a.cliVersion}"))
-
-  def from(association: entities.Association, allPlans: List[entities.Plan]): CliAssociation = {
-    val stepPlan       = findStepPlanOrFail(association.planId, allPlans)
-    val associatedPlan = CliAssociation.AssociatedPlan(from(stepPlan))
-    association
-      .fold { a =>
-        CliAssociation(a.resourceId, CliAgent(from(a.agent)), associatedPlan)
-      } { a =>
-        CliAssociation(a.resourceId, CliAgent(from(a.agent)), associatedPlan)
-      }
-  }
 
   def from(association: testentities.Association)(implicit renkuUrl: RenkuUrl): CliAssociation = {
     val associatedPlan = CliAssociation.AssociatedPlan(from(association.plan))
@@ -77,20 +50,9 @@ trait CliActivityConverters extends CliPlanConverters {
     CliAssociation(id, agent, associatedPlan)
   }
 
-  def from(usage: entities.Usage): CliUsage = CliUsage(
-    usage.resourceId,
-    from(usage.entity)
-  )
-
   def from(usage: testentities.Usage)(implicit renkuUrl: RenkuUrl): CliUsage = CliUsage(
     usages.ResourceId(usage.asEntityId.show),
     from(usage.entity)
-  )
-
-  def from(generation: entities.Generation): CliGeneration = CliGeneration(
-    generation.resourceId,
-    from(generation.entity),
-    generation.activityResourceId
   )
 
   def from(generation: testentities.Generation)(implicit renkuUrl: RenkuUrl): CliGeneration = CliGeneration(
@@ -99,28 +61,24 @@ trait CliActivityConverters extends CliPlanConverters {
     activities.ResourceId(generation.activity.asEntityId.show)
   )
 
-  def from(paramValue: entities.ParameterValue): CliParameterValue = paramValue match {
-    case v: entities.ParameterValue.LocationParameterValue =>
-      CliParameterValue(v.resourceId, v.valueReference.resourceId, ValueOverride(v.value.value))
-    case v: entities.ParameterValue.CommandParameterValue =>
-      CliParameterValue(v.resourceId, v.valueReference.resourceId, v.value)
-  }
-
   def from(paramValue: testentities.ParameterValue)(implicit renkuUrl: RenkuUrl): CliParameterValue = {
     val id = parameterValues.ResourceId(paramValue.asEntityId.show)
     paramValue match {
       case p: testentities.ParameterValue.LocationParameterValue.CommandOutputValue =>
         CliParameterValue(id,
                           commandParameters.ResourceId(p.valueReference.asEntityId.show),
-                          ValueOverride(p.value.value)
+                          CliParameterValue.Value(p.value.value)
         )
       case p: testentities.ParameterValue.LocationParameterValue.CommandInputValue =>
         CliParameterValue(id,
                           commandParameters.ResourceId(p.valueReference.asEntityId.show),
-                          ValueOverride(p.value.value)
+                          CliParameterValue.Value(p.value.value)
         )
       case p: testentities.ParameterValue.CommandParameterValue =>
-        CliParameterValue(id, commandParameters.ResourceId(p.valueReference.asEntityId.show), p.value)
+        CliParameterValue(id,
+                          commandParameters.ResourceId(p.valueReference.asEntityId.show),
+                          CliParameterValue.Value(p.value.value)
+        )
     }
   }
 }

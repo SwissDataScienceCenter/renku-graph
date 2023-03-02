@@ -18,8 +18,11 @@
 
 package io.renku.cli.model
 
+import io.circe.DecodingFailure
+import io.renku.cli.model.Ontologies.Schema
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.DatasetGenerators
+import io.renku.cli.model.tools.JsonLDTools
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
 import org.scalatest.matchers.should
@@ -43,10 +46,47 @@ class CliDatasetSpec
       }
     }
 
+    "be compatible with publication events" in {
+      forAll(DatasetGenerators.datasetWithEventsGen) { cliDataset =>
+        implicit val jsonEncoder = CliDataset.flatJsonLDEncoder
+        assertCompatibleCodec(cliDataset)
+      }
+    }
+
     "work on multiple items" in {
       forAll(datasetGen, datasetGen) { (cliDataset1, cliDataset2) =>
         assertCompatibleCodec(cliDataset1, cliDataset2)
       }
+    }
+
+    "work on multiple items with publication events" in {
+      forAll(DatasetGenerators.datasetWithEventsGen, DatasetGenerators.datasetWithEventsGen) {
+        (cliDataset1, cliDataset2) =>
+          implicit val jsonEncoder = CliDataset.flatJsonLDEncoder
+          assertCompatibleCodec(cliDataset1, cliDataset2)
+      }
+    }
+
+    "skip publicationEvents that belong to a different dataset" in {
+      val dataset                    = DatasetGenerators.datasetWithEventsGen.generateOne
+      val additionalEvents           = DatasetGenerators.datasetWithEventsGen.generateOne.publicationEvents
+      val datasetWithUnrelatedEvents = CliDataset.Lenses.publicationEventList.modify(additionalEvents ::: _)(dataset)
+
+      implicit val jsonEncoder = CliDataset.flatJsonLDEncoder
+      assertCompatibleCodec((_: CliDataset) => List(dataset))(datasetWithUnrelatedEvents)
+    }
+
+    "fail if no creators" in {
+      val dataset = datasetGen.generateOne
+      val noCreatorsJsonLD =
+        JsonLDTools
+          .view(dataset.asNestedJsonLD)
+          .remove(CliDataset.entityTypes, Schema.creator)
+          .value
+
+      val Left(error) = noCreatorsJsonLD.cursor.as[List[CliDataset]]
+      error            shouldBe a[DecodingFailure]
+      error.getMessage() should include(s"No creators on dataset with id: ${dataset.identifier.value}")
     }
   }
 }

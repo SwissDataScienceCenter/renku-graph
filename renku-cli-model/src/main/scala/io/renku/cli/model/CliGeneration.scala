@@ -18,12 +18,15 @@
 
 package io.renku.cli.model
 
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.Prov
-import io.renku.graph.model.activities
+import io.renku.graph.model.{activities, generations}
 import io.renku.graph.model.generations._
+import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import monocle.Lens
 
 final case class CliGeneration(
     resourceId:         ResourceId,
@@ -46,14 +49,38 @@ object CliGeneration {
     }
 
   implicit val jsonLDDecoder: JsonLDDecoder[CliGeneration] =
-    JsonLDDecoder.entity(entityTypes) { cursor =>
+    jsonLDDecoderFor(_ => Right(true))
+
+  def decoderForActivity(activityId: activities.ResourceId): JsonLDDecoder[CliGeneration] =
+    jsonLDDecoderFor(withActivity(activityId))
+
+  private def jsonLDDecoderFor(filter: Cursor => Result[Boolean]): JsonLDDecoder[CliGeneration] =
+    JsonLDDecoder.entity(entityTypes, filter) { cursor =>
       for {
-        resourceId  <- cursor.downEntityId.as[ResourceId]
-        activityId  <- cursor.downField(Prov.activity).downEntityId.as[activities.ResourceId]
-        allEntities <- cursor.focusTop.as[List[CliEntity]]
-        entity <- allEntities
-                    .find(_.generationIds.contains(resourceId))
-                    .toRight(DecodingFailure(s"No related entity found for generation '$resourceId'", Nil))
+        resourceId <- cursor.downEntityId.as[ResourceId]
+        activityId <- cursor.downField(Prov.activity).downEntityId.as[activities.ResourceId]
+        entity <-
+          cursor.focusTop
+            .as[List[CliEntity]](JsonLDDecoder.decodeList(CliEntity.jsonLDDecoderForGeneration(resourceId)))
+            .flatMap {
+              case entity :: Nil => entity.asRight
+              case _ =>
+                DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil).asLeft
+            }
       } yield CliGeneration(resourceId, entity, activityId)
     }
+
+  private def withActivity(activityId: activities.ResourceId): Cursor => JsonLDDecoder.Result[Boolean] =
+    _.downField(Prov.activity).downEntityId.as[activities.ResourceId].map(_ == activityId)
+
+  object Lenses {
+    val entity: Lens[CliGeneration, CliEntity] =
+      Lens[CliGeneration, CliEntity](_.entity)(e => _.copy(entity = e))
+
+    val entityPath: Lens[CliGeneration, EntityPath] =
+      entity.composeLens(CliEntity.Lenses.entityPath)
+
+    val entityGenerationIds: Lens[CliGeneration, List[generations.ResourceId]] =
+      entity.composeLens(CliEntity.Lenses.generationIds)
+  }
 }

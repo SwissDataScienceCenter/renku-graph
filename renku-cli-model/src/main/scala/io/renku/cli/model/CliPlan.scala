@@ -49,23 +49,30 @@ object CliPlan {
   lazy val allMappingParameterIds: CliCompositePlan => Set[commandParameters.ResourceId] = p =>
     p.mappings.map(_.resourceId).toSet
 
-  private val entityTypes: EntityTypes =
+  private[model] val entityTypes: EntityTypes =
     EntityTypes.of(Prov.Plan, Schema.Action, Schema.CreativeWork)
 
-  private def selectCandidates(ets: EntityTypes): Boolean =
-    CliStepPlan.matchingEntityTypes(ets) || CliCompositePlan.matchingEntityTypes(ets)
+  implicit def jsonLDDecoder: JsonLDEntityDecoder[CliPlan] =
+    jsonLDDecoderWith(CliStepPlan.jsonLDDecoder, CliCompositePlan.jsonLDDecoder)
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliPlan] = {
-    val plan = CliStepPlan.jsonLDDecoder.emap(plan => CliPlan(plan).asRight)
-    val cp   = CliCompositePlan.jsonLDDecoder.emap(plan => CliPlan(plan).asRight)
+  /** Decodes also "subtypes" of step plans, i.e. the WorkflowFilePlan, viewing them as a step/composite plan. */
+  def jsonLDDecoderLenientTyped: JsonLDEntityDecoder[CliPlan] =
+    jsonLDDecoderWith(CliStepPlan.jsonLDDecoderLenientTyped, CliCompositePlan.jsonLDDecoderLenientTyped)
 
-    JsonLDDecoder.cacheableEntity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
+  private def jsonLDDecoderWith(
+      stepPlanDecoder: JsonLDEntityDecoder[CliStepPlan],
+      compPlanDecoder: JsonLDEntityDecoder[CliCompositePlan]
+  ): JsonLDEntityDecoder[CliPlan] = {
+    val step = stepPlanDecoder.map(CliPlan.apply)
+    val comp = compPlanDecoder.map(CliPlan.apply)
+    val predicate = (cursor: Cursor) =>
+      (stepPlanDecoder.predicate(cursor), compPlanDecoder.predicate(cursor)).mapN(_ || _)
+
+    JsonLDDecoder.cacheableEntity(entityTypes, predicate) { cursor =>
       val currentEntityTypes = cursor.getEntityTypes
-      (currentEntityTypes.map(CliStepPlan.matchingEntityTypes),
-       currentEntityTypes.map(CliCompositePlan.matchingEntityTypes)
-      ).flatMapN {
-        case (true, _) => plan(cursor)
-        case (_, true) => cp(cursor)
+      (stepPlanDecoder.predicate(cursor), compPlanDecoder.predicate(cursor)).flatMapN {
+        case (true, _) => step(cursor)
+        case (_, true) => comp(cursor)
         case _ =>
           DecodingFailure(
             s"Invalid entity for decoding child plans of a composite plan: $currentEntityTypes",

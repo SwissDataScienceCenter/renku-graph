@@ -25,7 +25,9 @@ import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.Decoder
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.jsonld.{EntityId, EntityIdEncoder}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -38,9 +40,19 @@ private trait Migration[F[_]] {
 }
 
 private object Migration {
+
   final class Name private (val value: String) extends AnyVal with StringTinyType
   object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name] {
+
     implicit val decoder: Decoder[Name] = stringDecoder(Name)
+
+    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Name] = EntityIdEncoder.instance {
+      name => EntityId.of((renkuUrl / "migration" / name.asUrlPart).toString)
+    }
+
+    private implicit class MigrationNameOps(name: Migration.Name) {
+      lazy val asUrlPart: String = name.show.replace(' ', '-')
+    }
   }
 }
 

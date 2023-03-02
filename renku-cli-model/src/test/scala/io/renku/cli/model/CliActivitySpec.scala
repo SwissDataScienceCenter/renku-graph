@@ -19,6 +19,7 @@
 package io.renku.cli.model
 
 import io.circe.DecodingFailure
+import io.renku.cli.model.Ontologies.Prov
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.ActivityGenerators
 import io.renku.generators.Generators.Implicits._
@@ -79,6 +80,7 @@ class CliActivitySpec
       error       shouldBe a[DecodingFailure]
       error.message should endWith(s"Cannot decode SoftwareAgent on activity ${activity.resourceId}")
     }
+
     "fail if there is no Author entity" in {
       import io.renku.jsonld.syntax._
       val encoder = JsonLDEncoder.instance[CliActivity] { entity =>
@@ -104,6 +106,21 @@ class CliActivitySpec
 
       error       shouldBe a[DecodingFailure]
       error.message should endWith(s"Cannot decode PersonAgent on activity ${activity.resourceId}")
+    }
+
+    "fail if there's no Plan with the Id the Association points to" in {
+      val cliActivity = activityGen.generateOne
+      val planId      = cliActivity.association.plan.fold(_.id, _.id)
+      val jsonLD = cliActivity.asFlattenedJsonLD.asArray
+        .getOrElse(sys.error("expected a json array"))
+        .filter(el => el.entityId.exists(_.value != planId.value))
+
+      val Left(error) = JsonLD.arr(jsonLD: _*).cursor.as[List[CliActivity]]
+
+      error shouldBe a[DecodingFailure]
+      error.message should include(
+        s" Cannot find an entity of type(s) ${Prov.Plan.url}"
+      )
     }
   }
 }

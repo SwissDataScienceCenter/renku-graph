@@ -21,10 +21,12 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import cats.MonadThrow
 import io.renku.config.ConfigLoader
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.PositiveInt
 
 private[events] final class GenerationProcessesNumber private (val value: Int) extends AnyVal with IntTinyType
 private object GenerationProcessesNumber
-    extends TinyTypeFactory[GenerationProcessesNumber](new GenerationProcessesNumber(_)) {
+    extends TinyTypeFactory[GenerationProcessesNumber](new GenerationProcessesNumber(_))
+    with PositiveInt[GenerationProcessesNumber] {
 
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}

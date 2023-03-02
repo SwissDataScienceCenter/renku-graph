@@ -18,9 +18,15 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.{Validated, ValidatedNel}
+import cats.syntax.all._
+import io.renku.cli.model.{CliCommandInput, CliCommandOutput, CliCommandParameter, CliMappedIOStream}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters._
-import io.renku.jsonld.JsonLDDecoder
+import io.renku.graph.model.entityModel.Location
+import io.renku.jsonld.ontology.{xsd => _, _}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 sealed trait StepPlanCommandParameter extends CommandParameterBase
 
@@ -31,10 +37,6 @@ sealed trait ExplicitParameter {
 }
 
 object StepPlanCommandParameter {
-
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
   sealed trait CommandParameter extends StepPlanCommandParameter {
     override type DefaultValue = ParameterDefaultValue
@@ -61,6 +63,27 @@ object StepPlanCommandParameter {
 
     private val entityTypes: EntityTypes = EntityTypes of (renku / "CommandParameter", renku / "CommandParameterBase")
 
+    def fromCli(cliParam: CliCommandParameter): ValidatedNel[String, CommandParameter] =
+      cliParam.position match {
+        case Some(pos) =>
+          ExplicitCommandParameter(
+            cliParam.resourceId,
+            pos,
+            cliParam.name,
+            cliParam.description,
+            cliParam.prefix,
+            cliParam.defaultValue
+          ).validNel
+        case None =>
+          ImplicitCommandParameter(
+            cliParam.resourceId,
+            cliParam.name,
+            cliParam.description,
+            cliParam.prefix,
+            cliParam.defaultValue
+          ).validNel
+      }
+
     implicit def encoder[P <: CommandParameter]: JsonLDEncoder[P] = JsonLDEncoder.instance {
       case ExplicitCommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue) =>
         JsonLD.entity(
@@ -81,23 +104,6 @@ object StepPlanCommandParameter {
           renku / "prefix"        -> maybePrefix.asJsonLD,
           schema / "defaultValue" -> defaultValue.asJsonLD
         )
-    }
-
-    implicit lazy val decoder: JsonLDDecoder[CommandParameter] = JsonLDDecoder.entity(entityTypes) { cursor =>
-      import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-      for {
-        resourceId       <- cursor.downEntityId.as[ResourceId]
-        maybePosition    <- cursor.downField(renku / "position").as[Option[Position]]
-        name             <- cursor.downField(schema / "name").as[Name]
-        maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-        maybePrefix      <- cursor.downField(renku / "prefix").as[Option[Prefix]]
-        defaultValue     <- cursor.downField(schema / "defaultValue").as[ParameterDefaultValue]
-      } yield maybePosition match {
-        case Some(position) =>
-          ExplicitCommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue)
-        case None =>
-          ImplicitCommandParameter(resourceId, name, maybeDescription, maybePrefix, defaultValue)
-      }
     }
 
     lazy val ontology: Type = Type.Def(
@@ -147,6 +153,34 @@ object StepPlanCommandParameter {
   ) extends CommandInput
 
   object CommandInput {
+
+    def fromCli(cliInput: CliCommandInput): ValidatedNel[String, CommandInput] = {
+      val defaultValue = InputDefaultValue(
+        Location.FileOrFolder(cliInput.defaultValue.value)
+      )
+      val mappedIn = cliInput.mappedTo.traverse { mapped =>
+        mapped.streamType match {
+          case CliMappedIOStream.StreamType.StdIn =>
+            IOStream.StdIn(mapped.id).validNel
+          case CliMappedIOStream.StreamType.StdOut =>
+            Validated.invalidNel("Incompatible stream: expected stdin, but got stdout")
+          case CliMappedIOStream.StreamType.StdErr =>
+            Validated.invalidNel("Incompatible stream: expected stdin, but got stderr")
+        }
+      }
+      mappedIn.map { stream =>
+        createCommandInput(
+          cliInput.resourceId,
+          cliInput.position,
+          cliInput.name,
+          cliInput.description,
+          cliInput.prefix,
+          defaultValue,
+          cliInput.encodingFormat,
+          stream
+        )
+      }
+    }
 
     val entityTypes: EntityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
 
@@ -200,27 +234,6 @@ object StepPlanCommandParameter {
         )
     }
 
-    implicit lazy val decoder: JsonLDDecoder[CommandInput] = JsonLDDecoder.entity(entityTypes) { cursor =>
-      for {
-        resourceId          <- cursor.downEntityId.as[ResourceId]
-        maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
-        name                <- cursor.downField(schema / "name").as[Name]
-        maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
-        maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
-        defaultValue        <- cursor.downField(schema / "defaultValue").as[InputDefaultValue]
-        maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
-        maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.In]]
-      } yield createCommandInput(resourceId,
-                                 maybePosition,
-                                 name,
-                                 maybeDescription,
-                                 maybePrefix,
-                                 defaultValue,
-                                 maybeEncodingFormat,
-                                 maybeMappedTo
-      )
-    }
-
     private def createCommandInput(resourceId:          ResourceId,
                                    maybePosition:       Option[Position],
                                    name:                Name,
@@ -229,7 +242,7 @@ object StepPlanCommandParameter {
                                    defaultValue:        InputDefaultValue,
                                    maybeEncodingFormat: Option[EncodingFormat],
                                    maybeMappedTo:       Option[IOStream.In]
-    ) = (maybePosition, maybeMappedTo) match {
+    ): CommandInput = (maybePosition, maybeMappedTo) match {
       case (Some(position), None) =>
         LocationCommandInput(resourceId,
                              position,
@@ -363,29 +376,34 @@ object StepPlanCommandParameter {
         )
     }
 
-    implicit lazy val decoder: JsonLDDecoder[CommandOutput] =
-      JsonLDDecoder.entity(entityTypes) { cursor =>
-        for {
-          resourceId          <- cursor.downEntityId.as[ResourceId]
-          maybePosition       <- cursor.downField(renku / "position").as[Option[Position]]
-          name                <- cursor.downField(schema / "name").as[Name]
-          maybeDescription    <- cursor.downField(schema / "description").as[Option[Description]]
-          maybePrefix         <- cursor.downField(renku / "prefix").as[Option[Prefix]]
-          defaultValue        <- cursor.downField(schema / "defaultValue").as[OutputDefaultValue]
-          folderCreation      <- cursor.downField(renku / "createFolder").as[FolderCreation]
-          maybeEncodingFormat <- cursor.downField(schema / "encodingFormat").as[Option[EncodingFormat]]
-          maybeMappedTo       <- cursor.downField(renku / "mappedTo").as[Option[IOStream.Out]]
-        } yield createCommandOutput(resourceId,
-                                    maybePosition,
-                                    name,
-                                    maybeDescription,
-                                    maybePrefix,
-                                    defaultValue,
-                                    folderCreation,
-                                    maybeEncodingFormat,
-                                    maybeMappedTo
+    def fromCli(cliOutput: CliCommandOutput): ValidatedNel[String, CommandOutput] = {
+      val defaultValue = OutputDefaultValue(
+        Location.FileOrFolder(cliOutput.defaultValue.value)
+      )
+      val mappedOut = cliOutput.mappedTo.traverse { mapped =>
+        mapped.streamType match {
+          case CliMappedIOStream.StreamType.StdIn =>
+            Validated.invalidNel("Incompatible stream: expected stdout or stderr, but got stdin")
+          case CliMappedIOStream.StreamType.StdOut =>
+            IOStream.StdOut(mapped.id).validNel
+          case CliMappedIOStream.StreamType.StdErr =>
+            IOStream.StdErr(mapped.id).validNel
+        }
+      }
+      mappedOut.map { stream =>
+        createCommandOutput(
+          cliOutput.resourceId,
+          cliOutput.position,
+          cliOutput.name,
+          cliOutput.description,
+          cliOutput.prefix,
+          defaultValue,
+          cliOutput.createFolder,
+          cliOutput.encodingFormat,
+          stream
         )
       }
+    }
 
     private def createCommandOutput(resourceId:          ResourceId,
                                     maybePosition:       Option[Position],

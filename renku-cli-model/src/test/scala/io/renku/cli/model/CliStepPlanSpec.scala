@@ -18,10 +18,14 @@
 
 package io.renku.cli.model
 
+import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.PlanGenerators
+import io.renku.cli.model.tools.JsonLDTools
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl, Schemas}
+import io.renku.jsonld.JsonLDDecoder
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -33,12 +37,14 @@ class CliStepPlanSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with CliDiffInstances
+    with EitherValues
+    with DiffShouldMatcher
     with JsonLDCodecMatchers {
 
   private implicit val renkuUrl: RenkuUrl = RenkuTinyTypeGenerators.renkuUrls.generateOne
-  private val planGen                      = PlanGenerators.planGen(Instant.EPOCH)
+  private val planGen                      = PlanGenerators.stepPlanGen(Instant.EPOCH)
   private val compositePlanGen             = PlanGenerators.compositePlanGen(Instant.EPOCH)
-  private val workflowFilePlanGen          = PlanGenerators.workflowFilePlanGen(Instant.EPOCH)
+  private val workflowFilePlanGen          = PlanGenerators.workflowFileStepPlanGen(Instant.EPOCH)
   private val workflowFileCompositePlanGen = PlanGenerators.workflowFileCompositePlanGen(Instant.EPOCH)
 
   "plan decode/encode" should {
@@ -53,10 +59,21 @@ class CliStepPlanSpec
         assertCompatibleCodec(cliPan1, cliPlan2)
       }
     }
-  }
 
-  def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
-    in :: in.plans.collect { case CliPlan.Composite(p) => p }.flatMap(allCompositePlans)
+    "work with additional types" in {
+      val planDecoder = JsonLDDecoder.decodeList(CliPlan.jsonLDDecoderLenientTyped)
+      val plan        = PlanGenerators.compositePlanChildPlanGen(Instant.EPOCH).generateOne
+      val newJson =
+        JsonLDTools
+          .view(plan)
+          .selectByTypes(CliPlan.entityTypes)
+          .addType(Schemas.renku / "SomeOtherType")
+          .value
+
+      val result = newJson.cursor.as[List[CliPlan]](planDecoder)
+      result.value shouldMatchTo List(plan)
+    }
+  }
 
   "composite plan decode/encode" should {
     "be compatible" in {
@@ -97,4 +114,7 @@ class CliStepPlanSpec
       }
     }
   }
+
+  def allCompositePlans(in: CliCompositePlan): List[CliCompositePlan] =
+    in :: in.plans.collect { case CliPlan.Composite(p) => p }.flatMap(allCompositePlans)
 }

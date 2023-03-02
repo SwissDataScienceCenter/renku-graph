@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.events.producers
 
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription
+import io.renku.events.Subscription.SubscriberUrl
 
-private trait SubscriberTracker[F[_], SI <: SubscriptionInfo] {
-  def add(subscriptionInfo: SI):            F[Boolean]
+private trait SubscriberTracker[F[_], S <: Subscription.Subscriber] {
+  def add(subscriber:       S):             F[Boolean]
   def remove(subscriberUrl: SubscriberUrl): F[Boolean]
 }

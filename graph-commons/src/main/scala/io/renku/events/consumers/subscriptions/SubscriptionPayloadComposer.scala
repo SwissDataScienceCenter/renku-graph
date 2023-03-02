@@ -24,41 +24,64 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.circe.Json
-import io.renku.events.CategoryName
+import io.renku.events.{CategoryName, DefaultSubscription, Subscription}
+import io.renku.events.DefaultSubscription.DefaultSubscriber
+import io.renku.events.Subscription._
 import io.renku.microservices._
 
-trait SubscriptionPayloadComposer[F[_]] {
-  def prepareSubscriptionPayload(): F[Json]
+trait SubscriptionPayloadComposer[F[_], S <: Subscription] {
+  def prepareSubscriptionPayload(): F[S]
 }
 
-private class SubscriptionPayloadComposerImpl[F[_]: MonadThrow](
+class DefaultSubscriptionPayloadComposer[F[_]: MonadThrow](
     categoryName:           CategoryName,
     microserviceUrlFinder:  MicroserviceUrlFinder[F],
-    microserviceIdentifier: MicroserviceIdentifier
-) extends SubscriptionPayloadComposer[F] {
+    microserviceIdentifier: MicroserviceIdentifier,
+    maybeCapacity:          Option[SubscriberCapacity]
+) extends SubscriptionPayloadComposer[F, DefaultSubscription] {
 
-  import io.circe.syntax._
   import microserviceUrlFinder._
 
-  override def prepareSubscriptionPayload(): F[Json] =
-    findBaseUrl()
-      .map(newSubscriberUrl)
-      .map(SubscriberBasicInfo(_, SubscriberId(microserviceIdentifier)))
-      .map(CategoryAndUrlPayload(categoryName, _).asJson)
+  override def prepareSubscriptionPayload(): F[DefaultSubscription] =
+    buildSubscriber
+      .map(DefaultSubscription(categoryName, _))
 
-  private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
+  private def findSubscriberUrl = findBaseUrl().map(SubscriberUrl(_, "events"))
+
+  private def buildSubscriber =
+    findSubscriberUrl.map { url =>
+      maybeCapacity match {
+        case Some(c) => DefaultSubscriber(url, SubscriberId(microserviceIdentifier), c)
+        case None    => DefaultSubscriber(url, SubscriberId(microserviceIdentifier))
+      }
+    }
 }
 
 object SubscriptionPayloadComposer {
 
-  def categoryAndUrlPayloadsComposerFactory[F[_]: MonadThrow](
+  def defaultSubscriptionPayloadComposerFactory[F[_]: MonadThrow](
       microservicePort:       Int Refined Positive,
       microserviceIdentifier: MicroserviceIdentifier
-  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
-    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { categoryName =>
-      for {
-        subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
-      } yield new SubscriptionPayloadComposerImpl[F](categoryName, subscriptionUrlFinder, microserviceIdentifier)
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] { categoryName =>
+      MicroserviceUrlFinder(microservicePort).map(
+        new DefaultSubscriptionPayloadComposer[F](categoryName, _, microserviceIdentifier, maybeCapacity = None)
+      )
+    }
+
+  def defaultSubscriptionPayloadComposerFactory[F[_]: MonadThrow](
+      microservicePort:       Int Refined Positive,
+      microserviceIdentifier: MicroserviceIdentifier,
+      capacity:               SubscriberCapacity
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] =
+    Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] { categoryName =>
+      MicroserviceUrlFinder(microservicePort)
+        .map(
+          new DefaultSubscriptionPayloadComposer[F](categoryName,
+                                                    _,
+                                                    microserviceIdentifier,
+                                                    maybeCapacity = Some(capacity)
+          )
+        )
     }
 }

@@ -24,17 +24,23 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
 import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{RenkuUrl, entities}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class UsageSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with AdditionalMatchers
+    with DiffInstances {
 
-  "decode" should {
+  "fromCli" should {
     implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
-    "turn JsonLD Usage entity into the Usage object" in {
+    "turn CliUsage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlanners(
           stepPlanEntities(planCommands, cliShapedPersons, CommandInput.fromLocation(location)),
@@ -44,11 +50,10 @@ class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckProperty
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
 
-        activity
-          .to[CliActivity]
-          .asFlattenedJsonLD
-          .cursor
-          .as[List[entities.Usage]] shouldBe activity.usages.map(_.to[entities.Usage]).asRight
+        val cliUsages = activity.to[CliActivity].usages
+        val result    = cliUsages.traverse(entities.Usage.fromCli)
+
+        result shouldMatchToValid activity.usages.map(_.to[entities.Usage])
       }
     }
   }

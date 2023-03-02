@@ -18,19 +18,19 @@
 
 package io.renku.eventlog.events.producers.tsmigrationrequest
 
+import cats.{Id, MonadThrow}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Id, MonadThrow}
 import io.renku.config.ServiceVersion
-import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.db.implicits._
+import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers}
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.Subscription.SubscriberUrl
 import skunk._
 import skunk.codec.all.int8
 import skunk.data.Completion
@@ -165,8 +165,8 @@ private class EventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
 }
 
 private object EventFinder {
-  val SentStatusTimeout        = Duration ofHours 1
-  val RecoverableStatusTimeout = Duration ofMinutes 2
+  private val SentStatusTimeout        = Duration ofHours 1
+  private val RecoverableStatusTimeout = Duration ofMinutes 2
 
   def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, MigrationRequestEvent]] =
     MonadThrow[F].catchNonFatal {

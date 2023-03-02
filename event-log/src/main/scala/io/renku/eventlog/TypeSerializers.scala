@@ -21,14 +21,14 @@ package io.renku.eventlog
 import cats.syntax.all._
 import io.renku.eventlog.events.producers.eventdelivery._
 import io.renku.events.consumers.Project
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import scodec.bits.ByteVector
-import skunk.codec.all._
 import skunk.{Decoder, Encoder}
+import skunk.codec.all._
 
 import java.time.{OffsetDateTime, ZoneOffset}
 

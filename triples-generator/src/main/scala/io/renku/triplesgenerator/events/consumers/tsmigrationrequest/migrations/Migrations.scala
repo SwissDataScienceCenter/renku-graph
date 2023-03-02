@@ -40,7 +40,7 @@ private[tsmigrationrequest] object Migrations {
     compositePlan                  <- CompositePlanProvision.create[F]
     fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
     addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
-    migrationToV10                 <- MigrationToV10[F]
+    migrationToV10                 <- v10migration.MigrationToV10[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,

@@ -25,7 +25,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
+import DefaultSubscribers.DefaultSubscribers
 import io.renku.graph.model.events.EventDate
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
@@ -36,7 +36,7 @@ private trait ProjectPrioritisation[F[_]] {
   def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)]
 }
 
-private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends ProjectPrioritisation[F] {
+private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends ProjectPrioritisation[F] {
   import ProjectPrioritisation.Priority._
 
   private val FreeSpotsRatio = .15
@@ -49,7 +49,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
   private def rejectProjectsAboveOccupancyThreshold(projects:       List[ProjectInfo],
                                                     totalOccupancy: Long
   ): List[ProjectInfo] =
-    UrlAndIdSubscribers[F].getTotalCapacity
+    DefaultSubscribers[F].getTotalCapacity
       .map(_.value)
       .map { totalCapacity =>
         val freeSpots =
@@ -97,7 +97,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
       val prioritiesCorrectedByOccupancy = prioritiesList.map(
         correctPriority(
           totalCapacity =
-            UrlAndIdSubscribers[F].getTotalCapacity getOrElse Capacity((prioritiesList map toOccupancy).sum),
+            DefaultSubscribers[F].getTotalCapacity getOrElse TotalCapacity((prioritiesList map toOccupancy).sum),
           totalPriority = (prioritiesList map toPriority).sum
         )
       )
@@ -110,7 +110,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
         .map(alignItemType)
   }
 
-  private def correctPriority(totalCapacity: Capacity,
+  private def correctPriority(totalCapacity: TotalCapacity,
                               totalPriority: BigDecimal
   ): ((ProjectIds, Priority, Int Refined NonNegative)) => (ProjectIds, BigDecimal) = {
     case (project, currentPriority, currentOccupancy) if currentOccupancy.value == 0 =>
@@ -146,7 +146,7 @@ private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends Proje
 
 private object ProjectPrioritisation {
 
-  def apply[F[_]: MonadThrow: UrlAndIdSubscribers]: F[ProjectPrioritisation[F]] =
+  def apply[F[_]: MonadThrow: DefaultSubscribers]: F[ProjectPrioritisation[F]] =
     MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F])
 
   final case class ProjectInfo(id:               projects.GitLabId,
@@ -172,6 +172,5 @@ private object ProjectPrioritisation {
       case value if value >= 1.0 => MaxPriority
       case value                 => Priority(value)
     }
-    def safeApply(value: Double): Priority = safeApply(BigDecimal(value))
   }
 }

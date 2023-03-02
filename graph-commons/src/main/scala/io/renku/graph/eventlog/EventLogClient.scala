@@ -24,6 +24,7 @@ import cats.syntax.all._
 import fs2.{RaiseThrowable, Stream}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.eventlog.EventLogClient._
+import io.renku.graph.model.eventlogapi._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Path => ProjectPath}
@@ -45,6 +46,8 @@ trait EventLogClient[F[_]] {
       .flatMap(Stream.emits) ++ getAllEvents(criteria.nextPage)
 
   def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Result[Option[EventPayload]]]
+
+  def getStatus: F[Result[ServiceStatus]]
 }
 
 object EventLogClient {

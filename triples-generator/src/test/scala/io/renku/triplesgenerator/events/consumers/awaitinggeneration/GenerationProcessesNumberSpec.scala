@@ -18,20 +18,24 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
-import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, positiveInts}
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.config.RenkuUrlLoader
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Try}
+import scala.util.Try
 
-class GenerationProcessesNumberSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class GenerationProcessesNumberSpec
+    extends AnyWordSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with TryValues {
 
   "apply" should {
 
@@ -41,13 +45,12 @@ class GenerationProcessesNumberSpec extends AnyWordSpec with ScalaCheckPropertyC
           Map("generation-processes-number" -> value.value).asJava
         )
 
-        GenerationProcessesNumber[Try](config) shouldBe GenerationProcessesNumber(value.value).pure[Try]
+        GenerationProcessesNumber[Try](config).success.value shouldBe GenerationProcessesNumber(value.value)
       }
     }
 
     "fail if there's no value for the 'generation-processes-number'" in {
-      val Failure(exception) = GenerationProcessesNumber[Try](ConfigFactory.empty())
-      exception shouldBe an[ConfigLoadingException]
+      GenerationProcessesNumber[Try](ConfigFactory.empty()).failure.exception shouldBe an[ConfigLoadingException]
     }
 
     "fail if config value is invalid" in {
@@ -55,9 +58,7 @@ class GenerationProcessesNumberSpec extends AnyWordSpec with ScalaCheckPropertyC
         Map("generation-processes-number" -> nonBlankStrings().generateOne.value).asJava
       )
 
-      val Failure(exception) = RenkuUrlLoader[Try](config)
-
-      exception shouldBe an[ConfigLoadingException]
+      RenkuUrlLoader[Try](config).failure.exception shouldBe an[ConfigLoadingException]
     }
   }
 }

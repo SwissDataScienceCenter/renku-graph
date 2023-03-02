@@ -22,8 +22,10 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.cli.model.Ontologies.Prov
 import io.renku.graph.model.{entityModel, generations}
+import io.renku.jsonld.JsonLDDecoder.Result
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLDDecoder, JsonLDEncoder}
+import io.renku.jsonld.{Cursor, EntityTypes, JsonLDDecoder, JsonLDEncoder}
+import monocle.Lens
 
 sealed trait CliEntity extends CliModel {
   def resourceId:    entityModel.ResourceId
@@ -63,10 +65,16 @@ object CliEntity {
   private def selectCandidates(ets: EntityTypes): Boolean =
     CliSingleEntity.matchingEntityTypes(ets) || CliCollectionEntity.matchingEntityTypes(ets)
 
-  implicit def jsonLDDecoder: JsonLDDecoder[CliEntity] = {
+  implicit def jsonLDDecoder: JsonLDDecoder[CliEntity] =
+    jsonLDDecoderFor(_ => Right(true))
+
+  def jsonLDDecoderForGeneration(generationId: generations.ResourceId): JsonLDDecoder[CliEntity] =
+    jsonLDDecoderFor(withSpecificGeneration(generationId))
+
+  private def jsonLDDecoderFor(filter: Cursor => Result[Boolean]): JsonLDDecoder[CliEntity] = {
     val da = CliSingleEntity.jsonLDDecoder.emap(e => Right(CliEntity(e)))
     val db = CliCollectionEntity.jsonLdDecoder.emap(e => Right(CliEntity(e)))
-    JsonLDDecoder.entity(entityTypes, _.getEntityTypes.map(selectCandidates)) { cursor =>
+    JsonLDDecoder.entity(entityTypes, c => (c.getEntityTypes.map(selectCandidates), filter(c)).mapN(_ && _)) { cursor =>
       val currentTypes = cursor.getEntityTypes
       (currentTypes.map(CliSingleEntity.matchingEntityTypes), currentTypes.map(CliCollectionEntity.matchingEntityTypes))
         .flatMapN {
@@ -80,5 +88,23 @@ object CliEntity {
     }
   }
 
+  private def withSpecificGeneration(generationId: generations.ResourceId): Cursor => Result[Boolean] =
+    _.downField(Prov.qualifiedGeneration)
+      .as[List[generations.ResourceId]]
+      .map(_.contains(generationId))
+
   implicit def jsonLDEncoder: JsonLDEncoder[CliEntity] = JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD))
+
+  object Lenses {
+    val entityPath: Lens[CliEntity, EntityPath] =
+      Lens[CliEntity, EntityPath](_.path)(path => {
+        case Entity(e)     => CliEntity(e.copy(path = path))
+        case Collection(e) => CliEntity(e.copy(path = path))
+      })
+
+    val generationIds: Lens[CliEntity, List[generations.ResourceId]] =
+      Lens[CliEntity, List[generations.ResourceId]](_.generationIds)(ids =>
+        _.fold(e => CliEntity(e.copy(generationIds = ids)), e => CliEntity(e.copy(generationIds = ids)))
+      )
+  }
 }

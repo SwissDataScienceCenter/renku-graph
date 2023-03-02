@@ -27,6 +27,7 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.Image
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import monocle.{Lens, Traversal}
 
 final case class CliDataset(
     resourceId:         ResourceId,
@@ -61,7 +62,7 @@ final case class CliDataset(
 
 object CliDataset {
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Schema.Dataset, Prov.Entity)
+  private[model] val entityTypes: EntityTypes = EntityTypes.of(Schema.Dataset, Prov.Entity)
 
   implicit def jsonLDDecoder(implicit
       fileDecoder:   JsonLDDecoder[CliDatasetFile],
@@ -106,6 +107,8 @@ object CliDataset {
       maybeLicense     <- cursor.downField(Schema.license).as[Option[License]]
       maybeVersion     <- cursor.downField(Schema.version).as[Option[Version]]
       parts            <- cursor.downField(Schema.hasPart).as[List[CliDatasetFile]]
+      publicationEvents <-
+        cursor.focusTop.as(JsonLDDecoder.decodeList(CliPublicationEvent.decoder(identifier, resourceId)))
     } yield CliDataset(
       resourceId,
       identifier,
@@ -124,7 +127,7 @@ object CliDataset {
       maybeDerivedFrom,
       maybeOriginalIdentifier,
       maybeInvalidationTime,
-      publicationEvents = Nil
+      publicationEvents
     )
   }
 
@@ -166,5 +169,13 @@ object CliDataset {
   ): JsonLDEncoder[CliDataset] = JsonLDEncoder.instance { dataset =>
     val data = dataset.asNestedJsonLD :: dataset.publicationEvents.map(_.asNestedJsonLD)
     JsonLD.arr(data: _*).flatten.fold(throw _, identity)
+  }
+
+  object Lenses {
+    val publicationEventList: Lens[CliDataset, List[CliPublicationEvent]] =
+      Lens[CliDataset, List[CliPublicationEvent]](_.publicationEvents)(evs => _.copy(publicationEvents = evs))
+
+    val publicationEvents: Traversal[CliDataset, CliPublicationEvent] =
+      publicationEventList.composeTraversal(Traversal.fromTraverse[List, CliPublicationEvent])
   }
 }

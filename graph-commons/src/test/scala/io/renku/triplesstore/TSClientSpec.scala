@@ -62,9 +62,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       val responseBody = jsons.generateOne
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -78,7 +78,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     "fail if remote responds with non-OK status" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+        post(s"/${connectionConfig.datasetName}/sparql")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -88,20 +88,20 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${connectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
 
     "fail if remote responds with OK status but non-expected body" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+        post(s"/${connectionConfig.datasetName}/sparql")
           .willReturn(okJson("abc"))
       }
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
       }.getMessage should startWith(
-        s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned ${Status.Ok}; error: "
+        s"POST $fusekiUrl/${connectionConfig.datasetName}/sparql returned ${Status.Ok}; error: "
       )
     }
   }
@@ -123,9 +123,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       val pagingRequest = PagingRequest(Page.first, PerPage(2))
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -145,9 +145,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
         }
       }"""
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -174,9 +174,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       }"""
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -196,9 +196,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
         }
       }"""
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -225,9 +225,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       }"""
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -251,9 +251,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
         }
       }"""
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/sparql")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
@@ -272,7 +272,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
       val client = new TestTSQueryClientImpl(
         query = SparqlQuery(name = "test query", Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
-        renkuConnectionConfig
+        connectionConfig
       )
 
       val exception = intercept[Exception] {
@@ -285,7 +285,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     "fail for problems with calling the storage" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+        post(s"/${connectionConfig.datasetName}/sparql")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -295,7 +295,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
       intercept[Exception] {
         client.callWith(pagingRequests.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${connectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
   }
 
@@ -304,9 +304,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     "succeed returning unit if the update query succeeds" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/update")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/update")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withRequestBody(equalTo(s"update=${urlEncode(client.query.toString)}"))
@@ -319,7 +319,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/update")
+        post(s"/${connectionConfig.datasetName}/update")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -329,7 +329,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
       intercept[Exception] {
         client.sendUpdate.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/update returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${connectionConfig.datasetName}/update returned $BadRequest; body: some message"
     }
 
     "use the given response mapping for calculating the result" in new UpdateClientTestCase {
@@ -340,7 +340,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       }
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/update")
+        post(s"/${connectionConfig.datasetName}/update")
           .willReturn(
             aResponse.withStatus(Ok.code)
           )
@@ -349,7 +349,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       client.sendUpdate(responseMapper).unsafeRunSync() shouldBe ((): Unit)
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/update")
+        post(s"/${connectionConfig.datasetName}/update")
           .willReturn(
             aResponse.withStatus(BadRequest.code)
           )
@@ -365,9 +365,9 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
       val entity = jsonLDEntities.generateOne
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/data")
-          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                         renkuConnectionConfig.authCredentials.password.value
+        post(s"/${connectionConfig.datasetName}/data")
+          .withBasicAuth(connectionConfig.authCredentials.username.value,
+                         connectionConfig.authCredentials.password.value
           )
           .withHeader("content-type", equalTo("application/ld+json"))
           .withRequestBody(equalToJson(entity.toJson.toString()))
@@ -380,7 +380,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${renkuConnectionConfig.datasetName}/data")
+        post(s"/${connectionConfig.datasetName}/data")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -390,13 +390,13 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
       intercept[Exception] {
         client.uploadJson(jsonLDEntities.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/data returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${connectionConfig.datasetName}/data returned $BadRequest; body: some message"
     }
   }
 
   private trait TestCase {
-    val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
-    val renkuConnectionConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
+    val fusekiUrl        = FusekiUrl(externalServiceBaseUrl)
+    val connectionConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger:       Logger[IO]                  = TestLogger[IO]()
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
   }
@@ -407,14 +407,14 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
                           prefixes = Set.empty,
                           body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""
       ),
-      renkuConnectionConfig
+      connectionConfig
     )
   }
 
   private trait UpdateClientTestCase extends TestCase {
     val client = new TestTSClientImpl(
       query = SparqlQuery(name = "insert", Set.empty, """INSERT { 'o' 'p' 's' } {}"""),
-      renkuConnectionConfig
+      connectionConfig
     )
   }
 

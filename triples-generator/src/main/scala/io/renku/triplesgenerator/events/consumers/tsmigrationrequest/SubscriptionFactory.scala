@@ -23,7 +23,8 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.config.ServiceVersion
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.triplesgenerator.Microservice
@@ -40,9 +41,9 @@ object SubscriptionFactory {
     subscriberUrl  <- urlFinder.findBaseUrl().map(SubscriberUrl(_, "events"))
     serviceVersion <- ServiceVersion.readFromConfig()
     subscriptionMechanism <-
-      SubscriptionMechanism[F](
+      SubscriptionMechanism(
         categoryName,
-        PayloadComposer.payloadsComposerFactory[F](subscriberUrl, Microservice.Identifier, serviceVersion)
+        PayloadComposer.payloadsComposerFactory(subscriberUrl, Microservice.Identifier, serviceVersion)
       )
     handler <- EventHandler(subscriberUrl, Microservice.Identifier, serviceVersion, subscriptionMechanism, config)
   } yield handler -> subscriptionMechanism

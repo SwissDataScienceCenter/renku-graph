@@ -18,24 +18,24 @@
 
 package io.renku.eventlog.events.producers.awaitinggeneration
 
+import cats.{Id, Parallel}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Id, Parallel}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.db.implicits._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.EventFinder
-import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
 import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import skunk._
 import skunk.codec.all._
@@ -50,8 +50,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
     now:                   () => Instant = () => Instant.now,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation[F],
-    pickRandomlyFrom: List[producers.ProjectIds] => Option[producers.ProjectIds] = ids =>
-      ids.get(Random nextInt ids.size)
+    pickRandomly: List[producers.ProjectIds] => Option[producers.ProjectIds] = ids => ids.get(Random nextInt ids.size)
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, AwaitingGenerationEvent]
     with producers.SubscriptionTypeSerializers
@@ -106,7 +105,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
 	        FROM event ee
 	        WHERE ee.project_id = candidate_projects.project_id
               AND ee.execution_date <= $executionDateEncoder
-	          AND ee.event_date = candidate_projects.max_event_date 
+	          AND ee.event_date = candidate_projects.max_event_date
 	          AND ee.status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}')
 	      ) same_date_statuses_to_do ON 1 = 1
           WHERE younger_statuses_final.count = 0
@@ -148,7 +147,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
             AND execution_date < $executionDateEncoder
           GROUP BY project_id
         ) newest_event_date
-        JOIN event evt ON newest_event_date.project_id = evt.project_id 
+        JOIN event evt ON newest_event_date.project_id = evt.project_id
           AND newest_event_date.max_event_date = evt.event_date
           AND status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}')
           AND execution_date < $executionDateEncoder
@@ -161,7 +160,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
   private lazy val selectProject: List[(producers.ProjectIds, Priority)] => Option[producers.ProjectIds] = {
     case Nil                          => None
     case (projectIdAndPath, _) :: Nil => Some(projectIdAndPath)
-    case many                         => pickRandomlyFrom(prioritiesList(from = many))
+    case many                         => pickRandomly(prioritiesList(from = many))
   }
 
   private def prioritiesList(from: List[(producers.ProjectIds, Priority)]): List[producers.ProjectIds] =
@@ -215,10 +214,8 @@ private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 20
 
-  def apply[F[_]: Async: Parallel: UrlAndIdSubscribers: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[EventFinder[F, AwaitingGenerationEvent]] = for {
-    projectPrioritisation <- ProjectPrioritisation[F]
-  } yield new EventFinderImpl(projectsFetchingLimit = ProjectsFetchingLimit,
-                              projectPrioritisation = projectPrioritisation
-  )
+  def apply[F[_]: Async: Parallel: DefaultSubscribers: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[EventFinder[F, AwaitingGenerationEvent]] =
+    ProjectPrioritisation[F]
+      .map(pp => new EventFinderImpl(projectsFetchingLimit = ProjectsFetchingLimit, projectPrioritisation = pp))
 }

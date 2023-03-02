@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.circe.DecodingFailure
+import io.renku.cli.model.generators.BaseGenerators
 import io.renku.cli.model.CliActivity
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
@@ -29,29 +29,32 @@ import io.renku.graph.model.entities.Activity.entityTypes
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model._
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class ActivitySpec
+    extends AnyWordSpec
+    with should.Matchers
+    with ScalaCheckPropertyChecks
+    with DiffInstances
+    with AdditionalMatchers {
 
-  "decode" should {
+  "fromCli" should {
 
-    "turn JsonLD Activity entity into the Activity object" in {
+    "turn CliActivity entity into the Activity object" in {
       forAll(
         activityEntities(stepPlanEntities(planCommands, cliShapedPersons), cliShapedPersons)(
           projectCreatedDates().generateOne
         )
       ) { activity =>
-        implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
+        val cliActivity   = activity.to[CliActivity]
+        val modelActivity = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))
 
-        activity
-          .to[CliActivity]
-          .asFlattenedJsonLD
-          .cursor
-          .as[List[entities.Activity]] shouldBe List(activity.to[entities.Activity]).asRight
+        modelActivity shouldMatchToValid activity.to[entities.Activity]
       }
     }
 
@@ -66,33 +69,15 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
           .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
           .buildProvenanceUnsafe()
 
-      lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
-        JsonLD.arr(
-          array.map { jsonLd =>
-            jsonLd.cursor
-              .as[entities.Entity]
-              .map {
-                case entity: entities.Entity.InputEntity =>
-                  entity.copy(location = entityLocations.generateOne).asJsonLD
-                case entity => entity.asJsonLD
-              }
-              .fold(_ => jsonLd, identity)
-          }: _*
-        )
-      }
+      val cliActivity =
+        CliActivity.Lenses.usageEntityPaths
+          .set(BaseGenerators.entityPathGen.generateOne)
+          .apply(activity.to[CliActivity])
 
-      implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
-
-      val Left(error) = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .asArray
-        .fold(fail("JsonLD is not an array"))(replaceEntityLocation)
-        .cursor
-        .as[List[entities.Activity]]
-
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(s"No Usage found for CommandInputValue with $location")
+      val result = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))
+      result should beInvalidWithMessageIncluding(
+        s"No Usage found for CommandInputValue with $location"
+      )
     }
 
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
@@ -103,33 +88,15 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         cliShapedPersons
       ).generateOne.buildProvenanceUnsafe()
 
-      lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
-        JsonLD.arr(
-          array.map { jsonLd =>
-            jsonLd.cursor
-              .as[entities.Entity]
-              .map {
-                case entity: entities.Entity.OutputEntity =>
-                  entity.copy(location = entityLocations.generateOne).asJsonLD
-                case entity => entity.asJsonLD
-              }
-              .fold(_ => jsonLd, identity)
-          }: _*
-        )
-      }
+      val cliActivity =
+        CliActivity.Lenses.generationEntityPaths
+          .set(BaseGenerators.entityPathGen.generateOne)
+          .apply(activity.to[CliActivity])
 
-      implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
-
-      val Left(error) = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .asArray
-        .fold(fail("JsonLD is not an array"))(replaceEntityLocation)
-        .cursor
-        .as[List[entities.Activity]]
-
-      error            shouldBe a[DecodingFailure]
-      error.getMessage() should endWith(s"No Generation found for CommandOutputValue with $location")
+      val result = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))
+      result should beInvalidWithMessageIncluding(
+        s"No Generation found for CommandOutputValue with $location"
+      )
     }
 
     "fail if Activity startTime is older than Plan creation date" in {
@@ -139,19 +106,11 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         ).generateOne
         a.replaceStartTime(timestamps(max = a.plan.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime))
       }
-      val entitiesActivity = activity.to[entities.Activity]
+      val cliActivity = activity.to[CliActivity]
 
-      implicit val decoder: JsonLDDecoder[entities.Activity] = createDecoder(activity.association.plan)
-
-      val Left(error) = activity
-        .to[CliActivity]
-        .asFlattenedJsonLD
-        .cursor
-        .as[List[entities.Activity]]
-
-      error shouldBe a[DecodingFailure]
-      error.message should endWith(
-        show"Activity ${entitiesActivity.resourceId} date ${entitiesActivity.startTime} is older than plan ${activity.plan.dateCreated}"
+      val result = entities.Activity.fromCli(cliActivity, createDependencyLinks(activity.association.plan))
+      result should beInvalidWithMessageIncluding(
+        show"Activity ${cliActivity.resourceId} date ${cliActivity.startTime} is older than plan ${activity.plan.dateCreated}"
       )
     }
   }
@@ -233,12 +192,9 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     }
   }
 
-  private def createDecoder(plan: StepPlan): JsonLDDecoder[entities.Activity] = {
-    val entitiesPlan = plan.to[entities.StepPlan]
+  private def createDependencyLinks(plan: entities.StepPlan): DependencyLinks =
+    DependencyLinks(planId => Option.when(planId == plan.resourceId)(plan))
 
-    implicit val dl: DependencyLinks = (planId: plans.ResourceId) =>
-      Option.when(planId == entitiesPlan.resourceId)(entitiesPlan)
-
-    entities.Activity.decoder
-  }
+  private def createDependencyLinks(plan: StepPlan): DependencyLinks =
+    createDependencyLinks(plan.to[entities.StepPlan])
 }
