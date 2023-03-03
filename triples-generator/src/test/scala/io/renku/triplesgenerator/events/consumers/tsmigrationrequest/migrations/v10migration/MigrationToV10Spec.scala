@@ -49,12 +49,16 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
   "migrate" should {
 
-    "go through all projects found in the TS, " +
+    "prepare backlog of projects requiring migration " +
+      "and start the process that " +
+      "goes through all the projects, " +
       "wait until the env has capacity to serve a new re-provisioning event, " +
       "send the CLEAN_UP_REQUEST event to EL for each of them, " +
       "keep a note of the project once an event is sent for it, " +
       "explicitly run the post migration procedure " +
       "and remove info about all migrated projects" in new TestCase {
+
+        givenBacklogCreated()
 
         val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
@@ -81,6 +85,8 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     "return a Recoverable Error if in case of an exception while finding projects " +
       "the given strategy returns one" in new TestCase {
 
+        givenBacklogCreated()
+
         val exception = exceptions.generateOne
         (() => projectsFinder.nextProjectsPage())
           .expects()
@@ -95,6 +101,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val backlogCreator               = mock[BacklogCreator[IO]]
     val projectsFinder               = mock[PagedProjectsFinder[IO]]
     private val progressFinder       = mock[ProgressFinder[IO]]
     private val envReadinessChecker  = mock[EnvReadinessChecker[IO]]
@@ -108,15 +115,22 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new MigrationToV10[IO](projectsFinder,
-                                           progressFinder,
-                                           envReadinessChecker,
-                                           eventSender,
-                                           projectDonePersister,
-                                           executionRegister,
-                                           projectsDoneCleanUp,
-                                           recoveryStrategy
+    val migration = new MigrationToV10[IO](
+      backlogCreator,
+      projectsFinder,
+      progressFinder,
+      envReadinessChecker,
+      eventSender,
+      projectDonePersister,
+      executionRegister,
+      projectsDoneCleanUp,
+      recoveryStrategy
     )
+
+    def givenBacklogCreated() =
+      (backlogCreator.createBacklog _)
+        .expects()
+        .returning(().pure[IO])
 
     def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
       pages foreach { page =>

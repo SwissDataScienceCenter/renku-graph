@@ -35,6 +35,7 @@ import org.typelevel.log4cats.Logger
 import tooling._
 
 private class MigrationToV10[F[_]: Async: Logger](
+    backlogCreator:       BacklogCreator[F],
     projectsFinder:       PagedProjectsFinder[F],
     progressFinder:       ProgressFinder[F],
     envReadinessChecker:  EnvReadinessChecker[F],
@@ -58,24 +59,25 @@ private class MigrationToV10[F[_]: Async: Logger](
   private val cleanUpEventCategory = CategoryName("CLEAN_UP_REQUEST")
 
   protected[v10migration] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    Stream
-      .iterate(1)(_ + 1)
-      .evalMap(_ => nextProjectsPage())
-      .takeThrough(_.nonEmpty)
-      .flatMap(in => Stream.emits(in))
-      .evalMap(path => findProgressInfo.map(path -> _))
-      .evalTap { case (path, info) => logInfo(show"processing project '$path'; waiting for free resources", info) }
-      .evalTap(_ => envReadyToTakeEvent)
-      .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
-      .evalTap(sendCleanUpEvent)
-      .evalTap { case (path, _) => noteDone(path) }
-      .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
-      .compile
-      .drain
-      .flatMap(_ => registerExecution(name))
-      .flatMap(_ => cleanUp())
-      .map(_.asRight[ProcessingRecoverableError])
-      .recoverWith(maybeRecoverableError[F, Unit])
+    backlogCreator.createBacklog() >>
+      Stream
+        .iterate(1)(_ + 1)
+        .evalMap(_ => nextProjectsPage())
+        .takeThrough(_.nonEmpty)
+        .flatMap(in => Stream.emits(in))
+        .evalMap(path => findProgressInfo.map(path -> _))
+        .evalTap { case (path, info) => logInfo(show"processing project '$path'; waiting for free resources", info) }
+        .evalTap(_ => envReadyToTakeEvent)
+        .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
+        .evalTap(sendCleanUpEvent)
+        .evalTap { case (path, _) => noteDone(path) }
+        .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
+        .compile
+        .drain
+        .flatMap(_ => registerExecution(name))
+        .flatMap(_ => cleanUp())
+        .map(_.asRight[ProcessingRecoverableError])
+        .recoverWith(maybeRecoverableError[F, Unit])
   }
 
   private lazy val sendCleanUpEvent: ((projects.Path, String)) => F[Unit] = { case (path, _) =>
@@ -101,6 +103,7 @@ private[migrations] object MigrationToV10 {
   val name: Migration.Name = Migration.Name("Migration to V10")
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
+    backlogCreator       <- BacklogCreator[F]
     projectsFinder       <- PagedProjectsFinder[F]
     progressFinder       <- ProgressFinder[F]
     envReadinessChecker  <- EnvReadinessChecker[F]
@@ -108,7 +111,8 @@ private[migrations] object MigrationToV10 {
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
     projectsDoneCleanUp  <- ProjectsDoneCleanUp[F]
-  } yield new MigrationToV10(projectsFinder,
+  } yield new MigrationToV10(backlogCreator,
+                             projectsFinder,
                              progressFinder,
                              envReadinessChecker,
                              eventsSender,

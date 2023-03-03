@@ -21,10 +21,10 @@ package v10migration
 
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -47,14 +47,15 @@ class PagedProjectsFinderSpec
     with MockFactory {
 
   private val pageSize = 50
+  private val v9       = SchemaVersion("9")
+  private val v10      = SchemaVersion("10")
 
   "nextProjectsPage" should {
 
     "return next page of projects for migration each time the method is called" in new TestCase {
 
-      givenMigrationDateFinding(returning = Instant.now().plusSeconds(60).pure[IO])
-
       val projects = anyProjectEntities
+        .map(setSchema(v9))
         .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
         .map(_.to[entities.Project])
         .sortBy(_.path)
@@ -63,57 +64,31 @@ class PagedProjectsFinderSpec
 
       val (page1, page2) = projects.map(_.path) splitAt pageSize
 
-      givenMigratedCheck(of = page1, returning = page1.pure[IO])
-      givenMigratedCheck(of = page2, returning = page2.pure[IO])
+      givenMigratedCheck(of = page1, returning = page1.pure[IO]).atLeastOnce()
+      givenMigratedCheck(of = page2, returning = page2.pure[IO]).atLeastOnce()
 
       finder.nextProjectsPage().unsafeRunSync() shouldBe page1
       finder.nextProjectsPage().unsafeRunSync() shouldBe page2
       finder.nextProjectsPage().unsafeRunSync() shouldBe Nil
     }
 
-    "return only projects with creation date before the migration start date" in new TestCase {
+    "return only projects with schema v9" in new TestCase {
 
-      val migrationDate = timestampsNotInTheFuture.generateOne
-      givenMigrationDateFinding(returning = migrationDate.pure[IO])
+      val v9Project = anyProjectEntities.map(setSchema(v9)).generateOne.to[entities.Project]
 
-      val beforeMigrationDate = timestamps(max = migrationDate).generateAs[projects.DateCreated]
-      val oldProject = anyProjectEntities
-        .map(
-          _.fold(
-            _.copy(dateCreated = beforeMigrationDate),
-            _.copy(dateCreated = beforeMigrationDate),
-            _.copy(dateCreated = beforeMigrationDate),
-            _.copy(dateCreated = beforeMigrationDate)
-          )
-        )
-        .generateOne
-        .to[entities.Project]
+      val v10Project = anyProjectEntities.map(setSchema(v10)).generateOne.to[entities.Project]
 
-      val afterMigrationDate = timestampsNotInTheFuture(butYoungerThan = migrationDate).generateAs[projects.DateCreated]
-      val newProject = anyProjectEntities
-        .map(
-          _.fold(
-            _.copy(dateCreated = afterMigrationDate),
-            _.copy(dateCreated = afterMigrationDate),
-            _.copy(dateCreated = afterMigrationDate),
-            _.copy(dateCreated = afterMigrationDate)
-          )
-        )
-        .generateOne
-        .to[entities.Project]
+      upload(to = projectsDataset, v9Project, v10Project)
 
-      upload(to = projectsDataset, oldProject, newProject)
+      givenMigratedCheck(of = List(v9Project.path), returning = List(v9Project.path).pure[IO])
 
-      givenMigratedCheck(of = List(oldProject.path), returning = List(oldProject.path).pure[IO])
-
-      finder.nextProjectsPage().unsafeRunSync() shouldBe List(oldProject.path)
+      finder.nextProjectsPage().unsafeRunSync() shouldBe List(v9Project.path)
     }
 
     "skip projects for which migration events has been already sent" in new TestCase {
 
-      givenMigrationDateFinding(returning = Instant.now().plusSeconds(60).pure[IO])
-
       val projects = anyProjectEntities
+        .map(setSchema(v9))
         .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
         .map(_.to[entities.Project])
         .sortBy(_.path)
@@ -134,9 +109,8 @@ class PagedProjectsFinderSpec
 
     "reach for another page if all projects from the found page get filtered out by migrated check" in new TestCase {
 
-      givenMigrationDateFinding(returning = Instant.now().plusSeconds(60).pure[IO])
-
       val projects = anyProjectEntities
+        .map(setSchema(v9))
         .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
         .map(_.to[entities.Project])
         .sortBy(_.path)
@@ -174,4 +148,7 @@ class PagedProjectsFinderSpec
     def givenMigratedCheck(of: List[projects.Path], returning: IO[List[projects.Path]]) =
       (migratedProjectsChecker.filterNotMigrated _).expects(of).returning(returning)
   }
+
+  private def setSchema(version: SchemaVersion): Project => Project =
+    _.fold(_.copy(version = version), _.copy(version = version), identity, identity)
 }
