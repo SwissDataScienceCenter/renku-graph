@@ -28,7 +28,7 @@ import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.graph.model._
-import io.renku.jsonld.ontology.{ObjectProperty, _}
+import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
