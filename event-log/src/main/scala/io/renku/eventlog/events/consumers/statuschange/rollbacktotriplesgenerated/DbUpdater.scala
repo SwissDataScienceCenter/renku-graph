@@ -18,18 +18,18 @@
 
 package io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerated
 
-import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{TransformingTriples, TriplesGenerated}
+import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.projects
 import skunk.data.Completion
 import skunk.implicits._
@@ -42,7 +42,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, RollbackToTriplesGenerated] {
 
-  override def updateDB(event: RollbackToTriplesGenerated): UpdateResult[F] = measureExecutionTime {
+  override def updateDB(event: RollbackToTriplesGenerated): UpdateOp[F] = measureExecutionTime {
     SqlStatement[F](name = "to_triples_generated rollback - status update")
       .command[ExecutionDate ~ EventId ~ projects.GitLabId](
         sql"""UPDATE event
@@ -67,5 +67,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToTriplesGenerated) = Kleisli.pure(())
+  override def onRollback(event: RollbackToTriplesGenerated) = RollbackOp.none
 }

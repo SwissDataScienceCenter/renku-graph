@@ -23,23 +23,24 @@ import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits.PreparedQueryOps
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, UpdateResult, categoryName}
 import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, categoryName}
 import io.renku.eventlog.events.producers.minprojectinfo
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
+import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import org.typelevel.log4cats.Logger
-import skunk.{Session, SqlState, ~}
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Session, SqlState, ~}
 
 import java.time.Instant
 import scala.util.control.NonFatal
@@ -56,7 +57,7 @@ object DequeuedEventHandler {
   ) extends DbClient(Some(QueriesExecutionTimes[F]))
       with DequeuedEventHandler[F] {
 
-    override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = {
+    override def updateDB(event: ProjectEventsToNew): UpdateOp[F] = {
       for {
         statuses                 <- updateStatuses(event.project)
         _                        <- removeProcessingTimes(event.project)
@@ -242,13 +243,13 @@ object DequeuedEventHandler {
         Kleisli.liftF(Logger[F].error(error)(s"Clean up project failed: ${project.show}"))
     }
 
-    private def retryOnDeadlock(event: ProjectEventsToNew): PartialFunction[Throwable, UpdateResult[F]] = {
+    private def retryOnDeadlock(event: ProjectEventsToNew): PartialFunction[Throwable, UpdateOp[F]] = {
       case SqlState.DeadlockDetected(_) =>
         liftF[F, Session[F], Unit](
           Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
         ) >> updateDB(event)
     }
 
-    override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+    override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = RollbackOp.none
   }
 }

@@ -18,7 +18,22 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import cats.Applicative
+import cats.data.Kleisli
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
+import skunk.Session
+
 private[statuschange] trait DBUpdater[F[_], E <: StatusChangeEvent] {
-  def updateDB(event:   E): UpdateResult[F]
-  def onRollback(event: E): RollbackResult[F]
+  def updateDB(event:   E): UpdateOp[F]
+  def onRollback(event: E): RollbackOp[F]
+}
+
+private[statuschange] object DBUpdater {
+
+  type UpdateOp[F[_]]   = Kleisli[F, Session[F], DBUpdateResults]
+  type RollbackOp[F[_]] = Kleisli[F, Session[F], Unit]
+
+  object RollbackOp {
+    def none[F[_]: Applicative]: RollbackOp[F] = Kleisli.pure(())
+  }
 }

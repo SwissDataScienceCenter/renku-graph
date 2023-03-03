@@ -18,18 +18,18 @@
 
 package io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeletion
 
-import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
+import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import skunk.data.Completion
 import skunk.implicits._
@@ -42,7 +42,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with statuschange.DBUpdater[F, RollbackToAwaitingDeletion] {
 
-  override def updateDB(event: RollbackToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
+  override def updateDB(event: RollbackToAwaitingDeletion): UpdateOp[F] = measureExecutionTime {
     SqlStatement[F](name = "rollback_to_awaiting_deletion - status update")
       .command[EventStatus ~ ExecutionDate ~ projects.GitLabId ~ EventStatus](
         sql"""UPDATE event evt
@@ -65,5 +65,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToAwaitingDeletion) = Kleisli.pure(())
+  override def onRollback(event: RollbackToAwaitingDeletion) = RollbackOp.none
 }

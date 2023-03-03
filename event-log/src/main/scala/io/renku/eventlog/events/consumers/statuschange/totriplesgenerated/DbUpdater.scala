@@ -23,19 +23,20 @@ import cats.effect.Async
 import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesGenerated
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import skunk.{Session, ~}
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Session, ~}
 
 import java.time.Instant
 
@@ -51,7 +52,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
 
-  override def updateDB(event: ToTriplesGenerated): UpdateResult[F] =
+  override def updateDB(event: ToTriplesGenerated): UpdateOp[F] =
     deleteDelivery(event.eventId) >> updateStatus(event) >>= {
       case results if results.statusCounts.isEmpty => Kleisli.pure(results)
       case results => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]

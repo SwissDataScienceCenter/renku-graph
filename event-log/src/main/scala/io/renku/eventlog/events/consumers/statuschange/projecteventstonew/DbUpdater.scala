@@ -22,8 +22,9 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import io.circe.Encoder
 import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEvent, StatusChangeEventsQueue, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEvent, StatusChangeEventsQueue}
 import skunk.Session
 
 private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])
@@ -32,8 +33,8 @@ private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChang
   implicit val eventsQueueMessageEncoder: Encoder[ProjectEventsToNew] =
     Encoder[StatusChangeEvent].contramap(identity)
 
-  override def updateDB(event: ProjectEventsToNew): UpdateResult[F] =
+  override def updateDB(event: ProjectEventsToNew): UpdateOp[F] =
     eventsQueue.offer[ProjectEventsToNew](event).map(_ => DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+  override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = RollbackOp.none[F]
 }

@@ -21,21 +21,22 @@ package io.renku.eventlog.events.consumers.statuschange.tofailure
 import cats.data.Kleisli
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
+import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
-import skunk.{Session, ~}
 import skunk.SqlState.DeadlockDetected
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Session, ~}
 
 import java.time.{Duration, Instant}
 import scala.concurrent.duration._
@@ -50,7 +51,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
 
   override def onRollback(event: ToFailure) = deleteDelivery(event.eventId)
 
-  override def updateDB(event: ToFailure): UpdateResult[F] = for {
+  override def updateDB(event: ToFailure): UpdateOp[F] = for {
     _                     <- deleteDelivery(event.eventId)
     eventUpdateResult     <- updateEvent(event)
     ancestorsUpdateResult <- maybeUpdateAncestors(event, eventUpdateResult)

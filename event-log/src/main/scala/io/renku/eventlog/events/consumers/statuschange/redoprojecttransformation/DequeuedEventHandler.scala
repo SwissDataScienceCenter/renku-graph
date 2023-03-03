@@ -23,8 +23,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, UpdateResult}
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 import java.time.Instant
@@ -44,14 +45,14 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
 
   import io.renku.db.SqlStatement
   import io.renku.eventlog.events.producers.minprojectinfo
-  import io.renku.graph.model.events.{CompoundEventId, EventId, ExecutionDate}
   import io.renku.graph.model.events.EventStatus.{TriplesGenerated, TriplesStore}
+  import io.renku.graph.model.events.{CompoundEventId, EventId, ExecutionDate}
   import io.renku.graph.model.projects
-  import skunk.{Session, ~}
   import skunk.data.Completion
   import skunk.implicits._
+  import skunk.{Session, ~}
 
-  override def updateDB(event: RedoProjectTransformation): UpdateResult[F] =
+  override def updateDB(event: RedoProjectTransformation): UpdateOp[F] =
     findLatestSuccessfulEvent(event.project.path) >>= {
       case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.project.path)
       case None          => triggerMinProjectInfoEvent(event.project.path) map (_ => DBUpdateResults.ForProjects.empty)
@@ -127,5 +128,5 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
       .void
   }
 
-  override def onRollback(event: RedoProjectTransformation): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
+  override def onRollback(event: RedoProjectTransformation): Kleisli[F, Session[F], Unit] = RollbackOp.none
 }

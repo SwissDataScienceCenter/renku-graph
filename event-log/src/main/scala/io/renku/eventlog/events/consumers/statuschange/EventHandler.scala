@@ -23,6 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.producers.EventSender
@@ -33,7 +34,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
     processExecutor:     ProcessExecutor[F],
     statusChanger:       StatusChanger[F],
     eventSender:         EventSender[F],
@@ -53,10 +54,10 @@ class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
 
   private val dbUpdater: DBUpdater[F, StatusChangeEvent] =
     new DBUpdater[F, StatusChangeEvent] {
-      override def updateDB(event: StatusChangeEvent): UpdateResult[F] =
+      override def updateDB(event: StatusChangeEvent): UpdateOp[F] =
         dbUpdaterFor(event)._1
 
-      override def onRollback(event: StatusChangeEvent): RollbackResult[F] =
+      override def onRollback(event: StatusChangeEvent): RollbackOp[F] =
         dbUpdaterFor(event)._2
     }
 
@@ -68,13 +69,13 @@ class EventHandler2[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes]
             case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) =>
               e.copy(payload = payload).asRight
             case _ =>
-              Left(s"Missing event payload for: $e")
+              Left(show"Missing event payload for: $e")
           }
         case e => e.asRight
       }
       .apply(req.event.hcursor)
 
-  private def dbUpdaterFor(event: StatusChangeEvent): (UpdateResult[F], RollbackResult[F]) =
+  private def dbUpdaterFor(event: StatusChangeEvent): (UpdateOp[F], RollbackOp[F]) =
     event match {
       case ev: StatusChangeEvent.AllEventsToNew.type =>
         val updater = new alleventstonew.DbUpdater[F](eventSender)
@@ -136,7 +137,7 @@ object EventHandler {
          )
     eventSender     <- EventSender[F](EventLogUrl)
     processExecutor <- ProcessExecutor.concurrent(150)
-  } yield new EventHandler2[F](
+  } yield new EventHandler[F](
     processExecutor,
     statusChanger,
     eventSender,

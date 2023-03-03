@@ -29,11 +29,12 @@ import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
@@ -48,15 +49,11 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     with statuschange.DBUpdater[F, AllEventsToNew.type]
     with TypeSerializers {
 
-  private val applicative: Applicative[F] = Applicative[F]
-
-  import applicative._
-
-  override def updateDB(event: AllEventsToNew.type): UpdateResult[F] =
+  override def updateDB(event: AllEventsToNew.type): UpdateOp[F] =
     createEventsResource(sendEventIfFound(_))
       .map(_ => DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: AllEventsToNew.type) = Kleisli.pure(())
+  override def onRollback(event: AllEventsToNew.type) = RollbackOp.none[F]
 
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]
@@ -75,7 +72,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
   }
 
   private def sendEventIfFound(cursor: Cursor[F, ProjectEventsToNew], checkForMore: Boolean = true): F[Unit] =
-    whenA(checkForMore) {
+    Applicative[F].whenA(checkForMore) {
       cursor.fetch(1) >>= {
         case (Nil, _) => ().pure[F]
         case (event :: _, areMore) =>

@@ -18,11 +18,12 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import cats.MonadThrow
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
 import io.renku.eventlog.metrics.EventStatusGauges
 import skunk.Transaction
 
@@ -59,7 +60,7 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
       dbUpdater: DBUpdater[F, E]
-  ): PartialFunction[Throwable, UpdateResult[F]] = { case err =>
+  ): PartialFunction[Throwable, UpdateOp[F]] = { case err =>
     Kleisli.liftF {
       for {
         _ <- transaction.rollback(savepoint)

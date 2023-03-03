@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.Project
@@ -42,7 +43,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
-import skunk.{Session, ~}
+import skunk.~
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -125,7 +126,7 @@ class StatusChangerSpec
 
     private class TestDbUpdater extends DbClient[IO](None) with DBUpdater[IO, StatusChangeEvent] {
 
-      override def updateDB(event: StatusChangeEvent): UpdateResult[IO] = Kleisli { session =>
+      override def updateDB(event: StatusChangeEvent): UpdateOp[IO] = Kleisli { session =>
         val passingQuery = SqlStatement[IO](name = "passing dbUpdater query")
           .command[EventId](
             sql"""UPDATE event
@@ -153,7 +154,7 @@ class StatusChangerSpec
         passingQuery.run(session) >> failingQuery.run(session)
       }
 
-      override def onRollback(event: StatusChangeEvent): Kleisli[IO, Session[IO], Unit] = Kleisli {
+      override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = Kleisli {
         SqlStatement[IO](name = "onRollback dbUpdater query")
           .command[EventId ~ projects.GitLabId](
             sql"""DELETE FROM event_delivery
