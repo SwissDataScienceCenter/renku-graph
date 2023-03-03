@@ -36,37 +36,17 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
 
   "tryHandling" should {
 
-    "run post handling hook" in new TestCase {
-      val ref = Ref.unsafe[IO, Option[(Int, EventSchedulingResult)]](None)
-
-      val event = ints().generateOne
-      override val decode:  EventRequestContent => Either[Exception, Int] = _ => event.asRight
-      override val process: Int => IO[Unit]                               = _ => IO.unit
-      override def postProcess(event: Int, result: EventSchedulingResult): IO[Unit] =
-        ref.set(Some(event -> result))
-
-      override val precondition: IO[Option[EventSchedulingResult]] = IO.pure(None)
-      override val onRelease:    Option[IO[Unit]]                  = None
-
-      val request = json"""{"categoryName": $category}"""
-
-      handler.tryHandling(EventRequestContent(request)).unsafeRunSync()
-
-      ref.get.unsafeRunSync() shouldBe Some(event -> EventSchedulingResult.Accepted)
-    }
-
     "return the precondition if defined" in new TestCase {
 
       val result = ServiceUnavailable(nonEmptyStrings().generateOne)
       override val precondition: IO[Option[EventSchedulingResult]] = result.some.pure[IO]
 
-      handler.tryHandling(eventRequestContents.generateOne).unsafeRunSync() shouldBe result
+      val request = json"""{"categoryName": $category}"""
+
+      handler.tryHandling(EventRequestContent(request)).unsafeRunSync() shouldBe result
     }
 
     "return UnsupportedEventType if category of the event does not match the handler category" in new TestCase {
-
-      override val precondition: IO[Option[EventSchedulingResult]] = None.pure[IO]
-
       handler.tryHandling(eventRequestContents.generateOne).unsafeRunSync() shouldBe UnsupportedEventType
     }
 
@@ -95,6 +75,26 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
       handler.tryHandling(EventRequestContent(request)).unsafeRunSync() shouldBe successExecutionResult
 
       processInput.get.unsafeRunSync() shouldBe (event + 1).some
+    }
+
+    "run post handling hook" in new TestCase {
+      val ref = Ref.unsafe[IO, Option[(Int, EventSchedulingResult)]](None)
+
+      val event = ints().generateOne
+      override val decode:  EventRequestContent => Either[Exception, Int] = _ => event.asRight
+      override val process: Int => IO[Unit]                               = _ => IO.unit
+
+      override def postProcess(event: Int, result: EventSchedulingResult): IO[Unit] =
+        ref.set(Some(event -> result))
+
+      override val precondition: IO[Option[EventSchedulingResult]] = IO.pure(None)
+      override val onRelease:    Option[IO[Unit]]                  = None
+
+      val request = json"""{"categoryName": $category}"""
+
+      handler.tryHandling(EventRequestContent(request)).unsafeRunSync()
+
+      ref.get.unsafeRunSync() shouldBe Some(event -> EventSchedulingResult.Accepted)
     }
 
     "handle the process failure and still execute on onRelease procedure" in new TestCase {
@@ -146,7 +146,7 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
 
     val successExecutionResult = Accepted
     val failureExecutionResult = notHappySchedulingResults.generateOne
-    val processExecutor = new ProcessExecutor[IO] {
+    private val processExecutor = new ProcessExecutor[IO] {
       override def tryExecuting(process: IO[Unit]): IO[EventSchedulingResult] =
         process.as(successExecutionResult).recover(_ => failureExecutionResult)
     }

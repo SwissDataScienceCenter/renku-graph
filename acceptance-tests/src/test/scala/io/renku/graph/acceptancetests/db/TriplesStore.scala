@@ -18,8 +18,8 @@
 
 package io.renku.graph.acceptancetests.db
 
-import cats.effect.{IO, Temporal}
 import cats.{Applicative, Monad}
+import cats.effect.{IO, Temporal}
 import eu.timepit.refined.auto._
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -33,7 +33,6 @@ object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDat
   def start()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- Applicative[IO].unlessA(isRunning)(IO(container.start()))
     _ <- waitForReadiness
-    _ <- createDatasets()
     _ <- logger.info("Triples Store started")
   } yield ()
 

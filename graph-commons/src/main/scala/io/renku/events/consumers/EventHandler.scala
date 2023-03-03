@@ -51,13 +51,20 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
   @annotation.nowarn("cat=unused")
   protected def onPostHandling(event: Event, result: EventSchedulingResult): F[Unit] = ().pure[F]
 
-  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
+  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] =
+    checkCategory(request)
+      .leftMap(_.pure[F])
+      .as(doCategoryHandling(request))
+      .merge
+
+  private def doCategoryHandling(request: EventRequestContent) = {
+
     val handlingDefinition = createHandlingDefinition()
 
     handlingDefinition.precondition >>= {
       case Some(preconditionFailure) => preconditionFailure.pure[F]
       case None =>
-        (checkCategory(request) >> decodeEvent(request, handlingDefinition))
+        decodeEvent(request, handlingDefinition)
           .map(event => process(event, handlingDefinition).flatTap(result => onPostHandling(event, result)))
           .sequence
           .map(_.merge)
