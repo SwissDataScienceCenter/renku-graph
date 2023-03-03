@@ -24,10 +24,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{persons, projects}
-import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.graph.model.events.CommitId
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.http4s.EntityDecoder

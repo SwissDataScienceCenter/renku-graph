@@ -22,11 +22,11 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.versions.RenkuVersionPair
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 trait RenkuVersionPairFinder[F[_]] {

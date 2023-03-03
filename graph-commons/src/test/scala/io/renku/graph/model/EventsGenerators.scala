@@ -55,7 +55,7 @@ object EventsGenerators {
   implicit lazy val lastSyncedDates: Gen[LastSyncedDate] = timestampsNotInTheFuture.toGeneratorOf(LastSyncedDate)
 
   implicit val zippedEventPayloads: Gen[ZippedEventPayload] = Arbitrary.arbByte.arbitrary
-    .toGeneratorOfList()
+    .toGeneratorOfList(min = 1)
     .map(_.toArray)
     .generateAs(ZippedEventPayload.apply)
 

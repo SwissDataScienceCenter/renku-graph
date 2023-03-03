@@ -49,7 +49,7 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
           "id":   ${project.id},
           "path": ${project.path}
         },
-        "newStatus": $AwaitingDeletion
+        "subCategory": "ToAwaitingDeletion"
       }""")
 
       (eventSender

@@ -19,14 +19,12 @@
 package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.minprojectinfo
 
-import cats.data.EitherT.fromEither
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect._
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel}
-import io.renku.events.consumers.EventSchedulingResult.Accepted
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -34,36 +32,28 @@ import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-private[events] class EventHandler[F[_]: Concurrent: Logger](
-    override val categoryName:  CategoryName,
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
-    tsReadinessChecker:         TSReadinessForEventsChecker[F],
-    subscriptionMechanism:      SubscriptionMechanism[F],
-    eventProcessor:             EventProcessor[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    override val categoryName: CategoryName,
+    tsReadinessChecker:        TSReadinessForEventsChecker[F],
+    subscriptionMechanism:     SubscriptionMechanism[F],
+    eventProcessor:            EventProcessor[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import eventProcessor._
-  import tsReadinessChecker._
+  import io.renku.events.consumers.EventDecodingTools._
 
-  override def createHandlingProcess(request: EventRequestContent) =
-    EventHandlingProcess.withWaitingForCompletion[F](
-      verifyTSReady >> startProcessingEvent(request, _),
-      releaseProcess = subscriptionMechanism.renewSubscription()
+  protected override type Event = MinProjectInfoEvent
+
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      _.event.getProject.map(MinProjectInfoEvent(_)),
+      eventProcessor.process,
+      precondition = tsReadinessChecker.verifyTSReady,
+      onRelease = subscriptionMechanism.renewSubscription().some
     )
-
-  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
-    project <- fromEither(request.event.getProject)
-    result <-
-      Spawn[F]
-        .start((process(MinProjectInfoEvent(project)) recoverWith logError(project)) >> processing.complete(()))
-        .toRightT
-        .map(_ => Accepted)
-        .semiflatTap(Logger[F].log(project))
-        .leftSemiflatTap(Logger[F].log(project))
-  } yield result
 }
 
-private[events] object EventHandler {
+private object EventHandler {
   import com.typesafe.config.{Config, ConfigFactory}
   import eu.timepit.refined.api.Refined
   import eu.timepit.refined.numeric.Positive
@@ -75,15 +65,10 @@ private[events] object EventHandler {
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
-  ): F[EventHandler[F]] = for {
-    maxConcurrentProcesses     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses)
-    tsReadinessChecker         <- TSReadinessForEventsChecker[F]
-    eventProcessor             <- EventProcessor[F]
-  } yield new EventHandler[F](categoryName,
-                              concurrentProcessesLimiter,
-                              tsReadinessChecker,
-                              subscriptionMechanism,
-                              eventProcessor
-  )
+  ): F[consumers.EventHandler[F]] = for {
+    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    eventProcessor     <- EventProcessor[F]
+    processesCount     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
+    processExecutor    <- ProcessExecutor.concurrent(processesCount)
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, subscriptionMechanism, eventProcessor, processExecutor)
 }

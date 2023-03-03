@@ -27,8 +27,8 @@ import io.renku.graph.triplesstore.DatasetTTLs
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
-import io.renku.triplesstore.TSAdminClient.CreationResult
 import io.renku.triplesstore._
+import io.renku.triplesstore.TSAdminClient.CreationResult
 import org.typelevel.log4cats.Logger
 
 private trait DatasetsCreator[F[_]] extends Migration[F]

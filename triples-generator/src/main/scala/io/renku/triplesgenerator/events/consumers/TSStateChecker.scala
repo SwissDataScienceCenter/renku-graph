@@ -19,9 +19,9 @@
 package io.renku.triplesgenerator.events.consumers
 
 import TSStateChecker.TSState
+import cats.{MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import io.renku.graph.triplesstore.DatasetTTLs
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.{DatasetName, SparqlQueryTimeRecorder, TSAdminClient}

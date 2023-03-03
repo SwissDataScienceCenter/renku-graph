@@ -22,17 +22,17 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.graph.model
+import io.renku.graph.model.entities._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
-import io.renku.graph.model.entities._
 import monocle.{Lens, Traversal}
 
 import scala.annotation.tailrec
 
 private trait ProjectFunctions {
 
-  import ProjectFunctions.Lenses._
   import ProjectFunctions._
+  import ProjectFunctions.Lenses._
 
   def update(oldPerson: Person, newPerson: Person): Project => Project = project =>
     project

@@ -24,26 +24,26 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
-import io.renku.eventlog.events.consumers.statuschange.Generators._
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
-import io.renku.events.consumers.Project
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
+import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
-import io.renku.generators.Generators.{exceptions, fixed, nonNegativeInts, positiveInts}
+import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonNegativeInts
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventId, EventStatus}
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.{Session, ~}
 import skunk.implicits._
+import skunk.~
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -62,7 +62,7 @@ class StatusChangerSpec
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
       (gaugesUpdater.updateGauges _).expects(updateResults).returning(().pure[IO])
 
-      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
+      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
     }
 
     "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
@@ -70,14 +70,14 @@ class StatusChangerSpec
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
       findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
 
-      val event: StatusChangeEvent = ToTriplesGenerated(eventId,
-                                                        projectPaths.generateOne,
+      val event: StatusChangeEvent = ToTriplesGenerated(eventId.id,
+                                                        Project(eventId.projectId, projectPaths.generateOne),
                                                         eventProcessingTimes.generateOne,
                                                         zippedEventPayloads.generateOne
       )
 
       intercept[Exception] {
-        statusChanger.updateStatuses(event).unsafeRunSync()
+        statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
       }
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
@@ -86,19 +86,25 @@ class StatusChangerSpec
 
     "succeed if updating the gauge fails" in new MockedTestCase {
 
-      val exception = exceptions.generateOne
+      val exception = Generators.exceptions.generateOne
 
       val updateResults = updateResultsGen(event).generateOne
       (dbUpdater.updateDB _).expects(event).returning(Kleisli.pure(updateResults))
       (gaugesUpdater.updateGauges _).expects(updateResults).returning(exception.raiseError[IO, Unit])
 
-      statusChanger.updateStatuses(event).unsafeRunSync() shouldBe ()
+      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
     }
   }
 
-  private trait MockedTestCase {
+  trait MockedTestCase {
 
-    val event = Gen.oneOf(toTriplesGeneratedEvents, toTripleStoreEvents, rollbackToNewEvents).generateOne
+    val event = Gen
+      .oneOf(
+        StatusChangeGenerators.toTriplesGeneratedEvents,
+        StatusChangeGenerators.toTripleStoreEvents,
+        StatusChangeGenerators.rollbackToNewEvents
+      )
+      .generateOne
 
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
 
@@ -106,7 +112,7 @@ class StatusChangerSpec
     val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }
 
-  private trait NonMockedTestCase {
+  trait NonMockedTestCase {
 
     val eventId               = compoundEventIds.generateOne
     val initialStatus         = EventStatus.New
@@ -120,7 +126,7 @@ class StatusChangerSpec
 
     private class TestDbUpdater extends DbClient[IO](None) with DBUpdater[IO, StatusChangeEvent] {
 
-      override def updateDB(event: StatusChangeEvent): UpdateResult[IO] = Kleisli { session =>
+      override def updateDB(event: StatusChangeEvent): UpdateOp[IO] = Kleisli { session =>
         val passingQuery = SqlStatement[IO](name = "passing dbUpdater query")
           .command[EventId](
             sql"""UPDATE event
@@ -148,7 +154,7 @@ class StatusChangerSpec
         passingQuery.run(session) >> failingQuery.run(session)
       }
 
-      override def onRollback(event: StatusChangeEvent): Kleisli[IO, Session[IO], Unit] = Kleisli {
+      override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = Kleisli {
         SqlStatement[IO](name = "onRollback dbUpdater query")
           .command[EventId ~ projects.GitLabId](
             sql"""DELETE FROM event_delivery
@@ -169,25 +175,38 @@ class StatusChangerSpec
   }
 
   private def updateResultsGen(event: StatusChangeEvent): Gen[DBUpdateResults] = event match {
-    case AllEventsToNew                           => fixed(DBUpdateResults.ForAllProjects)
-    case ProjectEventsToNew(_)                    => fixed(DBUpdateResults.ForProjects.empty)
-    case RedoProjectTransformation(_)             => fixed(DBUpdateResults.ForProjects.empty)
-    case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
-    case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
-    case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
-      fixed(
-        DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
+    case AllEventsToNew                       => Gen.const(DBUpdateResults.ForAllProjects)
+    case ProjectEventsToNew(_)                => Gen.const(DBUpdateResults.ForProjects.empty)
+    case RedoProjectTransformation(_)         => Gen.const(DBUpdateResults.ForProjects.empty)
+    case ToTriplesGenerated(_, project, _, _) => genUpdateResult(project.path)
+    case ToTriplesStore(_, project, _)        => genUpdateResult(project.path)
+    case ev @ ToFailure(_, project, _, newStatus, _) =>
+      Gen.const(
+        DBUpdateResults.ForProjects(project.path, Map(ev.currentStatus -> -1, newStatus -> 1))
       )
-    case RollbackToNew(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(GeneratingTriples -> -1, New -> 1)))
-    case RollbackToTriplesGenerated(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
-    case ToAwaitingDeletion(_, projectPath) =>
-      fixed(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
+    case RollbackToNew(_, project) =>
+      Gen.const(
+        DBUpdateResults.ForProjects(project.path, Map(EventStatus.GeneratingTriples -> -1, EventStatus.New -> 1))
+      )
+    case RollbackToTriplesGenerated(_, project) =>
+      Gen.const(
+        DBUpdateResults.ForProjects(project.path,
+                                    Map(EventStatus.TransformingTriples -> -1, EventStatus.TriplesGenerated -> 1)
+        )
+      )
+    case ToAwaitingDeletion(_, project) =>
+      Gen.const(
+        DBUpdateResults.ForProjects(project.path,
+                                    Map(eventStatuses.generateOne -> -1, EventStatus.AwaitingDeletion -> 1)
+        )
+      )
     case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
-      val updatedRows = positiveInts(max = 40).generateOne
-      fixed(
-        DBUpdateResults.ForProjects(projectPath, Map(Deleting -> -updatedRows, AwaitingDeletion -> updatedRows))
+      val updatedRows = Generators.positiveInts(max = 40).generateOne
+      Gen.const(
+        DBUpdateResults.ForProjects(
+          projectPath,
+          Map(EventStatus.Deleting -> -updatedRows, EventStatus.AwaitingDeletion -> updatedRows)
+        )
       )
   }
 

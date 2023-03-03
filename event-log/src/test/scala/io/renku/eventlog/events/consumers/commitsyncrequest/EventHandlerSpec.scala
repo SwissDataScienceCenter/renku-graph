@@ -21,101 +21,52 @@ package commitsyncrequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.GraphModelGenerators._
+import io.circe.{Encoder, Json}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "handle" should {
-
-    s"decode an event from the request, " +
-      "force commit sync " +
-      s"and return $Accepted if forcing commit sync succeeds" in new TestCase {
-
-        val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-
-        (commitSyncForcer.forceCommitSync _)
-          .expects(projectId, projectPath)
-          .returning(().pure[IO])
-
-        handler
-          .createHandlingProcess(requestContent((projectId -> projectPath).asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
+  "createHandlingDefinition.decode" should {
+    "decode project id and path" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData = Json.obj(
+        "project" -> Json.obj(
+          "id"   -> 42.asJson,
+          "path" -> "the/project".asJson
         )
-
-        eventually {
-          logger.loggedOnly(
-            Info(
-              s"${handler.categoryName}: projectId = $projectId, projectPath = $projectPath -> $Accepted"
-            )
-          )
-        }
-      }
-
-    "log an error if commit sync forcing fails" in new TestCase {
-
-      val projectId   = projectIds.generateOne
-      val projectPath = projectPaths.generateOne
-
-      val exception = exceptions.generateOne
-      (commitSyncForcer.forceCommitSync _)
-        .expects(projectId, projectPath)
-        .returning(exception.raiseError[IO, Unit])
-
-      handler
-        .createHandlingProcess(
-          requestContent((projectId -> projectPath).asJson)
-        )
-        .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
-
-      eventually {
-        logger.loggedOnly(
-          Error(
-            s"${handler.categoryName}: projectId = $projectId, projectPath = $projectPath -> SchedulingError",
-            exception
-          )
-        )
-      }
+      )
+      definition.decode(EventRequestContent(eventData)) shouldBe Project(42, "the/project").asRight
     }
 
-    s"return $BadRequest if event is malformed" in new TestCase {
+    "fail on malformed event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+    }
+  }
 
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": "COMMIT_SYNC_REQUEST"
-        }"""
-      }
+  "createHandlingDefinition.process" should {
+    "call commitSyncForcer" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (commitSyncForcer.forceCommitSync _).expects(*, *).returning(IO.unit)
+      definition.process(Project(42, "the/project")).unsafeRunSync() shouldBe ()
+    }
+  }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
+  "createHandlingDefinition" should {
+    "not define onRelease and precondition" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.onRelease                    shouldBe None
+      definition.precondition.unsafeRunSync() shouldBe None
     }
   }
 

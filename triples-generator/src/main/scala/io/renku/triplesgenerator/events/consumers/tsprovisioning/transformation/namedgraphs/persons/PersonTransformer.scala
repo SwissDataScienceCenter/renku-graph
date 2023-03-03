@@ -24,11 +24,11 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
 import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
+import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{ProjectFunctions, RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 

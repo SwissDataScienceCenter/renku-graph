@@ -18,39 +18,35 @@
 
 package io.renku.eventlog.events.consumers.migrationstatuschange
 
-import cats.data.EitherT.fromEither
-import cats.effect.Async
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.ServiceVersion
 import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
+import io.renku.eventlog.events.consumers.migrationstatuschange.{Event => CategoryEvent}
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: Async: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     statusUpdater:             StatusUpdater[F],
     override val categoryName: CategoryName = categoryName
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
+
+  protected override type Event = CategoryEvent
 
   import statusUpdater._
 
-  protected override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](processEvent(request))
-
-  private def processEvent(request: EventRequestContent) = for {
-    event <- fromEither[F](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
-    result <- updateStatus(event).toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event))
-                .leftSemiflatTap(Logger[F].log(event))
-  } yield result
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[Event],
+      process = updateStatus
+    )
 
   private implicit val eventDecoder: Decoder[Event] = { cursor =>
     for {
@@ -69,6 +65,6 @@ private class EventHandler[F[_]: Async: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[EventHandler[F]] =
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
     StatusUpdater[F].map(new EventHandler[F](_))
 }

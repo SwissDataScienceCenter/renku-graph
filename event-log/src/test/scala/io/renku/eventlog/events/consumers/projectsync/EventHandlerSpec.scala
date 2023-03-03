@@ -20,18 +20,15 @@ package io.renku.eventlog.events.consumers
 package projectsync
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.events.consumers.ConcurrentProcessesLimiter
-import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -46,52 +43,37 @@ class EventHandlerSpec
     with Eventually
     with IntegrationPatience {
 
-  "handle" should {
-
-    "decode an event from the request, " +
-      "kick-off the project synchronization process " +
-      s"and return $Accepted" in new TestCase {
-
-        (synchronizer.syncProjectInfo _).expects(event).returning(().pure[IO])
-
-        handler
-          .createHandlingProcess(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Accepted.asRight
-
-        logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
-      }
-
-    s"return $Accepted and release the processing flag when synchronization process fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (synchronizer.syncProjectInfo _).expects(event).returning(exception.raiseError[IO, Unit])
-
-      val handlingProcess = handler
-        .createHandlingProcess(requestContent(event.asJson))
-        .unsafeRunSync()
-
-      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
-
-      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(
-        Info(show"$categoryName: $event -> $Accepted"),
-        Error(show"$categoryName: $event failed", exception)
-      )
+  "createHandlingDefinition.decode" should {
+    s"decode a valid event successfully" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = EventRequestContent(event.asJson)
+      definition.decode(eventData) shouldBe Right(event)
     }
 
-    s"return $BadRequest if event is malformed" in new TestCase {
+    "fail on invalid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+    }
+  }
 
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": ${categoryName.show}
-        }"""
-      }
+  "createHandlingDefinition.process" should {
+    "call to StatusUpdater" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (synchronizer.syncProjectInfo _).expects(*).returning(IO.unit)
+      definition.process(event).unsafeRunSync() shouldBe ()
+    }
+  }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
+  "createHandlingDefinition" should {
+    "not define  precondition" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.precondition.unsafeRunSync() shouldBe None
+    }
+
+    "onRelease call to renewSubscription" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.onRelease.map(_.unsafeRunSync()).getOrElse(sys.error("No onRelease defined")) shouldBe ()
     }
   }
 
@@ -99,10 +81,11 @@ class EventHandlerSpec
     val event = projectSyncEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val synchronizer               = mock[ProjectInfoSynchronizer[IO]]
-    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
-    val handler = new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, concurrentProcessesLimiter)
+    val synchronizer          = mock[ProjectInfoSynchronizer[IO]]
+    val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+
+    val handler =
+      new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, ProcessExecutor.sequential[IO])
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
   }

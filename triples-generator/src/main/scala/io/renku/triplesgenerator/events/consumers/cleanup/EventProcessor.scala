@@ -37,11 +37,13 @@ private class EventProcessorImpl[F[_]: Async: Logger](tsCleaner: namedgraphs.TSC
 ) extends EventProcessor[F] {
 
   override def process(project: Project): F[Unit] = {
-    tsCleaner.removeTriples(project.path) >> statusUpdater.projectToNew(project)
+    Logger[F].info(show"$categoryName: $project accepted") >>
+      tsCleaner.removeTriples(project.path) >>
+      statusUpdater.projectToNew(project)
   }.recoverWith(logError(project))
 
   private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
-    Logger[F].error(error)(show"$categoryName: $project - triples removal failed ${error.getMessage}")
+    Logger[F].error(error)(show"$categoryName: $project triples removal failure")
   }
 }
 

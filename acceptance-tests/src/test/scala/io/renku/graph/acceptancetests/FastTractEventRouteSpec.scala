@@ -24,11 +24,12 @@ import flows.TSProvisioning
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.testentities.{cliShapedPersons, removeMembers}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.scalatest.concurrent.Eventually
+import org.scalatest.EitherValues
 import testing.AcceptanceTestPatience
 import tooling.{AcceptanceSpec, ApplicationServices}
 
@@ -37,7 +38,8 @@ class FastTractEventRouteSpec
     with ApplicationServices
     with TSProvisioning
     with Eventually
-    with AcceptanceTestPatience {
+    with AcceptanceTestPatience
+    with EitherValues {
 
   Feature("Fast track route for events not in the TS") {
 
@@ -71,8 +73,8 @@ class FastTractEventRouteSpec
       Then("the project data should exist in the KG")
       eventually {
         val response = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}")
-        response.status                                        shouldBe Ok
-        response.jsonBody.hcursor.downField("path").as[String] shouldBe project.path.show.asRight
+        response.status                                              shouldBe Ok
+        response.jsonBody.hcursor.downField("path").as[String].value shouldBe project.path.show
       }
     }
   }

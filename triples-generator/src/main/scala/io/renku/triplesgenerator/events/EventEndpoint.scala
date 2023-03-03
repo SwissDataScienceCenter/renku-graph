@@ -25,15 +25,15 @@ import cats.effect.Async
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
-import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
+import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.http.ErrorMessage
+import org.http4s.{Request, Response}
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
-import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -121,7 +121,7 @@ class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsum
     case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
     case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.BadRequest(reason)   => BadRequest(ErrorMessage(reason))
     case EventSchedulingResult.ServiceUnavailable(reason) =>
       Logger[F].error(s"Service needed for event processing unavailable: $reason") >>
         ServiceUnavailable(InfoMessage(reason))

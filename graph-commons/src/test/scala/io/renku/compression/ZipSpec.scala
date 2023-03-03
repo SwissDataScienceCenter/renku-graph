@@ -25,23 +25,26 @@ import io.renku.testtools.IOSpec
 import org.scalacheck.Arbitrary
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 
 import java.io.EOFException
 import java.util.zip.ZipException
 
-class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
+class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers with EitherValues {
 
   "zip and unzip" should {
+
     "zip and unzip the content from String to Byte Array " in {
       val content = nonEmptyStrings().generateOne
       Zip
         .zip[IO](content)
-        .flatMap(byteArray => Zip.unzip[IO](byteArray))
+        .flatMap(byteArray => IO.fromEither(Zip.unzip(byteArray)))
         .unsafeRunSync() shouldBe content
     }
   }
 
   "zip" should {
+
     "fail with a meaningful error if zipping fails" in {
       val actual = intercept[Exception] {
         Zip.zip[IO](null).unsafeRunSync()
@@ -54,13 +57,11 @@ class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "unzip" should {
     "fail with a meaningful error if unzipping fails" in {
-      val actual = intercept[Exception] {
-        Zip
-          .unzip[IO](bytes = Arbitrary.arbByte.arbitrary.generateList(min = 10, max = 100).toArray)
-          .unsafeRunSync()
-      }
-      actual.getMessage shouldBe "Unzipping content failed"
-      actual.getCause     should (be(a[ZipException]) or be(a[EOFException]))
+
+      val actual = Zip.unzip(bytes = Arbitrary.arbByte.arbitrary.generateList(min = 10, max = 100).toArray)
+
+      actual.left.value.getMessage shouldBe "Unzipping content failed"
+      actual.left.value.getCause     should (be(a[ZipException]) or be(a[EOFException]))
     }
   }
 }

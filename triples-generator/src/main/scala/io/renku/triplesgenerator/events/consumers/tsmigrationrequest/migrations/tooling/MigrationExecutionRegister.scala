@@ -29,8 +29,8 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 private[migrations] trait MigrationExecutionRegister[F[_]] {

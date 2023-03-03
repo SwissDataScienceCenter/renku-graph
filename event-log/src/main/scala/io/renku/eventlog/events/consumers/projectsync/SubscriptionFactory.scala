@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.Microservice
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -37,7 +37,7 @@ object SubscriptionFactory {
   def apply[F[
       _
   ]: Async: Parallel: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(
         categoryName,

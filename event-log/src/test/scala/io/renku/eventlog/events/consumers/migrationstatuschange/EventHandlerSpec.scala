@@ -19,19 +19,17 @@
 package io.renku.eventlog.events.consumers.migrationstatuschange
 
 import cats.effect.IO
-import cats.syntax.all._
+import io.circe.Json
 import io.circe.literal._
-import io.renku.eventlog.{MigrationMessage, MigrationStatus}
+import io.circe.syntax._
 import io.renku.eventlog.MigrationStatus._
-import io.renku.eventlog.events.consumers.migrationstatuschange.Event._
+import io.renku.eventlog.{MigrationMessage, MigrationStatus}
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
 import io.renku.events.Generators.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -45,68 +43,36 @@ class EventHandlerSpec
     with should.Matchers
     with TableDrivenPropertyChecks {
 
-  "tryHandling" should {
-
-    "decode an event from the request, " +
-      "pass it to the Status Updater " +
-      s"and return $Accepted" in new TestCase {
-        forAll {
-          Table(
-            ("Event", "Json"),
-            (ToDone(url, version), generatePayload(Done)),
-            (ToRecoverableFailure(url, version, message), generatePayload(RecoverableFailure)),
-            (ToNonRecoverableFailure(url, version, message), generatePayload(NonRecoverableFailure))
-          )
-        } { (event, eventJson) =>
-          (statusUpdater.updateStatus _).expects(event).returning(().pure[IO])
-
-          handler.tryHandling(eventJson).unsafeRunSync() shouldBe Accepted
-
-          logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
-
-          logger.reset()
-        }
-      }
-
-    MigrationStatus.all - Done - NonRecoverableFailure - RecoverableFailure foreach { status =>
-      s"fail with $BadRequest for event with newStatus = $status" in new TestCase {
-
-        handler.tryHandling(generatePayload(status)).unsafeRunSync() shouldBe BadRequest
-
-        logger.expectNoLogs()
+  "createHandlingDefinition.decode" should {
+    List(Done, NonRecoverableFailure, RecoverableFailure).foreach { status =>
+      s"decode a valid event successfully for status $status" in new TestCase {
+        val definition = handler.createHandlingDefinition()
+        val eventData  = generatePayload(status)
+        val event      = createEvent(status)
+        definition.decode(eventData) shouldBe Right(event)
       }
     }
 
-    NonRecoverableFailure :: RecoverableFailure :: Nil foreach { status =>
-      s"fail with $BadRequest for event with newStatus = $status and no message" in new TestCase {
-
-        handler
-          .tryHandling(EventRequestContent.NoPayload(json"""{
-            "categoryName": "MIGRATION_STATUS_CHANGE",
-            "subscriber": {
-              "url":     ${url.value},
-              "id":      ${microserviceIdentifiers.generateOne.value},
-              "version": ${version.value}
-            },
-            "newStatus": ${status.value}
-          }"""))
-          .unsafeRunSync() shouldBe BadRequest
-
-        logger.expectNoLogs()
-      }
+    "fail on invalid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
     }
+  }
 
-    "log an error if the events updater fails" in new TestCase {
+  "createHandlingDefinition.process" should {
+    "call to StatusUpdater" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (statusUpdater.updateStatus _).expects(*).returning(IO.unit)
+      definition.process(Event.ToDone(url, version)).unsafeRunSync() shouldBe ()
+    }
+  }
 
-      val event     = ToDone(url, version)
-      val exception = exceptions.generateOne
-      (statusUpdater.updateStatus _)
-        .expects(event)
-        .returning(exception.raiseError[IO, Unit])
-
-      handler.tryHandling(generatePayload(Done)).unsafeRunSync() shouldBe SchedulingError(exception)
-
-      logger.loggedOnly(Error(show"$categoryName: $event -> SchedulingError", exception))
+  "createHandlingDefinition" should {
+    "not define onRelease and precondition" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.onRelease                    shouldBe None
+      definition.precondition.unsafeRunSync() shouldBe None
     }
   }
 
@@ -119,6 +85,14 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val statusUpdater = mock[StatusUpdater[IO]]
     val handler       = new EventHandler[IO](statusUpdater)
+
+    def createEvent(status: MigrationStatus): Event =
+      status match {
+        case Done                  => Event.ToDone(url, version)
+        case NonRecoverableFailure => Event.ToNonRecoverableFailure(url, version, message)
+        case RecoverableFailure    => Event.ToRecoverableFailure(url, version, message)
+        case _                     => sys.error(s"Invalid status for event: $status")
+      }
 
     def generatePayload: MigrationStatus => EventRequestContent = {
       case Done => EventRequestContent.NoPayload(json"""{

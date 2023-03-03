@@ -25,6 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.config.ServiceVersion
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.Subscription.SubscriberUrl
+import io.renku.events.consumers
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.triplesgenerator.Microservice
@@ -36,7 +37,7 @@ object SubscriptionFactory {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     urlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
     subscriberUrl  <- urlFinder.findBaseUrl().map(SubscriberUrl(_, "events"))
     serviceVersion <- ServiceVersion.readFromConfig()

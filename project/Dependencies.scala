@@ -18,6 +18,7 @@ object Dependencies {
     val refinedPureconfig      = "0.10.1"
     val circeCore              = "0.14.4"
     val circeOptics            = "0.14.1"
+    val circeGenericExtras     = "0.14.3"
     val jsonld4s               = "0.10.0"
     val catsCore               = "2.9.0"
     val catsEffect             = "3.4.8"
@@ -149,6 +150,9 @@ object Dependencies {
   )
   val circeGeneric = Seq(
     "io.circe" %% "circe-generic" % V.circeCore
+  )
+  val circeGenericExtras = Seq(
+    "io.circe" %% "circe-generic-extras" % V.circeGenericExtras
   )
   val circeParser = Seq(
     "io.circe" %% "circe-parser" % V.circeCore
