@@ -174,8 +174,11 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 
 - **EVENTS_STATUS_CHANGE**
 
-Changes the status of events. The events for which the status will be changed are defined within the event as well as
-the new status.
+Changes the status of events. The events for which the status will be
+changed are defined within the request payload. Requests are mulitpart
+requests, where the `event` part contains json describing the desired
+change. Some requests require a second part containing a zipped
+payload needed for processing.
 
 #### Changing status of the specified event from `GENERATING_TRIPLES` to `NEW`
 
@@ -210,6 +213,7 @@ the new status.
     "path": "namespace/project-name"
   },
   "message":   "<failure message>",
+  "newStatus": <failure status>,
   "subCategory": "ToFailure"
 }
 ```
@@ -228,7 +232,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_GENERATED"
+  "newStatus": "RollbackToTriplesGenerated"
 }
 ```
 
@@ -244,7 +248,7 @@ the new status.
   "project": {
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_GENERATED"
+  "subCategory": "RedoProjectTransformation"
 }
 ```
 
@@ -262,7 +266,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "AWAITING_DELETION"
+  "subCategory": "ToAwaitingDeletion"
 }
 ```
 
@@ -280,7 +284,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus":      "TRIPLES_GENERATED",
+  "subCategory": "ToTriplesGenerated",
   "processingTime": "PT2.023S"
 }
 ```
@@ -301,7 +305,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus":      "TRIPLES_STORE",
+  "subCategory": "ToTriplesStore",
   "processingTime": "PT2.023S"
 }
 ```
@@ -319,7 +323,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "NEW"
+  "subCategory": "ProjectEventsToNew"
 }
 ```
 
@@ -336,7 +340,7 @@ the new status.
     "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "AWAITING_DELETION"
+  "subCategory": "RollbackToAwaitingDeletion"
 }
 ```
 
@@ -349,7 +353,7 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "newStatus":    "NEW"
+  "subCategory":    "AllEventsToNew"
 }
 ```
 
