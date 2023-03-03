@@ -135,8 +135,9 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       },
       "subCategory": ${rollbackStatus.subCategory}
     }"""),
-    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                             errorMessage = s"$categoryName: Change event status as $rollbackStatus failed"
+    context = EventSender.EventContext(
+      CategoryName("EVENTS_STATUS_CHANGE"),
+      errorMessage = s"$categoryName: Change event status as $rollbackStatus failed"
     )
   )
 

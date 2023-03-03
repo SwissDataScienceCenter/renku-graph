@@ -50,7 +50,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
             "id":   ${event.id.projectId},
             "path": ${event.projectPath}
           },
-          "subCategory": "ProjectEventsToNew"
+          "subCategory": "RollbackToNew"
         }"""
       ),
       EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),

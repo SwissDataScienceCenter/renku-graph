@@ -136,8 +136,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "subCategory": "RollbackToNew"
             }"""
           ),
-          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   s"$categoryName: Change event status as $New failed"
+          EventSender.EventContext(
+            CategoryName("EVENTS_STATUS_CHANGE"),
+            s"$categoryName: Change event status as ${RollbackStatus.New} failed"
           )
         )
         .returning(IO.unit)
@@ -160,8 +161,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "subCategory": "RollbackToTriplesGenerated"
             }"""
           ),
-          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   s"$categoryName: Change event status as $TriplesGenerated failed"
+          EventSender.EventContext(
+            CategoryName("EVENTS_STATUS_CHANGE"),
+            s"$categoryName: Change event status as ${RollbackStatus.TriplesGenerated} failed"
           )
         )
         .returning(IO.unit)

@@ -36,7 +36,6 @@ import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
@@ -93,7 +92,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
         "id":   ${event.project.id},
         "path": ${event.project.path}
       },
-      "newStatus": ${EventStatus.New}
+      "subCategory": "ProjectEventsToNew"
     }"""
   }
 }
