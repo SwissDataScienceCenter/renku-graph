@@ -26,7 +26,7 @@ object Dependencies {
     val scalatest              = "3.2.15"
     val scalatestScalacheck    = "3.2.2.0"
     val scalamock              = "5.2.0"
-    val sentryLogback          = "6.14.0"
+    val sentryLogback          = "6.15.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.2"
     val skunk                  = "0.5.1"
