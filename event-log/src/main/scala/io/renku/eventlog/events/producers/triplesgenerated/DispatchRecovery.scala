@@ -49,7 +49,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
           "id":   ${event.id.projectId},
           "path": ${event.projectPath}
         },
-        "newStatus": $TriplesGenerated
+        "subCategory": "RollbackToTriplesGenerated"
       }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                              errorMessage =
@@ -69,6 +69,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
           "id":   ${event.id.projectId},
           "path": ${event.projectPath}
         },
+        "subCategory": "ToFailure",
         "newStatus": $TransformationNonRecoverableFailure,
         "message":   ${EventMessage(exception)} }"""),
       EventSender.EventContext(

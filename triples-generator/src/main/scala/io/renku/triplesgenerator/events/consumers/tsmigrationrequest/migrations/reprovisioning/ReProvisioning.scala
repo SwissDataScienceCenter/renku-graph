@@ -100,7 +100,7 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     .recoverWith(tryAgain(microserviceUrlFinder.findBaseUrl()))
 
   private def sendStatusChangeEvent() = sendEvent(
-    EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
+    EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "subCategory": "AllEventsToNew"}"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), formMessage("sending EVENTS_STATUS_CHANGE failed"))
   )
 

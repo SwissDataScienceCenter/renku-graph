@@ -20,13 +20,12 @@ package io.renku.triplesgenerator.events.consumers
 package tsprovisioning
 package triplesgenerated
 
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
-import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -34,11 +33,11 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.TransformationStepsCreator
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import transformation.TransformationStepsCreator
-import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
-import triplesuploading.TriplesUploadResult._
 
 import java.time.Duration
 import scala.util.control.NonFatal
@@ -169,7 +168,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def rollback(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case exception =>
-      statusUpdater.rollback[TriplesGenerated](event.compoundEventId, event.project.path) >>
+      statusUpdater.rollback(event.compoundEventId, event.project.path, RollbackStatus.TriplesGenerated) >>
         new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 

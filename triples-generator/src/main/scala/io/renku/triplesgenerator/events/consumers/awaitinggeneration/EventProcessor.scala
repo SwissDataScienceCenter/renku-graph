@@ -158,7 +158,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   private def rollbackEvent(commit: CommitEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case NonFatal(exception) =>
       statusUpdater
-        .rollback[EventStatus.New](commit.compoundEventId, commit.project.path)
+        .rollback(commit.compoundEventId, commit.project.path, RollbackStatus.New)
         .flatMap(_ => new Exception(s"$categoryName: processing failure -> Event rolled back", exception).raiseError)
   }
 

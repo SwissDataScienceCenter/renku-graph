@@ -35,7 +35,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -244,7 +244,7 @@ class EventProcessorSpec
 
     def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
-        .rollback[New](_: CompoundEventId, _: Path)(_: () => New))
+        .rollback(_: CompoundEventId, _: Path, _: RollbackStatus.New.type))
         .expects(commit.compoundEventId, commit.project.path, *)
         .returning(().pure[Try])
 

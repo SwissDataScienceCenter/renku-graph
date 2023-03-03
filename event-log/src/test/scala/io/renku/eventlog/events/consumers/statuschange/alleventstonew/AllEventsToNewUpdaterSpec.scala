@@ -133,6 +133,6 @@ class AllEventsToNewUpdaterSpec
       "id":   ${project.id},
       "path": ${project.path}
     },
-    "newStatus": ${EventStatus.New}
+    "subCategory": "ProjectEventsToNew"
   }"""
 }

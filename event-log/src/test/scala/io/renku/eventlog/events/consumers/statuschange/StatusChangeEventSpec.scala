@@ -29,7 +29,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  // TODO does this make sense to keep?
   "StatusChangeEvent" should {
 
     "be serializable and deserializable to and from Json" in {

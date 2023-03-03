@@ -50,7 +50,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           "id":   ${event.id.projectId},
           "path": ${event.projectPath}
         },
-        "newStatus": $TriplesGenerated
+        "subCategory": "RollbackToTriplesGenerated"
       }""")
 
       (eventSender
@@ -81,6 +81,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           "id":   ${event.id.projectId},
           "path": ${event.projectPath}
         },
+        "subCategory": "ToFailure",
         "message": ${EventMessage(exception)},
         "newStatus": $TransformationNonRecoverableFailure
       }""")

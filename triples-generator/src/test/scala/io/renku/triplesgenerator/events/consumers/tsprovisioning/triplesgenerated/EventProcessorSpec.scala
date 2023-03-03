@@ -20,21 +20,18 @@ package io.renku.triplesgenerator.events.consumers
 package tsprovisioning
 package triplesgenerated
 
-import CategoryGenerators._
-import EventStatusUpdater.ExecutionDelay
-import ProcessingRecoverableError._
 import cats.data.EitherT
 import cats.data.EitherT.leftT
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{entities, projects}
+import io.renku.generators.Generators._
 import io.renku.graph.model.entities.Project
+import io.renku.graph.model.events.EventStatus.{FailureStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure}
 import io.renku.graph.model.events._
-import io.renku.graph.model.events.EventStatus.{FailureStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{entities, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -42,16 +39,19 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
+import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.TransformationStepsCreator
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated.CategoryGenerators._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import tsprovisioning.transformation.Generators._
-import tsprovisioning.transformation.TransformationStepsCreator
-import tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
-import tsprovisioning.triplesuploading.TriplesUploadResult._
 
 import java.time.Duration
 import scala.util.Try
@@ -394,7 +394,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     def expectEventRolledBackToTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .rollback[TriplesGenerated](_: CompoundEventId, _: projects.Path)(_: () => TriplesGenerated))
+        .rollback(_: CompoundEventId, _: projects.Path, _: RollbackStatus.TriplesGenerated.type))
         .expects(event.compoundEventId, event.project.path, *)
         .returning(().pure[Try])
 

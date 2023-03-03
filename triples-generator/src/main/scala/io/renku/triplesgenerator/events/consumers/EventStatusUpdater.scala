@@ -23,19 +23,19 @@ import cats.syntax.all._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.DurationNotNegative
-import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
+import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -49,9 +49,7 @@ private trait EventStatusUpdater[F[_]] {
 
   def toTriplesStore(eventId: CompoundEventId, projectPath: projects.Path, processingTime: EventProcessingTime): F[Unit]
 
-  def rollback[S <: EventStatus](eventId: CompoundEventId, projectPath: projects.Path)(implicit
-      rollbackStatus: () => S
-  ): F[Unit]
+  def rollback(eventId: CompoundEventId, projectPath: projects.Path, status: RollbackStatus): F[Unit]
 
   def toFailure(eventId:     CompoundEventId,
                 projectPath: projects.Path,
@@ -93,7 +91,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
                          "id":   ${eventId.projectId},
                          "path": $projectPath
                        },
-                       "newStatus": $TriplesGenerated,
+                       "subCategory": "ToTriplesGenerated",
                        "processingTime": $processingTime
                      }""",
              payload = zippedContent
@@ -115,7 +113,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
         "id":   ${eventId.projectId},
         "path": $projectPath
       },
-      "newStatus":      $TriplesStore, 
+      "subCategory": "ToTriplesStore",
       "processingTime": $processingTime
     }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
@@ -123,10 +121,11 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
     )
   )
 
-  override def rollback[S <: EventStatus](
-      eventId:     CompoundEventId,
-      projectPath: projects.Path
-  )(implicit rollbackStatus: () => S): F[Unit] = eventSender.sendEvent(
+  override def rollback(
+      eventId:        CompoundEventId,
+      projectPath:    projects.Path,
+      rollbackStatus: RollbackStatus
+  ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id},
@@ -134,10 +133,10 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
         "id":   ${eventId.projectId},
         "path": $projectPath
       },
-      "newStatus": ${rollbackStatus().value}
+      "subCategory": ${rollbackStatus.subCategory}
     }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                             errorMessage = s"$categoryName: Change event status as ${rollbackStatus().value} failed"
+                             errorMessage = s"$categoryName: Change event status as $rollbackStatus failed"
     )
   )
 
@@ -167,6 +166,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
         "id":   ${eventId.projectId},
         "path": $projectPath
       },
+      "subCategory": "ToFailure",
       "newStatus": $eventStatus,
       "message":   ${ErrorMessage.withStackTrace(exception).value}
     }""".addIfDefined("executionDelay" -> maybeExecutionDelay)),
@@ -182,7 +182,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
         "id":   ${project.id},
         "path": ${project.path}
       },
-      "newStatus": $New
+      "subCategory": "ProjectEventsToNew"
     }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                              errorMessage = s"$categoryName: Change project events status as $New failed"
@@ -191,9 +191,17 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
 }
 
 private object EventStatusUpdater {
-
-  implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
-  implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
+  sealed trait RollbackStatus {
+    def subCategory: String
+  }
+  object RollbackStatus {
+    case object New extends RollbackStatus {
+      val subCategory = "RollbackToNew"
+    }
+    case object TriplesGenerated extends RollbackStatus {
+      val subCategory = "RollbackToTriplesGenerated"
+    }
+  }
 
   def apply[F[_]: Async: Logger: MetricsRegistry](categoryName: CategoryName): F[EventStatusUpdater[F]] =
     EventSender[F](EventLogUrl).map(new EventStatusUpdaterImpl(_, categoryName, Zip))
