@@ -29,8 +29,15 @@ import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
-trait RenkuVersionPairUpdater[F[_]] {
+private[migrations] trait RenkuVersionPairUpdater[F[_]] {
   def update(versionPair: RenkuVersionPair): F[Unit]
+}
+
+private[migrations] object RenkuVersionPairUpdater {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      migrationsDSConfig: MigrationsConnectionConfig
+  )(implicit renkuUrl: RenkuUrl): RenkuVersionPairUpdater[F] =
+    new RenkuVersionPairUpdaterImpl[F](migrationsDSConfig)
 }
 
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

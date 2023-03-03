@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.renku
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
@@ -36,38 +36,32 @@ private trait ProgressFinder[F[_]] {
 private object ProgressFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProgressFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    startDateFinder         <- MigrationStartTimeFinder[F]
     migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
-    projectsDSClient        <- ProjectsConnectionConfig[F]().map(TSClient[F](_))
-  } yield new ProgressFinderImpl[F](startDateFinder, migrationsDSClient, projectsDSClient)
+  } yield new ProgressFinderImpl[F](migrationsDSClient)
 }
 
-private class ProgressFinderImpl[F[_]: Sync](startDateFinder: MigrationStartTimeFinder[F],
-                                             migrationsDSClient: TSClient[F],
-                                             projectsDSClient:   TSClient[F]
-)(implicit ru: RenkuUrl)
+private class ProgressFinderImpl[F[_]: Sync](migrationsDSClient: TSClient[F])(implicit ru: RenkuUrl)
     extends ProgressFinder[F] {
 
   import io.renku.jsonld.syntax._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.client.syntax._
-  import startDateFinder._
 
   private val total: Ref[F, Int] = Ref.unsafe[F, Int](0)
 
   override def findProgressInfo: F[String] = for {
-    done  <- findMigratedCount
+    left  <- findLeftCount
     total <- findTotal
-  } yield s"$done of $total"
+  } yield s"$left left from $total"
 
-  private def findMigratedCount =
+  private def findLeftCount =
     migrationsDSClient.queryExpecting[Int](
       SparqlQuery.ofUnsafe(
-        show"${MigrationToV10.name} - find done",
+        show"${MigrationToV10.name} - find left",
         Prefixes of (renku -> "renku"),
         s"""|SELECT (COUNT(?path) AS ?count)
             |WHERE {
-            |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:migrated ?path
+            |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?path
             |}
             |""".stripMargin
       )
@@ -75,27 +69,9 @@ private class ProgressFinderImpl[F[_]: Sync](startDateFinder: MigrationStartTime
 
   private def findTotal: F[Int] =
     total.get >>= {
-      case 0       => queryTotal >>= (v => total.updateAndGet(_ => v))
+      case 0       => findLeftCount >>= (v => total.updateAndGet(_ => v))
       case nonZero => nonZero.pure[F]
     }
-
-  private def queryTotal = findMigrationStartDate >>= { startDate =>
-    projectsDSClient.queryExpecting[Int](
-      SparqlQuery.ofUnsafe(
-        show"${MigrationToV10.name} - find total",
-        Prefixes of (schema -> "schema"),
-        s"""|SELECT (COUNT(?id) AS ?count)
-            |WHERE {
-            |  GRAPH ?id {
-            |    ?id a schema:Project;
-            |        schema:dateCreated ?created.
-            |    FILTER (?created <= ${startDate.asTripleObject.asSparql.sparql})
-            |  }
-            |}
-            |""".stripMargin
-      )
-    )
-  }
 
   private implicit lazy val countDecoder: Decoder[Int] =
     ResultsDecoder.single[Int](implicit cur => extract[String]("count").map(_.toInt))

@@ -138,7 +138,7 @@ private[migrations] object ReProvisioning {
       judge,
       triplesRemover,
       eventSender,
-      new RenkuVersionPairUpdaterImpl(migrationsConnectionConfig),
+      RenkuVersionPairUpdater(migrationsConnectionConfig),
       microserviceUrlFinder,
       ReProvisioningStatus[F],
       executionTimeRecorder,
