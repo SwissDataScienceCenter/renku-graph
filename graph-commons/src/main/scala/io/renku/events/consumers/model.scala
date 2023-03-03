@@ -54,6 +54,6 @@ object EventSchedulingResult {
     case UnsupportedEventType       => "UnsupportedEventType"
     case BadRequest(reason)         => s"BadRequest: $reason"
     case ServiceUnavailable(reason) => s"ServiceUnavailable: $reason"
-    case SchedulingError(_)         => "SchedulingError"
+    case SchedulingError(ex)        => s"SchedulingError: ${ex.getMessage}"
   }
 }

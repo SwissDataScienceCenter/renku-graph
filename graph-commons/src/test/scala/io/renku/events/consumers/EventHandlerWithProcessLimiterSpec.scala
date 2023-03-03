@@ -36,6 +36,25 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
 
   "tryHandling" should {
 
+    "run post handling hook" in new TestCase {
+      val ref = Ref.unsafe[IO, Option[(Int, EventSchedulingResult)]](None)
+
+      val event = ints().generateOne
+      override val decode:  EventRequestContent => Either[Exception, Int] = _ => event.asRight
+      override val process: Int => IO[Unit]                               = _ => IO.unit
+      override def postProcess(event: Int, result: EventSchedulingResult): IO[Unit] =
+        ref.set(Some(event -> result))
+
+      override val precondition: IO[Option[EventSchedulingResult]] = IO.pure(None)
+      override val onRelease:    Option[IO[Unit]]                  = None
+
+      val request = json"""{"categoryName": $category}"""
+
+      handler.tryHandling(EventRequestContent(request)).unsafeRunSync()
+
+      ref.get.unsafeRunSync() shouldBe Some(event -> EventSchedulingResult.Accepted)
+    }
+
     "return the precondition if defined" in new TestCase {
 
       val result = ServiceUnavailable(nonEmptyStrings().generateOne)
@@ -120,6 +139,9 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
       exceptions.generateOne.raiseError[IO, Option[EventSchedulingResult]]
     val onRelease: Option[IO[Unit]] = Some(exceptions.generateOne.raiseError[IO, Unit])
 
+    @annotation.nowarn("cat=unused")
+    def postProcess(event: Int, result: EventSchedulingResult): IO[Unit] = IO.unit
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val successExecutionResult = Accepted
@@ -132,6 +154,9 @@ class EventHandlerWithProcessLimiterSpec extends AnyWordSpec with IOSpec with sh
 
       override val categoryName: CategoryName = category
       protected override type Event = Int
+
+      protected override def onPostHandling(event: Int, result: EventSchedulingResult): IO[Unit] =
+        postProcess(event, result)
 
       protected override def createHandlingDefinition(): EventHandlingDefinition = EventHandlingDefinition(
         decode,

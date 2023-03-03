@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
@@ -40,6 +41,11 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
 
         ev.asJson.as[StatusChangeEvent] shouldBe Right(ev)
       }
+    }
+
+    "have a Show instance naming its sub category" in {
+      val event = StatusChangeGenerators.statusChangeEvents.generateOne
+      event.show should include(event.subCategoryName)
     }
   }
 

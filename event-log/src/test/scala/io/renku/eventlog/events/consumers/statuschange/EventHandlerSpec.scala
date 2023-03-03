@@ -25,11 +25,12 @@ import io.circe.syntax._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.{MetricsRegistry, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
+import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -81,6 +82,42 @@ class EventHandlerSpec
         definition.process(event).unsafeRunSync() shouldBe ()
       }
     }
+
+    "not log rollback events when Accepted" in new TestCase {
+      forAll(StatusChangeGenerators.rollbackEvents) { event =>
+        (statusChanger
+          .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
+          .expects(*, event)
+          .returning(IO.unit)
+
+        handler.tryHandling(eventRequestContent(event)).unsafeRunSync()
+        logger.expectNoLogs()
+      }
+    }
+
+    "log other events when Accepted" in new TestCase {
+      forAll(StatusChangeGenerators.nonRollbackEvents) { event =>
+        (statusChanger
+          .updateStatuses(_: DBUpdater[IO, StatusChangeEvent])(_: StatusChangeEvent))
+          .expects(*, event)
+          .returning(IO.unit)
+
+        handler.tryHandling(eventRequestContent(event)).unsafeRunSync()
+        logger.logged(TestLogger.Level.Info(show"$categoryName: $event -> ${EventSchedulingResult.Accepted}"))
+        logger.reset()
+      }
+    }
+
+    "log on scheduling error" in new TestCase {
+      val error  = new Exception("fail")
+      val result = EventSchedulingResult.SchedulingError(error)
+      override val processExecutor: ProcessExecutor[IO] =
+        ProcessExecutor[IO](_ => IO.pure(result))
+
+      val event = StatusChangeGenerators.statusChangeEvents.generateOne
+      handler.tryHandling(eventRequestContent(event)).unsafeRunSync() shouldBe result
+      logger.logged(TestLogger.Level.Error(show"$categoryName: $event -> $result", error))
+    }
   }
 
   "createHandlingDefinition" should {
@@ -101,7 +138,9 @@ class EventHandlerSpec
     private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
     private val eventSender         = mock[EventSender[IO]]
 
-    val handler =
-      new EventHandler[IO](ProcessExecutor.sequential, statusChanger, eventSender, eventsQueue, deliveryInfoRemover)
+    val processExecutor: ProcessExecutor[IO] = ProcessExecutor.sequential
+
+    lazy val handler =
+      new EventHandler[IO](processExecutor, statusChanger, eventSender, eventsQueue, deliveryInfoRemover)
   }
 }

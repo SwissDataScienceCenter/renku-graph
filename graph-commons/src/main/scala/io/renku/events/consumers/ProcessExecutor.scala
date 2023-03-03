@@ -31,12 +31,15 @@ trait ProcessExecutor[F[_]] {
 }
 
 object ProcessExecutor {
+  def apply[F[_]](f: F[Unit] => F[EventSchedulingResult]): ProcessExecutor[F] =
+    (process: F[Unit]) => f(process)
 
   def sequential[F[_]: MonadThrow]: ProcessExecutor[F] =
-    (process: F[Unit]) =>
+    ProcessExecutor { process =>
       process
         .as(EventSchedulingResult.Accepted.widen)
         .handleError(error => EventSchedulingResult.SchedulingError(error))
+    }
 
   def concurrent[F[_]: Concurrent: Logger](processesCount: Int Refined Positive): F[ProcessExecutor[F]] =
     Semaphore(processesCount.value).map(new ConcurrentProcessExecutor[F](_))

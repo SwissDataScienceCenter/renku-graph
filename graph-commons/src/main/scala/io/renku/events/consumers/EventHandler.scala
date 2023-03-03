@@ -48,15 +48,18 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
   protected type Event
   protected def createHandlingDefinition(): EventHandlingDefinition
 
-  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
+  @annotation.nowarn("cat=unused")
+  protected def onPostHandling(event: Event, result: EventSchedulingResult): F[Unit] = ().pure[F]
 
+  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
     val handlingDefinition = createHandlingDefinition()
 
     handlingDefinition.precondition >>= {
       case Some(preconditionFailure) => preconditionFailure.pure[F]
       case None =>
-        (checkCategory(request) >> decodeEvent(request, handlingDefinition)
-          .map(process(_, handlingDefinition))).sequence
+        (checkCategory(request) >> decodeEvent(request, handlingDefinition))
+          .map(event => process(event, handlingDefinition).flatTap(result => onPostHandling(event, result)))
+          .sequence
           .map(_.merge)
     }
   }
@@ -66,10 +69,10 @@ abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
   ): Either[EventSchedulingResult, Event] =
     (processDefinition decode request).leftMap(err => BadRequest(err.getMessage))
 
-  private def process(event: Event, processDefinition: EventHandlingDefinition) = {
+  private def process(event: Event, processDefinition: EventHandlingDefinition): F[EventSchedulingResult] = {
     val processResource = Resource
       .make(().pure[F])(_ => processDefinition.onRelease.getOrElse(().pure[F]))
-      .evalTap(_ => processDefinition process event)
+      .evalTap(_ => processDefinition.process(event))
     processExecutor
       .tryExecuting(processResource.use_)
   }

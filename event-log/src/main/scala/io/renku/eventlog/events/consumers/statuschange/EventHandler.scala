@@ -25,7 +25,7 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
@@ -45,6 +45,19 @@ final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionT
   override val categoryName: CategoryName = io.renku.eventlog.events.consumers.statuschange.categoryName
 
   protected override type Event = StatusChangeEvent
+
+  protected override def onPostHandling(event: StatusChangeEvent, result: EventSchedulingResult): F[Unit] =
+    result match {
+      case EventSchedulingResult.Accepted =>
+        if (logEventAccepted(event)) Logger[F].info(show"$categoryName: $event -> $result")
+        else ().pure[F]
+
+      case EventSchedulingResult.SchedulingError(ex) =>
+        Logger[F].error(ex)(show"$categoryName: $event -> $result")
+
+      case _ =>
+        Logger[F].info(show"$categoryName: $event -> $result")
+    }
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
@@ -117,6 +130,13 @@ final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionT
         val updater = new totriplesstore.DbUpdater[F](deliveryInfoRemover)
         (updater.updateDB(ev), updater.onRollback(ev))
     }
+
+  private def logEventAccepted(event: StatusChangeEvent) = event match {
+    case _: StatusChangeEvent.RollbackToNew              => false
+    case _: StatusChangeEvent.RollbackToAwaitingDeletion => false
+    case _: StatusChangeEvent.RollbackToTriplesGenerated => false
+    case _ => true
+  }
 }
 
 object EventHandler {
@@ -136,7 +156,7 @@ object EventHandler {
            statusChanger.updateStatuses(toNewDequeuedEventHandler)(_: StatusChangeEvent.ProjectEventsToNew)
          )
     eventSender     <- EventSender[F](EventLogUrl)
-    processExecutor <- ProcessExecutor.concurrent(150)
+    processExecutor <- ProcessExecutor.concurrent(200)
   } yield new EventHandler[F](
     processExecutor,
     statusChanger,

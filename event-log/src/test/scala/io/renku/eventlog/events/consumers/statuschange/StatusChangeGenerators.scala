@@ -99,4 +99,18 @@ object StatusChangeGenerators {
       redoProjectTransformationEvents,
       allEventsToNewEvents
     )
+
+  def nonRollbackEvents: Gen[StatusChangeEvent] =
+    Gen.oneOf(
+      toTripleStoreEvents,
+      toTriplesGeneratedEvents,
+      toFailureEvents,
+      toAwaitingDeletionEvents,
+      projectEventsToNewEvents,
+      redoProjectTransformationEvents,
+      allEventsToNewEvents
+    )
+
+  def rollbackEvents: Gen[StatusChangeEvent] =
+    Gen.oneOf(rollbackToNewEvents, rollbackToAwaitingDeletionEvents, rollbackToTriplesGeneratedEvents)
 }
