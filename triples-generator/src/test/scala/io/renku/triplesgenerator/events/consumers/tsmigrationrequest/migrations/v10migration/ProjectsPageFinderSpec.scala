@@ -16,46 +16,55 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.v10migration
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package v10migration
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model._
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
-import io.renku.graph.model.RenkuTinyTypeGenerators._
-import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.Schemas.renku
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.model.Triple
-import io.renku.triplesstore.client.syntax._
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.OptionValues
+import tooling._
 
-import scala.util.Random
-
-class MigratedProjectsCheckerSpec
+class ProjectsPageFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
-    with MigrationsDataset {
+    with MigrationsDataset
+    with MockFactory
+    with OptionValues {
 
-  "filterNotMigrated" should {
+  private val pageSize = 50
 
-    "filter out projects that are registered as already migrated" in new TestCase {
+  "nextProjectsPage" should {
 
-      val paths = projectPaths.generateNonEmptyList().toList
+    "return next page of projects for migration each time the method is called" in new TestCase {
 
-      val migrated = Random.shuffle(paths).take(paths.size / 2)
+      val paths = projectPaths
+        .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
+        .sorted
 
-      migrated foreach { path =>
-        insert(to = migrationsDataset, Triple(MigrationToV10.name.asEntityId, renku / "migrated", path.asObject))
-      }
+      runUpdate(on = migrationsDataset, BacklogCreator.asToBeMigratedInserts.apply(paths).value).unsafeRunSync()
 
-      checker.filterNotMigrated(paths).unsafeRunSync() shouldBe (paths diff migrated)
+      val (page1, page2) = paths splitAt pageSize
+
+      finder.nextProjectsPage().unsafeRunSync() shouldBe page1
+
+      page1.foreach(donePersister.noteDone(_).unsafeRunSync())
+      finder.nextProjectsPage().unsafeRunSync() shouldBe page2
+
+      page2.foreach(donePersister.noteDone(_).unsafeRunSync())
+      finder.nextProjectsPage().unsafeRunSync() shouldBe Nil
     }
   }
 
@@ -63,6 +72,7 @@ class MigratedProjectsCheckerSpec
     implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val checker = new MigratedProjectsCheckerImpl[IO](TSClient[IO](migrationsDSConnectionInfo))
+    val finder        = new ProjectsPageFinderImpl[IO](RecordsFinder[IO](migrationsDSConnectionInfo))
+    val donePersister = new ProjectDonePersisterImpl[IO](TSClient[IO](migrationsDSConnectionInfo))
   }
 }

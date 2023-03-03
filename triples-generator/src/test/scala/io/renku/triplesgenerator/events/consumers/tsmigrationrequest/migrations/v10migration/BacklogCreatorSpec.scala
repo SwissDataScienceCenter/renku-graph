@@ -63,15 +63,14 @@ class BacklogCreatorSpec
 
         givenMigrationDateFinding(returning = Instant.now().pure[IO])
 
-        val projects = anyProjectEntities
+        val projects = anyRenkuProjectEntities
           .map(setSchema(v9))
           .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
-          .map(_.to[entities.Project])
 
         fetchBacklogProjects shouldBe Nil
 
-        upload(to = projectsDataset, projects: _*)(implicitly[EntityFunctions[entities.Project]],
-                                                   projectsDSGraphsProducer[entities.Project],
+        upload(to = projectsDataset, projects: _*)(implicitly[EntityFunctions[Project]],
+                                                   projectsDSGraphsProducer[Project],
                                                    ioRuntime
         )
 
@@ -89,8 +88,7 @@ class BacklogCreatorSpec
         .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
         .map(setSchema(v9))
         .generateOne
-        .to[entities.Project]
-      val v10Project = anyRenkuProjectEntities.map(setSchema(v10)).generateOne.to[entities.Project]
+      val v10Project = anyRenkuProjectEntities.map(setSchema(v10)).generateOne
       val v9Project2 = anyRenkuProjectEntities
         .modify(
           replaceProjectDateCreated(
@@ -99,12 +97,11 @@ class BacklogCreatorSpec
         )
         .map(setSchema(v9))
         .generateOne
-        .to[entities.Project]
 
       fetchBacklogProjects shouldBe Nil
 
-      upload(to = projectsDataset, v9Project1, v10Project, v9Project2)(implicitly[EntityFunctions[entities.Project]],
-                                                                       projectsDSGraphsProducer[entities.Project],
+      upload(to = projectsDataset, v9Project1, v10Project, v9Project2)(implicitly[EntityFunctions[Project]],
+                                                                       projectsDSGraphsProducer[Project],
                                                                        ioRuntime
       )
 
@@ -121,7 +118,6 @@ class BacklogCreatorSpec
       val oldProject1 = anyNonRenkuProjectEntities
         .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
         .generateOne
-        .to[entities.Project]
       val newProject = anyNonRenkuProjectEntities
         .modify(
           replaceProjectDateCreated(
@@ -129,16 +125,14 @@ class BacklogCreatorSpec
           )
         )
         .generateOne
-        .to[entities.Project]
       val oldProject2 = anyNonRenkuProjectEntities
         .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
         .generateOne
-        .to[entities.Project]
 
       fetchBacklogProjects shouldBe Nil
 
-      upload(to = projectsDataset, oldProject1, newProject, oldProject2)(implicitly[EntityFunctions[entities.Project]],
-                                                                         projectsDSGraphsProducer[entities.Project],
+      upload(to = projectsDataset, oldProject1, newProject, oldProject2)(implicitly[EntityFunctions[NonRenkuProject]],
+                                                                         projectsDSGraphsProducer[NonRenkuProject],
                                                                          ioRuntime
       )
 

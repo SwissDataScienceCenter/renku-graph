@@ -36,14 +36,32 @@ import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverabl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 import tooling._
 
-class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory with EitherValues {
 
   "MigrationToV10" should {
 
-    "be the RegisteredMigration" in new TestCase {
-      migration.getClass.getSuperclass shouldBe classOf[RegisteredMigration[IO]]
+    "be the ConditionedMigration" in new TestCase {
+      migration.getClass.getSuperclass shouldBe classOf[ConditionedMigration[IO]]
+    }
+  }
+
+  "required" should {
+
+    Set(
+      ConditionedMigration.MigrationRequired.No(nonEmptyStrings().generateOne),
+      ConditionedMigration.MigrationRequired.Yes(nonEmptyStrings().generateOne)
+    ) foreach { answer =>
+      s"return $answer if there are no projects to migrate" in new TestCase {
+
+        (() => migrationNeedChecker.checkMigrationNeeded)
+          .expects()
+          .returning(answer.pure[IO])
+
+        migration.required.value.unsafeRunSync().value shouldBe answer
+      }
     }
   }
 
@@ -54,9 +72,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       "goes through all the projects, " +
       "wait until the env has capacity to serve a new re-provisioning event, " +
       "send the CLEAN_UP_REQUEST event to EL for each of them, " +
-      "keep a note of the project once an event is sent for it, " +
-      "explicitly run the post migration procedure " +
-      "and remove info about all migrated projects" in new TestCase {
+      "keep a note of the project once an event is sent for it" in new TestCase {
 
         givenBacklogCreated()
 
@@ -75,11 +91,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
         allProjects foreach verifyProjectNotedDone
 
-        verifyMigrationExecutionRegistered
-
-        verifyPostMigrationCleanUpRun
-
-        migration.migrate().value.unsafeRunSync() shouldBe ().asRight
+        migration.migrate().value.unsafeRunSync().value shouldBe ()
       }
 
     "return a Recoverable Error if in case of an exception while finding projects " +
@@ -92,8 +104,18 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
           .expects()
           .returning(exception.raiseError[IO, List[projects.Path]])
 
-        migration.migrate().value.unsafeRunSync() shouldBe recoverableError.asLeft
+        migration.migrate().value.unsafeRunSync().left.value shouldBe recoverableError
       }
+  }
+
+  "postMigration" should {
+
+    "register migration execution" in new TestCase {
+
+      verifyMigrationExecutionRegistered
+
+      migration.postMigration().value.unsafeRunSync().value shouldBe ()
+    }
   }
 
   private trait TestCase {
@@ -101,14 +123,14 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
     private val eventCategoryName = CategoryName("CLEAN_UP_REQUEST")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val migrationNeedChecker         = mock[MigrationNeedChecker[IO]]
     val backlogCreator               = mock[BacklogCreator[IO]]
-    val projectsFinder               = mock[PagedProjectsFinder[IO]]
+    val projectsFinder               = mock[ProjectsPageFinder[IO]]
     private val progressFinder       = mock[ProgressFinder[IO]]
     private val envReadinessChecker  = mock[EnvReadinessChecker[IO]]
     private val eventSender          = mock[EventSender[IO]]
     private val projectDonePersister = mock[ProjectDonePersister[IO]]
     private val executionRegister    = mock[MigrationExecutionRegister[IO]]
-    private val projectsDoneCleanUp  = mock[ProjectsDoneCleanUp[IO]]
     val recoverableError             = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
@@ -116,6 +138,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       }
     }
     val migration = new MigrationToV10[IO](
+      migrationNeedChecker,
       backlogCreator,
       projectsFinder,
       progressFinder,
@@ -123,7 +146,6 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
       eventSender,
       projectDonePersister,
       executionRegister,
-      projectsDoneCleanUp,
       recoveryStrategy
     )
 
@@ -180,11 +202,6 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
     def verifyMigrationExecutionRegistered =
       (executionRegister.registerExecution _)
         .expects(MigrationToV10.name)
-        .returning(().pure[IO])
-
-    def verifyPostMigrationCleanUpRun =
-      (projectsDoneCleanUp.cleanUp _)
-        .expects()
         .returning(().pure[IO])
   }
 }

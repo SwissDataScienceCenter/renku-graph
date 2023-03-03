@@ -24,10 +24,13 @@ import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{projects, RenkuUrl}
+import io.renku.graph.model.Schemas._
+import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecordsFinder
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.model.Triple
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
@@ -40,9 +43,27 @@ private object BacklogCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[BacklogCreator[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
     startTimeFinder         <- MigrationStartTimeFinder[F]
-    recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
-    migrationsDSClient      <- ProjectsConnectionConfig[F]().map(TSClient[F](_))
+    recordsFinder           <- ProjectsConnectionConfig[F]().map(RecordsFinder[F](_))
+    migrationsDSClient      <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
   } yield new BacklogCreatorImpl[F](startTimeFinder, recordsFinder, migrationsDSClient)
+
+  def asToBeMigratedInserts(implicit ru: RenkuUrl): List[projects.Path] => Option[SparqlQuery] =
+    toTriples andThen toInsertQuery
+
+  private def toTriples(implicit ru: RenkuUrl): List[projects.Path] => List[Triple] =
+    _.map(path => Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", path.asObject))
+
+  private lazy val toInsertQuery: List[Triple] => Option[SparqlQuery] = {
+    case Nil => None
+    case triples =>
+      val inserts = triples.map(_.asSparql.sparql).mkString("\n\t", "\n\t", "\n")
+      SparqlQuery
+        .ofUnsafe(
+          show"${MigrationToV10.name} - store to backlog",
+          s"INSERT DATA {$inserts}"
+        )
+        .some
+  }
 }
 
 private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTimeFinder[F],
@@ -52,13 +73,11 @@ private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTim
     ru: RenkuUrl
 ) extends BacklogCreator[F] {
 
-  import io.renku.graph.model.Schemas._
-  import io.renku.jsonld.syntax._
   import io.renku.tinytypes.json.TinyTypeDecoders._
   import io.renku.triplesstore.ResultsDecoder._
-  import io.renku.triplesstore.client.syntax._
   import recordsFinder._
   import startTimeFinder._
+  import BacklogCreator._
 
   private val pageSize: Int = 50
 
@@ -68,8 +87,7 @@ private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTim
     (findMigrationStartDate -> currentPage.getAndUpdate(_ + 1))
       .mapN(query)
       .flatMap(findRecords[projects.Path])
-      .map(toTriples)
-      .map(toInsertQuery)
+      .map(asToBeMigratedInserts)
       .flatMap(storeInBacklog(currentPage))
 
   private def query(startDate: Instant, page: Int) = SparqlQuery.ofUnsafe(
@@ -101,21 +119,6 @@ private class BacklogCreatorImpl[F[_]: Async](startTimeFinder: MigrationStartTim
 
   private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
     implicit cur => extract[projects.Path]("path")
-  }
-
-  private lazy val toTriples: List[projects.Path] => List[Triple] =
-    _.map(path => Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", path.asObject))
-
-  private lazy val toInsertQuery: List[Triple] => Option[SparqlQuery] = {
-    case Nil => None
-    case triples =>
-      val inserts = triples.map(_.asSparql.sparql).mkString("\n\t", "\n\t", "\n")
-      SparqlQuery
-        .ofUnsafe(
-          show"${MigrationToV10.name} - store to backlog",
-          s"INSERT DATA {$inserts}"
-        )
-        .some
   }
 
   private def storeInBacklog(currentPage: Ref[F, Int]): Option[SparqlQuery] => F[Unit] = {
