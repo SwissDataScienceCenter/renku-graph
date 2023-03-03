@@ -25,7 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{projects, RenkuUrl, Schemas}
+import io.renku.graph.model.{RenkuUrl, Schemas, projects}
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
@@ -43,7 +43,7 @@ private object ProjectsPageFinder {
 }
 
 private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F])(implicit
-                                                                                   ru: RenkuUrl
+    ru: RenkuUrl
 ) extends ProjectsPageFinder[F]
     with Schemas {
 

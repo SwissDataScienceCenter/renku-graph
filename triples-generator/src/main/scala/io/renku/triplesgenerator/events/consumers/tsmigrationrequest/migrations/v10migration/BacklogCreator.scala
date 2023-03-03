@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{projects, RenkuUrl}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.model.Schemas._
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecordsFinder
