@@ -25,7 +25,6 @@ import cats.MonadThrow
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.projects
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
@@ -42,15 +41,15 @@ private object MigrationNeedChecker {
 private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends MigrationNeedChecker[F] {
 
   override def checkMigrationNeeded: F[ConditionedMigration.MigrationRequired] =
-    tsClient.queryExpecting[List[projects.Path]](query).map {
-      case Nil  => ConditionedMigration.MigrationRequired.No("All v9 projects migrated")
-      case list => ConditionedMigration.MigrationRequired.Yes(s"${list.size} v9 projects for migration")
+    tsClient.queryExpecting[Int](query).map {
+      case 0       => ConditionedMigration.MigrationRequired.No("all v9 projects migrated")
+      case nonZero => ConditionedMigration.MigrationRequired.Yes(s"$nonZero v9 projects for migration")
     }
 
   private lazy val query = SparqlQuery.ofUnsafe(
     show"${MigrationToV10.name} - check migration needed",
     Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
-    s"""|SELECT DISTINCT ?path
+    s"""|SELECT (COUNT(DISTINCT ?path) AS ?cnt)
         |WHERE {
         |  GRAPH ?id {
         |    ?id a schema:Project;
@@ -62,10 +61,9 @@ private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
         |""".stripMargin
   )
 
-  import io.renku.tinytypes.json.TinyTypeDecoders._
   import io.renku.triplesstore.ResultsDecoder._
 
-  private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur => extract[projects.Path]("path")
+  private implicit lazy val decoder: Decoder[Int] = ResultsDecoder.single[Int] { implicit cur =>
+    extract[String]("cnt").map(_.toInt)
   }
 }
