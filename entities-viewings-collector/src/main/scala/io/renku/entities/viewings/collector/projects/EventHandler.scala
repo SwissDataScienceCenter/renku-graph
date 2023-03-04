@@ -21,13 +21,14 @@ package io.renku.entities.viewings.collector.projects
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.events.consumers.EventDecodingTools.JsonOps
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    tsUploader:                TSUploader[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
@@ -37,7 +38,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode,
-      process = event => Logger[F].info(show"$categoryName: $event accepted")
+      process = tsUploader.uploadToTS
     )
 
   private lazy val decode: EventRequestContent => Either[Exception, ProjectViewedEvent] = { req =>
@@ -49,7 +50,6 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
 private object EventHandler {
   def apply[F[_]: Async: Logger]: F[consumers.EventHandler[F]] =
-    ProcessExecutor
-      .concurrent(processesCount = 10)
-      .map(new EventHandler[F](_))
+    (TSUploader[F], ProcessExecutor.concurrent(processesCount = 10))
+      .mapN(new EventHandler[F](_, _))
 }

@@ -19,6 +19,7 @@
 package io.renku.entities.viewings.collector.projects
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.literal._
 import Generators._
 import io.circe.Encoder
@@ -47,7 +48,10 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.process" should {
 
-    "be the MembersSynchronizer.synchronizerMembers" in new TestCase {
+    "be the TSUploader.uploadToTS" in new TestCase {
+
+      (tsUploader.uploadToTS _).expects(event).returns(().pure[IO])
+
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
   }
@@ -71,7 +75,8 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     val event = projectViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val handler = new EventHandler[IO](mock[ProcessExecutor[IO]])
+    val tsUploader = mock[TSUploader[IO]]
+    val handler    = new EventHandler[IO](tsUploader, mock[ProcessExecutor[IO]])
   }
 
   private implicit lazy val eventEncoder: Encoder[ProjectViewedEvent] =
