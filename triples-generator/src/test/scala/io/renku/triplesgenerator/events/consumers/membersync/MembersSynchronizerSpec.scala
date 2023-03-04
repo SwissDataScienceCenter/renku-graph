@@ -23,8 +23,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
 import io.renku.http.client.AccessToken
@@ -48,7 +47,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
       val maybeAccessToken = accessTokens.generateOption
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
+        .findAccessToken(_: projects.Path)(_: projects.Path => String))
         .expects(projectPath, projectPathToPath)
         .returning(maybeAccessToken.pure[Try])
 
@@ -64,14 +63,17 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
       synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
-      logger.loggedOnly(infoMessage(syncSummary))
+      logger.loggedOnly(
+        Info(show"$categoryName: $projectPath accepted"),
+        infoMessage(syncSummary)
+      )
     }
 
     "recover with log statement if collaborator fails" in new TestCase {
 
       val maybeAccessToken = accessTokens.generateOption
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
+        .findAccessToken(_: projects.Path)(_: projects.Path => String))
         .expects(projectPath, projectPathToPath)
         .returning(maybeAccessToken.pure[Try])
 
@@ -83,14 +85,12 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
       synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
-      logger.loggedOnly(
-        Error(s"$categoryName: Members synchronized for project $projectPath FAILED", exception)
-      )
+      logger.logged(Error(s"$categoryName: Members synchronized for project $projectPath failed", exception))
     }
   }
 
   private trait TestCase {
-    implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
+
     val projectPath = projectPaths.generateOne
 
     implicit val logger:            TestLogger[Try]        = TestLogger[Try]()

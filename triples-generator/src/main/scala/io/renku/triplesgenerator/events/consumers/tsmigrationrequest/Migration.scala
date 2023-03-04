@@ -20,17 +20,17 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
 import ConditionedMigration._
 import Migration.Name
+import cats.{MonadThrow, Show}
 import cats.data.EitherT
 import cats.data.EitherT._
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import io.circe.Decoder
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld.{EntityId, EntityIdEncoder}
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 

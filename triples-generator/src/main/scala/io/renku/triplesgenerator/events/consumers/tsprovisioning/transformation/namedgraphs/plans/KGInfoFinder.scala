@@ -39,12 +39,12 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](sto
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.Schemas.{prov, schema}
   import io.renku.graph.model._
+  import io.renku.graph.model.Schemas.{prov, schema}
   import io.renku.graph.model.views.RdfResource
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore._
+  import io.renku.triplesstore.SparqlQuery.Prefixes
 
   override def findDateCreated(projectId: projects.ResourceId,
                                planId:    plans.ResourceId

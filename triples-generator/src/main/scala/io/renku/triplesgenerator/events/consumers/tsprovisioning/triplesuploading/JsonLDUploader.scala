@@ -52,8 +52,8 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     )
     with JsonLDUploader[F] {
 
-  import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
+  import org.http4s.Status._
   import recoveryStrategy.maybeRecoverableError
 
   override def uploadJsonLD(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {

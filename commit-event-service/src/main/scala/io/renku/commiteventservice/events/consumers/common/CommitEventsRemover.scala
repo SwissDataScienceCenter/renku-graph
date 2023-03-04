@@ -51,7 +51,7 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender
             "id":   ${project.id},
             "path": ${project.path}
           },
-          "newStatus": $AwaitingDeletion
+          "subCategory": "ToAwaitingDeletion"
         }"""),
         EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                                  errorMessage = s"$categoryName: Marking event as $AwaitingDeletion failed"

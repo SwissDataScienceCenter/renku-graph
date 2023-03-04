@@ -49,10 +49,10 @@ private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru:
     tsClient.updateWithNoResult(v10MigratedTriple(path))
 
   private def v10MigratedTriple(path: projects.Path) = {
-    val triple = Triple(MigrationToV10.name.asEntityId, renku / "migrated", path.asObject)
+    val triple = Triple(MigrationToV10.name.asEntityId, renku / "toBeMigrated", path.asObject)
     SparqlQuery.ofUnsafe(
       show"${MigrationToV10.name} - store migrated",
-      s"INSERT DATA {${triple.asSparql.sparql}}"
+      s"DELETE DATA {${triple.asSparql.sparql}}"
     )
   }
 }

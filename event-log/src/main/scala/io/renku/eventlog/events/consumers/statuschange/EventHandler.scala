@@ -18,282 +18,150 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import cats.data.EitherT
-import cats.effect.{Async, Spawn}
+import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow, Show}
-import io.circe.DecodingFailure
+import eu.timepit.refined.auto._
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.consumers.statuschange.DBUpdater.EventUpdaterFactory
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import io.renku.events.consumers._
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
+import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventMessage, EventProcessingTime, EventStatus, ZippedEventPayload}
-import io.renku.graph.model.projects
+import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-import java.time.{Duration => JDuration}
+final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
+    processExecutor:     ProcessExecutor[F],
+    statusChanger:       StatusChanger[F],
+    eventSender:         EventSender[F],
+    eventsQueue:         StatusChangeEventsQueue[F],
+    deliveryInfoRemover: DeliveryInfoRemover[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-private class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionTimes](
-    override val categoryName: CategoryName,
-    eventsQueue:               StatusChangeEventsQueue[F],
-    statusChanger:             StatusChanger[F],
-    deliveryInfoRemover:       DeliveryInfoRemover[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+  override val categoryName: CategoryName = io.renku.eventlog.events.consumers.statuschange.categoryName
 
-  private val applicative = Applicative[F]
-  import EventHandler._
-  import applicative.whenA
+  protected override type Event = StatusChangeEvent
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess[F] {
-    tryHandle(
-      requestAs[ToTriplesGenerated],
-      requestAs[ToTriplesStore],
-      requestAs[ToFailure[ProcessingStatus, FailureStatus]],
-      requestAs[RollbackToNew],
-      requestAs[RollbackToTriplesGenerated],
-      requestAs[ToAwaitingDeletion],
-      requestAs[RollbackToAwaitingDeletion],
-      requestAs[RedoProjectTransformation],
-      requestAs[ProjectEventsToNew],
-      requestAs[AllEventsToNew]
-    )(request)
+  protected override def onPostHandling(event: StatusChangeEvent, result: EventSchedulingResult): F[Unit] =
+    result match {
+      case EventSchedulingResult.Accepted =>
+        if (logEventAccepted(event)) Logger[F].info(show"$categoryName: $event -> $result")
+        else ().pure[F]
+
+      case EventSchedulingResult.SchedulingError(ex) =>
+        Logger[F].error(ex)(show"$categoryName: $event -> $result")
+
+      case _ =>
+        Logger[F].info(show"$categoryName: $event -> $result")
+    }
+
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = eventDecoder,
+      process = statusChanger.updateStatuses(dbUpdater)
+    )
+
+  private val dbUpdater: DBUpdater[F, StatusChangeEvent] =
+    new DBUpdater[F, StatusChangeEvent] {
+      override def updateDB(event: StatusChangeEvent): UpdateOp[F] =
+        dbUpdaterFor(event)._1
+
+      override def onRollback(event: StatusChangeEvent): RollbackOp[F] =
+        dbUpdaterFor(event)._2
+    }
+
+  private val eventDecoder: EventRequestContent => Either[DecodingFailure, StatusChangeEvent] = req =>
+    Decoder[StatusChangeEvent]
+      .emap {
+        case e: StatusChangeEvent.ToTriplesGenerated =>
+          req match {
+            case EventRequestContent.WithPayload(_, payload: ZippedEventPayload) =>
+              e.copy(payload = payload).asRight
+            case _ =>
+              Left(show"Missing event payload for: $e")
+          }
+        case e => e.asRight
+      }
+      .apply(req.event.hcursor)
+
+  private def dbUpdaterFor(event: StatusChangeEvent): (UpdateOp[F], RollbackOp[F]) =
+    event match {
+      case ev: StatusChangeEvent.AllEventsToNew.type =>
+        val updater = new alleventstonew.DbUpdater[F](eventSender)
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.ProjectEventsToNew =>
+        val updater = new projecteventstonew.DbUpdater[F](eventsQueue)
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.RedoProjectTransformation =>
+        val updater = new redoprojecttransformation.DbUpdater[F](eventsQueue)
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.RollbackToAwaitingDeletion =>
+        val updater = new rollbacktoawaitingdeletion.DbUpdater[F]()
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.RollbackToNew =>
+        val updater = new rollbacktonew.DbUpdater[F]()
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.RollbackToTriplesGenerated =>
+        val updater = new rollbacktotriplesgenerated.DbUpdater[F]()
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.ToAwaitingDeletion =>
+        val updater = new toawaitingdeletion.DbUpdater[F]()
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.ToFailure =>
+        val updater = new tofailure.DbUpdater[F](deliveryInfoRemover)
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.ToTriplesGenerated =>
+        val updater = new totriplesgenerated.DbUpdater[F](deliveryInfoRemover)
+        (updater.updateDB(ev), updater.onRollback(ev))
+
+      case ev: StatusChangeEvent.ToTriplesStore =>
+        val updater = new totriplesstore.DbUpdater[F](deliveryInfoRemover)
+        (updater.updateDB(ev), updater.onRollback(ev))
+    }
+
+  private def logEventAccepted(event: StatusChangeEvent) = event match {
+    case _: StatusChangeEvent.RollbackToNew              => false
+    case _: StatusChangeEvent.RollbackToAwaitingDeletion => false
+    case _: StatusChangeEvent.RollbackToTriplesGenerated => false
+    case _ => true
   }
-
-  private def tryHandle(
-      options: EventRequestContent => EitherT[F, EventSchedulingResult, Accepted]*
-  ): EventRequestContent => EitherT[F, EventSchedulingResult, Accepted] = request =>
-    options.foldLeft(
-      EitherT.left[Accepted](UnsupportedEventType.pure[F].widen[EventSchedulingResult])
-    ) { case (previousOptionResult, option) => previousOptionResult orElse option(request) }
-
-  private def requestAs[E <: StatusChangeEvent](request: EventRequestContent)(implicit
-      updaterFactory: EventUpdaterFactory[F, E],
-      show:           Show[E],
-      decoder:        EventRequestContent => Either[DecodingFailure, E]
-  ): EitherT[F, EventSchedulingResult, Accepted] = EitherT(
-    decode[E](request)
-      .map(startUpdate)
-      .leftMap(_ => BadRequest)
-      .leftWiden[EventSchedulingResult]
-      .sequence
-  )
-
-  private def startUpdate[E <: StatusChangeEvent](implicit
-      updaterFactory: EventUpdaterFactory[F, E],
-      show:           Show[E]
-  ): E => F[Accepted] = event =>
-    Spawn[F]
-      .start(executeUpdate(event))
-      .map(_ => Accepted)
-      .flatTap(logAccepted(event))
-
-  private def executeUpdate[E <: StatusChangeEvent](
-      event: E
-  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = {
-    for {
-      factory <- updaterFactory(eventsQueue, deliveryInfoRemover)
-      result  <- statusChanger.updateStatuses(event)(factory)
-    } yield result
-  } recoverWith { case e => Logger[F].logError(event, e) }
-
-  private def logAccepted[E <: StatusChangeEvent](event: E)(implicit show: Show[E]): Accepted => F[Unit] =
-    accepted => whenA(!event.silent)(Logger[F].log(event.show)(accepted))
 }
 
-private object EventHandler {
-
+object EventHandler {
   def apply[F[
       _
   ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
-  ): F[EventHandler[F]] = for {
-    deliveryInfoRemover <- DeliveryInfoRemover[F]
-    gaugesUpdater       <- MonadThrow[F].catchNonFatal(new GaugesUpdaterImpl[F])
-    statusChanger       <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
-    _                   <- registerHandlers(eventsQueue, statusChanger)
-  } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover)
-
-  private def registerHandlers[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes](
-      eventsQueue:   StatusChangeEventsQueue[F],
-      statusChanger: StatusChanger[F]
-  ) = for {
-    projectsToNewUpdater <- ProjectEventsToNewUpdater[F]
-    _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
-    redoProjectTransformation <- RedoProjectTransformationUpdater[F]
-    _ <- eventsQueue.register[RedoProjectTransformation](statusChanger.updateStatuses(_)(redoProjectTransformation))
-  } yield ()
-
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-
-  private def decode[E <: StatusChangeEvent](
-      request: EventRequestContent
-  )(implicit decoder: EventRequestContent => Either[DecodingFailure, E]) = decoder(request)
-
-  private implicit lazy val eventTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, ToTriplesGenerated] = {
-    case EventRequestContent.WithPayload(event, payload: ZippedEventPayload) =>
-      for {
-        id             <- event.hcursor.downField("id").as[EventId]
-        projectId      <- event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath    <- event.hcursor.downField("project").downField("path").as[projects.Path]
-        processingTime <- event.hcursor.downField("processingTime").as[EventProcessingTime]
-        _ <- event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-               case TriplesGenerated => Right(())
-               case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-             }
-      } yield ToTriplesGenerated(CompoundEventId(id, projectId), projectPath, processingTime, payload)
-    case _ => Left(DecodingFailure("Missing event payload", Nil))
-  }
-
-  private implicit lazy val eventTripleStoreDecoder: EventRequestContent => Either[DecodingFailure, ToTriplesStore] = {
-    request =>
-      for {
-        id             <- request.event.hcursor.downField("id").as[EventId]
-        projectId      <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath    <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-        processingTime <- request.event.hcursor.downField("processingTime").as[EventProcessingTime]
-        _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-               case TriplesStore => Right(())
-               case status       => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-             }
-      } yield ToTriplesStore(CompoundEventId(id, projectId), projectPath, processingTime)
-  }
-
-  private implicit lazy val eventFailureDecoder
-      : EventRequestContent => Either[DecodingFailure, ToFailure[ProcessingStatus, FailureStatus]] = { request =>
-    for {
-      id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      message     <- request.event.hcursor.downField("message").as[EventMessage]
-      eventId = CompoundEventId(id, projectId)
-      executionDelay <-
-        request.event.hcursor.downField("executionDelay").as[Option[JDuration]]
-      statusChangeEvent <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-                             case status: GenerationRecoverableFailure =>
-                               ToFailure(eventId,
-                                         projectPath,
-                                         message,
-                                         GeneratingTriples,
-                                         status,
-                                         executionDelay
-                               ).asRight
-                             case status: GenerationNonRecoverableFailure =>
-                               ToFailure(eventId,
-                                         projectPath,
-                                         message,
-                                         GeneratingTriples,
-                                         status,
-                                         maybeExecutionDelay = None
-                               ).asRight
-                             case status: TransformationRecoverableFailure =>
-                               ToFailure(eventId,
-                                         projectPath,
-                                         message,
-                                         TransformingTriples,
-                                         status,
-                                         executionDelay
-                               ).asRight
-                             case status: TransformationNonRecoverableFailure =>
-                               ToFailure(eventId,
-                                         projectPath,
-                                         message,
-                                         TransformingTriples,
-                                         status,
-                                         maybeExecutionDelay = None
-                               ).asRight
-                             case status =>
-                               DecodingFailure(s"Unrecognized event status $status", Nil)
-                                 .asLeft[ToFailure[ProcessingStatus, FailureStatus]]
-                           }
-    } yield statusChangeEvent
-  }
-
-  private implicit lazy val eventRollbackToNewDecoder: EventRequestContent => Either[DecodingFailure, RollbackToNew] = {
-    request =>
-      for {
-        id          <- request.event.hcursor.downField("id").as[EventId]
-        projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-        _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-               case New    => Right(())
-               case status => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-             }
-      } yield RollbackToNew(CompoundEventId(id, projectId), projectPath)
-  }
-
-  private implicit lazy val eventRollbackToTriplesGeneratedDecoder
-      : EventRequestContent => Either[DecodingFailure, RollbackToTriplesGenerated] = { request =>
-    for {
-      id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-             case TriplesGenerated => Right(())
-             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield RollbackToTriplesGenerated(CompoundEventId(id, projectId), projectPath)
-  }
-
-  private implicit lazy val eventToAwaitingDeletionDecoder
-      : EventRequestContent => Either[DecodingFailure, ToAwaitingDeletion] = { request =>
-    for {
-      id          <- request.event.hcursor.downField("id").as[EventId]
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-             case AwaitingDeletion => Right(())
-             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield ToAwaitingDeletion(CompoundEventId(id, projectId), projectPath)
-  }
-
-  private implicit lazy val eventRollbackToAwaitingDeletionDecoder
-      : EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
-    for {
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-             case AwaitingDeletion => Right(())
-             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
-  }
-
-  private implicit lazy val eventToRedoProjectTransformationDecoder
-      : EventRequestContent => Either[DecodingFailure, RedoProjectTransformation] = { request =>
-    for {
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- request.event.hcursor.downField("newStatus").as[EventStatus] >>= {
-             case TriplesGenerated => Right(())
-             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield RedoProjectTransformation(projectPath)
-  }
-
-  private implicit lazy val eventToProjectEventsToNewDecoder
-      : EventRequestContent => Either[DecodingFailure, ProjectEventsToNew] = { request =>
-    for {
-      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
-      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
-             case New    => Right(())
-             case status => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-           }
-    } yield ProjectEventsToNew(Project(projectId, projectPath))
-  }
-
-  private implicit lazy val allEventNewDecoder: EventRequestContent => Either[DecodingFailure, AllEventsToNew] =
-    _.event.hcursor.downField("newStatus").as[EventStatus] >>= {
-      case New    => Right(AllEventsToNew)
-      case status => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
-    }
+  ): F[consumers.EventHandler[F]] = for {
+    deliveryInfoRemover       <- DeliveryInfoRemover[F]
+    statusChanger             <- StatusChanger[F]
+    redoDequeuedEventHandler  <- redoprojecttransformation.DequeuedEventHandler[F]
+    toNewDequeuedEventHandler <- projecteventstonew.DequeuedEventHandler[F]
+    _ <- eventsQueue.register(
+           statusChanger.updateStatuses(redoDequeuedEventHandler)(_: StatusChangeEvent.RedoProjectTransformation)
+         )
+    _ <- eventsQueue.register(
+           statusChanger.updateStatuses(toNewDequeuedEventHandler)(_: StatusChangeEvent.ProjectEventsToNew)
+         )
+    eventSender     <- EventSender[F](EventLogUrl)
+    processExecutor <- ProcessExecutor.concurrent(200)
+  } yield new EventHandler[F](
+    processExecutor,
+    statusChanger,
+    eventSender,
+    eventsQueue,
+    deliveryInfoRemover
+  )
 }

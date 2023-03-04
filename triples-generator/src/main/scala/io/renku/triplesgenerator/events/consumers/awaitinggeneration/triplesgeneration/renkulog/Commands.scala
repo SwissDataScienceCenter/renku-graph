@@ -24,16 +24,16 @@ import cats.data.EitherT
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.events.CommitId
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
+import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

@@ -16,52 +16,50 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.triplesgenerator.events.consumers
+package membersync
 
-import cats.Show
-import cats.data.EitherT.fromEither
-import cats.effect.{Async, Concurrent, Spawn}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.events.consumers.EventSchedulingResult.Accepted
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
+import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
-private[events] class EventHandler[F[_]: Concurrent: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
-    membersSynchronizer:       MembersSynchronizer[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+    membersSynchronizer:       MembersSynchronizer[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import io.renku.graph.model.projects
+  import io.renku.events.consumers.EventDecodingTools._
   import membersSynchronizer._
   import tsReadinessChecker._
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](verifyTSReady >> startSynchronizingMember(request))
+  protected override type Event = projects.Path
 
-  private def startSynchronizingMember(request: EventRequestContent) =
-    fromEither[F](request.event.getProjectPath) >>= { projectPath =>
-      Spawn[F]
-        .start(synchronizeMembers(projectPath))
-        .toRightT
-        .map(_ => Accepted)
-        .semiflatTap(Logger[F] log projectPath)
-        .leftSemiflatTap(Logger[F] log projectPath)
-    }
-
-  private implicit lazy val eventInfoToString: Show[projects.Path] = Show.show(path => s"projectPath = $path")
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.getProjectPath,
+      process = synchronizeMembers,
+      precondition = verifyTSReady,
+      onRelease = None
+    )
 }
 
-private[events] object EventHandler {
+private object EventHandler {
+
+  import eu.timepit.refined.auto._
+
   def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger]
-      : F[EventHandler[F]] = for {
+      : F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
     membersSynchronizer <- MembersSynchronizer[F]
-  } yield new EventHandler[F](categoryName, tsReadinessChecker, membersSynchronizer)
+    processExecutor     <- ProcessExecutor.concurrent(processesCount = 1)
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, membersSynchronizer, processExecutor)
 }

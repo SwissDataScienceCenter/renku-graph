@@ -69,7 +69,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                 "id": ${eventId.projectId.value},
                 "path": ${projectPath.value}
               },
-              "newStatus": "TRIPLES_GENERATED", 
+              "subCategory": "ToTriplesGenerated",
               "processingTime": ${processingTime.value}
             }""",
             payload = zippedPayload
@@ -103,7 +103,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                 "id": ${eventId.projectId.value},
                 "path": ${projectPath.value}
               },
-              "newStatus": "TRIPLES_STORE", 
+              "subCategory": "ToTriplesStore",
               "processingTime": ${processingTime.value}
             }"""
           ),
@@ -133,16 +133,17 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                 "id":   ${eventId.projectId.value},
                 "path": ${projectPath.value}
               },
-              "newStatus": ${New.value}
+              "subCategory": "RollbackToNew"
             }"""
           ),
-          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   s"$categoryName: Change event status as $New failed"
+          EventSender.EventContext(
+            CategoryName("EVENTS_STATUS_CHANGE"),
+            s"$categoryName: Change event status as ${RollbackStatus.New} failed"
           )
         )
         .returning(IO.unit)
 
-      updater.rollback[New](eventId, projectPath).unsafeRunSync() shouldBe ()
+      updater.rollback(eventId, projectPath, RollbackStatus.New).unsafeRunSync() shouldBe ()
     }
 
     s"send a ToTriplesGenerated status change event" in new TestCase {
@@ -157,16 +158,17 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                 "id":   ${eventId.projectId},
                 "path": $projectPath
               },
-              "newStatus": $TriplesGenerated
+              "subCategory": "RollbackToTriplesGenerated"
             }"""
           ),
-          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   s"$categoryName: Change event status as $TriplesGenerated failed"
+          EventSender.EventContext(
+            CategoryName("EVENTS_STATUS_CHANGE"),
+            s"$categoryName: Change event status as ${RollbackStatus.TriplesGenerated} failed"
           )
         )
         .returning(IO.unit)
 
-      updater.rollback[TriplesGenerated](eventId, projectPath).unsafeRunSync() shouldBe ()
+      updater.rollback(eventId, projectPath, RollbackStatus.TriplesGenerated).unsafeRunSync() shouldBe ()
     }
   }
 
@@ -187,6 +189,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                     "id":   ${eventId.projectId},
                     "path": $projectPath
                   },
+                  "subCategory": "ToFailure",
                   "message":   ${ErrorMessage.withStackTrace(exception).value},  
                   "newStatus": $eventStatus 
                 }"""
@@ -215,7 +218,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                 "id":   ${eventId.projectId.value},
                 "path": ${projectPath.value}
               },
-              "newStatus": ${New.value}
+              "subCategory": "ProjectEventsToNew"
             }"""
           ),
           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),

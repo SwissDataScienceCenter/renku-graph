@@ -18,11 +18,11 @@
 
 package io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration
 
+import cats.{NonEmptyParallel, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Show}
-import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary.semigroup
 import io.renku.commiteventservice.events.consumers.common.{SynchronizationSummary, UpdateResult}
+import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary.semigroup
 import io.renku.commiteventservice.events.consumers.globalcommitsync._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
@@ -54,7 +54,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
     now:                       () => Instant = () => Instant.now
 ) extends CommitsSynchronizer[F] {
 
-  val commitsPerPage = PerPage(50)
+  private val commitsPerPage = PerPage(50)
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
@@ -67,7 +67,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
   import missingCommitEventCreator._
 
   override def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit] = {
-    findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      findAccessToken(event.project.id) >>= { implicit mat =>
       fetchCommitStats(event.project.id) >>= {
         case maybeStats if outOfSync(event)(maybeStats) => createOrDeleteEvents(event)
         case _ =>

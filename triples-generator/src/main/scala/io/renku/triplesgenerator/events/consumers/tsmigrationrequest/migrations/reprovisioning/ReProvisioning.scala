@@ -25,8 +25,8 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.literal._
-import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.producers.EventSender
 import io.renku.graph.config.{EventLogUrl, RenkuUrlLoader}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
@@ -100,7 +100,7 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     .recoverWith(tryAgain(microserviceUrlFinder.findBaseUrl()))
 
   private def sendStatusChangeEvent() = sendEvent(
-    EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
+    EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "subCategory": "AllEventsToNew"}"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), formMessage("sending EVENTS_STATUS_CHANGE failed"))
   )
 
@@ -138,7 +138,7 @@ private[migrations] object ReProvisioning {
       judge,
       triplesRemover,
       eventSender,
-      new RenkuVersionPairUpdaterImpl(migrationsConnectionConfig),
+      RenkuVersionPairUpdater(migrationsConnectionConfig),
       microserviceUrlFinder,
       ReProvisioningStatus[F],
       executionTimeRecorder,

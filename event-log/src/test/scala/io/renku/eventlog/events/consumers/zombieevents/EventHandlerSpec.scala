@@ -20,22 +20,18 @@ package io.renku.eventlog.events.consumers
 package zombieevents
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.eventlog.metrics.{EventStatusGauges, TestEventStatusGauges}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.projects
+import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.metrics.LabeledGauge
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -51,114 +47,59 @@ class EventHandlerSpec
     with Eventually
     with IntegrationPatience {
 
-  "handle" should {
-
-    Updated :: NotUpdated :: Nil foreach { result =>
-      ProcessingStatus.all foreach { status =>
-        s"decode an event with the $status status from the request, " +
-          "schedule event update " +
-          s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
-
-            val eventId     = compoundEventIds.generateOne
-            val projectPath = projectPaths.generateOne
-            val event       = ZombieEvent(eventId, projectPath, status)
-
-            (zombieStatusCleaner.cleanZombieStatus _)
-              .expects(event)
-              .returning(result.pure[IO])
-
-            handler
-              .createHandlingProcess(requestContent(event.asJson))
-              .unsafeRunSync()
-              .process
-              .value
-              .unsafeRunSync() shouldBe Right(Accepted)
-
-            result match {
-              case Updated =>
-                val (incGauge, decGauge) = gaugesFor(status)
-                eventually {
-                  incGauge.getValue(projectPath).unsafeRunSync() shouldBe 1d
-                  decGauge.getValue(projectPath).unsafeRunSync() shouldBe -1d
-                }
-              case NotUpdated => ()
-            }
-
-            logger.loggedOnly(
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-              )
-            )
-          }
-      }
+  "createHandlingDefinition.decode" should {
+    s"decode a valid event successfully" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = events.generateOne
+      definition.decode(EventRequestContent(eventData.asJson)) shouldBe Right(eventData)
     }
 
-    "log an error if event status cleaning fails" in new TestCase {
+    "fail on invalid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+    }
+  }
 
+  "createHandlingDefinition.process" should {
+    "call to zombieStatusCleaner and update gauges on Updated result" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (zombieStatusCleaner.cleanZombieStatus _).expects(*).returning(IO.pure(Updated))
       val event = events.generateOne
+      definition.process(event).unsafeRunSync() shouldBe ()
 
-      val exception = exceptions.generateOne
-      (zombieStatusCleaner.cleanZombieStatus _)
-        .expects(event)
-        .returning(exception.raiseError[IO, UpdateResult])
-
-      handler
-        .createHandlingProcess(requestContent(event.asJson))
-        .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Right(Accepted)
-
-      eventually {
-        logger.loggedOnly(
-          Info(
-            s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-          ),
-          Error(
-            s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> Failure",
-            exception
-          )
-        )
-      }
-    }
-
-    s"return $BadRequest if event is malformed" in new TestCase {
-
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": "ZOMBIE_CHASING"
-        }"""
+      val (incGauge, decGauge) = event.status match {
+        case EventStatus.GeneratingTriples   => gauges.awaitingGeneration     -> gauges.underGeneration
+        case EventStatus.TransformingTriples => gauges.awaitingTransformation -> gauges.underTransformation
+        case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
+      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 1d
+      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe -1d
     }
 
-    s"return $BadRequest if event status is different than $GeneratingTriples or $TransformingTriples" in new TestCase {
-
+    "call to zombieStatusCleaner and don't update gauges on NotUpdated result" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (zombieStatusCleaner.cleanZombieStatus _).expects(*).returning(IO.pure(NotUpdated))
       val event = events.generateOne
+      definition.process(event).unsafeRunSync() shouldBe ()
 
-      val request = requestContent {
-        event.asJson deepMerge json"""{
-          "status": ${Gen
-            .oneOf(
-              New,
-              TriplesGenerated,
-              TriplesStore,
-              Skipped,
-              GenerationRecoverableFailure,
-              GenerationNonRecoverableFailure,
-              TransformationRecoverableFailure,
-              TransformationNonRecoverableFailure
-            )
-            .generateOne
-            .value}}"""
+      val (incGauge, decGauge) = event.status match {
+        case EventStatus.GeneratingTriples   => gauges.awaitingGeneration     -> gauges.underGeneration
+        case EventStatus.TransformingTriples => gauges.awaitingTransformation -> gauges.underTransformation
+        case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
+      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
+      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
+    }
+  }
 
-      logger.expectNoLogs()
+  "createHandlingDefinition" should {
+    "not define  precondition and onRelease" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.precondition.unsafeRunSync() shouldBe None
+      definition.onRelease                    shouldBe None
     }
   }
 
@@ -167,30 +108,24 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO]        = TestLogger[IO]()
     implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
     val zombieStatusCleaner = mock[ZombieStatusCleaner[IO]]
-    val handler             = new EventHandler[IO](categoryName, zombieStatusCleaner)
+    val handler             = new EventHandler[IO](categoryName, zombieStatusCleaner, ProcessExecutor.sequential[IO])
 
-    val gaugesFor: ProcessingStatus => (LabeledGauge[IO, projects.Path], LabeledGauge[IO, projects.Path]) = {
-      case GeneratingTriples   => gauges.awaitingGeneration     -> gauges.underGeneration
-      case TransformingTriples => gauges.awaitingTransformation -> gauges.underTransformation
-      case Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
+    val events: Gen[ZombieEvent] = for {
+      eventId     <- compoundEventIds
+      projectPath <- projectPaths
+      status      <- processingStatuses
+    } yield ZombieEvent(eventId, projectPath, status)
+
+    implicit val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
+      json"""{
+        "categoryName": "ZOMBIE_CHASING",
+        "id":           ${event.eventId.id.value},
+        "project": {
+          "id":         ${event.eventId.projectId.value},
+          "path":       ${event.projectPath.value}
+       },
+        "status":       ${event.status.value}
+      }"""
     }
-  }
-
-  private lazy val events: Gen[ZombieEvent] = for {
-    eventId     <- compoundEventIds
-    projectPath <- projectPaths
-    status      <- processingStatuses
-  } yield ZombieEvent(eventId, projectPath, status)
-
-  private implicit lazy val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
-    json"""{
-      "categoryName": "ZOMBIE_CHASING",
-      "id":           ${event.eventId.id.value},
-      "project": {
-        "id":         ${event.eventId.projectId.value},
-        "path":       ${event.projectPath.value}
-      },
-      "status":       ${event.status.value}
-    }"""
   }
 }

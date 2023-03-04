@@ -23,8 +23,8 @@ import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource

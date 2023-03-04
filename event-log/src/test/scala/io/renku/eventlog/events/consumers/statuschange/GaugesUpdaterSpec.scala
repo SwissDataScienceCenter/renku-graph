@@ -19,10 +19,10 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.eventlog.metrics.{EventStatusGauges, TestEventStatusGauges}
-import io.renku.generators.Generators.Implicits._
+import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.generators.Generators.{nonNegativeDoubles, nonNegativeInts}
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._

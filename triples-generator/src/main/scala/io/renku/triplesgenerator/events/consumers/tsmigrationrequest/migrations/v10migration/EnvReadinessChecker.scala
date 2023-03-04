@@ -25,6 +25,7 @@ import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import org.typelevel.log4cats.Logger
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration._
 
 private trait EnvReadinessChecker[F[_]] {
@@ -39,28 +40,31 @@ private object EnvReadinessChecker {
 private class EnvReadinessCheckerImpl[F[_]: Async](elClient: EventLogClient[F], retryTimeout: Duration = 1 second)
     extends EnvReadinessChecker[F] {
 
-  override def envReadyToTakeEvent: F[Unit] =
-    waitForTwoSubsequentReadyStatuses(previousCheck = false).void
+  private val consecutiveSuccessesToPass = 3
 
-  private def waitForTwoSubsequentReadyStatuses(previousCheck: Boolean): F[Boolean] =
-    checkFreeCapacity >>= {
-      case check @ false                  => waitAndTryAgain(check)
-      case check @ true if !previousCheck => waitAndTryAgain(check)
-      case check @ true                   => check.pure[F]
+  override def envReadyToTakeEvent: F[Unit] =
+    waitForSubsequentReadyStatuses(previousChecks = Queue.empty).void
+
+  private def waitForSubsequentReadyStatuses(previousChecks: Queue[Boolean]): F[Boolean] =
+    checkFreeCapacity.map(previousChecks.enqueue) >>= {
+      case checks if checks.size < consecutiveSuccessesToPass => waitAndTryAgain(checks)
+      case checks if !checks.forall(identity)                 => waitAndTryAgain(checks.dequeue._2)
+      case _                                                  => true.pure[F]
     }
 
-  private def waitAndTryAgain(previousCheck: Boolean) =
-    Temporal[F].delayBy(waitForTwoSubsequentReadyStatuses(previousCheck), retryTimeout)
+  private def waitAndTryAgain(previousChecks: Queue[Boolean]) =
+    Temporal[F].delayBy(waitForSubsequentReadyStatuses(previousChecks), retryTimeout)
 
   private def checkFreeCapacity =
-    elClient.getStatus.map(
-      _.toEither
-        .leftMap(_ => false)
-        .map(getAwaitingGenerationFreeCapacity)
-        .flatMap(Either.fromOption(_, ifNone = false))
-        .map(_ > 0)
-        .merge
-    )
+    elClient.getStatus
+      .map(
+        _.toEither
+          .leftMap(_ => false)
+          .map(getAwaitingGenerationFreeCapacity)
+          .flatMap(Either.fromOption(_, ifNone = false))
+          .map(_ > 0)
+          .merge
+      )
 
   private lazy val getAwaitingGenerationFreeCapacity: ServiceStatus => Option[Int] =
     _.subscriptions

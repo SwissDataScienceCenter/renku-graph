@@ -20,11 +20,11 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 
 import cats.syntax.all._
-import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.versions.RenkuVersionPair
-import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes}
+import io.renku.jsonld.syntax._
 
 package object reprovisioning {
 

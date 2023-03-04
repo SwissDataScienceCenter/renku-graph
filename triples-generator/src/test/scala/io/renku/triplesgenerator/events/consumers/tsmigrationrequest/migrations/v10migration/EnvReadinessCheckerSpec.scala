@@ -38,13 +38,18 @@ class EnvReadinessCheckerSpec extends AnyWordSpec with should.Matchers with Mock
 
   "envReadyToTakeEvent" should {
 
-    "succeed when two subsequent calls to EL's GET /status shows " +
+    "succeed when three subsequent calls to EL's GET /status shows " +
       "there's some free capacity to process an AWAITING_GENERATION event" in new TestCase {
 
-        givenELStatusReturning(nonZeroFreeCapacity.generateOne,
-                               0,
-                               nonZeroFreeCapacity.generateOne,
-                               nonZeroFreeCapacity.generateOne
+        givenELStatusReturning(
+          nonZeroFreeCapacity.generateOne,
+          0,
+          nonZeroFreeCapacity.generateOne,
+          0,
+          0,
+          nonZeroFreeCapacity.generateOne,
+          nonZeroFreeCapacity.generateOne,
+          nonZeroFreeCapacity.generateOne
         )
 
         val actual = Deferred.unsafe[IO, Unit]
@@ -53,7 +58,8 @@ class EnvReadinessCheckerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val (elapsed, _) = Temporal[IO].timed((call -> actual.get).parTupled).unsafeRunSync()
 
-        elapsed.toMillis should be > retryTimeout.toMillis * 3
+        val numberOfTriesBeforeSuccess = 7
+        elapsed.toMillis should be > retryTimeout.toMillis * numberOfTriesBeforeSuccess
       }
   }
 
@@ -64,7 +70,7 @@ class EnvReadinessCheckerSpec extends AnyWordSpec with should.Matchers with Mock
     private val elClient      = mock[EventLogClient[IO]]
     val checker               = new EnvReadinessCheckerImpl[IO](elClient, retryTimeout)
 
-    def givenELStatusReturning(capacities: Int*) =
+    def givenELStatusReturning(capacities: Int*): Unit =
       capacities foreach { capacity =>
         (() => elClient.getStatus)
           .expects()

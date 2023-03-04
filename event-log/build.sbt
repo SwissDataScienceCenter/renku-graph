@@ -20,4 +20,4 @@ name := "event-log"
 
 Test / fork := true
 
-libraryDependencies ++= Dependencies.logbackClassic
+libraryDependencies ++= Dependencies.logbackClassic ++ Dependencies.circeGenericExtras

@@ -14,10 +14,11 @@ object Dependencies {
     val log4cats               = "2.5.0"
     val log4jCore              = "2.20.0"
     val luceneQueryParser      = "9.5.0"
-    val refined                = "0.10.1"
-    val refinedPureconfig      = "0.10.1"
+    val refined                = "0.10.2"
+    val refinedPureconfig      = "0.10.2"
     val circeCore              = "0.14.4"
     val circeOptics            = "0.14.1"
+    val circeGenericExtras     = "0.14.3"
     val jsonld4s               = "0.10.0"
     val catsCore               = "2.9.0"
     val catsEffect             = "3.4.8"
@@ -26,7 +27,7 @@ object Dependencies {
     val scalatest              = "3.2.15"
     val scalatestScalacheck    = "3.2.2.0"
     val scalamock              = "5.2.0"
-    val sentryLogback          = "6.14.0"
+    val sentryLogback          = "6.15.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.2"
     val skunk                  = "0.5.1"
@@ -149,6 +150,9 @@ object Dependencies {
   )
   val circeGeneric = Seq(
     "io.circe" %% "circe-generic" % V.circeCore
+  )
+  val circeGenericExtras = Seq(
+    "io.circe" %% "circe-generic-extras" % V.circeGenericExtras
   )
   val circeParser = Seq(
     "io.circe" %% "circe-parser" % V.circeCore

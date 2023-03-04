@@ -35,7 +35,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
+import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.{ExecutionDelay, RollbackStatus}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -73,7 +73,10 @@ class EventProcessorSpec
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
-      logSummary(commitEvent)
+      logger.loggedOnly(
+        Info(s"${commonLogMessage(commitEvent)} accepted"),
+        Info(s"${commonLogMessage(commitEvent)} processed in ${allEventsTimeRecorder.elapsedTime}ms")
+      )
     }
 
     "succeed if event fails during triples generation with a ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
@@ -92,8 +95,6 @@ class EventProcessorSpec
       expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
-
-      logger.expectNoLogs()
     }
 
     "log an error and succeed " +
@@ -155,7 +156,7 @@ class EventProcessorSpec
 
         eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
-        logger.expectNoLogs()
+        logger.getMessages(Error).isEmpty shouldBe true
       }
 
     s"put event into status $New if finding access token fails" in new TestCase {
@@ -170,9 +171,7 @@ class EventProcessorSpec
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
-      logger.getMessages(Error).map(_.message) shouldBe List(
-        s"${logMessageCommon(commitEvent)}: commit Event processing failure"
-      )
+      logger.getMessages(Error).map(_.message) shouldBe List(s"${logMessageCommon(commitEvent)} processing failure")
     }
   }
 
@@ -245,18 +244,14 @@ class EventProcessorSpec
 
     def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
-        .rollback[New](_: CompoundEventId, _: Path)(_: () => New))
+        .rollback(_: CompoundEventId, _: Path, _: RollbackStatus.New.type))
         .expects(commit.compoundEventId, commit.project.path, *)
         .returning(().pure[Try])
-
-    def logSummary(commit: CommitEvent) = logger.logged(
-      Info(s"${commonLogMessage(commit)} processed in ${allEventsTimeRecorder.elapsedTime}ms")
-    )
 
     def logError(commit: CommitEvent, exception: Exception, message: String = "failed") =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
-      s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
+      show"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }

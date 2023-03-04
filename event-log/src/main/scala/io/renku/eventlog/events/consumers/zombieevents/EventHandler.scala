@@ -18,48 +18,37 @@
 
 package io.renku.eventlog.events.consumers.zombieevents
 
-import cats.Show
-import cats.data.EitherT.fromEither
-import cats.effect.Async
-import cats.effect.kernel.Spawn
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
-import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
+private class EventHandler[F[_]: MonadCancelThrow: Logger: EventStatusGauges](
     override val categoryName: CategoryName,
-    zombieStatusCleaner:       ZombieStatusCleaner[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+    zombieStatusCleaner:       ZombieStatusCleaner[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](startCleanZombieEvents(request))
+  protected override type Event = ZombieEvent
 
-  private def startCleanZombieEvents(request: EventRequestContent) = for {
-    event <- fromEither[F](
-               request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
-             )
-    result <- Spawn[F]
-                .start(cleanZombieStatus(event))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event))
-                .leftSemiflatTap(Logger[F].log(event))
-  } yield result
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[ZombieEvent],
+      process = cleanZombieStatus
+    )
 
   private def cleanZombieStatus(event: ZombieEvent): F[Unit] = {
     zombieStatusCleaner.cleanZombieStatus(event) >>= {
       case Updated => updateGauges(event)
       case _       => ().pure[F]
     }
-  } recoverWith { case exception => Logger[F].logError(event, exception) }
+  } recoverWith { case exception =>
+    Logger[F].error(exception)(show"$categoryName: $event -> Failure")
+  }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case ZombieEvent(_, projectPath, GeneratingTriples) =>
@@ -72,30 +61,14 @@ private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
       EventStatusGauges[F].awaitingDeletion.increment(projectPath) >>
         EventStatusGauges[F].underDeletion.decrement(projectPath)
   }
-
-  private implicit lazy val eventInfoToString: Show[ZombieEvent] = Show.show { event =>
-    show"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
-  }
-
-  private implicit lazy val eventDecoder: Decoder[ZombieEvent] = { cursor =>
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    implicit val processingStatusDecoder: Decoder[EventStatus.ProcessingStatus] = Decoder[EventStatus].emap {
-      case s: ProcessingStatus => s.asRight
-      case s => show"'$s' is not a ProcessingStatus".asLeft
-    }
-
-    for {
-      id          <- cursor.downField("id").as[EventId]
-      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      status      <- cursor.downField("status").as[EventStatus.ProcessingStatus]
-    } yield ZombieEvent(CompoundEventId(id, projectId), projectPath, status)
-  }
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]: F[EventHandler[F]] = for {
+  import eu.timepit.refined.auto._
+
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]
+      : F[consumers.EventHandler[F]] = for {
     zombieStatusCleaner <- ZombieStatusCleaner[F]
-  } yield new EventHandler[F](categoryName, zombieStatusCleaner)
+    processExecutor     <- ProcessExecutor.concurrent(5)
+  } yield new EventHandler[F](categoryName, zombieStatusCleaner, processExecutor)
 }

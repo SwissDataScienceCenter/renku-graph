@@ -26,8 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery

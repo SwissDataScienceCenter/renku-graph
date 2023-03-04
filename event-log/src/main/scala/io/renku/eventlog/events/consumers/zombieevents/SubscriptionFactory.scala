@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.Microservice
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import org.typelevel.log4cats.Logger
@@ -31,7 +31,7 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
 
   def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(
         categoryName,

@@ -27,10 +27,11 @@ import java.nio.charset.StandardCharsets
 import java.util.zip._
 import scala.io.{Codec, Source}
 import scala.util.control.NonFatal
+import scala.util.Try
 
 trait Zip {
-  def zip[F[_]:   Sync](content: String):      F[Array[Byte]]
-  def unzip[F[_]: Sync](bytes:   Array[Byte]): F[String]
+  def zip[F[_]: Sync](content: String): F[Array[Byte]]
+  def unzip(bytes: Array[Byte]): Either[Exception, String]
 }
 
 object Zip extends Zip {
@@ -63,14 +64,12 @@ object Zip extends Zip {
     }
   }
 
-  def unzip[F[_]: Sync](bytes: Array[Byte]): F[String] =
-    Resource
-      .make[F, GZIPInputStream] {
-        MonadThrow[F].catchNonFatal(new GZIPInputStream(new ByteArrayInputStream(bytes)))
-      }(stream => Sync[F].delay(stream.close()))
-      .use { inputStream =>
-        MonadThrow[F].catchNonFatal(Source.fromInputStream(inputStream)(Codec.UTF8).mkString)
-      } recoverWith { case NonFatal(error) =>
-      new Exception("Unzipping content failed", error).raiseError[F, String]
-    }
+  override def unzip(bytes: Array[Byte]): Either[Exception, String] =
+    Try(new GZIPInputStream(new ByteArrayInputStream(bytes)))
+      .flatMap { stream =>
+        Try(Source.fromInputStream(stream)(Codec.UTF8).mkString)
+          .flatTap(_ => Try(stream.close()).recover(_ => ()))
+      }
+      .toEither
+      .leftMap(error => new Exception("Unzipping content failed", error))
 }

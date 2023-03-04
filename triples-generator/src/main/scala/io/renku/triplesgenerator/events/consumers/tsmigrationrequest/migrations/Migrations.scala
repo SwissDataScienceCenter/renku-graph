@@ -37,19 +37,19 @@ private[tsmigrationrequest] object Migrations {
     datasetsRemover                <- DatasetsRemover[F]
     reProvisioning                 <- ReProvisioning[F](config)
     removeNotLinkedPersons         <- RemoveNotLinkedPersons[F]
-    compositePlan                  <- CompositePlanProvision.create[F]
     fixMultipleProjectCreatedDates <- FixMultipleProjectCreatedDates[F]
     addRenkuPlanWhereMissing       <- AddRenkuPlanWhereMissing[F]
     migrationToV10                 <- v10migration.MigrationToV10[F]
+    v10VersionSetter               <- V10VersionUpdater[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
                     reProvisioning,
                     removeNotLinkedPersons,
-                    compositePlan,
                     fixMultipleProjectCreatedDates,
                     addRenkuPlanWhereMissing,
-                    migrationToV10
+                    migrationToV10,
+                    v10VersionSetter
                   )
   } yield migrations
 

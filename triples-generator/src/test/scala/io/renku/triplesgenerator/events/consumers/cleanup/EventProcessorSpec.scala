@@ -20,13 +20,12 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import org.scalamock.scalatest.MockFactory
@@ -39,45 +38,43 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "remove the triples linked to the project and notify the EL when the process is done" in new TestCase {
 
-      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(project.path).returns(().pure[IO])
 
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
 
       (eventProcessor process project).unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(Info(s"${commonLogMessage(project)} accepted"))
     }
 
     "do not fail but log an error if the removal of the triples fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (tsCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
+      (tsCleaner.removeTriples _).expects(project.path).returns(exception.raiseError[IO, Unit])
 
       (eventProcessor process project).unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(
-        Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
-      )
+      logger.logged(Error(s"${commonLogMessage(project)} triples removal failure", exception))
     }
 
     "do not fail but log an error if the notification of the EL fails" in new TestCase {
 
-      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(project.path).returns(().pure[IO])
 
       val exception = exceptions.generateOne
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])
 
       (eventProcessor process project).unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(
-        Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
-      )
+      logger.logged(Error(s"${commonLogMessage(project)} triples removal failure", exception))
     }
   }
 
   private def commonLogMessage(project: Project): String = show"$categoryName: $project"
 
   private trait TestCase {
-    val path:    projects.Path = projectPaths.generateOne
-    val project: Project       = Project(projectIds.generateOne, path)
+
+    val project = consumerProjects.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tsCleaner          = mock[namedgraphs.TSCleaner[IO]]

@@ -18,8 +18,35 @@
 
 package io.renku.eventlog.events.consumers.zombieevents
 
+import io.renku.graph.model.{events, projects}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
-import io.renku.graph.model.projects
 
 private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+
+private object ZombieEvent {
+
+  import cats.Show
+  import cats.syntax.all._
+  import io.circe.Decoder
+  import io.renku.tinytypes.json.TinyTypeDecoders._
+
+  implicit lazy val eventDecoder: Decoder[ZombieEvent] = { cursor =>
+    implicit val statusDecoder: Decoder[events.EventStatus.ProcessingStatus] =
+      Decoder[events.EventStatus].emap {
+        case s: ProcessingStatus => s.asRight
+        case s => show"'$s' is not a ProcessingStatus".asLeft
+      }
+
+    for {
+      id          <- cursor.downField("id").as[events.EventId]
+      projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
+      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+      status      <- cursor.downField("status").as[events.EventStatus.ProcessingStatus]
+    } yield ZombieEvent(CompoundEventId(id, projectId), projectPath, status)
+  }
+
+  implicit lazy val show: Show[ZombieEvent] = Show.show { event =>
+    show"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+  }
+}

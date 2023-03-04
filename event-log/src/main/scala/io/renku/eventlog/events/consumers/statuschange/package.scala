@@ -18,12 +18,9 @@
 
 package io.renku.eventlog.events.consumers
 
-import cats.data.Kleisli
 import io.renku.events.CategoryName
-import skunk.Session
 
 package object statuschange {
   val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
 
-  private[statuschange] type UpdateResult[F[_]] = Kleisli[F, Session[F], DBUpdateResults]
 }

@@ -18,22 +18,30 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
+import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
+import io.renku.eventlog.metrics.EventStatusGauges
 import skunk.Transaction
 
 private trait StatusChanger[F[_]] {
-  def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit]
+  def updateStatuses[E <: StatusChangeEvent](dbUpdater: DBUpdater[F, E])(event: E): F[Unit]
 }
 
-private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
+private object StatusChanger {
+  def apply[F[_]: MonadCancelThrow: SessionResource: EventStatusGauges]: F[StatusChanger[F]] =
+    MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](GaugesUpdater[F]))
+}
+
+private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
     extends StatusChanger[F] {
 
   import gaugesUpdater._
 
-  override def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit] =
+  override def updateStatuses[E <: StatusChangeEvent](dbUpdater: DBUpdater[F, E])(event: E): F[Unit] =
     SessionResource[F].useWithTransactionK {
       Kleisli { case (transaction, session) =>
         {
@@ -43,7 +51,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
               dbUpdater
                 .updateDB(event)
                 .flatMapF(res => transaction.commit.map(_ => res))
-                .recoverWith(rollback(transaction)(savepoint)(event))
+                .recoverWith(rollback(transaction)(savepoint)(event)(dbUpdater))
             _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case _ => Kleisli.pure(()) }
           } yield ()
         } run session
@@ -51,8 +59,8 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
     }
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
-      implicit dbUpdater: DBUpdater[F, E]
-  ): PartialFunction[Throwable, UpdateResult[F]] = { case err =>
+      dbUpdater: DBUpdater[F, E]
+  ): PartialFunction[Throwable, UpdateOp[F]] = { case err =>
     Kleisli.liftF {
       for {
         _ <- transaction.rollback(savepoint)
