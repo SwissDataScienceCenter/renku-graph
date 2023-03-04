@@ -16,7 +16,7 @@ object Dependencies {
     val luceneQueryParser      = "9.5.0"
     val refined                = "0.10.1"
     val refinedPureconfig      = "0.10.1"
-    val circeCore              = "0.14.4"
+    val circeCore              = "0.14.5"
     val circeOptics            = "0.14.1"
     val circeGenericExtras     = "0.14.3"
     val jsonld4s               = "0.10.0"
