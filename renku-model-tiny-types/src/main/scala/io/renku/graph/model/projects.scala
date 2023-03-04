@@ -98,6 +98,12 @@ object projects {
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
+  final class DateViewed private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateViewed
+      extends TinyTypeFactory[DateViewed](new DateViewed(_))
+      with InstantNotInTheFuture[DateViewed]
+      with TinyTypeJsonLDOps[DateViewed]
+
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath
       extends TinyTypeFactory[FilePath](new FilePath(_))

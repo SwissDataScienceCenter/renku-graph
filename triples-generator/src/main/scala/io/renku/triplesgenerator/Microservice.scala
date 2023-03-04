@@ -26,6 +26,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
+import io.renku.entities.viewings
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -73,13 +74,15 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    projectViewingsSubscription                  <- viewings.collector.projects.SubscriptionFactory[IO]
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,
                                 triplesGeneratedSubscription,
                                 minProjectInfoSubscription,
                                 cleanUpSubscription,
-                                migrationRequestSubscription
+                                migrationRequestSubscription,
+                                projectViewingsSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
     microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)

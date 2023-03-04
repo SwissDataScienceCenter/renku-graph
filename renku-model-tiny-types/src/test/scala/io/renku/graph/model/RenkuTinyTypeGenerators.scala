@@ -118,6 +118,8 @@ trait RenkuTinyTypeGenerators {
 
   def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
     Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateCreated)
+  def projectViewedDates(min: Instant = Instant.EPOCH): Gen[projects.DateViewed] =
+    Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateViewed)
 
   implicit val projectNamespaces: Gen[projects.Namespace] = {
     val firstCharGen    = Gen.frequency(6 -> Gen.alphaChar, 2 -> Gen.numChar, 1 -> Gen.const('_'))
