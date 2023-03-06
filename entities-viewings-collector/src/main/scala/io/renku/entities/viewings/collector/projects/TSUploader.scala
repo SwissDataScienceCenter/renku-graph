@@ -20,6 +20,7 @@ package io.renku.entities.viewings.collector.projects
 
 import cats.effect.Async
 import cats.syntax.all._
+import cats.MonadThrow
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
@@ -32,6 +33,77 @@ private object TSUploader {
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new TSUploaderImpl[F](_))
 }
 
-private class TSUploaderImpl[F[_]](tsClient: TSClient[F]) extends TSUploader[F] {
-  override def uploadToTS(event: ProjectViewedEvent): F[Unit] = ???
+private class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSUploader[F] {
+
+  import eu.timepit.refined.auto._
+  import io.circe.Decoder
+  import io.renku.graph.model.{projects, GraphClass}
+  import io.renku.graph.model.Schemas._
+  import io.renku.jsonld._
+  import io.renku.jsonld.syntax._
+  import io.renku.triplesstore.ResultsDecoder._
+  import io.renku.triplesstore.SparqlQuery
+  import io.renku.triplesstore.client.syntax._
+  import io.renku.triplesstore.SparqlQuery.Prefixes
+  import tsClient.{queryExpecting, updateWithNoResult, upload}
+
+  override def uploadToTS(event: ProjectViewedEvent): F[Unit] =
+    findProjectId(event) >>= {
+      case None            => ().pure[F]
+      case Some(projectId) => deleteOldViewedDate(projectId) >> insert(projectId, event)
+    }
+
+  private def findProjectId(event: ProjectViewedEvent) = queryExpecting {
+    SparqlQuery.ofUnsafe(
+      show"${categoryName.show.toLowerCase}: find id",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      s"""|SELECT DISTINCT ?id
+          |WHERE {
+          |  GRAPH ?id {
+          |    ?id a schema:Project;
+          |        renku:projectPath ${event.path.asObject.asSparql.sparql}
+          |  }
+          |}
+          |""".stripMargin
+    )
+  }(idDecoder)
+
+  private lazy val idDecoder: Decoder[Option[projects.ResourceId]] = ResultsDecoder[Option, projects.ResourceId] {
+    Decoder.instance[projects.ResourceId] { implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[projects.ResourceId]("id")
+    }
+  }
+
+  private def deleteOldViewedDate(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
+    SparqlQuery.ofUnsafe(
+      show"${categoryName.show.toLowerCase}: delete",
+      Prefixes of renku -> "renku",
+      s"""|DELETE { GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} { ?id ?p ?o } }
+          |WHERE {
+          |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
+          |    BIND (${projectId.asEntityId.sparql} AS ?id)
+          |    ?id ?p ?o 
+          |  }
+          |}
+          |""".stripMargin
+    )
+  )
+
+  private def insert(projectId: projects.ResourceId, event: ProjectViewedEvent): F[Unit] =
+    upload(
+      NamedGraph.fromJsonLDsUnsafe(
+        GraphClass.ProjectViewedTimes.id,
+        (projectId -> event.dateViewed).asJsonLD
+      )
+    )
+
+  private implicit lazy val eventJsonLDEncoder: JsonLDEncoder[(projects.ResourceId, projects.DateViewed)] =
+    JsonLDEncoder.instance { case (id, date) =>
+      JsonLD.entity(
+        id.asEntityId,
+        EntityTypes.of(renku / "ProjectViewedTime"),
+        renku / "dateViewed" -> date.asJsonLD
+      )
+    }
 }

@@ -22,10 +22,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: Logger]: F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
-    handler <- EventHandler[F]
-  } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =
+    EventHandler[F].map(_ -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName))
 }

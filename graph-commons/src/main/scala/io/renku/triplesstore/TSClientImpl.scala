@@ -40,6 +40,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 trait TSClient[F[_]] {
   def updateWithNoResult(updateQuery:         SparqlQuery): F[Unit]
   def queryExpecting[ResultType](selectQuery: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType]
+  def upload(jsonLD:                          JsonLD): F[Unit]
 }
 
 object TSClient {
@@ -101,7 +102,7 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       SparqlSelect
     )
 
-  protected def upload(jsonLD: JsonLD): F[Unit] = uploadAndMap[Unit](jsonLD)(jsonUploadMapResponse)
+  override def upload(jsonLD: JsonLD): F[Unit] = uploadAndMap[Unit](jsonLD)(jsonUploadMapResponse)
 
   protected def uploadAndMap[ResultType](jsonLD: JsonLD)(mapResponse: ResponseMapping[ResultType]): F[ResultType] =
     for {
