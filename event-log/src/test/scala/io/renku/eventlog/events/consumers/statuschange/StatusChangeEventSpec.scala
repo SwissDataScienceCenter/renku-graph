@@ -43,9 +43,21 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
       }
     }
 
-    "have a Show instance naming its sub category" in {
-      val event = StatusChangeGenerators.statusChangeEvents.generateOne
-      event.show should include(event.subCategoryName)
+    Set(
+      StatusChangeGenerators.toTripleStoreEvents,
+      StatusChangeGenerators.toTriplesGeneratedEvents,
+      StatusChangeGenerators.toFailureEvents,
+      StatusChangeGenerators.toAwaitingDeletionEvents,
+      StatusChangeGenerators.rollbackToTriplesGeneratedEvents,
+      StatusChangeGenerators.rollbackToNewEvents,
+      StatusChangeGenerators.rollbackToAwaitingDeletionEvents,
+      StatusChangeGenerators.projectEventsToNewEvents,
+      StatusChangeGenerators.redoProjectTransformationEvents,
+      StatusChangeGenerators.allEventsToNewEvents
+    ).map(_.generateOne.widen).foreach { event =>
+      s"${event.subCategoryName} have a Show instance naming its sub category" in {
+        event.show should include(event.subCategoryName)
+      }
     }
   }
 

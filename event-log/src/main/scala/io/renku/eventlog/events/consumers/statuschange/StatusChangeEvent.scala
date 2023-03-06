@@ -40,16 +40,18 @@ sealed trait StatusChangeEvent extends Product {
 }
 
 object StatusChangeEvent {
-  implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
 
   final case class ProjectPath(path: projects.Path)
   object ProjectPath {
     implicit val jsonDecoder: Decoder[ProjectPath] = deriveDecoder[ProjectPath]
     implicit val jsonEncoder: Encoder[ProjectPath] = deriveEncoder[ProjectPath]
+    implicit val show:        Show[ProjectPath]    = Show.show(_.path.show)
   }
 
   case object AllEventsToNew extends StatusChangeEvent {
-    implicit val show: Show[AllEventsToNew.type] = Show.fromToString
+    implicit val show: Show[AllEventsToNew.type] = Show.show { event =>
+      show"${event.subCategoryName}"
+    }
 
     implicit val jsonDecoder: Decoder[AllEventsToNew.type] = specificDecoder[AllEventsToNew.type]
     implicit val jsonEncoder: Encoder[AllEventsToNew.type] = specificEncoder[AllEventsToNew.type]
@@ -61,7 +63,7 @@ object StatusChangeEvent {
       StatusChangeEventsQueue.EventType("PROJECT_EVENTS_TO_NEW")
 
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { event =>
-      show"${event.subCategoryName}(${event.project})"
+      show"${event.subCategoryName} ${event.project}"
     }
 
     implicit val jsonDecoder: Decoder[ProjectEventsToNew] = specificDecoder[ProjectEventsToNew]
@@ -77,7 +79,7 @@ object StatusChangeEvent {
       StatusChangeEventsQueue.EventType("REDO_PROJECT_TRANSFORMATION")
 
     implicit lazy val show: Show[RedoProjectTransformation] = Show.show { event =>
-      s"${event.subCategoryName}(project = ${event.project.path}, status = $ToTriplesGenerated)"
+      show"${event.subCategoryName} projectPath = ${event.project.path}, status = ${EventStatus.TriplesGenerated}"
     }
 
     implicit val jsonDecoder: Decoder[RedoProjectTransformation] = specificDecoder[RedoProjectTransformation]
@@ -90,7 +92,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[RollbackToAwaitingDeletion] = specificEncoder[RollbackToAwaitingDeletion]
 
     implicit lazy val show: Show[RollbackToAwaitingDeletion] = Show.show { event =>
-      s"${event.subCategoryName}(project = ${event.project})"
+      show"${event.subCategoryName} ${event.project}"
     }
   }
 
@@ -102,7 +104,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[RollbackToNew] = specificEncoder[RollbackToNew]
 
     implicit lazy val show: Show[RollbackToNew] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project=${event.project}, status=$New)"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}, status = $New"
     }
   }
 
@@ -114,7 +116,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[RollbackToTriplesGenerated] = specificEncoder[RollbackToTriplesGenerated]
 
     implicit lazy val show: Show[RollbackToTriplesGenerated] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project = ${event.project})"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}"
     }
   }
 
@@ -126,7 +128,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[ToAwaitingDeletion] = specificEncoder[ToAwaitingDeletion]
 
     implicit lazy val show: Show[ToAwaitingDeletion] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project=${event.project})"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}"
     }
   }
 
@@ -143,7 +145,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[ToTriplesGenerated] = specificEncoder[ToTriplesGenerated]
 
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project=${event.project})"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}"
     }
   }
 
@@ -159,7 +161,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[ToTriplesStore] = specificEncoder[ToTriplesStore]
 
     implicit lazy val show: Show[ToTriplesStore] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project=${event.project})"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}"
     }
   }
 
@@ -182,7 +184,7 @@ object StatusChangeEvent {
     implicit val jsonEncoder: Encoder[ToFailure] = specificEncoder[ToFailure]
 
     implicit lazy val show: Show[ToFailure] = Show.show { event =>
-      s"${event.subCategoryName}(${event.id}, project=${event.project}, newStatus=${event.newStatus})"
+      show"${event.subCategoryName} id = ${event.id}, ${event.project}, status = ${event.newStatus}"
     }
   }
 
@@ -245,6 +247,8 @@ object StatusChangeEvent {
 
   implicit val jsonDecoder: Decoder[StatusChangeEvent] = JsonCodec.jsonDecoder
   implicit val jsonEncoder: Encoder[StatusChangeEvent] = JsonCodec.jsonEncoder
+
+  implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow
 
   def show: Show[StatusChangeEvent] = {
     import io.renku.data.CoproductShow._
