@@ -58,9 +58,9 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
   private def deleteLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
       .command[projects.GitLabId ~ CategoryName](sql"""
-            DELETE FROM subscription_category_sync_time
-            WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-          """.command)
+        DELETE FROM subscription_category_sync_time
+        WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+      """.command)
       .arguments(projectId ~ commitsync.categoryName)
       .build
       .mapResult {
