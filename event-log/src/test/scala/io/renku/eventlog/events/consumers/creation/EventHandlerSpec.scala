@@ -20,14 +20,14 @@ package io.renku.eventlog.events.consumers
 package creation
 
 import cats.effect.IO
-import io.circe.literal._
 import io.circe.{Encoder, Json}
+import io.circe.literal._
 import io.circe.syntax._
-import io.renku.generators.Generators.Implicits._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
@@ -94,7 +94,7 @@ class EventHandlerSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventPersister = mock[EventPersister[IO]]
-    val handler        = new EventHandler[IO](categoryName, eventPersister)
+    val handler        = new EventHandler[IO](eventPersister)
   }
 
   private def toJson(event: Event): Json =

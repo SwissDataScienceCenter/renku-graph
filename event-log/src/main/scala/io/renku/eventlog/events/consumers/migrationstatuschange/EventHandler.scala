@@ -28,7 +28,7 @@ import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.consumers.migrationstatuschange.{Event => CategoryEvent}
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.Subscription.SubscriberUrl
 import org.typelevel.log4cats.Logger
@@ -45,7 +45,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[Event],
-      process = updateStatus
+      process = ev => Logger[F].info(show"$categoryName: $ev accepted") >> updateStatus(ev)
     )
 
   private implicit val eventDecoder: Decoder[Event] = { cursor =>

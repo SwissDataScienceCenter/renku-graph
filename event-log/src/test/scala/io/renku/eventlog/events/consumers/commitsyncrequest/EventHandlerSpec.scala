@@ -73,7 +73,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val commitSyncForcer = mock[CommitSyncForcer[IO]]
-    val handler          = new EventHandler[IO](categoryName, commitSyncForcer)
+    val handler          = new EventHandler[IO](commitSyncForcer)
   }
 
   private implicit lazy val eventEncoder: Encoder[(projects.GitLabId, projects.Path)] =

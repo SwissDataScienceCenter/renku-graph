@@ -22,15 +22,15 @@ import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.events.EventStatus._
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger: EventStatusGauges](
-    override val categoryName: CategoryName,
     zombieStatusCleaner:       ZombieStatusCleaner[F],
-    processExecutor:           ProcessExecutor[F]
+    processExecutor:           ProcessExecutor[F],
+    override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = ZombieEvent
@@ -38,7 +38,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger: EventStatusGauges](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[ZombieEvent],
-      process = cleanZombieStatus
+      process = ev => Logger[F].info(show"$categoryName: $ev accepted") >> cleanZombieStatus(ev)
     )
 
   private def cleanZombieStatus(event: ZombieEvent): F[Unit] = {
@@ -70,5 +70,5 @@ private object EventHandler {
       : F[consumers.EventHandler[F]] = for {
     zombieStatusCleaner <- ZombieStatusCleaner[F]
     processExecutor     <- ProcessExecutor.concurrent(5)
-  } yield new EventHandler[F](categoryName, zombieStatusCleaner, processExecutor)
+  } yield new EventHandler[F](zombieStatusCleaner, processExecutor)
 }

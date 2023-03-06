@@ -108,7 +108,7 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO]        = TestLogger[IO]()
     implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
     val zombieStatusCleaner = mock[ZombieStatusCleaner[IO]]
-    val handler             = new EventHandler[IO](categoryName, zombieStatusCleaner, ProcessExecutor.sequential[IO])
+    val handler             = new EventHandler[IO](zombieStatusCleaner, ProcessExecutor.sequential[IO])
 
     val events: Gen[ZombieEvent] = for {
       eventId     <- compoundEventIds
@@ -119,12 +119,12 @@ class EventHandlerSpec
     implicit val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
       json"""{
         "categoryName": "ZOMBIE_CHASING",
-        "id":           ${event.eventId.id.value},
+        "id": ${event.eventId.id.value},
         "project": {
-          "id":         ${event.eventId.projectId.value},
-          "path":       ${event.projectPath.value}
+          "id":   ${event.eventId.projectId.value},
+          "path": ${event.projectPath.value}
        },
-        "status":       ${event.status.value}
+        "status": ${event.status.value}
       }"""
     }
   }

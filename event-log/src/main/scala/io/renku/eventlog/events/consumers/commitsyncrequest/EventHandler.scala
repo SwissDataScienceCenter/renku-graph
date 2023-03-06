@@ -22,14 +22,14 @@ import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
 import org.typelevel.log4cats.Logger
 import EventDecodingTools._
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    override val categoryName: CategoryName,
-    commitSyncForcer:          CommitSyncForcer[F]
+    commitSyncForcer:          CommitSyncForcer[F],
+    override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
   protected override type Event = Project
@@ -40,12 +40,13 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       process = startForceCommitSync
     )
 
-  private lazy val startForceCommitSync: Event => F[Unit] = { case Project(projectId, projectPath) =>
-    commitSyncForcer.forceCommitSync(projectId, projectPath)
+  private lazy val startForceCommitSync: Event => F[Unit] = { case project @ Project(projectId, projectPath) =>
+    Logger[F].info(show"$categoryName: $project accepted") >>
+      commitSyncForcer.forceCommitSync(projectId, projectPath)
   }
 }
 
 private object EventHandler {
   def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
-    CommitSyncForcer[F].map(new EventHandler[F](categoryName, _))
+    CommitSyncForcer[F].map(new EventHandler[F](_))
 }

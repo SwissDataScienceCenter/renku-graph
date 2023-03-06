@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, commitsync}
+import io.renku.eventlog.events.producers.{commitsync, SubscriptionTypeSerializers}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventDate
@@ -49,7 +49,7 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
 
   override def forceCommitSync(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] =
     SessionResource[F].useK {
-      deleteLastSyncedDate(projectId) flatMap {
+      deleteLastSyncedDate(projectId) >>= {
         case true  => upsertProject(projectId, projectPath).void
         case false => Kleisli.pure(())
       }

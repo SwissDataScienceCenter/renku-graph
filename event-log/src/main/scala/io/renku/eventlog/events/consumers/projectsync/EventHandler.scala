@@ -22,7 +22,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -30,10 +30,10 @@ import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: MonadCancelThrow: Logger](override val categoryName: CategoryName,
-                                                           projectInfoSynchronizer: ProjectInfoSynchronizer[F],
-                                                           subscriptionMechanism:   SubscriptionMechanism[F],
-                                                           processExecutor:         ProcessExecutor[F]
+private class EventHandler[F[_]: MonadCancelThrow: Logger](projectInfoSynchronizer: ProjectInfoSynchronizer[F],
+                                                           subscriptionMechanism:     SubscriptionMechanism[F],
+                                                           processExecutor:           ProcessExecutor[F],
+                                                           override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = ProjectSyncEvent
@@ -44,7 +44,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](override val category
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.getProject.map(p => ProjectSyncEvent(p.id, p.path)),
-      process = syncProjectInfo,
+      process = ev => Logger[F].info(show"$categoryName: $ev accepted") >> syncProjectInfo(ev),
       onRelease = subscriptionMechanism.renewSubscription()
     )
 }
@@ -65,5 +65,5 @@ private object EventHandler {
     projectInfoSynchronizer    <- ProjectInfoSynchronizer[F]
     processesCount             <- find[F, Int Refined Positive]("project-sync-max-concurrent-processes", config)
     concurrentProcessesLimiter <- ProcessExecutor.concurrent[F](processesCount)
-  } yield new EventHandler[F](categoryName, projectInfoSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
+  } yield new EventHandler[F](projectInfoSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
 }

@@ -73,7 +73,7 @@ class EventHandlerSpec
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val globalCommitSyncForcer = mock[GlobalCommitSyncForcer[IO]]
-    val handler                = new EventHandler[IO](categoryName, globalCommitSyncForcer)
+    val handler                = new EventHandler[IO](globalCommitSyncForcer)
   }
 
   private implicit lazy val eventEncoder: Encoder[Project] =

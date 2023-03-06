@@ -25,7 +25,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.consumers.creation.{Event => CategoryEvent}
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
 import io.renku.events.consumers.EventDecodingTools._
 import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
@@ -33,16 +33,18 @@ import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    override val categoryName: CategoryName,
-    eventPersister:            EventPersister[F]
+    eventPersister:            EventPersister[F],
+    override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
+
+  import eventPersister.storeNewEvent
 
   protected override type Event = CategoryEvent
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[Event],
-      process = eventPersister.storeNewEvent(_).void
+      ev => Logger[F].info(show"$categoryName: $ev accepted") >> storeNewEvent(ev).void
     )
 
   private implicit val eventDecoder: Decoder[Event] = cursor =>
@@ -80,5 +82,5 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
 private object EventHandler {
   def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[consumers.EventHandler[F]] = EventPersister[F].map(new EventHandler[F](categoryName, _))
+      : F[consumers.EventHandler[F]] = EventPersister[F].map(new EventHandler[F](_))
 }

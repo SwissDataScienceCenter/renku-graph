@@ -84,8 +84,7 @@ class EventHandlerSpec
     val synchronizer          = mock[ProjectInfoSynchronizer[IO]]
     val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
 
-    val handler =
-      new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, ProcessExecutor.sequential[IO])
+    val handler = new EventHandler[IO](synchronizer, subscriptionMechanism, ProcessExecutor.sequential[IO])
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
   }
