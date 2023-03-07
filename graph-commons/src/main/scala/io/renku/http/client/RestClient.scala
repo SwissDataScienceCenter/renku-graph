@@ -37,14 +37,17 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
-import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.client.{Client, ConnectionFailure}
+import org.http4s.ember.client.EmberClientBuilder
+import org.http4s.ember.core.EmberException
 import org.http4s.headers.{Authorization, `Content-Disposition`, `Content-Type`}
 import org.http4s.multipart.{Multiparts, Part}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
+import java.io.IOException
 import java.net.{ConnectException, SocketException}
+import java.nio.channels.ClosedChannelException
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
 
@@ -179,18 +182,30 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
                                  attempt:     Int
   ): PartialFunction[Throwable, F[T]] = {
     case error: RestClientError => throttler.release() >> error.raiseError[F, T]
-    case NonFatal(exception @ (_: ConnectionFailure | _: ConnectException | _: SocketException))
-        if attempt <= maxRetries.value =>
+    case ConnectionError(exception) if attempt <= maxRetries.value =>
       for {
         _      <- Logger[F].warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
         _      <- Temporal[F] sleep retryInterval
         result <- callRemote(httpClient, request, mapResponse, attempt + 1)
       } yield result
-    case NonFatal(exception @ (_: ConnectionFailure | _: ConnectException | _: SocketException))
-        if attempt > maxRetries.value =>
+    case ConnectionError(exception) if attempt > maxRetries.value =>
       throttler.release() >> ConnectivityException(LogMessage(request.request, exception), exception).raiseError[F, T]
     case NonFatal(exception) =>
       throttler.release() >> ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
+  }
+
+  object ConnectionError {
+    def unapply(ex: Throwable): Option[Throwable] =
+      ex match {
+        case NonFatal(_: ConnectionFailure | _: ConnectException | _: SocketException | _: ConnectException) => Some(ex)
+        case NonFatal(_: IOException)
+            if ex.getMessage.toLowerCase
+              .contains("connection reset") || ex.getMessage.toLowerCase.contains("broken pipe") =>
+          Some(ex)
+        case _: EmberException.ReachedEndOfStream => Some(ex)
+        case _: ClosedChannelException            => Some(ex)
+        case _ => None
+      }
   }
 
   protected type ResponseMapping[ResultType] = ResponseMappingF[F, ResultType]
