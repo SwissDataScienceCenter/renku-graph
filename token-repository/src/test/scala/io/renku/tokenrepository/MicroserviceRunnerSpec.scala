@@ -75,6 +75,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with should.Matchers {
 
       startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
       assertCalledAllBut(dbInitializer, microserviceRoutes).unsafeRunSync()
+      assertNotCalled(microserviceRoutes).unsafeRunSync()
 
       logger.logged(Error("DB initialization failed", exception), Info("Service started"))
     }

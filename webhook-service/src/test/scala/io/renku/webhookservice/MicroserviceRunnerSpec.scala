@@ -63,6 +63,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with should.Matchers with IOSpe
       } shouldBe exception
 
       assertCalledAllBut(sentryInitializer, httpServer).unsafeRunSync()
+      assertNotCalled(httpServer).unsafeRunSync()
     }
 
     "fail if starting Http Server fails" in new TestCase {

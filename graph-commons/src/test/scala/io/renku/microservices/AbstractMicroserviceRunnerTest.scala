@@ -33,8 +33,8 @@ trait AbstractMicroserviceRunnerTest {
 
   def startFor(duration: FiniteDuration) =
     for {
-      term <- SignallingRef.of[IO, Boolean](true)
-      _ <-  (IO.sleep(duration) *> term.set(true)).start
+      term <- SignallingRef.of[IO, Boolean](false)
+      _    <- (IO.sleep(duration) *> term.set(true)).start
       exit <- runner.run(term)
     } yield exit
 
@@ -53,6 +53,8 @@ trait AbstractMicroserviceRunnerTest {
   def assertCalledAll = CallCounter.assertCalled(all)
 
   def assertCalledAllBut(exclude: CallCounter, excludes: CallCounter*) =
-    CallCounter.assertCalled(all.diff(exclude :: excludes.toList)) >>
-      CallCounter.assertNotCalled(excludes.toList)
+    CallCounter.assertCalled(all.diff(exclude :: excludes.toList))
+
+  def assertNotCalled(counter: CallCounter, more: CallCounter*) =
+    CallCounter.assertNotCalled(counter :: more.toList)
 }
