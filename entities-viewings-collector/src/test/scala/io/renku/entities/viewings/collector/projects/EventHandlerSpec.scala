@@ -21,7 +21,6 @@ package io.renku.entities.viewings.collector.projects
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import Generators._
 import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.events.EventRequestContent
@@ -29,6 +28,8 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.Generators._
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

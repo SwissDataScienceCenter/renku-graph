@@ -16,16 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.triplesgenerator.api.events
 
-import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators._
+import org.scalacheck.Gen
 
-private final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed)
-
-private object ProjectViewedEvent {
-  implicit val show: Show[ProjectViewedEvent] = Show.show { case ProjectViewedEvent(path, dateViewed) =>
-    show"projectPath = $path, date = $dateViewed"
-  }
+object Generators {
+  val projectViewedEvents: Gen[ProjectViewedEvent] =
+    (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)
 }

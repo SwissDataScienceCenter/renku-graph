@@ -25,6 +25,7 @@ import io.renku.events.{consumers, CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventDecodingTools.JsonOps
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.projects
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 

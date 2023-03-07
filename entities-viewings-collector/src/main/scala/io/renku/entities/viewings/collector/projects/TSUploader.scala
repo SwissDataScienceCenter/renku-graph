@@ -21,6 +21,7 @@ package io.renku.entities.viewings.collector.projects
 import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 

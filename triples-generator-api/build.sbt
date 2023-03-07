@@ -16,23 +16,5 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
-
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import Generators._
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-
-class ProjectViewedEventSpec extends AnyWordSpec with should.Matchers {
-
-  "show" should {
-
-    "return String info with path and the date" in {
-
-      val event = projectViewedEvents.generateOne
-
-      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}"
-    }
-  }
-}
+organization := "io.renku"
+name := "triples-generator-api"

@@ -46,6 +46,7 @@ lazy val root = project
     tokenRepository,
     webhookService,
     commitEventService,
+    triplesGeneratorApi,
     entitiesSearch,
     entitiesViewingsCollector,
     triplesGenerator,
@@ -144,11 +145,18 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val triplesGeneratorApi = project
+  .in(file("triples-generator-api"))
+  .withId("triples-generator-api")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val entitiesViewingsCollector = project
   .in(file("entities-viewings-collector"))
   .withId("entities-viewings-collector")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(triplesGeneratorApi % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGenerator = project
@@ -156,7 +164,7 @@ lazy val triplesGenerator = project
   .withId("triples-generator")
   .settings(commonSettings)
   .dependsOn(
-    graphCommons % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
     entitiesViewingsCollector
   )
@@ -180,8 +188,9 @@ lazy val knowledgeGraph = project
   .withId("knowledge-graph")
   .settings(commonSettings)
   .dependsOn(
-    graphCommons   % "compile->compile; test->test",
-    entitiesSearch % "compile->compile; test->test"
+    graphCommons        % "compile->compile; test->test",
+    entitiesSearch      % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,
