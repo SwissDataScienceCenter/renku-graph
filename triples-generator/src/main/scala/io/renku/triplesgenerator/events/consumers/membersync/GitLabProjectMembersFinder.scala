@@ -28,8 +28,8 @@ import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Path
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
-import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s._
+import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._

@@ -21,8 +21,8 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 import io.circe.Encoder
 import io.circe.literal._
 import io.renku.config.ServiceVersion
-import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.events.{CategoryName, Subscription}
+import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
 private final case class MigrationsSubscription(subscriber: Subscriber) extends Subscription {

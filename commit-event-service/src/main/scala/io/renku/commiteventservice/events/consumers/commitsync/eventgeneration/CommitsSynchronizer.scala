@@ -67,6 +67,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
     for {
+      _                                   <- Logger[F].info(show"$categoryName: $event accepted")
       implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.id)
       maybeLatestCommit                   <- findLatestCommit(event.project.id)
       _                                   <- checkForSkippedEvent(maybeLatestCommit, event)

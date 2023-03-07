@@ -18,50 +18,41 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import cats.data.EitherT.fromEither
-import cats.effect.Concurrent
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.events.consumers.creation.{Event => CategoryEvent}
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.EventDecodingTools._
 import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
-    override val categoryName: CategoryName,
-    eventPersister:            EventPersister[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    eventPersister:            EventPersister[F],
+    override val categoryName: CategoryName = categoryName
+) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
-  import eventPersister._
-  import io.renku.graph.model.projects
-  import io.renku.tinytypes.json.TinyTypeDecoders._
+  import eventPersister.storeNewEvent
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](storeEvent(request))
+  protected override type Event = CategoryEvent
 
-  private def storeEvent(request: EventRequestContent) = for {
-    event <- fromEither[F](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
-    result <- storeNewEvent(event).toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event))
-                .leftSemiflatTap(Logger[F].log(event))
-  } yield result
-
-  private implicit lazy val eventInfoToString: Show[Event] = Show.show { event =>
-    s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"
-  }
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[Event],
+      ev => Logger[F].info(show"$categoryName: $ev accepted") >> storeNewEvent(ev).void
+    )
 
   private implicit val eventDecoder: Decoder[Event] = cursor =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
       case None | Some(EventStatus.New) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[Project]
+          project   <- cursor.value.getProject
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -69,7 +60,7 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
       case Some(EventStatus.Skipped) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[Project]
+          project   <- cursor.value.getProject
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -87,15 +78,9 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
         case Some(message) => message.asRight
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
-
-  implicit val projectDecoder: Decoder[Project] = cursor =>
-    for {
-      id   <- cursor.downField("id").as[projects.GitLabId]
-      path <- cursor.downField("path").as[projects.Path]
-    } yield Project(id, path)
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]: F[EventHandler[F]] =
-    EventPersister[F].map(new EventHandler[F](categoryName, _))
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[consumers.EventHandler[F]] = EventPersister[F].map(new EventHandler[F](_))
 }

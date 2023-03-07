@@ -29,25 +29,31 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.OptionValues
+
+import scala.util.Random
 
 class ProjectDonePersisterSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
-    with MigrationsDataset {
+    with MigrationsDataset
+    with OptionValues {
 
   "noteDone" should {
 
     "persist the (MigrationToV10, renku:migrated, path) triple" in new TestCase {
 
-      val path = projectPaths.generateOne
+      val paths       = projectPaths.generateList(min = 2)
+      val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(paths).value
+      runUpdate(on = migrationsDataset, insertQuery).unsafeRunSync()
 
-      migratedProjectsChecker.filterNotMigrated(List(path)).unsafeRunSync() shouldBe List(path)
+      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${paths.size} left from ${paths.size}"
 
-      persister.noteDone(path).unsafeRunSync()
+      donePersister.noteDone(Random.shuffle(paths).head).unsafeRunSync()
 
-      migratedProjectsChecker.filterNotMigrated(List(path)).unsafeRunSync() shouldBe Nil
+      progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${paths.size - 1} left from ${paths.size}"
     }
   }
 
@@ -56,8 +62,7 @@ class ProjectDonePersisterSpec
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val tr:     SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val tsClient = TSClient[IO](migrationsDSConnectionInfo)
-    val persister        = new ProjectDonePersisterImpl[IO](tsClient)
-
-    val migratedProjectsChecker = new MigratedProjectsCheckerImpl[IO](tsClient)
+    val progressFinder   = new ProgressFinderImpl[IO](tsClient)
+    val donePersister    = new ProjectDonePersisterImpl[IO](tsClient)
   }
 }

@@ -18,38 +18,30 @@
 
 package io.renku.eventlog.events.consumers.cleanuprequest
 
-import cats.data.EitherT
-import cats.data.EitherT.fromEither
-import cats.effect.{Async, Concurrent}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.{CategoryName, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 
-private class EventHandler[F[_]: Concurrent: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     processor:                 EventProcessor[F],
     override val categoryName: CategoryName = categoryName
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
-  protected override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](processEvent(request))
+  protected override type Event = CleanUpRequestEvent
 
-  private def processEvent(request: EventRequestContent): EitherT[F, EventSchedulingResult, Accepted] = for {
-    event <- fromEither[F](request.event.as(event).leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
-    result <- processor
-                .process(event)
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event)(_))
-                .leftSemiflatTap(Logger[F].log(event)(_))
-  } yield result
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[CleanUpRequestEvent],
+      process = processor.process
+    )
 
-  private val event: Decoder[CleanUpRequestEvent] = {
+  private implicit val decoder: Decoder[CleanUpRequestEvent] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     _.downField("project").as[Json].map(_.hcursor) >>= { cursor =>
@@ -62,6 +54,6 @@ private class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[EventHandler[F]] =
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[consumers.EventHandler[F]] =
     EventProcessor[F].map(new EventHandler[F](_))
 }

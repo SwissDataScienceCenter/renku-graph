@@ -19,16 +19,15 @@
 package io.renku.eventlog.events.producers
 package cleanup
 
-import EventsSender.SendingResult
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
@@ -39,17 +38,17 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventS
     extends DispatchRecovery[F, CleanUpEvent] {
 
   override def returnToQueue(event: CleanUpEvent, reason: SendingResult): F[Unit] =
-    sendStatusChangeEvent(newStatus = AwaitingDeletion, event)
+    sendStatusChangeEvent(event)
 
   override def recover(url: SubscriberUrl, event: CleanUpEvent): PartialFunction[Throwable, F[Unit]] = {
     case NonFatal(exception) =>
-      sendStatusChangeEvent(newStatus = AwaitingDeletion, event) >>
+      sendStatusChangeEvent(event) >>
         Logger[F].error(exception)(show"$categoryName: $event, url = $url -> $AwaitingDeletion")
   }
 
-  private def sendStatusChangeEvent(newStatus: EventStatus, event: CleanUpEvent) =
+  private def sendStatusChangeEvent(event: CleanUpEvent) =
     eventSender.sendEvent(
-      event.toStatusChangeEvent(newStatus),
+      event.toAwaitingDeletionEvent,
       EventSender.EventContext(
         CategoryName("EVENTS_STATUS_CHANGE"),
         show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
@@ -58,14 +57,14 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventS
 
   private implicit class CleanUpEventOps(event: CleanUpEvent) {
 
-    def toStatusChangeEvent(newStatus: EventStatus) = EventRequestContent.NoPayload(
+    def toAwaitingDeletionEvent = EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "newStatus": $newStatus
+        "subCategory": "RollbackToAwaitingDeletion"
      }"""
     )
   }

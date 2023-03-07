@@ -20,21 +20,17 @@ package io.renku.eventlog.events.consumers
 package creation
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.literal.JsonStringContext
-import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.circe.literal._
+import io.circe.syntax._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.events.consumers.creation.EventPersister.Result.{Created, Existed}
-import io.renku.eventlog.events.consumers.creation.Generators._
-import io.renku.events.Generators._
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
+import io.renku.eventlog.events.consumers.creation.EventPersister.Result
+import io.renku.events.EventRequestContent
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
+import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -48,92 +44,49 @@ class EventHandlerSpec
     with TableDrivenPropertyChecks
     with should.Matchers {
 
-  "createHandlingProcess" should {
-
-    val scenarios = Table(
-      "status"  -> "resultFactory",
-      "Created" -> ((event: Event) => Created(event)),
-      "Existed" -> ((_: Event) => Existed)
-    )
-    forAll(scenarios) { case (status, resultFactory) =>
-      s"return $Accepted if the creation of the event returns $status" in new TestCase {
-        val event = newOrSkippedEvents.generateOne
-
-        (eventPersister.storeNewEvent _).expects(event).returning(resultFactory(event).pure[IO])
-
-        handler
-          .createHandlingProcess(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(Accepted)
-
-        logger.loggedOnly(
-          Info(
-            s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status} -> $Accepted"
-          )
-        )
-      }
+  "createHandlingDefinition.decode" should {
+    "decode a valid event successfully" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Generators.newOrSkippedEvents.generateOne
+      definition.decode(EventRequestContent(eventData.asJson)) shouldBe Right(eventData)
     }
 
-    s"return $BadRequest if the eventJson is malformed" in new TestCase {
-      val event = jsons.generateOne deepMerge json""" {"categoryName":${categoryName.value} }"""
-
-      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
-
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-        BadRequest
-      )
-
-      logger.expectNoLogs()
+    "fail on invalid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
     }
 
-    s"return $BadRequest if the skipped event does not contain a message" in new TestCase {
-      val event = skippedEvents.generateOne.asJson.deepMerge(json""" {"message":${blankStrings().generateOne} }""")
-
-      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
-
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-        BadRequest
-      )
-
-      logger.expectNoLogs()
+    "fail if the skipped event does not contain a message" in new TestCase {
+      val eventData =
+        Generators.skippedEvents.generateOne.asJson.deepMerge(json""" {"message":${blankStrings().generateOne} }""")
+      val definition = handler.createHandlingDefinition()
+      definition.decode(EventRequestContent(eventData.asJson)).isLeft shouldBe true
     }
 
     unacceptableStatuses.foreach { unacceptableStatus =>
-      s"return $BadRequest if the event status is $unacceptableStatus" in new TestCase {
-        val event =
-          newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
-
-        val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
-
-        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-          BadRequest
-        )
-
-        logger.expectNoLogs()
+      s"fail if the event status is $unacceptableStatus" in new TestCase {
+        val eventData =
+          Generators.newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
+        val definition = handler.createHandlingDefinition()
+        definition.decode(EventRequestContent(eventData.asJson)).isLeft shouldBe true
       }
     }
+  }
 
-    s"return $SchedulingError if the persister fails" in new TestCase {
-      val event     = newOrSkippedEvents.generateOne
-      val exception = exceptions.generateOne
+  "createHandlingDefinition.process" should {
+    "call to EventPersister" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (eventPersister.storeNewEvent _).expects(*).returning(IO.pure(Result.Existed))
+      definition.process(Generators.newOrSkippedEvents.generateOne).unsafeRunSync() shouldBe ()
+    }
+  }
 
-      (eventPersister.storeNewEvent _).expects(event).returning(exception.raiseError[IO, EventPersister.Result])
-
-      handler
-        .createHandlingProcess(requestContent(event.asJson))
-        .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
-
-      logger.loggedOnly(
-        Error(
-          s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status} -> $SchedulingError",
-          exception
-        )
-      )
+  "createHandlingDefinition" should {
+    "not define onRelease and precondition" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.onRelease                    shouldBe None
+      definition.precondition.unsafeRunSync() shouldBe None
     }
   }
 
@@ -141,7 +94,7 @@ class EventHandlerSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventPersister = mock[EventPersister[IO]]
-    val handler        = new EventHandler[IO](categoryName, eventPersister)
+    val handler        = new EventHandler[IO](eventPersister)
   }
 
   private def toJson(event: Event): Json =

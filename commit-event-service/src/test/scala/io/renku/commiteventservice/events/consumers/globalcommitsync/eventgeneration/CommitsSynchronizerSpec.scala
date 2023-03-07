@@ -28,8 +28,8 @@ import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommi
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.personalAccessTokens
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
@@ -63,6 +63,7 @@ class CommitsSynchronizerSpec
 
     "do not traverse commits history " +
       "if commits count and the latest commit id are the same between EL and GitLab" in new TestCase {
+
         val event = globalCommitSyncEvents().generateOne
 
         givenAccessTokenFound(event.project.id)
@@ -71,6 +72,7 @@ class CommitsSynchronizerSpec
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(
+          Info(show"$categoryName: $event accepted"),
           logSummary(event.project, SynchronizationSummary(Skipped.name -> event.commits.count.value.toInt))
         )
       }
@@ -96,7 +98,7 @@ class CommitsSynchronizerSpec
 
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
-        logger.loggedOnly(
+        logger.logged(
           logSummary(
             event.project,
             SynchronizationSummary(Created.name -> glOnlyIds.size, Deleted.name -> elOnlyIds.size),
@@ -123,7 +125,7 @@ class CommitsSynchronizerSpec
 
           commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
-          logger.loggedOnly(
+          logger.logged(
             logSummary(
               event.project,
               SynchronizationSummary(Created.name -> glOnlyIds.size, Deleted.name -> elOnlyIds.size),
@@ -165,7 +167,7 @@ class CommitsSynchronizerSpec
 
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
-        logger.loggedOnly(
+        logger.logged(
           logSummary(
             event.project,
             SynchronizationSummary(Created.name -> (glOnlyIds ::: glEventsSinceArrival).size,
@@ -190,7 +192,7 @@ class CommitsSynchronizerSpec
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync()
       } shouldBe exception
 
-      logger.loggedOnly(Error(show"$categoryName: failed to sync commits for project ${event.project}", exception))
+      logger.logged(Error(show"$categoryName: failed to sync commits for project ${event.project}", exception))
     }
 
     "delete all commits in EL if the project in GL is removed" in new TestCase {
@@ -211,7 +213,7 @@ class CommitsSynchronizerSpec
 
       commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(
+      logger.logged(
         logSummary(
           event.project,
           SynchronizationSummary(Created.name -> 0, Deleted.name -> elOnlyIds.size),
@@ -223,20 +225,20 @@ class CommitsSynchronizerSpec
 
   private trait TestCase {
 
-    val maybeAccessToken = personalAccessTokens.generateOption
-    val now              = Instant.now()
-    val untilNow         = DateCondition.Until(now)
-    val sinceNow         = DateCondition.Since(now)
+    private val maybeAccessToken = personalAccessTokens.generateOption
+    private val now              = Instant.now()
+    val untilNow                 = DateCondition.Until(now)
+    val sinceNow                 = DateCondition.Since(now)
 
     implicit val logger:                TestLogger[IO]                = TestLogger()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
     implicit val accessTokenFinder:     AccessTokenFinder[IO]         = mock[AccessTokenFinder[IO]]
-    val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
-    val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
-    val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
-    val commitEventDeleter        = mock[CommitEventDeleter[IO]]
-    val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
-    private val currentTime       = mockFunction[Instant]
+    private val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
+    private val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
+    private val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
+    private val commitEventDeleter        = mock[CommitEventDeleter[IO]]
+    private val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
+    private val currentTime               = mockFunction[Instant]
     val commitsSynchronizer = new CommitsSynchronizerImpl[IO](gitLabCommitStatFetcher,
                                                               gitLabCommitFetcher,
                                                               eventLogCommitFetcher,
@@ -324,11 +326,10 @@ class CommitsSynchronizerSpec
   private def logSummary(project:          Project,
                          summary:          SynchronizationSummary,
                          maybeElapsedTime: Option[ElapsedTime] = None
-  ) = Info(
-    s"$categoryName: projectId = ${project.id}, projectPath = ${project.path} -> events generation result: ${summary.show}${maybeElapsedTime
-        .map(t => s" in ${t}ms")
-        .getOrElse("")}"
-  )
+  ) = Info {
+    val et = maybeElapsedTime.map(t => s" in ${t}ms").getOrElse("")
+    show"$categoryName: $project -> events generation result: $summary$et"
+  }
 
   private implicit class PageOps(commits: List[CommitId]) {
 

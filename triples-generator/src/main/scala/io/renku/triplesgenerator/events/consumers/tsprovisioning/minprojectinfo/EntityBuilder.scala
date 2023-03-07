@@ -20,17 +20,17 @@ package io.renku.triplesgenerator.events.consumers
 package tsprovisioning
 package minprojectinfo
 
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{RenkuUrl, entities, persons}
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.ResourceId
-import io.renku.graph.model.{RenkuUrl, entities, persons}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 import projectinfo.ProjectInfoFinder

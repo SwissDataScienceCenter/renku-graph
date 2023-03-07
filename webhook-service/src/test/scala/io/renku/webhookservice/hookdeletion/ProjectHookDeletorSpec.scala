@@ -68,9 +68,10 @@ class ProjectHookDeletorSpec
     }
 
     // mapResponse
-
-    "return DeletionResult.HookDeleted when response is Ok" in new TestCase {
-      mapResponse(Status.Ok, Request(), Response()).unsafeRunSync() shouldBe DeletionResult.HookDeleted
+    Status.Ok :: Status.NoContent :: Nil foreach { status =>
+      s"return DeletionResult.HookDeleted when response is $status" in new TestCase {
+        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe DeletionResult.HookDeleted
+      }
     }
 
     "return DeletionResult.NotFound when response is NotFound" in new TestCase {

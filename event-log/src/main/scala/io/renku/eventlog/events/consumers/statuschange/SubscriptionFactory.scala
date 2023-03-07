@@ -22,7 +22,7 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
@@ -33,7 +33,7 @@ object SubscriptionFactory {
       _
   ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
       eventsQueue: StatusChangeEventsQueue[F]
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler[F](eventsQueue)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

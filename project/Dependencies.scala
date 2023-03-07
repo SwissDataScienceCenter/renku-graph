@@ -4,36 +4,37 @@ import sbt._
 object Dependencies {
 
   object V {
-    val rdf4jQueryParserSparql = "4.2.3"
     val ammonite               = "2.4.1"
+    val catsCore               = "2.9.0"
+    val catsEffect             = "3.4.8"
+    val circeCore              = "0.14.5"
+    val circeGenericExtras     = "0.14.3"
+    val circeOptics            = "0.14.1"
     val diffx                  = "0.8.2"
     val http4s                 = "0.23.18"
     val http4sBlaze            = "0.23.13"
     val http4sPrometheus       = "0.24.3"
-    val logback                = "1.4.5"
+    val jsonld4s               = "0.10.0"
     val log4cats               = "2.5.0"
     val log4jCore              = "2.20.0"
+    val logback                = "1.4.5"
     val luceneQueryParser      = "9.5.0"
-    val refined                = "0.10.1"
-    val refinedPureconfig      = "0.10.1"
-    val circeCore              = "0.14.4"
-    val circeOptics            = "0.14.1"
-    val jsonld4s               = "0.10.0"
-    val catsCore               = "2.9.0"
-    val catsEffect             = "3.4.8"
     val monocle                = "2.1.0"
-    val scalacheck             = "1.17.0"
-    val scalatest              = "3.2.15"
-    val scalatestScalacheck    = "3.2.2.0"
-    val scalamock              = "5.2.0"
-    val sentryLogback          = "6.14.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.2"
+    val rdf4jQueryParserSparql = "4.2.3"
+    val refined                = "0.10.2"
+    val refinedPureconfig      = "0.10.2"
+    val scalacheck             = "1.17.0"
+    val scalamock              = "5.2.0"
+    val scalatest              = "3.2.15"
+    val scalatestScalacheck    = "3.2.2.0"
+    val sentryLogback          = "6.15.0"
     val skunk                  = "0.5.1"
     val swaggerParser          = "2.1.12"
     val testContainersScala    = "0.40.12"
-    val wiremock               = "2.35.0"
     val widoco                 = "1.4.17"
+    val wiremock               = "2.35.0"
   }
 
   val scalatestScalaCheck = Seq(
@@ -149,6 +150,9 @@ object Dependencies {
   )
   val circeGeneric = Seq(
     "io.circe" %% "circe-generic" % V.circeCore
+  )
+  val circeGenericExtras = Seq(
+    "io.circe" %% "circe-generic-extras" % V.circeGenericExtras
   )
   val circeParser = Seq(
     "io.circe" %% "circe-parser" % V.circeCore

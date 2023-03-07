@@ -22,14 +22,14 @@ import cats.effect.Concurrent
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
   def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler[F]
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

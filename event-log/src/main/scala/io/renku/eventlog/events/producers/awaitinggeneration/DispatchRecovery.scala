@@ -50,7 +50,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
             "id":   ${event.id.projectId},
             "path": ${event.projectPath}
           },
-          "newStatus": $New
+          "subCategory": "RollbackToNew"
         }"""
       ),
       EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
@@ -70,6 +70,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
           "id":   ${event.id.projectId},
           "path": ${event.projectPath}
         },
+        "subCategory": "ToFailure",
         "message" : ${EventMessage(exception)},
         "newStatus": $GenerationNonRecoverableFailure
       }"""

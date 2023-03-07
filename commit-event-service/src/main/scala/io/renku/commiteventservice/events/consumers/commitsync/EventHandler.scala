@@ -18,16 +18,13 @@
 
 package io.renku.commiteventservice.events.consumers.commitsync
 
-import cats.MonadThrow
-import cats.data.EitherT
-import cats.data.EitherT.fromEither
-import cats.effect.{Async, Concurrent, Spawn}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers._
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -35,57 +32,39 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
-private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
-    commitsSynchronizer:       CommitsSynchronizer[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+    commitsSynchronizer:       CommitsSynchronizer[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import commitsSynchronizer._
-  import io.renku.graph.model.projects
+  protected override type Event = CommitSyncEvent
+
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = _.event.as[CommitSyncEvent],
+      process = commitsSynchronizer.synchronizeEvents
+    )
+
   import io.renku.tinytypes.json.TinyTypeDecoders._
-
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](startSynchronizingEvents(request))
-
-  private def startSynchronizingEvents(request: EventRequestContent): EitherT[F, EventSchedulingResult, Accepted] =
-    for {
-      event <- fromEither[F](request.event.as[CommitSyncEvent].leftMap(_ => BadRequest))
-      result <- Spawn[F]
-                  .start(synchronizeEvents(event) recoverWith logError(event))
-                  .toRightT
-                  .map(_ => Accepted)
-                  .semiflatTap(Logger[F] log event)
-                  .leftSemiflatTap(Logger[F] log event)
-    } yield result
-
-  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].logError(event, exception)
-    exception.raiseError[F, Unit]
-  }
+  import EventDecodingTools._
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
-    cursor.downField("id").as[Option[CommitId]] flatMap {
+    cursor.downField("id").as[Option[CommitId]] >>= {
       case Some(id) =>
         for {
-          project    <- cursor.downField("project").as[Project]
+          project    <- cursor.value.getProject
           lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
         } yield FullCommitSyncEvent(id, project, lastSynced)
       case None =>
-        cursor.downField("project").as[Project].map(MinimalCommitSyncEvent)
+        cursor.value.getProject.map(MinimalCommitSyncEvent)
     }
-
-  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
-    for {
-      id   <- cursor.downField("id").as[projects.GitLabId]
-      path <- cursor.downField("path").as[projects.Path]
-    } yield Project(id, path)
 }
 
-private[events] object EventHandler {
+private object EventHandler {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
-      : F[EventHandler[F]] = for {
+      : F[consumers.EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]
-  } yield new EventHandler[F](categoryName, commitEventSynchronizer)
+    processExecutor         <- ProcessExecutor.concurrent(10)
+  } yield new EventHandler[F](categoryName, commitEventSynchronizer, processExecutor)
 }

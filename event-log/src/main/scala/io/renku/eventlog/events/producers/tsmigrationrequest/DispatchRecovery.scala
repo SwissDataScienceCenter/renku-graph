@@ -102,7 +102,7 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: Queries
 
   override def recover(url: SubscriberUrl, event: MigrationRequestEvent): PartialFunction[Throwable, F[Unit]] = {
     case NonFatal(exception) =>
-      Logger[F].info(exception)(s"${categoryName.show}: recovering from NonRecoverable Failure") >>
+      Logger[F].info(exception)(show"$categoryName: recovering from NonRecoverable Failure") >>
         SessionResource[F].useK(setFailureStatus(event, exception))
   }
 

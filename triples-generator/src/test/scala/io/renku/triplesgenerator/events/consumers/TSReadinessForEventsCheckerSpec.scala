@@ -46,17 +46,19 @@ class TSReadinessForEventsCheckerSpec
       )
     ) { case (tsState, result) =>
       show"return ServiceUnavailable if TSState is $tsState" in new TestCase {
+
         (() => tsStateChecker.checkTSState).expects().returning(tsState.pure[IO])
 
-        checker.verifyTSReady.value.unsafeRunSync() shouldBe result.asLeft
+        checker.verifyTSReady.unsafeRunSync() shouldBe result.some
       }
     }
 
     "return SchedulingError if TSState check fails" in new TestCase {
+
       val exception = exceptions.generateOne
       (() => tsStateChecker.checkTSState).expects().returning(exception.raiseError[IO, TSState])
 
-      checker.verifyTSReady.value.unsafeRunSync() shouldBe SchedulingError(exception).asLeft
+      checker.verifyTSReady.unsafeRunSync() shouldBe SchedulingError(exception).some
     }
   }
 

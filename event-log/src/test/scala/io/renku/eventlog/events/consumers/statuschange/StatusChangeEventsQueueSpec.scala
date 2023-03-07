@@ -22,14 +22,12 @@ import cats.effect.{Async, IO, Ref}
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.consumers.statuschange.Generators.projectEventsToNewEvents
+import io.renku.generators.Generators.Implicits._
+import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
+import io.renku.generators.Generators
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
@@ -50,7 +48,7 @@ class StatusChangeEventsQueueSpec
 
     "keep dequeuing items from the status_change_events_queue" in new TestCase {
 
-      val event = projectEventsToNewEvents.generateOne
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
 
       sessionResource.useK(queue offer event).unsafeRunSync()
 
@@ -62,7 +60,7 @@ class StatusChangeEventsQueueSpec
         dequeuedEvents.get.unsafeRunSync() shouldBe List(event)
       }
 
-      val nextEvent = projectEventsToNewEvents.generateOne
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
       eventually {
@@ -71,10 +69,10 @@ class StatusChangeEventsQueueSpec
     }
 
     "be dequeueing the oldest events first" in new TestCase {
-      val event = projectEventsToNewEvents.generateOne
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer event).unsafeRunSync()
 
-      val nextEvent = projectEventsToNewEvents.generateOne
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
       queue.register(eventHandler).unsafeRunSync()
@@ -87,14 +85,14 @@ class StatusChangeEventsQueueSpec
     }
 
     "log error and continue dequeueing next events if handler fails during processing event" in new TestCase {
-      val event = projectEventsToNewEvents.generateOne
+      val event = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer event).unsafeRunSync()
-      val nextEvent = projectEventsToNewEvents.generateOne
+      val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
-      val exception = exceptions.generateOne
+      val exception = Generators.exceptions.generateOne
       val failingHandler: ProjectEventsToNew => IO[Unit] = {
-        case `event` => exception.raiseError[IO, Unit]
+        case `event` => IO.raiseError(exception)
         case other   => dequeuedEvents.update(_ ::: other :: Nil)
       }
 
@@ -104,7 +102,7 @@ class StatusChangeEventsQueueSpec
 
       eventually {
         logger.loggedOnly(
-          Error(
+          TestLogger.Level.Error(
             show"$categoryName processing event ${event.asJson.noSpaces} of type ${ProjectEventsToNew.eventType} failed",
             exception
           )
@@ -117,10 +115,10 @@ class StatusChangeEventsQueueSpec
       implicit val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
         Session.single[IO](
           host = dbConfig.host.value,
-          port = positiveInts().generateOne.value,
-          user = nonEmptyStrings().generateOne,
-          database = nonEmptyStrings().generateOne,
-          password = Some(nonEmptyStrings().generateOne)
+          port = Generators.positiveInts().generateOne.value,
+          user = Generators.nonEmptyStrings().generateOne,
+          database = Generators.nonEmptyStrings().generateOne,
+          password = Some(Generators.nonEmptyStrings().generateOne)
         )
       )
       implicit val logger:           TestLogger[IO]            = TestLogger[IO]()
@@ -136,7 +134,7 @@ class StatusChangeEventsQueueSpec
 
       eventually {
         logger
-          .getMessages(Error)
+          .getMessages(TestLogger.Level.Error)
           .map(_.message)
           .count(_ contains show"$categoryName processing events from the queue failed") should be > 1
       }

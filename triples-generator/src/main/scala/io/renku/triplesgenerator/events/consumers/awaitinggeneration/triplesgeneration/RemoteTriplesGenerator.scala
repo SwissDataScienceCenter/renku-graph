@@ -28,8 +28,8 @@ import io.renku.control.Throttler
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
-import io.renku.tinytypes.constraints.Url
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.Url
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.CommitEvent
@@ -54,9 +54,9 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
 
   import cats.data.EitherT
   import io.renku.http.client.RestClientError.UnauthorizedException
+  import org.http4s._
   import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
-  import org.http4s._
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
