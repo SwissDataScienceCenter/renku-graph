@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.events.consumers.creation
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventDate, EventId, EventMessage, EventStatus}
 
@@ -43,9 +45,7 @@ private object Event {
       body:      EventBody,
       status:    EventStatus = EventStatus.New
   ) extends Event {
-
     override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
-
   }
 
   final case class SkippedEvent(
@@ -57,7 +57,10 @@ private object Event {
       message:   EventMessage
   ) extends Event {
     val status: EventStatus = EventStatus.Skipped
-
     override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+  }
+
+  implicit val show: Show[Event] = Show.show { e =>
+    show"id = ${e.id}, ${e.project}, status = ${e.status}"
   }
 }

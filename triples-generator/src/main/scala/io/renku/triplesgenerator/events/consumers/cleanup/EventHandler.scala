@@ -18,71 +18,51 @@
 
 package io.renku.triplesgenerator.events.consumers.cleanup
 
-import cats.effect.kernel.Deferred
-import cats.effect.{Async, Concurrent, Spawn}
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
-import eu.timepit.refined.api.Refined
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import eu.timepit.refined.auto._
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
-    override val categoryName:  CategoryName,
-    tsReadinessChecker:         TSReadinessForEventsChecker[F],
-    eventProcessor:             EventProcessor[F],
-    eventBodyDeserializer:      EventBodyDeserializer[F],
-    subscriptionMechanism:      SubscriptionMechanism[F],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    override val categoryName: CategoryName,
+    tsReadinessChecker:        TSReadinessForEventsChecker[F],
+    eventProcessor:            EventProcessor[F],
+    eventDecoder:              EventDecoder,
+    subscriptionMechanism:     SubscriptionMechanism[F],
+    processExecutor:           ProcessExecutor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  import eventBodyDeserializer.toCleanUpEvent
-  import eventProcessor._
-  import tsReadinessChecker._
+  protected override type Event = CleanUpEvent
 
-  override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess.withWaitingForCompletion[F](
-      verifyTSReady >> startCleanUp(requestContent, _),
-      subscriptionMechanism.renewSubscription()
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      eventDecoder.decode,
+      e => eventProcessor.process(e.project),
+      precondition = tsReadinessChecker.verifyTSReady,
+      onRelease = subscriptionMechanism.renewSubscription().some
     )
-
-  private def startCleanUp(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
-    event <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
-    result <-
-      Spawn[F]
-        .start((process(event.project) recoverWith logError(event.project)) >> deferred.complete(()))
-        .toRightT
-        .map(_ => Accepted)
-        .semiflatTap(Logger[F].log(event))
-        .leftSemiflatTap(Logger[F].log(event))
-  } yield result
-
-  private implicit lazy val eventInfoToString: Show[CleanUpEvent] = Show.show { event =>
-    show"projectId = ${event.project.id}, projectPath = ${event.project.path}"
-  }
 }
 
-object EventHandler {
-
-  private val singleProcess = 1
+private object EventHandler {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F]
-  ): F[EventHandler[F]] = for {
-    concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(singleProcess))
-    tsReadinessChecker       <- TSReadinessForEventsChecker[F]
-    eventProcessor           <- EventProcessor[F]
+  ): F[consumers.EventHandler[F]] = for {
+    tsReadinessChecker <- TSReadinessForEventsChecker[F]
+    eventProcessor     <- EventProcessor[F]
+    processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](categoryName,
                               tsReadinessChecker,
                               eventProcessor,
-                              EventBodyDeserializer[F],
+                              EventDecoder,
                               subscriptionMechanism,
-                              concurrentProcessLimiter
+                              processExecutor
   )
 }

@@ -70,6 +70,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
+      logger.logged(Info(s"${commonLogMessage(event)} accepted"))
       logSummary(event, isSuccessful = true)
     }
 
@@ -240,7 +241,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
-      logger.loggedOnly(Error(message = show"$categoryName: processing failure: $event", exception))
+      logger.logged(Error(message = show"$categoryName: $event processing failure", exception))
     }
   }
 

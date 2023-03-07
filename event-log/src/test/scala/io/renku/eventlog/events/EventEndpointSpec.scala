@@ -23,22 +23,23 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators.eventRequestContents
-import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import io.renku.generators.Generators.Implicits._
+import io.renku.events.consumers.ConsumersModelGenerators.badRequests
+import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient._
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
+import org.http4s._
 import org.http4s.MediaType._
 import org.http4s.Status._
-import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.multipart.Part
@@ -129,15 +130,16 @@ class EventEndpointSpec
 
     s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
 
+      val badRequest = badRequests.generateOne
       (eventConsumersRegistry.handle _)
         .expects(*)
-        .returning(EventSchedulingResult.BadRequest.pure[IO])
+        .returning(badRequest.pure[IO])
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(badRequest.reason)
     }
 
     s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {

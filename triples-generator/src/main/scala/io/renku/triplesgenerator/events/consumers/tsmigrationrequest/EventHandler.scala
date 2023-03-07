@@ -19,137 +19,101 @@
 package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 
-import cats.data.EitherT
-import cats.data.EitherT.{left, leftT, rightT}
-import cats.effect.{Async, Concurrent}
-import cats.effect.kernel.Deferred
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import com.typesafe.config.Config
-import io.circe.Json
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, ServiceUnavailable}
+import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.Subscription.SubscriberUrl
+import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import migrations.reprovisioning.ReProvisioningStatus
+import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[events] class EventHandler[F[_]: Async: Logger](
-    subscriberUrl:              SubscriberUrl,
-    serviceId:                  MicroserviceIdentifier,
-    serviceVersion:             ServiceVersion,
-    tsStateChecker:             TSStateChecker[F],
-    migrationsRunner:           MigrationsRunner[F],
-    eventSender:                EventSender[F],
-    subscriptionMechanism:      SubscriptionMechanism[F],
-    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
-    override val categoryName:  CategoryName = categoryName
-) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
+private class EventHandler[F[_]: MonadCancelThrow: Logger](
+    subscriberUrl:             SubscriberUrl,
+    serviceId:                 MicroserviceIdentifier,
+    serviceVersion:            ServiceVersion,
+    tsStateChecker:            TSStateChecker[F],
+    migrationsRunner:          MigrationsRunner[F],
+    eventSender:               EventSender[F],
+    subscriptionMechanism:     SubscriptionMechanism[F],
+    processExecutor:           ProcessExecutor[F],
+    eventDecoder:              EventDecoder = EventDecoder,
+    override val categoryName: CategoryName = categoryName
+) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
+
+  protected override type Event = Unit
 
   import eventSender._
   import io.circe.literal._
+  import io.renku.events.consumers.EventDecodingTools._
   import tsStateChecker._
 
-  protected[tsmigrationrequest] override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    verifyTSState >> startEventProcessing(request, _),
-    subscriptionMechanism.renewSubscription()
-  )
+  override def createHandlingDefinition(): EventHandlingDefinition =
+    EventHandlingDefinition(
+      decode = eventDecoder.decode(serviceVersion),
+      process = _ => runMigrations(),
+      precondition = verifyTSState,
+      onRelease = subscriptionMechanism.renewSubscription().some
+    )
 
-  private def verifyTSState: EitherT[F, EventSchedulingResult, Accepted] = EitherT {
-    checkTSState
-      .map {
-        case TSState.Ready | TSState.MissingDatasets => Accepted.asRight
-        case TSState.ReProvisioning =>
-          ServiceUnavailable("Re-provisioning running").asLeft.leftWiden[EventSchedulingResult]
-      }
-      .recover { case NonFatal(exception) =>
-        SchedulingError(exception).asLeft[Accepted].leftWiden[EventSchedulingResult]
-      }
-  }
+  private def runMigrations(): F[Unit] =
+    Logger[F].info(show"$categoryName: $serviceVersion accepted") >>
+      migrationsRunner
+        .run()
+        .semiflatMap(_ => changeMigrationStatus("DONE"))
+        .leftSemiflatMap(toRecoverableFailure)
+        .merge
+        .recoverWith(nonRecoverableFailure)
 
-  private def startEventProcessing(request: EventRequestContent, deferred: Deferred[F, Unit]) = for {
-    event            <- toJson(request)
-    requestedVersion <- decodeVersion(event)
-    _                <- checkVersionSupported(requestedVersion)
-    result <- Concurrent[F]
-                .start(migration(deferred))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(requestedVersion))
-                .leftSemiflatTap(Logger[F].log(requestedVersion))
-  } yield result
-
-  private def toJson: EventRequestContent => EitherT[F, EventSchedulingResult, Json] = {
-    case EventRequestContent.NoPayload(event: Json) => rightT(event)
-    case _                                          => leftT[F, Json](BadRequest).leftWiden[EventSchedulingResult]
-  }
-
-  private def decodeVersion(event: Json): EitherT[F, EventSchedulingResult, ServiceVersion] = EitherT.fromEither[F] {
-    event.hcursor
-      .downField("subscriber")
-      .downField("version")
-      .as[ServiceVersion]
-      .leftMap(_ => BadRequest)
-  }
-
-  private def checkVersionSupported: ServiceVersion => EitherT[F, EventSchedulingResult, Unit] = {
-    case `serviceVersion` => rightT(())
-    case version =>
-      left {
-        Logger[F]
-          .logInfo(version, show"$BadRequest service in version '$serviceVersion'")
-          .map(_ => BadRequest)
-      }
-  }
-
-  private def migration(deferred: Deferred[F, Unit]): F[Unit] =
-    migrationsRunner
-      .run()
-      .semiflatMap(_ => changeMigrationStatus("DONE"))
-      .leftSemiflatMap(toRecoverableFailure)
-      .merge
-      .recoverWith(nonRecoverableFailure) >> deferred.complete(()).void
-
-  private def changeMigrationStatus(status: String, maybeMessage: Option[String] = None): F[Unit] = sendEvent(
-    EventRequestContent.NoPayload(json"""{
+  private def changeMigrationStatus(status: String, maybeMessage: Option[String] = None): F[Unit] =
+    sendEvent(
+      EventRequestContent.NoPayload(json"""{
         "categoryName": "MIGRATION_STATUS_CHANGE",
         "subscriber": {
-          "url":     ${subscriberUrl.value},
-          "id":      ${serviceId.value},
-          "version": ${serviceVersion.value}
+          "url":     $subscriberUrl,
+          "id":      $serviceId,
+          "version": $serviceVersion
         },
         "newStatus": $status
       }
       """.addIfDefined("message" -> maybeMessage)),
-    EventSender.EventContext(CategoryName("MIGRATION_STATUS_CHANGE"),
-                             show"$categoryName: sending status change event failed"
+      EventSender.EventContext(CategoryName("MIGRATION_STATUS_CHANGE"),
+                               show"$categoryName: sending status change event failed"
+      )
     )
-  )
 
-  private def toRecoverableFailure(recoverableFailure: ProcessingRecoverableError) = changeMigrationStatus(
-    "RECOVERABLE_FAILURE",
-    ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).value.some
-  )
+  private def toRecoverableFailure(recoverableFailure: ProcessingRecoverableError) =
+    changeMigrationStatus(
+      "RECOVERABLE_FAILURE",
+      ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).value.some
+    )
 
   private def nonRecoverableFailure: PartialFunction[Throwable, F[Unit]] = { case NonFatal(e) =>
     changeMigrationStatus("NON_RECOVERABLE_FAILURE", ErrorMessage.withStackTrace(e).value.some)
   }
+
+  private def verifyTSState: F[Option[EventSchedulingResult]] =
+    checkTSState
+      .map {
+        case Ready | MissingDatasets => None
+        case ReProvisioning          => ServiceUnavailable("Re-provisioning running").widen.some
+      }
+      .recover { case NonFatal(exception) => SchedulingError(exception).widen.some }
 }
 
-private[events] object EventHandler {
+private object EventHandler {
   import eu.timepit.refined.auto._
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
@@ -158,11 +122,11 @@ private[events] object EventHandler {
       serviceVersion:        ServiceVersion,
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config
-  ): F[EventHandler[F]] = for {
-    tsStateChecker           <- TSStateChecker[F]
-    migrationsRunner         <- MigrationsRunner[F](config)
-    eventSender              <- EventSender[F](EventLogUrl)
-    concurrentProcessLimiter <- ConcurrentProcessesLimiter(processesCount = 1)
+  ): F[consumers.EventHandler[F]] = for {
+    tsStateChecker   <- TSStateChecker[F]
+    migrationsRunner <- MigrationsRunner[F](config)
+    eventSender      <- EventSender[F](EventLogUrl)
+    processExecutor  <- ProcessExecutor.concurrent(processesCount = 1)
   } yield new EventHandler[F](subscriberUrl,
                               serviceId,
                               serviceVersion,
@@ -170,6 +134,6 @@ private[events] object EventHandler {
                               migrationsRunner,
                               eventSender,
                               subscriptionMechanism,
-                              concurrentProcessLimiter
+                              processExecutor
   )
 }

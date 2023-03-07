@@ -25,7 +25,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{RenkuUrl, Schemas, projects}
+import io.renku.graph.model.{projects, RenkuUrl, Schemas}
 import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
@@ -38,7 +38,7 @@ private trait ProjectsPageFinder[F[_]] {
 private object ProjectsPageFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectsPageFinder[F]] = for {
     implicit0(ru: RenkuUrl) <- RenkuUrlLoader[F]()
-    recordsFinder           <- ProjectsConnectionConfig[F]().map(RecordsFinder[F](_))
+    recordsFinder           <- MigrationsConnectionConfig[F]().map(RecordsFinder[F](_))
   } yield new ProjectsPageFinderImpl(recordsFinder)
 }
 

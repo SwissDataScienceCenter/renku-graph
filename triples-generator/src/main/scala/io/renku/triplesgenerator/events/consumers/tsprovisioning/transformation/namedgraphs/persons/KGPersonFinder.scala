@@ -21,13 +21,13 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
+import io.renku.graph.model.{GraphClass, persons}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{Email, GitLabId, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, persons}
-import io.renku.triplesstore.SparqlQuery._
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery._
 import org.typelevel.log4cats.Logger
 
 private trait KGPersonFinder[F[_]] {

@@ -22,9 +22,9 @@ import cats.data.EitherT
 import cats.data.EitherT.rightT
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
-import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery

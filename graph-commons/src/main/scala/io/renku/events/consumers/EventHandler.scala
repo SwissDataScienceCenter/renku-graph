@@ -18,113 +18,98 @@
 
 package io.renku.events.consumers
 
-import cats.data.EitherT
-import cats.data.EitherT._
+import cats.effect.{MonadCancelThrow, Resource}
 import cats.syntax.all._
-import cats.{Monad, MonadThrow, Show}
-import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.model.events.{CompoundEventId, EventId}
-import io.renku.graph.model.projects
-import io.renku.json.JsonOps.JsonExt
+import io.renku.events.consumers.EventSchedulingResult._
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 trait EventHandler[F[_]] {
-  def tryHandling(request:                     EventRequestContent): F[EventSchedulingResult]
-  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
-}
-
-abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimiter: ConcurrentProcessesLimiter[F])
-    extends EventHandler[F] {
 
   val categoryName: CategoryName
 
-  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
-    for {
-      _                    <- fromEither[F](request.event.validateCategoryName)
-      eventHandlingProcess <- right(createHandlingProcess(request))
-      result               <- right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
-    } yield result
-  }.merge
+  def tryHandling(request: EventRequestContent): F[EventSchedulingResult]
 
-  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
+  import EventDecodingTools._
 
-  implicit class JsonOps(override val json: Json) extends JsonExt {
+  protected lazy val checkCategory: EventRequestContent => Either[EventSchedulingResult, CategoryName] =
+    _.event.categoryName.leftMap(_ => UnsupportedEventType.widen) >>= checkCategoryName
 
-    import io.renku.tinytypes.json.TinyTypeDecoders._
+  private lazy val checkCategoryName: CategoryName => Either[EventSchedulingResult, CategoryName] = {
+    case name @ `categoryName` => name.asRight
+    case _                     => UnsupportedEventType.asLeft
+  }
+}
 
-    lazy val validateCategoryName: Either[EventSchedulingResult, Unit] =
-      (json.hcursor.downField("categoryName").as[CategoryName] flatMap checkCategoryName)
-        .leftMap(_ => UnsupportedEventType)
-        .void
+abstract class EventHandlerWithProcessLimiter[F[_]: MonadCancelThrow: Logger](
+    processExecutor: ProcessExecutor[F]
+) extends EventHandler[F] {
 
-    lazy val getProject: Either[EventSchedulingResult, Project] = json.as[Project].leftMap(_ => BadRequest)
+  protected type Event
+  protected def createHandlingDefinition(): EventHandlingDefinition
 
-    lazy val getEventId: Either[EventSchedulingResult, CompoundEventId] =
-      json.as[CompoundEventId].leftMap(_ => BadRequest)
+  @annotation.nowarn("cat=unused")
+  protected def onPostHandling(event: Event, result: EventSchedulingResult): F[Unit] = ().pure[F]
 
-    lazy val getProjectPath: Either[EventSchedulingResult, projects.Path] =
-      json.hcursor.downField("project").downField("path").as[projects.Path].leftMap(_ => BadRequest)
+  final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] =
+    checkCategory(request)
+      .leftMap(_.pure[F])
+      .as(doCategoryHandling(request))
+      .merge
 
-    private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
-      case name @ `categoryName` => Right(name)
-      case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
-    }
+  private def doCategoryHandling(request: EventRequestContent) = {
 
-    private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
-      for {
-        projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      } yield Project(projectId, projectPath)
-    }
+    val handlingDefinition = createHandlingDefinition()
 
-    private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>
-      for {
-        id        <- cursor.downField("id").as[EventId]
-        projectId <- cursor.downField("project").downField("id").as[projects.GitLabId]
-      } yield CompoundEventId(id, projectId)
+    handlingDefinition.precondition >>= {
+      case Some(preconditionFailure) => preconditionFailure.pure[F]
+      case None =>
+        decodeEvent(request, handlingDefinition)
+          .map(event => process(event, handlingDefinition).flatTap(result => onPostHandling(event, result)))
+          .sequence
+          .map(_.merge)
     }
   }
 
-  protected def logError[E](event: E)(implicit show: Show[E]): PartialFunction[Throwable, F[Unit]] = { case exception =>
-    Logger[F].error(exception)(show"$categoryName: $event failed")
+  private def decodeEvent(request:           EventRequestContent,
+                          processDefinition: EventHandlingDefinition
+  ): Either[EventSchedulingResult, Event] =
+    (processDefinition decode request).leftMap(err => BadRequest(err.getMessage))
+
+  private def process(event: Event, processDefinition: EventHandlingDefinition): F[EventSchedulingResult] = {
+    val processResource = Resource
+      .make(().pure[F])(_ => processDefinition.onRelease.getOrElse(().pure[F]))
+      .evalTap(_ => processDefinition.process(event))
+    processExecutor
+      .tryExecuting(processResource.use_)
   }
 
-  protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {
+  case class EventHandlingDefinition(
+      decode:       EventRequestContent => Either[Exception, Event],
+      process:      Event => F[Unit],
+      precondition: F[Option[EventSchedulingResult]],
+      onRelease:    Option[F[Unit]] = None
+  )
 
-    def log[EventInfo](eventInfo: EventInfo)(result: EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
-      result match {
-        case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
-        case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
-        case _                                  => ME.unit
-      }
+  object EventHandlingDefinition {
 
-    def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit show: Show[EventInfo]): F[Unit] =
-      logger.info(show"$categoryName: $eventInfo -> $message")
+    def apply(decode:    EventRequestContent => Either[Exception, Event],
+              process:   Event => F[Unit],
+              onRelease: F[Unit]
+    ): EventHandlingDefinition = EventHandlingDefinition(
+      decode,
+      process,
+      precondition = Option.empty[EventSchedulingResult].pure[F],
+      onRelease.some
+    )
 
-    def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit show: Show[EventInfo]): F[Unit] =
-      logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
-  }
-
-  protected implicit class EitherTOps[T](operation: F[T])(implicit ME: MonadThrow[F]) {
-
-    def toRightT(recoverTo: EventSchedulingResult): EitherT[F, EventSchedulingResult, T] = EitherT {
-      operation.map(_.asRight[EventSchedulingResult]) recover as(recoverTo)
-    }
-
-    lazy val toRightT: EitherT[F, EventSchedulingResult, T] = EitherT {
-      operation.map(_.asRight[EventSchedulingResult]) recover asSchedulingError
-    }
-
-    private def as(result: EventSchedulingResult): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
-      case NonFatal(_) => Left(result)
-    }
-
-    private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
-      case NonFatal(exception) => Left(SchedulingError(exception))
-    }
+    def apply(decode:  EventRequestContent => Either[Exception, Event],
+              process: Event => F[Unit]
+    ): EventHandlingDefinition = EventHandlingDefinition(
+      decode,
+      process,
+      precondition = Option.empty[EventSchedulingResult].pure[F],
+      onRelease = None
+    )
   }
 }

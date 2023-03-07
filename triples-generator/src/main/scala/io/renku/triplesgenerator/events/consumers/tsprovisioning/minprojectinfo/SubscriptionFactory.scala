@@ -18,9 +18,10 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.minprojectinfo
 
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel}
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -36,7 +37,7 @@ object SubscriptionFactory {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+      : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(
         categoryName,

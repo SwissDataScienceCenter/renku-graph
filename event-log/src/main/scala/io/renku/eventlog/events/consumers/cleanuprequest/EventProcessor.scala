@@ -42,7 +42,11 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](projectIdFinder: Proj
 
   import projectIdFinder._
 
-  override def process(event: CleanUpRequestEvent): F[Unit] = event match {
+  override def process(event: CleanUpRequestEvent): F[Unit] =
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      enqueue(event)
+
+  private def enqueue(event: CleanUpRequestEvent) = event match {
     case CleanUpRequestEvent.Full(id, path) => queue.offer(id, path)
     case CleanUpRequestEvent.Partial(path) =>
       findProjectId(path) >>= {

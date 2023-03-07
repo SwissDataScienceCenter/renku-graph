@@ -52,8 +52,8 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     )
     with UpdateQueryRunner[F] {
 
-  import org.http4s.Status.Ok
   import org.http4s.{Request, Response, Status}
+  import org.http4s.Status.Ok
   import recoveryStrategy._
 
   override def run(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {

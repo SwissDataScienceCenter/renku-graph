@@ -19,9 +19,9 @@
 package io.renku.eventlog.events.consumers.commitsyncrequest
 
 import cats.effect.IO
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.producers._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates

@@ -19,114 +19,92 @@
 package io.renku.commiteventservice.events.consumers.globalcommitsync
 
 import Generators._
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.ConcurrentProcessesLimiter
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "handle" should {
+  "handlingDefinition.decode" should {
 
-    "decode an event from the request, " +
-      s"schedule commit synchronization and return $Accepted" in new TestCase {
-
-        val event = globalCommitSyncEvents().generateOne
-
-        (commitEventSynchronizer.synchronizeEvents _)
-          .expects(event)
-          .returning(().pure[IO])
-
-        handler
-          .createHandlingProcess(requestContent(event.asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Accepted.asRight
-
-        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
-      }
-
-    s"return $Accepted and release the processing flag when scheduling event synchronization fails" in new TestCase {
+    "decode the event from the request" in new TestCase {
 
       val event = globalCommitSyncEvents().generateOne
 
-      val exception = exceptions.generateOne
-      (commitEventSynchronizer.synchronizeEvents _)
-        .expects(event)
-        .returning(exception.raiseError[IO, Unit])
-
-      val handlingProcess = handler
-        .createHandlingProcess(requestContent(event.asJson))
-        .unsafeRunSync()
-
-      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
-
-      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(
-        Info(s"${logMessageCommon(event)} -> $Accepted"),
-        Error(show"$categoryName: $event failed", exception)
-      )
+      handler
+        .createHandlingDefinition()
+        .decode(requestContent(event.asJson)) shouldBe event.asRight
     }
+  }
 
-    s"return $BadRequest if event is malformed" in new TestCase {
+  "handlingDefinition.process" should {
 
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": ${categoryName.value}
-        }"""
-      }
+    "be the synchronizer.synchronizeEvents" in new TestCase {
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe BadRequest.asLeft
+      val event = globalCommitSyncEvents().generateOne
+
+      (synchronizer.synchronizeEvents _)
+        .expects(event)
+        .returning(().pure[IO])
+
+      handler
+        .createHandlingDefinition()
+        .process(event)
+        .unsafeRunSync() shouldBe ()
+    }
+  }
+
+  "createHandlingDefinition" should {
+
+    "not define precondition" in new TestCase {
+      handler.createHandlingDefinition().precondition shouldBe None.pure[IO]
+    }
+  }
+
+  "handlingDefinition.onRelease" should {
+
+    "do the renewSubscription" in new TestCase {
+
+      handler.createHandlingDefinition().onRelease.foreach(_.unsafeRunSync())
+
+      renewSubscriptionCalled.get.unsafeRunSync() shouldBe true
     }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val commitEventSynchronizer    = mock[CommitsSynchronizer[IO]]
-    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
-    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val synchronizer                  = mock[CommitsSynchronizer[IO]]
+    private val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
+    (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
-    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
-
-    val handler =
-      new EventHandler[IO](categoryName, commitEventSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
+    val handler = new EventHandler[IO](categoryName, synchronizer, subscriptionMechanism, mock[ProcessExecutor[IO]])
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent.NoPayload(event)
   }
 
-  private implicit def eventEncoder[E <: GlobalCommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
+  private implicit lazy val eventEncoder: Encoder[GlobalCommitSyncEvent] = Encoder.instance {
     case GlobalCommitSyncEvent(project, commits) => json"""{
       "categoryName": "GLOBAL_COMMIT_SYNC",
       "project": {
-        "id":         ${project.id.value},
-        "path":       ${project.path.value}
+        "id":   ${project.id},
+        "path": ${project.path}
       },
       "commits": {
-        "count":  ${commits.count.value},
-        "latest": ${commits.latest.value}
+        "count":  ${commits.count},
+        "latest": ${commits.latest}
       }
     }"""
   }

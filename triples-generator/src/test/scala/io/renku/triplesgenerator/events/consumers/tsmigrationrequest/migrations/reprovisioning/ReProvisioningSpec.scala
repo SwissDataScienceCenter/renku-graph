@@ -282,7 +282,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventContext))
         .expects(
-          EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
+          EventRequestContent.NoPayload(
+            json"""{"categoryName": "EVENTS_STATUS_CHANGE", "subCategory": "AllEventsToNew"}"""
+          ),
           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                                    s"$categoryName: $migrationName sending EVENTS_STATUS_CHANGE failed"
           )

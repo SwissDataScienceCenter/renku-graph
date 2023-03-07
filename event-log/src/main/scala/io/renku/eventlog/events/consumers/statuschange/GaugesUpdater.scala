@@ -24,8 +24,12 @@ import io.renku.eventlog.metrics.EventStatusGauges
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 
-private trait GaugesUpdater[F[_]] {
+private[statuschange] trait GaugesUpdater[F[_]] {
   def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit]
+}
+
+private[statuschange] object GaugesUpdater {
+  def apply[F[_]: Applicative: EventStatusGauges]: GaugesUpdater[F] = new GaugesUpdaterImpl[F]
 }
 
 private class GaugesUpdaterImpl[F[_]: Applicative: EventStatusGauges] extends GaugesUpdater[F] {

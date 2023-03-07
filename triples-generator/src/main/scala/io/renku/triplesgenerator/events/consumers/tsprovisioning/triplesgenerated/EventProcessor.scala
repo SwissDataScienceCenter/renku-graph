@@ -25,7 +25,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
-import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -34,11 +33,11 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.TransformationStepsCreator
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import transformation.TransformationStepsCreator
-import triplesuploading.TriplesUploadResult._
-import triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 
 import java.time.Duration
 import scala.util.control.NonFatal
@@ -65,6 +64,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
     for {
+      _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
       implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollback(event)
       results                             <- measureExecutionTime(transformAndUpload(event))
       _                                   <- updateEventLog(results)
@@ -73,7 +73,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   } recoverWith logError(event)
 
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = { case exception =>
-    Logger[F].error(exception)(show"$categoryName: processing failure: $event")
+    Logger[F].error(exception)(show"$categoryName: $event processing failure")
   }
 
   private def transformAndUpload(
@@ -168,7 +168,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def rollback(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case exception =>
-      statusUpdater.rollback[TriplesGenerated](event.compoundEventId, event.project.path) >>
+      statusUpdater.rollback(event.compoundEventId, event.project.path, RollbackStatus.TriplesGenerated) >>
         new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 

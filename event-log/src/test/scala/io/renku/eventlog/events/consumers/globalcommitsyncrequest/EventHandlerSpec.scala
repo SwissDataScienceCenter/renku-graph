@@ -20,17 +20,12 @@ package io.renku.eventlog.events.consumers
 package globalcommitsyncrequest
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -45,88 +40,44 @@ class EventHandlerSpec
     with Eventually
     with IntegrationPatience {
 
-  "handle" should {
-
-    "decode an event from the request, " +
-      "force global commit sync " +
-      s"and return $Accepted if forcing global commit sync succeeds" in new TestCase {
-
-        val projectId   = projectIds.generateOne
-        val projectPath = projectPaths.generateOne
-
-        (globalCommitSyncForcer.moveGlobalCommitSync _)
-          .expects(projectId, projectPath)
-          .returning(().pure[IO])
-
-        handler
-          .createHandlingProcess(requestContent((projectId -> projectPath).asJson))
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(
-          Accepted
-        )
-
-        eventually {
-          logger.loggedOnly(
-            Info(
-              s"${handler.categoryName}: projectId = $projectId, projectPath = $projectPath -> $Accepted"
-            )
-          )
-        }
-      }
-
-    "log an error if the global commit sync forcing fails" in new TestCase {
-
-      val projectId   = projectIds.generateOne
-      val projectPath = projectPaths.generateOne
-
-      val exception = exceptions.generateOne
-      (globalCommitSyncForcer.moveGlobalCommitSync _)
-        .expects(projectId, projectPath)
-        .returning(exception.raiseError[IO, Unit])
-
-      handler
-        .createHandlingProcess(
-          requestContent((projectId -> projectPath).asJson)
-        )
-        .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
-
-      eventually {
-        logger.loggedOnly(
-          Error(
-            s"${handler.categoryName}: projectId = $projectId, projectPath = $projectPath -> SchedulingError",
-            exception
-          )
-        )
-      }
+  "createHandlingDefinition.decode" should {
+    "decode a valid event successfully" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Project(42, "the/project")
+      definition.decode(EventRequestContent(eventData.asJson)) shouldBe Right(eventData)
     }
 
-    s"return $BadRequest if event is malformed" in new TestCase {
+    "fail on invalid event data" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      val eventData  = Json.obj("invalid" -> true.asJson)
+      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+    }
+  }
 
-      val request = requestContent {
-        jsons.generateOne deepMerge json"""{
-          "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST"
-        }"""
-      }
+  "createHandlingDefinition.process" should {
+    "call to EventPersister" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      (globalCommitSyncForcer.moveGlobalCommitSync _).expects(*, *).returning(IO.unit)
+      definition.process(Project(42, "the/project")).unsafeRunSync() shouldBe ()
+    }
+  }
 
-      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)
-
-      logger.expectNoLogs()
+  "createHandlingDefinition" should {
+    "not define onRelease and precondition" in new TestCase {
+      val definition = handler.createHandlingDefinition()
+      definition.onRelease                    shouldBe None
+      definition.precondition.unsafeRunSync() shouldBe None
     }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val globalCommitSyncForcer = mock[GlobalCommitSyncForcer[IO]]
-    val handler                = new EventHandler[IO](categoryName, globalCommitSyncForcer)
+    val handler                = new EventHandler[IO](globalCommitSyncForcer)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(projects.GitLabId, projects.Path)] =
-    Encoder.instance[(projects.GitLabId, projects.Path)] { case (id, path) =>
+  private implicit lazy val eventEncoder: Encoder[Project] =
+    Encoder.instance[Project] { case Project(id, path) =>
       json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
         "project": {

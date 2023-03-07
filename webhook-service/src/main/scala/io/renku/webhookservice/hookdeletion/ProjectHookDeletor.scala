@@ -29,7 +29,7 @@ import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
-import org.http4s.Status.{NotFound, Ok}
+import org.http4s.Status.{NoContent, NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
@@ -49,17 +49,15 @@ private class ProjectHookDeletorImpl[F[_]: Async: GitLabClient: Logger] extends 
   import org.http4s.{Request, Response}
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[DeletionResult]] = {
-    case (Ok, _, _)           => DeletionResult.HookDeleted.pure[F].widen[DeletionResult]
-    case (NotFound, _, _)     => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+    case (Ok | NoContent, _, _) => DeletionResult.HookDeleted.pure[F].widen[DeletionResult]
+    case (NotFound, _, _)       => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
+    case (Unauthorized, _, _)   => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
   def delete(projectId: projects.GitLabId, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
     GitLabClient[F].delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete-hook")(
       mapResponse
-    )(
-      accessToken.some
-    )
+    )(accessToken.some)
 }
 
 private object ProjectHookDeletor {

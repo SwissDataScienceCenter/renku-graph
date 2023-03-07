@@ -19,18 +19,17 @@
 package io.renku.triplesgenerator.events.consumers
 
 import cats.MonadThrow
-import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, SchedulingError, ServiceUnavailable}
-import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
+import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private trait TSReadinessForEventsChecker[F[_]] {
-  def verifyTSReady: EitherT[F, EventSchedulingResult, Accepted]
+  def verifyTSReady: F[Option[EventSchedulingResult]]
 }
 
 private object TSReadinessForEventsChecker {
@@ -41,15 +40,11 @@ private object TSReadinessForEventsChecker {
 private class TSReadinessForEventsCheckerImpl[F[_]: MonadThrow](tsStateChecker: TSStateChecker[F])
     extends TSReadinessForEventsChecker[F] {
 
-  override def verifyTSReady: EitherT[F, EventSchedulingResult, Accepted] = EitherT {
+  override def verifyTSReady: F[Option[EventSchedulingResult]] =
     tsStateChecker.checkTSState
       .map {
-        case TSState.Ready => Accepted.asRight
-        case state @ (TSState.MissingDatasets | TSState.ReProvisioning) =>
-          ServiceUnavailable(state.show).asLeft.leftWiden[EventSchedulingResult]
+        case Ready                                      => None
+        case state @ (MissingDatasets | ReProvisioning) => ServiceUnavailable(state.show).widen.some
       }
-      .recover { case exception =>
-        SchedulingError(exception).asLeft[Accepted].leftWiden[EventSchedulingResult]
-      }
-  }
+      .recover { case exception => SchedulingError(exception).widen.some }
 }

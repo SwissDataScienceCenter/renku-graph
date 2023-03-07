@@ -18,12 +18,12 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.projectinfo
 
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError

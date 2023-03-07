@@ -49,7 +49,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "newStatus": $AwaitingDeletion
+        "subCategory": "RollbackToAwaitingDeletion"
       }""")
 
       (eventSender
@@ -80,7 +80,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "newStatus": $AwaitingDeletion
+        "subCategory": "RollbackToAwaitingDeletion"
       }""")
 
       (eventSender
