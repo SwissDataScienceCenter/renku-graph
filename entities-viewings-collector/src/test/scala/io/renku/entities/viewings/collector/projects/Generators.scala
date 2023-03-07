@@ -16,29 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.data
+package io.renku.entities.viewings.collector.projects
 
-import cats.Show
-import shapeless._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators._
+import org.scalacheck.Gen
 
-trait CoproductShow {
-
-  implicit val cnilShow: Show[CNil] = Show.show(_ => "")
-
-  implicit def coproductShow[H, T <: Coproduct](implicit
-      hs: Lazy[Show[H]],
-      ts: Show[T]
-  ): Show[H :+: T] =
-    Show.show {
-      case Inl(h) => hs.value.show(h)
-      case Inr(t) => ts.show(t)
-    }
-
-  implicit def toGeneric[A, Repr](implicit gen: Generic.Aux[A, Repr], rshow: Show[Repr]): Show[A] =
-    Show.show[A] { a =>
-      rshow.show(gen.to(a))
-    }
-
+private object Generators {
+  val projectViewedEvents: Gen[ProjectViewedEvent] =
+    (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)
 }
-
-object CoproductShow extends CoproductShow

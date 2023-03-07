@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator
 
 import cats.MonadThrow
-import cats.effect.{Async, Clock, Resource}
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.events.consumers.EventConsumersRegistry
@@ -35,9 +35,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint: EventEndpoint[F],
     routesMetrics: RoutesMetrics[F],
     versionRoutes: version.Routes[F],
-    config:        Option[Config] = None
-)(implicit clock: Clock[F])
-    extends Http4sDsl[F] {
+    config:        Config
+) extends Http4sDsl[F] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
@@ -52,17 +51,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: on
 
   private lazy val configInfo = config
-    .map(
-      _.entrySet().asScala
-        .map(mapEntry => mapEntry.getKey -> mapEntry.getValue.render())
-        .mkString("\n")
-    )
-    .getOrElse("No config found")
+    .entrySet()
+    .asScala
+    .map(mapEntry => mapEntry.getKey -> mapEntry.getValue.render())
+    .mkString("\n")
 }
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry](consumersRegistry: EventConsumersRegistry[F],
-                                                  config:            Option[Config]
+                                                  config:            Config
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint <- EventEndpoint(consumersRegistry)
     versionRoutes <- version.Routes[F]

@@ -36,8 +36,7 @@ class MigrationsSpec extends AnyWordSpec with should.Matchers with IOSpec with M
   "apply" should {
 
     "not raise an error if there are migrations with unique names" in {
-      val migrations = Migrations[IO](ConfigFactory.load()).unsafeRunSync()
-      migrations.isEmpty shouldBe false
+      Migrations[IO](ConfigFactory.load()).unsafeRunSync().isEmpty shouldBe false
     }
   }
 

@@ -16,29 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.data
+package io.renku.entities.viewings.collector.projects
 
-import cats.Show
-import shapeless._
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.events.consumers
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 
-trait CoproductShow {
-
-  implicit val cnilShow: Show[CNil] = Show.show(_ => "")
-
-  implicit def coproductShow[H, T <: Coproduct](implicit
-      hs: Lazy[Show[H]],
-      ts: Show[T]
-  ): Show[H :+: T] =
-    Show.show {
-      case Inl(h) => hs.value.show(h)
-      case Inr(t) => ts.show(t)
-    }
-
-  implicit def toGeneric[A, Repr](implicit gen: Generic.Aux[A, Repr], rshow: Show[Repr]): Show[A] =
-    Show.show[A] { a =>
-      rshow.show(gen.to(a))
-    }
-
+object SubscriptionFactory {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =
+    EventHandler[F].map(_ -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName))
 }
-
-object CoproductShow extends CoproductShow

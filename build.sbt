@@ -47,7 +47,7 @@ lazy val root = project
     webhookService,
     commitEventService,
     entitiesSearch,
-    entitiesViewsCollector,
+    entitiesViewingsCollector,
     triplesGenerator,
     knowledgeGraph
   )
@@ -144,9 +144,9 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val entitiesViewsCollector = project
-  .in(file("entities-views-collector"))
-  .withId("entities-views-collector")
+lazy val entitiesViewingsCollector = project
+  .in(file("entities-viewings-collector"))
+  .withId("entities-viewings-collector")
   .settings(commonSettings)
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
@@ -158,7 +158,7 @@ lazy val triplesGenerator = project
   .dependsOn(
     graphCommons % "compile->compile; test->test",
     entitiesSearch,
-    entitiesViewsCollector
+    entitiesViewingsCollector
   )
   .enablePlugins(
     JavaAppPackaging,

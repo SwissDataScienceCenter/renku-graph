@@ -16,29 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.data
+package io.renku.entities.viewings.collector.projects
 
 import cats.Show
-import shapeless._
+import cats.syntax.all._
+import io.renku.graph.model.projects
 
-trait CoproductShow {
+private final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed)
 
-  implicit val cnilShow: Show[CNil] = Show.show(_ => "")
-
-  implicit def coproductShow[H, T <: Coproduct](implicit
-      hs: Lazy[Show[H]],
-      ts: Show[T]
-  ): Show[H :+: T] =
-    Show.show {
-      case Inl(h) => hs.value.show(h)
-      case Inr(t) => ts.show(t)
-    }
-
-  implicit def toGeneric[A, Repr](implicit gen: Generic.Aux[A, Repr], rshow: Show[Repr]): Show[A] =
-    Show.show[A] { a =>
-      rshow.show(gen.to(a))
-    }
-
+private object ProjectViewedEvent {
+  implicit val show: Show[ProjectViewedEvent] = Show.show { case ProjectViewedEvent(path, dateViewed) =>
+    show"projectPath = $path, date = $dateViewed"
+  }
 }
-
-object CoproductShow extends CoproductShow

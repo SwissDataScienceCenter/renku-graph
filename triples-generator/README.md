@@ -142,6 +142,25 @@ If yes, it kicks-off execution of all configured Triples Store migrations.
 }
 ```
 
+- **PROJECT_VIEWED**
+
+Once an event of the type is sent, triples-generator upserts project viewing info in the TS with the data from the payload.
+In case there's no project with the given path in the TS, the event is discarded.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_VIEWED",
+  "project": {
+    "path": "project/path"
+  },
+  "date": "2001-09-04T10:48:29.457Z"
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |

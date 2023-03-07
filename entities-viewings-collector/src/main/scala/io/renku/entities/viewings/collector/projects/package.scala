@@ -16,29 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.data
+package io.renku.entities.viewings.collector
 
-import cats.Show
-import shapeless._
+import io.renku.events.CategoryName
 
-trait CoproductShow {
-
-  implicit val cnilShow: Show[CNil] = Show.show(_ => "")
-
-  implicit def coproductShow[H, T <: Coproduct](implicit
-      hs: Lazy[Show[H]],
-      ts: Show[T]
-  ): Show[H :+: T] =
-    Show.show {
-      case Inl(h) => hs.value.show(h)
-      case Inr(t) => ts.show(t)
-    }
-
-  implicit def toGeneric[A, Repr](implicit gen: Generic.Aux[A, Repr], rshow: Show[Repr]): Show[A] =
-    Show.show[A] { a =>
-      rshow.show(gen.to(a))
-    }
-
+package object projects {
+  val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 }
-
-object CoproductShow extends CoproductShow

@@ -52,7 +52,6 @@ private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader
 )(implicit renkuUrl: RenkuUrl, gitLabUrl: GitLabApiUrl)
     extends TransformationResultsUploader[F] {
 
-  import Schemas.schema
   import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
   import jsonLDUploader._
 
@@ -73,7 +72,7 @@ private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader
 
   private def projectGraph(project: Project) = {
     implicit val encoder: JsonLDEncoder[Project] = EntityFunctions[Project].encoder(GraphClass.Project)
-    NamedGraph.from(project.resourceId.asEntityId, project.asJsonLD)
+    NamedGraph.from(GraphClass.Project.id(project.resourceId), project.asJsonLD)
   }
 
   private def maybePersonsGraph(project: Project) =
@@ -81,6 +80,6 @@ private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader
       case Nil => Option.empty[NamedGraph].asRight
       case h :: t =>
         implicit val encoder: JsonLDEncoder[Person] = EntityFunctions[Person].encoder(GraphClass.Persons)
-        NamedGraph.from(schema / "Person", h.asJsonLD, t.map(_.asJsonLD): _*).map(Option.apply)
+        NamedGraph.from(GraphClass.Persons.id, h.asJsonLD, t.map(_.asJsonLD): _*).map(Option.apply)
     }
 }

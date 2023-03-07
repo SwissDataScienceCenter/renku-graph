@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,5 +16,23 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "entities-views-collector"
+package io.renku.entities.viewings.collector.projects
+
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import Generators._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+
+class ProjectViewedEventSpec extends AnyWordSpec with should.Matchers {
+
+  "show" should {
+
+    "return String info with path and the date" in {
+
+      val event = projectViewedEvents.generateOne
+
+      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}"
+    }
+  }
+}

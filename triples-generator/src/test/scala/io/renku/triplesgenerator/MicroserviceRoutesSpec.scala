@@ -20,6 +20,7 @@ package io.renku.triplesgenerator
 
 import cats.effect.IO
 import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
 import io.renku.generators.CommonGraphGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.EndpointTester._
@@ -74,11 +75,11 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
   }
 
   private trait TestCase {
-    val eventEndpoint = mock[EventEndpoint[IO]]
-    val routesMetrics = TestRoutesMetrics()
-    val versionRoutes = mock[version.Routes[IO]]
-    val routes =
-      new MicroserviceRoutes[IO](eventEndpoint, routesMetrics, versionRoutes).routes.map(_.or(notAvailableResponse))
+    val eventEndpoint         = mock[EventEndpoint[IO]]
+    private val routesMetrics = TestRoutesMetrics()
+    private val versionRoutes = mock[version.Routes[IO]]
+    val routes = new MicroserviceRoutes[IO](eventEndpoint, routesMetrics, versionRoutes, ConfigFactory.empty()).routes
+      .map(_.or(notAvailableResponse))
 
     val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
     (versionRoutes.apply _)
