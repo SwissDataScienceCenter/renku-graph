@@ -12,7 +12,7 @@ object Dependencies {
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.2"
     val http4s                 = "0.23.18"
-    val http4sBlaze            = "0.23.18"
+    val http4sEmber            = "0.23.18"
     val http4sPrometheus       = "0.24.3"
     val ip4s                   = "3.2.0"
     val jsonld4s               = "0.10.0"
@@ -98,10 +98,10 @@ object Dependencies {
   )
 
   val http4sClient = Seq(
-    "org.http4s" %% "http4s-ember-client" % V.http4sBlaze
+    "org.http4s" %% "http4s-ember-client" % V.http4sEmber
   )
   val http4sServer = Seq(
-    "org.http4s" %% "http4s-ember-server" % V.http4sBlaze,
+    "org.http4s" %% "http4s-ember-server" % V.http4sEmber,
     "org.http4s" %% "http4s-server"       % V.http4s
   )
   val http4sCirce = Seq(

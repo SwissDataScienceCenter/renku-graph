@@ -197,8 +197,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
   object ConnectionError {
     def unapply(ex: Throwable): Option[Throwable] =
       ex match {
-        case _: ConnectionFailure | _: ConnectException | _: SocketException | _: ConnectException |
-            _: UnknownHostException =>
+        case _: ConnectionFailure | _: ConnectException | _: SocketException | _: UnknownHostException =>
           Some(ex)
         case _: IOException
             if ex.getMessage.toLowerCase

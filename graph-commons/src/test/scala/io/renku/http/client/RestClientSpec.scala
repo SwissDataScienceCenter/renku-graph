@@ -275,9 +275,7 @@ class RestClientSpec
           client.callRemote(mapResponseToInt).unsafeRunSync()
         }
 
-//        exception.getCause shouldBe a[IOException]
         val causeMessage = exception.getCause.getMessage
-//        exception.getMessage shouldBe s"GET $hostUrl/resource error: Connection reset"
 
         logger.loggedOnly(
           Warn(s"GET $hostUrl/resource timed out -> retrying attempt 1 error: $causeMessage"),
