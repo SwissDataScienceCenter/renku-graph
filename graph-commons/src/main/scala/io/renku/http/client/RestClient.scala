@@ -46,7 +46,7 @@ import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 import java.io.IOException
-import java.net.{ConnectException, SocketException}
+import java.net.{ConnectException, SocketException, UnknownHostException}
 import java.nio.channels.ClosedChannelException
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
@@ -197,8 +197,10 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
   object ConnectionError {
     def unapply(ex: Throwable): Option[Throwable] =
       ex match {
-        case NonFatal(_: ConnectionFailure | _: ConnectException | _: SocketException | _: ConnectException) => Some(ex)
-        case NonFatal(_: IOException)
+        case _: ConnectionFailure | _: ConnectException | _: SocketException | _: ConnectException |
+            _: UnknownHostException =>
+          Some(ex)
+        case _: IOException
             if ex.getMessage.toLowerCase
               .contains("connection reset") || ex.getMessage.toLowerCase.contains("broken pipe") =>
           Some(ex)
