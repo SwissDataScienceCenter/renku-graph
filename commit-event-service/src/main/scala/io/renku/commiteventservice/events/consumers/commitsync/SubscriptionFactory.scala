@@ -39,6 +39,6 @@ object SubscriptionFactory {
         categoryName,
         defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
       )
-    handler <- EventHandler[F]
+    handler <- EventHandler[F](subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }
