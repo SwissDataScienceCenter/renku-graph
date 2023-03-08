@@ -16,45 +16,44 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.deletion.projects
 
-import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import cats.effect.Async
+import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
-private[viewings] trait TSUploader[F[_]] {
-  def uploadToTS(event: ProjectViewedEvent): F[Unit]
+private trait ViewingRemover[F[_]] {
+  def removeViewing(event: ProjectViewingDeletion): F[Unit]
 }
 
-private object TSUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSUploader[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new TSUploaderImpl[F](_))
+private object ViewingRemover {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ViewingRemover[F]] =
+    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new ViewingRemoverImpl[F](_))
 }
 
-private[viewings] class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSUploader[F] {
+private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends ViewingRemover[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
-  import io.renku.jsonld._
   import io.renku.jsonld.syntax._
-  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.client.syntax._
+  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery.Prefixes
-  import tsClient.{queryExpecting, updateWithNoResult, upload}
+  import tsClient._
 
-  override def uploadToTS(event: ProjectViewedEvent): F[Unit] =
+  override def removeViewing(event: ProjectViewingDeletion): F[Unit] =
     findProjectId(event) >>= {
       case None            => ().pure[F]
-      case Some(projectId) => deleteOldViewedDate(projectId) >> insert(projectId, event)
+      case Some(projectId) => deleteViewing(projectId)
     }
 
-  private def findProjectId(event: ProjectViewedEvent) = queryExpecting {
+  private def findProjectId(event: ProjectViewingDeletion) = queryExpecting {
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: find id",
       Prefixes of (renku -> "renku", schema -> "schema"),
@@ -76,7 +75,7 @@ private[viewings] class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
     }
   }
 
-  private def deleteOldViewedDate(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
+  private def deleteViewing(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: delete",
       Prefixes of renku -> "renku",
@@ -84,27 +83,10 @@ private[viewings] class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
           |WHERE {
           |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
           |    BIND (${projectId.asEntityId.sparql} AS ?id)
-          |    ?id ?p ?o 
+          |    ?id ?p ?o
           |  }
           |}
           |""".stripMargin
     )
   )
-
-  private def insert(projectId: projects.ResourceId, event: ProjectViewedEvent): F[Unit] =
-    upload(
-      NamedGraph.fromJsonLDsUnsafe(
-        GraphClass.ProjectViewedTimes.id,
-        (projectId -> event.dateViewed).asJsonLD
-      )
-    )
-
-  private implicit lazy val eventJsonLDEncoder: JsonLDEncoder[(projects.ResourceId, projects.DateViewed)] =
-    JsonLDEncoder.instance { case (id, date) =>
-      JsonLD.entity(
-        id.asEntityId,
-        EntityTypes.of(renku / "ProjectViewedTime"),
-        renku / "dateViewed" -> date.asJsonLD
-      )
-    }
 }
