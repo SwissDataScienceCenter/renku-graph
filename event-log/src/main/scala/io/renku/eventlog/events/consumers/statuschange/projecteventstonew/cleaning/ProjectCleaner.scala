@@ -21,6 +21,7 @@ package projecteventstonew.cleaning
 
 import cats.Applicative
 import cats.data.Kleisli
+import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -30,43 +31,57 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import org.typelevel.log4cats.Logger
+import skunk.{~, Session, SqlState}
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Session, SqlState, ~}
-
-import scala.util.control.NonFatal
 
 private[statuschange] trait ProjectCleaner[F[_]] {
   def cleanUp(project: Project): Kleisli[F, Session[F], Unit]
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes]: F[ProjectCleaner[F]] = for {
-    projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
-  } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover)
+  def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]: F[ProjectCleaner[F]] =
+    for {
+      tgClient                      <- triplesgenerator.api.events.Client[F]
+      projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
+    } yield new ProjectCleanerImpl[F](tgClient, projectWebhookAndTokenRemover)
 }
 
 private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecutionTimes](
+    tgClient:                      triplesgenerator.api.events.Client[F],
     projectWebhookAndTokenRemover: ProjectWebhookAndTokenRemover[F]
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectCleaner[F] {
   private val applicative = Applicative[F]
   import applicative._
-  import projectWebhookAndTokenRemover._
 
   override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = {
     for {
       _       <- removeCleanUpEvents(project)
       _       <- removeProjectSubscriptionSyncTimes(project)
       removed <- removeProject(project)
-      _       <- Kleisli.liftF(whenA(removed)(removeWebhookAndToken(project) recoverWith logError(project)))
-      _       <- Kleisli.liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
+      _       <- liftF(whenA(removed)(sendProjectViewingDeletion(project)))
+      _       <- liftF(whenA(removed)(removeWebhookAndToken(project)))
+      _       <- liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
     } yield ()
   } recoverWith logWarnAndRetry(project)
 
-  private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
-    Logger[F].error(error)(s"Failed to remove webhook or token for project: ${project.show}")
+  private def sendProjectViewingDeletion(project: Project) =
+    tgClient
+      .send(ProjectViewingDeletion(project.path))
+      .handleErrorWith(logError(project, "sending ProjectViewingDeletion"))
+
+  private def removeWebhookAndToken(project: Project) =
+    projectWebhookAndTokenRemover
+      .removeWebhookAndToken(project)
+      .handleErrorWith(logError(project, "removing webhook or token"))
+
+  private def logError(project: Project, message: String): Throwable => F[Unit] = { error =>
+    Logger[F].error(error)(s"$categoryName: $message for project: ${project.show} failed")
   }
 
   private def removeCleanUpEvents(project: Project) = measureExecutionTime {

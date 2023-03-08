@@ -112,7 +112,9 @@ lazy val eventLog = project
   .in(file("event-log"))
   .withId("event-log")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(
+    triplesGeneratorApi % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin

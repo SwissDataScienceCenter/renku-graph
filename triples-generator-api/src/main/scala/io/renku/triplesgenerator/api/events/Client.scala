@@ -27,7 +27,8 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
-  def send(event: ProjectViewedEvent): F[Unit]
+  def send(event: ProjectViewedEvent):     F[Unit]
+  def send(event: ProjectViewingDeletion): F[Unit]
 }
 
 object Client {
@@ -47,6 +48,14 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
       EventRequestContent.NoPayload(event.asJson),
       EventContext(ProjectViewedEvent.categoryName,
                    show"${ProjectViewedEvent.categoryName}: sending event $event failed"
+      )
+    )
+
+  override def send(event: ProjectViewingDeletion): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(event.asJson),
+      EventContext(ProjectViewingDeletion.categoryName,
+                   show"${ProjectViewingDeletion.categoryName}: sending event $event failed"
       )
     )
 }
