@@ -60,6 +60,6 @@ private object EventHandler {
       : F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
     membersSynchronizer <- MembersSynchronizer[F]
-    processExecutor     <- ProcessExecutor.concurrent(processesCount = 5)
+    processExecutor     <- ProcessExecutor.concurrent(processesCount = 100)
   } yield new EventHandler[F](categoryName, tsReadinessChecker, membersSynchronizer, processExecutor)
 }

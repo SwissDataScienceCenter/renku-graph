@@ -65,6 +65,6 @@ private object EventHandler {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
       : F[consumers.EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]
-    processExecutor         <- ProcessExecutor.concurrent(10)
+    processExecutor         <- ProcessExecutor.concurrent(100)
   } yield new EventHandler[F](categoryName, commitEventSynchronizer, processExecutor)
 }
