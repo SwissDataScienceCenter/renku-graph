@@ -31,8 +31,8 @@ import io.renku.graph.model.entities.{EntityFunctions, Person}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld._
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.model.{Quad, Triple}
 import io.renku.triplesstore.client.syntax._
@@ -133,6 +133,17 @@ trait InMemoryJena {
       .flatMap(
         _.runQuery(
           SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
+        ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
+      )
+      .unsafeRunSync()
+
+  def triplesCount(on: DatasetName, graphId: EntityId)(implicit ioRuntime: IORuntime): Long =
+    queryRunnerFor(on)
+      .flatMap(
+        _.runQuery(
+          SparqlQuery.of("triples count on graph",
+                         s"SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ${graphId.sparql} { ?s ?p ?o } }"
+          )
         ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       )
       .unsafeRunSync()
