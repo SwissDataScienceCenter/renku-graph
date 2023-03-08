@@ -40,7 +40,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode,
-      process = tsUploader.uploadToTS
+      process
     )
 
   private lazy val decode: EventRequestContent => Either[Exception, ProjectViewedEvent] = { req =>
@@ -48,10 +48,14 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     (req.event.getProjectPath, req.event.hcursor.downField("date").as[projects.DateViewed])
       .mapN(ProjectViewedEvent.apply)
   }
+
+  private def process(event: Event) =
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      tsUploader.uploadToTS(event)
 }
 
 private object EventHandler {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[consumers.EventHandler[F]] =
-    (TSUploader[F], ProcessExecutor.concurrent(processesCount = 10))
+    (TSUploader[F], ProcessExecutor.concurrent(processesCount = 100))
       .mapN(new EventHandler[F](_, _))
 }
