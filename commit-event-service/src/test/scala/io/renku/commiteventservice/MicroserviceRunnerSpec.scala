@@ -77,8 +77,8 @@ class MicroserviceRunnerSpec extends AnyWordSpec with IOSpec with should.Matcher
 
       eventConsumersRegistry.failWith(exceptions.generateOne).unsafeRunSync()
 
-      startAndStopRunner.unsafeRunSync() shouldBe ExitCode.Success
-      assertCalledAllBut(eventConsumersRegistry).unsafeRunSync()
+      startFor(500.millis).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(eventConsumersRegistry, httpServer).unsafeRunSync()
     }
   }
 
