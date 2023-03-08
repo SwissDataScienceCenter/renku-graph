@@ -30,6 +30,8 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
@@ -46,6 +48,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     stepsCreator:          TransformationStepsCreator[F],
     uploader:              TransformationStepsRunner[F],
     entityBuilder:         EntityBuilder[F],
+    tgClient:              triplesgenerator.api.events.Client[F],
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
@@ -58,10 +61,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import uploader._
 
   override def process(event: MinProjectInfoEvent): F[Unit] = {
-    Logger[F].info(show"$categoryName: $event accepted") >>
-      findAccessToken(event.project.path) >>= { implicit accessToken =>
-      measureExecutionTime(transformAndUpload(event)) >>= logSummary(event)
-    }
+    for {
+      _                                   <- Logger[F].info(s"${prefix(event)} accepted")
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path)
+      result                              <- measureExecutionTime(transformAndUpload(event))
+      _                                   <- logSummary(event)(result)
+      _                                   <- sendProjectViewedEvent(event)(result)
+    } yield ()
   } recoverWith logError(event)
 
   private def logError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
@@ -70,7 +76,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def transformAndUpload(
       event: MinProjectInfoEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[EventUploadingResult] = {
+  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
       result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
@@ -80,7 +86,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
       Logger[F]
-        .error(error)(s"${logMessageCommon(event)} ${error.getMessage}")
+        .error(error)(s"${prefix(event)} ${error.getMessage}")
         .map(_ => RecoverableError(event, error))
     case error: SilentRecoverableError =>
       RecoverableError(event, error).pure[F].widen[EventUploadingResult]
@@ -90,13 +96,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     case DeliverySuccess => Uploaded(event).pure[F].widen
     case RecoverableFailure(error @ LogWorthyRecoverableError(message, _)) =>
       Logger[F]
-        .error(error)(s"${logMessageCommon(event)} $message")
+        .error(error)(s"${prefix(event)} $message")
         .map(_ => RecoverableError(event, error))
     case RecoverableFailure(error @ SilentRecoverableError(_, _)) =>
       RecoverableError(event, error).pure[F].widen[EventUploadingResult]
     case error: NonRecoverableFailure =>
       Logger[F]
-        .error(error)(s"${logMessageCommon(event)} ${error.message}")
+        .error(error)(s"${prefix(event)} ${error.message}")
         .map(_ => NonRecoverableError(event, error: Throwable))
   }
 
@@ -105,8 +111,18 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       NonRecoverableError(event, exception).pure[F].widen[EventUploadingResult]
     case NonFatal(exception) =>
       Logger[F]
-        .error(exception)(s"${logMessageCommon(event)} ${exception.getMessage}")
+        .error(exception)(s"${prefix(event)} ${exception.getMessage}")
         .map(_ => NonRecoverableError(event, exception))
+  }
+
+  private def sendProjectViewedEvent(event: MinProjectInfoEvent): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
+    case (_, Uploaded(_)) =>
+      tgClient
+        .send(ProjectViewedEvent.forProject(event.project.path))
+        .handleErrorWith(
+          Logger[F].error(_)(s"${prefix(event)} sending ${ProjectViewedEvent.categoryName} event failed")
+        )
+    case _ => ().pure[F]
   }
 
   private def logSummary(event: MinProjectInfoEvent): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
@@ -115,10 +131,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         case Uploaded(_) => "success"
         case _           => "failure"
       }
-      Logger[F].info(s"${logMessageCommon(event)} processed in ${elapsedTime}ms: $message")
+      Logger[F].info(s"${prefix(event)} processed in ${elapsedTime}ms: $message")
   }
 
-  private def logMessageCommon(event: MinProjectInfoEvent): String = show"$categoryName: $event"
+  private def prefix(event: MinProjectInfoEvent): String = show"$categoryName: $event"
 
   private sealed trait EventUploadingResult extends UploadingResult {
     val event: MinProjectInfoEvent
@@ -152,6 +168,7 @@ private object EventProcessor {
     uploader      <- TransformationStepsRunner[F]
     stepsCreator  <- TransformationStepsCreator[F]
     entityBuilder <- EntityBuilder[F]
+    tgClient      <- triplesgenerator.api.events.Client[F]
     eventsProcessingTimes <- Histogram(
                                name = "min_project_info_processing_times",
                                help = "Min project info processing times",
@@ -159,5 +176,5 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-  } yield new EventProcessorImpl(stepsCreator, uploader, entityBuilder, executionTimeRecorder)
+  } yield new EventProcessorImpl(stepsCreator, uploader, entityBuilder, tgClient, executionTimeRecorder)
 }
