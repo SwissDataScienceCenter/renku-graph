@@ -62,16 +62,19 @@ class CliStepPlanSpec
 
     "work with additional types" in {
       val planDecoder = JsonLDDecoder.decodeList(CliPlan.jsonLDDecoderLenientTyped)
-      val plan        = PlanGenerators.compositePlanChildPlanGen(Instant.EPOCH).generateOne
-      val newJson =
-        JsonLDTools
-          .view(plan)
-          .selectByTypes(CliPlan.entityTypes)
-          .addType(Schemas.renku / "SomeOtherType")
-          .value
+      forAll(PlanGenerators.compositePlanChildPlanGen(Instant.EPOCH)) { plan =>
+        val newJson =
+          JsonLDTools
+            .view(plan)
+            .selectByTypes(CliPlan.entityTypes)
+            .addType(Schemas.renku / "SomeOtherType")
+            .value
 
-      val result = newJson.cursor.as[List[CliPlan]](planDecoder)
-      result.value shouldMatchTo List(plan)
+        val result = newJson.cursor
+          .as[List[CliPlan]](planDecoder)
+          .map(_.filter(_.id == plan.id))
+        result.value shouldMatchTo List(plan)
+      }
     }
   }
 

@@ -47,7 +47,7 @@ trait StatusChangeEventsQueue[F[_]] {
       show:      Show[E]
   ): Kleisli[F, Session[F], Unit]
 
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 object StatusChangeEventsQueue {
@@ -104,7 +104,7 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
     case other                => Logger[F].error(s"$categoryName offering ${event.show} failed with $other")
   }
 
-  override def run(): F[Unit] = dequeueAll().foreverM
+  override def run: F[Unit] = dequeueAll().foreverM
 
   private def dequeueAll(): F[Unit] = Temporal[F].andWait(
     (handlers.get >>= (_.map(h => dequeueType(h)).sequence.void)) recoverWith loggingStatement,

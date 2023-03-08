@@ -29,7 +29,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
 trait KGMetrics[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class KGMetricsImpl[F[_]: Temporal: Logger](
@@ -39,7 +39,7 @@ class KGMetricsImpl[F[_]: Temporal: Logger](
     countsInterval: FiniteDuration = KGMetrics.countsInterval
 ) extends KGMetrics[F] {
 
-  def run(): F[Unit] = Temporal[F].delayBy(updateCounts().foreverM[Unit], initialDelay)
+  def run: F[Unit] = Temporal[F].delayBy(updateCounts().foreverM[Unit], initialDelay)
 
   private def updateCounts(): F[Unit] = {
     for {

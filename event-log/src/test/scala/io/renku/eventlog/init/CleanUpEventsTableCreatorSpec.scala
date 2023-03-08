@@ -36,18 +36,18 @@ class CleanUpEventsTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitS
 
     "create the 'clean_up_events_queue' table if does not exist" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'clean_up_events_queue' table created"))
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'clean_up_events_queue' table created"), Info("'clean_up_events_queue' table exists"))
     }
 
     "create indices for the date column" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       verifyIndexExists("clean_up_events_queue", "idx_date")
       verifyIndexExists("clean_up_events_queue", "idx_project_path")

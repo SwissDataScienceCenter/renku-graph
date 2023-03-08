@@ -53,7 +53,7 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
         .expects(path)
         .returning(Applicative[Try].unit)
 
-      certInstaller.run() shouldBe Applicative[Try].unit
+      certInstaller.run shouldBe Applicative[Try].unit
 
       logger.loggedOnly(Info("Certificate installed for Git"))
     }
@@ -62,7 +62,7 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
 
       findCertificate.expects().returning(None.pure[Try])
 
-      certInstaller.run() shouldBe Applicative[Try].unit
+      certInstaller.run shouldBe Applicative[Try].unit
     }
 
     "fail if finding the certificate fails" in new TestCase {
@@ -70,7 +70,7 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
       val exception = exceptions.generateOne
       findCertificate.expects().returning(exception.raiseError[Try, Option[Certificate]])
 
-      certInstaller.run() shouldBe exception.raiseError[Try, Unit]
+      certInstaller.run shouldBe exception.raiseError[Try, Unit]
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }
@@ -86,7 +86,7 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
         .expects(certificate)
         .returning(exception.raiseError[Try, Path])
 
-      certInstaller.run() shouldBe exception.raiseError[Try, Unit]
+      certInstaller.run shouldBe exception.raiseError[Try, Unit]
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }
@@ -108,7 +108,7 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
         .expects(path)
         .returning(exception.raiseError[Try, Unit])
 
-      certInstaller.run() shouldBe exception.raiseError[Try, Unit]
+      certInstaller.run shouldBe exception.raiseError[Try, Unit]
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }

@@ -51,7 +51,7 @@ class ProjectIdOnCleanUpTableSpec
 
       verifyColumnExists("clean_up_events_queue", "project_id") shouldBe false
 
-      migrator.run().unsafeRunSync() shouldBe ()
+      migrator.run.unsafeRunSync() shouldBe ()
 
       verifyColumnExists("clean_up_events_queue", "project_id") shouldBe true
 
@@ -59,7 +59,7 @@ class ProjectIdOnCleanUpTableSpec
 
       logger.reset()
 
-      migrator.run().unsafeRunSync() shouldBe ()
+      migrator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'clean_up_events_queue.project_id' column exists"))
     }
@@ -75,7 +75,7 @@ class ProjectIdOnCleanUpTableSpec
         val projectPath2 = projectPaths.generateOne
         insertToQueue(projectPath2)
 
-        migrator.run().unsafeRunSync() shouldBe ()
+        migrator.run.unsafeRunSync() shouldBe ()
 
         findQueueRows shouldBe List(projectPath1 -> projectId1)
       }

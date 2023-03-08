@@ -24,4 +24,5 @@ libraryDependencies ++=
     Dependencies.circeCore ++
     Dependencies.jsonld4s ++
     Dependencies.catsCore ++
-    Dependencies.scalacheck).map(_ % Test)
+    Dependencies.scalacheck).map(_ % Test) ++
+    Dependencies.ip4s

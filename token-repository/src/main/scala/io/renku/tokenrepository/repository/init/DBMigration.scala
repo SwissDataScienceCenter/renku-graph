@@ -19,5 +19,5 @@
 package io.renku.tokenrepository.repository.init
 
 trait DBMigration[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }

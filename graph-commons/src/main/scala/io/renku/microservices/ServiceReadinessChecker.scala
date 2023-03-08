@@ -20,8 +20,7 @@ package io.renku.microservices
 
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import com.comcast.ip4s._
 import io.renku.http.client.ServiceHealthChecker
 import org.typelevel.log4cats.Logger
 
@@ -32,7 +31,7 @@ trait ServiceReadinessChecker[F[_]] {
 }
 
 object ServiceReadinessChecker {
-  def apply[F[_]: Async: Logger](microservicePort: Int Refined Positive): F[ServiceReadinessChecker[F]] = for {
+  def apply[F[_]: Async: Logger](microservicePort: Port): F[ServiceReadinessChecker[F]] = for {
     urlFinder     <- MicroserviceUrlFinder[F](microservicePort)
     healthChecker <- ServiceHealthChecker[F]
   } yield new ServiceReadinessCheckerImpl(urlFinder, healthChecker)

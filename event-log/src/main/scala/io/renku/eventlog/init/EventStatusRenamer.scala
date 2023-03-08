@@ -33,7 +33,7 @@ private trait EventStatusRenamer[F[_]] extends DbMigrator[F]
 
 private class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionResource]() extends EventStatusRenamer[F] {
 
-  override def run(): F[Unit] = {
+  override def run: F[Unit] = {
     for {
       _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
       _ <- Logger[F].info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")

@@ -19,6 +19,7 @@
 package io.renku.testtools
 
 import cats.effect.IO
+import cats.syntax.all._
 import org.scalamock.handlers.CallHandler0
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Suite
@@ -28,18 +29,18 @@ import scala.language.reflectiveCalls
 trait MockedRunnableCollaborators {
   self: Suite with MockFactory =>
 
-  private type Runnable[R] = { def run(): IO[R] }
+  type Runnable[R] = { def run: IO[R] }
 
   def `given`[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
 
   class RunnableOps[R](runnable: Runnable[R]) {
-    import cats.syntax.all._
-
+    @annotation.nowarn
     def succeeds(returning: R): CallHandler0[IO[R]] =
       (runnable.run _)
         .expects()
         .returning(returning.pure[IO])
 
+    @annotation.nowarn
     def fails(becauseOf: Exception): CallHandler0[IO[R]] =
       (runnable.run _)
         .expects()

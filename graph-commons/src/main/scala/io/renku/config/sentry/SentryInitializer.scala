@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.sentry.SentryOptions
 
 trait SentryInitializer[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class SentryInitializerImpl[F[_]: MonadThrow](
@@ -31,7 +31,7 @@ class SentryInitializerImpl[F[_]: MonadThrow](
     initSentry:        SentryOptions => Unit
 ) extends SentryInitializer[F] {
 
-  override def run(): F[Unit] = maybeSentryConfig.map(toSentryOptions) match {
+  override def run: F[Unit] = maybeSentryConfig.map(toSentryOptions) match {
     case Some(options) => MonadThrow[F].catchNonFatal(initSentry(options))
     case _             => MonadThrow[F].unit
   }

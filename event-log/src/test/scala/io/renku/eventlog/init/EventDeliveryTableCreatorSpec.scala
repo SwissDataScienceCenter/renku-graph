@@ -39,7 +39,7 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitS
 
       tableExists("event_delivery") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_delivery") shouldBe true
 
@@ -47,14 +47,14 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitS
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'event_delivery' table exists"))
     }
 
     "create indices for all the columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_delivery") shouldBe true
 

@@ -43,7 +43,7 @@ class DbInitializerSpec
       given(migrator1).succeeds(returning = ())
       given(migrator2).succeeds(returning = ())
 
-      initializer.run().unsafeRunSync() shouldBe ()
+      initializer.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("Projects Tokens database initialization success"))
     }
@@ -58,7 +58,7 @@ class DbInitializerSpec
         given(migrator2).succeeds(returning = ())
       }
 
-      initializer.run().unsafeRunSync() shouldBe ()
+      initializer.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Error("Projects Tokens database initialization failed", exception),
                         Info("Projects Tokens database initialization success")

@@ -32,7 +32,7 @@ private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Session
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("subscriber")(
       Kleisli.liftF(Logger[F] info "'subscriber' table exists"),
       otherwise = createTable()

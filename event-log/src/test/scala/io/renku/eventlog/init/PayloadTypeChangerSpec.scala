@@ -41,12 +41,12 @@ class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
       verify("event_payload", "payload", "text")
       verify("event_payload", "schema_version", "text")
 
-      tableRefactor.run().unsafeRunSync() shouldBe ()
+      tableRefactor.run.unsafeRunSync() shouldBe ()
 
       verify("event_payload", "payload", "bytea")
       verifyColumnExists("event_payload", "schema_version") shouldBe false
 
-      tableRefactor.run().unsafeRunSync() shouldBe ()
+      tableRefactor.run.unsafeRunSync() shouldBe ()
 
       verify("event_payload", "payload", "bytea")
       verifyColumnExists("event_payload", "schema_version") shouldBe false

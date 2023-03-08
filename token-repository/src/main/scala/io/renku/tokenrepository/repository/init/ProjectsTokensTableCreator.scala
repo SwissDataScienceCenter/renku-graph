@@ -34,7 +34,7 @@ private class ProjectsTokensTableCreator[F[_]: MonadCancelThrow: Logger: Session
   import skunk._
   import skunk.implicits._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case false => createTable.flatMapF(_ => Logger[F].info("'projects_tokens' table created"))
       case true  => Kleisli.liftF(Logger[F].info("'projects_tokens' table existed"))

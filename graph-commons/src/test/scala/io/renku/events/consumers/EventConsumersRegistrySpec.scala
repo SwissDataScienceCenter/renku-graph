@@ -45,7 +45,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
         .expects()
         .returning(IO.unit)
 
-      registry.run().unsafeRunSync() shouldBe ()
+      registry.run.unsafeRunSync() shouldBe ()
     }
 
     "fail if one of the subscriptionMechanisms fails to start" in new TestCase {
@@ -59,7 +59,7 @@ class EventConsumersRegistrySpec extends AnyWordSpec with IOSpec with should.Mat
         .returning(IO.unit)
 
       intercept[Exception] {
-        registry.run().unsafeRunSync()
+        registry.run.unsafeRunSync()
       } shouldBe exception
     }
   }

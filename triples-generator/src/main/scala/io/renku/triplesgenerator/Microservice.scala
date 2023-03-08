@@ -20,10 +20,9 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import cats.syntax.all._
+import fs2.concurrent.{Signal, SignallingRef}
+import com.comcast.ip4s._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.entities.viewings
@@ -34,21 +33,22 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
-import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort:             Int Refined Positive = 9002
-  private implicit val logger: Logger[IO]           = ApplicationLogger
+  val ServicePort:             Port       = port"9002"
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   private def parseConfigArgs(args: List[String]): IO[Config] = IO {
     args.headOption match {
@@ -86,6 +86,7 @@ object Microservice extends IOMicroservice {
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
     microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config).map(_.routes)
+    termSignal              <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
                     serviceReadinessChecker,
@@ -94,13 +95,13 @@ object Microservice extends IOMicroservice {
                     sentryInitializer,
                     cliVersionCompatChecker,
                     eventConsumersRegistry,
-                    HttpServer[IO](serverPort = ServicePort.value, routes)
-                  ).run()
+                    HttpServer[IO](serverPort = ServicePort, routes)
+                  ).run(termSignal)
                 }
   } yield exitCode
 }
 
-private class MicroserviceRunner[F[_]: Spawn: Logger](
+private class MicroserviceRunner[F[_]: Async: Logger](
     serviceReadinessChecker:         ServiceReadinessChecker[F],
     certificateLoader:               CertificateLoader[F],
     gitCertificateInstaller:         GitCertificateInstaller[F],
@@ -110,18 +111,21 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     httpServer:                      HttpServer[F]
 ) {
 
-  def run(): F[ExitCode] = {
+  def run(signal: Signal[F, Boolean]): F[ExitCode] =
+    Ref.of[F, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
+
+  def createServer: Resource[F, Server] = {
     for {
-      _        <- certificateLoader.run()
-      _        <- gitCertificateInstaller.run()
-      _        <- sentryInitializer.run()
-      _        <- cliVersionCompatibilityVerifier.run()
-      _        <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run())
-      exitCode <- httpServer.run()
-    } yield exitCode
+      _      <- Resource.eval(certificateLoader.run)
+      _      <- Resource.eval(gitCertificateInstaller.run)
+      _      <- Resource.eval(sentryInitializer.run)
+      _      <- Resource.eval(cliVersionCompatibilityVerifier.run)
+      _      <- Spawn[F].background(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run)
+      server <- httpServer.createServer
+    } yield server
   } recoverWith logAndThrow
 
-  private lazy val logAndThrow: PartialFunction[Throwable, F[ExitCode]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, ExitCode])
+  private lazy val logAndThrow: PartialFunction[Throwable, Resource[F, Server]] = { case NonFatal(exception) =>
+    Resource.eval(Logger[F].error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[F, Server]))
   }
 }

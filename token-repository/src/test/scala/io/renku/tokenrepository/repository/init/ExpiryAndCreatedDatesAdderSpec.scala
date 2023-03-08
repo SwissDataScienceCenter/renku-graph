@@ -45,7 +45,7 @@ class ExpiryAndCreatedDatesAdderSpec
       verifyColumnExists("projects_tokens", "expiry_date") shouldBe false
       verifyColumnExists("projects_tokens", "created_at")  shouldBe false
 
-      datesAdder.run().unsafeRunSync() shouldBe ()
+      datesAdder.run.unsafeRunSync() shouldBe ()
 
       verifyColumnExists("projects_tokens", "expiry_date")    shouldBe true
       verifyColumnExists("projects_tokens", "created_at")     shouldBe true
@@ -55,7 +55,7 @@ class ExpiryAndCreatedDatesAdderSpec
       logger.loggedOnly(Info("'expiry_date' column added"), Info("'created_at' column added"))
       logger.reset()
 
-      datesAdder.run().unsafeRunSync() shouldBe ()
+      datesAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'expiry_date' column existed"), Info("'created_at' column existed"))
     }

@@ -33,7 +33,7 @@ private object DuplicateProjectsRemover {
 
 private class DuplicateProjectsRemover[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     for {
       _ <- deduplicateProjects()
       _ <- Kleisli.liftF(Logger[F] info "Projects de-duplicated")

@@ -18,37 +18,32 @@
 
 package io.renku.eventlog
 
+import cats.Show
+import cats.data.Kleisli
 import cats.effect._
-import cats.syntax.all._
+import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
-import io.renku.eventlog.events.producers.EventProducersRegistry
+import io.renku.eventlog.events.consumers.statuschange.{StatusChangeEvent, StatusChangeEventsQueue}
+import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.server.HttpServer
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.GaugeResetScheduler
-import io.renku.microservices.ServiceReadinessChecker
-import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceReadinessChecker, ServiceRunCounter}
+import io.renku.testtools.IOSpec
+
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
+import skunk.Session
+import MicroserviceRunnerSpec._
+import io.renku.http.server.HttpServer
 import scala.concurrent.duration._
 
-class MicroserviceRunnerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockedRunnableCollaborators
-    with MockFactory
-    with Eventually
-    with IntegrationPatience
-    with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "run" should {
 
@@ -56,196 +51,96 @@ class MicroserviceRunnerSpec
       "if Sentry, Events Distributor and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
-        override val metrics        = new Metrics()
-        override val gaugeScheduler = new Gauge()
-
-        given(certificateLoader).succeeds(returning = ())
-        given(sentryInitializer).succeeds(returning = ())
-        given(dbInitializer).succeeds(returning = ())
-        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(eventProducersRegistry).succeeds(returning = ())
-        given(eventConsumersRegistry).succeeds(returning = ())
-        given(eventsQueue).succeeds(returning = ())
-        given(httpServer).succeeds(returning = ExitCode.Success)
-
-        runner.run().unsafeRunAndForget()
-
-        eventually {
-          metrics.counter.get.unsafeRunSync()        should be > 1
-          gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-        }
+        startFor(1.second).unsafeRunSync()
+        assertCalledAll.unsafeRunSync()
       }
 
     "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      given(certificateLoader).fails(becauseOf = exception)
+      certificateLoader.failWith(exception).unsafeRunSync()
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
+      intercept[Exception](startAndStopRunner.unsafeRunSync()) shouldBe exception
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(sentryInitializer).fails(becauseOf = exception)
+      sentryInitializer.failWith(exception).unsafeRunSync()
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if DB initialisation fails" in new TestCase {
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(dbInitializer).fails(becauseOf = exception)
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      dbInitializer.failWith(exception).unsafeRunSync()
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      startAndStopRunner.unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "fail if starting the http server fails" in new TestCase {
-      override val metrics        = new Metrics()
-      override val gaugeScheduler = new Gauge()
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(httpServer).fails(becauseOf = exception)
+      httpServer.failWith(exception).unsafeRunSync()
 
-      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
-
-      eventually {
-        metrics.counter.get.unsafeRunSync()        should be > 1
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      intercept[Exception](startRunnerForever.unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if Event Producers Registry initialisation fails" in new TestCase {
 
-      override val metrics        = new Metrics()
-      override val gaugeScheduler = new Gauge()
+      eventProducersRegistry.failWith(exceptions.generateOne).unsafeRunSync()
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
-
-      eventually {
-        metrics.counter.get.unsafeRunSync()        should be > 1
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      assertCalledAllBut(eventProducersRegistry).unsafeRunSync()
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
 
-      override val metrics        = new Metrics()
-      override val gaugeScheduler = new Gauge()
+      eventConsumersRegistry.failWith(exceptions.generateOne).unsafeRunSync()
 
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
-
-      eventually {
-        metrics.counter.get.unsafeRunSync()        should be > 1
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(eventConsumersRegistry).unsafeRunSync()
     }
 
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
 
-      override val gaugeScheduler = new Gauge()
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      given(metrics).fails(becauseOf = exceptions.generateOne)
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunAndForget() shouldBe ()
-
-      eventually {
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      metrics.failWith(exceptions.generateOne).unsafeRunSync()
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(metrics).unsafeRunSync()
     }
 
     "return Success ExitCode even if StatusChangeEventQueue initialisation fails" in new TestCase {
 
-      override val gaugeScheduler = new Gauge()
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      given(metrics).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunAndForget() shouldBe ()
-
-      eventually {
-        gaugeScheduler.counter.get.unsafeRunSync() should be > 1
-      }
+      eventsQueue.failWith(exceptions.generateOne).unsafeRunSync()
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(eventsQueue).unsafeRunSync()
     }
 
     "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
-
-      override val metrics = new Metrics()
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(dbInitializer).succeeds(returning = ())
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventProducersRegistry).succeeds(returning = ())
-      given(eventConsumersRegistry).succeeds(returning = ())
-      given(eventsQueue).succeeds(returning = ())
-      given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunAndForget()
-
-      eventually {
-        metrics.counter.get.unsafeRunSync() should be > 1
-      }
+      gaugeScheduler.failWith(exceptions.generateOne).unsafeRunSync()
+      startFor(1.second).unsafeRunSync() shouldBe ExitCode.Success
+      assertCalledAllBut(gaugeScheduler).unsafeRunSync()
     }
   }
+}
 
-  private trait TestCase {
+object MicroserviceRunnerSpec {
+  private trait TestCase extends AbstractMicroserviceRunnerTest {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
-    val certificateLoader       = mock[CertificateLoader[IO]]
-    val sentryInitializer       = mock[SentryInitializer[IO]]
-    val dbInitializer           = mock[DbInitializer[IO]]
-    val eventProducersRegistry  = mock[EventProducersRegistry[IO]]
-    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
-    val metrics                 = mock[EventLogMetrics[IO]]
-    val eventsQueue             = mock[StatusChangeEventsQueue[IO]]
-    val httpServer              = mock[HttpServer[IO]]
-    val gaugeScheduler          = mock[GaugeResetScheduler[IO]]
+    val serviceReadinessChecker: ServiceReadinessChecker[IO] with CallCounter = new CountEffect(
+      "ServerReadinessChecker"
+    )
+    val certificateLoader:      CertificateLoader[IO] with CallCounter       = new CountEffect("CertificateLoader")
+    val sentryInitializer:      SentryInitializer[IO] with CallCounter       = new CountEffect("SentryInitializer")
+    val dbInitializer:          DbInitializer[IO] with CallCounter           = new CountEffect("DbInitializer")
+    val eventProducersRegistry: EventProducersRegistry[IO] with CallCounter  = new CountEffect("EventProducerRegistry")
+    val eventConsumersRegistry: EventConsumersRegistry[IO] with CallCounter  = new CountEffect("EventConsumerRegistry")
+    val metrics:                EventLogMetrics[IO] with CallCounter         = new CountEffect("EventLogMetrics")
+    val eventsQueue:            StatusChangeEventsQueue[IO] with CallCounter = new CountEffect("StatusChangeEventQueue")
+    val gaugeScheduler:         GaugeResetScheduler[IO] with CallCounter     = new CountEffect("GaugeResetScheduler")
+    val httpServer:             HttpServer[IO] with CallCounter              = new CountEffect("HttpServer")
+
     lazy val runner = new MicroserviceRunner(
       serviceReadinessChecker,
       certificateLoader,
@@ -258,23 +153,40 @@ class MicroserviceRunnerSpec
       gaugeScheduler,
       httpServer
     )
+
+    lazy val all: List[CallCounter] = List(
+      serviceReadinessChecker,
+      certificateLoader,
+      sentryInitializer,
+      dbInitializer,
+      eventsQueue,
+      eventConsumersRegistry,
+      eventProducersRegistry,
+      metrics,
+      gaugeScheduler,
+      httpServer
+    )
   }
 
-  private class Metrics extends EventLogMetrics[IO] {
-    val counter = Ref.unsafe[IO, Int](0)
+  final class CountEffect(name: String)
+      extends ServiceRunCounter(name)
+      with DbInitializer[IO]
+      with EventLogMetrics[IO]
+      with EventProducersRegistry[IO]
+      with StatusChangeEventsQueue[IO] {
 
-    override def run(): IO[Unit] = keepGoing.foreverM
+    override def register(subscriptionRequest: Json): IO[EventProducersRegistry.SubscriptionResult] = ???
 
-    private def keepGoing =
-      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
-  }
+    override def getStatus: IO[Set[EventProducerStatus]] = ???
 
-  private class Gauge extends GaugeResetScheduler[IO] {
-    val counter = Ref.unsafe[IO, Int](0)
+    override def register[E <: StatusChangeEvent](
+        handler: E => IO[Unit]
+    )(implicit decoder: Decoder[E], eventType: StatusChangeEventsQueue.EventType[E]): IO[Unit] = ???
 
-    override def run(): IO[Unit] = keepGoing.foreverM
-
-    private def keepGoing =
-      Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+    override def offer[E <: StatusChangeEvent](event: E)(implicit
+        encoder:   Encoder[E],
+        eventType: StatusChangeEventsQueue.EventType[E],
+        show:      Show[E]
+    ): Kleisli[IO, Session[IO], Unit] = ???
   }
 }

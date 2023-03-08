@@ -40,7 +40,7 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s._
-import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
@@ -185,11 +185,12 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   def resource(bindAddress: Host, port: Port): Resource[F, Server] =
     Resource.eval(logger.trace(s"Starting GitLab stub on $bindAddress:$port")) *>
-      BlazeServerBuilder[F]
-        .bindHttp(port.value, bindAddress.show)
-        .withoutBanner
+      EmberServerBuilder
+        .default[F]
+        .withHost(bindAddress)
+        .withPort(port)
         .withHttpApp(enableLogging[F](allRoutes.orNotFound))
-        .resource
+        .build
 
   def resource(bindAddress: String, port: Int): Resource[F, Server] =
     (Host.fromString(bindAddress), Port.fromInt(port))
