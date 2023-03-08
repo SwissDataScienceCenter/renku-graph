@@ -23,8 +23,10 @@ import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import Generators._
+import cats.Show
 import io.circe.syntax._
-import io.renku.events.EventRequestContent
+import io.circe.Encoder
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
@@ -33,13 +35,25 @@ import scala.util.Try
 
 class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
-  "send" should {
+  "send ProjectViewedEvent" should {
 
     "send the given event through the EventSender" in new TestCase {
 
       val event = projectViewedEvents.generateOne
 
-      givenSending(event, returning = ().pure[Try])
+      givenSending(event, ProjectViewedEvent.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
+  "send ProjectViewingDeletion" should {
+
+    "send the given event through the EventSender" in new TestCase {
+
+      val event = projectViewingDeletions.generateOne
+
+      givenSending(event, ProjectViewingDeletion.categoryName, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -50,17 +64,16 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     private val eventSender = mock[EventSender[Try]]
     val client              = new ClientImpl[Try](eventSender)
 
-    def givenSending(event: ProjectViewedEvent, returning: Try[Unit]) =
+    def givenSending[E](event: E, categoryName: CategoryName, returning: Try[Unit])(implicit
+        encoder: Encoder[E],
+        show:    Show[E]
+    ) =
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           EventRequestContent.NoPayload(event.asJson),
-          EventSender.EventContext(
-            ProjectViewedEvent.categoryName,
-            show"${ProjectViewedEvent.categoryName}: sending event $event failed"
-          )
+          EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed")
         )
         .returning(returning)
-
   }
 }

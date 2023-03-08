@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.deletion.projects
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -46,9 +46,9 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.process" should {
 
-    "be the TSUploader.uploadToTS" in new TestCase {
+    "be the ViewingRemover.removeViewing" in new TestCase {
 
-      (tsUploader.uploadToTS _).expects(event).returns(().pure[IO])
+      (viewingRemover.removeViewing _).expects(event).returns(().pure[IO])
 
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
@@ -70,10 +70,10 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   private trait TestCase {
 
-    val event = projectViewedEvents.generateOne
+    val event = projectViewingDeletions.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tsUploader = mock[TSUploader[IO]]
-    val handler    = new EventHandler[IO](tsUploader, mock[ProcessExecutor[IO]])
+    val viewingRemover = mock[ViewingRemover[IO]]
+    val handler        = new EventHandler[IO](viewingRemover, mock[ProcessExecutor[IO]])
   }
 }

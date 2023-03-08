@@ -16,46 +16,39 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.deletion.projects
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.EventDecodingTools.JsonOps
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.projects
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    tsUploader:                TSUploader[F],
+    viewingRemover:            ViewingRemover[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  protected override type Event = ProjectViewedEvent
+  protected override type Event = ProjectViewingDeletion
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode,
+      decode = _.event.getProjectPath.map(ProjectViewingDeletion.apply),
       process
     )
 
-  private lazy val decode: EventRequestContent => Either[Exception, ProjectViewedEvent] = { req =>
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-    (req.event.getProjectPath, req.event.hcursor.downField("date").as[projects.DateViewed])
-      .mapN(ProjectViewedEvent.apply)
-  }
-
   private def process(event: Event) =
     Logger[F].info(show"$categoryName: $event accepted") >>
-      tsUploader.uploadToTS(event)
+      viewingRemover.removeViewing(event)
 }
 
 private object EventHandler {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[consumers.EventHandler[F]] =
-    (TSUploader[F], ProcessExecutor.concurrent(processesCount = 100))
+    (ViewingRemover[F], ProcessExecutor.concurrent(processesCount = 100))
       .mapN(new EventHandler[F](_, _))
 }

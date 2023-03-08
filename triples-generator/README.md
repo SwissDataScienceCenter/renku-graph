@@ -161,6 +161,23 @@ In case there's no project with the given path in the TS, the event is discarded
 }
 ```
 
+- **PROJECT_VIEWING_DELETION**
+
+Once an event of the type is sent, triples-generator removes project viewing info from the TS.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_VIEWING_DELETION",
+  "project": {
+    "path": "project/path"
+  }
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |

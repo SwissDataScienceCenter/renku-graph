@@ -18,36 +18,30 @@
 
 package io.renku.triplesgenerator.api.events
 
-import cats.Show
 import cats.syntax.all._
+import cats.Show
 import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.circe.literal._
 import io.circe.DecodingFailure.Reason.CustomReason
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 
-import java.time.Instant
+final case class ProjectViewingDeletion(path: projects.Path)
 
-final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed)
+object ProjectViewingDeletion {
 
-object ProjectViewedEvent {
+  val categoryName: CategoryName = CategoryName("PROJECT_VIEWING_DELETION")
 
-  def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()))
-
-  val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
-
-  implicit val encoder: Encoder[ProjectViewedEvent] = Encoder.instance { case ProjectViewedEvent(path, dateViewed) =>
+  implicit val encoder: Encoder[ProjectViewingDeletion] = Encoder.instance { case ProjectViewingDeletion(path) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
         "path": $path
-      },
-      "date": $dateViewed
+      }
     }"""
   }
 
-  implicit val decoder: Decoder[ProjectViewedEvent] = Decoder.instance { cursor =>
+  implicit val decoder: Decoder[ProjectViewingDeletion] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     lazy val validateCategory = cursor.downField("categoryName").as[CategoryName] >>= {
@@ -55,14 +49,10 @@ object ProjectViewedEvent {
       case other          => DecodingFailure(CustomReason(s"Expected $categoryName but got $other"), cursor).asLeft
     }
 
-    for {
-      _    <- validateCategory
-      path <- cursor.downField("project").downField("path").as[projects.Path]
-      date <- cursor.downField("date").as[projects.DateViewed]
-    } yield ProjectViewedEvent(path, date)
+    (validateCategory >> cursor.downField("project").downField("path").as[projects.Path])
+      .map(ProjectViewingDeletion.apply)
   }
 
-  implicit val show: Show[ProjectViewedEvent] = Show.show { case ProjectViewedEvent(path, dateViewed) =>
-    show"projectPath = $path, date = $dateViewed"
-  }
+  implicit val show: Show[ProjectViewingDeletion] =
+    Show.show { case ProjectViewingDeletion(path) => show"projectPath = $path" }
 }

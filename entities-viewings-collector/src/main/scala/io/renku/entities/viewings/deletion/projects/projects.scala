@@ -16,18 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.api.events
+package io.renku.entities.viewings.deletion
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators._
-import org.scalacheck.Gen
+import io.renku.events.CategoryName
 
-object Generators {
-
-  val projectViewedEvents: Gen[ProjectViewedEvent] =
-    (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)
-
-  val projectViewingDeletions: Gen[ProjectViewingDeletion] =
-    projectPaths.map(ProjectViewingDeletion.apply)
+package object projects {
+  val categoryName: CategoryName = CategoryName("PROJECT_VIEWING_DELETION")
 }

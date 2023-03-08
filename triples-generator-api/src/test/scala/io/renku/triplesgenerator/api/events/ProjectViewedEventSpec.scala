@@ -86,8 +86,7 @@ class ProjectViewedEventSpec
           "path": ${projectPaths.generateOne}
         },
         "date": ${projectViewedDates().generateOne}
-      }""".hcursor
-        .as[ProjectViewedEvent]
+      }""".hcursor.as[ProjectViewedEvent]
 
       result.left.value.getMessage() should include(s"Expected PROJECT_VIEWED but got $otherCategory")
     }
