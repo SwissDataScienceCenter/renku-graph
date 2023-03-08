@@ -20,21 +20,21 @@ package io.renku.entities.viewings.collector.projects
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
-import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectViewedDates
 import io.renku.graph.model.Schemas.renku
+import io.renku.interpreters.TestLogger
+import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.Generators._
+import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
