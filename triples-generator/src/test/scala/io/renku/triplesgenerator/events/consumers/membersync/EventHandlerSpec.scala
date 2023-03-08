@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -26,6 +26,7 @@ import io.circe.{DecodingFailure, Encoder}
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
 import io.renku.graph.model.GraphModelGenerators.projectPaths
@@ -77,8 +78,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "handlingDefinition.onRelease" should {
 
-    "be not defined" in new TestCase {
-      handler.createHandlingDefinition().onRelease shouldBe None
+    "do the renewSubscription" in new TestCase {
+
+      handler.createHandlingDefinition().onRelease.foreach(_.unsafeRunSync())
+
+      renewSubscriptionCalled.get.unsafeRunSync() shouldBe true
     }
   }
 
@@ -94,7 +98,16 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     val membersSynchronizer = mock[MembersSynchronizer[IO]]
 
-    val handler = new EventHandler[IO](categoryName, tsReadinessChecker, membersSynchronizer, mock[ProcessExecutor[IO]])
+    private val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
+    (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
+
+    val handler = new EventHandler[IO](categoryName,
+                                       tsReadinessChecker,
+                                       membersSynchronizer,
+                                       subscriptionMechanism,
+                                       mock[ProcessExecutor[IO]]
+    )
   }
 
   private lazy val eventEncoder: Encoder[projects.Path] = Encoder.instance { projectPath =>

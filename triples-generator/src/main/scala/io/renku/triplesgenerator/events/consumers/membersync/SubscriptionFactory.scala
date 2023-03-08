@@ -40,6 +40,6 @@ object SubscriptionFactory {
         defaultSubscriptionPayloadComposerFactory(Microservice.ServicePort, Microservice.Identifier)
       )
     _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
-    handler <- EventHandler[F]
+    handler <- EventHandler[F](subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

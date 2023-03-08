@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.consumers.commitsync
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.circe.literal._
@@ -28,6 +28,7 @@ import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.C
 import io.renku.events
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -77,19 +78,29 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "createHandlingDefinition" should {
 
-    "not define onRelease and precondition" in new TestCase {
+    "not define precondition" in new TestCase {
+      handler.createHandlingDefinition().precondition shouldBe None.pure[IO]
+    }
+  }
 
-      val definition = handler.createHandlingDefinition()
+  "handlingDefinition.onRelease" should {
 
-      definition.onRelease    shouldBe None
-      definition.precondition shouldBe None.pure[IO]
+    "do the renewSubscription" in new TestCase {
+
+      handler.createHandlingDefinition().onRelease.foreach(_.unsafeRunSync())
+
+      renewSubscriptionCalled.get.unsafeRunSync() shouldBe true
     }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger()
-    val commitsSynchronizer = mock[CommitsSynchronizer[IO]]
-    val handler             = new EventHandler[IO](categoryName, commitsSynchronizer, mock[ProcessExecutor[IO]])
+    val commitsSynchronizer           = mock[CommitsSynchronizer[IO]]
+    private val subscriptionMechanism = mock[SubscriptionMechanism[IO]]
+    val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
+    (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
+    val handler =
+      new EventHandler[IO](categoryName, commitsSynchronizer, subscriptionMechanism, mock[ProcessExecutor[IO]])
 
     def requestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }
