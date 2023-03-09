@@ -28,6 +28,9 @@ object Generators {
   val projectViewedEvents: Gen[ProjectViewedEvent] =
     (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)
 
+  val datasetViewedEvents: Gen[DatasetViewedEvent] =
+    (datasetIdentifiers -> datasetViewedDates()).mapN(DatasetViewedEvent.apply)
+
   val projectViewingDeletions: Gen[ProjectViewingDeletion] =
     projectPaths.map(ProjectViewingDeletion.apply)
 }
