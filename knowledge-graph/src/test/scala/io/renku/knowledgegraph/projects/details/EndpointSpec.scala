@@ -159,7 +159,7 @@ class EndpointSpec
 
       endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(Request[IO]()).unsafeRunSync().status shouldBe Ok
 
-      logger.logged(Error(show"Sending ${ProjectViewedEvent.categoryName} event failed", exception))
+      logger.logged(Error(show"sending ${ProjectViewedEvent.categoryName} event failed", exception))
     }
   }
 
