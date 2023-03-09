@@ -161,6 +161,26 @@ In case there's no project with the given path in the TS, the event is discarded
 }
 ```
 
+- **DATASET_VIEWED**
+
+Once an event of the type is sent, triples-generator locates a project where Dataset with the given identifier is defined
+and upserts project viewing info in the TS for the project.
+In case there's no dataset with the given identifier or no project where this dataset exists, the event is discarded.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "DATASET_VIEWED",
+  "dataset": {
+    "identifier": "123456"
+  },
+  "date": "2001-09-04T10:48:29.457Z"
+}
+```
+
 - **PROJECT_VIEWING_DELETION**
 
 Once an event of the type is sent, triples-generator removes project viewing info from the TS.
