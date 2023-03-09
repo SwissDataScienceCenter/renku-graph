@@ -21,10 +21,14 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.GraphClass
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.syntax._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,22 +41,39 @@ class TriplesRemoverSpec
 
   "removeAllTriples" should {
 
-    "remove all the triples from the storage except for CLI version" in new TestCase {
+    "remove all graphs from the projects DS except from the renku:ProjectViewedTime" in new TestCase {
 
-      upload(to = projectsDataset, anyRenkuProjectEntities.generateOne, anyRenkuProjectEntities.generateOne)
+      val someProject = anyRenkuProjectEntities.generateOne
+      upload(to = projectsDataset, someProject, anyRenkuProjectEntities.generateOne)
+      insertViewTime(someProject)
 
       triplesCount(on = projectsDataset) should be > 0L
 
+      val viewingGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id)
+      viewingGraphTriples should be > 0L
+
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      triplesCount(on = projectsDataset) shouldBe 0L
+      triplesCount(on = projectsDataset) shouldBe viewingGraphTriples
+
+      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id) shouldBe viewingGraphTriples
     }
   }
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val etr = TestExecutionTimeRecorder[IO]()
-    private implicit val tr: SparqlQueryTimeRecorder[IO] = new SparqlQueryTimeRecorder[IO](etr)
+    private implicit val tr: SparqlQueryTimeRecorder[IO] =
+      new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
     val triplesRemover = new TriplesRemoverImpl[IO](projectsDSConnectionInfo)
   }
+
+  private def insertViewTime(project: Project) =
+    insert(
+      to = projectsDataset,
+      Quad(GraphClass.ProjectViewedTimes.id,
+           project.resourceId.asEntityId,
+           renku / "dateViewed",
+           projectViewedDates().generateOne.asObject
+      )
+    )
 }
