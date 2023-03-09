@@ -38,14 +38,14 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class TSUploaderSpec
+class EventPersisterSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
-  "uploadToTS" should {
+  "persist" should {
 
     "insert the given ProjectViewedEvent to the TS " +
       "if there's no event for the project yet" in new TestCase {
@@ -55,7 +55,7 @@ class TSUploaderSpec
 
         val event = projectViewedEvents.generateOne.copy(path = project.path)
 
-        uploader.uploadToTS(event).unsafeRunSync() shouldBe ()
+        persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
       }
@@ -68,14 +68,14 @@ class TSUploaderSpec
 
         val event = projectViewedEvents.generateOne.copy(path = project.path)
 
-        uploader.uploadToTS(event).unsafeRunSync() shouldBe ()
+        persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
 
         val newDate =
           projectViewedDates(timestampsNotInTheFuture(butYoungerThan = event.dateViewed.value).generateOne).generateOne
 
-        uploader.uploadToTS(event.copy(dateViewed = newDate)).unsafeRunSync() shouldBe ()
+        persister.persist(event.copy(dateViewed = newDate)).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(project.resourceId -> newDate)
       }
@@ -84,7 +84,7 @@ class TSUploaderSpec
 
       val event = projectViewedEvents.generateOne
 
-      uploader.uploadToTS(event).unsafeRunSync() shouldBe ()
+      persister.persist(event).unsafeRunSync() shouldBe ()
 
       findAllViewings shouldBe Set.empty
     }
@@ -93,7 +93,7 @@ class TSUploaderSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val uploader = new TSUploaderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+    val persister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   }
 
   private def findAllViewings =

@@ -30,7 +30,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    tsUploader:                TSUploader[F],
+    eventPersister:            EventPersister[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
@@ -51,11 +51,11 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   private def process(event: Event) =
     Logger[F].info(show"$categoryName: $event accepted") >>
-      tsUploader.uploadToTS(event)
+      eventPersister.persist(event)
 }
 
 private object EventHandler {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[consumers.EventHandler[F]] =
-    (TSUploader[F], ProcessExecutor.concurrent(processesCount = 100))
+    (EventPersister[F], ProcessExecutor.concurrent(processesCount = 100))
       .mapN(new EventHandler[F](_, _))
 }

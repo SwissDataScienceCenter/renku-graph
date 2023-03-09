@@ -20,7 +20,7 @@ package io.renku.entities.viewings.deletion.projects
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
-import io.renku.entities.viewings.collector.projects.TSUploaderImpl
+import io.renku.entities.viewings.collector.projects.EventPersisterImpl
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.testentities._
@@ -79,7 +79,7 @@ class ViewingRemoverSpec
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val remover = new ViewingRemoverImpl[IO](TSClient[IO](projectsDSConnectionInfo))
 
-    private val tsUploader = new TSUploaderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+    private val eventPersister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
 
     def insertViewing(project: Project) = {
 
@@ -87,7 +87,7 @@ class ViewingRemoverSpec
 
       val event = projectViewedEvents.generateOne.copy(path = project.path)
 
-      tsUploader.uploadToTS(event).unsafeRunSync()
+      eventPersister.persist(event).unsafeRunSync()
     }
   }
 
