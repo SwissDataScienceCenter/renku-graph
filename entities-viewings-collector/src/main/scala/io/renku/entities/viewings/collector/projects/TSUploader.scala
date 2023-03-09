@@ -29,7 +29,7 @@ private[viewings] trait TSUploader[F[_]] {
   def uploadToTS(event: ProjectViewedEvent): F[Unit]
 }
 
-private object TSUploader {
+private[viewings] object TSUploader {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSUploader[F]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new TSUploaderImpl[F](_))
 }
