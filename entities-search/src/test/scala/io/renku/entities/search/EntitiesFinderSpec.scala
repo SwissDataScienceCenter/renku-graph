@@ -18,23 +18,23 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters._
-import Criteria.{Filters, Sort}
-import EntityConverters._
-import Generators._
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.entities.search
+import io.renku.entities.search.Criteria.Filters._
+import io.renku.entities.search.Criteria.{Filters, Sort}
+import io.renku.entities.search.EntityConverters._
+import io.renku.entities.search.Generators._
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.{Dataset, StepPlan}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.rest.{SortBy, Sorting}
+import io.renku.graph.model.testentities.{Dataset, StepPlan}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should

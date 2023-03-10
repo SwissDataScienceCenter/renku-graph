@@ -22,7 +22,7 @@ import Criteria.Filters.EntityType
 import io.circe.Decoder
 import io.renku.triplesstore.ResultsDecoder
 
-private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with Product with Serializable {
+private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder {
   val entityType:      EntityType
   val selectVariables: Set[String]
   def query(criteria: Criteria): Option[String]
