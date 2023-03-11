@@ -21,7 +21,10 @@ package io.renku.entities.viewings.collector.datasets
 import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
-import io.renku.triplesgenerator.api.events.DatasetViewedEvent
+import cats.data.OptionT
+import io.renku.entities.viewings.collector.projects.EventPersister
+import io.renku.graph.model.projects
+import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -31,10 +34,22 @@ private trait EventUploader[F[_]] {
 
 private object EventUploader {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventUploader[F]] =
-    new EventUploaderImpl[F].pure[F].widen
+    (ProjectFinder[F], EventPersister[F])
+      .mapN(new EventUploaderImpl[F](_, _))
 }
 
-private class EventUploaderImpl[F[_]: MonadThrow] extends EventUploader[F] {
+private class EventUploaderImpl[F[_]: MonadThrow](
+    projectFinder:  ProjectFinder[F],
+    eventPersister: EventPersister[F]
+) extends EventUploader[F] {
 
-  override def upload(event: DatasetViewedEvent): F[Unit] = ().pure[F]
+  import eventPersister._
+  import projectFinder._
+
+  override def upload(event: DatasetViewedEvent): F[Unit] =
+    OptionT(findProject(event.identifier))
+      .map(ProjectViewedEvent(_, projects.DateViewed(event.dateViewed.value)))
+      .semiflatMap(persist)
+      .value
+      .void
 }
