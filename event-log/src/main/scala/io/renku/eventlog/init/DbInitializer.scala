@@ -153,6 +153,12 @@ object DbInitializer {
       currentStatus = GenerationNonRecoverableFailure,
       destinationStatus = New,
       discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Cannot modify immutable object%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
     )
   )
 
