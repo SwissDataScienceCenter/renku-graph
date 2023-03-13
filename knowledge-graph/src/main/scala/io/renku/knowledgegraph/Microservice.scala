@@ -32,13 +32,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
 object Microservice extends IOMicroservice {
-
-  protected implicit val executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
-
-  import cats.effect.unsafe.implicits.global
 
   private implicit val logger: Logger[IO] = ApplicationLogger
 
@@ -48,7 +42,7 @@ object Microservice extends IOMicroservice {
     certificateLoader                            <- CertificateLoader[IO]
     sentryInitializer                            <- SentryInitializer[IO]
     kgMetrics                                    <- KGMetrics[IO]
-    microserviceRoutes                           <- MicroserviceRoutes()
+    microserviceRoutes                           <- MicroserviceRoutes[IO]
     termSignal                                   <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.routes.use { routes =>
                   val httpServer = HttpServer[IO](serverPort = port"9004", routes)
@@ -67,7 +61,7 @@ private class MicroserviceRunner(
   def run(signal: Signal[IO, Boolean]): IO[ExitCode] =
     Ref.of[IO, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
-  def createServer: Resource[IO, Server] = for {
+  private def createServer: Resource[IO, Server] = for {
     _      <- Resource.eval(certificateLoader.run)
     _      <- Resource.eval(sentryInitializer.run)
     _      <- Resource.eval(kgMetrics.run.start)

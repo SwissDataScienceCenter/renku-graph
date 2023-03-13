@@ -18,11 +18,11 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
-import cats.effect.unsafe.IORuntime
-import cats.effect.{Async, IO, Resource}
+import cats.data.Validated.Valid
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
+import cats.Parallel
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
@@ -41,22 +41,20 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
-import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:     datasets.Endpoint[F],
     datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
-    lineageEndpoint:            projects.files.lineage.Endpoint[F],
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
+    lineageEndpoint:            projects.files.lineage.Endpoint[F],
     docsEndpoint:               docs.Endpoint[F],
     usersProjectsEndpoint:      users.projects.Endpoint[F],
     authMiddleware:             AuthMiddleware[F, Option[AuthUser]],
@@ -72,8 +70,8 @@ private class MicroserviceRoutes[F[_]: Async](
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
-  import projectDatasetTagsEndpoint._
   import projectDatasetsEndpoint._
+  import projectDatasetTagsEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import routesMetrics._
@@ -86,9 +84,9 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
+    import datasets._
     import datasets.Endpoint.Query.query
     import datasets.Endpoint.Sort.sort
-    import datasets._
 
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "datasets"
@@ -118,10 +116,10 @@ private class MicroserviceRoutes[F[_]: Async](
 
   private lazy val `GET /users/*` : AuthedRoutes[Option[AuthUser], F] = {
     import users.binders._
-    import users.projects.Endpoint.Criteria.Filters
-    import users.projects.Endpoint.Criteria.Filters.ActivationState._
-    import users.projects.Endpoint.Criteria.Filters._
     import users.projects.Endpoint._
+    import users.projects.Endpoint.Criteria.Filters
+    import users.projects.Endpoint.Criteria.Filters._
+    import users.projects.Endpoint.Criteria.Filters.ActivationState._
     import usersProjectsEndpoint._
 
     AuthedRoutes.of {
@@ -179,8 +177,8 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeUser:    Option[AuthUser],
       request:      Request[F]
   ): F[Response[F]] = {
-    import EntitiesSearchCriteria.Filters._
     import EntitiesSearchCriteria.{Filters, Sort}
+    import EntitiesSearchCriteria.Filters._
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
@@ -276,45 +274,39 @@ private class MicroserviceRoutes[F[_]: Async](
 
 private object MicroserviceRoutes {
 
-  def apply()(implicit
-      executionContext:   ExecutionContext,
-      runtime:            IORuntime,
-      logger:             Logger[IO],
-      metricsRegistry:    MetricsRegistry[IO],
-      sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
-  ): IO[MicroserviceRoutes[IO]] = for {
-    implicit0(gv: GitLabClient[IO])       <- GitLabClient[IO]()
-    implicit0(atf: AccessTokenFinder[IO]) <- AccessTokenFinder[IO]()
-    datasetsSearchEndpoint                <- datasets.Endpoint[IO]
-    datasetDetailsEndpoint                <- datasets.details.Endpoint[IO]
-    entitiesEndpoint                      <- entities.Endpoint[IO]
-    lineageEndpoint                       <- projects.files.lineage.Endpoint[IO]
-    ontologyEndpoint                      <- ontology.Endpoint[IO]
-    projectDetailsEndpoint                <- projects.details.Endpoint[IO]
-    projectDatasetsEndpoint               <- projects.datasets.Endpoint[IO]
-    projectDatasetTagsEndpoint            <- projects.datasets.tags.Endpoint[IO]
-    docsEndpoint                          <- docs.Endpoint[IO]
-    usersProjectsEndpoint                 <- users.projects.Endpoint[IO]
-    authenticator                         <- GitLabAuthenticator[IO]
-    authMiddleware                        <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer                 <- Authorizer.using(ProjectPathRecordsFinder[IO])
-    datasetIdAuthorizer                   <- Authorizer.using(DatasetIdRecordsFinder[IO])
-    versionRoutes                         <- version.Routes[IO]
+  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[MicroserviceRoutes[F]] = for {
+    implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
+    implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
+    datasetsSearchEndpoint               <- datasets.Endpoint[F]
+    datasetDetailsEndpoint               <- datasets.details.Endpoint[F]
+    entitiesEndpoint                     <- entities.Endpoint[F]
+    ontologyEndpoint                     <- ontology.Endpoint[F]
+    projectDetailsEndpoint               <- projects.details.Endpoint[F]
+    projectDatasetsEndpoint              <- projects.datasets.Endpoint[F]
+    projectDatasetTagsEndpoint           <- projects.datasets.tags.Endpoint[F]
+    lineageEndpoint                      <- projects.files.lineage.Endpoint[F]
+    docsEndpoint                         <- docs.Endpoint[F]
+    usersProjectsEndpoint                <- users.projects.Endpoint[F]
+    authenticator                        <- GitLabAuthenticator[F]
+    authMiddleware                       <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+    projectPathAuthorizer                <- Authorizer.using(ProjectPathRecordsFinder[F])
+    datasetIdAuthorizer                  <- Authorizer.using(DatasetIdRecordsFinder[F])
+    versionRoutes                        <- version.Routes[F]
   } yield new MicroserviceRoutes(
     datasetsSearchEndpoint,
     datasetDetailsEndpoint,
     entitiesEndpoint,
-    lineageEndpoint,
     ontologyEndpoint,
     projectDetailsEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,
+    lineageEndpoint,
     docsEndpoint,
     usersProjectsEndpoint,
     authMiddleware,
     projectPathAuthorizer,
     datasetIdAuthorizer,
-    new RoutesMetrics[IO],
+    new RoutesMetrics[F],
     versionRoutes
   )
 }
