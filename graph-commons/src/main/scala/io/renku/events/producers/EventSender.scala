@@ -34,7 +34,7 @@ import io.renku.http.client.RestClientError.{ClientException, ConnectivityExcept
 import io.renku.metrics.MetricsRegistry
 import org.http4s._
 import org.http4s.Method.POST
-import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
+import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable, TooManyRequests}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -54,7 +54,7 @@ object EventSender {
   ): F[EventSender[F]] = for {
     consumerUrl     <- consumerUrlFactory()
     sentEventsGauge <- SentEventsGauge[F]
-  } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onErrorSleep = 15 seconds)
+  } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onBusySleep = 2 seconds, onErrorSleep = 15 seconds)
 
   final case class EventContext(categoryName: CategoryName, errorMessage: String)
 }
@@ -63,6 +63,7 @@ class EventSenderImpl[F[_]: Async: Logger](
     eventConsumerUrl:       EventConsumerUrl,
     sentEventsGauge:        SentEventsGauge[F],
     onErrorSleep:           FiniteDuration,
+    onBusySleep:            FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
@@ -111,14 +112,16 @@ class EventSenderImpl[F[_]: Async: Logger](
   private def retryOnServerError(retry:   Eval[F[Status]],
                                  context: EventContext
   ): PartialFunction[Throwable, F[Status]] = {
+    case exception @ UnexpectedResponseException(TooManyRequests, _) =>
+      waitAndRetry(retry, onErrorSleep, exception, context.errorMessage)
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
-      waitAndRetry(retry, exception, context.errorMessage)
+      waitAndRetry(retry, onBusySleep, exception, context.errorMessage)
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      waitAndRetry(retry, exception, context.errorMessage)
+      waitAndRetry(retry, onErrorSleep, exception, context.errorMessage)
   }
 
-  private def waitAndRetry(retry: Eval[F[Status]], exception: Throwable, errorMessage: String) =
-    Temporal[F].andWait(Logger[F].error(exception)(errorMessage), onErrorSleep) >>
+  private def waitAndRetry(retry: Eval[F[Status]], sleep: Duration, exception: Throwable, errorMessage: String) =
+    Temporal[F].andWait(Logger[F].error(exception)(errorMessage), sleep) >>
       retry.value
 
   private lazy val responseMapping: PartialFunction[(Status, Request[F], Response[F]), F[Status]] = {
