@@ -23,118 +23,95 @@ import Dataset.{DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDat
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.circe.Decoder._
 import io.circe.syntax._
-import io.circe.{Decoder, DecodingFailure, Json}
 import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
+import io.renku.graph.model.{datasets, projects, publicationEvents}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.{projects, publicationEvents}
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
-import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}
+import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
-import org.http4s.Status._
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import org.http4s._
+import org.http4s.Status._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.Instant
 
 class EndpointSpec
     extends AnyWordSpec
+    with should.Matchers
+    with EitherValues
     with MockFactory
     with ScalaCheckPropertyChecks
     with EntitiesGenerators
-    with should.Matchers
     with IOSpec {
 
   "getDataset" should {
 
-    "respond with OK and the found NonModifiedDataset" in new TestCase {
-      forAll(
-        Gen.oneOf(
-          anyRenkuProjectEntities
-            .addDataset(datasetEntities(provenanceImportedExternal))
-            .map((importedExternalToNonModified _).tupled),
-          anyRenkuProjectEntities
-            .addDatasetAndModification(datasetEntities(provenanceInternal))
-            .map { case (_ -> modified, project) => modified -> project }
-            .map((modifiedToModified _).tupled)
+    forAll(
+      Table(
+        ("DS type", "DS"),
+        ("non-modified",
+         anyRenkuProjectEntities
+           .addDataset(datasetEntities(provenanceImportedExternal))
+           .map((importedExternalToNonModified _).tupled)
+           .generateOne
+        ),
+        ("modified",
+         anyRenkuProjectEntities
+           .addDatasetAndModification(datasetEntities(provenanceInternal))
+           .map { case (_ -> modified, project) => modified -> project }
+           .map((modifiedToModified _).tupled)
+           .generateOne
         )
-      ) { dataset =>
+      )
+    ) { (dsType, dataset) =>
+      s"sends a DATASET_VIEWED event and respond with OK in case a $dsType ds was found" in new TestCase {
+
         val authContext = authContexts(fixed(dataset.id)).generateOne
 
-        (datasetsFinder
-          .findDataset(_: Identifier, _: AuthContext[Identifier]))
-          .expects(dataset.id, authContext)
-          .returning(dataset.some.pure[IO])
+        givenDatasetFinding(dataset.id, authContext, returning = dataset.some.pure[IO])
+
+        givenDatasetViewedEventSent(dataset.id, returning = ().pure[IO])
 
         val response = endpoint.getDataset(dataset.id, authContext).unsafeRunSync()
 
         response.status                      shouldBe Ok
         response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
         response.as[Dataset].unsafeRunSync() shouldBe dataset
-        response.as[Json].unsafeRunSync()._links shouldBe Links
-          .of(
-            Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
-            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
-            Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
-          )
-          .asRight
+        verifyLinks(response, dataset)
 
         val responseCursor = response.as[Json].unsafeRunSync().hcursor
-
-        val Right(mainProject) = responseCursor.downField("project").as[Json]
-        (mainProject.hcursor.downField("path").as[Path], mainProject._links)
-          .mapN { case (path, links) =>
-            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
-          }
-          .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
-
-        val Right(usedInJsons) = responseCursor.downField("usedIn").as[List[Json]]
-        usedInJsons should have size dataset.usedIn.size
-        usedInJsons.foreach { json =>
-          (json.hcursor.downField("path").as[Path], json._links)
-            .mapN { case (path, links) =>
-              links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
-            }
-            .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
-        }
-
-        val Right(imagesJsons) = responseCursor.downField("images").as[List[Json]]
-        imagesJsons should have size dataset.images.size
-        imagesJsons.foreach { json =>
-          (json.hcursor.downField("location").as[ImageUri], json._links)
-            .mapN {
-              case (uri: ImageUri.Relative, links) =>
-                links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.path / "raw" / "master" / uri))
-              case (uri: ImageUri.Absolute, links) =>
-                links shouldBe Links.of(Rel("view") -> Href(uri.show))
-              case (uri, links) => fail(s"$uri 'location' or $links 'view' links of unknown shape")
-            }
-            .getOrElse(fail("No 'location' or 'view' links on the 'images' elements"))
-        }
+        verifyProject(responseCursor)
+        verifyUsedIn(responseCursor, dataset)
+        verifyImages(responseCursor, dataset)
 
         logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
-        logger.reset()
       }
     }
 
@@ -143,10 +120,7 @@ class EndpointSpec
       val identifier  = datasetIdentifiers.generateOne
       val authContext = authContexts(fixed(identifier)).generateOne
 
-      (datasetsFinder
-        .findDataset(_: Identifier, _: AuthContext[Identifier]))
-        .expects(identifier, authContext)
-        .returning(Option.empty[Dataset].pure[IO])
+      givenDatasetFinding(identifier, authContext, returning = Option.empty[Dataset].pure[IO])
 
       val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
@@ -164,10 +138,7 @@ class EndpointSpec
       val authContext = authContexts(fixed(identifier)).generateOne
 
       val exception = exceptions.generateOne
-      (datasetsFinder
-        .findDataset(_: Identifier, _: AuthContext[Identifier]))
-        .expects(identifier, authContext)
-        .returning(exception.raiseError[IO, Option[Dataset]])
+      givenDatasetFinding(identifier, authContext, returning = exception.raiseError[IO, Option[Dataset]])
 
       val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
@@ -178,16 +149,102 @@ class EndpointSpec
 
       logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
     }
+
+    "do not fail if sending PROJECT_VIEWED event fails" in new TestCase {
+
+      val ds = anyRenkuProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal))
+        .map((importedExternalToNonModified _).tupled)
+        .generateOne
+
+      val authContext = authContexts(fixed(ds.id)).generateOne
+
+      givenDatasetFinding(ds.id, authContext, returning = ds.some.pure[IO])
+
+      val exception = exceptions.generateOne
+      givenDatasetViewedEventSent(ds.id, returning = exception.raiseError[IO, Unit])
+
+      endpoint.getDataset(ds.id, authContext).unsafeRunSync().status shouldBe Ok
+
+      logger.logged(Error(show"sending ${DatasetViewedEvent.categoryName} event failed", exception))
+    }
   }
 
   private trait TestCase {
-    val gitLabUrl = gitLabUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val datasetsFinder        = mock[DatasetFinder[IO]]
-    val renkuApiUrl           = renkuApiUrls.generateOne
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    private val datasetsFinder = mock[DatasetFinder[IO]]
+    private val renkuApiUrl    = renkuApiUrls.generateOne
+    private val gitLabUrl      = gitLabUrls.generateOne
+    private val tgClient       = mock[triplesgenerator.api.events.Client[IO]]
+    val executionTimeRecorder  = TestExecutionTimeRecorder[IO]()
+    private val currentTime    = Instant.now()
+    private val now            = mockFunction[Instant]
+    now.expects().returning(currentTime).anyNumberOfTimes()
+    val endpoint = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder, now)
+
+    def givenDatasetViewedEventSent(identifier: datasets.Identifier, returning: IO[Unit]) =
+      (tgClient
+        .send(_: DatasetViewedEvent))
+        .expects(DatasetViewedEvent.forDataset(identifier, now))
+        .returning(returning)
+
+    def givenDatasetFinding(id:          datasets.Identifier,
+                            authContext: AuthContext[datasets.Identifier],
+                            returning:   IO[Option[Dataset]]
+    ) = (datasetsFinder
+      .findDataset(_: Identifier, _: AuthContext[Identifier]))
+      .expects(id, authContext)
+      .returning(returning)
+
+    def verifyLinks(response: Response[IO], dataset: Dataset) =
+      response.as[Json].unsafeRunSync()._links.value shouldBe Links
+        .of(
+          Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
+          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
+          Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
+        )
+
+    def verifyProject(cursor: HCursor) = {
+      val mainProject = cursor.downField("project").as[Json].value
+      (mainProject.hcursor.downField("path").as[Path], mainProject._links)
+        .mapN { case (path, links) =>
+          links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
+        }
+        .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
+    }
+
+    def verifyUsedIn(cursor: HCursor, dataset: Dataset): Unit = {
+
+      val usedInJsons = cursor.downField("usedIn").as[List[Json]].value
+
+      usedInJsons should have size dataset.usedIn.size
+      usedInJsons foreach { json =>
+        (json.hcursor.downField("path").as[Path], json._links)
+          .mapN { case (path, links) =>
+            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
+          }
+          .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
+      }
+    }
+
+    def verifyImages(cursor: HCursor, dataset: Dataset): Unit = {
+
+      val imagesJsons = cursor.downField("images").as[List[Json]].value
+
+      imagesJsons should have size dataset.images.size
+      imagesJsons foreach { json =>
+        (json.hcursor.downField("location").as[ImageUri], json._links)
+          .mapN {
+            case (uri: ImageUri.Relative, links) =>
+              links shouldBe Links.of(Rel("view") -> Href(gitLabUrl / dataset.project.path / "raw" / "master" / uri))
+            case (uri: ImageUri.Absolute, links) =>
+              links shouldBe Links.of(Rel("view") -> Href(uri.show))
+            case (uri, links) => fail(s"$uri 'location' or $links 'view' links of unknown shape")
+          }
+          .getOrElse(fail("No 'location' or 'view' links on the 'images' elements"))
+      }
+    }
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
