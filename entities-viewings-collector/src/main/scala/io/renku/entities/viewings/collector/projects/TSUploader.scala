@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, ResultsDecoder, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private[viewings] trait TSUploader[F[_]] {

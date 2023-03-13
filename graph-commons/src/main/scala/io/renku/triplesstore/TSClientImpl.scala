@@ -18,21 +18,21 @@
 
 package io.renku.triplesstore
 
+import cats.{Applicative, MonadThrow}
 import cats.effect._
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.control.Throttler
-import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.{HttpRequest, RestClient}
+import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.JsonLD
-import org.http4s.MediaRange._
 import org.http4s.{MediaType, Uri}
+import org.http4s.MediaRange._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -69,7 +69,6 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                      requestTimeoutOverride
     )
     with TSClient[F]
-    with ResultsDecoder
     with RdfMediaTypes {
 
   private val applicative: Applicative[F] = Applicative[F]
@@ -77,12 +76,12 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import applicative.whenA
   import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
+  import org.http4s.{Request, Response, Status}
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
   import org.http4s.circe._
   import org.http4s.headers._
-  import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
 
   override def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =

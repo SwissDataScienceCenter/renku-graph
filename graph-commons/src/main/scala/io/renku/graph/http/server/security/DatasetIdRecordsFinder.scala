@@ -22,12 +22,13 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.{datasets, projects, GraphClass}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{GraphClass, datasets, projects}
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.ResultsDecoder._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {

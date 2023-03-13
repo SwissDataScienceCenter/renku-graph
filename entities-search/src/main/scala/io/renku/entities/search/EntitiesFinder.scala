@@ -23,11 +23,11 @@ import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.Sorting
-import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
+import io.renku.http.rest.paging.Paging.PagedResultsFinder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import io.renku.triplesstore.client.model.OrderBy
 import io.renku.triplesstore.client.sparql.SparqlEncoder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -83,6 +83,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
 
   private implicit lazy val recordDecoder: Decoder[Entity] = { implicit cursor =>
     import io.circe.DecodingFailure
+    import io.renku.triplesstore.ResultsDecoder._
 
     extract[EntityType]("entityType") >>= { entityType =>
       entityQueries.flatMap(_.getDecoder(entityType)) match {
