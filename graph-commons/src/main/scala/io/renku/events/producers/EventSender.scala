@@ -112,17 +112,22 @@ class EventSenderImpl[F[_]: Async: Logger](
   private def retryOnServerError(retry:   Eval[F[Status]],
                                  context: EventContext
   ): PartialFunction[Throwable, F[Status]] = {
-    case exception @ UnexpectedResponseException(TooManyRequests, _) =>
-      waitAndRetry(retry, onErrorSleep, exception, context.errorMessage)
+    case UnexpectedResponseException(TooManyRequests, _) =>
+      waitAndRetry(retry, context.errorMessage)
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
-      waitAndRetry(retry, onBusySleep, exception, context.errorMessage)
+      waitAndRetry(retry, exception, context.errorMessage)
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      waitAndRetry(retry, onErrorSleep, exception, context.errorMessage)
+      waitAndRetry(retry, exception, context.errorMessage)
   }
 
-  private def waitAndRetry(retry: Eval[F[Status]], sleep: Duration, exception: Throwable, errorMessage: String) =
-    Temporal[F].andWait(Logger[F].error(exception)(errorMessage), sleep) >>
-      retry.value
+  private def waitAndRetry(retry: Eval[F[Status]], message: String): F[Status] =
+    Logger[F].info(s"$message - consumer busy") >> waitAndRetry(retry, onBusySleep)
+
+  private def waitAndRetry(retry: Eval[F[Status]], exception: Throwable, errorMessage: String): F[Status] =
+    Logger[F].error(exception)(errorMessage) >> waitAndRetry(retry, onErrorSleep)
+
+  private def waitAndRetry(retry: Eval[F[Status]], sleep: Duration): F[Status] =
+    Temporal[F].delayBy(retry.value, sleep)
 
   private lazy val responseMapping: PartialFunction[(Status, Request[F], Response[F]), F[Status]] = {
     case (Accepted, _, _) => Accepted.pure[F]
