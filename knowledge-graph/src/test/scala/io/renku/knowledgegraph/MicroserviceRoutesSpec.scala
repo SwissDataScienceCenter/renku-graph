@@ -18,18 +18,19 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.EitherT.{leftT, rightT}
 import cats.data.{Kleisli, OptionT}
+import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -42,13 +43,12 @@ import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
-import org.http4s.MediaType.application
-import org.http4s.Method.GET
-import org.http4s.Status._
 import org.http4s._
+import org.http4s.MediaType.application
+import org.http4s.Method.{DELETE, GET}
+import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.server.AuthMiddleware
@@ -71,10 +71,10 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/datasets?query=<phrase>" should {
 
+    import datasets._
     import datasets.Endpoint.Query._
     import datasets.Endpoint.Sort
     import datasets.Endpoint.Sort._
-    import datasets._
 
     s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
@@ -249,8 +249,8 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/entities" should {
     import io.renku.entities.search.Criteria
-    import io.renku.entities.search.Criteria.Sort._
     import io.renku.entities.search.Criteria._
+    import io.renku.entities.search.Criteria.Sort._
     import io.renku.entities.search.Generators._
 
     forAll {
@@ -435,9 +435,59 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "DELETE /knowledge-graph/projects/:namespace/../:name" should {
+
+    val projectPath = projectPaths.generateOne
+    val request     = Request[IO](DELETE, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+
+    s"return $Accepted for valid path parameters and user" in new TestCase {
+
+      val authUser = authUsers.generateOne
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.some)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.some, projectPath, Set(projectPath))))
+
+      (projectDeleteEndpoint
+        .`DELETE /projects/:path`(_: model.projects.Path, _: AuthUser))
+        .expects(projectPath, authUser)
+        .returning(Response[IO](Accepted).pure[IO])
+
+      routes(authUser.some).call(request).status shouldBe Accepted
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"return $Unauthorized when authentication fails" in new TestCase {
+      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+        .call(request)
+        .status shouldBe Unauthorized
+    }
+
+    s"return $NotFound when no auth header" in new TestCase {
+      routes(maybeAuthUser = None).call(request).status shouldBe NotFound
+    }
+
+    s"return $NotFound when the user has no rights to the project" in new TestCase {
+
+      val authUser = authUsers.generateOne
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.some)
+        .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
+
+      val response = routes(authUser.some).call(request)
+
+      response.status             shouldBe NotFound
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+    }
+  }
+
   "GET /knowledge-graph/projects/:namespace/../:name" should {
 
     s"return $Ok for valid path parameters" in new TestCase {
+
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
@@ -457,6 +507,7 @@ class MicroserviceRoutesSpec
     }
 
     s"return $NotFound for invalid project paths" in new TestCase {
+
       val maybeAuthUser = authUsers.generateOption
       val namespace     = nonBlankStrings().generateOne.value
 
@@ -476,6 +527,7 @@ class MicroserviceRoutesSpec
     }
 
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
+
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
@@ -715,9 +767,9 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/users/:id/projects" should {
-    import users.projects.Endpoint.Criteria._
-    import users.projects.Endpoint._
     import users.projects._
+    import users.projects.Endpoint._
+    import users.projects.Endpoint.Criteria._
 
     val userId = personGitLabIds.generateOne
 
@@ -823,6 +875,7 @@ class MicroserviceRoutesSpec
     val entitiesEndpoint           = mock[entities.Endpoint[IO]]
     val lineageEndpoint            = mock[projects.files.lineage.Endpoint[IO]]
     val ontologyEndpoint           = mock[ontology.Endpoint[IO]]
+    val projectDeleteEndpoint      = mock[projects.delete.Endpoint[IO]]
     val projectDetailsEndpoint     = mock[projects.details.Endpoint[IO]]
     val projectDatasetsEndpoint    = mock[projects.datasets.Endpoint[IO]]
     val projectDatasetTagsEndpoint = mock[projects.datasets.tags.Endpoint[IO]]
@@ -843,6 +896,7 @@ class MicroserviceRoutesSpec
         datasetDetailsEndpoint,
         entitiesEndpoint,
         ontologyEndpoint,
+        projectDeleteEndpoint,
         projectDetailsEndpoint,
         projectDatasetsEndpoint,
         projectDatasetTagsEndpoint,

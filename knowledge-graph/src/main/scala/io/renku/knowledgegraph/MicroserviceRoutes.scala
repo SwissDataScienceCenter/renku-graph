@@ -51,6 +51,7 @@ private class MicroserviceRoutes[F[_]: Async](
     datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
     ontologyEndpoint:           ontology.Endpoint[F],
+    projectDeleteEndpoint:      projects.delete.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
@@ -70,6 +71,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
+  import projectDeleteEndpoint._
   import projectDatasetsEndpoint._
   import projectDatasetTagsEndpoint._
   import projectDetailsEndpoint._
@@ -134,8 +136,19 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private lazy val `GET /projects/*` : AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
+
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       routeToProjectsEndpoints(path, maybeUser)(authReq.req)
+
+    case DELETE -> "knowledge-graph" /: "projects" /: path as Some(user) =>
+      path.segments.toList
+        .map(_.toString)
+        .toProjectPath
+        .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
+        .semiflatMap(`DELETE /projects/:path`(_, user))
+        .merge
+
+    case DELETE -> "knowledge-graph" /: "projects" /: _ as None => resourceNotFound[F]
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -281,6 +294,7 @@ private object MicroserviceRoutes {
     datasetDetailsEndpoint               <- datasets.details.Endpoint[F]
     entitiesEndpoint                     <- entities.Endpoint[F]
     ontologyEndpoint                     <- ontology.Endpoint[F]
+    projectDeleteEndpoint                <- projects.delete.Endpoint[F]
     projectDetailsEndpoint               <- projects.details.Endpoint[F]
     projectDatasetsEndpoint              <- projects.datasets.Endpoint[F]
     projectDatasetTagsEndpoint           <- projects.datasets.tags.Endpoint[F]
@@ -297,6 +311,7 @@ private object MicroserviceRoutes {
     datasetDetailsEndpoint,
     entitiesEndpoint,
     ontologyEndpoint,
+    projectDeleteEndpoint,
     projectDetailsEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,
