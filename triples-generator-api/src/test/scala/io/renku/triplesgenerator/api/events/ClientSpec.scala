@@ -47,6 +47,18 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     }
   }
 
+  "send DatasetViewedEvent" should {
+
+    "send the given event through the EventSender" in new TestCase {
+
+      val event = datasetViewedEvents.generateOne
+
+      givenSending(event, DatasetViewedEvent.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
   "send ProjectViewingDeletion" should {
 
     "send the given event through the EventSender" in new TestCase {
@@ -67,13 +79,12 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     def givenSending[E](event: E, categoryName: CategoryName, returning: Try[Unit])(implicit
         encoder: Encoder[E],
         show:    Show[E]
-    ) =
-      (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-        .expects(
-          EventRequestContent.NoPayload(event.asJson),
-          EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed")
-        )
-        .returning(returning)
+    ) = (eventSender
+      .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+      .expects(
+        EventRequestContent.NoPayload(event.asJson),
+        EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed")
+      )
+      .returning(returning)
   }
 }

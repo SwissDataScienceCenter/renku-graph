@@ -25,16 +25,16 @@ import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
-private[viewings] trait TSUploader[F[_]] {
-  def uploadToTS(event: ProjectViewedEvent): F[Unit]
+private[viewings] trait EventPersister[F[_]] {
+  def persist(event: ProjectViewedEvent): F[Unit]
 }
 
-private object TSUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSUploader[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new TSUploaderImpl[F](_))
+private[viewings] object EventPersister {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
+    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new EventPersisterImpl[F](_))
 }
 
-private[viewings] class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSUploader[F] {
+private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends EventPersister[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -48,7 +48,7 @@ private[viewings] class TSUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import tsClient.{queryExpecting, updateWithNoResult, upload}
 
-  override def uploadToTS(event: ProjectViewedEvent): F[Unit] =
+  override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {
       case None            => ().pure[F]
       case Some(projectId) => deleteOldViewedDate(projectId) >> insert(projectId, event)
