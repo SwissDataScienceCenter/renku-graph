@@ -22,7 +22,7 @@ import cats.syntax.all._
 import cats.MonadThrow
 import cats.effect.Async
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
-import io.renku.triplesstore.{ProjectsConnectionConfig, ResultsDecoder, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait ViewingRemover[F[_]] {
@@ -37,53 +37,25 @@ private object ViewingRemover {
 private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends ViewingRemover[F] {
 
   import eu.timepit.refined.auto._
-  import io.circe.Decoder
   import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
-  import io.renku.jsonld.syntax._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.client.syntax._
-  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import tsClient._
 
   override def removeViewing(event: ProjectViewingDeletion): F[Unit] =
-    findProjectId(event) >>= {
-      case None            => ().pure[F]
-      case Some(projectId) => deleteViewing(projectId)
-    }
+    deleteViewing(event.path)
 
-  private def findProjectId(event: ProjectViewingDeletion) = queryExpecting {
-    SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: find id",
-      Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""|SELECT DISTINCT ?id
-          |WHERE {
-          |  GRAPH ?id {
-          |    ?id a schema:Project;
-          |        renku:projectPath ${event.path.asObject.asSparql.sparql}
-          |  }
-          |}
-          |""".stripMargin
-    )
-  }(idDecoder)
-
-  private lazy val idDecoder: Decoder[Option[projects.ResourceId]] = ResultsDecoder[Option, projects.ResourceId] {
-    Decoder.instance[projects.ResourceId] { implicit cur =>
-      import io.renku.tinytypes.json.TinyTypeDecoders._
-      extract[projects.ResourceId]("id")
-    }
-  }
-
-  private def deleteViewing(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
+  private def deleteViewing(path: projects.Path): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: delete",
       Prefixes of renku -> "renku",
       s"""|DELETE { GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} { ?id ?p ?o } }
           |WHERE {
           |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
-          |    BIND (${projectId.asEntityId.sparql} AS ?id)
           |    ?id ?p ?o
+          |    FILTER (STRENDS(STR(?id), ${path.asObject.asSparql.sparql}))
           |  }
           |}
           |""".stripMargin
