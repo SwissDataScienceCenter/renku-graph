@@ -31,6 +31,7 @@ import io.renku.graph.model.projects
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
+import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -115,10 +116,16 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     val endpoint               = new EndpointImpl[IO](projectFinder, projectRemover, elClient)
 
     def givenProjectFinding(path: projects.Path, returning: IO[Option[Project]]) =
-      (projectFinder.findProject _).expects(path).returning(returning)
+      (projectFinder
+        .findProject(_: projects.Path)(_: AccessToken))
+        .expects(path, authUser.accessToken)
+        .returning(returning)
 
     def givenProjectDelete(id: projects.GitLabId, returning: IO[Unit]) =
-      (projectRemover.deleteProject _).expects(id).returning(returning)
+      (projectRemover
+        .deleteProject(_: projects.GitLabId)(_: AccessToken))
+        .expects(id, authUser.accessToken)
+        .returning(returning)
 
     def givenCommitSyncRequestSent(project: Project, returning: IO[Unit]) =
       (elClient

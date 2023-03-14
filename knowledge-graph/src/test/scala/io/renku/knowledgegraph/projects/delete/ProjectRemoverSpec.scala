@@ -18,35 +18,73 @@
 
 package io.renku.knowledgegraph.projects.delete
 
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
-import org.http4s.Uri
+import io.renku.testtools.{GitLabClientTools, IOSpec}
+import org.http4s.{Request, Response, Uri}
 import org.http4s.implicits._
+import org.http4s.Method.DELETE
+import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+class ProjectRemoverSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with MockFactory
+    with IOSpec
+    with GitLabClientTools[IO] {
 
-class ProjectRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory {
+  "deleteProject" should {
 
-  val authUser         = authUsers.generateOne
-  private val glClient = mock[GitLabClient[Try]]
+    "call the Delete Project GL API" in new TestCase {
 
-  def givenProjectDelete(path: projects.Path, returning: Try[Unit]) = {
-    val endpointName: String Refined NonEmpty = "project-delete"
-    (glClient
-      .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[Try, Unit])(_: Option[AccessToken]))
-      .expects(uri"projects" / path, endpointName, *, authUser.accessToken.some)
-      .returning(returning)
+      givenDeleteAPICall(id, returning = ().pure[IO])
+
+      remover.deleteProject(id).unsafeRunSync() shouldBe ()
+    }
+
+    Set(Ok, Accepted, NoContent, NotFound) foreach { status =>
+      s"succeed if service responds with $status" in new TestCase {
+        mapResponse(status, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe ()
+      }
+    }
+
+    "fail for other response statuses" in new TestCase {
+      intercept[Exception] {
+        mapResponse(BadRequest, Request[IO](), Response[IO]()).unsafeRunSync()
+      }
+    }
   }
 
+  private trait TestCase {
+
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val id = projectIds.generateOne
+
+    private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val remover = new ProjectRemoverImpl[IO]
+
+    def givenDeleteAPICall(id: projects.GitLabId, returning: IO[Unit]) = {
+      val endpointName: String Refined NonEmpty = "project-delete"
+      (glClient
+        .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
+        .expects(uri"projects" / id, endpointName, *, accessToken.some)
+        .returning(returning)
+    }
+
+    lazy val mapResponse: ResponseMappingF[IO, Unit] =
+      captureMapping(glClient)(remover.deleteProject(projectIds.generateOne).unsafeRunSync(), (), method = DELETE)
+  }
 }

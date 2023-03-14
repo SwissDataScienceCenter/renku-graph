@@ -19,11 +19,12 @@
 package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.graph.model.projects
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait ProjectRemover[F[_]] {
-  def deleteProject(id: projects.GitLabId): F[Unit]
+  def deleteProject(id: projects.GitLabId)(implicit at: AccessToken): F[Unit]
 }
 
 private object ProjectRemover {
@@ -32,5 +33,17 @@ private object ProjectRemover {
 
 private class ProjectRemoverImpl[F[_]: Async: GitLabClient] extends ProjectRemover[F] {
 
-  override def deleteProject(id: projects.GitLabId): F[Unit] = ???
+  import eu.timepit.refined.auto._
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
+  import org.http4s._
+  import org.http4s.dsl.io._
+  import org.http4s.implicits._
+
+  override def deleteProject(id: projects.GitLabId)(implicit at: AccessToken): F[Unit] =
+    GitLabClient[F].delete(uri"projects" / id, "project-delete")(mapResponse)(at.some)
+
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
+    case (status, _, _) if status.responseClass == Status.Successful => ().pure[F]
+    case (NotFound, _, _)                                            => ().pure[F]
+  }
 }

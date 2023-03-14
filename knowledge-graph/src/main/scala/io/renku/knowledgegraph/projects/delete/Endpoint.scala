@@ -25,7 +25,7 @@ import io.renku.graph.eventlog
 import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.InfoMessage._
 import io.renku.metrics.MetricsRegistry
@@ -58,6 +58,8 @@ private class EndpointImpl[F[_]: Temporal: Logger](projectFinder: ProjectFinder[
   import projectRemover.deleteProject
 
   override def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]] = {
+    implicit val at: AccessToken = authUser.accessToken
+
     findProject(path) >>= {
       case None =>
         NotFound(InfoMessage("Project does not exist"))
@@ -69,7 +71,7 @@ private class EndpointImpl[F[_]: Temporal: Logger](projectFinder: ProjectFinder[
     }
   }.handleErrorWith(httpResult(path))
 
-  private def waitForDeletion(project: Project): F[Unit] =
+  private def waitForDeletion(project: Project)(implicit ac: AccessToken): F[Unit] =
     findProject(project.path) >>= {
       case None    => ().pure[F]
       case Some(_) => Temporal[F].delayBy(waitForDeletion(project), waitBeforeNextCheck)

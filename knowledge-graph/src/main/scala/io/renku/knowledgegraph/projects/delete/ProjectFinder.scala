@@ -19,12 +19,13 @@
 package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait ProjectFinder[F[_]] {
-  def findProject(path: projects.Path): F[Option[Project]]
+  def findProject(path: projects.Path)(implicit at: AccessToken): F[Option[Project]]
 }
 
 private object ProjectFinder {
@@ -33,5 +34,27 @@ private object ProjectFinder {
 
 private class ProjectFinderImpl[F[_]: Async: GitLabClient] extends ProjectFinder[F] {
 
-  override def findProject(path: projects.Path): F[Option[Project]] = ???
+  import eu.timepit.refined.auto._
+  import io.circe.Decoder
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
+  import org.http4s._
+  import org.http4s.Status._
+  import org.http4s.circe._
+  import org.http4s.implicits._
+
+  override def findProject(path: projects.Path)(implicit at: AccessToken): F[Option[Project]] =
+    GitLabClient[F].get(uri"projects" / path, "single-project")(mapResponse)(at.some)
+
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[Project]]] = {
+    case (Ok, _, response) => response.as[Project].map(Option.apply)
+    case (NotFound, _, _)  => Option.empty[Project].pure[F]
+  }
+
+  private implicit lazy val decoder: Decoder[Project] = Decoder.instance { cursor =>
+    import io.renku.tinytypes.json.TinyTypeDecoders._
+    (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Path])
+      .mapN(Project(_, _))
+  }
+
+  private implicit lazy val eDecoder: EntityDecoder[F, Project] = jsonOf
 }
