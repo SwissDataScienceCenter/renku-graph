@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -48,32 +48,26 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
     "be the TSUploader.uploadToTS" in new TestCase {
 
-      (tsUploader.persist _).expects(event).returns(().pure[IO])
+      (eventUploader.upload _).expects(event).returns(().pure[IO])
 
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
   }
 
-  "handlingDefinition.precondition" should {
+  "handlingDefinition.precondition and onRelease" should {
 
     "be not defined" in new TestCase {
       handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe None
-    }
-  }
-
-  "handlingDefinition.onRelease" should {
-
-    "be not defined" in new TestCase {
-      handler.createHandlingDefinition().onRelease shouldBe None
+      handler.createHandlingDefinition().onRelease                    shouldBe None
     }
   }
 
   private trait TestCase {
 
-    val event = projectViewedEvents.generateOne
+    val event = datasetViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tsUploader = mock[EventPersister[IO]]
-    val handler    = new EventHandler[IO](tsUploader, mock[ProcessExecutor[IO]])
+    val eventUploader = mock[EventUploader[IO]]
+    val handler       = new EventHandler[IO](eventUploader, mock[ProcessExecutor[IO]])
   }
 }

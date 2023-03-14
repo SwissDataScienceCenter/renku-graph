@@ -198,6 +198,9 @@ trait RenkuTinyTypeGenerators {
   def datasetModifiedDates(notYoungerThan: datasets.CreatedOrPublished): Gen[datasets.DateModified] =
     timestampsNotInTheFuture(notYoungerThan.instant).generateAs(datasets.DateModified(_))
 
+  def datasetViewedDates(min: Instant = Instant.EPOCH): Gen[datasets.DateViewed] =
+    Generators.timestamps(min, max = Instant.now()).toGeneratorOf(datasets.DateViewed)
+
   implicit val datasetKeywords: Gen[datasets.Keyword] =
     Generators.nonBlankStrings(minLength = 5) map (_.value) map datasets.Keyword.apply
   implicit val datasetLicenses: Gen[datasets.License] = Generators.httpUrls() map datasets.License.apply

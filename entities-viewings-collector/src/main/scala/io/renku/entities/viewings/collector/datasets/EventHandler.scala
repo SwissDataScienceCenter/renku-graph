@@ -16,26 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector.datasets
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.{consumers, CategoryName, EventRequestContent}
-import io.renku.events.consumers.EventDecodingTools.JsonOps
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.projects
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.graph.model.datasets
+import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
-    eventPersister:            EventPersister[F],
+    eventUploader:             EventUploader[F],
     processExecutor:           ProcessExecutor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
-  protected override type Event = ProjectViewedEvent
+  protected override type Event = DatasetViewedEvent
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
@@ -43,19 +42,20 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       process
     )
 
-  private lazy val decode: EventRequestContent => Either[Exception, ProjectViewedEvent] = { req =>
+  private lazy val decode: EventRequestContent => Either[Exception, DatasetViewedEvent] = { req =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    (req.event.getProjectPath, req.event.hcursor.downField("date").as[projects.DateViewed])
-      .mapN(ProjectViewedEvent.apply)
+    (req.event.hcursor.downField("dataset").downField("identifier").as[datasets.Identifier],
+     req.event.hcursor.downField("date").as[datasets.DateViewed]
+    ).mapN(DatasetViewedEvent.apply)
   }
 
   private def process(event: Event) =
     Logger[F].info(show"$categoryName: $event accepted") >>
-      eventPersister.persist(event)
+      eventUploader.upload(event)
 }
 
 private object EventHandler {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[consumers.EventHandler[F]] =
-    (EventPersister[F], ProcessExecutor.concurrent(processesCount = 100))
+    (EventUploader[F], ProcessExecutor.concurrent(processesCount = 100))
       .mapN(new EventHandler[F](_, _))
 }

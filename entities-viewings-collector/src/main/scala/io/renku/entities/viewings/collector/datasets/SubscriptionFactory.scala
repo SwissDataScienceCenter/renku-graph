@@ -16,21 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.api.events
+package io.renku.entities.viewings.collector.datasets
 
+import cats.effect.Async
 import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators._
-import org.scalacheck.Gen
+import io.renku.events.consumers
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 
-object Generators {
-
-  val projectViewedEvents: Gen[ProjectViewedEvent] =
-    (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)
-
-  val datasetViewedEvents: Gen[DatasetViewedEvent] =
-    (datasetIdentifiers -> datasetViewedDates()).mapN(DatasetViewedEvent.apply)
-
-  val projectViewingDeletions: Gen[ProjectViewingDeletion] =
-    projectPaths.map(ProjectViewingDeletion.apply)
+object SubscriptionFactory {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =
+    EventHandler[F].map(_ -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName))
 }

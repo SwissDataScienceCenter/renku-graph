@@ -75,6 +75,7 @@ object Microservice extends IOMicroservice {
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
     projectViewingsSubscription                  <- viewings.collector.projects.SubscriptionFactory[IO]
+    datasetViewingsSubscription                  <- viewings.collector.datasets.SubscriptionFactory[IO]
     viewingDeletionSubscription                  <- viewings.deletion.projects.SubscriptionFactory[IO]
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
@@ -84,6 +85,7 @@ object Microservice extends IOMicroservice {
                                 cleanUpSubscription,
                                 migrationRequestSubscription,
                                 projectViewingsSubscription,
+                                datasetViewingsSubscription,
                                 viewingDeletionSubscription
                               )
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)

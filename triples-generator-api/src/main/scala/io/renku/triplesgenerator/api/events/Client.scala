@@ -20,14 +20,17 @@ package io.renku.triplesgenerator.api.events
 
 import cats.effect.Async
 import cats.syntax.all._
+import cats.Show
+import io.circe.Encoder
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
-import io.renku.events.EventRequestContent
 import io.renku.graph.config.TriplesGeneratorUrl
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
   def send(event: ProjectViewedEvent):     F[Unit]
+  def send(event: DatasetViewedEvent):     F[Unit]
   def send(event: ProjectViewingDeletion): F[Unit]
 }
 
@@ -44,18 +47,17 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   import EventSender.EventContext
 
   override def send(event: ProjectViewedEvent): F[Unit] =
-    eventSender.sendEvent(
-      EventRequestContent.NoPayload(event.asJson),
-      EventContext(ProjectViewedEvent.categoryName,
-                   show"${ProjectViewedEvent.categoryName}: sending event $event failed"
-      )
-    )
+    send(event, ProjectViewedEvent.categoryName)
+
+  override def send(event: DatasetViewedEvent): F[Unit] =
+    send(event, DatasetViewedEvent.categoryName)
 
   override def send(event: ProjectViewingDeletion): F[Unit] =
+    send(event, ProjectViewingDeletion.categoryName)
+
+  private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(event.asJson),
-      EventContext(ProjectViewingDeletion.categoryName,
-                   show"${ProjectViewingDeletion.categoryName}: sending event $event failed"
-      )
+      EventContext(category, show"$category: sending event $event failed")
     )
 }
