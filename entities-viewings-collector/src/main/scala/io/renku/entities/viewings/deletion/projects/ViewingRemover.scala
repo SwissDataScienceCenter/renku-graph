@@ -22,7 +22,7 @@ import cats.syntax.all._
 import cats.MonadThrow
 import cats.effect.Async
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, ResultsDecoder, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait ViewingRemover[F[_]] {

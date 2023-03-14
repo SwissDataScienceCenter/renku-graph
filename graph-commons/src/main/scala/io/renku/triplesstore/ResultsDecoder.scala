@@ -24,19 +24,19 @@ import cats.syntax.all._
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.{Decoder, HCursor}
 
-object ResultsDecoder extends ResultsDecoder
+object ResultsDecoder extends ResultsDecoder {
+
+  def apply[F[_], OUT](rowDecoder: Decoder[OUT])(implicit toF: List[OUT] => Either[String, F[OUT]]): Decoder[F[OUT]] =
+    _.downField("results").downField("bindings").as(decodeList(rowDecoder).emap(toF))
+
+  def single[OUT](rowDecoder: Decoder[OUT])(implicit toF: List[OUT] => Either[String, Id[OUT]]): Decoder[OUT] =
+    apply[Id, OUT](rowDecoder)
+
+  def singleWithErrors[OUT](onEmpty: => String, onMultiple: => String)(rowDecoder: Decoder[OUT]): Decoder[OUT] =
+    apply[Id, OUT](rowDecoder)(toSingle(onEmpty, onMultiple))
+}
 
 trait ResultsDecoder {
-
-  object ResultsDecoder {
-    def apply[F[_], OUT](rowDecoder: Decoder[OUT])(implicit toF: List[OUT] => Either[String, F[OUT]]): Decoder[F[OUT]] =
-      _.downField("results").downField("bindings").as(decodeList(rowDecoder).emap(toF))
-
-    def single[OUT](rowDecoder: Decoder[OUT])(implicit toF: List[OUT] => Either[String, Id[OUT]]): Decoder[OUT] =
-      apply[Id, OUT](rowDecoder)
-    def singleWithErrors[OUT](onEmpty: => String, onMultiple: => String)(rowDecoder: Decoder[OUT]): Decoder[OUT] =
-      apply[Id, OUT](rowDecoder)(toSingle(onEmpty, onMultiple))
-  }
 
   implicit def toList[OUT]: List[OUT] => Either[String, List[OUT]] = _.asRight
 

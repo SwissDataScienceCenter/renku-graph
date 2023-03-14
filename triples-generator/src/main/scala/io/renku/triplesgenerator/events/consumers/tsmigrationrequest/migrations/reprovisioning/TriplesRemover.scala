@@ -47,6 +47,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.GraphClass
   import io.renku.graph.model.Schemas._
   import io.renku.triplesstore.client.syntax._
+  import io.renku.triplesstore.ResultsDecoder._
 
   override def removeAllTriples(): F[Unit] =
     queryExpecting[Option[EntityId]](findGraph) >>= {

@@ -34,7 +34,7 @@ import io.renku.graph.metrics.SentEventsGauge
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
+import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable, TooManyRequests}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -82,7 +82,7 @@ class EventSenderSpec
         }
       }
 
-      Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
+      Set(TooManyRequests, BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
         s"retry if remote responds with status such as $errorStatus" in new TestCase {
           val eventRequest = post(urlEqualTo(s"/events")).inScenario("Retry")
 
@@ -121,6 +121,7 @@ class EventSenderSpec
 
       failureResponses foreach { case (responseName, failureResponse) =>
         s"retry in case of $responseName" in new TestCase {
+
           val eventRequest = post(urlEqualTo(s"/events"))
             .inScenario("Retry")
 
@@ -164,12 +165,14 @@ class EventSenderSpec
     private val eventConsumerUrl = new EventConsumerUrl {
       override val value: String = externalServiceBaseUrl
     }
-    val eventSender = new EventSenderImpl[IO](eventConsumerUrl,
-                                              sentEventsGauge,
-                                              onErrorSleep = 500 millis,
-                                              retryInterval = 100 millis,
-                                              maxRetries = 2,
-                                              requestTimeoutOverride = Some(requestTimeout)
+    val eventSender = new EventSenderImpl[IO](
+      eventConsumerUrl,
+      sentEventsGauge,
+      onBusySleep = 200 millis,
+      onErrorSleep = 500 millis,
+      retryInterval = 100 millis,
+      maxRetries = 2,
+      requestTimeoutOverride = Some(requestTimeout)
     )
   }
 }

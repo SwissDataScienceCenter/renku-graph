@@ -27,6 +27,7 @@ import io.renku.graph.model.Schemas
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesstore._
+import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 

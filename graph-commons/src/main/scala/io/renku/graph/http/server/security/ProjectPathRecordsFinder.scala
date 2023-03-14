@@ -23,14 +23,15 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.{projects, GraphClass, RenkuUrl}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.projects.{ResourceId, Visibility}
+import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.ResultsDecoder._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 object ProjectPathRecordsFinder {

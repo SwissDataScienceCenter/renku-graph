@@ -39,7 +39,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends
 
   import io.circe.Decoder
   import io.renku.graph.model.Schemas.{renku, schema}
-  import io.renku.triplesstore.SparqlQuery
+  import io.renku.triplesstore.{ResultsDecoder, SparqlQuery}
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.ResultsDecoder._
