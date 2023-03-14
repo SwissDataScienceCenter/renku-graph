@@ -66,6 +66,13 @@ private[gitlab] trait Http4sDslUtils {
     def unapply(str: String): Option[Int] = str.toIntOption
   }
 
+  def Accepted[F[_]: Applicative, A](implicit enc: EntityEncoder[F, A]): F[Response[F]] = {
+    val dsl = new Http4sDsl[F] {}
+    import dsl._
+
+    Response[F](Accepted).pure[F]
+  }
+
   def OkOrNotFound[F[_]: Applicative, A](payload: Option[A])(implicit enc: EntityEncoder[F, A]): F[Response[F]] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._
