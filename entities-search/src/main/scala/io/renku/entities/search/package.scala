@@ -96,8 +96,8 @@ package object search {
       foldQuery(_ => snippet, s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
 
     def foldQuery[A](ifPresent: String => A, ifMissing: => A): A =
-      if (query.isQueryAll) ifMissing
-      else ifPresent(query.query)
+      if (query != LuceneQuery.queryAll) ifPresent(query.query)
+      else ifMissing
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true
