@@ -94,7 +94,7 @@ private[migrations] object ProjectsDateViewedCreator {
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] =
     for {
-      tsClient          <- MigrationsConnectionConfig[F]().map(TSClient[F](_))
+      tsClient          <- ProjectsConnectionConfig[F]().map(TSClient[F](_))
       tgClient          <- triplesgenerator.api.events.Client[F]
       executionRegister <- MigrationExecutionRegister[F]
     } yield new ProjectsDateViewedCreator[F](tsClient, tgClient, executionRegister, RecoverableErrorsRecovery)
