@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.projects.delete
 
-import cats.effect.IO
+import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -63,6 +63,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         response.status                          shouldBe Accepted
         response.contentType                     shouldBe `Content-Type`(application.json).some
         response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Project deleted")
+
+        ensureEventSent.get.unsafeRunSync() shouldBe true
       }
 
     "return 404 Not Found in case the project does not exist in GL" in new TestCase {
@@ -85,6 +87,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       givenCommitSyncRequestSent(project, returning = ().pure[IO])
 
       endpoint.`DELETE /projects/:path`(project.path, authUser).unsafeRunSync().status shouldBe Accepted
+
+      ensureEventSent.get.unsafeRunSync() shouldBe true
     }
 
     "return 500 Internal Server Error in case any of the operations fails" in new TestCase {
@@ -127,10 +131,11 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         .expects(id, authUser.accessToken)
         .returning(returning)
 
+    val ensureEventSent = Deferred.unsafe[IO, Boolean]
     def givenCommitSyncRequestSent(project: Project, returning: IO[Unit]) =
       (elClient
         .send(_: CommitSyncRequest))
         .expects(CommitSyncRequest(project))
-        .returning(returning)
+        .onCall((_: CommitSyncRequest) => returning >> ensureEventSent.complete(true).void)
   }
 }

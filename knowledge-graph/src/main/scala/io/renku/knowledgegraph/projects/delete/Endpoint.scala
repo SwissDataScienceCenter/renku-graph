@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.projects.delete
 
-import cats.effect.{Async, Temporal}
+import cats.effect.{Async, Spawn, Temporal}
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.eventlog
@@ -46,10 +46,10 @@ object Endpoint {
       .map(new EndpointImpl(ProjectFinder[F], ProjectRemover[F], _))
 }
 
-private class EndpointImpl[F[_]: Temporal: Logger](projectFinder: ProjectFinder[F],
-                                                   projectRemover:      ProjectRemover[F],
-                                                   elClient:            eventlog.api.events.Client[F],
-                                                   waitBeforeNextCheck: Duration = 1 second
+private class EndpointImpl[F[_]: Async: Logger](projectFinder: ProjectFinder[F],
+                                                projectRemover:      ProjectRemover[F],
+                                                elClient:            eventlog.api.events.Client[F],
+                                                waitBeforeNextCheck: Duration = 1 second
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -65,8 +65,7 @@ private class EndpointImpl[F[_]: Temporal: Logger](projectFinder: ProjectFinder[
         NotFound(InfoMessage("Project does not exist"))
       case Some(project) =>
         deleteProject(project.id) >>
-          waitForDeletion(project) >>
-          send(CommitSyncRequest(project)) >>
+          Spawn[F].start(waitForDeletion(project) >> send(CommitSyncRequest(project))) >>
           Accepted(InfoMessage("Project deleted"))
     }
   }.handleErrorWith(httpResult(path))
