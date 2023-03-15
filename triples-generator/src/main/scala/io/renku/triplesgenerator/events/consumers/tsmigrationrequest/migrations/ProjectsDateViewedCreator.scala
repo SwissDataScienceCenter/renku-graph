@@ -24,8 +24,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import fs2.Stream
 import io.circe.Decoder
+import io.renku.graph.eventlog.EventLogClient
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.projects
+import io.renku.http.rest.paging.model.PerPage
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
@@ -39,6 +41,7 @@ import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery, Registere
 
 private class ProjectsDateViewedCreator[F[_]: Async: Logger](
     tsClient:          TSClient[F],
+    elClient:          EventLogClient[F],
     tgClient:          triplesgenerator.api.events.Client[F],
     executionRegister: MigrationExecutionRegister[F],
     recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
@@ -53,6 +56,7 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
       .evalMap(findEventsPage)
       .takeThrough(_.nonEmpty)
       .flatMap(in => Stream.emits(in))
+      .evalMap(updateDateWithLatestEvent)
       .evalMap(tgClient.send)
       .compile
       .drain
@@ -86,6 +90,23 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
       (extract[projects.Path]("path") -> extract[projects.DateViewed]("date"))
         .mapN(ProjectViewedEvent.apply)
   }
+
+  private def updateDateWithLatestEvent(event: ProjectViewedEvent): F[ProjectViewedEvent] = {
+    import EventLogClient._
+    elClient
+      .getEvents(
+        SearchCriteria
+          .forProject(event.path)
+          .sortBy(SearchCriteria.Sort.EventDateDesc)
+          .withPerPage(PerPage(1))
+      )
+      .map(
+        _.toEither.toOption
+          .flatMap(_.headOption)
+          .map(ev => event.copy(dateViewed = projects.DateViewed(ev.eventDate.value)))
+          .getOrElse(event)
+      )
+  }
 }
 
 private[migrations] object ProjectsDateViewedCreator {
@@ -95,7 +116,8 @@ private[migrations] object ProjectsDateViewedCreator {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] =
     for {
       tsClient          <- ProjectsConnectionConfig[F]().map(TSClient[F](_))
+      elClient          <- EventLogClient[F]
       tgClient          <- triplesgenerator.api.events.Client[F]
       executionRegister <- MigrationExecutionRegister[F]
-    } yield new ProjectsDateViewedCreator[F](tsClient, tgClient, executionRegister, RecoverableErrorsRecovery)
+    } yield new ProjectsDateViewedCreator[F](tsClient, elClient, tgClient, executionRegister, RecoverableErrorsRecovery)
 }
