@@ -54,7 +54,7 @@ class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers 
       val config = ConfigFactory.parseMap(
         Map[String, Any](
           "triples-generation" -> "remote-generator",
-          "services"           -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
+          "services"           -> Map("remote-triples-generator" -> Map("url" -> "http://host").asJava).asJava
         ).asJava
       )
 
