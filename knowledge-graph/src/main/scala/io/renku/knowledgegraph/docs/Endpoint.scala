@@ -95,6 +95,7 @@ object Endpoint {
     datasetDetailsEndpoint,
     entitiesEndpoint,
     ontologyEndpoint,
+    projects.delete.EndpointDocs,
     projectDetailsEndpoint,
     projects.files.lineage.EndpointDocs,
     projectDatasetsEndpoint,

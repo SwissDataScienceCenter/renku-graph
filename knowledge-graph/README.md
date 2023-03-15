@@ -12,6 +12,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
@@ -484,6 +485,24 @@ Response body example for `Accept: application/ld+json`:
   }
 ]
 ```
+
+#### DELETE /knowledge-graph/projects/:namespace/:name
+
+API to remove the project with the given `namespace/name` from both knowledge-graph and GitLab
+
+The endpoint requires an authorization token to be passed. Supported headers are:
+
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+
+**Response**
+
+| Status                      | Description                                                                                                |
+|-----------------------------|------------------------------------------------------------------------------------------------------------|
+| ACCEPTED (202)              | If the deletion process for the project with the given `namespace/name` was successfully scheduled         |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
 
 #### GET /knowledge-graph/projects/:namespace/:name
 

@@ -24,13 +24,13 @@ import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.events.CommitId
+import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, Request, Response}
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
-import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, Request, Response}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 

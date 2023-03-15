@@ -20,45 +20,37 @@ package io.renku.eventlog.events.consumers
 package commitsyncrequest
 
 import cats.effect.IO
-import cats.syntax.all._
-import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.Project
-import io.renku.graph.model.projects
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.eventlog.api.events.Generators
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.EitherValues
 
-class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with EitherValues {
 
   "createHandlingDefinition.decode" should {
-    "decode project id and path" in new TestCase {
-      val definition = handler.createHandlingDefinition()
-      val eventData = Json.obj(
-        "project" -> Json.obj(
-          "id"   -> 42.asJson,
-          "path" -> "the/project".asJson
-        )
-      )
-      definition.decode(EventRequestContent(eventData)) shouldBe Project(42, "the/project").asRight
-    }
 
-    "fail on malformed event data" in new TestCase {
+    "decode project id and path" in new TestCase {
+
       val definition = handler.createHandlingDefinition()
-      val eventData  = Json.obj("invalid" -> true.asJson)
-      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+
+      val event = Generators.commitSyncRequests.generateOne
+
+      definition.decode(EventRequestContent(event.asJson)).value shouldBe event
     }
   }
 
   "createHandlingDefinition.process" should {
     "call commitSyncForcer" in new TestCase {
       val definition = handler.createHandlingDefinition()
-      (commitSyncForcer.forceCommitSync _).expects(*, *).returning(IO.unit)
-      definition.process(Project(42, "the/project")).unsafeRunSync() shouldBe ()
+      val event      = Generators.commitSyncRequests.generateOne
+      (commitSyncForcer.forceCommitSync _).expects(event.project.id, event.project.path).returning(IO.unit)
+      definition.process(event).unsafeRunSync() shouldBe ()
     }
   }
 
@@ -75,15 +67,4 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val commitSyncForcer = mock[CommitSyncForcer[IO]]
     val handler          = new EventHandler[IO](commitSyncForcer)
   }
-
-  private implicit lazy val eventEncoder: Encoder[(projects.GitLabId, projects.Path)] =
-    Encoder.instance[(projects.GitLabId, projects.Path)] { case (id, path) =>
-      json"""{
-        "categoryName": "COMMIT_SYNC_REQUEST",
-        "project": {
-          "id":   ${id.value},
-          "path": ${path.value}
-        }
-      }"""
-    }
 }

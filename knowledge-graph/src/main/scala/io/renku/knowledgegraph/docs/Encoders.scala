@@ -47,8 +47,8 @@ private object Encoders {
     val operations: Json = path.operations
       .map { operation: Operation =>
         operation match {
-          case _: Operation.Get =>
-            json"""{"get": $operation}"""
+          case _: Operation.Get    => json"""{"get": $operation}"""
+          case _: Operation.Delete => json"""{"delete": $operation}"""
         }
       }
       .foldLeft(json"""{}""")((acc, opJson) => acc deepMerge opJson)
