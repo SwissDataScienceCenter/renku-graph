@@ -40,9 +40,63 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     imagesVar
   ).map(_.name)
 
-  override def query(criteria: Criteria): Option[String] = ???
+  override def query(criteria: Criteria): Option[String] =
+    criteria.filters.whenRequesting(entityType) {
+      fr"""SELECT $entityTypeVar
+          |       $matchingScoreVar
+          |       $nameVar
+          |       $idsPathsVisibilitiesVar
+          |       $sameAsVar
+          |       $maybeDateCreatedVar
+          |       $maybeDatePublishedVar
+          |       $dateVar
+          |       $creatorsNamesVar
+          |       $maybeDescriptionVar
+          |       $keywordsVar
+          |       $imagesVar
+          |WHERE {
+          |  BIND ('dataset' AS $entityTypeVar)
+          |
+          |  # textQuery
+          |  ${textQueryPart(criteria.filters.maybeQuery)}
+          |
+          |  # creators
+          |  ${creatorsPart(criteria.filters.creators)}
+          |
+          |  # dates, keywords, description
+          |  ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
+          |
+          |  # images
+          |  $imagesPart
+          |
+          |  # resolve project
+          |  $resolveProject
+          |
+          |  # project namespaces
+          |  ${namespacesPart(criteria.filters.namespaces)}
+          |}
+          |""".stripMargin.sparql
+    }
 
-  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = ???
+  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = DatasetsQuery.decoder
+
+  def pathVisibility: Fragment =
+//    |${
+//      criteria.maybeOnAccessRightsAndVisibility("?projectId", "?visibility")
+//    }
+//    | BIND (CONCAT(STR(? identifier), STR(':'), STR(? projectPath), STR(':'), STR(? visibility)) AS ? idPathVisibility)
+
+    Fragment.empty
+
+  def imagesPart: Fragment =
+    fr"""
+        |  OPTIONAL {
+        |    $dsId schema:image ?imageId .
+        |    ?imageId schema:position ?imagePosition ;
+        |             schema:contentUrl ?imageUrl .
+        |    BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |  }
+        |""".stripMargin
 
   def resolveProject: Fragment =
     fr"""
@@ -61,11 +115,12 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
         ).flatten.intercalate(fr" && ")
 
       if (cond.isEmpty) Fragment.empty
-      fr"FILTER ($cond)"
+      else fr"FILTER ($cond)"
     }
 
     fr"""
         |  Graph schema:Dataset {
+        |    $dsId renku:slug $nameVar
         |    OPTIONAL {
         |      $dsId schema:dateCreated $maybeDateCreatedVar.
         |      BIND ($maybeDateCreatedVar AS $dateVar)

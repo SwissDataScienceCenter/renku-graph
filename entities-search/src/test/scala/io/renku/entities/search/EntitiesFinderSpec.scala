@@ -51,7 +51,7 @@ import scala.util.Random
 class EntitiesFinderSpec
     extends AnyWordSpec
     with should.Matchers
-    with EntitiesGenerators
+      with EntitiesGenerators
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
