@@ -38,21 +38,23 @@ private[cleanup] trait TSCleaner[F[_]] {
 
 private[cleanup] object TSCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-      maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-      idleTimeout:    Duration = 16 minutes,
-      requestTimeout: Duration = 15 minutes
-  ): F[TSCleaner[F]] = (DatasetsGraphCleaner[F], ProjectsConnectionConfig[F]())
-    .mapN((datasetsGraphCleaner, connectionConfig) =>
-      new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
-                           datasetsGraphCleaner,
-                           connectionConfig,
-                           retryInterval,
-                           maxRetries,
-                           idleTimeout,
-                           requestTimeout
-      )
+      connectionConfig: ProjectsConnectionConfig,
+      retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
+      maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+      idleTimeout:      Duration = 16 minutes,
+      requestTimeout:   Duration = 15 minutes
+  ): TSCleaner[F] =
+    new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
+                         DatasetsGraphCleaner(connectionConfig),
+                         connectionConfig,
+                         retryInterval,
+                         maxRetries,
+                         idleTimeout,
+                         requestTimeout
     )
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSCleaner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

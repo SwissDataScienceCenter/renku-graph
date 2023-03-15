@@ -70,7 +70,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
         |                {
-        |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query.query}').
         |                } {
         |                  GRAPH ?projectId {
         |                    ?id a schema:Dataset

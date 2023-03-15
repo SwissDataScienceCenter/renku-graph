@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import commands.UpdateCommandsProducer
 import io.renku.graph.model.entities.Project
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 trait DatasetsGraphProvisioner[F[_]] {
@@ -31,10 +31,16 @@ trait DatasetsGraphProvisioner[F[_]] {
 }
 
 object DatasetsGraphProvisioner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsGraphProvisioner[F]] = for {
-    updatesProducer    <- UpdateCommandsProducer[F]
-    searchInfoUploader <- UpdateCommandsUploader[F]
-  } yield new DatasetsGraphProvisionerImpl[F](updatesProducer, searchInfoUploader)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): DatasetsGraphProvisioner[F] = {
+    val updatesProducer    = UpdateCommandsProducer[F](connectionConfig)
+    val searchInfoUploader = UpdateCommandsUploader[F](connectionConfig)
+    new DatasetsGraphProvisionerImpl[F](updatesProducer, searchInfoUploader)
+  }
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsGraphProvisioner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class DatasetsGraphProvisionerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],

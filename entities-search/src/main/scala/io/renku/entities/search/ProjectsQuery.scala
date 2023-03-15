@@ -51,7 +51,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
         |      WHERE {
         |        {
-        |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
+        |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query.query}')
         |        } {
         |          GRAPH ?id {
         |            ?id a schema:Project

@@ -18,8 +18,11 @@
 
 package io.renku.triplesstore.client
 
+import io.renku.jsonld.{EntityId, Property}
 import io.renku.triplesstore.client.model._
-import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder}
+import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, SparqlEncoder, VarName}
+
+import java.time.{Instant, LocalDate}
 
 object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances {
 
@@ -30,5 +33,36 @@ object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances
     def asTripleObject(implicit enc: TripleObjectEncoder[T]): TripleObject = enc(obj)
 
     def asSparql(implicit enc: SparqlEncoder[T]): Fragment = enc(obj)
+  }
+
+  final implicit class FragmentStringContext(private val sc: StringContext) {
+    def fr(args: Any*): Fragment = {
+      val values = args.map(makeValue)
+      Fragment(sc.s(values: _*))
+    }
+
+    private def makeValue(arg: Any): String = arg match {
+      case q:        LuceneQuery  => q.asSparql.sparql
+      case s:        String       => s.asTripleObject.asSparql.sparql
+      case s:        Char         => s.toString.asTripleObject.asSparql.sparql
+      case n:        Float        => n.asTripleObject.asSparql.sparql
+      case n:        Long         => n.asTripleObject.asSparql.sparql
+      case n:        Double       => n.asTripleObject.asSparql.sparql
+      case b:        Boolean      => b.asTripleObject.asSparql.sparql
+      case dt:       Instant      => dt.asTripleObject.asSparql.sparql
+      case ld:       LocalDate    => ld.asTripleObject.asSparql.sparql
+      case entityId: EntityId     => entityId.asSparql.sparql
+      case tr:       Triple       => tr.asSparql.sparql
+      case q:        Quad         => q.asSparql.sparql
+      case to:       TripleObject => to.asSparql.sparql
+      case p:        Property     => p.asSparql.sparql
+      case f:        Fragment     => f.sparql
+      case v:        VarName      => v.name
+      case seq:      Iterable[Any] =>
+        seq.map(makeValue).map(s => s"($s)").mkString(" ")
+      case opt: Option[Any] =>
+        opt.map(makeValue).getOrElse("")
+      case _ => sys.error(s"Unsupported value type '${arg.getClass}: $arg'")
+    }
   }
 }

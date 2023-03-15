@@ -18,28 +18,9 @@
 
 package io.renku.triplesstore.client.sparql
 
-import cats.{Monoid, Show}
+import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
 
-final case class Fragment(sparql: String) {
-  def isEmpty:  Boolean = sparql.isBlank
-  def nonEmpty: Boolean = !isEmpty
+private object LuceneQueryEncoder {
 
-  def ++(next: Fragment): Fragment =
-    (sparql, next.sparql) match {
-      case ("", r) => Fragment(r)
-      case (l, "") => Fragment(l)
-      case (l, r)  => Fragment(s"$l\n$r")
-    }
-
-  def stripMargin: Fragment =
-    Fragment(sparql.stripMargin)
-}
-
-object Fragment {
-
-  val empty: Fragment = Fragment("")
-
-  implicit val show: Show[Fragment] = Show.show(_.sparql)
-  implicit val monoid: Monoid[Fragment] =
-    Monoid.instance(empty, _ ++ _)
+  def queryAsString(v: String): String = QueryParserUtil.escape(v).replace("\\", "\\\\")
 }

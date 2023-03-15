@@ -102,7 +102,7 @@ private[tsprovisioning] object TransformationStepsRunner {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunner[F]] = for {
     resultsUploader         <- TransformationResultsUploader[F]
-    searchGraphsProvisioner <- SearchGraphsProvisioner[F]
+    searchGraphsProvisioner <- SearchGraphsProvisioner.default[F]
   } yield new TransformationStepsRunnerImpl[F](resultsUploader, searchGraphsProvisioner)
 }
 
