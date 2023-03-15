@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesstore.{ProjectsConnectionConfig, ResultsDecoder, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private[viewings] trait EventPersister[F[_]] {
@@ -51,7 +51,15 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
   override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {
       case None            => ().pure[F]
-      case Some(projectId) => deleteOldViewedDate(projectId) >> insert(projectId, event)
+      case Some(projectId) => persistIfOlderOrNone(event, projectId)
+    }
+
+  private def persistIfOlderOrNone(event: ProjectViewedEvent, projectId: projects.ResourceId) =
+    findStoredDate(projectId) >>= {
+      case None => insert(projectId, event)
+      case Some(date) if (date compareTo event.dateViewed) < 0 =>
+        deleteOldViewedDate(projectId) >> insert(projectId, event)
+      case _ => ().pure[F]
     }
 
   private def findProjectId(event: ProjectViewedEvent) = queryExpecting {
@@ -73,6 +81,28 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
     Decoder.instance[projects.ResourceId] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       extract[projects.ResourceId]("id")
+    }
+  }
+
+  private def findStoredDate(id: projects.ResourceId): F[Option[projects.DateViewed]] =
+    queryExpecting {
+      SparqlQuery.ofUnsafe(
+        show"${categoryName.show.toLowerCase}: find date",
+        Prefixes of renku -> "renku",
+        s"""|SELECT DISTINCT ?date
+            |WHERE {
+            |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
+            |    ${id.asEntityId.sparql} renku:dateViewed ?date
+            |  }
+            |}
+            |""".stripMargin
+      )
+    }(dateDecoder)
+
+  private lazy val dateDecoder: Decoder[Option[projects.DateViewed]] = ResultsDecoder[Option, projects.DateViewed] {
+    Decoder.instance[projects.DateViewed] { implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[projects.DateViewed]("date")
     }
   }
 

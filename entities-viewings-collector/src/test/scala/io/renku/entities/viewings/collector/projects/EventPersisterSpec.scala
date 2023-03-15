@@ -20,11 +20,10 @@ package io.renku.entities.viewings.collector.projects
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectViewedDates
 import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -61,7 +60,8 @@ class EventPersisterSpec
       }
 
     "update the date for the project from the ProjectViewedEvent " +
-      "if an event for the project already exists in the TS" in new TestCase {
+      "if an event for the project already exists in the TS " +
+      "and the date from the event is newer than this from the TS" in new TestCase {
 
         val project = anyProjectEntities.generateOne
         upload(to = projectsDataset, project)
@@ -72,15 +72,32 @@ class EventPersisterSpec
 
         findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
 
-        val newDate =
-          projectViewedDates(timestampsNotInTheFuture(butYoungerThan = event.dateViewed.value).generateOne).generateOne
+        val newDate = timestampsNotInTheFuture(butYoungerThan = event.dateViewed.value).generateAs(projects.DateViewed)
 
         persister.persist(event.copy(dateViewed = newDate)).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(project.resourceId -> newDate)
       }
 
-    "do nothing if the given ProjectViewedEvent is for non existing project" in new TestCase {
+    "do nothing if the even date is older than the date in the TS" in new TestCase {
+
+      val project = anyProjectEntities.generateOne
+      upload(to = projectsDataset, project)
+
+      val event = projectViewedEvents.generateOne.copy(path = project.path)
+
+      persister.persist(event).unsafeRunSync() shouldBe ()
+
+      findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
+
+      val newDate = timestamps(max = event.dateViewed.value.minusSeconds(1)).generateAs(projects.DateViewed)
+
+      persister.persist(event.copy(dateViewed = newDate)).unsafeRunSync() shouldBe ()
+
+      findAllViewings shouldBe Set(project.resourceId -> event.dateViewed)
+    }
+
+    "do nothing if the given ProjectViewedEvent is for non-existing project" in new TestCase {
 
       val event = projectViewedEvents.generateOne
 
