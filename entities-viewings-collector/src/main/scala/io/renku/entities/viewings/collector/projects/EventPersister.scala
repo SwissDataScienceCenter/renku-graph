@@ -57,7 +57,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
   private def persistIfOlderOrNone(event: ProjectViewedEvent, projectId: projects.ResourceId) =
     findStoredDate(projectId) >>= {
       case None => insert(projectId, event)
-      case Some(date) if (date compareTo event.dateViewed) < 0 =>
+      case Some(date) if date < event.dateViewed =>
         deleteOldViewedDate(projectId) >> insert(projectId, event)
       case _ => ().pure[F]
     }
