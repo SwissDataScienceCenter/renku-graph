@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import cats.effect.MonadCancelThrow
+import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import io.circe.{ACursor, Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -29,11 +29,16 @@ import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
 import io.renku.events.consumers.EventDecodingTools._
 import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeDecoders._
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     eventPersister:            EventPersister[F],
+    tgClient:                  triplesgenerator.api.events.Client[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
@@ -44,8 +49,23 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[Event],
-      ev => Logger[F].info(show"$categoryName: $ev accepted") >> storeNewEvent(ev).void
+      processEvent
     )
+
+  private def processEvent(event: Event): F[Unit] =
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      storeNewEvent(event) >>=
+      sendProjectViewed()
+
+  private def sendProjectViewed(): EventPersister.Result => F[Unit] = {
+    case EventPersister.Result.Created(event) =>
+      tgClient
+        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value)))
+        .handleErrorWith(
+          Logger[F].error(_)(show"$categoryName: sending ${ProjectViewedEvent.categoryName} event failed")
+        )
+    case _ => ().pure[F]
+  }
 
   private implicit val eventDecoder: Decoder[Event] = cursor =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
@@ -81,6 +101,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[consumers.EventHandler[F]] = EventPersister[F].map(new EventHandler[F](_))
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges: MetricsRegistry]
+      : F[consumers.EventHandler[F]] =
+    (EventPersister[F], triplesgenerator.api.events.Client[F])
+      .mapN(new EventHandler[F](_, _))
 }
