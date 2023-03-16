@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector.projects.activated
 
 import cats.effect.Async
 import cats.syntax.all._

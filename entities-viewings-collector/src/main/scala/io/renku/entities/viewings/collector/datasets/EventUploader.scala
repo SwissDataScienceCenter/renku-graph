@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import cats.data.OptionT
-import io.renku.entities.viewings.collector.projects.EventPersister
+import io.renku.entities.viewings.collector.projects.viewed.EventPersister
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent}
 import io.renku.triplesstore.SparqlQueryTimeRecorder

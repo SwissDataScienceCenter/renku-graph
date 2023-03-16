@@ -17,6 +17,7 @@
  */
 
 package io.renku.entities.viewings.collector.projects
+package viewed
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -40,13 +41,13 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
   import io.circe.Decoder
   import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
-  import io.renku.jsonld._
   import io.renku.jsonld.syntax._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import tsClient.{queryExpecting, updateWithNoResult, upload}
+  import ProjectViewingEncoder._
 
   override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {
@@ -123,18 +124,6 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
 
   private def insert(projectId: projects.ResourceId, event: ProjectViewedEvent): F[Unit] =
     upload(
-      NamedGraph.fromJsonLDsUnsafe(
-        GraphClass.ProjectViewedTimes.id,
-        (projectId -> event.dateViewed).asJsonLD
-      )
+      encode(ProjectViewing(projectId, event.dateViewed))
     )
-
-  private implicit lazy val eventJsonLDEncoder: JsonLDEncoder[(projects.ResourceId, projects.DateViewed)] =
-    JsonLDEncoder.instance { case (id, date) =>
-      JsonLD.entity(
-        id.asEntityId,
-        EntityTypes.of(renku / "ProjectViewedTime"),
-        renku / "dateViewed" -> date.asJsonLD
-      )
-    }
 }

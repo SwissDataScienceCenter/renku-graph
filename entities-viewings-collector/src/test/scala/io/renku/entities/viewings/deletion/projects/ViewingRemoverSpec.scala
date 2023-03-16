@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.deletion.projects
+package io.renku.entities.viewings
+package deletion.projects
 
 import cats.effect.IO
+import collector.projects.viewed.EventPersisterImpl
 import eu.timepit.refined.auto._
-import io.renku.entities.viewings.collector.projects.EventPersisterImpl
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.testentities._

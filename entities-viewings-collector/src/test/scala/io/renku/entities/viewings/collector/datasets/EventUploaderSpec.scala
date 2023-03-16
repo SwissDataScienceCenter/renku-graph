@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.datasets
+package io.renku.entities.viewings.collector
+package datasets
 
 import cats.syntax.all._
-import io.renku.entities.viewings.collector.projects.EventPersister
 import io.renku.generators.Generators.Implicits._
+import projects.viewed.EventPersister
 import io.renku.graph.model.{datasets, projects}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
 import io.renku.triplesgenerator.api.events.Generators.datasetViewedEvents

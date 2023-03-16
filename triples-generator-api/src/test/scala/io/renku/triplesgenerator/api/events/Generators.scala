@@ -20,10 +20,15 @@ package io.renku.triplesgenerator.api.events
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import org.scalacheck.Gen
 
 object Generators {
+
+  val projectActivatedEvents: Gen[ProjectActivated] =
+    (projectPaths -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
+      .mapN(ProjectActivated.apply)
 
   val projectViewedEvents: Gen[ProjectViewedEvent] =
     (projectPaths -> projectViewedDates()).mapN(ProjectViewedEvent.apply)

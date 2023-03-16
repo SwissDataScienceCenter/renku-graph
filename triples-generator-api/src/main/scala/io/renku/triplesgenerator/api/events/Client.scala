@@ -29,6 +29,7 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
+  def send(event: ProjectActivated):       F[Unit]
   def send(event: ProjectViewedEvent):     F[Unit]
   def send(event: DatasetViewedEvent):     F[Unit]
   def send(event: ProjectViewingDeletion): F[Unit]
@@ -45,6 +46,9 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   import cats.syntax.all._
   import io.circe.syntax._
   import EventSender.EventContext
+
+  override def send(event: ProjectActivated): F[Unit] =
+    send(event, ProjectActivated.categoryName)
 
   override def send(event: ProjectViewedEvent): F[Unit] =
     send(event, ProjectViewedEvent.categoryName)
