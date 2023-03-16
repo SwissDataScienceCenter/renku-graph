@@ -40,7 +40,7 @@ import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -60,7 +60,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
   "process" should {
 
-    "succeed and send ProjectViewedEvent " +
+    "succeed and send ProjectActivated event " +
       "if events are successfully turned into triples" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = event.project.path)
@@ -71,7 +71,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         successfulTriplesTransformationAndUpload(project)
 
-        givenProjectViewedEventSent(event.project.path, returning = ().pure[Try])
+        givenProjectActivatedEventSent(event.project.path, returning = ().pure[Try])
 
         eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -250,7 +250,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       logger.logged(Error(message = show"$categoryName: $event processing failure", exception))
     }
 
-    "log an error when sending ProjectViewedEvent fails" in new TestCase {
+    "log an error when sending ProjectActivated event fails" in new TestCase {
 
       givenFetchingAccessToken(forProjectPath = event.project.path)
         .returning(maybeAccessToken.pure[Try])
@@ -261,13 +261,13 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       successfulTriplesTransformationAndUpload(project)
 
       val exception = exceptions.generateOne
-      givenProjectViewedEventSent(event.project.path, returning = exception.raiseError[Try, Unit])
+      givenProjectActivatedEventSent(event.project.path, returning = exception.raiseError[Try, Unit])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logger.logged(
         Info(s"${commonLogMessage(event)} accepted"),
-        Error(s"${commonLogMessage(event)} sending ${ProjectViewedEvent.categoryName} event failed", exception)
+        Error(s"${commonLogMessage(event)} sending ${ProjectActivated.categoryName} event failed", exception)
       )
       logSummary(event, isSuccessful = true)
     }
@@ -320,10 +320,10 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects(event, maybeAccessToken)
         .returning(returning)
 
-    def givenProjectViewedEventSent(path: projects.Path, returning: Try[Unit]) =
+    def givenProjectActivatedEventSent(path: projects.Path, returning: Try[Unit]) =
       (tgClient
-        .send(_: ProjectViewedEvent))
-        .expects(where((ev: ProjectViewedEvent) => ev.path == path))
+        .send(_: ProjectActivated))
+        .expects(where((ev: ProjectActivated) => ev.path == path))
         .returning(returning)
 
     def logSummary(event: MinProjectInfoEvent, isSuccessful: Boolean): Assertion = logger.logged(

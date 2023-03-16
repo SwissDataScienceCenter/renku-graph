@@ -31,7 +31,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
@@ -66,7 +66,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path)
       result                              <- measureExecutionTime(transformAndUpload(event))
       _                                   <- logSummary(event)(result)
-      _                                   <- sendProjectViewedEvent(event)(result)
+      _                                   <- sendProjectActivatedEvent(event)(result)
     } yield ()
   } recoverWith logError(event)
 
@@ -115,13 +115,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         .map(_ => NonRecoverableError(event, exception))
   }
 
-  private def sendProjectViewedEvent(event: MinProjectInfoEvent): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
+  private def sendProjectActivatedEvent(
+      event: MinProjectInfoEvent
+  ): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
     case (_, Uploaded(_)) =>
       tgClient
-        .send(ProjectViewedEvent.forProject(event.project.path))
-        .handleErrorWith(
-          Logger[F].error(_)(s"${prefix(event)} sending ${ProjectViewedEvent.categoryName} event failed")
-        )
+        .send(ProjectActivated.forProject(event.project.path))
+        .handleErrorWith(Logger[F].error(_)(s"${prefix(event)} sending ${ProjectActivated.categoryName} event failed"))
     case _ => ().pure[F]
   }
 
