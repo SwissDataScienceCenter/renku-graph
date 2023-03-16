@@ -74,21 +74,32 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |       $imagesVar
           |WHERE {
           |  BIND ('dataset' AS $entityTypeVar)
-          |
           |  # textQuery
           |  ${textQueryPart(criteria.filters.maybeQuery)}
           |
-          |  # creators
-          |  ${creatorsPart(criteria.filters.creators)}
+          |  BIND($dsId AS $sameAsVar)
           |
-          |  # dates, keywords, description
-          |  ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
+          | { # start sub select
+          |  SELECT ?projectId ?dsId
+          |    (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
+          |    #(GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS ?idsPathsVisibilities)
+          |    (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
+          |    (GROUP_CONCAT(?encodedImageUrl; separator=',') AS $imagesVar)
+          |  WHERE {
+          |    # creators
+          |    ${creatorsPart(criteria.filters.creators)}
           |
-          |  # images
-          |  $imagesPart
+          |    # dates, keywords, description
+          |    ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
           |
-          |  # resolve project
-          |  $resolveProject
+          |    # images
+          |    $imagesPart
+          |
+          |    # resolve project
+          |    $resolveProject
+          |  }
+          |  GROUP BY ?projectId ?dsId
+          |  } # end sub select
           |
           |  # project namespaces
           |  ${namespacesPart(criteria.filters.namespaces)}

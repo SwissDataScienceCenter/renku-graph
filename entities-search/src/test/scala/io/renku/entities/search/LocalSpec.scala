@@ -54,9 +54,10 @@ class LocalSpec
     upload(to = projectsDataset, project)
   }
 
+  override def clearDatasetsBefore: Boolean = false
+
   def writeQuery(q: SparqlQuery): Unit = {
     import fs2.io.file._
-
 
     val out = Path("/Users/ekettner/org/sdsc/files/q2.sparql")
     fs2.Stream
