@@ -74,7 +74,7 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
-    projectViewingsSubscription                  <- viewings.collector.projects.SubscriptionFactory[IO]
+    projectViewingsSubscription                  <- viewings.collector.projects.viewed.SubscriptionFactory[IO]
     datasetViewingsSubscription                  <- viewings.collector.datasets.SubscriptionFactory[IO]
     viewingDeletionSubscription                  <- viewings.deletion.projects.SubscriptionFactory[IO]
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
@@ -118,7 +118,7 @@ private class MicroserviceRunner[F[_]: Async: Logger](
   def run(signal: Signal[F, Boolean]): F[ExitCode] =
     Ref.of[F, ExitCode](ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
 
-  def createServer: Resource[F, Server] = {
+  private def createServer: Resource[F, Server] = {
     for {
       _      <- Resource.eval(certificateLoader.run)
       _      <- Resource.eval(gitCertificateInstaller.run)

@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector
+package io.renku.entities.viewings.collector.projects
 
 import io.renku.events.CategoryName
 
-package object projects {
+package object viewed {
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 }
