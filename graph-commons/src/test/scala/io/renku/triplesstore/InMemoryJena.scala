@@ -107,14 +107,16 @@ trait InMemoryJena {
       }
       .unsafeRunSync()
 
-  def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
+  def uploadIO(to: DatasetName, graphs: Graph*): IO[Unit] =
     graphs
       .map(_.flatten.fold(throw _, identity))
       .toList
       .map(g => queryRunnerFor(to).flatMap(_.uploadPayload(g)))
       .sequence
       .void
-      .unsafeRunSync()
+
+  def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
+    uploadIO(to, graphs: _*).unsafeRunSync()
 
   def upload[T](to: DatasetName, objects: T*)(implicit
       entityFunctions: EntityFunctions[T],

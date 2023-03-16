@@ -24,7 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.projects
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
@@ -32,10 +32,16 @@ private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
 }
 
 private[searchgraphs] object UpdateCommandsProducer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsProducer[F]] = for {
-    searchInfoFetcher <- SearchInfoFetcher[F]
-    visibilityFinder  <- VisibilityFinder[F]
-  } yield new UpdateCommandsProducerImpl[F](searchInfoFetcher, visibilityFinder, CommandsCalculator[F]())
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): UpdateCommandsProducer[F] = {
+    val searchInfoFetcher = SearchInfoFetcher[F](connectionConfig)
+    val visibilityFinder  = VisibilityFinder[F](connectionConfig)
+    new UpdateCommandsProducerImpl[F](searchInfoFetcher, visibilityFinder, CommandsCalculator[F]())
+  }
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsProducer[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],

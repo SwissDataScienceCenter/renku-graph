@@ -32,8 +32,13 @@ private trait SearchInfoFetcher[F[_]] {
 }
 
 private object SearchInfoFetcher {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
-    ProjectsConnectionConfig[F]().map(new SearchInfoFetcherImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): SearchInfoFetcher[F] =
+    new SearchInfoFetcherImpl[F](connectionConfig)
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
