@@ -50,6 +50,6 @@ private class EventProcessorImpl[F[_]: Async: Logger](tsCleaner: namedgraphs.TSC
 private object EventProcessor {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
     eventStatusUpdater <- EventStatusUpdater(categoryName)
-    tsCleaner          <- namedgraphs.TSCleaner[F]()
+    tsCleaner          <- namedgraphs.TSCleaner.default[F]
   } yield new EventProcessorImpl[F](tsCleaner, eventStatusUpdater)
 }

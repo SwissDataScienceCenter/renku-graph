@@ -18,28 +18,10 @@
 
 package io.renku.triplesstore.client.sparql
 
-import cats.{Monoid, Show}
+final class VarName private (val name: String) extends AnyVal
 
-final case class Fragment(sparql: String) {
-  def isEmpty:  Boolean = sparql.isBlank
-  def nonEmpty: Boolean = !isEmpty
-
-  def ++(next: Fragment): Fragment =
-    (sparql, next.sparql) match {
-      case ("", r) => Fragment(r)
-      case (l, "") => Fragment(l)
-      case (l, r)  => Fragment(s"$l\n$r")
-    }
-
-  def stripMargin: Fragment =
-    Fragment(sparql.stripMargin)
-}
-
-object Fragment {
-
-  val empty: Fragment = Fragment("")
-
-  implicit val show: Show[Fragment] = Show.show(_.sparql)
-  implicit val monoid: Monoid[Fragment] =
-    Monoid.instance(empty, _ ++ _)
+object VarName {
+  def apply(name: String): VarName =
+    if (name.startsWith("?")) new VarName(name)
+    else new VarName(s"?$name")
 }

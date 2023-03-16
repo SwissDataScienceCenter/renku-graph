@@ -40,7 +40,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
           |      WHERE {
           |        ${filters.onQuery(
-                   s"""(?id ?score) text:query (schema:name '${filters.query}').""",
+                   s"""(?id ?score) text:query (schema:name '${filters.query.query}').""",
                    matchingScoreVariableName = "?score")}
           |        GRAPH <${GraphClass.Persons.id}> {
           |          ?id a schema:Person;

@@ -29,8 +29,13 @@ private trait VisibilityFinder[F[_]] {
 }
 
 private object VisibilityFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[VisibilityFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new VisibilityFinderImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): VisibilityFinder[F] =
+    new VisibilityFinderImpl[F](connectionConfig)
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[VisibilityFinder[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class VisibilityFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
