@@ -20,9 +20,9 @@ package io.renku.triplesgenerator
 
 import cats.effect._
 import cats.syntax.all._
-import fs2.concurrent.{Signal, SignallingRef}
 import com.comcast.ip4s._
 import com.typesafe.config.{Config, ConfigFactory}
+import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.entities.viewings
@@ -74,6 +74,7 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    projectActivationsSubscription               <- viewings.collector.projects.activated.SubscriptionFactory[IO]
     projectViewingsSubscription                  <- viewings.collector.projects.viewed.SubscriptionFactory[IO]
     datasetViewingsSubscription                  <- viewings.collector.datasets.SubscriptionFactory[IO]
     viewingDeletionSubscription                  <- viewings.deletion.projects.SubscriptionFactory[IO]
@@ -84,6 +85,7 @@ object Microservice extends IOMicroservice {
                                 minProjectInfoSubscription,
                                 cleanUpSubscription,
                                 migrationRequestSubscription,
+                                projectActivationsSubscription,
                                 projectViewingsSubscription,
                                 datasetViewingsSubscription,
                                 viewingDeletionSubscription
