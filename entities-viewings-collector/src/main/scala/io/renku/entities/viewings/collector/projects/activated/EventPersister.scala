@@ -17,45 +17,49 @@
  */
 
 package io.renku.entities.viewings.collector.projects
-package viewed
+package activated
 
 import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-private[viewings] trait EventPersister[F[_]] {
-  def persist(event: ProjectViewedEvent): F[Unit]
+private trait EventPersister[F[_]] {
+  def persist(event: ProjectActivated): F[Unit]
 }
 
-private[viewings] object EventPersister {
+private object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new EventPersisterImpl[F](_))
 }
 
-private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends EventPersister[F] {
+private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends EventPersister[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
+  import ProjectViewingEncoder._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
-  import tsClient.{queryExpecting, updateWithNoResult, upload}
-  import ProjectViewingEncoder._
+  import tsClient.{queryExpecting, upload}
 
-  override def persist(event: ProjectViewedEvent): F[Unit] =
+  override def persist(event: ProjectActivated): F[Unit] =
     findProjectId(event) >>= {
-      case None            => ().pure[F]
-      case Some(projectId) => deleteOldViewedDate(projectId) >> insert(projectId, event)
+      case None => ().pure[F]
+      case Some(projectId) =>
+        eventExists(projectId) >>= {
+          case false => insert(projectId, event)
+          case true  => ().pure[F]
+        }
     }
 
-  private def findProjectId(event: ProjectViewedEvent) = queryExpecting {
+  private def findProjectId(event: ProjectActivated) = queryExpecting {
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: find id",
       Prefixes of (renku -> "renku", schema -> "schema"),
@@ -77,23 +81,30 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
     }
   }
 
-  private def deleteOldViewedDate(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
+  private def eventExists(projectId: projects.ResourceId) = queryExpecting {
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: delete",
+      show"${categoryName.show.toLowerCase}: check exists",
       Prefixes of renku -> "renku",
-      s"""|DELETE { GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} { ?id ?p ?o } }
+      s"""|SELECT DISTINCT ?date
           |WHERE {
           |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
-          |    BIND (${projectId.asEntityId.sparql} AS ?id)
-          |    ?id ?p ?o 
+          |    ${projectId.asEntityId.sparql} renku:dateViewed ?date
           |  }
           |}
           |""".stripMargin
     )
-  )
+  }(dateDecoder)
+    .map(_.isDefined)
 
-  private def insert(projectId: projects.ResourceId, event: ProjectViewedEvent): F[Unit] =
+  private lazy val dateDecoder: Decoder[Option[projects.DateViewed]] = ResultsDecoder[Option, projects.DateViewed] {
+    Decoder.instance[projects.DateViewed] { implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[projects.DateViewed]("date")
+    }
+  }
+
+  private def insert(projectId: projects.ResourceId, event: ProjectActivated): F[Unit] =
     upload(
-      encode(ProjectViewing(projectId, event.dateViewed))
+      encode(ProjectViewing(projectId, projects.DateViewed(event.dateActivated.value)))
     )
 }

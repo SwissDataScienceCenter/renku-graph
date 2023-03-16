@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings
-package deletion.projects
+package io.renku.entities.viewings.collector.projects.activated
 
 import cats.effect.IO
-import collector.projects.viewed.EventPersisterImpl
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.Schemas.renku
@@ -30,81 +29,75 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
-import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
+import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ViewingRemoverSpec
+import java.time.Instant
+
+class EventPersisterSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
-  "removeViewing" should {
+  "persist" should {
 
-    "remove the relevant renku:ProjectViewedTime entity from the ProjectViewedTimes graph" in new TestCase {
+    "insert the given ProjectActivated event into the TS " +
+      "if there's no event for the project yet" in new TestCase {
+
+        val project = anyProjectEntities.generateOne
+        upload(to = projectsDataset, project)
+
+        val event = projectActivatedEvents.generateOne.copy(path = project.path)
+
+        persister.persist(event).unsafeRunSync() shouldBe ()
+
+        findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
+      }
+
+    "do nothing if there's already an event for the project in the TS" in new TestCase {
 
       val project = anyProjectEntities.generateOne
-      insertViewing(project)
+      upload(to = projectsDataset, project)
 
-      val otherProject = anyProjectEntities.generateOne
-      insertViewing(otherProject)
+      val event = projectActivatedEvents.generateOne.copy(path = project.path)
 
-      findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
+      persister.persist(event).unsafeRunSync() shouldBe ()
 
-      val event = ProjectViewingDeletion(project.path)
+      findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
 
-      remover.removeViewing(event).unsafeRunSync() shouldBe ()
+      val otherEvent = event.copy(dateActivated = timestampsNotInTheFuture.generateAs(ProjectActivated.DateActivated))
 
-      findProjectsWithViewings shouldBe Set(otherProject.resourceId)
-    }
+      persister.persist(otherEvent).unsafeRunSync() shouldBe ()
 
-    "do nothing if there's no project with the given path" in new TestCase {
-
-      findProjectsWithViewings shouldBe Set.empty
-
-      val event = ProjectViewingDeletion(projectPaths.generateOne)
-
-      remover.removeViewing(event).unsafeRunSync() shouldBe ()
-
-      findProjectsWithViewings shouldBe Set.empty
+      findAllViewings shouldBe Set(project.resourceId -> projects.DateViewed(event.dateActivated.value))
     }
   }
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val remover = new ViewingRemoverImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-
-    private val eventPersister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-
-    def insertViewing(project: Project) = {
-
-      upload(to = projectsDataset, project)
-
-      val event = projectViewedEvents.generateOne.copy(path = project.path)
-
-      eventPersister.persist(event).unsafeRunSync()
-    }
+    val persister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   }
 
-  private def findProjectsWithViewings =
+  private def findAllViewings =
     runSelect(
       on = projectsDataset,
       SparqlQuery.of(
         "test find project viewing",
         Prefixes of renku -> "renku",
-        s"""|SELECT DISTINCT ?id
+        s"""|SELECT ?id ?date
             |FROM ${GraphClass.ProjectViewedTimes.id.asSparql.sparql} {
-            |  ?id a renku:ProjectViewedTime
+            |  ?id renku:dateViewed ?date.
             |}
             |""".stripMargin
       )
     ).unsafeRunSync()
-      .map(row => projects.ResourceId(row("id")))
+      .map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date"))))
       .toSet
 }
