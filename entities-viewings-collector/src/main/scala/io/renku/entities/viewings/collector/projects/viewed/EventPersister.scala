@@ -90,12 +90,14 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
       SparqlQuery.ofUnsafe(
         show"${categoryName.show.toLowerCase}: find date",
         Prefixes of renku -> "renku",
-        s"""|SELECT DISTINCT ?date
+        s"""|SELECT (MAX(?date) AS ?mostRecentDate)
             |WHERE {
             |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
-            |    ${id.asEntityId.sparql} renku:dateViewed ?date
+            |    BIND (${id.asEntityId.sparql} AS ?id)
+            |    ?id renku:dateViewed ?date
             |  }
             |}
+            |GROUP BY ?id
             |""".stripMargin
       )
     }(dateDecoder)
@@ -103,7 +105,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
   private lazy val dateDecoder: Decoder[Option[projects.DateViewed]] = ResultsDecoder[Option, projects.DateViewed] {
     Decoder.instance[projects.DateViewed] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
-      extract[projects.DateViewed]("date")
+      extract[projects.DateViewed]("mostRecentDate")
     }
   }
 

@@ -85,12 +85,13 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: check exists",
       Prefixes of renku -> "renku",
-      s"""|SELECT DISTINCT ?date
+      s"""|SELECT ?date
           |WHERE {
           |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
           |    ${projectId.asEntityId.sparql} renku:dateViewed ?date
           |  }
           |}
+          |LIMIT 1
           |""".stripMargin
     )
   }(dateDecoder)
