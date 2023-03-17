@@ -73,7 +73,9 @@ private class GLProjectFinderImpl[F[_]: Async: Parallel: GitLabClient: Logger] e
   ): F[(List[Project.NotActivated], Option[Total])] =
     GitLabClient[F]
       .get(
-        (uri"users" / criteria.userId / "projects")
+        uri"projects"
+          .withQueryParam("membership", true)
+          .withQueryParam("min_access_level", 40) // Maintainer
           .withQueryParam("page", page)
           .withQueryParam("per_page", requestPageSize),
         "user-projects"
