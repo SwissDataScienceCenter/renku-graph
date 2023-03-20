@@ -42,7 +42,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
   self: Suite with IOSpec with MockFactory =>
 
   protected def initDb(): Unit =
-    allMigrations.map(_.run()).sequence.void.unsafeRunSync()
+    allMigrations.map(_.run).sequence.void.unsafeRunSync()
 
   protected def prepareDbForTest(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>

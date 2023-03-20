@@ -28,15 +28,19 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets.Identifier
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.Href
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
+import java.time.Instant
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
@@ -47,7 +51,9 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     datasetFinder:         DatasetFinder[F],
     renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[F]
+    tgClient:              triplesgenerator.api.events.Client[F],
+    executionTimeRecorder: ExecutionTimeRecorder[F],
+    now:                   () => Instant = () => Instant.now()
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -60,9 +66,18 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] = measureExecutionTime {
     datasetFinder
       .findDataset(identifier, authContext)
+      .flatTap(sendDatasetViewedEvent)
       .flatMap(toHttpResult(identifier))
       .recoverWith(httpResult(identifier))
   } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+
+  private lazy val sendDatasetViewedEvent: Option[Dataset] => F[Unit] = {
+    case None => ().pure[F]
+    case Some(ds) =>
+      tgClient
+        .send(DatasetViewedEvent.forDataset(ds.id, now))
+        .handleErrorWith(err => Logger[F].error(err)(show"sending ${DatasetViewedEvent.categoryName} event failed"))
+  }
 
   private def toHttpResult(
       identifier: Identifier
@@ -87,12 +102,13 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
 object Endpoint {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] = for {
     datasetFinder         <- DatasetFinder[F]
     renkuApiUrl           <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
+    tgClient              <- triplesgenerator.api.events.Client[F]
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new EndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+  } yield new EndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, identifier: Identifier): Href =
     Href(renkuApiUrl / "datasets" / identifier)

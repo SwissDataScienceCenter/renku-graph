@@ -54,7 +54,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       createEventTable()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ()
+      batchDateAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column adding skipped"))
     }
@@ -63,7 +63,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       checkColumnExists shouldBe false
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ()
+      batchDateAdder.run.unsafeRunSync() shouldBe ()
 
       checkColumnExists shouldBe true
 
@@ -71,7 +71,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       logger.reset()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ()
+      batchDateAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column exists"))
     }
@@ -87,7 +87,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ()
+      batchDateAdder.run.unsafeRunSync() shouldBe ()
 
       findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
 

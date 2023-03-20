@@ -23,8 +23,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.consumers.commitsync.eventgeneration.CommitsSynchronizer
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -35,6 +36,7 @@ import org.typelevel.log4cats.Logger
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     commitsSynchronizer:       CommitsSynchronizer[F],
+    subscriptionMechanism:     SubscriptionMechanism[F],
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
@@ -43,7 +45,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.as[CommitSyncEvent],
-      process = commitsSynchronizer.synchronizeEvents
+      process = commitsSynchronizer.synchronizeEvents,
+      onRelease = subscriptionMechanism.renewSubscription()
     )
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -62,9 +65,10 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
-      : F[consumers.EventHandler[F]] = for {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder](
+      subscriptionMechanism: SubscriptionMechanism[F]
+  ): F[consumers.EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]
-    processExecutor         <- ProcessExecutor.concurrent(100)
-  } yield new EventHandler[F](categoryName, commitEventSynchronizer, processExecutor)
+    processExecutor         <- ProcessExecutor.concurrent(10)
+  } yield new EventHandler[F](categoryName, commitEventSynchronizer, subscriptionMechanism, processExecutor)
 }

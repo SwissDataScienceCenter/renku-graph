@@ -22,8 +22,8 @@ package commands
 import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.datasets.TopmostSameAs
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
@@ -32,8 +32,13 @@ private trait SearchInfoFetcher[F[_]] {
 }
 
 private object SearchInfoFetcher {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
-    ProjectsConnectionConfig[F]().map(new SearchInfoFetcherImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): SearchInfoFetcher[F] =
+    new SearchInfoFetcherImpl[F](connectionConfig)
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
@@ -45,8 +50,9 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore._
+  import io.renku.triplesstore.ResultsDecoder._
+  import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore.client.syntax._
 
   override def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[SearchInfo]] =

@@ -81,7 +81,7 @@ class FailedEventsRestorerSpec
           projectPath
         )._1
 
-        restorer.run().unsafeRunSync() shouldBe ()
+        restorer.run.unsafeRunSync() shouldBe ()
 
         findEvent(compoundId(eventToChange)).map(_._2)         shouldBe New.some
         findEvent(compoundId(olderMatchingEvent)).map(_._2)    shouldBe New.some
@@ -114,7 +114,7 @@ class FailedEventsRestorerSpec
           projectPath
         )._1
 
-        restorer.run().unsafeRunSync() shouldBe ()
+        restorer.run.unsafeRunSync() shouldBe ()
 
         findEvent(compoundId(matchingEvent)).map(_._2)                shouldBe GenerationNonRecoverableFailure.some
         findEvent(compoundId(olderMatchingEvent)).map(_._2)           shouldBe GenerationNonRecoverableFailure.some

@@ -63,7 +63,7 @@ class KGMetricsSpec
 
       sleep(500)
 
-      metrics.run().unsafeRunAndForget()
+      metrics.run.unsafeRunAndForget()
 
       sleep(1000)
 
@@ -91,7 +91,7 @@ class KGMetricsSpec
 
       sleep(500)
 
-      metrics.run().start.unsafeRunAndForget()
+      metrics.run.start.unsafeRunAndForget()
 
       sleep(1000)
 

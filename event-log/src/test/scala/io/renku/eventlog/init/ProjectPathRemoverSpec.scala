@@ -49,7 +49,7 @@ class ProjectPathRemoverSpec
 
       createEventTable()
 
-      projectPathRemover.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'project_path' column dropping skipped"))
     }
@@ -58,7 +58,7 @@ class ProjectPathRemoverSpec
 
       checkColumnExists shouldBe true
 
-      projectPathRemover.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe false
 
@@ -66,7 +66,7 @@ class ProjectPathRemoverSpec
 
       logger.reset()
 
-      projectPathRemover.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathRemover.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'project_path' column already removed"))
     }

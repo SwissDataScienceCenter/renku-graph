@@ -24,25 +24,26 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import org.typelevel.log4cats.Logger
-import EventDecodingTools._
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     commitSyncForcer:          CommitSyncForcer[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ProcessExecutor.sequential) {
 
-  protected override type Event = Project
+  protected override type Event = CommitSyncRequest
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.getProject,
+      decode = _.event.hcursor.as[CommitSyncRequest],
       process = startForceCommitSync
     )
 
-  private lazy val startForceCommitSync: Event => F[Unit] = { case project @ Project(projectId, projectPath) =>
-    Logger[F].info(show"$categoryName: $project accepted") >>
-      commitSyncForcer.forceCommitSync(projectId, projectPath)
+  private lazy val startForceCommitSync: Event => F[Unit] = {
+    case CommitSyncRequest(project @ Project(projectId, projectPath)) =>
+      Logger[F].info(show"$categoryName: $project accepted") >>
+        commitSyncForcer.forceCommitSync(projectId, projectPath)
   }
 }
 

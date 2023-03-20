@@ -163,11 +163,27 @@ object model {
       OpMapping(Uri.getTemplate(uri.parts), Get("".some, parameters, None, statusAndResponse.toMap, Nil))
     }
 
+    def DELETE(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts), Delete("".some, parameters, None, statusAndResponse.toMap, Nil))
+    }
+
     case class Get(summary:     Option[String],
                    parameters:  List[Parameter],
                    requestBody: Option[RequestBody],
                    responses:   Map[Status, Response],
                    security:    List[SecurityRequirement]
+    ) extends Operation
+
+    case class Delete(summary:     Option[String],
+                      parameters:  List[Parameter],
+                      requestBody: Option[RequestBody],
+                      responses:   Map[Status, Response],
+                      security:    List[SecurityRequirement]
     ) extends Operation
   }
 
@@ -260,7 +276,9 @@ object model {
 
     def apply(code: Int, name: String): Status = new Status(code, name)
 
-    case object Ok extends Status(200, "Ok")
+    case object Ok       extends Status(200, "Ok")
+    case object Created  extends Status(201, "Created")
+    case object Accepted extends Status(202, "Accepted")
 
     case object BadRequest   extends Status(400, "Bad Request")
     case object Unauthorized extends Status(401, "Unauthorized")

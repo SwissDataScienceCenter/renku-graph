@@ -35,7 +35,7 @@ private class ExpiryAndCreatedDatesAdder[F[_]: Spawn: Logger: SessionResource] e
   import skunk._
   import skunk.implicits._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     addIfNotExists(column = "expiry_date", "DATE") >> addIfNotExists(column = "created_at", "TIMESTAMPTZ")
   }
 

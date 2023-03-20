@@ -35,14 +35,14 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
       val compatConfig = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
       val checker      = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
 
-      checker.run() shouldBe Success(())
+      checker.run shouldBe Success(())
     }
 
     "fail if the cli version does not match the cli version from the compatibility config" in {
       val cliVersion         = cliVersions.generateOne
       val compatConfig       = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
       val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
-      val Failure(exception) = checker.run()
+      val Failure(exception) = checker.run
       exception shouldBe a[IllegalStateException]
       exception.getMessage shouldBe s"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
     }

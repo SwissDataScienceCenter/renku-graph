@@ -41,7 +41,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       tableExists("event_log") shouldBe true
 
-      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_log") shouldBe false
       tableExists("event")     shouldBe true
@@ -53,7 +53,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       tableExists("event_log") shouldBe true
 
-      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_log") shouldBe false
       tableExists("event")     shouldBe true
@@ -62,7 +62,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       logger.reset()
 
-      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'event' table already exists"))
     }
@@ -71,7 +71,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       tableExists("event_log") shouldBe true
 
-      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_log") shouldBe false
       tableExists("event")     shouldBe true
@@ -85,7 +85,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
       tableExists("event_log") shouldBe true
       tableExists("event")     shouldBe true
 
-      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRenamer.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_log") shouldBe false
       tableExists("event")     shouldBe true

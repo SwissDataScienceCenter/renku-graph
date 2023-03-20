@@ -21,21 +21,24 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew.clean
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.events.consumers.statuschange.categoryName
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.eventlog.metrics.QueriesExecutionTimes
-import io.renku.events.CategoryName
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.eventlog.events.consumers.statuschange.categoryName
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.LastSyncedDate
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -59,7 +62,8 @@ class ProjectCleanerSpec
         val otherProject = consumerProjects.generateOne
         insertCleanUpEvent(otherProject)
 
-        (projectHookRemover.removeWebhookAndToken _).expects(project).returns(().pure[IO])
+        givenProjectViewingDeletionEventSent(project.path, returning = ().pure[IO])
+        givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
         sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
 
@@ -70,9 +74,11 @@ class ProjectCleanerSpec
         logger.loggedOnly(Info(show"$categoryName: $project removed"))
       }
 
-    "log an error if the removal of the webhook fails" in new TestCase {
+    "log an error if sending ProjectViewingDeletion event fails" in new TestCase {
+
       val exception = exceptions.generateOne
-      (projectHookRemover.removeWebhookAndToken _).expects(project).returns(exception.raiseError[IO, Unit])
+      givenProjectViewingDeletionEventSent(project.path, returning = exception.raiseError[IO, Unit])
+      givenHookAndTokenRemoval(project, returning = ().pure[IO])
 
       sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
 
@@ -80,7 +86,24 @@ class ProjectCleanerSpec
       findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
 
       logger.loggedOnly(
-        Error(show"Failed to remove webhook or token for project: $project", exception),
+        Error(show"$categoryName: sending ProjectViewingDeletion for project: $project failed", exception),
+        Info(show"$categoryName: $project removed")
+      )
+    }
+
+    "log an error if removal of webhook and token fails" in new TestCase {
+
+      givenProjectViewingDeletionEventSent(project.path, returning = ().pure[IO])
+      val exception = exceptions.generateOne
+      givenHookAndTokenRemoval(project, returning = exception.raiseError[IO, Unit])
+
+      sessionResource.useK(projectCleaner cleanUp project).unsafeRunSync()
+
+      findProjects.find(_._1 == project.id)    shouldBe None
+      findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
+
+      logger.loggedOnly(
+        Error(show"$categoryName: removing webhook or token for project: $project failed", exception),
         Info(show"$categoryName: $project removed")
       )
     }
@@ -96,7 +119,17 @@ class ProjectCleanerSpec
     implicit val logger:                   TestLogger[IO]            = TestLogger[IO]()
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val projectHookRemover = mock[ProjectWebhookAndTokenRemover[IO]]
-    val projectCleaner     = new ProjectCleanerImpl[IO](projectHookRemover)
+    private val projectHookRemover = mock[ProjectWebhookAndTokenRemover[IO]]
+    private val tgClient           = mock[triplesgenerator.api.events.Client[IO]]
+    val projectCleaner             = new ProjectCleanerImpl[IO](tgClient, projectHookRemover)
+
+    def givenProjectViewingDeletionEventSent(path: projects.Path, returning: IO[Unit]) =
+      (tgClient
+        .send(_: ProjectViewingDeletion))
+        .expects(ProjectViewingDeletion(path))
+        .returning(returning)
+
+    def givenHookAndTokenRemoval(project: consumers.Project, returning: IO[Unit]) =
+      (projectHookRemover.removeWebhookAndToken _).expects(project).returning(returning)
   }
 }

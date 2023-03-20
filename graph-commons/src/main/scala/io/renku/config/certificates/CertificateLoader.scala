@@ -22,7 +22,7 @@ import cats.MonadThrow
 import org.typelevel.log4cats.Logger
 
 trait CertificateLoader[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 object CertificateLoader {
@@ -50,7 +50,7 @@ class CertificateLoaderImpl[F[_]: MonadThrow: Logger] private[certificates] (
 
   import scala.util.control.NonFatal
 
-  override def run(): F[Unit] = {
+  override def run: F[Unit] = {
     for {
       maybeCertificate <- findCertificate()
       _                <- maybeCertificate map addCertificate getOrElse Logger[F].info("No client certificate found")

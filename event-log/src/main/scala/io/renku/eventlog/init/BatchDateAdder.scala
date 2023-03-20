@@ -38,7 +38,7 @@ private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'batch_date' column adding skipped"),
       otherwise = checkColumnExists("event_log", "batch_date") >>= {

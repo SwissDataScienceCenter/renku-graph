@@ -46,12 +46,12 @@ class ProjectPathAdderSpec
 
       verifyColumnExists("projects_tokens", "project_path") shouldBe false
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column added"))
       logger.reset()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column existed"))
 

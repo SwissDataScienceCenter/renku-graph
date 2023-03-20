@@ -29,7 +29,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
@@ -37,12 +37,12 @@ class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
                                                 retrySleepDuration: FiniteDuration = 20.seconds
 ) extends DbInitializer[F] {
 
-  override def run(): F[Unit] = runMigrations()
+  override def run: F[Unit] = runMigrations()
 
   private def runMigrations(retryCount: Int = 0): F[Unit] = {
     for {
       _ <- isMigrating.update(_ => true)
-      _ <- migrators.map(_.run()).sequence
+      _ <- migrators.map(_.run).sequence
       _ <- Logger[F].info("Event Log database initialization success")
       _ <- isMigrating.update(_ => false)
     } yield ()
@@ -102,12 +102,6 @@ object DbInitializer {
     ),
     FailedEventsRestorer[F](
       "%fatal: could not read Username for%",
-      currentStatus = GenerationNonRecoverableFailure,
-      destinationStatus = New,
-      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-    ),
-    FailedEventsRestorer[F](
-      "%Error: Cannot find object:%",
       currentStatus = GenerationNonRecoverableFailure,
       destinationStatus = New,
       discardingStatuses = TriplesGenerated :: TriplesStore :: Nil

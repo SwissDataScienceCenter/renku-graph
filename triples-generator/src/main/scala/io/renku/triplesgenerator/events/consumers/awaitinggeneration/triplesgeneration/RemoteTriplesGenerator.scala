@@ -41,7 +41,7 @@ private[events] object RemoteTriplesGenerator {
   import ConfigLoader._
 
   def apply[F[_]: Async: Logger](configuration: Config = ConfigFactory.load()): F[TriplesGenerator[F]] = for {
-    serviceUrl <- find[F, String]("services.triples-generator.url", configuration) flatMap (url =>
+    serviceUrl <- find[F, String]("services.remote-triples-generator.url", configuration) flatMap (url =>
                     MonadThrow[F].fromEither(TriplesGenerationServiceUrl from url)
                   )
   } yield new RemoteTriplesGenerator(serviceUrl)

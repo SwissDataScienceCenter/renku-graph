@@ -66,7 +66,7 @@ class DuplicateProjectsRemoverSpec
       findToken(projectId1) shouldBe Some(encryptedToken1.value)
       findToken(projectId2) shouldBe Some(encryptedToken2.value)
 
-      deduplicator.run().unsafeRunSync() shouldBe ((): Unit)
+      deduplicator.run.unsafeRunSync() shouldBe ((): Unit)
 
       findToken(projectId1)   shouldBe None
       findToken(projectId2)   shouldBe Some(encryptedToken2.value)

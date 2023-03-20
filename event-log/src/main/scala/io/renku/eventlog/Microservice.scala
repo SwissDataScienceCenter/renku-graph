@@ -21,9 +21,8 @@ package io.renku.eventlog
 import cats.effect._
 import cats.effect.kernel.Ref
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
+import com.comcast.ip4s._
+import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
@@ -39,21 +38,26 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics._
-import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
+import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
 import natchez.Trace.Implicits.noop
+import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort:             Int Refined Positive = 9005
-  private implicit val logger: Logger[IO]           = ApplicationLogger
+  val ServicePort:             Port       = port"9005"
+  private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
-    exitCode            <- runMicroservice(sessionPoolResource)
+    termSignal          <- SignallingRef.of[IO, Boolean](false)
+    exitCode            <- runMicroservice(sessionPoolResource, termSignal)
   } yield exitCode
 
-  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
+  private def runMicroservice(
+      sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]],
+      termSignal:          SignallingRef[IO, Boolean]
+  ) =
     sessionPoolResource.use { implicit sessionResource =>
       for {
         implicit0(mr: MetricsRegistry[IO])                  <- MetricsRegistry[IO]()
@@ -103,14 +107,14 @@ object Microservice extends IOMicroservice {
                         eventProducersRegistry,
                         eventConsumersRegistry,
                         metricsResetScheduler,
-                        HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
+                        HttpServer[IO](serverPort = ServicePort, routes)
+                      ).run(termSignal)
                     }
       } yield exitCode
     }
 }
 
-private class MicroserviceRunner[F[_]: Spawn: Logger](
+private class MicroserviceRunner[F[_]: Spawn: Concurrent: Logger](
     serviceReadinessChecker: ServiceReadinessChecker[F],
     certificateLoader:       CertificateLoader[F],
     sentryInitializer:       SentryInitializer[F],
@@ -123,19 +127,23 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     httpServer:              HttpServer[F]
 ) {
 
-  def run(): F[ExitCode] = for {
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    _      <- Spawn[F].start(dbInitializer.run() >> startDBDependentProcesses())
-    result <- httpServer.run()
-  } yield result
+  def run(signal: Signal[F, Boolean]): F[ExitCode] =
+    Ref.of(ExitCode.Success).flatMap(rc => ResourceUse(createServer).useUntil(signal, rc))
+
+  def createServer: Resource[F, Server] =
+    for {
+      _      <- Resource.eval(certificateLoader.run)
+      _      <- Resource.eval(sentryInitializer.run)
+      _      <- Spawn[F].background(dbInitializer.run >> startDBDependentProcesses())
+      result <- httpServer.createServer
+    } yield result
 
   private def startDBDependentProcesses() = for {
-    _ <- Spawn[F].start(metrics.run())
+    _ <- Spawn[F].start(metrics.run)
     _ <- serviceReadinessChecker.waitIfNotUp
-    _ <- Spawn[F].start(eventProducersRegistry.run())
-    _ <- Spawn[F].start(eventConsumersRegistry.run())
-    _ <- Spawn[F].start(eventsQueue.run())
-    _ <- gaugeScheduler.run()
+    _ <- Spawn[F].start(eventProducersRegistry.run)
+    _ <- Spawn[F].start(eventConsumersRegistry.run)
+    _ <- Spawn[F].start(eventsQueue.run)
+    _ <- gaugeScheduler.run
   } yield ()
 }

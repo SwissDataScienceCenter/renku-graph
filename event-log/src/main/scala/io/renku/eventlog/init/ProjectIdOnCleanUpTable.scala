@@ -38,7 +38,7 @@ private class ProjectIdOnCleanUpTableImpl[F[_]: MonadCancelThrow: Logger: Sessio
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkColumnExists("clean_up_events_queue", "project_id") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'clean_up_events_queue.project_id' column exists")
       case false => addColumn()

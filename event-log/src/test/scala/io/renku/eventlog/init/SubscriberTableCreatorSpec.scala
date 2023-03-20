@@ -39,7 +39,7 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec
 
       tableExists("subscriber") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("subscriber") shouldBe true
 
@@ -47,14 +47,14 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'subscriber' table exists"))
     }
 
     "create indices for all the columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("subscriber") shouldBe true
 

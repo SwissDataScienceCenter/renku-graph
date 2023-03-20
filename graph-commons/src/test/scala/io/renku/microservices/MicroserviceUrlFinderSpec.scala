@@ -20,7 +20,7 @@ package io.renku.microservices
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.positiveInts
+import io.renku.generators.Generators.httpPorts
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,7 +40,7 @@ class MicroserviceUrlFinderSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
-    val microservicePort = positiveInts().generateOne
+    val microservicePort = httpPorts.generateOne
     val finder           = new MicroserviceUrlFinderImpl[Try](microservicePort)
   }
 

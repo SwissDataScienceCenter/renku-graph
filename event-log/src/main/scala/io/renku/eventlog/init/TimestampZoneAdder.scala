@@ -40,7 +40,7 @@ private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionReso
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     columnsToMigrate.map { case (table, column) => migrateIfNeeded(table, column) }.sequence.void
   }
 

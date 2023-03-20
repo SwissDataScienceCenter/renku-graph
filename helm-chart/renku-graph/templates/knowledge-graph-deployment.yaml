@@ -49,8 +49,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "jena.fullname" . }}
                   key: jena-users-renku-password
+            - name: TRIPLES_GENERATOR_BASE_URL
+              value: "http://{{ template "triplesGenerator.fullname" . }}:{{ .Values.triplesGenerator.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+            - name: EVENT_LOG_BASE_URL
+              value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
             - name: GITLAB_BASE_URL
               value: {{ .Values.gitlab.url }}
             - name: GITLAB_RATE_LIMIT

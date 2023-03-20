@@ -38,7 +38,7 @@ private class CleanUpEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sess
   import skunk._
   import skunk.implicits._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkTableExists("clean_up_events_queue") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'clean_up_events_queue' table exists")
       case false => createTable()

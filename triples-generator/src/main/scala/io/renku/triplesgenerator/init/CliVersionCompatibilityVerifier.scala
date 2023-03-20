@@ -28,14 +28,14 @@ import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGenerati
 import org.typelevel.log4cats.Logger
 
 trait CliVersionCompatibilityVerifier[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 private class CliVersionCompatibilityVerifierImpl[F[_]: MonadThrow](
     cliVersion:    CliVersion,
     compatibility: VersionCompatibilityConfig
 ) extends CliVersionCompatibilityVerifier[F] {
-  override def run(): F[Unit] =
+  override def run: F[Unit] =
     if (cliVersion != compatibility.cliVersion)
       MonadThrow[F].raiseError(
         new IllegalStateException(

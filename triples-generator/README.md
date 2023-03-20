@@ -142,6 +142,81 @@ If yes, it kicks-off execution of all configured Triples Store migrations.
 }
 ```
 
+- **PROJECT_ACTIVATED**
+
+Once an event of the type is sent, triples-generator inserts project viewing info into the TS in case there's no viewing data for the project set, yet.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_ACTIVATED",
+  "project": {
+    "path": "project/path"
+  },
+  "date": "2001-09-04T10:48:29.457Z"
+}
+```
+- 
+- **PROJECT_VIEWED**
+
+Once an event of the type is sent, triples-generator upserts project viewing info in the TS with the data from the payload.
+The upsert happens only if the date from the event is newer than the date from the TS.
+In case there's no project with the given path in the TS, the event is discarded.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_VIEWED",
+  "project": {
+    "path": "project/path"
+  },
+  "date": "2001-09-04T10:48:29.457Z"
+}
+```
+
+- **DATASET_VIEWED**
+
+Once an event of the type is sent, triples-generator locates a project where Dataset with the given identifier is defined
+and upserts project viewing info in the TS for the project.
+In case there's no dataset with the given identifier or no project where this dataset exists, the event is discarded.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "DATASET_VIEWED",
+  "dataset": {
+    "identifier": "123456"
+  },
+  "date": "2001-09-04T10:48:29.457Z"
+}
+```
+
+- **PROJECT_VIEWING_DELETION**
+
+Once an event of the type is sent, triples-generator removes project viewing info from the TS.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_VIEWING_DELETION",
+  "project": {
+    "path": "project/path"
+  }
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |

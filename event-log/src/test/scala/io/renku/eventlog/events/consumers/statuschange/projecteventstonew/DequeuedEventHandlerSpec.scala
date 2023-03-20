@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
+package io.renku.eventlog.events.consumers.statuschange
+package projecteventstonew
 
 import cats.data.Kleisli
 import cats.effect.IO
@@ -50,7 +51,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import scala.util.Random
 
-class ProjectEventsToNewPollerSpec
+class DequeuedEventHandlerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -173,7 +174,7 @@ class ProjectEventsToNewPollerSpec
         findEvent(event1) shouldBe None
         findEvent(event2) shouldBe None
 
-        logger.loggedOnly(Error(s"Clean up project failed: ${project.show}", exception))
+        logger.loggedOnly(Error(show"$categoryName: project clean up failed: ${project.show}", exception))
       }
   }
 

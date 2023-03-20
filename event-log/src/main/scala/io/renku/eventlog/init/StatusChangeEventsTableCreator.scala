@@ -39,7 +39,7 @@ private class StatusChangeEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger:
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkTableExists flatMap {
       case true  => Kleisli.liftF(Logger[F] info "'status_change_events_queue' table exists")
       case false => createTable()

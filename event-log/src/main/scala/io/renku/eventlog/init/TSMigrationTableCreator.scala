@@ -39,7 +39,7 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true  => Kleisli.liftF(Logger[F] info "'ts_migration' table exists")
       case false => createTable()

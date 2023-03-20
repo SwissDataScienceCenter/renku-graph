@@ -42,7 +42,7 @@ class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
         verify(table, column, timestampType)
       }
 
-      tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRefactor.run.unsafeRunSync() shouldBe ((): Unit)
 
       columnsToMigrate foreach { case (table, column) =>
         verify(table, column, timestamptzType)
@@ -58,13 +58,13 @@ class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
 
       tableExists("event") shouldBe true
 
-      tableRefactor.run().unsafeRunSync() shouldBe ()
+      tableRefactor.run.unsafeRunSync() shouldBe ()
 
       columnsToMigrate foreach { case (table, column) =>
         verify(table, column, timestamptzType)
       }
 
-      tableRefactor.run().unsafeRunSync() shouldBe ()
+      tableRefactor.run.unsafeRunSync() shouldBe ()
 
       columnsToMigrate foreach { case (table, column) =>
         verify(table, column, timestamptzType)

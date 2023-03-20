@@ -21,9 +21,8 @@ package io.renku.events.consumers.subscriptions
 import cats.MonadThrow
 import cats.data.Kleisli
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
+import com.comcast.ip4s._
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.events.{CategoryName, DefaultSubscription, Subscription}
 import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.events.Subscription._
@@ -60,7 +59,7 @@ class DefaultSubscriptionPayloadComposer[F[_]: MonadThrow](
 object SubscriptionPayloadComposer {
 
   def defaultSubscriptionPayloadComposerFactory[F[_]: MonadThrow](
-      microservicePort:       Int Refined Positive,
+      microservicePort:       Port,
       microserviceIdentifier: MicroserviceIdentifier
   ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] =
     Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] { categoryName =>
@@ -70,7 +69,7 @@ object SubscriptionPayloadComposer {
     }
 
   def defaultSubscriptionPayloadComposerFactory[F[_]: MonadThrow](
-      microservicePort:       Int Refined Positive,
+      microservicePort:       Port,
       microserviceIdentifier: MicroserviceIdentifier,
       capacity:               SubscriberCapacity
   ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F, DefaultSubscription]] =

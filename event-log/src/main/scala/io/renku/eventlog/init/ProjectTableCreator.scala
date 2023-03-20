@@ -35,7 +35,7 @@ private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRes
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project' table creation skipped"),
       otherwise = whenTableExists("project")(

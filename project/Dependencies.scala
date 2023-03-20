@@ -12,12 +12,13 @@ object Dependencies {
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.2"
     val http4s                 = "0.23.18"
-    val http4sBlaze            = "0.23.13"
+    val http4sEmber            = "0.23.18"
     val http4sPrometheus       = "0.24.3"
+    val ip4s                   = "3.2.0"
     val jsonld4s               = "0.10.0"
     val log4cats               = "2.5.0"
     val log4jCore              = "2.20.0"
-    val logback                = "1.4.5"
+    val logback                = "1.4.6"
     val luceneQueryParser      = "9.5.0"
     val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
@@ -29,13 +30,17 @@ object Dependencies {
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.15"
     val scalatestScalacheck    = "3.2.2.0"
-    val sentryLogback          = "6.15.0"
+    val sentryLogback          = "6.16.0"
     val skunk                  = "0.5.1"
     val swaggerParser          = "2.1.12"
     val testContainersScala    = "0.40.12"
     val widoco                 = "1.4.17"
     val wiremock               = "2.35.0"
   }
+
+  val ip4s = Seq(
+    "com.comcast" %% "ip4s-core" % V.ip4s
+  )
 
   val scalatestScalaCheck = Seq(
     "org.scalatestplus" %% "scalacheck-1-14" % V.scalatestScalacheck
@@ -93,10 +98,10 @@ object Dependencies {
   )
 
   val http4sClient = Seq(
-    "org.http4s" %% "http4s-blaze-client" % V.http4sBlaze
+    "org.http4s" %% "http4s-ember-client" % V.http4sEmber
   )
   val http4sServer = Seq(
-    "org.http4s" %% "http4s-blaze-server" % V.http4sBlaze,
+    "org.http4s" %% "http4s-ember-server" % V.http4sEmber,
     "org.http4s" %% "http4s-server"       % V.http4s
   )
   val http4sCirce = Seq(
