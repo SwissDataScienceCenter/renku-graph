@@ -179,6 +179,9 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
+    def ofUnsafe(v: String)(implicit renkuUrl: RenkuUrl): SameAs =
+      of(v).fold(throw _, identity)
+
     def of(v: String)(implicit renkuUrl: RenkuUrl): Either[IllegalArgumentException, SameAs] =
       validateConstraints(v).toList match {
         case Nil =>
