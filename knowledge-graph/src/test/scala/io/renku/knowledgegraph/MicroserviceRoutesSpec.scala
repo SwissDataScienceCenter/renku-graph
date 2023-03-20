@@ -212,7 +212,7 @@ class MicroserviceRoutesSpec
         .expects(id, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](authContext))
 
-      (datasetDetailsEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
+      (datasetDetailsEndpoint.`GET /datasets/:id` _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
         .call(Request(GET, uri"/knowledge-graph/datasets" / id.value))

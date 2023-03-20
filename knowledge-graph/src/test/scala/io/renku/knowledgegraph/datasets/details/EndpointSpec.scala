@@ -71,7 +71,7 @@ class EndpointSpec
     with EntitiesGenerators
     with IOSpec {
 
-  "getDataset" should {
+  "GET /datasets/:id" should {
 
     forAll(
       Table(
@@ -99,7 +99,7 @@ class EndpointSpec
 
         givenDatasetViewedEventSent(dataset.id, returning = ().pure[IO])
 
-        val response = endpoint.getDataset(dataset.id, authContext).unsafeRunSync()
+        val response = endpoint.`GET /datasets/:id`(dataset.id, authContext).unsafeRunSync()
 
         response.status                      shouldBe Ok
         response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -122,7 +122,7 @@ class EndpointSpec
 
       givenDatasetFinding(identifier, authContext, returning = Option.empty[Dataset].pure[IO])
 
-      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
+      val response = endpoint.`GET /datasets/:id`(identifier, authContext).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -140,7 +140,7 @@ class EndpointSpec
       val exception = exceptions.generateOne
       givenDatasetFinding(identifier, authContext, returning = exception.raiseError[IO, Option[Dataset]])
 
-      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
+      val response = endpoint.`GET /datasets/:id`(identifier, authContext).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -164,7 +164,7 @@ class EndpointSpec
       val exception = exceptions.generateOne
       givenDatasetViewedEventSent(ds.id, returning = exception.raiseError[IO, Unit])
 
-      endpoint.getDataset(ds.id, authContext).unsafeRunSync().status shouldBe Ok
+      endpoint.`GET /datasets/:id`(ds.id, authContext).unsafeRunSync().status shouldBe Ok
 
       logger.logged(Error(show"sending ${DatasetViewedEvent.categoryName} event failed", exception))
     }

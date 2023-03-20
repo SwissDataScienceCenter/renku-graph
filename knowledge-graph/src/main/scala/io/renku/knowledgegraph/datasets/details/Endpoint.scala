@@ -44,7 +44,7 @@ import java.time.Instant
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
+  def `GET /datasets/:id`(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
@@ -63,13 +63,14 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
   private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] = measureExecutionTime {
-    datasetFinder
-      .findDataset(identifier, authContext)
-      .flatTap(sendDatasetViewedEvent)
-      .flatMap(toHttpResult(identifier))
-      .recoverWith(httpResult(identifier))
-  } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+  def `GET /datasets/:id`(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] =
+    measureExecutionTime {
+      datasetFinder
+        .findDataset(identifier, authContext)
+        .flatTap(sendDatasetViewedEvent)
+        .flatMap(toHttpResult(identifier))
+        .recoverWith(httpResult(identifier))
+    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
   private lazy val sendDatasetViewedEvent: Option[Dataset] => F[Unit] = {
     case None => ().pure[F]

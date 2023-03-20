@@ -225,7 +225,7 @@ private class MicroserviceRoutes[F[_]: Async](
   private def fetchDataset(datasetId: model.datasets.Identifier, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
     authorizeDatasetId(datasetId, maybeAuthUser)
       .leftMap(_.toHttpResponse[F])
-      .semiflatMap(getDataset(datasetId, _))
+      .semiflatMap(`GET /datasets/:id`(datasetId, _))
       .merge
 
   private def routeToProjectsEndpoints(
