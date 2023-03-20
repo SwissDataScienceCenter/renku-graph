@@ -29,16 +29,16 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }
 
 class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
                                              retrySleepDuration: FiniteDuration = 20 seconds
 ) extends DbInitializer[F] {
 
-  override def run(): F[Unit] = {
+  override def run: F[Unit] = {
     for {
-      _ <- migrators.map(_.run()).sequence
+      _ <- migrators.map(_.run).sequence
       _ <- Logger[F].info("Projects Tokens database initialization success")
     } yield ()
   } recoverWith logAndRetry
@@ -47,7 +47,7 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
     for {
       _ <- Temporal[F] sleep retrySleepDuration
       _ <- Logger[F].error(exception)(s"Projects Tokens database initialization failed")
-      _ <- run()
+      _ <- run
     } yield ()
   }
 }

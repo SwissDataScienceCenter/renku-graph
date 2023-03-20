@@ -38,7 +38,7 @@ private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: Se
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     checkColumnExists("event_delivery", "event_type_id") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
       case false => addEventTypeColumn()

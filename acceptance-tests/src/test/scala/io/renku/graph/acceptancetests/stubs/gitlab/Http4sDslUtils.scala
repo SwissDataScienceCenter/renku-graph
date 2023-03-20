@@ -18,19 +18,22 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import cats.Applicative
+import cats.{Applicative, MonadThrow}
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
+import io.renku.graph.acceptancetests.data.Project.Permissions.AccessLevel
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.events.CommitId
+import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
+import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
+import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, QueryParamDecoder, Request, Response}
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
+import org.http4s.dsl.impl.{OptionalQueryParamDecoderMatcher, QueryParamDecoderMatcher}
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
-import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, Request, Response}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -73,16 +76,37 @@ private[gitlab] trait Http4sDslUtils {
     payload.map(Ok(_)).getOrElse(Response.notFound[F].pure[F])
   }
 
-  def OkWithTotalHeader[F[_]: Applicative, A](
+  object Membership extends QueryParamDecoderMatcher[Boolean]("membership")
+
+  implicit val accessLevelDecoder: QueryParamDecoder[AccessLevel] = QueryParamDecoder[Int].map(pv =>
+    AccessLevel.all.find(_.value.value == pv).getOrElse(throw new Exception(s"$pv not a valid AccessLevel"))
+  )
+
+  object MinAccessLevel extends QueryParamDecoderMatcher[AccessLevel]("min_access_level")
+
+  def OkWithTotalHeader[F[_]: MonadThrow, A](
       req: Request[F]
   )(entities: List[A])(implicit enc: Encoder[A]): F[Response[F]] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._
 
-    val perPage    = req.params.getOrElse("per_page", "20").toInt
-    val totalPages = (entities.size / perPage) + (if (entities.size % perPage == 0) 0 else 1)
+    def totalPages(pagingRequest: PagingRequest) =
+      (entities.size / pagingRequest.perPage.value) +
+        (if (entities.size % pagingRequest.perPage.value == 0) 0 else 1)
 
-    Ok(entities).map(_.withHeaders(Header.Raw(ci"X-Total-Pages", totalPages.toString)))
+    def pageResults(pagingRequest: PagingRequest) =
+      PagingResponse.from(entities, pagingRequest).map(_.results)
+
+    def withTotalHeader(pagingRequest: PagingRequest): Response[F] => Response[F] =
+      _.withHeaders(Header.Raw(ci"X-Total-Pages", totalPages(pagingRequest).toString))
+
+    PagingRequest(page.unapply(req.multiParams).flatten, perPage.unapply(req.multiParams).flatten).toEither
+      .leftMap(err => BadRequest(err.map(_.message).intercalate("; ")))
+      .map(pagingRequest =>
+        pageResults(pagingRequest)
+          .flatMap(Ok(_).map(withTotalHeader(pagingRequest)))
+      )
+      .merge
   }
 
   def enableLogging[F[_]: Async: Logger](app: HttpApp[F]): HttpApp[F] = {

@@ -26,6 +26,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore._
+import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 

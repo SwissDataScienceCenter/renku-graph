@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.graph.model.projects
 import io.renku.triplesstore._
+import io.renku.triplesstore.ResultsDecoder._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

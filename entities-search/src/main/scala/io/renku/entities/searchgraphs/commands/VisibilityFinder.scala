@@ -29,8 +29,13 @@ private trait VisibilityFinder[F[_]] {
 }
 
 private object VisibilityFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[VisibilityFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new VisibilityFinderImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): VisibilityFinder[F] =
+    new VisibilityFinderImpl[F](connectionConfig)
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[VisibilityFinder[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class VisibilityFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
@@ -42,8 +47,9 @@ private class VisibilityFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder]
   import io.renku.graph.model.GraphClass
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore._
+  import io.renku.triplesstore.ResultsDecoder._
+  import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore.client.syntax._
 
   override def findVisibility(projectId: projects.ResourceId): F[Option[projects.Visibility]] =

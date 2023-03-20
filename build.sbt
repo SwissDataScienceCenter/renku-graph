@@ -46,8 +46,9 @@ lazy val root = project
     tokenRepository,
     webhookService,
     commitEventService,
+    triplesGeneratorApi,
     entitiesSearch,
-    entitiesViewsCollector,
+    entitiesViewingsCollector,
     triplesGenerator,
     knowledgeGraph
   )
@@ -111,7 +112,9 @@ lazy val eventLog = project
   .in(file("event-log"))
   .withId("event-log")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(
+    triplesGeneratorApi % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -144,11 +147,18 @@ lazy val entitiesSearch = project
   .dependsOn(graphCommons % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val entitiesViewsCollector = project
-  .in(file("entities-views-collector"))
-  .withId("entities-views-collector")
+lazy val triplesGeneratorApi = project
+  .in(file("triples-generator-api"))
+  .withId("triples-generator-api")
   .settings(commonSettings)
   .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val entitiesViewingsCollector = project
+  .in(file("entities-viewings-collector"))
+  .withId("entities-viewings-collector")
+  .settings(commonSettings)
+  .dependsOn(triplesGeneratorApi % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGenerator = project
@@ -156,9 +166,9 @@ lazy val triplesGenerator = project
   .withId("triples-generator")
   .settings(commonSettings)
   .dependsOn(
-    graphCommons % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
-    entitiesViewsCollector
+    entitiesViewingsCollector
   )
   .enablePlugins(
     JavaAppPackaging,
@@ -180,8 +190,9 @@ lazy val knowledgeGraph = project
   .withId("knowledge-graph")
   .settings(commonSettings)
   .dependsOn(
-    graphCommons   % "compile->compile; test->test",
-    entitiesSearch % "compile->compile; test->test"
+    graphCommons        % "compile->compile; test->test",
+    entitiesSearch      % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,

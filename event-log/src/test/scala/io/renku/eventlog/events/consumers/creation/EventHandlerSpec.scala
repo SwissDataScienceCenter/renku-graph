@@ -20,18 +20,21 @@ package io.renku.eventlog.events.consumers
 package creation
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.Project
+import io.renku.generators.Generators.{blankStrings, exceptions}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -45,6 +48,7 @@ class EventHandlerSpec
     with should.Matchers {
 
   "createHandlingDefinition.decode" should {
+
     "decode a valid event successfully" in new TestCase {
       val definition = handler.createHandlingDefinition()
       val eventData  = Generators.newOrSkippedEvents.generateOne
@@ -75,10 +79,42 @@ class EventHandlerSpec
   }
 
   "createHandlingDefinition.process" should {
-    "call to EventPersister" in new TestCase {
+
+    "persist the event and not send ProjectViewed event when Existed" in new TestCase {
+
       val definition = handler.createHandlingDefinition()
-      (eventPersister.storeNewEvent _).expects(*).returning(IO.pure(Result.Existed))
-      definition.process(Generators.newOrSkippedEvents.generateOne).unsafeRunSync() shouldBe ()
+
+      val event = Generators.newOrSkippedEvents.generateOne
+
+      (eventPersister.storeNewEvent _).expects(event).returning(Result.Existed.pure[IO])
+
+      definition.process(event).unsafeRunSync() shouldBe ()
+    }
+
+    "persist the event and send ProjectViewed event when created" in new TestCase {
+
+      val definition = handler.createHandlingDefinition()
+
+      val event = Generators.newOrSkippedEvents.generateOne
+
+      (eventPersister.storeNewEvent _).expects(event).returning(Result.Created(event).pure[IO])
+      givenProjectViewEventSent(event, returning = ().pure[IO])
+
+      definition.process(event).unsafeRunSync() shouldBe ()
+    }
+
+    "do not fail if sending ProjectViewed event failed" in new TestCase {
+
+      val definition = handler.createHandlingDefinition()
+
+      val event = Generators.newOrSkippedEvents.generateOne
+
+      (eventPersister.storeNewEvent _).expects(event).returning(Result.Created(event).pure[IO])
+
+      val exception = exceptions.generateOne
+      givenProjectViewEventSent(event, returning = exception.raiseError[IO, Unit])
+
+      definition.process(event).unsafeRunSync() shouldBe ()
     }
   }
 
@@ -93,32 +129,31 @@ class EventHandlerSpec
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventPersister = mock[EventPersister[IO]]
-    val handler        = new EventHandler[IO](eventPersister)
+    val eventPersister   = mock[EventPersister[IO]]
+    private val tgClient = mock[triplesgenerator.api.events.Client[IO]]
+    val handler          = new EventHandler[IO](eventPersister, tgClient)
+
+    def givenProjectViewEventSent(event: Event, returning: IO[Unit]) =
+      (tgClient
+        .send(_: ProjectViewedEvent))
+        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value)))
+        .returning(returning)
   }
 
-  private def toJson(event: Event): Json =
-    json"""{
-      "categoryName": ${categoryName.value},
-      "id":         ${event.id.value},
-      "project":    ${event.project},
-      "date":       ${event.date.value},
-      "batchDate":  ${event.batchDate.value},
-      "body":       ${event.body.value},
-      "status":     ${event.status.value}
-    }"""
-
-  private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
-    json"""{
-      "id":   ${project.id.value},
-      "path": ${project.path.value}
-    }"""
-  }
+  private def toJson(event: Event): Json = json"""{
+    "categoryName": $categoryName,
+    "id":           ${event.id},
+    "project":      ${event.project},
+    "date":         ${event.date},
+    "batchDate":    ${event.batchDate},
+    "body":         ${event.body},
+    "status":       ${event.status}
+  }"""
 
   private lazy val unacceptableStatuses = EventStatus.all.diff(Set(EventStatus.New, EventStatus.Skipped))
 
   private implicit def eventEncoder[T <: Event]: Encoder[T] = Encoder.instance[T] {
     case event: NewEvent     => toJson(event)
-    case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
+    case event: SkippedEvent => toJson(event) deepMerge json"""{ "message": ${event.message.value} }"""
   }
 }

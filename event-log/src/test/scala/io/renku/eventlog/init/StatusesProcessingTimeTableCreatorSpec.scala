@@ -39,7 +39,7 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with IOSpec wit
 
       tableExists("status_processing_time") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("status_processing_time") shouldBe true
 
@@ -47,7 +47,7 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with IOSpec wit
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'status_processing_time' table exists"))
 
@@ -57,7 +57,7 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with IOSpec wit
 
       tableExists("status_processing_time") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("status_processing_time") shouldBe true
 

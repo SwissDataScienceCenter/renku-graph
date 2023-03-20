@@ -18,17 +18,18 @@
 
 package io.renku.eventlog.events.consumers.creation
 
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Concurrent: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+  def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes: EventStatusGauges: MetricsRegistry]
       : F[(consumers.EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler[F]
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)

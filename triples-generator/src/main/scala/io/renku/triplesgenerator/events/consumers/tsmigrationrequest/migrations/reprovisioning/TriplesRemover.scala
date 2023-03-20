@@ -44,7 +44,10 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
+  import io.renku.graph.model.GraphClass
   import io.renku.graph.model.Schemas._
+  import io.renku.triplesstore.client.syntax._
+  import io.renku.triplesstore.ResultsDecoder._
 
   override def removeAllTriples(): F[Unit] =
     queryExpecting[Option[EntityId]](findGraph) >>= {
@@ -56,7 +59,10 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     name = "triples remove - count",
     Prefixes of renku -> "renku",
     s"""|SELECT DISTINCT ?graph
-        |WHERE { GRAPH ?graph { ?s ?p ?o } }
+        |WHERE {
+        |  GRAPH ?graph { ?s ?p ?o }
+        |  FILTER (?graph != ${GraphClass.ProjectViewedTimes.id.sparql})
+        |}
         |LIMIT 1
         |""".stripMargin
   )
@@ -64,7 +70,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def remove(graphId: EntityId) = SparqlQuery.of(
     name = "triples remove - delete",
     Prefixes of renku -> "renku",
-    s"DROP GRAPH <$graphId>"
+    s"DROP GRAPH ${graphId.sparql}"
   )
 
   private implicit val graphIdDecoder: Decoder[Option[EntityId]] = ResultsDecoder[List, EntityId] { implicit cur =>

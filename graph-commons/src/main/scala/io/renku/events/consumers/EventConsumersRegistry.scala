@@ -27,7 +27,7 @@ import io.renku.events.{CategoryName, EventRequestContent}
 trait EventConsumersRegistry[F[_]] {
   def handle(requestContent: EventRequestContent): F[EventSchedulingResult]
   def renewAllSubscriptions(): F[Unit]
-  def run():                   F[Unit]
+  def run:                     F[Unit]
 }
 
 class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](
@@ -58,7 +58,7 @@ class EventConsumersRegistryImpl[F[_]: MonadThrow: Parallel](
           .raiseError[F, SubscriptionMechanism[F]]
       )
 
-  def run(): F[Unit] = subscriptionsMechanisms.map(_.run()).parSequence.void
+  def run: F[Unit] = subscriptionsMechanisms.map(_.run()).parSequence.void
 
   def renewAllSubscriptions(): F[Unit] =
     subscriptionsMechanisms.map(_.renewSubscription()).parSequence.void

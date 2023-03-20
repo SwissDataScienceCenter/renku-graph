@@ -37,7 +37,7 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
 
   before {
     findAllTables() foreach dropTable
-    migrationsToRun.map(_.run()).sequence.unsafeRunSync()
+    migrationsToRun.map(_.run).sequence.unsafeRunSync()
   }
 
   private def findAllTables(): List[String] = execute {
@@ -52,7 +52,7 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
 
   protected def createEventTable(): Unit =
     List(EventLogTableCreator[IO], BatchDateAdder[IO], EventLogTableRenamer[IO])
-      .map(_.run())
+      .map(_.run)
       .sequence
       .void
       .unsafeRunSync()

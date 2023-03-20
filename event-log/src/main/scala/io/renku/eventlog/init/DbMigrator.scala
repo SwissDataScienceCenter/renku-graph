@@ -19,5 +19,5 @@
 package io.renku.eventlog.init
 
 trait DbMigrator[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
 }

@@ -44,7 +44,7 @@ class ExpiryAndCreatedDatesNotNullSpec
       verifyColumnNullable("projects_tokens", "expiry_date") shouldBe true
       verifyColumnNullable("projects_tokens", "created_at")  shouldBe true
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       verifyColumnNullable("projects_tokens", "expiry_date") shouldBe false
       verifyColumnNullable("projects_tokens", "created_at")  shouldBe false
@@ -53,7 +53,7 @@ class ExpiryAndCreatedDatesNotNullSpec
 
       logger.reset()
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'expiry_date' column already NOT NULL"), Info("'created_at' column already NOT NULL"))
     }

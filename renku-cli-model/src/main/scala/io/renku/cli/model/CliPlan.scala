@@ -21,12 +21,14 @@ package io.renku.cli.model
 import Ontologies.{Prov, Schema}
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.commandParameters
+import io.renku.graph.model.{commandParameters, plans}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
 sealed trait CliPlan extends CliModel {
   def fold[A](fa: CliStepPlan => A, fb: CliCompositePlan => A): A
+
+  def id: plans.ResourceId = fold(_.id, _.id)
 }
 
 object CliPlan {

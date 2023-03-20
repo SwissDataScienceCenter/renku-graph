@@ -23,11 +23,11 @@ import Endpoint.Criteria
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
+import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.users.projects.model.Project
+import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait TSProjectFinder[F[_]] {
@@ -120,6 +120,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     import io.renku.graph.model.persons
     import io.renku.graph.model.projects._
     import io.renku.tinytypes.json.TinyTypeDecoders._
+    import ResultsDecoder._
 
     val toSetOfKeywords: Option[String] => Decoder.Result[Set[Keyword]] =
       _.map(_.split(',').toList.map(Keyword.from).sequence.map(_.toSet)).sequence

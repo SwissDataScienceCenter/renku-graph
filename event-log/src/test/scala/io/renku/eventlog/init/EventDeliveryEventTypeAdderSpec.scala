@@ -43,13 +43,13 @@ class EventDeliveryEventTypeAdderSpec
 
     "do nothing if the 'event_type_id' collumn already exists" in new TestCase {
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ()
+      eventTypeAdder.run.unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 
       logger.reset()
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ()
+      eventTypeAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'event_type_id' column adding skipped"))
     }
@@ -58,7 +58,7 @@ class EventDeliveryEventTypeAdderSpec
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe false
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ()
+      eventTypeAdder.run.unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 

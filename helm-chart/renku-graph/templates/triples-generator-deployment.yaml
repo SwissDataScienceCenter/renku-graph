@@ -42,6 +42,8 @@ spec:
               value: {{ .Values.global.renku.domain }}
             - name: RENKU_URL
               value: https://{{ .Values.global.renku.domain }}
+            - name: TRIPLES_GENERATOR_BASE_URL
+              value: "http://{{ template "triplesGenerator.fullname" . }}:{{ .Values.triplesGenerator.service.port }}"
             - name: EVENT_LOG_BASE_URL
               value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL

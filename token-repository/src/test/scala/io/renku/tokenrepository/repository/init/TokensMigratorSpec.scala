@@ -65,7 +65,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         val (projectTokenEncrypted, creationInfo) =
           givenSuccessfulTokenReplacement(oldTokenProject, oldTokenEncrypted)
 
-        migration.run().unsafeRunSync() shouldBe ()
+        migration.run.unsafeRunSync() shouldBe ()
 
         findToken(validTokenProject.id)    shouldBe validTokenEncrypted.value.some
         findToken(oldTokenProject.id)      shouldBe projectTokenEncrypted.value.some
@@ -88,7 +88,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val (projectTokenEncrypted1, creationInfo1) =
         givenSuccessfulTokenReplacement(oldTokenProject1, oldTokenEncrypted1)
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(validTokenProject.id)     shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)       shouldBe projectTokenEncrypted.value.some
@@ -112,7 +112,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       givenTokenValidation(oldToken, returning = false.pure[IO])
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
@@ -131,7 +131,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.none)
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
@@ -144,7 +144,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val exception = exceptions.generateOne
       givenDecryption(oldTokenEncrypted, returning = exception.raiseError[IO, AccessToken])
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(oldTokenProject.id) shouldBe None
     }
@@ -171,7 +171,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(oldTokenProject.id) shouldBe projectTokenEncrypted.value.some
 
@@ -206,7 +206,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
 
-      migration.run().unsafeRunSync() shouldBe ()
+      migration.run.unsafeRunSync() shouldBe ()
 
       findToken(oldTokenProject.id) shouldBe projectTokenEncrypted.value.some
 

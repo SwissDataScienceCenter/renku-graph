@@ -41,7 +41,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSp
 
       intercept[Exception] {
 
-        tableCreator.run().unsafeRunSync()
+        tableCreator.run.unsafeRunSync()
       }.getMessage shouldBe "Event table missing; creation of event_payload is not possible"
     }
 
@@ -49,7 +49,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSp
 
       tableExists("event_payload") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_payload") shouldBe true
 
@@ -60,7 +60,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSp
 
       tableExists("event_payload") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_payload") shouldBe true
 
@@ -68,7 +68,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSp
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("'event_payload' table exists"))
     }
@@ -77,7 +77,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSp
 
       tableExists("event_payload") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run.unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_payload") shouldBe true
 

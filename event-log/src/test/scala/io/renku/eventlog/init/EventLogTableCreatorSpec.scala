@@ -38,7 +38,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec w
       tableExists("event")     shouldBe true
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe false
 
@@ -49,7 +49,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 
@@ -60,7 +60,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 
@@ -68,14 +68,14 @@ class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'event_log' table exists"))
     }
 
     "create indices for certain columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 

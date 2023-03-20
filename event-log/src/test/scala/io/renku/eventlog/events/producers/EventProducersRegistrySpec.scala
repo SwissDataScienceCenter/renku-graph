@@ -40,7 +40,7 @@ private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with Mo
     "return unit when all of the categories return Unit" in new TestCase {
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
       val registry   = new EventProducersRegistryImpl[IO](categories)
-      registry.run().unsafeRunSync() shouldBe ()
+      registry.run.unsafeRunSync() shouldBe ()
     }
 
     "throw an error when one of the categories throws an error" in new TestCase {
@@ -52,7 +52,7 @@ private class EventProducersRegistrySpec extends AnyWordSpec with IOSpec with Mo
       val registry   = new EventProducersRegistryImpl[IO](categories)
 
       intercept[Exception] {
-        registry.run().unsafeRunSync()
+        registry.run.unsafeRunSync()
       } shouldBe exception
     }
   }

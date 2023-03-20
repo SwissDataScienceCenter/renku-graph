@@ -26,7 +26,7 @@ import cats.syntax.all._
 import io.renku.entities.searchgraphs.DatasetsGraphProvisioner
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait SearchGraphsProvisioner[F[_]] {
@@ -34,8 +34,13 @@ private trait SearchGraphsProvisioner[F[_]] {
 }
 
 private object SearchGraphsProvisioner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchGraphsProvisioner[F]] =
-    DatasetsGraphProvisioner[F].map(new SearchGraphsProvisionerImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): SearchGraphsProvisioner[F] =
+    new SearchGraphsProvisionerImpl[F](DatasetsGraphProvisioner[F](connectionConfig))
+
+  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchGraphsProvisioner[F]] =
+    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](datasetsGraphProvisioner: DatasetsGraphProvisioner[F],

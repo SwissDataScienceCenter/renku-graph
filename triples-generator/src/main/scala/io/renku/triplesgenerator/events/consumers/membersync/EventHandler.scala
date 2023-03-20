@@ -21,8 +21,9 @@ package membersync
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.events.{CategoryName, consumers}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
@@ -34,6 +35,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     membersSynchronizer:       MembersSynchronizer[F],
+    subscriptionMechanism:     SubscriptionMechanism[F],
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
@@ -48,7 +50,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       decode = _.event.getProjectPath,
       process = synchronizeMembers,
       precondition = verifyTSReady,
-      onRelease = None
+      onRelease = subscriptionMechanism.renewSubscription().some
     )
 }
 
@@ -56,10 +58,16 @@ private object EventHandler {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger]
-      : F[consumers.EventHandler[F]] = for {
+  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
+      subscriptionMechanism: SubscriptionMechanism[F]
+  ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
     membersSynchronizer <- MembersSynchronizer[F]
-    processExecutor     <- ProcessExecutor.concurrent(processesCount = 100)
-  } yield new EventHandler[F](categoryName, tsReadinessChecker, membersSynchronizer, processExecutor)
+    processExecutor     <- ProcessExecutor.concurrent(processesCount = 10)
+  } yield new EventHandler[F](categoryName,
+                              tsReadinessChecker,
+                              membersSynchronizer,
+                              subscriptionMechanism,
+                              processExecutor
+  )
 }

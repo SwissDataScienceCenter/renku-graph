@@ -52,7 +52,7 @@ class StatusChangeEventsQueueSpec
 
       sessionResource.useK(queue offer event).unsafeRunSync()
 
-      queue.run().unsafeRunAndForget()
+      queue.run.unsafeRunAndForget()
 
       queue.register(eventHandler).unsafeRunSync()
 
@@ -77,7 +77,7 @@ class StatusChangeEventsQueueSpec
 
       queue.register(eventHandler).unsafeRunSync()
 
-      queue.run().unsafeRunAndForget()
+      queue.run.unsafeRunAndForget()
 
       eventually {
         dequeuedEvents.get.unsafeRunSync() shouldBe List(event, nextEvent)
@@ -98,7 +98,7 @@ class StatusChangeEventsQueueSpec
 
       queue.register(failingHandler).unsafeRunSync()
 
-      queue.run().unsafeRunAndForget()
+      queue.run.unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -130,7 +130,7 @@ class StatusChangeEventsQueueSpec
       val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
       queue.register(handler).unsafeRunSync()
 
-      queue.run().unsafeRunAndForget()
+      queue.run.unsafeRunAndForget()
 
       eventually {
         logger

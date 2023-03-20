@@ -199,6 +199,13 @@ abstract class ServiceClient(implicit logger: Logger[IO])
     } yield response
   }.unsafeRunSync()
 
+  def DELETE(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
+    for {
+      uri      <- validateUri(s"$baseUrl/$url")
+      response <- send(request(Method.DELETE, uri, accessToken.some))(mapResponse)
+    } yield response
+  }.unsafeRunSync()
+
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.tinytypes._
+import io.renku.triplesstore.client.sparql.LuceneQuery
 import io.renku.triplesstore.client.syntax._
 import search.Criteria.Filters
 
@@ -79,10 +80,9 @@ package object search {
   private[search] implicit class FiltersOps(filters: Filters) {
 
     import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
-    import io.renku.triplesstore.LuceneQueryEncoder.queryAsString
 
-    private val queryAll: String = "*"
-    lazy val query:       String = filters.maybeQuery.map(q => queryAsString(q.value)).getOrElse(queryAll)
+    lazy val query: LuceneQuery =
+      filters.maybeQuery.map(q => LuceneQuery.escape(q.value)).getOrElse(LuceneQuery.queryAll)
 
     def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
       val typeMatching = filters.entityTypes match {
@@ -96,8 +96,8 @@ package object search {
       foldQuery(_ => snippet, s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
 
     def foldQuery[A](ifPresent: String => A, ifMissing: => A): A =
-      if (query.trim != queryAll) ifPresent(query)
-      else ifMissing
+      if (query.isQueryAll) ifMissing
+      else ifPresent(query.query)
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true

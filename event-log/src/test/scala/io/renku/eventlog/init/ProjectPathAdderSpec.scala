@@ -58,7 +58,7 @@ class ProjectPathAdderSpec
 
       createEventTable()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column adding skipped"))
     }
@@ -67,7 +67,7 @@ class ProjectPathAdderSpec
 
       verifyColumnExists("event_log", "project_path") shouldBe false
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_log", "project_path") shouldBe true
 
@@ -75,7 +75,7 @@ class ProjectPathAdderSpec
 
       logger.reset()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column exists"))
     }
@@ -89,7 +89,7 @@ class ProjectPathAdderSpec
       val event2 = events.generateOne
       storeEvent(event2)
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      projectPathAdder.run.unsafeRunSync() shouldBe ()
 
       findProjectPaths shouldBe Set(event1.project.path, event2.project.path)
 

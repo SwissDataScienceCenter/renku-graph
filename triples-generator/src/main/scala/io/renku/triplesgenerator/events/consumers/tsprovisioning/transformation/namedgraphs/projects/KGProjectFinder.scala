@@ -42,6 +42,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import Decoder._
+  import ResultsDecoder._
   import io.renku.graph.model.Schemas._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 

@@ -62,7 +62,7 @@ class EventLogMetricsSpec
       val statusCount = statusCounts.generateOne
       givenStatusesMethodToReturn add statusCount.pure[IO]
 
-      metrics.run().unsafeRunAndForget()
+      metrics.run.unsafeRunAndForget()
 
       eventually {
         categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount
@@ -85,7 +85,7 @@ class EventLogMetricsSpec
       val statuses = statusCounts.generateOne
       givenStatusesMethodToReturn add statuses.pure[IO]
 
-      metrics.run().unsafeRunAndForget()
+      metrics.run.unsafeRunAndForget()
 
       eventually {
         categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount
@@ -105,7 +105,7 @@ class EventLogMetricsSpec
       val categoryNameCount2 = categoryNameCounts.generateOne
       givenCountEventsByCategoryNameMethodToReturn add categoryNameCount2.pure[IO]
 
-      metrics.run().unsafeRunAndForget()
+      metrics.run.unsafeRunAndForget()
 
       eventually {
         categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount2

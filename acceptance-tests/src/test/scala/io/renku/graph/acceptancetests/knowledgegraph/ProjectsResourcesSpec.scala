@@ -30,14 +30,16 @@ import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabI
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.http.server.EndpointTester.{jsonEntityDecoder, JsonOps}
 import org.http4s.Status._
+import org.scalatest.EitherValues
 
 class ProjectsResourcesSpec
     extends AcceptanceSpec
     with ApplicationServices
     with TSProvisioning
-    with DatasetsApiEncoders {
+    with DatasetsApiEncoders
+    with EitherValues {
 
   private val user        = authUsers.generateOne
   private val accessToken = user.accessToken
@@ -94,17 +96,19 @@ class ProjectsResourcesSpec
       projectDetails shouldBe fullJson(project)(gitLabUrl)
 
       When("user then fetches project's datasets using the link from the response")
-      val datasetsLink = projectDetails._links.fold(throw _, identity).get(Links.Rel("datasets")) getOrElse fail(
-        "No link with rel 'datasets'"
-      )
-      val datasetsResponse = restClient
+      val datasetsLink = projectDetails._links
+        .fold(throw _, identity)
+        .get(Links.Rel("datasets"))
+        .getOrElse(fail("No link with rel 'datasets'"))
+
+      val datasetsResponseStatus -> datasetsResponseBody = restClient
         .GET(datasetsLink.href.toString, accessToken)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
         .unsafeRunSync()
 
       Then("he should get OK response with the projects datasets")
-      datasetsResponse._1 shouldBe Ok
-      val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
+      datasetsResponseStatus shouldBe Ok
+      val foundDatasets = datasetsResponseBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.path))
 
       When("there's an authenticated user who is not project member")
@@ -117,6 +121,14 @@ class ProjectsResourcesSpec
 
       Then("he should get NOT_FOUND response")
       projectDetailsResponseForNonMember.status shouldBe NotFound
+
+      When("the user calls the Delete Project API")
+      knowledgeGraphClient.DELETE(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe Accepted
+
+      Then("the project should be deleted")
+      eventually {
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe NotFound
+      }
     }
   }
 }

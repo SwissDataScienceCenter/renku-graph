@@ -21,6 +21,7 @@ package io.renku.generators
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import cats.{Functor, Monad, Semigroupal}
+import com.comcast.ip4s.Port
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -187,7 +188,7 @@ object Generators {
     } yield parts.mkString("/")
   }
 
-  val httpPorts: Gen[Int] = choose(2000, 10000)
+  val httpPorts: Gen[Port] = choose(2000, 10000).map(Port.fromInt).map(_.getOrElse(sys.error("Invalid generated port")))
 
   def httpUrls(hostGenerator: Gen[String] = nonEmptyStrings(),
                pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)

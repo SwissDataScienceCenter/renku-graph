@@ -68,7 +68,7 @@ class EventStatusRenamerSpec
         val otherEvents = events.generateNonEmptyList()
         otherEvents.map(event => store(event, withStatus = event.status.toString))
 
-        eventStatusRenamer.run().unsafeRunSync() shouldBe ()
+        eventStatusRenamer.run.unsafeRunSync() shouldBe ()
 
         findEventsCompoundId(status = GeneratingTriples).toSet shouldBe
           (processingEvents.toList ++ otherEvents.filter(_.status == GeneratingTriples))
@@ -96,7 +96,7 @@ class EventStatusRenamerSpec
       val otherEvents = events.generateNonEmptyList()
       otherEvents.map(event => store(event, withStatus = event.status.show))
 
-      eventStatusRenamer.run().unsafeRunSync() shouldBe ()
+      eventStatusRenamer.run.unsafeRunSync() shouldBe ()
 
       findEventsCompoundId(status = GeneratingTriples).toSet shouldBe otherEvents
         .filter(_.status == GeneratingTriples)

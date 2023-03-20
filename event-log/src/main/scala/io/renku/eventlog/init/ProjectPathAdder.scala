@@ -47,7 +47,7 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
 
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project_path' column adding skipped"),
       otherwise = checkColumnExists("event_log", "project_path") >>= {

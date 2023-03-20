@@ -42,7 +42,7 @@ private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRe
   import MigratorTools._
   import cats.syntax.all._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {

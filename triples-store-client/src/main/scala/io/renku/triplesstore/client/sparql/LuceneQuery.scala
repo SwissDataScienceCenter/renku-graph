@@ -16,11 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesstore.client.sparql
 
-import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
+final class LuceneQuery(val query: String) extends AnyVal {
+  def isQueryAll: Boolean = query == LuceneQuery.queryAll.query
+}
 
-object LuceneQueryEncoder {
+object LuceneQuery {
+  val queryAll: LuceneQuery = LuceneQuery("*")
 
-  def queryAsString(v: String): String = QueryParserUtil.escape(v).replace("\\", "\\\\")
+  def apply(str: String): LuceneQuery = new LuceneQuery(str)
+
+  def escape(str: String): LuceneQuery = LuceneQuery(LuceneQueryEncoder.queryAsString(str))
+
+  implicit val sparqlEncoder: SparqlEncoder[LuceneQuery] =
+    SparqlEncoder.instance(q => Fragment(s"'${q.query}'"))
 }

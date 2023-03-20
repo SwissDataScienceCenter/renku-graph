@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2023 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,5 +16,10 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "entities-views-collector"
+package io.renku.entities.viewings.deletion
+
+import io.renku.events.CategoryName
+
+package object projects {
+  val categoryName: CategoryName = CategoryName("PROJECT_VIEWING_DELETION")
+}

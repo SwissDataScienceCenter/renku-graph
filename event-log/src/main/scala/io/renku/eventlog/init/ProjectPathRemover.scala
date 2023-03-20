@@ -36,7 +36,7 @@ private object ProjectPathRemover {
 private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends ProjectPathRemover[F] {
   import MigratorTools._
 
-  override def run(): F[Unit] = SessionResource[F].useK {
+  override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project_path' column dropping skipped"),
       otherwise = checkColumnExists >>= {

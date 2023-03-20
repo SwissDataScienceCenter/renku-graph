@@ -32,18 +32,19 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.acceptancetests.data.Project.Permissions.AccessLevel
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
 import io.renku.graph.model
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
-import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s._
-import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.{Router, Server}
 import org.typelevel.log4cats.Logger
 
@@ -99,7 +100,15 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   private def projectRoutes: HttpRoutes[F] =
     GitLabAuth.authOptF(stateRef) { maybeAuthedReq =>
+
       HttpRoutes.of {
+
+        case req @ GET -> Root :? Membership(true) +& MinAccessLevel(AccessLevel.Maintainer) =>
+          query(findCallerProjects(maybeAuthedReq)).flatMap(OkWithTotalHeader(req))
+
+        case DELETE -> Root / ProjectId(id) =>
+          update(removeProject(id)).map(_ => Response[F](Accepted))
+
         case GET -> Root / ProjectId(id) =>
           query(findProjectById(id, maybeAuthedReq)).flatMap(OkOrNotFound(_))
 
@@ -185,11 +194,12 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   def resource(bindAddress: Host, port: Port): Resource[F, Server] =
     Resource.eval(logger.trace(s"Starting GitLab stub on $bindAddress:$port")) *>
-      BlazeServerBuilder[F]
-        .bindHttp(port.value, bindAddress.show)
-        .withoutBanner
+      EmberServerBuilder
+        .default[F]
+        .withHost(bindAddress)
+        .withPort(port)
         .withHttpApp(enableLogging[F](allRoutes.orNotFound))
-        .resource
+        .build
 
   def resource(bindAddress: String, port: Int): Resource[F, Server] =
     (Host.fromString(bindAddress), Port.fromInt(port))

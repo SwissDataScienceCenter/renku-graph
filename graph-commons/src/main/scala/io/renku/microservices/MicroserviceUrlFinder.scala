@@ -19,8 +19,7 @@
 package io.renku.microservices
 
 import cats.MonadThrow
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import com.comcast.ip4s._
 import io.circe.Decoder
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.{Url, UrlOps}
@@ -31,8 +30,7 @@ trait MicroserviceUrlFinder[F[_]] {
   def findBaseUrl(): F[MicroserviceBaseUrl]
 }
 
-class MicroserviceUrlFinderImpl[F[_]: MonadThrow](microservicePort: Int Refined Positive)
-    extends MicroserviceUrlFinder[F] {
+class MicroserviceUrlFinderImpl[F[_]: MonadThrow](microservicePort: Port) extends MicroserviceUrlFinder[F] {
 
   import cats.syntax.all._
 
@@ -58,7 +56,7 @@ class MicroserviceUrlFinderImpl[F[_]: MonadThrow](microservicePort: Int Refined 
 
 object MicroserviceUrlFinder {
 
-  def apply[F[_]: MonadThrow](microservicePort: Int Refined Positive): F[MicroserviceUrlFinder[F]] =
+  def apply[F[_]: MonadThrow](microservicePort: Port): F[MicroserviceUrlFinder[F]] =
     MonadThrow[F].catchNonFatal {
       new MicroserviceUrlFinderImpl[F](microservicePort)
     }

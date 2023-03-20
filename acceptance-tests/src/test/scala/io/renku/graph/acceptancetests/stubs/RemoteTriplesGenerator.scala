@@ -20,19 +20,19 @@ package io.renku.graph.acceptancetests.stubs
 
 import cats.data.NonEmptyList
 import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
+import com.typesafe.config.ConfigFactory
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data.toPayloadJsonLD
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, TestLogger}
 import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
+
+import java.net.URL
 
 trait RemoteTriplesGenerator {
   self: ApplicationServices =>
@@ -122,12 +122,16 @@ trait RemoteTriplesGenerator {
 private object RemoteTriplesGeneratorWiremockInstance {
   private val logger = TestLogger()
 
-  val port: Int Refined Positive = 8080
+  private val remoteTriplesGeneratorUrl = new URL(
+    ConfigFactory.load().getString("services.remote-triples-generator.url")
+  )
 
-  val instance = WireMock.create().http().host("localhost").port(port.value).build()
+  private val port: Int = remoteTriplesGeneratorUrl.getPort
+
+  val instance = WireMock.create().http().host(remoteTriplesGeneratorUrl.getHost).port(port).build()
 
   val server = {
-    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
+    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port))
     newServer.start()
     WireMock.configureFor(newServer.port())
     logger.info(s"Remote Triples Generator stub started")

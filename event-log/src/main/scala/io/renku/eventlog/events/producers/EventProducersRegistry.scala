@@ -30,7 +30,7 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait EventProducersRegistry[F[_]] {
-  def run(): F[Unit]
+  def run: F[Unit]
   def register(subscriptionRequest: Json): F[SubscriptionResult]
   def getStatus: F[Set[EventProducerStatus]]
 }
@@ -39,7 +39,7 @@ private[producers] class EventProducersRegistryImpl[F[_]: Parallel: Applicative]
     categories: Set[SubscriptionCategory[F]]
 ) extends EventProducersRegistry[F] {
 
-  override def run(): F[Unit] = categories.toList.map(_.run()).parSequence.void
+  override def run: F[Unit] = categories.toList.map(_.run()).parSequence.void
 
   override def register(subscriptionRequest: Json): F[SubscriptionResult] =
     if (categories.isEmpty) {

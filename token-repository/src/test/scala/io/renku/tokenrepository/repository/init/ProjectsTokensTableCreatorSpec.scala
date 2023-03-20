@@ -39,13 +39,13 @@ class ProjectsTokensTableCreatorSpec
     "create the projects_tokens table if id does not exist" in new TestCase {
       tableExists("projects_tokens") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'projects_tokens' table created"))
 
       tableExists("projects_tokens") shouldBe true
 
-      tableCreator.run().unsafeRunSync() shouldBe ()
+      tableCreator.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'projects_tokens' table created"), Info("'projects_tokens' table existed"))
     }

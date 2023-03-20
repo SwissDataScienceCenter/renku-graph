@@ -26,6 +26,7 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.sparql.LuceneQuery
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -35,8 +36,6 @@ class LuceneQueryEncoderSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
     with should.Matchers {
-
-  import LuceneQueryEncoder._
 
   "queryAsString" should {
 
@@ -78,7 +77,7 @@ class LuceneQueryEncoderSpec
             s"""SELECT ?name
             WHERE {
               GRAPH ?g {
-                ?id text:query (schema:name '${queryAsString(query)}');
+                ?id text:query (schema:name '${LuceneQuery.escape(query).query}');
                     schema:name ?name
               }
             }

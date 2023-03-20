@@ -34,9 +34,7 @@ private trait TagsFinder[F[_]] {
 }
 
 private object TagsFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](implicit
-      renkuUrl: RenkuUrl
-  ): F[TagsFinder[F]] =
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](implicit ru: RenkuUrl): F[TagsFinder[F]] =
     ProjectsConnectionConfig[F]().map(new TagsFinderImpl(_))
 }
 
@@ -49,9 +47,10 @@ private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryT
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.Schemas._
   import io.renku.graph.model.{datasets, publicationEvents}
+  import io.renku.graph.model.Schemas._
   import io.renku.http.rest.paging.Paging.PagedResultsFinder
+  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.SparqlQuery.Prefixes
 

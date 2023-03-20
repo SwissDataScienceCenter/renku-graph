@@ -53,7 +53,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
 
         makeSslContextDefault.expects(sslContext, *).returning(().pure[Try])
 
-        certificateLoader.run() shouldBe ().pure[Try]
+        certificateLoader.run shouldBe ().pure[Try]
 
         logger.loggedOnly(Info("Client certificate added"))
       }
@@ -62,7 +62,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       findCertificate.expects().returning(None.pure[Try])
 
-      certificateLoader.run() shouldBe ().pure[Try]
+      certificateLoader.run shouldBe ().pure[Try]
 
       logger.loggedOnly(Info("No client certificate found"))
     }
@@ -72,7 +72,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       findCertificate.expects().returning(exception.raiseError[Try, Option[Certificate]])
 
-      certificateLoader.run() shouldBe Failure(exception)
+      certificateLoader.run shouldBe Failure(exception)
 
       logger.loggedOnly(Error("Loading client certificate failed", exception))
     }
@@ -85,7 +85,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       (keystore.load(_: Certificate)).expects(certificate).returning(exception.raiseError[Try, Unit])
 
-      certificateLoader.run() shouldBe Failure(exception)
+      certificateLoader.run shouldBe Failure(exception)
 
       logger.loggedOnly(Error("Loading client certificate failed", exception))
     }
@@ -100,7 +100,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       createSslContext.expects(keystore).returning(exception.raiseError[Try, SslContext])
 
-      certificateLoader.run() shouldBe Failure(exception)
+      certificateLoader.run shouldBe Failure(exception)
 
       logger.loggedOnly(Error("Loading client certificate failed", exception))
     }
@@ -118,7 +118,7 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       makeSslContextDefault.expects(sslContext, *).returning(exception.raiseError[Try, Unit])
 
-      certificateLoader.run() shouldBe Failure(exception)
+      certificateLoader.run shouldBe Failure(exception)
 
       logger.loggedOnly(Error("Loading client certificate failed", exception))
     }
