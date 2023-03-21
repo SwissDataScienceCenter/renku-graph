@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{Kleisli, OptionT}
+import cats.data.{EitherT, Kleisli, OptionT}
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
@@ -30,6 +30,7 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -44,6 +45,7 @@ import io.renku.http.server.security.EndpointSecurityException.AuthorizationFail
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
+import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.MediaType.application
@@ -203,20 +205,28 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/datasets/:id" should {
 
-    s"return $Ok when a valid :id path parameter given" in new TestCase {
-      val id            = datasetIdentifiers.generateOne
-      val maybeAuthUser = authUsers.generateOption
+    forAll {
+      Table(
+        "requested DS id" -> "id",
+        "DS identifier"   -> RequestedDataset(datasetIdentifiers.generateOne),
+        "DS sameAs"       -> RequestedDataset(datasetSameAs.generateOne)
+      )
+    } { (dsIdType, requestedDS) =>
+      s"return $Ok when a valid $dsIdType given" in new TestCase {
 
-      val authContext = AuthContext(maybeAuthUser, id, projectPaths.generateSet())
-      (datasetIdAuthorizer.authorize _)
-        .expects(id, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](authContext))
+        val maybeAuthUser = authUsers.generateOption
 
-      (datasetDetailsEndpoint.`GET /datasets/:id` _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
+        val authContext = AuthContext(maybeAuthUser, requestedDS, projectPaths.generateSet())
+        givenDSAuthorizer(requestedDS, maybeAuthUser, returning = rightT[IO, EndpointSecurityException](authContext))
 
-      routes(maybeAuthUser)
-        .call(Request(GET, uri"/knowledge-graph/datasets" / id.value))
-        .status shouldBe Ok
+        (datasetDetailsEndpoint.`GET /datasets/:id` _)
+          .expects(requestedDS, authContext)
+          .returning(Response[IO](Ok).pure[IO])
+
+        routes(maybeAuthUser)
+          .call(Request(GET, uri"/knowledge-graph/datasets" / requestedDS))
+          .status shouldBe Ok
+      }
     }
 
     s"return $NotFound when no :id path parameter given" in new TestCase {
@@ -227,19 +237,21 @@ class MicroserviceRoutesSpec
 
     s"return $Unauthorized when user authentication failed" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
-        .call(Request(GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
+        .call(Request(GET, uri"/knowledge-graph/datasets" / RequestedDataset(datasetIdentifiers.generateOne)))
         .status shouldBe Unauthorized
     }
 
     s"return $NotFound when user has no rights for the project the dataset belongs to" in new TestCase {
+
       val id            = datasetIdentifiers.generateOne
       val maybeAuthUser = authUsers.generateOption
 
-      (datasetIdAuthorizer.authorize _)
-        .expects(id, maybeAuthUser)
-        .returning(leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure))
+      givenDSIdAuthorizer(id,
+                          maybeAuthUser,
+                          returning = leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure)
+      )
 
-      val response = routes(maybeAuthUser).call(Request(GET, uri"/knowledge-graph/datasets" / id.show))
+      val response = routes(maybeAuthUser).call(Request(GET, uri"/knowledge-graph/datasets" / RequestedDataset(id)))
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
@@ -870,21 +882,23 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val datasetsSearchEndpoint     = mock[datasets.Endpoint[IO]]
-    val datasetDetailsEndpoint     = mock[datasets.details.Endpoint[IO]]
-    val entitiesEndpoint           = mock[entities.Endpoint[IO]]
-    val lineageEndpoint            = mock[projects.files.lineage.Endpoint[IO]]
-    val ontologyEndpoint           = mock[ontology.Endpoint[IO]]
-    val projectDeleteEndpoint      = mock[projects.delete.Endpoint[IO]]
-    val projectDetailsEndpoint     = mock[projects.details.Endpoint[IO]]
-    val projectDatasetsEndpoint    = mock[projects.datasets.Endpoint[IO]]
-    val projectDatasetTagsEndpoint = mock[projects.datasets.tags.Endpoint[IO]]
-    val docsEndpoint               = mock[docs.Endpoint[IO]]
-    val usersProjectsEndpoint      = mock[users.projects.Endpoint[IO]]
-    val projectPathAuthorizer      = mock[Authorizer[IO, model.projects.Path]]
-    val datasetIdAuthorizer        = mock[Authorizer[IO, model.datasets.Identifier]]
-    val routesMetrics              = TestRoutesMetrics()
-    private val versionRoutes      = mock[version.Routes[IO]]
+    private implicit val ru: RenkuUrl = renkuUrls.generateOne
+    val datasetsSearchEndpoint          = mock[datasets.Endpoint[IO]]
+    val datasetDetailsEndpoint          = mock[datasets.details.Endpoint[IO]]
+    val entitiesEndpoint                = mock[entities.Endpoint[IO]]
+    val lineageEndpoint                 = mock[projects.files.lineage.Endpoint[IO]]
+    val ontologyEndpoint                = mock[ontology.Endpoint[IO]]
+    val projectDeleteEndpoint           = mock[projects.delete.Endpoint[IO]]
+    val projectDetailsEndpoint          = mock[projects.details.Endpoint[IO]]
+    val projectDatasetsEndpoint         = mock[projects.datasets.Endpoint[IO]]
+    val projectDatasetTagsEndpoint      = mock[projects.datasets.tags.Endpoint[IO]]
+    val docsEndpoint                    = mock[docs.Endpoint[IO]]
+    val usersProjectsEndpoint           = mock[users.projects.Endpoint[IO]]
+    val projectPathAuthorizer           = mock[Authorizer[IO, model.projects.Path]]
+    private val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
+    private val datasetSameAsAuthorizer = mock[Authorizer[IO, model.datasets.SameAs]]
+    val routesMetrics                   = TestRoutesMetrics()
+    private val versionRoutes           = mock[version.Routes[IO]]
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
       givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))
@@ -906,6 +920,7 @@ class MicroserviceRoutesSpec
         middleware,
         projectPathAuthorizer,
         datasetIdAuthorizer,
+        datasetSameAsAuthorizer,
         routesMetrics,
         versionRoutes
       ).routes.map(_.or(notAvailableResponse))
@@ -918,5 +933,27 @@ class MicroserviceRoutesSpec
         HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
       }
       .atLeastOnce()
+
+    def givenDSAuthorizer(requestedDS:   RequestedDataset,
+                          maybeAuthUser: Option[AuthUser],
+                          returning:     EitherT[IO, EndpointSecurityException, AuthContext[RequestedDataset]]
+    ) = requestedDS.fold(
+      id => givenDSIdAuthorizer(id, maybeAuthUser, returning = returning.map(_.replaceKey(id))),
+      sameAs => givenDSSameAsAuthorizer(sameAs, maybeAuthUser, returning = returning.map(_.replaceKey(sameAs)))
+    )
+
+    def givenDSIdAuthorizer(identifier:    model.datasets.Identifier,
+                            maybeAuthUser: Option[AuthUser],
+                            returning: EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.Identifier]]
+    ) = (datasetIdAuthorizer.authorize _)
+      .expects(identifier, maybeAuthUser)
+      .returning(returning)
+
+    def givenDSSameAsAuthorizer(sameAs:        model.datasets.SameAs,
+                                maybeAuthUser: Option[AuthUser],
+                                returning: EitherT[IO, EndpointSecurityException, AuthContext[model.datasets.SameAs]]
+    ) = (datasetSameAsAuthorizer.authorize _)
+      .expects(sameAs, maybeAuthUser)
+      .returning(returning)
   }
 }

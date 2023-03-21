@@ -18,11 +18,15 @@
 
 package io.renku.knowledgegraph.datasets.details
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.graph.model.{datasets, RenkuUrl}
 import org.http4s.Uri.Path.{Segment, SegmentEncoder}
 import scodec.bits.{Bases, ByteVector}
 
-trait RequestedDataset
+trait RequestedDataset {
+  def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A
+}
 
 object RequestedDataset {
 
@@ -43,8 +47,13 @@ object RequestedDataset {
     } else
       datasets.Identifier.from(value).toOption.map(RequestedDataset(_))
 
-  final case class Identifier(value: datasets.Identifier) extends RequestedDataset
-  final case class SameAs(value: datasets.SameAs)         extends RequestedDataset
+  final case class Identifier(value: datasets.Identifier) extends RequestedDataset {
+    override def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A = idf(value)
+  }
+
+  final case class SameAs(value: datasets.SameAs) extends RequestedDataset {
+    override def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A = saf(value)
+  }
 
   implicit val se: SegmentEncoder[RequestedDataset] = SegmentEncoder.instance {
     case Identifier(v) =>
@@ -56,5 +65,10 @@ object RequestedDataset {
           .fold(throw _, identity)
           .toBase64(base64Alphabet)
       Segment(s"$sameAsPathEncodingPrefix$base64")
+  }
+
+  implicit val show: Show[RequestedDataset] = Show.show {
+    case Identifier(v) => v.show
+    case SameAs(v)     => v.show
   }
 }

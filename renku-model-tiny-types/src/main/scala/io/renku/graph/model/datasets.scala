@@ -58,7 +58,9 @@ object datasets {
       with TinyTypeJsonLDOps[Identifier]
       with NonBlank[Identifier]
 
-  final class OriginalIdentifier private (val value: String) extends AnyVal with DatasetIdentifier
+  final class OriginalIdentifier private (val value: String) extends AnyVal with DatasetIdentifier {
+    def asIdentifier: Identifier = Identifier(value)
+  }
   implicit object OriginalIdentifier
       extends TinyTypeFactory[OriginalIdentifier](new OriginalIdentifier(_))
       with DatasetIdentifierFactory[OriginalIdentifier]

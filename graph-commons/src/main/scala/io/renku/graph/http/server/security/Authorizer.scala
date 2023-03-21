@@ -42,6 +42,7 @@ object Authorizer {
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
     def addAllowedProject(path: projects.Path): AuthContext[Key] = copy(allowedProjects = allowedProjects + path)
+    def replaceKey[K](key:      K):             AuthContext[K]   = AuthContext(maybeAuthUser, key, allowedProjects)
   }
 
   object AuthContext {

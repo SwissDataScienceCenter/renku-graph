@@ -368,7 +368,7 @@ object Generators {
         else generated
       }
 
-      def toGenerateOfFixedValue: Gen[T] = fixed(generateExample(generator))
+      def toGeneratorOfFixedValue: Gen[T] = fixed(generateExample(generator))
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)

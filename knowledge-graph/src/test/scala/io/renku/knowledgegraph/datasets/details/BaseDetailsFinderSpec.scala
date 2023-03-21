@@ -57,7 +57,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           .generateOne
       ) foreach { case (dataset, project, nonModifiedDataset) =>
         nonModifiedToResultSet(project, dataset, blankStrings().generateOne)
-          .as[Option[Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
+          .as[Option[Dataset]](maybeDatasetDecoder(RequestedDataset(dataset.identification.identifier))) shouldBe
           nonModifiedDataset
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
@@ -79,7 +79,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         blankStrings()
       ) { case ((_ ::~ dataset, project), description) =>
         modifiedToResultSet(project, dataset, description)
-          .as[Option[Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
+          .as[Option[Dataset]](maybeDatasetDecoder(RequestedDataset(dataset.identification.identifier))) shouldBe
           modifiedToModified(dataset, project)
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
