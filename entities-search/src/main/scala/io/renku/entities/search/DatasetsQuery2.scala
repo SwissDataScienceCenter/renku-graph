@@ -21,7 +21,10 @@ package io.renku.entities.search
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.entities.Person
+import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.{GraphClass, persons, projects}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import model.Entity
@@ -32,7 +35,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   val entityTypeVar           = VarName("entityType")
   val matchingScoreVar        = VarName("matchingScore")
   val nameVar                 = VarName("name")
-  val idsPathsVisibilitiesVar = VarName("idsPathsVisibilitiesVar")
+  val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
   val maybeDatePublishedVar   = VarName("maybeDatePublished")
@@ -58,6 +61,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     imagesVar
   ).map(_.name)
 
+  //TODO reorganize fragments to go into one graph selection
   override def query(criteria: Criteria): Option[String] =
     criteria.filters.whenRequesting(entityType) {
       fr"""SELECT $entityTypeVar
@@ -80,9 +84,9 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |  BIND($dsId AS $sameAsVar)
           |
           | { # start sub select
-          |  SELECT ?projectId ?dsId
+          |  SELECT $dsId (SAMPLE(?projId) as ?projectId)
           |    (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
-          |    #(GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS ?idsPathsVisibilities)
+          |    (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS ?idsPathsVisibilities)
           |    (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
           |    (GROUP_CONCAT(?encodedImageUrl; separator=',') AS $imagesVar)
           |  WHERE {
@@ -93,16 +97,18 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |    ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
           |
           |    # images
-          |    $imagesPart
+          |    
           |
           |    # resolve project
           |    $resolveProject
+          |
+          |    # project namespaces
+          |    ${namespacesPart(criteria.filters.namespaces)}
+          |
           |  }
-          |  GROUP BY ?projectId ?dsId
+          |  GROUP BY $dsId
           |  } # end sub select
           |
-          |  # project namespaces
-          |  ${namespacesPart(criteria.filters.namespaces)}
           |}
           |""".stripMargin.sparql
     }
@@ -117,6 +123,48 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
 
     Fragment.empty
 
+  def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
+    maybeUser match {
+      case Some(user) =>
+        val nonPrivateVisibilities =
+          if (visibilities.isEmpty)
+            projects.Visibility.all - projects.Visibility.Private
+          else (projects.Visibility.all - projects.Visibility.Private) intersect visibilities
+
+        val selectPrivateValue =
+          if (visibilities.isEmpty || visibilities.contains(projects.Visibility.Private))
+            projects.Visibility.Private.asObject.asSparql.sparql
+          else "''"
+        fr"""|{
+             |  ?projectId renku:projectVisibility ?visibility .
+             |  {
+             |    VALUES (?visibility) {
+             |      ${nonPrivateVisibilities.map(_.asObject)}
+             |    }
+             |  } UNION {
+             |    VALUES (?visibility) {
+             |      ($selectPrivateValue)
+             |    }
+             |    ?projectId schema:member ?memberId.
+             |    GRAPH ${GraphClass.Persons.id} {
+             |      ?memberId schema:sameAs ?memberSameAs.
+             |      ?memberSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
+             |                    schema:identifier ${user.id.asObject}
+             |    }
+             |  }
+             |}
+             |""".stripMargin
+      case None =>
+        visibilities match {
+          case v if v.isEmpty || v.contains(projects.Visibility.Public) =>
+            fr"""|?projectId renku:projectVisibility ?visibility .
+                 |VALUES (?visibility) { (${projects.Visibility.Public.asObject}) }""".stripMargin
+          case _ =>
+            fr"""|?projectId renku:projectVisibility ?visibility .
+                 |VALUES (?visibility) { ('') }""".stripMargin
+        }
+    }
+
   def imagesPart: Fragment =
     fr"""
         |  OPTIONAL {
@@ -130,8 +178,8 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   def resolveProject: Fragment =
     fr"""
         |  Graph schema:Dataset {
-        |    $dsId renku:datasetProjectLink ?linkId.
-        |    ?linkId renku:project ?projectId
+        |    $dsId a renku:DiscoverableDataset;
+        |            renku:datasetProjectLink / renku:project ?projId.
         |  }
         |""".stripMargin
 
@@ -177,10 +225,18 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
       else fr"Values (?namespace) { ${ns.map(_.value)}  }"
 
     fr"""
-        | GRAPH ?projectId {
-        |  ?projectId renku:projectPath ?projectPath;
-        |             renku:projectNamespace ?namespace
+        | GRAPH ?projId {
+        |  ?projId renku:projectPath ?projectPath;
+        |          renku:projectNamespace ?namespace.
         |  $matchFrag
+        |
+        |        ?projId renku:projectVisibility ?visibility .
+        |        VALUES (?visibility) { ('public') }
+        |
+        |        # Return all visibilities and select the broadest in decoding
+        |        BIND (CONCAT(STR(?projectPath), STR(':'),
+        |                     STR(?visibility)) AS ?idPathVisibility)
+        |
         |}
       """.stripMargin
   }
@@ -193,11 +249,8 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     fr"""
         |  Graph schema:Dataset {
         |    OPTIONAL {
-        |      ?id_ schema:creator ?creatorId_.
-        |      GRAPH schema:Person {
-        |        ?creatorId_ schema:name ?creatorName
-        |        $matchFrag
-        |      }
+        |      $dsId schema:creator / schema:name ?creatorName.
+        |      $matchFrag
         |    }
         |  }
         |
