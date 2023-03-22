@@ -71,7 +71,7 @@ class EndpointSpec
     with EntitiesGenerators
     with IOSpec {
 
-  "getDataset" should {
+  "GET /datasets/:id" should {
 
     forAll(
       Table(
@@ -91,21 +91,23 @@ class EndpointSpec
         )
       )
     ) { (dsType, dataset) =>
-      s"sends a DATASET_VIEWED event and respond with OK in case a $dsType ds was found" in new TestCase {
+      s"respond with OK and sends a DATASET_VIEWED event in case a $dsType DS was found" in new TestCase {
 
-        val authContext = authContexts(fixed(dataset.id)).generateOne
+        val requestedDataset = RequestedDataset(dataset.id)
 
-        givenDatasetFinding(dataset.id, authContext, returning = dataset.some.pure[IO])
+        val authContext = authContexts(fixed(requestedDataset)).generateOne
+
+        givenDatasetFinding(requestedDataset, authContext, returning = dataset.some.pure[IO])
 
         givenDatasetViewedEventSent(dataset.id, returning = ().pure[IO])
 
-        val response = endpoint.getDataset(dataset.id, authContext).unsafeRunSync()
+        val response = endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync()
 
         response.status                      shouldBe Ok
-        response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.contentType                 shouldBe `Content-Type`(MediaType.application.json).some
         response.as[Dataset].unsafeRunSync() shouldBe dataset
-        verifyLinks(response, dataset)
 
+        verifyLinks(response, dataset)
         val responseCursor = response.as[Json].unsafeRunSync().hcursor
         verifyProject(responseCursor)
         verifyUsedIn(responseCursor, dataset)
@@ -115,39 +117,59 @@ class EndpointSpec
       }
     }
 
+    "fetch DS by sameAs if given in the request instead of identifier" in new TestCase {
+
+      val ds = anyRenkuProjectEntities
+        .addDataset(datasetEntities(provenanceImportedExternal))
+        .map((importedExternalToNonModified _).tupled)
+        .generateOne
+
+      val requestedDataset = RequestedDataset(ds.sameAs)
+
+      val authContext = authContexts(fixed(requestedDataset)).generateOne
+
+      givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
+
+      givenDatasetViewedEventSent(ds.id, returning = ().pure[IO])
+
+      endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
+    }
+
     "respond with NOT_FOUND if there is no dataset with the given id" in new TestCase {
 
-      val identifier  = datasetIdentifiers.generateOne
-      val authContext = authContexts(fixed(identifier)).generateOne
+      val identifier       = datasetIdentifiers.generateOne
+      val requestedDataset = RequestedDataset(identifier)
+      val authContext      = authContexts(fixed(requestedDataset)).generateOne
 
-      givenDatasetFinding(identifier, authContext, returning = Option.empty[Dataset].pure[IO])
+      givenDatasetFinding(requestedDataset, authContext, returning = Option.empty[Dataset].pure[IO])
 
-      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
+      val response = endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync()
 
       response.status      shouldBe NotFound
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No dataset with '$identifier' id found").asJson
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No '$identifier' dataset found").asJson
 
-      logger.loggedOnly(Warn(s"Finding '$identifier' dataset finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(show"Finding '$identifier' dataset finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
 
-      val identifier  = datasetIdentifiers.generateOne
-      val authContext = authContexts(fixed(identifier)).generateOne
+      val identifier       = datasetIdentifiers.generateOne
+      val requestedDataset = RequestedDataset(identifier)
+      val authContext      = authContexts(fixed(requestedDataset)).generateOne
 
       val exception = exceptions.generateOne
-      givenDatasetFinding(identifier, authContext, returning = exception.raiseError[IO, Option[Dataset]])
+      givenDatasetFinding(requestedDataset, authContext, returning = exception.raiseError[IO, Option[Dataset]])
 
-      val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
+      val response = endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding dataset with '$identifier' id failed").asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding dataset '$identifier' failed").asJson
 
-      logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
+      logger.loggedOnly(Error(show"Finding dataset '$identifier' failed", exception))
     }
 
     "do not fail if sending PROJECT_VIEWED event fails" in new TestCase {
@@ -157,14 +179,16 @@ class EndpointSpec
         .map((importedExternalToNonModified _).tupled)
         .generateOne
 
-      val authContext = authContexts(fixed(ds.id)).generateOne
+      val requestedDataset = RequestedDataset(ds.id)
 
-      givenDatasetFinding(ds.id, authContext, returning = ds.some.pure[IO])
+      val authContext = authContexts(fixed(requestedDataset)).generateOne
+
+      givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
 
       val exception = exceptions.generateOne
       givenDatasetViewedEventSent(ds.id, returning = exception.raiseError[IO, Unit])
 
-      endpoint.getDataset(ds.id, authContext).unsafeRunSync().status shouldBe Ok
+      endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
 
       logger.logged(Error(show"sending ${DatasetViewedEvent.categoryName} event failed", exception))
     }
@@ -189,11 +213,11 @@ class EndpointSpec
         .expects(DatasetViewedEvent.forDataset(identifier, now))
         .returning(returning)
 
-    def givenDatasetFinding(id:          datasets.Identifier,
-                            authContext: AuthContext[datasets.Identifier],
+    def givenDatasetFinding(id:          RequestedDataset,
+                            authContext: AuthContext[RequestedDataset],
                             returning:   IO[Option[Dataset]]
     ) = (datasetsFinder
-      .findDataset(_: Identifier, _: AuthContext[Identifier]))
+      .findDataset(_: RequestedDataset, _: AuthContext[RequestedDataset]))
       .expects(id, authContext)
       .returning(returning)
 

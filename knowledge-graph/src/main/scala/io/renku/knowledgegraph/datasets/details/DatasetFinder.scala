@@ -25,13 +25,13 @@ import cats.data.NonEmptyList
 import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.datasets.{Identifier, Keyword}
+import io.renku.graph.model.datasets.Keyword
 import io.renku.graph.model.images.ImageUri
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetFinder[F[_]] {
-  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]]
+  def findDataset(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Option[Dataset]]
 }
 
 private class DatasetFinderImpl[F[_]: Spawn](
@@ -46,7 +46,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] =
+  def findDataset(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Option[Dataset]] =
     findBaseDetails(identifier, authContext) >>= {
       case None => Option.empty[Dataset].pure[F]
       case Some(dataset) =>
@@ -57,7 +57,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
           usedInFiber     <- Spawn[F].start(findUsedIn(dataset, authContext))
           keywordsFiber   <- Spawn[F].start(findKeywords(dataset))
           imagesFiber     <- Spawn[F].start(findImages(dataset))
-          creatorsFiber   <- Spawn[F].start(findCreators(identifier, dataset.project.id))
+          creatorsFiber   <- Spawn[F].start(findCreators(dataset.id, dataset.project.id))
           partsFiber      <- Spawn[F].start(findParts(dataset))
           maybeInitialTag <- initialTagFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("initial tag")))
           usedIn          <- usedInFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("usedIn")))

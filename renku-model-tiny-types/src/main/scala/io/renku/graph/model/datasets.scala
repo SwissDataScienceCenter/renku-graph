@@ -26,12 +26,12 @@ import eu.timepit.refined.string
 import io.circe._
 import io.circe.syntax._
 import io.renku.graph.model.views._
+import io.renku.jsonld._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
-import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, Url => UrlConstraint, UrlOps}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UrlOps, UUID, Url => UrlConstraint}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -58,7 +58,9 @@ object datasets {
       with TinyTypeJsonLDOps[Identifier]
       with NonBlank[Identifier]
 
-  final class OriginalIdentifier private (val value: String) extends AnyVal with DatasetIdentifier
+  final class OriginalIdentifier private (val value: String) extends AnyVal with DatasetIdentifier {
+    def asIdentifier: Identifier = Identifier(value)
+  }
   implicit object OriginalIdentifier
       extends TinyTypeFactory[OriginalIdentifier](new OriginalIdentifier(_))
       with DatasetIdentifierFactory[OriginalIdentifier]
@@ -178,6 +180,17 @@ object datasets {
       from(value.value) map (sameAs => new ExternalSameAs(sameAs.value))
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
+
+    def ofUnsafe(v: String)(implicit renkuUrl: RenkuUrl): SameAs =
+      of(v).fold(throw _, identity)
+
+    def of(v: String)(implicit renkuUrl: RenkuUrl): Either[IllegalArgumentException, SameAs] =
+      validateConstraints(v).toList match {
+        case Nil =>
+          if (v startsWith renkuUrl.value) new InternalSameAs(v).asRight
+          else new ExternalSameAs(v).asRight
+        case errors => new IllegalArgumentException(errors.mkString("; ")).asLeft
+      }
 
     implicit lazy val jsonLDEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
       case sameAs @ InternalSameAs(_) => internalSameAsEncoder(sameAs)

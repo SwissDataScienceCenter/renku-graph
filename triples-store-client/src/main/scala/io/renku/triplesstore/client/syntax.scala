@@ -36,6 +36,9 @@ object syntax extends TripleObjectEncoder.Instances with SparqlEncoder.Instances
   }
 
   final implicit class FragmentStringContext(private val sc: StringContext) {
+
+    def sparql(args: Any*): Fragment = fr(args: _*)
+
     def fr(args: Any*): Fragment = {
       val values = args.map(makeValue)
       Fragment(sc.s(values: _*))

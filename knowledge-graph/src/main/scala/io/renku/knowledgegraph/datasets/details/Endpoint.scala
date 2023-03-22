@@ -27,7 +27,6 @@ import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.datasets.Identifier
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.Href
@@ -36,7 +35,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.Response
+import org.http4s.{Response, Uri}
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -44,7 +43,7 @@ import java.time.Instant
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
+  def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
@@ -63,13 +62,14 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
   private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] = measureExecutionTime {
-    datasetFinder
-      .findDataset(identifier, authContext)
-      .flatTap(sendDatasetViewedEvent)
-      .flatMap(toHttpResult(identifier))
-      .recoverWith(httpResult(identifier))
-  } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+  def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
+    measureExecutionTime {
+      datasetFinder
+        .findDataset(identifier, authContext)
+        .flatTap(sendDatasetViewedEvent)
+        .flatMap(toHttpResult(identifier))
+        .recoverWith(httpResult(identifier))
+    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
   private lazy val sendDatasetViewedEvent: Option[Dataset] => F[Unit] = {
     case None => ().pure[F]
@@ -79,24 +79,21 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${DatasetViewedEvent.categoryName} event failed"))
   }
 
-  private def toHttpResult(
-      identifier: Identifier
-  ): Option[Dataset] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
+  private def toHttpResult(identifier: RequestedDataset): Option[Dataset] => F[Response[F]] = {
+    case None          => NotFound(InfoMessage(show"No '$identifier' dataset found"))
     case Some(dataset) => Ok(dataset.asJson)
   }
 
-  private def httpResult(
-      identifier: Identifier
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
-    Logger[F].error(exception)(errorMessage.value) >>
-      InternalServerError(errorMessage)
+  private def httpResult(identifier: RequestedDataset): PartialFunction[Throwable, F[Response[F]]] = {
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage(show"Finding dataset '$identifier' failed")
+      Logger[F].error(exception)(errorMessage.value) >>
+        InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[F], String] = {
+  private def finishedSuccessfully(identifier: RequestedDataset): PartialFunction[Response[F], String] = {
     case response if response.status == Ok || response.status == NotFound =>
-      s"Finding '$identifier' dataset finished"
+      show"Finding '$identifier' dataset finished"
   }
 }
 
@@ -110,6 +107,6 @@ object Endpoint {
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
   } yield new EndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder)
 
-  def href(renkuApiUrl: renku.ApiUrl, identifier: Identifier): Href =
-    Href(renkuApiUrl / "datasets" / identifier)
+  def href(renkuApiUrl: renku.ApiUrl, identifier: RequestedDataset): Href =
+    Href((Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / identifier).toString)
 }

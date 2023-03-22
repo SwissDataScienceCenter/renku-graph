@@ -21,6 +21,7 @@ package io.renku.knowledgegraph.projects.datasets.tags
 import io.renku.config.renku
 import io.renku.graph.model.{datasets, publicationEvents}
 import io.renku.knowledgegraph
+import io.renku.knowledgegraph.datasets.details.RequestedDataset
 
 private object model {
 
@@ -48,7 +49,7 @@ private object model {
           _links(
             Link(
               Rel("dataset-details") ->
-                knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, tag.datasetId)
+                knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(tag.datasetId))
             )
           )
         )
