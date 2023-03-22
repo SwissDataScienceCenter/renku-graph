@@ -140,6 +140,7 @@ class DatasetFinderSpec
         findById(dataset2.identifier, project2.path).value shouldBe expectedDS2
 
         val expectedDS1 = importedInternalToNonModified(dataset1, project1)
+          .copy(usedIn = expectedSourceDS.usedIn)
         findBySameAs(SameAs(sourceDataset.entityId), sourceProject.path, project1.path, project2.path).value should
           (be(expectedSourceDS) or be(expectedDS2) or be(expectedDS1))
       }

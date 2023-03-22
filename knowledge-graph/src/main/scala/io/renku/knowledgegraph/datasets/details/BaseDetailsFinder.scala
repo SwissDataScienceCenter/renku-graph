@@ -191,16 +191,22 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
     case Some(user) =>
-      fr"""|?originalDsProjId renku:projectVisibility ?visibility .
-           |OPTIONAL {
+      fr"""|?originalDsProjId renku:projectVisibility ?visibility.
+           |{
+           |  VALUES (?visibility) {
+           |    (${projects.Visibility.Public.asObject}) (${projects.Visibility.Internal.asObject})
+           |  }
+           |} UNION {
+           |  VALUES (?visibility) {
+           |    (${projects.Visibility.Private.asObject})
+           |  }
            |  ?originalDsProjId schema:member ?memberId
            |  GRAPH ${GraphClass.Persons.id} {
            |    ?memberId schema:sameAs ?sameAsId.
            |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-           |              schema:identifier ?userGitlabId
+           |              schema:identifier ${user.id.asObject}
            |  }
            |}
-           |FILTER (?visibility = ${projects.Visibility.Public.asObject} || ?userGitlabId = ${user.id.asObject})
            |""".stripMargin
     case _ =>
       fr"""|?originalDsProjId renku:projectVisibility ?visibility .
