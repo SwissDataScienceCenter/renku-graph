@@ -49,7 +49,7 @@ class DatasetIdRecordsFinderSpec
       )
     }
 
-    "return SecurityRecord with project visibility, path and no member if project is none" in new TestCase {
+    "return SecurityRecord with project visibility, path and no member if project has none" in new TestCase {
 
       val (dataset, project) =
         renkuProjectEntities(anyVisibility)
