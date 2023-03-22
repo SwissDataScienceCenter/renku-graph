@@ -20,12 +20,15 @@ package io.renku.knowledgegraph.datasets
 package details
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.entities.searchgraphs.SearchInfoDataset
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{projects, RenkuUrl}
 import io.renku.graph.model.datasets.{Identifier, SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
+import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.details.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -69,7 +72,7 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when unrelated projects are using the same imported dataset" in new TestCase {
+      "- a case when unrelated projects are using the same External dataset" in new TestCase {
 
         val commonSameAs = datasetExternalSameAs.generateOne
         val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
@@ -119,7 +122,7 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case where unrelated projects are using the same renku dataset" in new TestCase {
+      "- a case where unrelated projects are using the same Internal dataset" in new TestCase {
 
         val sourceDataset -> sourceProject =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
@@ -189,530 +192,500 @@ class DatasetFinderSpec
       ).value shouldBe expectedDSWithInvalidatedPart
     }
 
-//    "not return dataset if user is not authorised to the project where the DS belongs to" in new TestCase {
-//      val (dataset, project) =
-//        (anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)).generateOne
-//
-//      upload(to = projectsDataset, project)
-//
-//      datasetFinder
-//        .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(projectPaths.generateOne)))
-//        .unsafeRunSync() shouldBe None
-//    }
-//
-//    "return dataset without usedIn to which the user has no access to" in new TestCase {
-//      val authUser = authUsers.generateOne
-//      val (dataset, project) = (renkuProjectEntities(visibilityNonPublic).map(
-//        _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some)))
-//      ) addDataset datasetEntities(provenanceInternal)).generateOne
-//      val (_, otherProject) = renkuProjectEntities(visibilityNonPublic)
-//        .map(_.copy(members = personEntities(withGitLabId).generateSet()))
-//        .importDataset(dataset)
-//        .generateOne
-//
-//      upload(to = projectsDataset, project, otherProject)
-//
-//      datasetFinder
-//        .findDataset(dataset.identifier, AuthContext(authUser.some, dataset.identifier, Set(project.path)))
-//        .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
-//    }
-//
-//    "return dataset with usedIn to which the user has access to" in new TestCase {
-//      val authUser = authUsers.generateOne
-//      val (dataset, project) = (renkuProjectEntities(visibilityNonPublic).map(
-//        _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = authUser.id.some)))
-//      ) addDataset datasetEntities(provenanceInternal)).generateOne
-//      val (_, otherProject) = renkuProjectEntities(visibilityNonPublic)
-//        .map(_.copy(members = personEntities(withGitLabId).generateSet() ++ project.members))
-//        .importDataset(dataset)
-//        .generateOne
-//
-//      upload(to = projectsDataset, project, otherProject)
-//
-//      datasetFinder
-//        .findDataset(dataset.identifier,
-//                     AuthContext(authUser.some, dataset.identifier, Set(project.path, otherProject.path))
-//        )
-//        .unsafeRunSync() shouldBe internalToNonModified(dataset, project)
-//        .copy(usedIn = List(project.to[DatasetProject], otherProject.to[DatasetProject]).sorted)
-//        .some
-//    }
-//  }
-//
-//  "findDataset in case of forks" should {
-//
-//    "return details of the dataset with the given id " +
-//      "- a case where a Renku created dataset is defined on a project which has a fork" in new TestCase {
-//        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceInternal))
-//          .forkOnce()
-//          .generateOne
-//
-//        upload(to = projectsDataset, originalProject, fork)
-//
-//        assume(originalProject.datasets === fork.datasets,
-//               "Datasets on original project and its fork should be the same"
-//        )
-//
-//        datasetFinder
-//          .findDataset(originalDataset.identifier,
-//                       AuthContext(None, originalDataset.identifier, Set(originalProject.path))
-//          )
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(originalDataset, originalProject)
-//            .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
-//            .some
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- a case where unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
-//        val commonSameAs = datasetExternalSameAs.toGeneratorOfFixedValue
-//        val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
-//          .generateOne
-//        val (dataset2, project2 -> project2Fork) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
-//          .forkOnce()
-//          .generateOne
-//
-//        upload(to = projectsDataset, project1, project2, project2Fork)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe
-//          importedExternalToNonModified(dataset1, project1)
-//            .copy(usedIn =
-//              List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
-//            )
-//            .some
-//
-//        assume(project2.datasets === project2Fork.datasets, "Datasets on original project and fork should be the same")
-//
-//        datasetFinder
-//          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
-//          .unsafeRunSync() shouldBe
-//          importedExternalToNonModified(dataset2, project2)
-//            .copy(usedIn =
-//              List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject]).sorted
-//            )
-//            .some
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- a case where a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
-//        forAll(anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)) {
-//          case dataset -> grandparent =>
-//            val grandparentForked -> parent = grandparent.forkOnce()
-//            val parentForked -> child       = parent.forkOnce()
-//
-//            upload(to = projectsDataset, grandparentForked, parentForked, child)
-//
-//            assume(
-//              (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
-//              "Datasets on original project and forks have to be the same"
-//            )
-//
-//            datasetFinder
-//              .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(grandparentForked.path)))
-//              .unsafeRunSync() shouldBe
-//              internalToNonModified(dataset, grandparentForked)
-//                .copy(usedIn =
-//                  List(grandparentForked.to[DatasetProject],
-//                       parentForked.to[DatasetProject],
-//                       child.to[DatasetProject]
-//                  ).sorted
-//                )
-//                .some
-//        }
-//
-//        clear(projectsDataset)
-//      }
-//
-//    "return details of the modified dataset with the given id " +
-//      "- case where modification is followed by forking" in new TestCase {
-//        forAll(
-//          anyRenkuProjectEntities(visibilityPublic)
-//            .addDatasetAndModification(datasetEntities(provenanceInternal))
-//            .forkOnce()
-//        ) { case (original -> modified, project -> fork) =>
-//          upload(to = projectsDataset, project, fork)
-//
-//          datasetFinder
-//            .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
-//            .unsafeRunSync() shouldBe
-//            internalToNonModified(original, project).copy(usedIn = Nil).some
-//
-//          datasetFinder
-//            .findDataset(modified.identifier, AuthContext(None, modified.identifier, Set(project.path)))
-//            .unsafeRunSync() shouldBe
-//            modifiedToModified(modified, project)
-//              .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
-//              .some
-//
-//          clear(projectsDataset)
-//        }
-//      }
-//
-//    "return details of the modified dataset with the given id " +
-//      "- case where modification is followed by forking and some other modification" in new TestCase {
-//        val (original -> modified, project -> fork) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDatasetAndModification(datasetEntities(provenanceInternal))
-//          .forkOnce()
-//          .generateOne
-//        val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
-//
-//        upload(to = projectsDataset, projectUpdated, fork)
-//
-//        datasetFinder
-//          .findDataset(original.identifier, AuthContext(None, original.identifier, Set(projectUpdated.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(original, projectUpdated).copy(usedIn = Nil).some
-//
-//        datasetFinder
-//          .findDataset(modified.identifier, AuthContext(None, modified.identifier, Set(projectUpdated.path)))
-//          .unsafeRunSync() shouldBe
-//          modifiedToModified(modified, projectUpdated).copy(usedIn = List(fork.to[DatasetProject])).some
-//
-//        datasetFinder
-//          .findDataset(modifiedAgain.identifier, AuthContext(None, modifiedAgain.identifier, Set(projectUpdated.path)))
-//          .unsafeRunSync() shouldBe
-//          modifiedToModified(modifiedAgain, projectUpdated).some
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- case where forking is followed by modification" in new TestCase {
-//        forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
-//          case (original, project -> fork) =>
-//            val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
-//
-//            upload(to = projectsDataset, project, forkUpdated)
-//
-//            datasetFinder
-//              .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
-//              .unsafeRunSync() shouldBe
-//              internalToNonModified(original, project).some
-//
-//            datasetFinder
-//              .findDataset(modifiedOnFork.identifier,
-//                           AuthContext(None, modifiedOnFork.identifier, Set(forkUpdated.path))
-//              )
-//              .unsafeRunSync() shouldBe
-//              modifiedToModified(modifiedOnFork, forkUpdated).some
-//
-//            clear(projectsDataset)
-//        }
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- case when a dataset on a fork is deleted" in new TestCase {
-//        forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
-//          case (original, project -> fork) =>
-//            val invalidation         = original.invalidateNow(personEntities)
-//            val forkWithInvalidation = fork.addDatasets(invalidation)
-//
-//            upload(to = projectsDataset, project, forkWithInvalidation)
-//
-//            datasetFinder
-//              .findDataset(original.identifier, AuthContext.forUnknownUser(original.identifier, Set(project.path)))
-//              .unsafeRunSync() shouldBe
-//              internalToNonModified(original, project).some
-//
-//            datasetFinder
-//              .findDataset(invalidation.identifier,
-//                           AuthContext.forUnknownUser(invalidation.identifier, Set(project.path))
-//              )
-//              .unsafeRunSync() shouldBe None
-//
-//            clear(projectsDataset)
-//        }
-//      }
-//
-//    "return details of a fork dataset with the given id " +
-//      "- case where the dataset on the parent is deleted" in new TestCase {
-//        val (original, project -> fork) =
-//          anyRenkuProjectEntities(visibilityPublic)
-//            .addDataset(datasetEntities(provenanceInternal))
-//            .forkOnce()
-//            .generateOne
-//        val invalidation            = original.invalidateNow(personEntities)
-//        val projectWithInvalidation = project.addDatasets(invalidation)
-//
-//        upload(to = projectsDataset, projectWithInvalidation, fork)
-//
-//        datasetFinder
-//          .findDataset(original.identifier, AuthContext(None, original.identifier, Set(fork.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(original, fork).some
-//
-//        datasetFinder
-//          .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(fork.path)))
-//          .unsafeRunSync() shouldBe None
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- a case where the user has no access to the original project" in new TestCase {
-//        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceInternal))
-//          .forkOnce()
-//          .generateOne
-//
-//        upload(to = projectsDataset, originalProject, fork)
-//
-//        assume(originalProject.datasets === fork.datasets,
-//               "Datasets on original project and its fork should be the same"
-//        )
-//
-//        datasetFinder
-//          .findDataset(originalDataset.identifier, AuthContext(None, originalDataset.identifier, Set(fork.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(originalDataset, fork)
-//            .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
-//            .some
-//      }
-//  }
-//
-//  "findDataset in the case of dataset import hierarchy" should {
-//
-//    "return details of the dataset with the given id " +
-//      "- case where the first dataset is imported from a third party provider" in new TestCase {
-//        val commonSameAs = datasetExternalSameAs.toGeneratorOfFixedValue
-//        val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
-//          .generateOne
-//        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
-//          .generateOne
-//        val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
-//
-//        upload(to = projectsDataset, project1, project2, project3)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe
-//          importedExternalToNonModified(dataset1, project1)
-//            .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
-//            .some
-//
-//        datasetFinder
-//          .findDataset(dataset3.identifier, AuthContext(None, dataset3.identifier, Set(project3.path)))
-//          .unsafeRunSync() shouldBe
-//          importedInternalToNonModified(dataset3, project3)
-//            .copy(
-//              sameAs = dataset2.provenance.sameAs,
-//              usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
-//            )
-//            .some
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- case where the first dataset is renku created" in new TestCase {
-//        val (dataset1, project1) =
-//          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
-//        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-//        val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
-//
-//        upload(to = projectsDataset, project1, project2, project3)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(dataset1, project1)
-//            .copy(usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted)
-//            .some
-//
-//        datasetFinder
-//          .findDataset(dataset3.identifier, AuthContext(None, dataset3.identifier, Set(project3.path)))
-//          .unsafeRunSync() shouldBe
-//          importedInternalToNonModified(dataset3, project3)
-//            .copy(
-//              sameAs = SameAs(dataset1.provenance.entityId),
-//              usedIn = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
-//            )
-//            .some
-//      }
-//
-//    "return details of the dataset with the given id " +
-//      "- case where the sameAs hierarchy is broken by dataset modification" in new TestCase {
-//        val (dataset1, project1) =
-//          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
-//        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-//        val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
-//        val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
-//
-//        upload(to = projectsDataset, project1, project2Updated, project3)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(dataset1, project1).some
-//        datasetFinder
-//          .findDataset(dataset2Modified.identifier,
-//                       AuthContext(None, dataset2Modified.identifier, Set(project2Updated.path))
-//          )
-//          .unsafeRunSync() shouldBe
-//          modifiedToModified(dataset2Modified, project2Updated)
-//            .copy(usedIn = List(project2Updated.to[DatasetProject], project3.to[DatasetProject]).sorted)
-//            .some
-//      }
-//
-//    "not return the details of a dataset" +
-//      "- case where the latest import of the dataset has been invalidated" in new TestCase {
-//        val (dataset1, project1) =
-//          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
-//        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-//        val dataset2Invalidation = dataset2.invalidateNow(personEntities)
-//        val project2Updated      = project2.addDatasets(dataset2Invalidation)
-//
-//        upload(to = projectsDataset, project1, project2Updated)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe
-//          internalToNonModified(dataset1, project1).some
-//        datasetFinder
-//          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
-//          .unsafeRunSync() shouldBe None
-//        datasetFinder
-//          .findDataset(dataset2Invalidation.identifier,
-//                       AuthContext(None, dataset2Invalidation.identifier, Set(project2.path))
-//          )
-//          .unsafeRunSync() shouldBe None
-//      }
-//
-//    "not return the details of a dataset" +
-//      "- case where the original dataset has been invalidated" in new TestCase {
-//
-//        val (dataset1, project1) =
-//          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
-//        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
-//        val dataset1Invalidation = dataset1.invalidateNow(personEntities)
-//        val project1Updated      = project1.addDatasets(dataset1Invalidation)
-//
-//        upload(to = projectsDataset, project1Updated, project2)
-//
-//        datasetFinder
-//          .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
-//          .unsafeRunSync() shouldBe None
-//        datasetFinder
-//          .findDataset(dataset1Invalidation.identifier,
-//                       AuthContext(None, dataset1Invalidation.identifier, Set(project1.path))
-//          )
-//          .unsafeRunSync() shouldBe None
-//        datasetFinder
-//          .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
-//          .unsafeRunSync() shouldBe importedInternalToNonModified(dataset2, project2).some
-//      }
-//
-//    "not return the details of a dataset" +
-//      "- case where the latest modification of the dataset has been invalidated" in new TestCase {
-//        val (dataset -> datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDatasetAndModification(datasetEntities(provenanceInternal))
-//          .generateOne
-//        val datasetInvalidation = datasetModified.invalidateNow(personEntities)
-//        val projectUpdated      = project.addDatasets(datasetInvalidation)
-//
-//        upload(to = projectsDataset, projectUpdated)
-//
-//        datasetFinder
-//          .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
-//          .unsafeRunSync() shouldBe internalToNonModified(dataset, projectUpdated).copy(usedIn = Nil).some
-//        datasetFinder
-//          .findDataset(datasetModified.identifier, AuthContext(None, datasetModified.identifier, Set(project.path)))
-//          .unsafeRunSync() shouldBe None
-//        datasetFinder
-//          .findDataset(datasetInvalidation.identifier,
-//                       AuthContext(None, datasetInvalidation.identifier, Set(projectUpdated.path))
-//          )
-//          .unsafeRunSync() shouldBe None
-//      }
-//  }
-//
-//  "findDataset in the case the DS was imported from a tag" should {
-//
-//    "return info about the initial tag if it was imported from a tag on another Renku DS " +
-//      "which means there are PublicationEvents on both original and imported DS with the same name and desc, " +
-//      "there's sameAs on the imported DS to the original DS " +
-//      "and imported DS has schema:version the same as the PublicationEvent name" in new TestCase {
-//
-//        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(
-//            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
-//          )
-//          .generateOne
-//
-//        val originalDSTag = originalDS.publicationEvents.head
-//
-//        val (importedDS, importedDSProject) =
-//          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
-//
-//        upload(to = projectsDataset, originalDSProject, importedDSProject)
-//
-//        datasetFinder
-//          .findDataset(importedDS.identifier,
-//                       AuthContext(None, importedDS.identifier, Set(originalDSProject.path, importedDSProject.path))
-//          )
-//          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject)
-//          .copy(
-//            maybeInitialTag = Tag(originalDSTag.name, originalDSTag.maybeDescription).some,
-//            usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
-//          )
-//          .some
-//      }
-//
-//    "not return info about the initial tag even if it was imported from a tag on another Renku DS " +
-//      "but the user has no access to the project of the original DS anymore" in new TestCase {
-//
-//        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPrivate)
-//          .addDataset(
-//            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
-//          )
-//          .generateOne
-//
-//        val originalDSTag = originalDS.publicationEvents.head
-//
-//        val (importedDS, importedDSProject) =
-//          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
-//
-//        upload(to = projectsDataset, originalDSProject, importedDSProject)
-//
-//        datasetFinder
-//          .findDataset(importedDS.identifier, AuthContext(None, importedDS.identifier, Set(importedDSProject.path)))
-//          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject).some
-//      }
-//
-//    "not return info about the initial tag if " +
-//      "there are PublicationEvents with the same name and desc on both original and imported DS " +
-//      "but the version on the imported DS is different that the event name" in new TestCase {
-//
-//        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
-//          .addDataset(
-//            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
-//          )
-//          .generateOne
-//
-//        val originalDSTag = originalDS.publicationEvents.head
-//
-//        val (importedDS, importedDSProject) = {
-//          val (ds, proj)    = anyRenkuProjectEntities(visibilityPublic).importDataset(originalDS).generateOne
-//          val dsWithSameTag = ds.copy(publicationEventFactories = List(originalDSTag.toFactory))
-//          dsWithSameTag -> proj.replaceDatasets(dsWithSameTag)
-//        }
-//
-//        upload(to = projectsDataset, originalDSProject, importedDSProject)
-//
-//        originalDSTag.name             shouldBe importedDS.publicationEvents.head.name
-//        originalDSTag.maybeDescription shouldBe importedDS.publicationEvents.head.maybeDescription
-//
-//        datasetFinder
-//          .findDataset(importedDS.identifier,
-//                       AuthContext(None, importedDS.identifier, Set(originalDSProject.path, importedDSProject.path))
-//          )
-//          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject)
-//          .copy(maybeInitialTag = None,
-//                usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
-//          )
-//          .some
-//      }
+    "not return a dataset if the user is not authorised for the project where the DS belongs to" in new TestCase {
+
+      val (dataset, project) =
+        anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+      provisionTestProject(project).unsafeRunSync()
+
+      findById(dataset.identifier, projectPaths.generateOne)                          shouldBe None
+      findByTopmostSameAs(dataset.provenance.topmostSameAs, projectPaths.generateOne) shouldBe None
+    }
+
+    "return dataset without usedIn to which the user has no access" in new TestCase {
+
+      val authUser = authUsers.generateOne
+      val (dataset, project) = renkuProjectEntities(visibilityNonPublic)
+        .map(replaceMembers(Set(personEntities(authUser.id.some).generateOne)))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+      val (_, otherProject) = renkuProjectEntities(visibilityNonPublic)
+        .map(replaceMembers(Set(personEntities(withGitLabId).generateOne)))
+        .importDataset(dataset)
+        .generateOne
+
+      provisionTestProjects(project, otherProject).unsafeRunSync()
+
+      val expectedDS = internalToNonModified(dataset, project)
+      findById(dataset.identifier, authUser, project.path).value                          shouldBe expectedDS
+      findByTopmostSameAs(dataset.provenance.topmostSameAs, authUser, project.path).value shouldBe expectedDS
+    }
+
+    "return dataset with usedIn to which the user has access" in new TestCase {
+
+      val authUser = authUsers.generateOne
+      val (dataset, project) = renkuProjectEntities(visibilityNonPublic)
+        .map(replaceMembers(Set(personEntities(authUser.id.some).generateOne)))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+      val (otherDS, otherProject) = renkuProjectEntities(visibilityNonPublic)
+        .map(replaceMembers(personEntities(withGitLabId).generateSet() ++ project.members))
+        .importDataset(dataset)
+        .generateOne
+
+      provisionTestProjects(project, otherProject).unsafeRunSync()
+
+      val expectedUsedIns = List(project.to[DatasetProject], otherProject.to[DatasetProject]).sorted
+      val expectedDS      = internalToNonModified(dataset, project).copy(usedIn = expectedUsedIns)
+      val expectedOtherDS = importedInternalToNonModified(otherDS, otherProject).copy(usedIn = expectedUsedIns)
+      findById(dataset.identifier, authUser, project.path, otherProject.path).value shouldBe expectedDS
+      findByTopmostSameAs(dataset.provenance.topmostSameAs, authUser, project.path, otherProject.path).value should
+        (be(expectedDS) or be(expectedOtherDS))
+    }
+  }
+
+  "findDataset in case of forks" should {
+
+    "return details of the dataset with the given id " +
+      "- a case where an Internal dataset is defined on a project which has a fork" in new TestCase {
+
+        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+
+        provisionTestProjects(originalProject, fork).unsafeRunSync()
+
+        assume(originalProject.datasets === fork.datasets,
+               "Datasets on original project and its fork should be the same"
+        )
+
+        val expectedDS = internalToNonModified(originalDataset, originalProject)
+          .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+        findById(originalDataset.identifier, originalProject.path).value                          shouldBe expectedDS
+        findByTopmostSameAs(originalDataset.provenance.topmostSameAs, originalProject.path).value shouldBe expectedDS
+      }
+
+    "return details of the dataset with the given id " +
+      "- a case where unrelated projects are sharing a dataset and one of has a fork" in new TestCase {
+
+        val commonSameAs = datasetExternalSameAs.generateOne
+        val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
+          .generateOne
+        val (dataset2, project2 -> project2Fork) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
+          .forkOnce()
+          .generateOne
+
+        provisionTestProjects(project1, project2, project2Fork).unsafeRunSync()
+
+        val expectedUsedIns =
+          List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject])
+        val expectedDS1 = importedExternalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns.sorted)
+        findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
+
+        assume(project2.datasets === project2Fork.datasets, "Datasets on original project and fork should be the same")
+
+        val expectedDS2 = importedExternalToNonModified(dataset2, project2).copy(usedIn = expectedUsedIns.sorted)
+        findById(dataset2.identifier, project2.path).value shouldBe expectedDS2
+
+        val expectedDS2Fork =
+          importedExternalToNonModified(dataset2, project2Fork).copy(usedIn = expectedUsedIns.sorted)
+        findBySameAs(commonSameAs, project1.path, project2.path, project2Fork.path).value should
+          (be(expectedDS1) or be(expectedDS2) or be(expectedDS2Fork))
+      }
+
+    "return details of the dataset with the given id " +
+      "- a case where an Internal dataset is defined on a grandparent project with two levels of forks" in new TestCase {
+
+        val dataset -> grandparent =
+          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        val grandparentForked -> parent = grandparent.forkOnce()
+        val parentForked -> child       = parent.forkOnce()
+
+        provisionTestProjects(grandparentForked, parentForked, child).unsafeRunSync()
+
+        assume(
+          (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
+          "Datasets on original project and forks have to be the same"
+        )
+
+        val expectedDS = internalToNonModified(dataset, grandparentForked).copy(usedIn =
+          List(grandparentForked.to[DatasetProject], parentForked.to[DatasetProject], child.to[DatasetProject]).sorted
+        )
+        findById(dataset.identifier, grandparentForked.path).value                          shouldBe expectedDS
+        findByTopmostSameAs(dataset.provenance.topmostSameAs, grandparentForked.path).value shouldBe expectedDS
+      }
+
+    "return details of the modified dataset with the given id " +
+      "- case where modification is followed by forking" in new TestCase {
+
+        val (original -> modified, project -> fork) =
+          anyRenkuProjectEntities(visibilityPublic)
+            .addDatasetAndModification(datasetEntities(provenanceInternal))
+            .forkOnce()
+            .generateOne
+
+        provisionTestProjects(project, fork).unsafeRunSync()
+
+        findById(original.identifier, project.path).value shouldBe
+          internalToNonModified(original, project).copy(usedIn = Nil)
+
+        val expectedUsedIns  = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted
+        val expectedModified = modifiedToModified(modified, project).copy(usedIn = expectedUsedIns)
+        findById(modified.identifier, project.path).value shouldBe expectedModified
+
+        val expectedModifiedFork = modifiedToModified(modified, fork).copy(usedIn = expectedUsedIns)
+        findByTopmostSameAs(modified.provenance.topmostSameAs, project.path, fork.path).value should
+          (be(expectedModified) or be(expectedModifiedFork))
+      }
+
+    "return details of the modified dataset with the given id " +
+      "- case where modification is followed by forking and some other modification" in new TestCase {
+
+        val (original -> modified, project -> fork) = anyRenkuProjectEntities(visibilityPublic)
+          .addDatasetAndModification(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+        val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
+
+        provisionTestProjects(projectUpdated, fork).unsafeRunSync()
+
+        findById(original.identifier, projectUpdated.path).value shouldBe
+          internalToNonModified(original, projectUpdated).copy(usedIn = Nil)
+        findByTopmostSameAs(original.provenance.topmostSameAs, projectUpdated.path) shouldBe None
+
+        val expectedModified = modifiedToModified(modified, projectUpdated).copy(usedIn = List(fork.to[DatasetProject]))
+        findById(modified.identifier, projectUpdated.path).value                    shouldBe expectedModified
+        findByTopmostSameAs(modified.provenance.topmostSameAs, projectUpdated.path) shouldBe None
+
+        val expectedLastModification = modifiedToModified(modifiedAgain, projectUpdated)
+        findById(modifiedAgain.identifier, projectUpdated.path).value shouldBe expectedLastModification
+        findByTopmostSameAs(modifiedAgain.provenance.topmostSameAs,
+                            projectUpdated.path
+        ).value shouldBe expectedLastModification
+      }
+
+    "return details of the dataset with the given id " +
+      "- case where forking is followed by modification" in new TestCase {
+
+        val (original, project -> fork) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+        val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
+
+        provisionTestProjects(project, forkUpdated).unsafeRunSync()
+
+        val expectedOriginal = internalToNonModified(original, project)
+        findById(original.identifier, project.path).value                          shouldBe expectedOriginal
+        findByTopmostSameAs(original.provenance.topmostSameAs, project.path).value shouldBe expectedOriginal
+
+        val expectedModificationOnFork = modifiedToModified(modifiedOnFork, forkUpdated)
+        findById(modifiedOnFork.identifier, forkUpdated.path).value shouldBe expectedModificationOnFork
+        findByTopmostSameAs(modifiedOnFork.provenance.topmostSameAs,
+                            forkUpdated.path
+        ).value shouldBe expectedModificationOnFork
+      }
+
+    "return details of the dataset with the given id " +
+      "- case when a dataset on a fork is deleted" in new TestCase {
+
+        val (original, project -> fork) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+        val invalidation         = original.invalidateNow(personEntities)
+        val forkWithInvalidation = fork.addDatasets(invalidation)
+
+        provisionTestProjects(project, forkWithInvalidation).unsafeRunSync()
+
+        val expectedOriginal = internalToNonModified(original, project)
+        findById(original.identifier, project.path).value                          shouldBe expectedOriginal
+        findByTopmostSameAs(original.provenance.topmostSameAs, project.path).value shouldBe expectedOriginal
+
+        findById(invalidation.identifier, project.path) shouldBe None
+      }
+
+    "return details of a fork dataset with the given id " +
+      "- case where the dataset on the parent is deleted" in new TestCase {
+
+        val (original, project -> fork) =
+          anyRenkuProjectEntities(visibilityPublic)
+            .addDataset(datasetEntities(provenanceInternal))
+            .forkOnce()
+            .generateOne
+        val invalidation            = original.invalidateNow(personEntities)
+        val projectWithInvalidation = project.addDatasets(invalidation)
+
+        provisionTestProjects(projectWithInvalidation, fork).unsafeRunSync()
+
+        val expectedOriginal = internalToNonModified(original, fork)
+        findById(original.identifier, fork.path).value                          shouldBe expectedOriginal
+        findByTopmostSameAs(original.provenance.topmostSameAs, fork.path).value shouldBe expectedOriginal
+
+        findById(invalidation.identifier, fork.path) shouldBe None
+      }
+
+    "return details of the dataset with the given id " +
+      "- a case where the user has no access to the original project" in new TestCase {
+
+        val (originalDataset, originalProject -> fork) = renkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceInternal))
+          .forkOnce()
+          .generateOne
+
+        provisionTestProjects(originalProject, fork).unsafeRunSync()
+
+        assume(originalProject.datasets === fork.datasets,
+               "Datasets on original project and its fork should be the same"
+        )
+
+        val expectedDS = internalToNonModified(originalDataset, fork)
+          .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+        findById(originalDataset.identifier, fork.path).value                          shouldBe expectedDS
+        findByTopmostSameAs(originalDataset.provenance.topmostSameAs, fork.path).value shouldBe expectedDS
+      }
+  }
+
+  "findDataset in the case of dataset import hierarchy" should {
+
+    "return details of the dataset with the given id " +
+      "- a case where the first dataset is an External dataset" in new TestCase {
+
+        val commonSameAs = datasetExternalSameAs.generateOne
+        val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
+          .generateOne
+        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
+          .generateOne
+        val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
+
+        provisionTestProjects(project1, project2, project3).unsafeRunSync()
+
+        val expectedUsedIns = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
+        val expectedDS1     = importedExternalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
+        findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
+
+        val expectedDS3 = importedInternalToNonModified(dataset3, project3).copy(
+          sameAs = dataset2.provenance.sameAs,
+          usedIn = expectedUsedIns
+        )
+        findById(dataset3.identifier, project3.path).value shouldBe expectedDS3
+
+        val expectedDS2 = importedExternalToNonModified(dataset2, project2).copy(usedIn = expectedUsedIns)
+        findBySameAs(commonSameAs, List(project1, project2, project3).map(_.path): _*).value should
+          (be(expectedDS1) or be(expectedDS2) or be(expectedDS3))
+      }
+
+    "return details of the dataset with the given id " +
+      "- case where the first dataset is an Internal dataset" in new TestCase {
+
+        val (dataset1, project1) =
+          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
+        val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
+
+        provisionTestProjects(project1, project2, project3).unsafeRunSync()
+
+        val expectedUsedIns = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
+        val expectedDS1     = internalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
+        findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
+
+        val expectedDS3 = importedInternalToNonModified(dataset3, project3).copy(
+          sameAs = SameAs(dataset1.provenance.entityId),
+          usedIn = expectedUsedIns
+        )
+        findById(dataset3.identifier, project3.path).value shouldBe expectedDS3
+
+        val expectedDS2 = importedInternalToNonModified(dataset2, project2).copy(usedIn = expectedUsedIns)
+        findByTopmostSameAs(dataset1.provenance.topmostSameAs,
+                            List(project1, project2, project3).map(_.path): _*
+        ).value should (be(expectedDS1) or be(expectedDS2) or be(expectedDS3))
+      }
+
+    "return details of the dataset with the given id " +
+      "- case where the sameAs hierarchy is broken by dataset modification" in new TestCase {
+
+        val (dataset1, project1) =
+          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
+        val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
+        val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
+
+        provisionTestProjects(project1, project2Updated, project3).unsafeRunSync()
+
+        val expectedDS1 = internalToNonModified(dataset1, project1)
+        findById(dataset1.identifier, project1.path).value                          shouldBe expectedDS1
+        findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.path).value shouldBe expectedDS1
+
+        val expectedDS2Modified = modifiedToModified(dataset2Modified, project2Updated)
+          .copy(usedIn = List(project2Updated, project3).map(_.to[DatasetProject]).sorted)
+        findById(dataset2Modified.identifier, project2Updated.path).value shouldBe expectedDS2Modified
+        findByTopmostSameAs(dataset2Modified.provenance.topmostSameAs,
+                            project2Updated.path
+        ).value shouldBe expectedDS2Modified
+      }
+
+    "not return details of a dataset" +
+      "- case where the latest import of the dataset has been invalidated" in new TestCase {
+
+        val (dataset1, project1) =
+          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
+        val dataset2Invalidation = dataset2.invalidateNow(personEntities)
+        val project2Updated      = project2.addDatasets(dataset2Invalidation)
+
+        provisionTestProjects(project1, project2Updated).unsafeRunSync()
+
+        val expectedDS1 = internalToNonModified(dataset1, project1)
+        findById(dataset1.identifier, project1.path).value                          shouldBe expectedDS1
+        findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.path).value shouldBe expectedDS1
+
+        findById(dataset2.identifier, project2.path)                          shouldBe None
+        findByTopmostSameAs(dataset2.provenance.topmostSameAs, project2.path) shouldBe None
+        findById(dataset2Invalidation.identifier, project2.path)              shouldBe None
+      }
+
+    "not return details of a dataset" +
+      "- case where the original dataset has been invalidated" in new TestCase {
+
+        val (dataset1, project1) =
+          anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
+        val dataset1Invalidation = dataset1.invalidateNow(personEntities)
+        val project1Updated      = project1.addDatasets(dataset1Invalidation)
+
+        provisionTestProjects(project1Updated, project2).unsafeRunSync()
+
+        findById(dataset1.identifier, project1.path)                          shouldBe None
+        findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.path) shouldBe None
+        findById(dataset1Invalidation.identifier, project1.path)              shouldBe None
+
+        val expectedDS2 = importedInternalToNonModified(dataset2, project2)
+        findById(dataset2.identifier, project2.path).value                          shouldBe expectedDS2
+        findByTopmostSameAs(dataset2.provenance.topmostSameAs, project2.path).value shouldBe expectedDS2
+      }
+
+    "not return details of a dataset" +
+      "- case where the latest modification of the dataset has been invalidated" in new TestCase {
+
+        val (dataset -> datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
+          .addDatasetAndModification(datasetEntities(provenanceInternal))
+          .generateOne
+        val datasetInvalidation = datasetModified.invalidateNow(personEntities)
+        val projectUpdated      = project.addDatasets(datasetInvalidation)
+
+        provisionTestProject(projectUpdated).unsafeRunSync()
+
+        findById(dataset.identifier, project.path).value shouldBe internalToNonModified(dataset, projectUpdated)
+          .copy(usedIn = Nil)
+        findByTopmostSameAs(dataset.provenance.topmostSameAs, project.path) shouldBe None
+
+        findById(datasetModified.identifier, project.path)                          shouldBe None
+        findByTopmostSameAs(datasetModified.provenance.topmostSameAs, project.path) shouldBe None
+
+        findById(datasetInvalidation.identifier, projectUpdated.path)                          shouldBe None
+        findByTopmostSameAs(datasetInvalidation.provenance.topmostSameAs, projectUpdated.path) shouldBe None
+      }
+  }
+
+  "findDataset in the case the DS was imported from a tag" should {
+
+    "return info about the initial tag if it was imported from a tag on another Renku DS " +
+      "which means there are PublicationEvents on both original and imported DS with the same name and desc, " +
+      "there's sameAs on the imported DS to the original DS " +
+      "and imported DS has schema:version the same as the PublicationEvent name" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) =
+          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
+
+        provisionTestProjects(originalDSProject, importedDSProject).unsafeRunSync()
+
+        val expectedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
+          maybeInitialTag = Tag(originalDSTag.name, originalDSTag.maybeDescription).some,
+          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+        )
+        findById(importedDS.identifier, originalDSProject.path, importedDSProject.path).value shouldBe expectedDS
+        findByTopmostSameAs(importedDS.provenance.topmostSameAs,
+                            originalDSProject.path,
+                            importedDSProject.path
+        ).value shouldBe expectedDS
+      }
+
+    "not return info about the initial tag even if it was imported from a tag on another Renku DS " +
+      "but the user has no access to the project of the original DS anymore" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPrivate)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) =
+          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
+
+        provisionTestProjects(originalDSProject, importedDSProject).unsafeRunSync()
+
+        val expectedDS = importedInternalToNonModified(importedDS, importedDSProject)
+        findById(importedDS.identifier, importedDSProject.path).value                          shouldBe expectedDS
+        findByTopmostSameAs(importedDS.provenance.topmostSameAs, importedDSProject.path).value shouldBe expectedDS
+      }
+
+    "not return info about the initial tag if " +
+      "there are PublicationEvents with the same name and desc on both original and imported DS " +
+      "but the version on the imported DS is different that the event name" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) = {
+          val (ds, proj)    = anyRenkuProjectEntities(visibilityPublic).importDataset(originalDS).generateOne
+          val dsWithSameTag = ds.copy(publicationEventFactories = List(originalDSTag.toFactory))
+          dsWithSameTag -> proj.replaceDatasets(dsWithSameTag)
+        }
+
+        provisionTestProjects(originalDSProject, importedDSProject).unsafeRunSync()
+
+        originalDSTag.name             shouldBe importedDS.publicationEvents.head.name
+        originalDSTag.maybeDescription shouldBe importedDS.publicationEvents.head.maybeDescription
+
+        val expectedImportedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
+          maybeInitialTag = None,
+          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+        )
+        findById(importedDS.identifier,
+                 originalDSProject.path,
+                 importedDSProject.path
+        ).value shouldBe expectedImportedDS
+
+        val expectedOriginalDS = internalToNonModified(originalDS, originalDSProject).copy(
+          maybeInitialTag = None,
+          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+        )
+        findByTopmostSameAs(importedDS.provenance.topmostSameAs,
+                            originalDSProject.path,
+                            importedDSProject.path
+        ).value should (be(expectedImportedDS) or be(expectedOriginalDS))
+      }
   }
 
   implicit override val ioLogger: TestLogger[IO] = TestLogger[IO]()
@@ -720,13 +693,15 @@ class DatasetFinderSpec
   private trait TestCase {
     implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val datasetFinder = new DatasetFinderImpl[IO](
+    private val datasetFinder = new DatasetFinderImpl[IO](
       new BaseDetailsFinderImpl[IO](projectsDSConnectionInfo),
       new CreatorsFinderImpl[IO](projectsDSConnectionInfo),
       new PartsFinderImpl[IO](projectsDSConnectionInfo),
       new ProjectsFinderImpl[IO](projectsDSConnectionInfo)
     )
 
+    def findById(identifier: Identifier, authUser: AuthUser, allowedProjects: projects.Path*): Option[details.Dataset] =
+      findDS(RequestedDataset(identifier), authUser, allowedProjects: _*)
     def findById(identifier: Identifier, allowedProjects: projects.Path*): Option[details.Dataset] =
       findDS(RequestedDataset(identifier), allowedProjects: _*)
 
@@ -735,10 +710,26 @@ class DatasetFinderSpec
 
     def findByTopmostSameAs(topmostSameAs: TopmostSameAs, allowedProjects: projects.Path*): Option[details.Dataset] =
       findDS(RequestedDataset(SameAs.ofUnsafe(topmostSameAs.value)), allowedProjects: _*)
+    def findByTopmostSameAs(topmostSameAs:   TopmostSameAs,
+                            authUser:        AuthUser,
+                            allowedProjects: projects.Path*
+    ): Option[details.Dataset] =
+      findDS(RequestedDataset(SameAs.ofUnsafe(topmostSameAs.value)), authUser, allowedProjects: _*)
 
-    def findDS(requestedDS: RequestedDataset, allowedProjects: projects.Path*): Option[details.Dataset] =
+    private def findDS(requestedDS: RequestedDataset, allowedProjects: projects.Path*): Option[details.Dataset] =
+      findDS(requestedDS, AuthContext.forUnknownUser(requestedDS, allowedProjects.toSet))
+
+    private def findDS(requestedDS:     RequestedDataset,
+                       authUser:        AuthUser,
+                       allowedProjects: projects.Path*
+    ): Option[details.Dataset] =
+      findDS(requestedDS, AuthContext(authUser.some, requestedDS, allowedProjects.toSet))
+
+    private def findDS(requestedDS: RequestedDataset,
+                       authContext: AuthContext[RequestedDataset]
+    ): Option[details.Dataset] =
       datasetFinder
-        .findDataset(requestedDS, AuthContext.forUnknownUser(requestedDS, allowedProjects.toSet))
+        .findDataset(requestedDS, authContext)
         .unsafeRunSync()
 
     ioLogger.reset()
