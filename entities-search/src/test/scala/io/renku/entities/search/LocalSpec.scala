@@ -20,10 +20,14 @@ package io.renku.entities.search
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
+import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.http.client.AccessToken.UserOAuthAccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -31,6 +35,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{ExternalJenaForSpec, InMemoryJenaForSpec, ProjectsDataset, SparqlQuery, SparqlQueryTimeRecorder}
 import org.scalatest.flatspec.AnyFlatSpec
 
+import java.time.LocalDate
 import scala.language.reflectiveCalls
 
 class LocalSpec
@@ -71,8 +76,16 @@ class LocalSpec
 
   it should "play with query" in {
 
-    val criteria = Criteria()
-    val query    = DatasetsQuery2.query(criteria).get
+    val criteria =
+      Criteria(
+        filters = Criteria.Filters(
+          entityTypes = Set(EntityType.Dataset),
+          creators = Set("Jonas Meirer"),
+          maybeSince = Some(Criteria.Filters.Since(LocalDate.now()))
+        ),
+        maybeUser = Some(AuthUser(GitLabId(88), UserOAuthAccessToken("bla")))
+      )
+    val query = DatasetsQuery2.query(criteria).get
     val q = SparqlQuery.of(
       "test",
       Prefixes.of(Schemas.xsd -> "xsd", Schemas.schema -> "schema", Schemas.renku -> "renku"),
