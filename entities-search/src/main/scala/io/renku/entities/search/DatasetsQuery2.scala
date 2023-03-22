@@ -23,7 +23,7 @@ import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{GraphClass, persons, projects}
+import io.renku.graph.model.{GraphClass, RenkuUrl, persons, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
@@ -61,7 +61,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     imagesVar
   ).map(_.name)
 
-  //TODO reorganize fragments to go into one graph selection
+  // TODO reorganize fragments to go into one graph selection
   override def query(criteria: Criteria): Option[String] =
     criteria.filters.whenRequesting(entityType) {
       fr"""SELECT $entityTypeVar
@@ -113,7 +113,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = DatasetsQuery.decoder
+  override def decoder[EE >: Entity.Dataset](implicit renkuUrl: RenkuUrl): Decoder[EE] = DatasetsQuery.decoder
 
   def pathVisibility: Fragment =
 //    |${

@@ -20,7 +20,7 @@ package io.renku.entities.search
 
 import Criteria.Filters.EntityType
 import io.circe.Decoder
-import io.renku.graph.model.{GraphClass, persons, projects}
+import io.renku.graph.model.{GraphClass, RenkuUrl, persons, projects}
 import model.{Entity, MatchingScore}
 
 private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
@@ -100,7 +100,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     // format: on
   }
 
-  override def decoder[EE >: Entity.Project]: Decoder[EE] = { implicit cursor =>
+  override def decoder[EE >: Entity.Project](implicit renkuUrl: RenkuUrl): Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import cats.syntax.all._
     import io.renku.tinytypes.json.TinyTypeDecoders._

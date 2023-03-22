@@ -106,7 +106,7 @@ private object ModelEncoders {
           _links(
             Link(
               Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl,
-                                                                              RequestedDataset(ds.identifier)
+                                                                              RequestedDataset(ds.sameAs)
               )
             )
           )

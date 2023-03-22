@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.entities.{CompositePlan, StepPlan}
-import io.renku.graph.model.{plans, projects}
+import io.renku.graph.model.{RenkuUrl, plans, projects}
 import model.Entity.Workflow.WorkflowType
 import model.{Entity, MatchingScore}
 
@@ -127,7 +127,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
        |}
        |""".stripMargin
 
-  override def decoder[EE >: Entity.Workflow]: Decoder[EE] = { implicit cursor =>
+  override def decoder[EE >: Entity.Workflow](implicit renkuUrl: RenkuUrl): Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import cats.syntax.all._
     import io.renku.tinytypes.json.TinyTypeDecoders._

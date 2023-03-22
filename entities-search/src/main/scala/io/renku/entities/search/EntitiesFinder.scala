@@ -22,6 +22,7 @@ import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.RenkuUrl
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
@@ -32,7 +33,7 @@ import model._
 import org.typelevel.log4cats.Logger
 
 trait EntitiesFinder[F[_]] {
-  def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
+  def findEntities(criteria: Criteria)(implicit renkuUrl: RenkuUrl): F[PagingResponse[Entity]]
 }
 
 object EntitiesFinder {
@@ -53,7 +54,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.SparqlQuery.Prefixes
 
-  override def findEntities(criteria: Criteria): F[PagingResponse[Entity]] = {
+  override def findEntities(criteria: Criteria)(implicit renkuUrl: RenkuUrl): F[PagingResponse[Entity]] = {
     implicit val resultsFinder: PagedResultsFinder[F, Entity] = pagedResultsFinder(query(criteria))
     findPage[F](criteria.paging)
   }
@@ -81,7 +82,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     encoder(sorting.toOrderBy(mapPropertyName)).sparql
   }
 
-  private implicit lazy val recordDecoder: Decoder[Entity] = { implicit cursor =>
+  private implicit def recordDecoder(implicit renkuUrl: RenkuUrl): Decoder[Entity] = { implicit cursor =>
     import io.circe.DecodingFailure
     import io.renku.triplesstore.ResultsDecoder._
 

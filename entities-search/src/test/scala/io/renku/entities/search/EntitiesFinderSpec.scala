@@ -26,6 +26,7 @@ import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.Generators._
+import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
@@ -34,6 +35,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.{Dataset, StepPlan}
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.{SortBy, Sorting}
@@ -41,8 +43,8 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.{Instant, LocalDate, ZoneOffset}
@@ -51,8 +53,10 @@ import scala.util.Random
 class EntitiesFinderSpec
     extends AnyWordSpec
     with should.Matchers
-      with EntitiesGenerators
+    with EntitiesGenerators
     with FinderSpecOps
+    with SearchDiffInstances
+    with AdditionalMatchers
     with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDataset
@@ -70,7 +74,7 @@ class EntitiesFinderSpec
 
       upload(to = projectsDataset, project)
 
-      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe allEntitiesFrom(project).sortBy(_.name)(
+      finder.findEntities(Criteria()).unsafeRunSync().results shouldMatchTo allEntitiesFrom(project).sortBy(_.name)(
         nameOrdering
       )
     }

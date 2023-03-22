@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model._
+import io.renku.jsonld.EntityId
 import model.{Entity, MatchingScore}
 
 private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
@@ -152,7 +153,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
     // format: on
   }
 
-  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { implicit cursor =>
+  override def decoder[EE >: Entity.Dataset](implicit renkuUrl: RenkuUrl): Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -211,16 +212,17 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
       maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
       images    <- extract[Option[String]]("images") >>= toListOfImageUris
-    } yield Entity.Dataset(matchingScore,
-                           idPathAndVisibility._1,
-                           name,
-                           idPathAndVisibility._3,
-                           date,
-                           creators,
-                           keywords,
-                           maybeDesc,
-                           images,
-                           idPathAndVisibility._2
+    } yield Entity.Dataset(
+      matchingScore,
+      datasets.SameAs.apply(EntityId.of((renkuUrl / "datasets" / idPathAndVisibility._1).value)),
+      name,
+      idPathAndVisibility._3,
+      date,
+      creators,
+      keywords,
+      maybeDesc,
+      images,
+      idPathAndVisibility._2
     )
   }
 }

@@ -61,7 +61,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
   import org.http4s.circe.jsonEncoderOf
 
   override def `GET /entities`(criteria: Criteria, request: Request[F]): F[Response[F]] =
-    finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
+    finder.findEntities(criteria)(renkuUrl) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
     implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")

@@ -34,6 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
+import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.images.ImageUri
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -43,6 +44,7 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.jsonld.EntityId
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -57,6 +59,8 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
+  implicit val renkuUrl = renkuUrls.generateOne
+  val renkuApiUrl       = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   "GET /entities" should {
 
@@ -102,9 +106,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       logger.loggedOnly(Error(errorMessage, exception))
     }
   }
-
-  private lazy val renkuUrl    = renkuUrls.generateOne
-  private lazy val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   private trait TestCase {
     val criteria = criterias.generateOne
@@ -216,7 +217,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                           .toRight(DecodingFailure("Invalid dataset-details link", Nil))
                           .map(datasets.Identifier)
           projectPath <- possibleEntities.collect {
-                           case ds: model.Entity.Dataset if ds.identifier == identifier => ds.exemplarProjectPath
+                           case ds: model.Entity.Dataset if ds.sameAs.value.contains(identifier.value) =>
+                             ds.exemplarProjectPath
                          } match {
                            case path :: Nil => path.asRight
                            case _ => DecodingFailure(s"DS $identifier doesn't exist in possible results", Nil).asLeft
@@ -230,7 +232,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
             )
           }
         } yield model.Entity.Dataset(score,
-                                     identifier,
+                                     SameAs(EntityId.of((renkuUrl / identifier.value).value)),
                                      name,
                                      visibility,
                                      date,

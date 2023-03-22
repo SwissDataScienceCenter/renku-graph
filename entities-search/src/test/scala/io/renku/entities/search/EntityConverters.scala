@@ -20,7 +20,7 @@ package io.renku.entities.search
 
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.graph.model.testentities.{Entity => _, _}
-import io.renku.graph.model.{RenkuUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import model._
 
 private object EntityConverters {
@@ -38,11 +38,12 @@ private object EntityConverters {
       project.images
     )
 
-  private[search] implicit def datasetConverter[P <: testentities.Project]
-      : ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
+  private[search] implicit def datasetConverter[P <: testentities.Project](implicit
+      renkuUrl: RenkuUrl
+  ): ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
       MatchingScore.min,
-      dataset.identification.identifier,
+      datasets.SameAs(Dataset.entityId(dataset.identification.identifier)),
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,
