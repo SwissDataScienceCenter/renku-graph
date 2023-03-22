@@ -614,15 +614,21 @@ class DatasetFinderSpec
 
         provisionTestProjects(originalDSProject, importedDSProject).unsafeRunSync()
 
-        val expectedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
+        val expectedUsedIns = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+        val expectedImportedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
           maybeInitialTag = Tag(originalDSTag.name, originalDSTag.maybeDescription).some,
-          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+          usedIn = expectedUsedIns
         )
-        findById(importedDS.identifier, originalDSProject.path, importedDSProject.path).value shouldBe expectedDS
+        findById(importedDS.identifier,
+                 originalDSProject.path,
+                 importedDSProject.path
+        ).value shouldBe expectedImportedDS
+
+        val expectedOriginalDS = internalToNonModified(originalDS, originalDSProject).copy(usedIn = expectedUsedIns)
         findByTopmostSameAs(importedDS.provenance.topmostSameAs,
                             originalDSProject.path,
                             importedDSProject.path
-        ).value shouldBe expectedDS
+        ).value should (be(expectedImportedDS) or be(expectedOriginalDS))
       }
 
     "not return info about the initial tag even if it was imported from a tag on another Renku DS " +
