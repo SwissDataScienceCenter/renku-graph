@@ -29,8 +29,6 @@ import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import model.Entity
 
-import java.time.ZoneOffset
-
 object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
 
@@ -83,18 +81,17 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |  ${textQueryPart(criteria.filters.maybeQuery)}
           |
           |  { # start sub select
-          |    SELECT $sameAsVar (SAMPLE(?projId) as ?projectId) (SAMPLE(?date1) as $dateVar)
+          |    SELECT $sameAsVar (SAMPLE(?projId) as ?projectId)
           |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
           |      (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS $idsPathsVisibilitiesVar)
           |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
-          |      (GROUP_CONCAT(?encodedImageUrl; separator=',') AS $imagesVar)
           |    WHERE {
           |      Graph schema:Dataset {
           |        #creator
           |        ${creatorsPart(criteria.filters.creators)}
           |
-          |        # dates, keywords, description
-          |        ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
+          |        #keywords, description
+          |        $keywords
           |
           |        # resolve project
           |        $resolveProject
@@ -113,6 +110,17 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |    }
           |    GROUP BY $sameAsVar
           |  }# end sub select
+          |
+          |  Graph schema:Dataset {
+          |    # name
+          |    $sameAsVar renku:slug $nameVar
+          |
+          |    #description
+          |    $description
+          |
+          |    # dates
+          |    ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
+          |  }
           |
           |  $images
           |}
@@ -192,57 +200,46 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
          |""".stripMargin
 
   def datesPart(maybeSince: Option[Filters.Since], maybeUntil: Option[Filters.Until]): Fragment = {
-    val sinceUTC =
-      maybeSince.map(_.value.atStartOfDay().atZone(ZoneOffset.UTC)).map(d => fr"xsd:date($d)")
-    val untilUTC =
-      maybeUntil.map(_.value.atStartOfDay().atZone(ZoneOffset.UTC)).map(d => fr"xsd:date($d)")
-
     val sinceLocal =
-      maybeSince.map(_.value).map(d => fr"xsd:date($d)")
+      maybeSince.map(_.value).map(d => fr"$d")
     val untilLocal =
-      maybeUntil.map(_.value).map(d => fr"xsd:date($d)")
+      maybeUntil.map(_.value).map(d => fr"$d")
 
-    def dateCondCreated = {
+    def dateCond = {
       val cond =
         List(
-          sinceUTC.map(s => fr"$maybeDateCreatedVar >= $s"),
-          untilUTC.map(s => fr"$maybeDateCreatedVar <= $s")
+          sinceLocal.map(s => fr"$dateVar >= $s"),
+          untilLocal.map(s => fr"$dateVar <= $s")
         ).flatten.intercalate(fr" && ")
 
       if (cond.isEmpty) Fragment.empty
       else fr"FILTER ($cond)"
     }
-
-    def dateCondPublished = {
-      val cond =
-        List(
-          sinceLocal.map(s => fr"$maybeDatePublishedVar >= $s"),
-          untilLocal.map(s => fr"$maybeDatePublishedVar <= $s")
-        ).flatten.intercalate(fr" && ")
-
-      if (cond.isEmpty) Fragment.empty
-      else fr"FILTER ($cond)"
-    }
-
-    fr"""|    $sameAsVar renku:slug $nameVar
-         |    OPTIONAL {
+    // To make sure comparing dates with the same timezone, we strip the Z timezone from
+    // the dateCreated dateTime. The datePublished is a localdate without a timezone as well
+    // as the date provided in the query
+    fr"""|    OPTIONAL {
          |      $sameAsVar schema:dateCreated $maybeDateCreatedVar.
-         |      BIND ($maybeDateCreatedVar AS ?date1)
-         |      $dateCondCreated
+         |      BIND (xsd:date(substr(str($maybeDateCreatedVar), 1, 10)) AS $dateVar)
          |    }
          |    OPTIONAL {
          |      $sameAsVar schema:datePublished $maybeDatePublishedVar
-         |      BIND ($maybeDatePublishedVar AS ?date1)
-         |      $dateCondPublished
+         |      BIND (xsd:date($maybeDatePublishedVar) AS $dateVar)
          |    }
-         |    OPTIONAL {
-         |      $sameAsVar schema:keywords ?keyword
-         |    }
-         |    OPTIONAL {
-         |      $sameAsVar schema:description $maybeDescriptionVar
-         |    }
+         |    $dateCond
          |""".stripMargin
   }
+
+  def keywords: Fragment =
+    fr"""|OPTIONAL {
+         |  $sameAsVar schema:keywords ?keyword
+         |}
+         |""".stripMargin
+
+  def description: Fragment =
+    fr"""| OPTIONAL {
+         |   $sameAsVar schema:description $maybeDescriptionVar
+         | }""".stripMargin
 
   def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
@@ -259,8 +256,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     val creatorNames = fr"$sameAsVar schema:creator / schema:name ?creatorName."
     val matchFrag =
       fr"""Bind (LCASE(?creatorName) as ?creatorNameLC)
-           Values (?creatorNameLC) { ${creators.map(_.value.toLowerCase)} }
-          """
+           Values (?creatorNameLC) { ${creators.map(_.value.toLowerCase)} }"""
 
     if (creators.isEmpty) {
       fr"""|OPTIONAL {
