@@ -20,10 +20,10 @@ package io.renku.entities.search
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
-import io.renku.entities.search.Criteria.Filters.EntityType
+import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.Schemas
+import io.renku.graph.model.{Schemas, projects}
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken.UserOAuthAccessToken
@@ -38,6 +38,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import java.time.LocalDate
 import scala.language.reflectiveCalls
 
+@annotation.nowarn
 class LocalSpec
     extends AnyFlatSpec
     with IOSpec
@@ -76,21 +77,27 @@ class LocalSpec
   }
 
   it should "play with query" in {
-
+    val x = LocalDate.now()
+    val y = EntityType.Dataset
     val criteria =
       Criteria(
         filters = Criteria.Filters(
+          //maybeQuery = Some(Criteria.Filters.Query("methods space")),
           entityTypes = Set(EntityType.Dataset),
-          creators = Set("Jonas Meirer"),
+          creators = Set("Rok Roskar"),
           maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
-          maybeUntil = Some(Criteria.Filters.Until(LocalDate.now()))
+          maybeUntil = Some(Criteria.Filters.Until(LocalDate.now())),
+          //namespaces = Set(projects.Namespace("kg.user")),
+          visibilities = Set(projects.Visibility.Private, projects.Visibility.Public)
         ),
-        maybeUser = Some(AuthUser(GitLabId(88), UserOAuthAccessToken("bla")))
+        maybeUser = Some(AuthUser(GitLabId(13), UserOAuthAccessToken("bla")))
       )
+
+    // user=13 = Rok, user=88 = me
     val query = DatasetsQuery2.query(criteria).get
     val q = SparqlQuery.of(
       "test",
-      Prefixes.of(Schemas.xsd -> "xsd", Schemas.schema -> "schema", Schemas.renku -> "renku"),
+      Prefixes.of(Schemas.xsd -> "xsd", Schemas.schema -> "schema", Schemas.renku -> "renku", Schemas.text -> "text"),
       query
     )
     println(s"---- query ----\n${q.toString}\n---- ----")
