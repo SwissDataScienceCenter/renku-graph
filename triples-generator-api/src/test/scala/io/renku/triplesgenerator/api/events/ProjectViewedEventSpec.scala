@@ -26,7 +26,7 @@ import Generators._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectPaths, projectViewedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
@@ -51,7 +51,7 @@ class ProjectViewedEventSpec
 
       val path = projectPaths.generateOne
 
-      ProjectViewedEvent.forProject(path, now) shouldBe ProjectViewedEvent(path, currentTime)
+      ProjectViewedEvent.forProject(path, now) shouldBe ProjectViewedEvent(path, currentTime, maybeUserId = None)
     }
   }
 
@@ -70,10 +70,14 @@ class ProjectViewedEventSpec
         "project": {
           "path": "project/path"
         },
-        "date": "1988-11-04T00:00:00.000Z"
+        "date": "1988-11-04T00:00:00.000Z",
+        "user": {
+          "id": 123
+        }
       }""".hcursor.as[ProjectViewedEvent].value shouldBe ProjectViewedEvent(
         projects.Path("project/path"),
-        projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z"))
+        projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
+        maybeUserId = Some(persons.GitLabId(123))
       )
     }
 
@@ -98,7 +102,8 @@ class ProjectViewedEventSpec
 
       val event = projectViewedEvents.generateOne
 
-      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}"
+      val userShow = event.maybeUserId.map(u => s", user = $u").getOrElse("")
+      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}$userShow"
     }
   }
 }

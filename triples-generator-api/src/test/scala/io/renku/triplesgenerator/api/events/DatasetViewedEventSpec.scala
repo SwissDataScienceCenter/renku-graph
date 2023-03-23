@@ -26,7 +26,7 @@ import Generators._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.datasets
+import io.renku.graph.model.{datasets, persons}
 import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetViewedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
@@ -51,7 +51,10 @@ class DatasetViewedEventSpec
 
       val identifier = datasetIdentifiers.generateOne
 
-      DatasetViewedEvent.forDataset(identifier, now) shouldBe DatasetViewedEvent(identifier, currentTime)
+      DatasetViewedEvent.forDataset(identifier, now) shouldBe DatasetViewedEvent(identifier,
+                                                                                 currentTime,
+                                                                                 maybeUserId = None
+      )
     }
   }
 
@@ -71,10 +74,14 @@ class DatasetViewedEventSpec
         "dataset": {
           "identifier": "12345"
         },
-        "date": "1988-11-04T00:00:00.000Z"
+        "date": "1988-11-04T00:00:00.000Z",
+        "user": {
+          "id": 123
+        }
       }""".hcursor.as[DatasetViewedEvent].value shouldBe DatasetViewedEvent(
         datasets.Identifier("12345"),
-        datasets.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z"))
+        datasets.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
+        maybeUserId = Some(persons.GitLabId(123))
       )
     }
 
@@ -99,7 +106,8 @@ class DatasetViewedEventSpec
 
       val event = datasetViewedEvents.generateOne
 
-      event.show shouldBe show"datasetIdentifier = ${event.identifier}, date = ${event.dateViewed}"
+      val userShow = event.maybeUserId.map(u => s", user = $u").getOrElse("")
+      event.show shouldBe show"datasetIdentifier = ${event.identifier}, date = ${event.dateViewed}$userShow"
     }
   }
 }

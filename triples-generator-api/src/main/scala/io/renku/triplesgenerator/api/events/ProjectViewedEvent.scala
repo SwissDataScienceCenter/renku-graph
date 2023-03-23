@@ -24,27 +24,32 @@ import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.circe.literal._
 import io.circe.DecodingFailure.Reason.CustomReason
 import io.renku.events.CategoryName
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
+import io.renku.json.JsonOps._
 
 import java.time.Instant
 
-final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed)
+final case class ProjectViewedEvent(path:        projects.Path,
+                                    dateViewed:  projects.DateViewed,
+                                    maybeUserId: Option[persons.GitLabId]
+)
 
 object ProjectViewedEvent {
 
   def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()))
+    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId = None)
 
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 
-  implicit val encoder: Encoder[ProjectViewedEvent] = Encoder.instance { case ProjectViewedEvent(path, dateViewed) =>
-    json"""{
-      "categoryName": $categoryName,
-      "project": {
-        "path": $path
-      },
-      "date": $dateViewed
-    }"""
+  implicit val encoder: Encoder[ProjectViewedEvent] = Encoder.instance {
+    case ProjectViewedEvent(path, dateViewed, maybeUserId) =>
+      json"""{
+        "categoryName": $categoryName,
+        "project": {
+          "path": $path
+        },
+        "date": $dateViewed
+      }""" addIfDefined ("user" -> maybeUserId.map(id => json"""{"id": $id}"""))
   }
 
   implicit val decoder: Decoder[ProjectViewedEvent] = Decoder.instance { cursor =>
@@ -56,13 +61,17 @@ object ProjectViewedEvent {
     }
 
     for {
-      _    <- validateCategory
-      path <- cursor.downField("project").downField("path").as[projects.Path]
-      date <- cursor.downField("date").as[projects.DateViewed]
-    } yield ProjectViewedEvent(path, date)
+      _           <- validateCategory
+      path        <- cursor.downField("project").downField("path").as[projects.Path]
+      date        <- cursor.downField("date").as[projects.DateViewed]
+      maybeUserId <- cursor.downField("user").downField("id").as[Option[persons.GitLabId]]
+    } yield ProjectViewedEvent(path, date, maybeUserId)
   }
 
-  implicit val show: Show[ProjectViewedEvent] = Show.show { case ProjectViewedEvent(path, dateViewed) =>
-    show"projectPath = $path, date = $dateViewed"
+  implicit val show: Show[ProjectViewedEvent] = Show.show {
+    case ProjectViewedEvent(path, dateViewed, None) =>
+      show"projectPath = $path, date = $dateViewed"
+    case ProjectViewedEvent(path, dateViewed, Some(userId)) =>
+      show"projectPath = $path, date = $dateViewed, user = $userId"
   }
 }

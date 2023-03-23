@@ -176,7 +176,10 @@ In case there's no project with the given path in the TS, the event is discarded
   "project": {
     "path": "project/path"
   },
-  "date": "2001-09-04T10:48:29.457Z"
+  "date": "2001-09-04T10:48:29.457Z",
+  "user": {
+    "id": 123 // optional
+  }
 }
 ```
 
@@ -196,7 +199,10 @@ In case there's no dataset with the given identifier or no project where this da
   "dataset": {
     "identifier": "123456"
   },
-  "date": "2001-09-04T10:48:29.457Z"
+  "date": "2001-09-04T10:48:29.457Z",
+  "user": {
+    "id": 123 // optional
+  }
 }
 ```
 
