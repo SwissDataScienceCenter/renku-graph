@@ -126,6 +126,17 @@ class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
       )
     }
 
+    "encode an Iterable in case of query with new lines" in {
+      val value = nonEmptyStrings().generateNonEmptyList().toList
+      val actual = fr"""|VALUES (?v)
+                        |{ $value }""".stripMargin
+      val expected = Fragment {
+        s"""|VALUES (?v)
+            |{ ${value.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"""
+      }.stripMargin
+      actual shouldBe expected
+    }
+
     "fail if an Iterable is used in a context other than VALUES or IN" in {
       val value = nonEmptyStrings().generateNonEmptyList().toList
       intercept[Exception](fr"some ($value)").getMessage should startWith("Iterable cannot be resolved in this context")

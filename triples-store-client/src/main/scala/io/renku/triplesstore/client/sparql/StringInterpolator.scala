@@ -81,9 +81,11 @@ private object StringInterpolator {
       case object IN     extends ClauseType
     }
 
-    def detectClauseContext(snippet: String): Option[ClauseType] =
-      if (valuesClause matches snippet.toUpperCase) Some(ClauseType.VALUES)
-      else if (inClause.matches(snippet.toUpperCase)) Some(ClauseType.IN)
+    def detectClauseContext(snippet: String): Option[ClauseType] = {
+      val validated = snippet.filter(c => c >= ' ' && c != '|').toUpperCase
+      if (valuesClause matches validated) Some(ClauseType.VALUES)
+      else if (inClause matches validated) Some(ClauseType.IN)
       else Option.empty
+    }
   }
 }
