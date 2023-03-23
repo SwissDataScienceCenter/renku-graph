@@ -111,7 +111,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |         ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
              |         ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
              |         ?maybeSchemaVersion
-             |""".stripMargin.sparql
+             |""".stripMargin
   )
 
   private lazy val parentMemberFilterQuery: Option[AuthUser] => Fragment = {
