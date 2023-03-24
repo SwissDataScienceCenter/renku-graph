@@ -52,11 +52,8 @@ class PersonViewedProjectPersisterSpec
     "insert the given GLUserViewedProject to the TS " +
       "if it doesn't exist yet" in new TestCase {
 
-        val userId = personGitLabIds.generateOne
-        val project = anyProjectEntities
-          .map(replaceProjectCreator(personEntities(userId.some).generateSome))
-          .generateOne
-          .to[entities.Project]
+        val userId  = personGitLabIds.generateOne
+        val project = generateProjectWithCreator(userId)
 
         upload(to = projectsDataset, project)
 
@@ -74,11 +71,8 @@ class PersonViewedProjectPersisterSpec
       "if an event for the project already exists in the TS " +
       "and the date from the new event is newer than this in the TS" in new TestCase {
 
-        val userId = personGitLabIds.generateOne
-        val project = anyProjectEntities
-          .map(replaceProjectCreator(personEntities(userId.some).generateSome))
-          .generateOne
-          .to[entities.Project]
+        val userId  = personGitLabIds.generateOne
+        val project = generateProjectWithCreator(userId)
 
         upload(to = projectsDataset, project)
 
@@ -100,11 +94,8 @@ class PersonViewedProjectPersisterSpec
 
     "do nothing if the event date is older than the date in the TS" in new TestCase {
 
-      val userId = personGitLabIds.generateOne
-      val project = anyProjectEntities
-        .map(replaceProjectCreator(personEntities(userId.some).generateSome))
-        .generateOne
-        .to[entities.Project]
+      val userId  = personGitLabIds.generateOne
+      val project = generateProjectWithCreator(userId)
 
       upload(to = projectsDataset, project)
 
@@ -127,16 +118,9 @@ class PersonViewedProjectPersisterSpec
     "update the date for the user and project from the GLUserViewedProject " +
       "and leave other user viewings if they exist" in new TestCase {
 
-        val userId = personGitLabIds.generateOne
-        val project1 = anyProjectEntities
-          .map(replaceProjectCreator(personEntities(userId.some).generateSome))
-          .generateOne
-          .to[entities.Project]
-
-        val project2 = anyProjectEntities
-          .map(replaceProjectCreator(personEntities(userId.some).generateSome))
-          .generateOne
-          .to[entities.Project]
+        val userId   = personGitLabIds.generateOne
+        val project1 = generateProjectWithCreator(userId)
+        val project2 = generateProjectWithCreator(userId)
 
         upload(to = projectsDataset, project1, project2)
 
@@ -166,10 +150,7 @@ class PersonViewedProjectPersisterSpec
 
     "do nothing if the given event is for a non-existing user" in new TestCase {
 
-      val project = anyProjectEntities
-        .map(replaceProjectCreator(personEntities(withGitLabId).generateSome))
-        .generateOne
-        .to[entities.Project]
+      val project = generateProjectWithCreator(personGitLabIds.generateOne)
 
       val event = GLUserViewedProject(personGitLabIds.generateOne,
                                       toEncoderProject(project),
@@ -187,6 +168,12 @@ class PersonViewedProjectPersisterSpec
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val persister = new PersonViewedProjectPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   }
+
+  private def generateProjectWithCreator(userId: persons.GitLabId) =
+    anyProjectEntities
+      .map(replaceProjectCreator(personEntities(userId.some).generateSome))
+      .generateOne
+      .to[entities.Project]
 
   private def findAllViewings =
     runSelect(
