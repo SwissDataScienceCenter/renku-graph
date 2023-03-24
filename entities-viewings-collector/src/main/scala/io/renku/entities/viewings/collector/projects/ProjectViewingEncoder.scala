@@ -19,7 +19,6 @@
 package io.renku.entities.viewings.collector.projects
 
 import io.renku.graph.model.{persons, projects, GraphClass}
-import io.renku.graph.model.Schemas._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -47,8 +46,8 @@ private object ProjectViewingEncoder {
     JsonLDEncoder.instance { case ProjectViewing(entityId, date) =>
       JsonLD.entity(
         entityId.asEntityId,
-        EntityTypes of renku / "ProjectViewedTime",
-        renku / "dateViewed" -> date.asJsonLD
+        EntityTypes of ProjectViewedTimeOntology.classType,
+        ProjectViewedTimeOntology.dataViewedProperty.id -> date.asJsonLD
       )
     }
 
@@ -56,8 +55,8 @@ private object ProjectViewingEncoder {
     JsonLDEncoder.instance { case ev @ PersonViewedProject(userId, _, _) =>
       JsonLD.entity(
         userId.asEntityId,
-        EntityTypes of renku / "PersonViewing",
-        renku / "viewedProject" -> ev.asJsonLD(viewedProjectEncoder)
+        EntityTypes of PersonViewingOntology.classType,
+        PersonViewingOntology.viewedProjectProperty -> ev.asJsonLD(viewedProjectEncoder)
       )
     }
 
@@ -65,9 +64,9 @@ private object ProjectViewingEncoder {
     JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, path), date) =>
       JsonLD.entity(
         EntityId.of(s"$userId/$path"),
-        EntityTypes of renku / "ViewedProject",
-        renku / "project"    -> id.asJsonLD,
-        renku / "dateViewed" -> date.asJsonLD
+        EntityTypes of PersonViewedProjectOntology.classType,
+        PersonViewedProjectOntology.projectProperty       -> id.asJsonLD,
+        PersonViewedProjectOntology.dateViewedProperty.id -> date.asJsonLD
       )
     }
 }
