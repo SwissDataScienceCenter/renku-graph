@@ -54,7 +54,7 @@ private class ProjectExistenceCheckerImpl[F[_]](tsClient: TSClient[F]) extends P
                |  GRAPH ?id { ?id a schema:Project }
                |}
                |LIMIT 1
-               |""".stripMargin.sparql
+               |""".stripMargin
     )
   }(decoder)
 

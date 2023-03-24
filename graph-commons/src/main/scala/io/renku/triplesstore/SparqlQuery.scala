@@ -26,6 +26,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.Schema
 import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.SparqlQuery.Prefix
+import io.renku.triplesstore.client.sparql.Fragment
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
                              prefixes:           Set[Prefix],
@@ -52,10 +53,39 @@ object SparqlQuery {
   import io.renku.tinytypes.TinyTypeFactory
   import io.renku.tinytypes.constraints.NonBlank
 
+  def apply(name:               String Refined NonEmpty,
+            prefixes:           Set[Prefix],
+            body:               Fragment,
+            maybePagingRequest: Option[PagingRequest]
+  ): SparqlQuery = new SparqlQuery(name, prefixes, body.sparql, maybePagingRequest)
+
+  def apply(name: String Refined NonEmpty, prefixes: Set[String Refined NonEmpty], body: String): SparqlQuery =
+    SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, maybePagingRequest = None)
+
+  def apply(name: String Refined NonEmpty, prefixes: Set[String Refined NonEmpty], body: Fragment): SparqlQuery =
+    apply(name, prefixes, body.sparql)
+
+  def apply(name:          String Refined NonEmpty,
+            prefixes:      Set[String Refined NonEmpty],
+            body:          String,
+            pagingRequest: PagingRequest
+  ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, pagingRequest.some)
+
+  def apply(name:          String Refined NonEmpty,
+            prefixes:      Set[String Refined NonEmpty],
+            body:          Fragment,
+            pagingRequest: PagingRequest
+  ): SparqlQuery = apply(name, prefixes, body.sparql, pagingRequest)
+
   def of(
       name: String Refined NonEmpty,
       body: String
   ): SparqlQuery = SparqlQuery(name, Prefixes.empty, body, maybePagingRequest = None)
+
+  def of(
+      name: String Refined NonEmpty,
+      body: Fragment
+  ): SparqlQuery = of(name, Prefixes.empty, body.sparql)
 
   def of(
       name:     String Refined NonEmpty,
@@ -63,10 +93,21 @@ object SparqlQuery {
       body:     String
   ): SparqlQuery = SparqlQuery(name, prefixes map (p => Prefix(p.value)), body, maybePagingRequest = None)
 
+  def of(
+      name:     String Refined NonEmpty,
+      prefixes: Set[Prefix],
+      body:     Fragment
+  ): SparqlQuery = of(name, prefixes map (p => Prefix(p.value)), body.sparql)
+
   def ofUnsafe(
       name: String,
       body: String
   ): SparqlQuery = of(Refined.unsafeApply(name), body)
+
+  def ofUnsafe(
+      name: String,
+      body: Fragment
+  ): SparqlQuery = ofUnsafe(name, body.sparql)
 
   def ofUnsafe(
       name:     String,
@@ -74,17 +115,11 @@ object SparqlQuery {
       body:     String
   ): SparqlQuery = of(Refined.unsafeApply(name), prefixes, body)
 
-  def apply(
-      name:     String Refined NonEmpty,
-      prefixes: Set[String Refined NonEmpty],
-      body:     String
-  ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, maybePagingRequest = None)
-
-  def apply(name:          String Refined NonEmpty,
-            prefixes:      Set[String Refined NonEmpty],
-            body:          String,
-            pagingRequest: PagingRequest
-  ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, pagingRequest.some)
+  def ofUnsafe(
+      name:     String,
+      prefixes: Set[Prefix],
+      body:     Fragment
+  ): SparqlQuery = ofUnsafe(name, prefixes, body.sparql)
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
   implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank[Prefix] {
