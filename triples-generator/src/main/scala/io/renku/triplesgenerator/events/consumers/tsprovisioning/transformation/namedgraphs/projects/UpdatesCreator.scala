@@ -179,7 +179,7 @@ private object UpdatesCreator extends UpdatesCreator {
                  |    ?img ?p ?s
                  |  }
                  |}
-                 |""".stripMargin.sparql
+                 |""".stripMargin
       )
     }
 

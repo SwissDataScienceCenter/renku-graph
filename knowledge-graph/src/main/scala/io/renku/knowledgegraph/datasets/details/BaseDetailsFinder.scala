@@ -109,7 +109,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
                |  }
                |}
-               |""".stripMargin.sparql
+               |""".stripMargin
     )
 
   private def queryWithSameAs(sameAs: SameAs, authContext: AuthContext[RequestedDataset]) =
@@ -155,7 +155,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
                |  }
                |}
-               |""".stripMargin.sparql
+               |""".stripMargin
     )
 
   def findInitialTag(dataset: Dataset, authContext: AuthContext[RequestedDataset]): F[Option[Tag]] =
@@ -186,7 +186,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |  }
              |}
              |LIMIT 1
-             |""".stripMargin.sparql
+             |""".stripMargin
   )
 
   private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
@@ -226,7 +226,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |             schema:keywords ?keyword
              |}
              |ORDER BY ASC(?keyword)
-             |""".stripMargin.sparql
+             |""".stripMargin
   )
 
   def findImages(dataset: Dataset): F[List[ImageUri]] =
@@ -244,7 +244,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |           schema:position ?position
              |}
              |ORDER BY ASC(?position)
-             |""".stripMargin.sparql
+             |""".stripMargin
   )
 }
 
