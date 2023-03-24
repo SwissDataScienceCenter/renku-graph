@@ -45,7 +45,7 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
         val path = projectPaths.generateOne
         givenProjectFinding(event.identifier, returning = path.some.pure[Try])
 
-        givenEventPersisting(ProjectViewedEvent(path, projects.DateViewed(event.dateViewed.value)),
+        givenEventPersisting(ProjectViewedEvent(path, projects.DateViewed(event.dateViewed.value), event.maybeUserId),
                              returning = ().pure[Try]
         )
 

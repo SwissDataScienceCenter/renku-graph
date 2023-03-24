@@ -18,7 +18,7 @@
 
 package io.renku.entities.viewings.collector.projects
 
-import io.renku.graph.model.{projects, GraphClass}
+import io.renku.graph.model.{persons, projects, GraphClass}
 import io.renku.graph.model.Schemas._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -27,18 +27,46 @@ private object ProjectViewingEncoder {
 
   final case class ProjectViewing(projectId: projects.ResourceId, dateViewed: projects.DateViewed)
 
-  def encode: ProjectViewing => NamedGraph = { case ProjectViewing(id, date) =>
+  final case class Project(id: projects.ResourceId, path: projects.Path)
+
+  final case class PersonViewedProject(userId: persons.ResourceId, project: Project, dateViewed: projects.DateViewed)
+
+  def encode(viewing: ProjectViewing): NamedGraph =
     NamedGraph.fromJsonLDsUnsafe(
       GraphClass.ProjectViewedTimes.id,
-      (id -> date).asJsonLD
+      viewing.asJsonLD
     )
-  }
 
-  private implicit lazy val jsonLDEncoder: JsonLDEncoder[(projects.ResourceId, projects.DateViewed)] =
-    JsonLDEncoder.instance { case (id, date) =>
+  def encode(viewing: PersonViewedProject): NamedGraph =
+    NamedGraph.fromJsonLDsUnsafe(
+      GraphClass.PersonViewings.id,
+      viewing.asJsonLD
+    )
+
+  private implicit lazy val projectViewingEncoder: JsonLDEncoder[ProjectViewing] =
+    JsonLDEncoder.instance { case ProjectViewing(entityId, date) =>
       JsonLD.entity(
-        id.asEntityId,
-        EntityTypes.of(renku / "ProjectViewedTime"),
+        entityId.asEntityId,
+        EntityTypes of renku / "ProjectViewedTime",
+        renku / "dateViewed" -> date.asJsonLD
+      )
+    }
+
+  private implicit lazy val personViewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
+    JsonLDEncoder.instance { case ev @ PersonViewedProject(userId, _, _) =>
+      JsonLD.entity(
+        userId.asEntityId,
+        EntityTypes of renku / "PersonViewing",
+        renku / "viewedProject" -> ev.asJsonLD(viewedProjectEncoder)
+      )
+    }
+
+  private lazy val viewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
+    JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, path), date) =>
+      JsonLD.entity(
+        EntityId.of(s"$userId/$path"),
+        EntityTypes of renku / "ViewedProject",
+        renku / "project"    -> id.asJsonLD,
         renku / "dateViewed" -> date.asJsonLD
       )
     }

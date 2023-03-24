@@ -48,7 +48,7 @@ private class EventUploaderImpl[F[_]: MonadThrow](
 
   override def upload(event: DatasetViewedEvent): F[Unit] =
     OptionT(findProject(event.identifier))
-      .map(ProjectViewedEvent(_, projects.DateViewed(event.dateViewed.value)))
+      .map(ProjectViewedEvent(_, projects.DateViewed(event.dateViewed.value), event.maybeUserId))
       .semiflatMap(persist)
       .value
       .void

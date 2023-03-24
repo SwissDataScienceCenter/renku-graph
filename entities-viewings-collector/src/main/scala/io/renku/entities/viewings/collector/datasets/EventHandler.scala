@@ -21,9 +21,8 @@ package io.renku.entities.viewings.collector.datasets
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.datasets
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -38,16 +37,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode,
+      _.event.as[DatasetViewedEvent],
       process
     )
-
-  private lazy val decode: EventRequestContent => Either[Exception, DatasetViewedEvent] = { req =>
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-    (req.event.hcursor.downField("dataset").downField("identifier").as[datasets.Identifier],
-     req.event.hcursor.downField("date").as[datasets.DateViewed]
-    ).mapN(DatasetViewedEvent.apply)
-  }
 
   private def process(event: Event) =
     Logger[F].info(show"$categoryName: $event accepted") >>
