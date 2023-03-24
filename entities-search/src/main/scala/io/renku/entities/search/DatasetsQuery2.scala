@@ -86,6 +86,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
           |      (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS $idsPathsVisibilitiesVar)
           |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
+          |      (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS $imagesVar)
           |    WHERE {
           |      Graph schema:Dataset {
           |        #creator
@@ -96,6 +97,9 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |
           |        # resolve project
           |        $resolveProject
+          |
+          |        # images
+          |        $images
           |      }
           |
           |      Graph ?projId {
@@ -122,8 +126,6 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |    # dates
           |    ${datesPart(criteria.filters.maybeSince, criteria.filters.maybeUntil)}
           |  }
-          |
-          |  $images
           |}
           |}
           |""".stripMargin.sparql
@@ -178,20 +180,12 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     }
 
   def images: Fragment =
-    fr"""|# images
-         |  {
-         |    SELECT (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
-         |    WHERE {
-         |      Graph schema:Dataset {
-         |        OPTIONAL {
+    fr"""|       OPTIONAL {
          |          ?sameAs schema:image ?imageId .
          |          ?imageId schema:position ?imagePosition ;
          |                   schema:contentUrl ?imageUrl .
          |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-         |        }
-         |      }
-         |    }
-         |}
+         |       }
          |""".stripMargin
 
   def resolveProject: Fragment =

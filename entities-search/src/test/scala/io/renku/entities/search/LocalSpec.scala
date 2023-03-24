@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{Schemas, projects}
+import io.renku.graph.model.Schemas
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken.UserOAuthAccessToken
@@ -32,7 +32,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{ExternalJenaForSpec, InMemoryJenaForSpec, ProjectsDataset, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore._
 import org.scalatest.flatspec.AnyFlatSpec
 
 import java.time.LocalDate
@@ -84,11 +84,11 @@ class LocalSpec
         filters = Criteria.Filters(
           // maybeQuery = Some(Criteria.Filters.Query("methods space")),
           entityTypes = Set(EntityType.Dataset),
-          creators = Set("Rok Roskar"),
+          // creators = Set("Rok Roskar"),
           maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
-          maybeUntil = Some(Criteria.Filters.Until(LocalDate.now())),
+          maybeUntil = Some(Criteria.Filters.Until(LocalDate.now()))
           // namespaces = Set(projects.Namespace("kg.user")),
-          visibilities = Set(projects.Visibility.Private, projects.Visibility.Public)
+          // visibilities = Set(projects.Visibility.Private, projects.Visibility.Public)
         ),
         maybeUser = Some(AuthUser(GitLabId(13), UserOAuthAccessToken("bla")))
       )
