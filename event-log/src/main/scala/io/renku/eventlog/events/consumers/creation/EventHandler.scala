@@ -60,7 +60,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   private def sendProjectViewed(): EventPersister.Result => F[Unit] = {
     case EventPersister.Result.Created(event) =>
       tgClient
-        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value)))
+        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId = None))
         .handleErrorWith(
           Logger[F].error(_)(show"$categoryName: sending ${ProjectViewedEvent.categoryName} event failed")
         )

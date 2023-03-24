@@ -136,7 +136,7 @@ class EventHandlerSpec
     def givenProjectViewEventSent(event: Event, returning: IO[Unit]) =
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value)))
+        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId = None))
         .returning(returning)
   }
 
