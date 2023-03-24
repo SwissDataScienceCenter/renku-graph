@@ -154,7 +154,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     ).asJson,
     Dataset(
       MatchingScore(1),
-      datasets.SameAs("http://localhost/123444"),
+      datasets.TopmostSameAs("http://localhost/123444"),
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),

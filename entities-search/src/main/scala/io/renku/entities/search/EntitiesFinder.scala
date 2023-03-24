@@ -43,7 +43,7 @@ object EntitiesFinder {
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     storeConfig:   ProjectsConnectionConfig,
-    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery2, WorkflowsQuery, PersonsQuery)
 ) extends TSClientImpl[F](storeConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {

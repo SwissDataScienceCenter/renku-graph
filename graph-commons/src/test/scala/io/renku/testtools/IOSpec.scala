@@ -18,6 +18,7 @@
 
 package io.renku.testtools
 
+import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import org.scalatest.Suite
 
@@ -25,4 +26,12 @@ trait IOSpec {
   self: Suite =>
 
   implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
+
+  object IOBody {
+    def apply[A](code: IO[A]): A = code.unsafeRunSync()
+  }
+
+//  implicit class GeneratorOps[A](self: Gen[A]) extends GenOps[A](self) {
+//    def generateOneIO: IO[A] = IO.delay(generateExample(self))
+//  }
 }

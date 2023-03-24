@@ -34,7 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.SameAs
+import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.images.ImageUri
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -232,7 +232,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
             )
           }
         } yield model.Entity.Dataset(score,
-                                     SameAs(EntityId.of((renkuUrl / identifier.value).value)),
+                                     TopmostSameAs(EntityId.of((renkuUrl / identifier.value).value)),
                                      name,
                                      visibility,
                                      date,

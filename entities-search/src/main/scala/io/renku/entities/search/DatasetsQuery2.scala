@@ -18,16 +18,17 @@
 
 package io.renku.entities.search
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.circe.Decoder
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.Criteria.Filters
+import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{GraphClass, RenkuUrl, persons, projects}
+import io.renku.graph.model._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
-import model.Entity
+import io.renku.triplesstore.client.syntax._
 
 object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
@@ -60,10 +61,10 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     imagesVar
   ).map(_.name)
 
-  // TODO reorganize fragments to go into one graph selection
   override def query(criteria: Criteria): Option[String] =
     criteria.filters.whenRequesting(entityType) {
-      fr"""SELECT $entityTypeVar
+      fr"""{
+          |SELECT $entityTypeVar
           |       $matchingScoreVar
           |       $nameVar
           |       $idsPathsVisibilitiesVar
@@ -124,10 +125,9 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |
           |  $images
           |}
+          |}
           |""".stripMargin.sparql
     }
-
-  override def decoder[EE >: Entity.Dataset](implicit renkuUrl: RenkuUrl): Decoder[EE] = DatasetsQuery.decoder
 
   def pathVisibility: Fragment =
     fr"""|  # Return all visibilities and select the broadest in decoding
@@ -215,9 +215,9 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
       if (cond.isEmpty) Fragment.empty
       else fr"FILTER ($cond)"
     }
-    // To make sure comparing dates with the same timezone, we strip the Z timezone from
-    // the dateCreated dateTime. The datePublished is a localdate without a timezone as well
-    // as the date provided in the query
+    // To make sure comparing dates with the same timezone, we strip the timezone from
+    // the dateCreated dateTime. The datePublished and the date given in the query is a
+    // localdate without a timezone
     fr"""|    OPTIONAL {
          |      $sameAsVar schema:dateCreated $maybeDateCreatedVar.
          |      BIND (xsd:date(substr(str($maybeDateCreatedVar), 1, 10)) AS $dateVar)
@@ -292,4 +292,62 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
              |  }
             """.stripMargin
     }
+
+  override def decoder[EE >: Entity.Dataset](implicit renkuUrl: RenkuUrl): Decoder[EE] = { implicit cursor =>
+    import DecodingTools._
+    import io.renku.tinytypes.json.TinyTypeDecoders._
+
+    lazy val toListOfIdsPathsAndVisibilities
+        : Option[String] => Decoder.Result[NonEmptyList[(projects.Path, projects.Visibility)]] =
+      _.map(
+        _.split(",")
+          .map(_.trim)
+          .map { case s"$projectPath:$visibility" =>
+            (
+              projects.Path.from(projectPath),
+              projects.Visibility.from(visibility)
+            ).mapN((_, _))
+          }
+          .toList
+          .sequence
+          .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+          .map {
+            case head :: tail => NonEmptyList.of(head, tail: _*).some
+            case Nil          => None
+          }
+      ).getOrElse(Option.empty[NonEmptyList[(projects.Path, projects.Visibility)]].asRight)
+        .flatMap {
+          case Some(tuples) => tuples.asRight
+          case None         => DecodingFailure("DS's project path and visibility not found", Nil).asLeft
+        }
+
+    for {
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[datasets.Name]("name")
+      sameAs        <- extract[datasets.TopmostSameAs]("sameAs")
+      pathAndVisibility <- extract[Option[String]]("idsPathsVisibilities")
+                             .flatMap(toListOfIdsPathsAndVisibilities)
+                             .map(_.toList.maxBy(_._2))
+      maybeDateCreated   <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
+      maybeDatePublished <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
+      date <-
+        Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
+      creators <- extract[Option[String]]("creatorsNames") >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      keywords <-
+        extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+      maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
+      images    <- extract[Option[String]]("images") >>= toListOfImageUris
+    } yield Entity.Dataset(
+      matchingScore,
+      sameAs,
+      name,
+      pathAndVisibility._2,
+      date,
+      creators,
+      keywords,
+      maybeDesc,
+      images,
+      pathAndVisibility._1
+    )
+  }
 }

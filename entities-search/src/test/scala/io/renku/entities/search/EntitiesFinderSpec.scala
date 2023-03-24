@@ -29,8 +29,8 @@ import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.CommonGraphGenerators.sortingDirections
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -72,11 +72,15 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      IOBody {
+        for {
+          _     <- provisionTestProject(project)
+          found <- finder.findEntities(Criteria())
 
-      finder.findEntities(Criteria()).unsafeRunSync().results shouldMatchTo allEntitiesFrom(project).sortBy(_.name)(
-        nameOrdering
-      )
+          expected = allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
+          _        = found.results shouldMatchTo expected
+        } yield ()
+      }
     }
 
     "return all entities sorted by name if no query is given with modified plans" in new TestCase {
@@ -91,7 +95,7 @@ class EntitiesFinderSpec
       upload(to = projectsDataset, project)
       val results =
         finder.findEntities(Criteria()).unsafeRunSync().results
-      results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
+      results shouldMatchTo allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
     }
   }
 

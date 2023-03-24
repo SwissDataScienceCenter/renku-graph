@@ -65,8 +65,8 @@ class LocalSpec
   def writeQuery(q: SparqlQuery): Unit = {
     import fs2.io.file._
 
-    // val out = Path("/Users/ekettner/org/sdsc/files/q2.sparql")
-    val out = Path("/home/sdsc/org/sdsc/files/q2.sparql")
+    val out = Path("/Users/ekettner/org/sdsc/files/q2.sparql")
+    // val out = Path("/home/sdsc/org/sdsc/files/q2.sparql")
     fs2.Stream
       .emit(q.toString)
       .through(fs2.text.utf8.encode)
@@ -82,12 +82,12 @@ class LocalSpec
     val criteria =
       Criteria(
         filters = Criteria.Filters(
-          //maybeQuery = Some(Criteria.Filters.Query("methods space")),
+          // maybeQuery = Some(Criteria.Filters.Query("methods space")),
           entityTypes = Set(EntityType.Dataset),
           creators = Set("Rok Roskar"),
           maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
           maybeUntil = Some(Criteria.Filters.Until(LocalDate.now())),
-          //namespaces = Set(projects.Namespace("kg.user")),
+          // namespaces = Set(projects.Namespace("kg.user")),
           visibilities = Set(projects.Visibility.Private, projects.Visibility.Public)
         ),
         maybeUser = Some(AuthUser(GitLabId(13), UserOAuthAccessToken("bla")))

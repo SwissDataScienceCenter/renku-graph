@@ -18,13 +18,13 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters.EntityType
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.entities.search.Criteria.Filters.EntityType
+import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model._
 import io.renku.jsonld.EntityId
-import model.{Entity, MatchingScore}
 
 private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
 
@@ -214,7 +214,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
       images    <- extract[Option[String]]("images") >>= toListOfImageUris
     } yield Entity.Dataset(
       matchingScore,
-      datasets.SameAs.apply(EntityId.of((renkuUrl / "datasets" / idPathAndVisibility._1).value)),
+      datasets.TopmostSameAs.apply(EntityId.of((renkuUrl / "datasets" / idPathAndVisibility._1).value)),
       name,
       idPathAndVisibility._3,
       date,

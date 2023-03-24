@@ -18,8 +18,8 @@
 
 package io.renku.entities.search
 
-import EntityConverters._
 import cats.effect.IO
+import io.renku.entities.search.EntityConverters._
 import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.{Entity => _, _}
@@ -39,7 +39,7 @@ trait FinderSpecOps {
   self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
 
   protected[search] trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val finder = new EntitiesFinderImpl[IO](projectsDSConnectionInfo)
   }
