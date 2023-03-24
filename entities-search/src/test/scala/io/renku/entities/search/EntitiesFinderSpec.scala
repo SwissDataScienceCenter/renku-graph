@@ -327,12 +327,14 @@ class EntitiesFinderSpec
             .map(_.resultsWithSkippedMatchingScore)
       }
 
-      results shouldMatchTo List(
+      val expected = List(
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         projectCreator.to[model.Entity.Person],
         dsCreator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
+
+      results shouldMatchTo expected
     }
   }
 

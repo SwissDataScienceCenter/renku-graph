@@ -82,9 +82,9 @@ class LocalSpec
     val criteria =
       Criteria(
         filters = Criteria.Filters(
-          // maybeQuery = Some(Criteria.Filters.Query("methods space")),
-          entityTypes = Set(EntityType.Dataset),
-          creators = Set("Rok Roskar", "Detlef Sauer")
+          maybeQuery = Some(Criteria.Filters.Query("Rok Roskar")),
+          entityTypes = Set(EntityType.Dataset)
+          // creators = Set("Rok Roskar", "Detlef Sauer")
           // maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
           // maybeUntil = Some(Criteria.Filters.Until(LocalDate.now()))
           // namespaces = Set(projects.Namespace("kg.user")),
