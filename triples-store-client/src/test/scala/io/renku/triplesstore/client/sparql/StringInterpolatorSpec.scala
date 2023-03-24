@@ -30,7 +30,7 @@ import syntax._
 
 class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
 
-  "fr" should {
+  "fr / sparql interpolator" should {
 
     "encode a LuceneQuery if used" in {
       val value = LuceneQuery(s"{${nonEmptyStrings(minLength = 3).generateOne}")
@@ -112,10 +112,17 @@ class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
       fr"$value" shouldBe Fragment(value.name)
     }
 
-    "encode an Iterable if used in a context of VALUES clause" in {
+    "encode an Iterable if used in a context of VALUES clause - case with variable wrapped in brackets" in {
       val col = nonEmptyStrings().generateNonEmptyList().toList
       fr"VALUES (?v) { $col }" shouldBe Fragment(
         s"VALUES (?v) { ${col.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"
+      )
+    }
+
+    "encode an Iterable if used in a context of VALUES clause - case with variable without wrapping" in {
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      fr"VALUES ?v { $col }" shouldBe Fragment(
+        s"VALUES ?v { ${col.map(v => fr"$v".sparql).mkString(" ")} }"
       )
     }
 

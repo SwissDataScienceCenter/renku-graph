@@ -62,8 +62,9 @@ class StringInterpolator(private val sc: StringContext) {
     ClauseDetector
       .detectClauseContext(sc.parts(idx))
       .map {
-        case ClauseType.VALUES => it.map(makeValue(_, idx)).map(s => s"($s)").mkString(" ")
-        case ClauseType.IN     => it.map(makeValue(_, idx)).mkString(", ")
+        case ClauseType.VALUES_BRACKETED     => it.map(makeValue(_, idx)).map(s => s"($s)").mkString(" ")
+        case ClauseType.VALUES_NOT_BRACKETED => it.map(makeValue(_, idx)).mkString(" ")
+        case ClauseType.IN                   => it.map(makeValue(_, idx)).mkString(", ")
       }
       .getOrElse(sys.error("Iterable cannot be resolved in this context"))
   }
@@ -72,18 +73,21 @@ class StringInterpolator(private val sc: StringContext) {
 private object StringInterpolator {
 
   private object ClauseDetector {
-    private val valuesClause = ".*VALUES[\\s]*\\([\\s]*\\?\\w+[\\s]*\\)[\\s]*\\{[\\s]*$".r
-    private val inClause     = ".*IN[\\s]*\\([\\s]*$".r
+    private val valuesBracketedClause    = ".*VALUES\\s*\\(\\s*\\?\\w+\\s*\\)\\s*\\{\\s*$".r
+    private val valuesNotBracketedClause = ".*VALUES\\s*\\?\\w+\\s*\\{\\s*$".r
+    private val inClause                 = ".*IN\\s*\\(\\s*$".r
 
     sealed trait ClauseType
     object ClauseType {
-      case object VALUES extends ClauseType
-      case object IN     extends ClauseType
+      case object VALUES_BRACKETED     extends ClauseType
+      case object VALUES_NOT_BRACKETED extends ClauseType
+      case object IN                   extends ClauseType
     }
 
     def detectClauseContext(snippet: String): Option[ClauseType] = {
       val validated = snippet.filter(c => c >= ' ' && c != '|').toUpperCase
-      if (valuesClause matches validated) Some(ClauseType.VALUES)
+      if (valuesBracketedClause matches validated) Some(ClauseType.VALUES_BRACKETED)
+      else if (valuesNotBracketedClause matches validated) Some(ClauseType.VALUES_NOT_BRACKETED)
       else if (inClause matches validated) Some(ClauseType.IN)
       else Option.empty
     }
