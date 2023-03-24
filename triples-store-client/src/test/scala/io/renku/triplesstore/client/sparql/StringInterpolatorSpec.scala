@@ -113,33 +113,47 @@ class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
     }
 
     "encode an Iterable if used in a context of VALUES clause" in {
-      val value = nonEmptyStrings().generateNonEmptyList().toList
-      fr"VALUES (?v) { $value }" shouldBe Fragment(
-        s"VALUES (?v) { ${value.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      fr"VALUES (?v) { $col }" shouldBe Fragment(
+        s"VALUES (?v) { ${col.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"
       )
     }
 
     "encode an Iterable if used in a context of IN clause" in {
-      val value = nonEmptyStrings().generateNonEmptyList().toList
-      fr"IN ($value)" shouldBe Fragment(
-        s"IN (${value.map(v => fr"$v".sparql).mkString(", ")})"
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      fr"IN ($col)" shouldBe Fragment(
+        s"IN (${col.map(v => fr"$v".sparql).mkString(", ")})"
       )
     }
 
     "encode an Iterable in case of query with new lines" in {
-      val value = nonEmptyStrings().generateNonEmptyList().toList
+      val col = nonEmptyStrings().generateNonEmptyList().toList
       val actual = fr"""|VALUES (?v)
-                        |{ $value }""".stripMargin
+                        |{ $col }""".stripMargin
       val expected = Fragment {
         s"""|VALUES (?v)
-            |{ ${value.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"""
+            |{ ${col.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"""
       }.stripMargin
       actual shouldBe expected
     }
 
+    "encode an Iterable if used in a context of VALUES clause where IN clause is used before" in {
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      fr"IN ('value') VALUES (?v) { $col }" shouldBe Fragment(
+        s"IN ('value') VALUES (?v) { ${col.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"
+      )
+    }
+
+    "encode an Iterable if used in a context of IN clause where VALUES clause is used before" in {
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      fr"VALUES (?v) { ('value') } IN ($col)" shouldBe Fragment(
+        s"VALUES (?v) { ('value') } IN (${col.map(v => fr"$v".sparql).mkString(", ")})"
+      )
+    }
+
     "fail if an Iterable is used in a context other than VALUES or IN" in {
-      val value = nonEmptyStrings().generateNonEmptyList().toList
-      intercept[Exception](fr"some ($value)").getMessage should startWith("Iterable cannot be resolved in this context")
+      val col = nonEmptyStrings().generateNonEmptyList().toList
+      intercept[Exception](fr"some ($col)").getMessage should startWith("Iterable cannot be resolved in this context")
     }
 
     "encode a non empty Option if used" in {
