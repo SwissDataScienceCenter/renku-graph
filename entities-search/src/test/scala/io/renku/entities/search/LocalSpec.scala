@@ -84,9 +84,9 @@ class LocalSpec
         filters = Criteria.Filters(
           // maybeQuery = Some(Criteria.Filters.Query("methods space")),
           entityTypes = Set(EntityType.Dataset),
-          // creators = Set("Rok Roskar"),
-          maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
-          maybeUntil = Some(Criteria.Filters.Until(LocalDate.now()))
+          creators = Set("Rok Roskar", "Detlef Sauer")
+          // maybeSince = Some(Criteria.Filters.Since(LocalDate.now().minusYears(14))),
+          // maybeUntil = Some(Criteria.Filters.Until(LocalDate.now()))
           // namespaces = Set(projects.Namespace("kg.user")),
           // visibilities = Set(projects.Visibility.Private, projects.Visibility.Public)
         ),

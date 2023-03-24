@@ -448,11 +448,13 @@ class EntitiesFinderSpec
             .findEntities(Criteria(Filters(creators = Set(creator.name))))
       }
 
-      results.results shouldBe List(
+      val expected = List(
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         creator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
+
+      results.results shouldMatchTo expected
     }
 
     "return entities creator matches in a case-insensitive way" in new TestCase {

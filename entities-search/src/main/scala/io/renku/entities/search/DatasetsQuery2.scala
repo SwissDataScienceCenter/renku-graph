@@ -90,7 +90,9 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |    WHERE {
           |      Graph schema:Dataset {
           |        #creator
-          |        ${creatorsPart(criteria.filters.creators)}
+          |        Optional {
+          |          $sameAsVar schema:creator / schema:name ?creatorName.
+          |        }
           |
           |        #keywords, description
           |        $keywords
@@ -115,6 +117,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |    }
           |    GROUP BY $sameAsVar
           |  }# end sub select
+          |  ${creatorsPart(criteria.filters.creators)}
           |
           |  Graph schema:Dataset {
           |    # name
@@ -247,20 +250,16 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   }
 
   def creatorsPart(creators: Set[persons.Name]): Fragment = {
-    val creatorNames = fr"$sameAsVar schema:creator / schema:name ?creatorName."
     val matchFrag =
-      fr"""Bind (LCASE(?creatorName) as ?creatorNameLC)
-           Values (?creatorNameLC) { ${creators.map(_.value.toLowerCase)} }"""
+      creators
+        .map(c => fr"CONTAINS(LCASE($creatorsNamesVar), ${c.value.toLowerCase})")
+        .toList
+        .intercalate(Fragment(" || "))
 
     if (creators.isEmpty) {
-      fr"""|OPTIONAL {
-           |  $creatorNames
-           |}
-           |""".stripMargin
+      Fragment.empty
     } else
-      fr"""|$creatorNames
-           |$matchFrag
-           |""".stripMargin
+      fr"""FILTER (IF (BOUND($creatorsNamesVar), $matchFrag, false))""".stripMargin
   }
 
   def textQueryPart(mq: Option[Filters.Query]): Fragment =
