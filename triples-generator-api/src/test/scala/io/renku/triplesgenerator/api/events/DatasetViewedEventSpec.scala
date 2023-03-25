@@ -27,7 +27,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.{datasets, persons}
-import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetViewedDates}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetViewedDates, personGitLabIds}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -49,12 +49,11 @@ class DatasetViewedEventSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val identifier = datasetIdentifiers.generateOne
+      val identifier    = datasetIdentifiers.generateOne
+      val maybeUserGLId = personGitLabIds.generateSome
 
-      DatasetViewedEvent.forDataset(identifier, now) shouldBe DatasetViewedEvent(identifier,
-                                                                                 currentTime,
-                                                                                 maybeUserId = None
-      )
+      DatasetViewedEvent.forDataset(identifier, maybeUserGLId, now) shouldBe
+        DatasetViewedEvent(identifier, currentTime, maybeUserGLId)
     }
   }
 

@@ -36,8 +36,11 @@ final case class DatasetViewedEvent(identifier:  datasets.Identifier,
 
 object DatasetViewedEvent {
 
-  def forDataset(identifier: datasets.Identifier, now: () => Instant = () => Instant.now): DatasetViewedEvent =
-    DatasetViewedEvent(identifier, dateViewed = datasets.DateViewed(now()), maybeUserId = None)
+  def forDataset(identifier:  datasets.Identifier,
+                 maybeUserId: Option[persons.GitLabId],
+                 now:         () => Instant = () => Instant.now
+  ): DatasetViewedEvent =
+    DatasetViewedEvent(identifier, dateViewed = datasets.DateViewed(now()), maybeUserId)
 
   val categoryName: CategoryName = CategoryName("DATASET_VIEWED")
 

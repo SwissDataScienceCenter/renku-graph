@@ -99,7 +99,7 @@ class EndpointSpec
 
         givenDatasetFinding(requestedDataset, authContext, returning = dataset.some.pure[IO])
 
-        givenDatasetViewedEventSent(dataset.id, returning = ().pure[IO])
+        givenDatasetViewedEventSent(dataset.id, authContext, returning = ().pure[IO])
 
         val response = endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync()
 
@@ -130,7 +130,7 @@ class EndpointSpec
 
       givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
 
-      givenDatasetViewedEventSent(ds.id, returning = ().pure[IO])
+      givenDatasetViewedEventSent(ds.id, authContext, returning = ().pure[IO])
 
       endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
     }
@@ -186,7 +186,7 @@ class EndpointSpec
       givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
 
       val exception = exceptions.generateOne
-      givenDatasetViewedEventSent(ds.id, returning = exception.raiseError[IO, Unit])
+      givenDatasetViewedEventSent(ds.id, authContext, returning = exception.raiseError[IO, Unit])
 
       endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
 
@@ -207,11 +207,13 @@ class EndpointSpec
     now.expects().returning(currentTime).anyNumberOfTimes()
     val endpoint = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder, now)
 
-    def givenDatasetViewedEventSent(identifier: datasets.Identifier, returning: IO[Unit]) =
-      (tgClient
-        .send(_: DatasetViewedEvent))
-        .expects(DatasetViewedEvent.forDataset(identifier, now))
-        .returning(returning)
+    def givenDatasetViewedEventSent(identifier:  datasets.Identifier,
+                                    authContext: AuthContext[RequestedDataset],
+                                    returning:   IO[Unit]
+    ) = (tgClient
+      .send(_: DatasetViewedEvent))
+      .expects(DatasetViewedEvent.forDataset(identifier, authContext.maybeAuthUser.map(_.id), now))
+      .returning(returning)
 
     def givenDatasetFinding(id:          RequestedDataset,
                             authContext: AuthContext[RequestedDataset],

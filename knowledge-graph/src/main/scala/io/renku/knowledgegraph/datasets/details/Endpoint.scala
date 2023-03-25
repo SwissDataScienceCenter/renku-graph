@@ -66,16 +66,16 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     measureExecutionTime {
       datasetFinder
         .findDataset(identifier, authContext)
-        .flatTap(sendDatasetViewedEvent)
+        .flatTap(sendDatasetViewedEvent(authContext))
         .flatMap(toHttpResult(identifier))
         .recoverWith(httpResult(identifier))
     } map logExecutionTimeWhen(finishedSuccessfully(identifier))
 
-  private lazy val sendDatasetViewedEvent: Option[Dataset] => F[Unit] = {
+  private def sendDatasetViewedEvent(authContext: AuthContext[RequestedDataset]): Option[Dataset] => F[Unit] = {
     case None => ().pure[F]
     case Some(ds) =>
       tgClient
-        .send(DatasetViewedEvent.forDataset(ds.id, now))
+        .send(DatasetViewedEvent.forDataset(ds.id, authContext.maybeAuthUser.map(_.id), now))
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${DatasetViewedEvent.categoryName} event failed"))
   }
 
