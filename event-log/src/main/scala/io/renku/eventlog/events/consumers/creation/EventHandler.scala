@@ -33,7 +33,7 @@ import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -59,8 +59,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   private def sendProjectViewed(): EventPersister.Result => F[Unit] = {
     case EventPersister.Result.Created(event) =>
+      val maybeUserId = (event.body.maybeAuthorEmail orElse event.body.maybeCommitterEmail).map(UserId(_))
       tgClient
-        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId = None))
+        .send(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId))
         .handleErrorWith(
           Logger[F].error(_)(show"$categoryName: sending ${ProjectViewedEvent.categoryName} event failed")
         )
