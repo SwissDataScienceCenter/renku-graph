@@ -30,8 +30,10 @@ object Generators {
     (projectPaths -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
       .mapN(ProjectActivated.apply)
 
+  val userIds: Gen[UserId] = Gen.oneOf(personGitLabIds.map(UserId(_)), personEmails.map(UserId(_)))
+
   val projectViewedEvents: Gen[ProjectViewedEvent] =
-    (projectPaths, projectViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
+    (projectPaths, projectViewedDates(), userIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
 
   val datasetViewedEvents: Gen[DatasetViewedEvent] =
     (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)

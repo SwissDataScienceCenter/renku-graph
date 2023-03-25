@@ -178,10 +178,13 @@ In case there's no project with the given path in the TS, the event is discarded
   },
   "date": "2001-09-04T10:48:29.457Z",
   "user": {
-    "id": 123 // optional
+    "id":    123,      // optional
+    "email": "a@b.com" // optional
   }
 }
 ```
+
+**NOTE:** It should be either `user.id` or `user.email` given. In case both are given, the `id` will be used.
 
 - **DATASET_VIEWED**
 

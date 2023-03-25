@@ -29,18 +29,24 @@ import io.renku.json.JsonOps._
 
 import java.time.Instant
 
-final case class ProjectViewedEvent(path:        projects.Path,
-                                    dateViewed:  projects.DateViewed,
-                                    maybeUserId: Option[persons.GitLabId]
-)
+final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed, maybeUserId: Option[UserId])
 
 object ProjectViewedEvent {
 
-  def forProject(path:        projects.Path,
-                 maybeUserId: Option[persons.GitLabId],
-                 now:         () => Instant = () => Instant.now
+  def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectViewedEvent =
+    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId = None)
+
+  def forProjectAndUserId(path:   projects.Path,
+                          userId: Option[persons.GitLabId],
+                          now:    () => Instant = () => Instant.now
   ): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId)
+    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), userId.map(UserId(_)))
+
+  def forProjectAndUserEmail(path:      projects.Path,
+                             userEmail: persons.Email,
+                             now:       () => Instant = () => Instant.now
+  ): ProjectViewedEvent =
+    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), Some(UserId(userEmail)))
 
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 
@@ -52,7 +58,7 @@ object ProjectViewedEvent {
           "path": $path
         },
         "date": $dateViewed
-      }""" addIfDefined ("user" -> maybeUserId.map(id => json"""{"id": $id}"""))
+      }""" addIfDefined "user" -> maybeUserId
   }
 
   implicit val decoder: Decoder[ProjectViewedEvent] = Decoder.instance { cursor =>
@@ -67,7 +73,7 @@ object ProjectViewedEvent {
       _           <- validateCategory
       path        <- cursor.downField("project").downField("path").as[projects.Path]
       date        <- cursor.downField("date").as[projects.DateViewed]
-      maybeUserId <- cursor.downField("user").downField("id").as[Option[persons.GitLabId]]
+      maybeUserId <- cursor.downField("user").as[Option[UserId]]
     } yield ProjectViewedEvent(path, date, maybeUserId)
   }
 

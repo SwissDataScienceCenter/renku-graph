@@ -196,7 +196,7 @@ class EndpointSpec
     def givenProjectViewedEventSent(path: projects.Path, returning: IO[Unit]) =
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent.forProject(path, maybeAuthUser.map(_.id), now))
+        .expects(ProjectViewedEvent.forProjectAndUserId(path, maybeAuthUser.map(_.id), now))
         .returning(returning)
   }
 }

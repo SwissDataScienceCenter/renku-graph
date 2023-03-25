@@ -84,7 +84,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
     case None => ().pure[F]
     case Some(proj) =>
       tgClient
-        .send(ProjectViewedEvent.forProject(proj.path, maybeAuthUser.map(_.id), now))
+        .send(ProjectViewedEvent.forProjectAndUserId(proj.path, maybeAuthUser.map(_.id), now))
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${ProjectViewedEvent.categoryName} event failed"))
   }
 

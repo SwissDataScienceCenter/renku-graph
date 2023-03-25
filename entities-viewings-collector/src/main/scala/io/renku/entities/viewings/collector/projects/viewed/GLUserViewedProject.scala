@@ -19,7 +19,8 @@
 package io.renku.entities.viewings.collector.projects
 package viewed
 
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.projects
 import ProjectViewingEncoder.Project
+import io.renku.triplesgenerator.api.events.UserId
 
-private final case class GLUserViewedProject(userId: persons.GitLabId, project: Project, date: projects.DateViewed)
+private final case class GLUserViewedProject(userId: UserId, project: Project, date: projects.DateViewed)

@@ -24,6 +24,7 @@ import cats.syntax.all._
 import collector.projects.viewed.{EventPersisterImpl, PersonViewedProjectPersister}
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.fixed
 import io.renku.graph.model.{persons, projects, GraphClass}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.Schemas.renku
@@ -32,7 +33,7 @@ import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
-import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
+import io.renku.triplesgenerator.api.events.{ProjectViewingDeletion, UserId}
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -52,12 +53,12 @@ class ViewingRemoverSpec
 
     "remove the relevant triples from the ProjectViewedTime and PersonViewing graphs" in new TestCase {
 
-      val personGLId = personGitLabIds.generateOne
-      val project    = generateProjectWithCreator(personGLId)
-      insertViewing(project, personGLId)
+      val userId  = userIds.generateOne
+      val project = generateProjectWithCreator(userId)
+      insertViewing(project, userId)
 
-      val otherProject = generateProjectWithCreator(personGLId)
-      insertViewing(otherProject, personGLId)
+      val otherProject = generateProjectWithCreator(userId)
+      insertViewing(otherProject, userId)
 
       val personId = otherProject.maybeCreator.value.resourceId
       findProjectsWithViewings shouldBe Set(project.resourceId, otherProject.resourceId)
@@ -74,13 +75,13 @@ class ViewingRemoverSpec
     "remove all person data from the PersonViewing graph " +
       "if he had viewings only from the project that is gone" in new TestCase {
 
-        val personGLId = personGitLabIds.generateOne
-        val project    = generateProjectWithCreator(personGLId)
-        insertViewing(project, personGLId)
+        val userId  = userIds.generateOne
+        val project = generateProjectWithCreator(userId)
+        insertViewing(project, userId)
 
-        val otherPersonGLId = personGitLabIds.generateOne
-        val otherProject    = generateProjectWithCreator(otherPersonGLId)
-        insertViewing(otherProject, otherPersonGLId)
+        val otherUserId  = userIds.generateOne
+        val otherProject = generateProjectWithCreator(otherUserId)
+        insertViewing(otherProject, otherUserId)
 
         val personId      = project.maybeCreator.value.resourceId
         val otherPersonId = otherProject.maybeCreator.value.resourceId
@@ -109,8 +110,8 @@ class ViewingRemoverSpec
 
     "do nothing if there are no triples in the PersonViewing graph for the given path" in new TestCase {
 
-      val personGLId = personGitLabIds.generateOne
-      val project    = generateProjectWithCreator(personGLId)
+      val userId  = userIds.generateOne
+      val project = generateProjectWithCreator(userId)
 
       upload(to = projectsDataset, project)
 
@@ -139,7 +140,7 @@ class ViewingRemoverSpec
     private val tsClient = TSClient[IO](projectsDSConnectionInfo)
     val eventPersister   = new EventPersisterImpl[IO](tsClient, PersonViewedProjectPersister[IO](tsClient))
 
-    def insertViewing(project: Project, userId: persons.GitLabId): Unit = {
+    def insertViewing(project: Project, userId: UserId): Unit = {
 
       upload(to = projectsDataset, project)
 
@@ -149,10 +150,19 @@ class ViewingRemoverSpec
     }
   }
 
-  private def generateProjectWithCreator(userId: persons.GitLabId) =
+  private def generateProjectWithCreator(userId: UserId) = {
+
+    val creator = userId
+      .fold(
+        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
+        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
+      )
+      .generateSome
+
     anyProjectEntities
-      .map(replaceProjectCreator(personEntities(userId.some).generateSome))
+      .map(replaceProjectCreator(creator))
       .generateOne
+  }
 
   private def findProjectsWithViewings =
     runSelect(

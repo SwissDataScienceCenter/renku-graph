@@ -22,6 +22,7 @@ package viewed
 import cats.MonadThrow
 import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.entities.Person
+import io.renku.triplesgenerator.api.events.UserId
 import io.renku.triplesstore.TSClient
 
 private[viewings] trait PersonViewedProjectPersister[F[_]] {
@@ -50,26 +51,47 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
   import ProjectViewingEncoder._
 
   override def persist(event: GLUserViewedProject): F[Unit] =
-    findPersonId(event) >>= {
+    findPersonId(event.userId) >>= {
       case None           => ().pure[F]
       case Some(personId) => persistIfOlderOrNone(personId, event)
     }
 
-  private def findPersonId(event: GLUserViewedProject) = queryExpecting {
+  private def findPersonId(userId: UserId) =
+    queryExpecting[Option[persons.ResourceId]] {
+      userId.fold(
+        userResourceIdByGLId,
+        userResourceIdByEmail
+      )
+    }(idDecoder)
+
+  private def userResourceIdByGLId(glId: persons.GitLabId) =
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: find user id",
+      show"${categoryName.show.toLowerCase}: find user id by glid",
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?id
                |WHERE {
                |  GRAPH ${GraphClass.Persons.id} {
                |    ?id schema:sameAs ?sameAsId.
                |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
-               |              schema:identifier ${event.userId.asObject}
+               |              schema:identifier ${glId.asObject}
                |  }
                |}
+               |LIMIT 1
                |""".stripMargin
     )
-  }(idDecoder)
+  private def userResourceIdByEmail(email: persons.Email) =
+    SparqlQuery.ofUnsafe(
+      show"${categoryName.show.toLowerCase}: find user id by email",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      sparql"""|SELECT DISTINCT ?id
+               |WHERE {
+               |  GRAPH ${GraphClass.Persons.id} {
+               |    ?id schema:email ${email.asObject}
+               |  }
+               |}
+               |LIMIT 1
+               |""".stripMargin
+    )
 
   private lazy val idDecoder: Decoder[Option[persons.ResourceId]] = ResultsDecoder[Option, persons.ResourceId] {
     Decoder.instance[persons.ResourceId] { implicit cur =>

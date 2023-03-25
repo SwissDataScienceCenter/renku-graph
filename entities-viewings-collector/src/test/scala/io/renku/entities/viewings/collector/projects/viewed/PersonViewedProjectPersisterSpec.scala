@@ -22,7 +22,7 @@ package viewed
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{fixed, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -30,6 +30,8 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.Generators.userIds
+import io.renku.triplesgenerator.api.events.UserId
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -49,10 +51,28 @@ class PersonViewedProjectPersisterSpec
 
   "persist" should {
 
-    "insert the given GLUserViewedProject to the TS " +
-      "if it doesn't exist yet" in new TestCase {
+    "insert the given GLUserViewedProject to the TS if it doesn't exist yet " +
+      "case with a user identified with GitLab id" in new TestCase {
 
-        val userId  = personGitLabIds.generateOne
+        val userId  = UserId(personGitLabIds.generateOne)
+        val project = generateProjectWithCreator(userId)
+
+        upload(to = projectsDataset, project)
+
+        val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
+        val event      = GLUserViewedProject(userId, toEncoderProject(project), dateViewed)
+
+        persister.persist(event).unsafeRunSync() shouldBe ()
+
+        findAllViewings shouldBe Set(
+          ViewingRecord(project.maybeCreator.value.resourceId, project.resourceId, dateViewed)
+        )
+      }
+
+    "insert the given GLUserViewedProject to the TS if it doesn't exist yet " +
+      "case with a user identified with email" in new TestCase {
+
+        val userId  = UserId(personEmails.generateOne)
         val project = generateProjectWithCreator(userId)
 
         upload(to = projectsDataset, project)
@@ -71,7 +91,7 @@ class PersonViewedProjectPersisterSpec
       "if an event for the project already exists in the TS " +
       "and the date from the new event is newer than this in the TS" in new TestCase {
 
-        val userId  = personGitLabIds.generateOne
+        val userId  = userIds.generateOne
         val project = generateProjectWithCreator(userId)
 
         upload(to = projectsDataset, project)
@@ -94,7 +114,7 @@ class PersonViewedProjectPersisterSpec
 
     "do nothing if the event date is older than the date in the TS" in new TestCase {
 
-      val userId  = personGitLabIds.generateOne
+      val userId  = userIds.generateOne
       val project = generateProjectWithCreator(userId)
 
       upload(to = projectsDataset, project)
@@ -118,7 +138,7 @@ class PersonViewedProjectPersisterSpec
     "update the date for the user and project from the GLUserViewedProject " +
       "and leave other user viewings if they exist" in new TestCase {
 
-        val userId   = personGitLabIds.generateOne
+        val userId   = userIds.generateOne
         val project1 = generateProjectWithCreator(userId)
         val project2 = generateProjectWithCreator(userId)
 
@@ -150,9 +170,9 @@ class PersonViewedProjectPersisterSpec
 
     "do nothing if the given event is for a non-existing user" in new TestCase {
 
-      val project = generateProjectWithCreator(personGitLabIds.generateOne)
+      val project = generateProjectWithCreator(userIds.generateOne)
 
-      val event = GLUserViewedProject(personGitLabIds.generateOne,
+      val event = GLUserViewedProject(userIds.generateOne,
                                       toEncoderProject(project),
                                       projectViewedDates(project.dateCreated.value).generateOne
       )
@@ -169,11 +189,20 @@ class PersonViewedProjectPersisterSpec
     val persister = new PersonViewedProjectPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   }
 
-  private def generateProjectWithCreator(userId: persons.GitLabId) =
+  private def generateProjectWithCreator(userId: UserId) = {
+
+    val creator = userId
+      .fold(
+        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
+        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
+      )
+      .generateSome
+
     anyProjectEntities
-      .map(replaceProjectCreator(personEntities(userId.some).generateSome))
+      .map(replaceProjectCreator(creator))
       .generateOne
       .to[entities.Project]
+  }
 
   private def findAllViewings =
     runSelect(
