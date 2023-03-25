@@ -27,7 +27,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.{persons, projects}
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectPaths, projectViewedDates}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectPaths, projectViewedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -49,9 +49,11 @@ class ProjectViewedEventSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val path = projectPaths.generateOne
+      val path          = projectPaths.generateOne
+      val maybeUserGLId = personGitLabIds.generateSome
 
-      ProjectViewedEvent.forProject(path, now) shouldBe ProjectViewedEvent(path, currentTime, maybeUserId = None)
+      ProjectViewedEvent.forProject(path, maybeUserGLId, now) shouldBe
+        ProjectViewedEvent(path, currentTime, maybeUserGLId)
     }
   }
 

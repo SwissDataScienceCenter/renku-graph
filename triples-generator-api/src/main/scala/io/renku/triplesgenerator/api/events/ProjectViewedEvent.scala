@@ -36,8 +36,11 @@ final case class ProjectViewedEvent(path:        projects.Path,
 
 object ProjectViewedEvent {
 
-  def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId = None)
+  def forProject(path:        projects.Path,
+                 maybeUserId: Option[persons.GitLabId],
+                 now:         () => Instant = () => Instant.now
+  ): ProjectViewedEvent =
+    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId)
 
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 
