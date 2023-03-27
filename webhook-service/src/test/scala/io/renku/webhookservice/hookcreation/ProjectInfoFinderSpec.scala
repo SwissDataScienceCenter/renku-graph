@@ -102,15 +102,14 @@ class ProjectInfoFinderSpec
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectInfoFinder = new ProjectInfoFinderImpl[IO]
 
-    lazy val projectJson: String =
-      json"""{
-        "id":                  $projectId,
-        "path_with_namespace": $projectPath
-      }""".noSpaces
+    lazy val projectJson: String = json"""{
+      "id":                  $projectId,
+      "path_with_namespace": $projectPath
+    }""".noSpaces
 
     lazy val mapResponse = captureMapping(gitLabClient)(
       projectInfoFinder.findProjectInfo(projectId).unsafeRunSync(),
-      Gen.const(projectJson)
+      Gen.const(project)
     )
   }
 }
