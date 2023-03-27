@@ -22,7 +22,6 @@ import eu.timepit.refined.api.Refined
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import io.renku.webhookservice.hookcreation.project.ProjectInfo
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model._
 import org.scalacheck.Gen
@@ -43,12 +42,6 @@ object WebhookServiceGenerators {
   implicit val hookTokens: Gen[HookToken] = for {
     projectId <- projectIds
   } yield HookToken(projectId)
-
-  implicit val projectInfos: Gen[ProjectInfo] = for {
-    id         <- projectIds
-    visibility <- projectVisibilities
-    path       <- projectPaths
-  } yield ProjectInfo(id, visibility, path)
 
   implicit val selfUrls:        Gen[SelfUrl]        = validatedUrls map (url => SelfUrl.apply(url.value))
   implicit val projectHookUrls: Gen[ProjectHookUrl] = selfUrls map ProjectHookUrl.from
