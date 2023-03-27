@@ -44,7 +44,7 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.GraphClass
+  import io.renku.graph.model.GraphClass.{ProjectViewedTimes, PersonViewings}
   import io.renku.graph.model.Schemas._
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.ResultsDecoder._
@@ -58,13 +58,13 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private val findGraph = SparqlQuery.of(
     name = "triples remove - count",
     Prefixes of renku -> "renku",
-    s"""|SELECT DISTINCT ?graph
-        |WHERE {
-        |  GRAPH ?graph { ?s ?p ?o }
-        |  FILTER (?graph != ${GraphClass.ProjectViewedTimes.id.sparql})
-        |}
-        |LIMIT 1
-        |""".stripMargin
+    sparql"""|SELECT DISTINCT ?graph
+             |WHERE {
+             |  GRAPH ?graph { ?s ?p ?o }
+             |  FILTER (?graph NOT IN (${ProjectViewedTimes.id}, ${PersonViewings.id}))
+             |}
+             |LIMIT 1
+             |""".stripMargin
   )
 
   private def remove(graphId: EntityId) = SparqlQuery.of(
