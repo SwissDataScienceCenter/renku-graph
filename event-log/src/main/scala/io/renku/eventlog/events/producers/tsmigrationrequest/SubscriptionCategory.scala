@@ -21,7 +21,6 @@ package tsmigrationrequest
 
 import cats.effect.Async
 import cats.syntax.all._
-import eventdelivery.EventDelivery
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -33,15 +32,12 @@ private[producers] object SubscriptionCategory {
   def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[producers.SubscriptionCategory[F]] = for {
     implicit0(st: MigrationSubscriberTracker[F]) <- MigrationSubscriberTracker[F]
-    subscribers                                  <- MigrationSubscribers[F](categoryName)
+    subscribers                                  <- MigrationSubscribers[F]()
     eventFinder                                  <- EventFinder[F]
     dispatchRecovery                             <- DispatchRecovery[F]
-    eventDelivery                                <- EventDelivery.noOp[F, MigrationRequestEvent]
-    distributor <- EventsDistributor[F, MigrationRequestEvent](
-                     categoryName,
+    distributor <- MigrationEventsDistributor[F](
                      subscribers,
                      eventFinder,
-                     eventDelivery,
                      EventEncoder(MigrationRequestEvent.encodeEvent),
                      dispatchRecovery
                    )
