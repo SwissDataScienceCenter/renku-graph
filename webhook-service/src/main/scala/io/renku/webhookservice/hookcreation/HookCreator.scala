@@ -20,18 +20,19 @@ package io.renku.webhookservice.hookcreation
 
 import cats.effect._
 import cats.syntax.all._
+import cats.Show
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
+import io.renku.webhookservice.{hookvalidation, CommitSyncRequestSender}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
-import io.renku.webhookservice.hookcreation.project.{ProjectInfo, ProjectInfoFinder}
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
-import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, ProjectHookUrl}
+import io.renku.webhookservice.model._
 import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
-import io.renku.webhookservice.{CommitSyncRequestSender, hookvalidation}
 import org.typelevel.log4cats.Logger
 
 private trait HookCreator[F[_]] {
@@ -54,33 +55,41 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookValidator._
-  import projectInfoFinder._
+  import projectInfoFinder.findProjectInfo
 
   override def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult] = {
-    def sendCommitSyncReq(projectInfo: ProjectInfo) =
-      sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject), "HookCreation")
 
-    def createIfMissing(hvr: HookValidationResult, projectInfo: ProjectInfo): F[CreationResult] =
+    def createIfMissing(hvr: HookValidationResult): F[CreationResult] =
       hvr match {
         case HookValidationResult.HookMissing =>
           for {
-            serializedHookToken <- encrypt(HookToken(projectInfo.id))
-            _                   <- create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
             _                   <- associate(projectId, accessToken)
+            serializedHookToken <- encrypt(HookToken(projectId))
+            _                   <- create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
           } yield HookCreated
         case HookValidationResult.HookExists =>
-          (HookExisted: CreationResult).pure[F]
+          associate(projectId, accessToken).map(_ => HookExisted.widen)
       }
 
     {
       for {
-        hookValidation <- validateHook(projectId, Some(accessToken))
-        projectInfo    <- findProjectInfo(projectId)(Some(accessToken))
-        result         <- createIfMissing(hookValidation, projectInfo)
-        _              <- Spawn[F].start(sendCommitSyncReq(projectInfo))
-      } yield result
+        validationResult <- validateHook(projectId, accessToken.some)
+        creationResult   <- createIfMissing(validationResult)
+        _                <- Logger[F].info(show"Hook $creationResult for projectId $projectId")
+        _                <- Spawn[F].start(sendCommitSyncReq(projectId, accessToken))
+      } yield creationResult
     }.onError(loggingError(projectId))
   }
+
+  private def sendCommitSyncReq(projectId: projects.GitLabId, accessToken: AccessToken) =
+    findProjectInfo(projectId)(accessToken.some)
+      .onError(
+        Logger[F].error(_)(
+          s"Hook creation - sending COMMIT_SYNC_REQUEST failure; finding project info for projectId $projectId failed"
+        )
+      )
+      .map(CommitSyncRequest)
+      .flatMap(sendCommitSyncRequest(_, "HookCreation"))
 
   private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
@@ -89,13 +98,18 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
 
 private object HookCreator {
 
-  sealed trait CreationResult extends Product with Serializable
+  sealed trait CreationResult extends Product {
+    lazy val widen: CreationResult = this
+  }
   object CreationResult {
     final case object HookCreated extends CreationResult
     final case object HookExisted extends CreationResult
-  }
 
-  case class HookAlreadyCreated(projectId: GitLabId, projectHookUrl: ProjectHookUrl)
+    implicit val show: Show[CreationResult] = Show {
+      case HookCreated => "created"
+      case HookExisted => "existed"
+    }
+  }
 
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl:  ProjectHookUrl,
                                                                 hookTokenCrypto: HookTokenCrypto[F]
