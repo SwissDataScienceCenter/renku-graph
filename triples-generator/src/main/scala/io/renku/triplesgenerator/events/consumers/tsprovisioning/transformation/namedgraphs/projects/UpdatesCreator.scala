@@ -19,6 +19,8 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import cats.syntax.all._
+import io.renku.triplesstore.client.syntax._
+import io.renku.jsonld.syntax._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities._
@@ -161,23 +163,23 @@ private object UpdatesCreator extends UpdatesCreator {
 
   private def imageDeletion(project: Project, kgData: ProjectMutableData) =
     Option.when(kgData.images.toSet != project.images.map(_.resourceId).toSet) {
-      val resource = project.resourceId.showAs[RdfResource]
+      val resource = project.resourceId.asEntityId
       SparqlQuery.of(
         name = "transformation - delete project images",
-        Prefixes.of(schema -> "schema"),
-        s"""|DELETE {
-            |  GRAPH $resource {
-            |    $resource schema:image ?img.
-            |    ?img ?p ?s
-            |  } 
-            |}
-            |WHERE  {
-            |  GRAPH $resource {
-            |    $resource schema:image ?img.
-            |    ?img ?p ?s
-            |  }
-            |}
-            |""".stripMargin
+        Prefixes of schema -> "schema",
+        sparql"""|DELETE {
+                 |  GRAPH $resource {
+                 |    $resource schema:image ?img.
+                 |    ?img ?p ?s
+                 |  } 
+                 |}
+                 |WHERE  {
+                 |  GRAPH $resource {
+                 |    $resource schema:image ?img.
+                 |    ?img ?p ?s
+                 |  }
+                 |}
+                 |""".stripMargin
       )
     }
 

@@ -20,10 +20,8 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.Generators.subscriberUrls
-import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
-import org.scalacheck.Gen
+import Generators.migrationRequestEvents
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -32,7 +30,8 @@ class MigrationRequestEventSpec extends AnyWordSpec with should.Matchers {
   "encodeEvent" should {
 
     "serialize MemberSyncEvent to Json" in {
-      val event = events.generateOne
+
+      val event = migrationRequestEvents.generateOne
 
       MigrationRequestEvent.encodeEvent(event) shouldBe json"""{
         "categoryName": "TS_MIGRATION_REQUEST",
@@ -46,14 +45,10 @@ class MigrationRequestEventSpec extends AnyWordSpec with should.Matchers {
   "show" should {
 
     "return String representation of the event containing url and version" in {
-      val event = events.generateOne
 
-      event.show shouldBe show"""subscriberVersion = ${event.subscriberVersion}"""
+      val event = migrationRequestEvents.generateOne
+
+      event.show shouldBe show"""subscriberUrl = ${event.subscriberUrl}, subscriberVersion = ${event.subscriberVersion}"""
     }
   }
-
-  private lazy val events: Gen[MigrationRequestEvent] = for {
-    url     <- subscriberUrls
-    version <- serviceVersions
-  } yield MigrationRequestEvent(url, version)
 }

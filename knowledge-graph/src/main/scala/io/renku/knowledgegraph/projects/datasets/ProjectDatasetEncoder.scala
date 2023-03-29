@@ -22,11 +22,11 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.Encoder
 import io.renku.config.renku
+import io.renku.graph.model.{projects, GitLabUrl}
 import io.renku.graph.model.datasets.{DerivedFrom, SameAs}
-
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.rest.Links.{Rel, _links}
+import io.renku.http.rest.Links.{_links, Rel}
 import io.renku.knowledgegraph
+import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.knowledgegraph.projects.images.ImagesEncoder
 
 private object ProjectDatasetEncoder extends ImagesEncoder {
@@ -54,8 +54,9 @@ private object ProjectDatasetEncoder extends ImagesEncoder {
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(
           _links(
-            Rel("details")         -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, id),
-            Rel("initial-version") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, originalId.value),
+            Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)),
+            Rel("initial-version") ->
+              knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(originalId.asIdentifier)),
             Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, name)
           )
         )

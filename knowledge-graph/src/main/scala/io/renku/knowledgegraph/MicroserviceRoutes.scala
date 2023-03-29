@@ -24,9 +24,10 @@ import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import cats.Parallel
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
-import io.renku.graph.model.persons
+import io.renku.graph.model.{persons, RenkuUrl}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -39,6 +40,7 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
+import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
@@ -61,19 +63,22 @@ private class MicroserviceRoutes[F[_]: Async](
     authMiddleware:             AuthMiddleware[F, Option[AuthUser]],
     projectPathAuthorizer:      Authorizer[F, model.projects.Path],
     datasetIdAuthorizer:        Authorizer[F, model.datasets.Identifier],
+    datasetSameAsAuthorizer:    Authorizer[F, model.datasets.SameAs],
     routesMetrics:              RoutesMetrics[F],
     versionRoutes:              version.Routes[F]
-) extends Http4sDsl[F] {
+)(implicit ru: RenkuUrl)
+    extends Http4sDsl[F] {
 
   import datasetDetailsEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
+  import datasetSameAsAuthorizer.{authorize => authorizeDatasetSameAs}
   import entitiesEndpoint._
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
-  import projectDeleteEndpoint._
   import projectDatasetsEndpoint._
   import projectDatasetTagsEndpoint._
+  import projectDeleteEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import routesMetrics._
@@ -86,7 +91,6 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
-    import datasets._
     import datasets.Endpoint.Query.query
     import datasets.Endpoint.Sort.sort
 
@@ -94,7 +98,8 @@ private class MicroserviceRoutes[F[_]: Async](
       case GET -> Root / "knowledge-graph" / "datasets"
           :? query(maybePhrase) +& sort(sortBy) +& page(page) +& perPage(perPage) as maybeUser =>
         searchForDatasets(maybePhrase, sortBy, page, perPage, maybeUser)
-      case GET -> Root / "knowledge-graph" / "datasets" / DatasetId(id) as maybeUser => fetchDataset(id, maybeUser)
+      case GET -> Root / "knowledge-graph" / "datasets" / RequestedDataset(dsId) as maybeUser =>
+        fetchDataset(dsId, maybeUser)
     }
   }
 
@@ -222,10 +227,14 @@ private class MicroserviceRoutes[F[_]: Async](
     }.fold(toBadRequest, identity)
   }
 
-  private def fetchDataset(datasetId: model.datasets.Identifier, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
-    authorizeDatasetId(datasetId, maybeAuthUser)
+  private def fetchDataset(requestedDS: RequestedDataset, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
+    requestedDS
+      .fold(
+        authorizeDatasetId(_, maybeAuthUser).map(_.replaceKey(requestedDS)),
+        authorizeDatasetSameAs(_, maybeAuthUser).map(_.replaceKey(requestedDS))
+      )
       .leftMap(_.toHttpResponse[F])
-      .semiflatMap(getDataset(datasetId, _))
+      .semiflatMap(`GET /datasets/:id`(requestedDS, _))
       .merge
 
   private def routeToProjectsEndpoints(
@@ -290,6 +299,7 @@ private object MicroserviceRoutes {
   def apply[F[_]: Async: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[MicroserviceRoutes[F]] = for {
     implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
     implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
+    implicit0(ru: RenkuUrl)              <- RenkuUrlLoader[F]()
     datasetsSearchEndpoint               <- datasets.Endpoint[F]
     datasetDetailsEndpoint               <- datasets.details.Endpoint[F]
     entitiesEndpoint                     <- entities.Endpoint[F]
@@ -305,6 +315,7 @@ private object MicroserviceRoutes {
     authMiddleware                       <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     projectPathAuthorizer                <- Authorizer.using(ProjectPathRecordsFinder[F])
     datasetIdAuthorizer                  <- Authorizer.using(DatasetIdRecordsFinder[F])
+    datasetSameAsAuthorizer              <- Authorizer.using(DatasetSameAsRecordsFinder[F])
     versionRoutes                        <- version.Routes[F]
   } yield new MicroserviceRoutes(
     datasetsSearchEndpoint,
@@ -321,6 +332,7 @@ private object MicroserviceRoutes {
     authMiddleware,
     projectPathAuthorizer,
     datasetIdAuthorizer,
+    datasetSameAsAuthorizer,
     new RoutesMetrics[F],
     versionRoutes
   )

@@ -34,7 +34,7 @@ import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -133,11 +133,15 @@ class EventHandlerSpec
     private val tgClient = mock[triplesgenerator.api.events.Client[IO]]
     val handler          = new EventHandler[IO](eventPersister, tgClient)
 
-    def givenProjectViewEventSent(event: Event, returning: IO[Unit]) =
+    def givenProjectViewEventSent(event: Event, returning: IO[Unit]) = {
+
+      val maybeUserId = (event.body.maybeAuthorEmail orElse event.body.maybeCommitterEmail).map(UserId(_))
+
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value)))
+        .expects(ProjectViewedEvent(event.project.path, projects.DateViewed(event.date.value), maybeUserId))
         .returning(returning)
+    }
   }
 
   private def toJson(event: Event): Json = json"""{

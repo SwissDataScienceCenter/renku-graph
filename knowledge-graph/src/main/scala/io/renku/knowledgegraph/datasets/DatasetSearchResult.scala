@@ -26,9 +26,10 @@ import io.circe.{Encoder, Json}
 import io.renku.config
 import io.renku.graph.model.datasets.{CreatedOrPublished, DatePublished, Description, Identifier, Keyword, Name, Title}
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.graph.model.{projects, GitLabUrl}
+import io.renku.http.rest.Links.{_links, Href, Link, Rel}
 import io.renku.json.JsonOps._
+import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
@@ -73,7 +74,7 @@ object DatasetSearchResult {
         "images":        ${images -> exemplarProject}
       }"""
           .addIfDefined("description" -> maybeDescription)
-          .deepMerge(_links(Link(Rel("details") -> datasets.details.Endpoint.href(renkuApiUrl, id))))
+          .deepMerge(_links(Link(Rel("details") -> datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)))))
     }
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], CreatedOrPublished)] = Encoder.instance {

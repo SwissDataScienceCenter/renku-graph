@@ -16,15 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.hookcreation.project
+package io.renku.entities.viewings.collector.projects
+package viewed
 
-import io.renku.graph.model.projects.{GitLabId, Path, Visibility}
-import io.renku.webhookservice.model.Project
+import io.renku.graph.model.projects
+import ProjectViewingEncoder.Project
+import io.renku.triplesgenerator.api.events.UserId
 
-final case class ProjectInfo(
-    id:         GitLabId,
-    visibility: Visibility,
-    path:       Path
-) {
-  lazy val toProject: Project = Project(id, path)
-}
+private final case class GLUserViewedProject(userId: UserId, project: Project, date: projects.DateViewed)

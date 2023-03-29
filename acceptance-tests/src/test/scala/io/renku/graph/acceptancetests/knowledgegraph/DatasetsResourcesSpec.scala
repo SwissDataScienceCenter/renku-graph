@@ -23,23 +23,24 @@ import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
-import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.{::~, creatorUsernameUpdaterInternal}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
+import org.scalatest.EitherValues
 
 import scala.util.Random
 
@@ -48,7 +49,8 @@ class DatasetsResourcesSpec
     with ApplicationServices
     with TSProvisioning
     with TSData
-    with DatasetsApiEncoders {
+    with DatasetsApiEncoders
+    with EitherValues {
 
   private val creator = authUsers.generateOne
   private val user    = authUsers.generateOne
@@ -82,7 +84,7 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
-      val Right(foundDatasets) = projectDatasetsResponse.jsonBody.as[List[Json]]
+      val foundDatasets = projectDatasetsResponse.jsonBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
                                                           briefJson(dataset2Modified, project.path)
       )
@@ -92,42 +94,41 @@ class DatasetsResourcesSpec
       val someDatasetDetailsLink = someDatasetJson._links
         .get(Rel("details"))
         .getOrFail(message = "No link with rel 'details'")
-      val datasetDetailsResponse = (restClient GET someDatasetDetailsLink.toString)
+      val dsDetailsResponseStatus -> dsDetailsResponseBody = (restClient GET someDatasetDetailsLink.toString)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
         .unsafeRunSync()
 
       Then("he should get OK response with dataset details")
-      datasetDetailsResponse._1 shouldBe Ok
-      val foundDatasetDetails = datasetDetailsResponse._2
+      dsDetailsResponseStatus shouldBe Ok
       val expectedDataset = List(dataset1, dataset2Modified)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.identifier.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the Triples store")
-      findIdentifier(foundDatasetDetails) shouldBe expectedDataset.identifier
+      findIdentifier(dsDetailsResponseBody) shouldBe expectedDataset.identifier
 
       When("user is authenticated")
       gitLabStub.addAuthenticated(user)
 
-      val datasetUsedInProjectLink = foundDatasetDetails.hcursor
+      val datasetUsedInProjectLink = dsDetailsResponseBody.hcursor
         .downField("usedIn")
         .downArray
         ._links
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'")
 
-      foundDatasetDetails.hcursor
+      dsDetailsResponseBody.hcursor
         .downField("project")
         ._links
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'") shouldBe datasetUsedInProjectLink
 
-      val getProjectResponse = restClient
+      val getProjectResponseStatus -> getProjectResponseBody = restClient
         .GET(datasetUsedInProjectLink.toString, user.accessToken)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
         .unsafeRunSync()
 
       Then("he should get OK response with project details")
-      getProjectResponse._1 shouldBe Ok
-      getProjectResponse._2 shouldBe fullJson(project)
+      getProjectResponseStatus shouldBe Ok
+      getProjectResponseBody   shouldBe fullJson(project)
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
@@ -146,7 +147,7 @@ class DatasetsResourcesSpec
       findIdentifier(getInitialVersionResponse._2) shouldBe dataset2.identifier
 
       When("user fetches dataset's tags using the 'tags' link")
-      val dsTagsLink = foundDatasetDetails.hcursor._links
+      val dsTagsLink = dsDetailsResponseBody.hcursor._links
         .get(Rel("tags"))
         .getOrFail("No link with rel 'tags' in the Dataset Details response")
 
@@ -264,7 +265,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets")
       dsSearchResponse.status shouldBe Ok
 
-      val Right(foundDatasets) = dsSearchResponse.jsonBody.as[List[Json]]
+      val foundDatasets = dsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should {
         contain theSameElementsAs List(
           searchResultJson(dataset1, 1, project1.path, foundDatasets),
@@ -286,7 +287,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets sorted by title ASC")
       searchSortedByName.status shouldBe Ok
 
-      val Right(foundDatasetsSortedByName) = searchSortedByName.jsonBody.as[List[Json]]
+      val foundDatasetsSortedByName = searchSortedByName.jsonBody.as[List[Json]].value
       val datasetsSortedByNameProj4Path = List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
@@ -309,7 +310,7 @@ class DatasetsResourcesSpec
         knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1"
 
       Then("he should get OK response with the dataset from the requested page")
-      val Right(foundDatasetsPage) = searchForPage.jsonBody.as[List[Json]]
+      val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
       foundDatasetsPage should {
         contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)) or
           contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1))
@@ -319,7 +320,7 @@ class DatasetsResourcesSpec
       val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
 
       Then("he should get OK response with all the datasets")
-      val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.jsonBody.as[List[Json]]
+      val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
       foundDatasetsWithoutPhrase should {
         contain allElementsOf List(
           searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
@@ -409,7 +410,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok
 
-      val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
+      val foundDatasets = datasetsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs List(
         searchResultJson(dataset1, 1, project1.path, foundDatasets),
         searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)

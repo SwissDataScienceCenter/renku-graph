@@ -124,8 +124,8 @@ private object Dataset {
         ("images" -> (dataset.images, dataset.project).asJson).some
       ).flatten: _*
     ) deepMerge _links(
-      Rel.Self -> Endpoint.href(renkuApiUrl, dataset.id),
-      Rel("initial-version") -> Endpoint.href(renkuApiUrl, dataset.versions.initial.value),
+      Rel.Self -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.id)),
+      Rel("initial-version") -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.versions.initial.asIdentifier)),
       Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
     )
   }

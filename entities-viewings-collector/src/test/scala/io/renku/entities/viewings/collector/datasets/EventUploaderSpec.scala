@@ -25,7 +25,7 @@ import projects.viewed.EventPersister
 import io.renku.graph.model.{datasets, projects}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
 import io.renku.triplesgenerator.api.events.Generators.datasetViewedEvents
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,8 +45,9 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
         val path = projectPaths.generateOne
         givenProjectFinding(event.identifier, returning = path.some.pure[Try])
 
-        givenEventPersisting(ProjectViewedEvent(path, projects.DateViewed(event.dateViewed.value)),
-                             returning = ().pure[Try]
+        givenEventPersisting(
+          ProjectViewedEvent(path, projects.DateViewed(event.dateViewed.value), event.maybeUserId.map(UserId(_))),
+          returning = ().pure[Try]
         )
 
         uploader.upload(event).success.value shouldBe ()

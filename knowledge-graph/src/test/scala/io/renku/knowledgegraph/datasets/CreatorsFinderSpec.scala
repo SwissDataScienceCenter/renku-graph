@@ -56,8 +56,8 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     "results": {
       "bindings": [
         {
-          "email":       {"value": ${email.value}},
-          "name":        {"value": ${name.value}},
+          "email":       {"value": $email},
+          "name":        {"value": $name},
           "affiliation": {"value": $blank}
         }
       ]

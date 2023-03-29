@@ -145,6 +145,134 @@ Response body example:
 ]
 ```
 
+#### GET /knowledge-graph/datasets/:id
+
+Finds details of the dataset with the given `id`. The `id` can be either Dataset's _Identifier_ or a ResourceId of a group of the same Datasets existing on multiple projects.
+
+**Response**
+
+| Status                       | Description                                                                                       |
+|------------------------------|---------------------------------------------------------------------------------------------------|
+| OK (200)                     | If dataset details are found                                                                      |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                      |
+| NOT_FOUND (404)              | If dataset is not found or user is not authorised to access project where this dataset belongs to |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                         |
+
+Response body example:
+
+```json
+{
+  "_links": [
+    {
+      "rel":  "self",
+      "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+    },
+    {
+      "rel":  "initial-version",
+      "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "rel":  "tags",
+      "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
+    }
+  ],
+  "identifier": "22222222-2222-2222-2222-222222222222",
+  "versions": {
+    "initial": "11111111-1111-1111-1111-111111111111"
+  },
+  "tags": {                                      // optional
+    "initial": {
+      "name":        "1.0.1",
+      "description": "some tag"                  //optional
+    }
+  },
+  "title":       "dataset title",
+  "name":        "dataset-name",
+  "url":         "http://host/url1",             // optional property
+  "sameAs":      "http://host/url2",             // optional property when no "derivedFrom" exists
+  "derivedFrom": "http://host/url1",             // optional property when no "sameAs" exists
+  "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+  "published": {
+    "datePublished": "2012-10-14",               // optional property
+    "creator": [
+      {
+        "name":        "e wmtnxmcguz",
+        "affiliation": "SDSC"                    // optional property
+      },
+      {
+        "name":  "iilmadw vcxabmh",
+        "email": "ticUnrW@cBmrdomoa"             // optional property
+      }
+    ]
+  },
+  "created": "2012-10-15T03:02:25.639Z",         // optional property
+  "hasPart": [
+    {
+      "atLocation": "data/dataset-name/file1"
+    },
+    {
+      "atLocation": "data/dataset-name/file2"
+    }
+  ],
+  "project":  {
+    "_links": [
+      {
+        "rel":  "project-details",
+        "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
+      }
+    ],
+    "path": "namespace1/project1-name",
+    "name": "project1 name",
+    "visibility": "public"
+  },
+  "usedIn": [
+    {
+      "_links": [
+        {
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
+        }
+      ],
+      "path": "namespace1/project1-name",
+      "name": "project1 name",
+      "visibility": "public"
+    },
+    {
+      "_links": [
+        {
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path": "namespace2/project2-name",
+      "name": "project2 name",
+      "visibility": "public"
+    }
+  ],
+  "keywords": [ "rldzpwo", "gfioui" ],
+  "images": [
+    {
+      "location": "image.png",
+      "_links":[
+         {
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+         }
+      ]
+    },
+    {
+      "location": "http://host/external-image.png",
+      "_links":[
+         {
+            "rel":  "view",
+            "href": "http://host/external-image.png"
+         }
+      ]
+    }
+  ],
+}
+```
+
 #### GET /knowledge-graph/entities
 
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
@@ -295,134 +423,6 @@ Response body example:
     "_links":        []
   }
 ]
-```
-
-#### GET /knowledge-graph/datasets/:id
-
-Finds details of the dataset with the given `id`.
-
-**Response**
-
-| Status                       | Description                                                                                       |
-|------------------------------|---------------------------------------------------------------------------------------------------|
-| OK (200)                     | If dataset details are found                                                                      |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                      |
-| NOT_FOUND (404)              | If dataset is not found or user is not authorised to access project where this dataset belongs to |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                         |
-
-Response body example:
-
-```json
-{
-  "_links": [
-    {
-      "rel":  "self",
-      "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
-    },
-    {
-      "rel":  "initial-version",
-      "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
-    },
-    {
-      "rel":  "tags",
-      "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
-    }
-  ],
-  "identifier": "22222222-2222-2222-2222-222222222222",
-  "versions": {
-    "initial": "11111111-1111-1111-1111-111111111111"
-  },
-  "tags": {                                      // optional
-    "initial": {
-      "name":        "1.0.1",
-      "description": "some tag"                  //optional
-    }
-  },
-  "title":       "dataset title",
-  "name":        "dataset-name",
-  "url":         "http://host/url1",             // optional property
-  "sameAs":      "http://host/url2",             // optional property when no "derivedFrom" exists
-  "derivedFrom": "http://host/url1",             // optional property when no "sameAs" exists
-  "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-  "published": {
-    "datePublished": "2012-10-14",               // optional property
-    "creator": [
-      {
-        "name":        "e wmtnxmcguz",
-        "affiliation": "SDSC"                    // optional property
-      },
-      {
-        "name":  "iilmadw vcxabmh",
-        "email": "ticUnrW@cBmrdomoa"             // optional property
-      }
-    ]
-  },
-  "created": "2012-10-15T03:02:25.639Z",         // optional property
-  "hasPart": [
-    {
-      "atLocation": "data/dataset-name/file1"
-    },
-    {
-      "atLocation": "data/dataset-name/file2"
-    }
-  ],
-  "project":  {
-    "_links": [
-      {
-        "rel":  "project-details",
-        "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
-      }
-    ],
-    "path": "namespace1/project1-name",
-    "name": "project1 name",
-    "visibility": "public"
-  },
-  "usedIn": [
-    {
-      "_links": [
-        {
-          "rel":  "project-details",
-          "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
-        }
-      ],
-      "path": "namespace1/project1-name",
-      "name": "project1 name",
-      "visibility": "public"
-    },
-    {
-      "_links": [
-        {
-          "rel":  "project-details",
-          "href": "https://zemdgsw:9540/projects/namespace2/project2-name"
-        }
-      ],
-      "path": "namespace2/project2-name",
-      "name": "project2 name",
-      "visibility": "public"
-    }
-  ],
-  "keywords": [ "rldzpwo", "gfioui" ],
-  "images": [
-    {
-      "location": "image.png",
-      "_links":[
-         {
-            "rel":  "view",
-            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
-         }
-      ]
-    },
-    {
-      "location": "http://host/external-image.png",
-      "_links":[
-         {
-            "rel":  "view",
-            "href": "http://host/external-image.png"
-         }
-      ]
-    }
-  ],
-}
 ```
 
 #### GET /knowledge-graph/ontology

@@ -31,8 +31,9 @@ import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import RenkuTinyTypeGenerators.personEmails
 
-import java.time.{Clock, Duration => JavaDuration, Instant, ZoneId}
+import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
 import scala.util.Random
 
@@ -205,6 +206,74 @@ class EventBodySpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       }
 
       eventBody.decodeAs[Wrapper] shouldBe Right(Wrapper(value))
+    }
+  }
+
+  "maybeAuthorEmail" should {
+
+    "return value from author.email property if exists" in {
+
+      val email = personEmails.generateOne
+      val eventBody = EventBody {
+        json"""{
+          "author": {
+            "email": $email
+          }
+        }""".noSpaces
+      }
+
+      eventBody.maybeAuthorEmail shouldBe email.some
+    }
+
+    "return None if author.email property invalid" in {
+
+      val eventBody = EventBody {
+        json"""{
+          "author": {
+            "email": true
+          }
+        }""".noSpaces
+      }
+
+      eventBody.maybeAuthorEmail shouldBe None
+    }
+
+    "return None if author.email property does not exist" in {
+      EventBody("{}").maybeAuthorEmail shouldBe None
+    }
+  }
+
+  "maybeCommitterEmail" should {
+
+    "return value from committer.email property if exists" in {
+
+      val email = personEmails.generateOne
+      val eventBody = EventBody {
+        json"""{
+          "committer": {
+            "email": $email
+          }
+        }""".noSpaces
+      }
+
+      eventBody.maybeCommitterEmail shouldBe email.some
+    }
+
+    "return None if committer.email property invalid" in {
+
+      val eventBody = EventBody {
+        json"""{
+          "committer": {
+            "email": true
+          }
+        }""".noSpaces
+      }
+
+      eventBody.maybeCommitterEmail shouldBe None
+    }
+
+    "return None if committer.email property does not exist" in {
+      EventBody("{}").maybeCommitterEmail shouldBe None
     }
   }
 }

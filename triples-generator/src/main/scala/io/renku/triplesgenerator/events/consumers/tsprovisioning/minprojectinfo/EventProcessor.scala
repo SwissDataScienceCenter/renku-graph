@@ -22,7 +22,6 @@ package minprojectinfo
 
 import ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -45,11 +44,12 @@ private trait EventProcessor[F[_]] {
 }
 
 private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    stepsCreator:          TransformationStepsCreator[F],
-    uploader:              TransformationStepsRunner[F],
-    entityBuilder:         EntityBuilder[F],
-    tgClient:              triplesgenerator.api.events.Client[F],
-    executionTimeRecorder: ExecutionTimeRecorder[F]
+    stepsCreator:            TransformationStepsCreator[F],
+    uploader:                TransformationStepsRunner[F],
+    entityBuilder:           EntityBuilder[F],
+    projectExistenceChecker: ProjectExistenceChecker[F],
+    tgClient:                triplesgenerator.api.events.Client[F],
+    executionTimeRecorder:   ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
@@ -57,6 +57,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import accessTokenFinder._
   import entityBuilder._
   import executionTimeRecorder._
+  import projectExistenceChecker._
   import stepsCreator._
   import uploader._
 
@@ -76,12 +77,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def transformAndUpload(
       event: MinProjectInfoEvent
-  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
-    for {
-      project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
-    } yield result
-  }.merge recoverWith nonRecoverableFailure(event)
+  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] =
+    (buildEntity(event) leftSemiflatMap toUploadingError(event)).semiflatMap { project =>
+      checkProjectExists(project.resourceId) >>= {
+        case true  => Skipped(event).widen.pure[F]
+        case false => run(createSteps, project) >>= toUploadingResult(event)
+      }
+    }.merge recoverWith nonRecoverableFailure(event)
 
   private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
@@ -129,6 +131,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     case (elapsedTime, uploadingResult) =>
       val message = uploadingResult match {
         case Uploaded(_) => "success"
+        case Skipped(_)  => "skipped"
         case _           => "failure"
       }
       Logger[F].info(s"${prefix(event)} processed in ${elapsedTime}ms: $message")
@@ -136,16 +139,18 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def prefix(event: MinProjectInfoEvent): String = show"$categoryName: $event"
 
-  private sealed trait EventUploadingResult extends UploadingResult {
+  private sealed trait EventUploadingResult extends UploadingResult with Product {
     val event: MinProjectInfoEvent
+    val widen: EventUploadingResult = this
   }
-
+  private sealed trait ProcessingSuccessful extends EventUploadingResult
   private sealed trait UploadingError extends EventUploadingResult {
     val cause: Throwable
   }
 
   private object EventUploadingResult {
-    case class Uploaded(event: MinProjectInfoEvent) extends EventUploadingResult with UploadingResult.Uploaded
+    case class Skipped(event: MinProjectInfoEvent)  extends ProcessingSuccessful with UploadingResult.Uploaded
+    case class Uploaded(event: MinProjectInfoEvent) extends ProcessingSuccessful with UploadingResult.Uploaded
 
     case class RecoverableError(event: MinProjectInfoEvent, cause: ProcessingRecoverableError)
         extends UploadingError
@@ -165,10 +170,11 @@ private object EventProcessor {
       _
   ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
       : F[EventProcessor[F]] = for {
-    uploader      <- TransformationStepsRunner[F]
-    stepsCreator  <- TransformationStepsCreator[F]
-    entityBuilder <- EntityBuilder[F]
-    tgClient      <- triplesgenerator.api.events.Client[F]
+    uploader                <- TransformationStepsRunner[F]
+    stepsCreator            <- TransformationStepsCreator[F]
+    entityBuilder           <- EntityBuilder[F]
+    projectExistenceChecker <- ProjectExistenceChecker[F]
+    tgClient                <- triplesgenerator.api.events.Client[F]
     eventsProcessingTimes <- Histogram(
                                name = "min_project_info_processing_times",
                                help = "Min project info processing times",
@@ -176,5 +182,11 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-  } yield new EventProcessorImpl(stepsCreator, uploader, entityBuilder, tgClient, executionTimeRecorder)
+  } yield new EventProcessorImpl(stepsCreator,
+                                 uploader,
+                                 entityBuilder,
+                                 projectExistenceChecker,
+                                 tgClient,
+                                 executionTimeRecorder
+  )
 }

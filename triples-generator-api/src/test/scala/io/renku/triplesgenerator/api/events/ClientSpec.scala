@@ -43,7 +43,7 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
       givenSending(event, ProjectActivated.categoryName, returning = ().pure[Try])
 
-      client.send(event).success.value shouldBe()
+      client.send(event).success.value shouldBe ()
     }
   }
 

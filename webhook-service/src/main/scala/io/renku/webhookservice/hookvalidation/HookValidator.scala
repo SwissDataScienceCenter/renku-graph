@@ -18,12 +18,11 @@
 
 package io.renku.webhookservice.hookvalidation
 
+import cats.{Applicative, MonadThrow}
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
@@ -46,8 +45,8 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
 
   private val applicative = Applicative[F]
 
-  import HookValidator.HookValidationResult._
   import HookValidator._
+  import HookValidator.HookValidationResult._
   import Token._
   import accessTokenAssociator._
   import accessTokenFinder._
@@ -56,59 +55,60 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   import projectHookVerifier._
 
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[HookValidationResult] =
-    findToken(projectId, maybeAccessToken) flatMap {
-      case GivenToken(token) =>
-        for {
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- whenA(hookPresent)(associate(projectId, token))
-          _                <- whenA(!hookPresent)(removeAccessToken(projectId))
-          validationResult <- toValidationResult(hookPresent).pure[F]
-        } yield validationResult
-      case StoredToken(token) =>
-        for {
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- whenA(!hookPresent)(removeAccessToken(projectId))
-          validationResult <- toValidationResult(hookPresent).pure[F]
-        } yield validationResult
-    } recoverWith loggingError(projectId)
+    findToken(projectId, maybeAccessToken)
+      .flatMap {
+        case GivenToken(token) =>
+          for {
+            hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
+            _                <- whenA(hookPresent)(associate(projectId, token))
+            _                <- whenA(!hookPresent)(removeAccessToken(projectId))
+            validationResult <- toValidationResult(hookPresent).pure[F]
+          } yield validationResult
+        case StoredToken(token) =>
+          for {
+            hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
+            _                <- whenA(!hookPresent)(removeAccessToken(projectId))
+            validationResult <- toValidationResult(hookPresent).pure[F]
+          } yield validationResult
+      }
+      .onError(logError(projectId))
 
   private def findToken(
       projectId:        GitLabId,
       maybeAccessToken: Option[AccessToken]
   ): F[Token] =
     maybeAccessToken
-      .map(token => (GivenToken(token): Token).pure[F])
+      .map(GivenToken(_).widen.pure[F])
       .getOrElse(findStoredToken(projectId))
 
   private def findStoredToken(projectId: GitLabId): F[Token] =
-    findAccessToken(projectId) flatMap getOrError(projectId) recoverWith storedAccessTokenError(projectId)
+    findAccessToken(projectId)
+      .adaptError(storedAccessTokenError(projectId))
+      .flatMap(getOrError(projectId))
+
+  private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] = exception =>
+    new Exception(s"Finding stored access token for $projectId failed", exception)
 
   private def getOrError(projectId: GitLabId): Option[AccessToken] => F[Token] = {
     case Some(token) =>
-      (StoredToken(token): Token).pure[F]
+      StoredToken(token).widen.pure[F]
     case None =>
-      NoAccessTokenException(s"No access token found for projectId $projectId").raiseError[F, Token]
-  }
-
-  private def storedAccessTokenError(
-      projectId: GitLabId
-  ): PartialFunction[Throwable, F[Token]] = { case UnauthorizedException =>
-    new Exception(s"Stored access token for $projectId is invalid").raiseError[F, Token]
+      NoAccessTokenException(s"No stored access token found for projectId $projectId").raiseError[F, Token]
   }
 
   private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing
 
-  private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[HookValidationResult]] = {
-    case exception @ NoAccessTokenException(message) =>
-      Logger[F].info(s"Hook validation failed: $message") >>
-        exception.raiseError[F, HookValidationResult]
+  private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = {
+    case NoAccessTokenException(message) =>
+      Logger[F].info(s"Hook validation failed: $message")
     case NonFatal(exception) =>
-      Logger[F].error(exception)(s"Hook validation failed for project with id $projectId") >>
-        exception.raiseError[F, HookValidationResult]
+      Logger[F].error(exception)(s"Hook validation failed for projectId $projectId")
   }
 
-  private sealed abstract class Token(val value: AccessToken)
+  private sealed abstract class Token(val value: AccessToken) {
+    lazy val widen: Token = this
+  }
   private object Token {
     case class GivenToken(override val value: AccessToken)  extends Token(value)
     case class StoredToken(override val value: AccessToken) extends Token(value)

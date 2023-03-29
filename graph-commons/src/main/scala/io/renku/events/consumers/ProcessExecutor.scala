@@ -20,7 +20,7 @@ package io.renku.events.consumers
 
 import cats.syntax.all._
 import cats.MonadThrow
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.effect.std.Semaphore
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -41,6 +41,6 @@ object ProcessExecutor {
         .handleError(error => EventSchedulingResult.SchedulingError(error))
     }
 
-  def concurrent[F[_]: Concurrent: Logger](processesCount: Int Refined Positive): F[ProcessExecutor[F]] =
+  def concurrent[F[_]: Async: Logger](processesCount: Int Refined Positive): F[ProcessExecutor[F]] =
     Semaphore(processesCount.value).map(new ConcurrentProcessExecutor[F](_))
 }

@@ -18,25 +18,25 @@
 
 package io.renku.events.consumers
 
-import cats.effect.{Concurrent, Resource}
+import cats.effect.{Async, Concurrent, Deferred}
 import cats.effect.std.Semaphore
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, Busy}
 import org.typelevel.log4cats.Logger
 
-private class ConcurrentProcessExecutor[F[_]: Concurrent: Logger](semaphore: Semaphore[F]) extends ProcessExecutor[F] {
+private class ConcurrentProcessExecutor[F[_]: Async: Logger](semaphore: Semaphore[F]) extends ProcessExecutor[F] {
 
-  def tryExecuting(process: F[Unit]): F[EventSchedulingResult] = semaphore.tryAcquire >>= {
-    case false =>
-      Busy.pure[F].widen[EventSchedulingResult]
-    case _ =>
-      Concurrent[F]
-        .start {
-          Resource
-            .make(().pure[F])(_ => semaphore.release)
-            .evalTap(_ => process.handleErrorWith(Logger[F].error(_)("Scheduled process failed")))
-            .use_
-        }
-        .as(Accepted)
-  }
+  def tryExecuting(process: F[Unit]): F[EventSchedulingResult] = for {
+    eventScheduled <- Deferred[F, EventSchedulingResult]
+    _ <- Concurrent[F]
+           .start {
+             semaphore.tryPermit.use {
+               case false => eventScheduled.complete(Busy.widen).void
+               case true =>
+                 eventScheduled.complete(Accepted.widen) >>
+                   process.handleErrorWith(Logger[F].error(_)("Scheduled process failed"))
+             }
+           }
+    result <- eventScheduled.get
+  } yield result
 }
