@@ -21,6 +21,7 @@ package io.renku.entities.search
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.search.Criteria.{Filters, Sort}
@@ -40,6 +41,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -326,6 +328,19 @@ class EntitiesFinderSpec
             .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
             .map(_.resultsWithSkippedMatchingScore)
       }
+
+      import eu.timepit.refined.auto._
+      val testResult = IOBody {
+        queryRunnerFor(projectsDataset).flatMap(
+          _.queryExpecting[Json](
+            SparqlQuery.of("name",
+                           Prefixes.of(Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.text -> "text"),
+                           DatasetsQuery2.textQueryPart(Query(query.value).some).sparql.drop(1).dropRight(1)
+            )
+          )
+        )
+      }
+      println(testResult)
 
       val expected = List(
         soleProject.to[model.Entity.Project],

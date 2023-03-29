@@ -267,17 +267,21 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
       case Some(q) =>
         val luceneQuery = LuceneQuery(q.value)
         fr"""|{
-             |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
+             |  SELECT $sameAsVar ?id (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
-             |      $sameAsVar a renku:DiscoverableDataset.
-             |      ($sameAsVar ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
+             |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
+             |     # {
+             |     #   ?id a renku:DiscoverableDatasetPerson.
+             |     #   $sameAsVar schema:creator ?id
+             |     # } UNION {
+             |     #   ?id a renku:DiscoverableDataset
+             |     #   BIND (?id AS $sameAsVar)
+             |     # }
              |    }
              |  }
-             |  group by $sameAsVar
-             |}
-             |
-             |""".stripMargin
+             | group by $sameAsVar ?id
+             |}""".stripMargin
 
       case None =>
         fr"""|  Bind (xsd:float(1.0) as $matchingScoreVar)
