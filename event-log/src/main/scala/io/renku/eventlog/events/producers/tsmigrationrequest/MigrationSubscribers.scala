@@ -19,11 +19,9 @@
 package io.renku.eventlog.events.producers
 package tsmigrationrequest
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.events.producers.Subscribers
-import io.renku.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 private object MigrationSubscribers {
@@ -32,9 +30,6 @@ private object MigrationSubscribers {
 
   def apply[F[_]](implicit subscribers: MigrationSubscribers[F]): MigrationSubscribers[F] = subscribers
 
-  def apply[F[_]: Async: MigrationSubscriberTracker: Logger](categoryName: CategoryName): F[MigrationSubscribers[F]] =
-    for {
-      subscribersRegistry <- SubscribersRegistry[F](categoryName)
-      subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry))
-    } yield subscribers
+  def apply[F[_]: Async: MigrationSubscriberTracker: Logger](): F[MigrationSubscribers[F]] =
+    SubscribersRegistry[F](categoryName).map(new SubscribersImpl(categoryName, _))
 }

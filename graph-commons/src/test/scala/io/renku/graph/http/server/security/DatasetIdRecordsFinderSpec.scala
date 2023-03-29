@@ -20,9 +20,7 @@ package io.renku.graph.http.server.security
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabApiUrl
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -33,7 +31,6 @@ import org.scalatest.wordspec.AnyWordSpec
 class DatasetIdRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with should.Matchers {
@@ -41,6 +38,7 @@ class DatasetIdRecordsFinderSpec
   "apply" should {
 
     "return SecurityRecord with project visibility, path and all project members" in new TestCase {
+
       val (dataset, project) =
         renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
 
@@ -51,10 +49,11 @@ class DatasetIdRecordsFinderSpec
       )
     }
 
-    "return SecurityRecord with project visibility, path and no member is project has none" in new TestCase {
+    "return SecurityRecord with project visibility, path and no member if project has none" in new TestCase {
+
       val (dataset, project) =
         renkuProjectEntities(anyVisibility)
-          .map(_.copy(members = Set.empty))
+          .modify(removeMembers())
           .addDataset(datasetEntities(provenanceNonModified))
           .generateOne
 
@@ -65,10 +64,11 @@ class DatasetIdRecordsFinderSpec
       )
     }
 
-    "return SecurityRecords with projects visibilities, paths and members" in new TestCase {
+    "return SecurityRecords with projects visibilities, paths and members in case of forks" in new TestCase {
+
       val (dataset, (parentProject, project)) =
         renkuProjectEntities(anyVisibility)
-          .map(_.copy(members = Set.empty))
+          .modify(removeMembers())
           .addDataset(datasetEntities(provenanceNonModified))
           .forkOnce()
           .generateOne
@@ -85,8 +85,6 @@ class DatasetIdRecordsFinderSpec
       recordsFinder(datasetIdentifiers.generateOne).unsafeRunSync() shouldBe Nil
     }
   }
-
-  implicit lazy val newGitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()

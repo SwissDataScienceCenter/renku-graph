@@ -23,18 +23,17 @@ import cats.MonadThrow
 import cats.effect.kernel.Async
 import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
+import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.datasets.Identifier
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
 private trait ProjectsFinder[F[_]] {
-  def findUsedIn(dataset: Dataset, authContext: AuthContext[Identifier]): F[List[DatasetProject]]
+  def findUsedIn(dataset: Dataset, authContext: AuthContext[RequestedDataset]): F[List[DatasetProject]]
 }
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
@@ -43,7 +42,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
 
   import ProjectsFinderImpl._
 
-  def findUsedIn(dataset: Dataset, authContext: AuthContext[Identifier]): F[List[DatasetProject]] =
+  def findUsedIn(dataset: Dataset, authContext: AuthContext[RequestedDataset]): F[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](query(dataset, authContext.maybeAuthUser))
 
   private def query(ds: Dataset, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(

@@ -23,9 +23,9 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects.GitLabId
+import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.webhookservice.WebhookServiceGenerators._
@@ -36,227 +36,170 @@ import io.renku.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTok
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.TryValues
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
-class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
   import AccessTokenFinder.Implicits._
 
-  s"validateHook - finding access token" should {
+  "validateHook - finding access token" should {
 
     "fail if finding stored access token fails when no access token given" in new TestCase {
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (accessTokenFinder
-        .findAccessToken(_: GitLabId)(_: GitLabId => String))
-        .expects(projectId, projectIdToPath)
-        .returning(error)
+      val exception = exceptions.generateOne
+      givenAccessTokenFinding(returning = exception.raiseError[Try, Option[AccessToken]])
 
-      validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
+      val result = validator.validateHook(projectId, maybeAccessToken = None)
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      result.failure.exception.getMessage shouldBe show"Finding stored access token for $projectId failed"
+      result.failure.exception.getCause   shouldBe exception
+
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", result.failure.exception))
     }
 
-    "fail if finding stored access token return NOT_FOUND when no access token given" in new TestCase {
+    "fail if finding stored access token return None when no access token given" in new TestCase {
 
-      (accessTokenFinder
-        .findAccessToken(_: GitLabId)(_: GitLabId => String))
-        .expects(projectId, projectIdToPath)
-        .returning(Option.empty[AccessToken].pure[Try])
+      givenAccessTokenFinding(returning = Option.empty[AccessToken].pure[Try])
 
-      val noAccessTokenException = NoAccessTokenException(s"No access token found for projectId $projectId")
+      val noAccessTokenException = NoAccessTokenException(s"No stored access token found for projectId $projectId")
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe noAccessTokenException
         .raiseError[Try, Nothing]
 
       logger.loggedOnly(Info(s"Hook validation failed: ${noAccessTokenException.getMessage}"))
     }
-
-    "fail if finding stored access token fails with UnauthorizedException" in new TestCase {
-
-      (accessTokenFinder
-        .findAccessToken(_: GitLabId)(_: GitLabId => String))
-        .expects(projectId, projectIdToPath)
-        .returning(UnauthorizedException.raiseError[Try, Option[AccessToken]])
-
-      val Failure(exception) = validator.validateHook(projectId, maybeAccessToken = None)
-
-      exception            shouldBe an[Exception]
-      exception.getMessage shouldBe s"Stored access token for $projectId is invalid"
-
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
-    }
   }
 
-  s"validateHook - given access token" should {
+  "validateHook - given access token" should {
 
     "succeed with HookExists and re-associate access token if there's a hook" in new TestCase {
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(true.pure[Try])
 
-      (accessTokenAssociator
-        .associate(_: GitLabId, _: AccessToken))
-        .expects(projectId, givenAccessToken)
-        .returning(().pure[Try])
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = true.pure[Try])
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe HookExists.pure[Try]
+      givenTokenAssociation(givenAccessToken, returning = ().pure[Try])
+
+      validator.validateHook(projectId, givenAccessToken.some) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }
 
     "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(false.pure[Try])
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = false.pure[Try])
 
-      (accessTokenRemover
-        .removeAccessToken(_: GitLabId))
-        .expects(projectId)
-        .returning(().pure[Try])
+      givenTokenRemoving(returning = ().pure[Try])
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe HookMissing.pure[Try]
+      validator.validateHook(projectId, givenAccessToken.some) shouldBe HookMissing.pure[Try]
 
       logger.expectNoLogs()
     }
 
-    "fail if finding hook verification fails" in new TestCase {
+    "fail if hook verification step fails" in new TestCase {
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(error)
+      val exception = exceptions.generateOne
+      val error     = exception.raiseError[Try, Nothing]
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = error)
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
 
     "fail if access token re-association fails" in new TestCase {
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(true.pure[Try])
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (accessTokenAssociator
-        .associate(_: GitLabId, _: AccessToken))
-        .expects(projectId, givenAccessToken)
-        .returning(error)
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = true.pure[Try])
+
+      val exception = exceptions.generateOne
+      val error     = exception.raiseError[Try, Nothing]
+      givenTokenAssociation(givenAccessToken, returning = error)
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
 
     "fail if access token removal fails" in new TestCase {
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(false.pure[Try])
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (accessTokenRemover
-        .removeAccessToken(_: GitLabId))
-        .expects(projectId)
-        .returning(error)
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = false.pure[Try])
+
+      val exception = exceptions.generateOne
+      val error     = exception.raiseError[Try, Nothing]
+      givenTokenRemoving(returning = error)
 
       validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
   }
 
-  s"validateHook - given valid stored access token" should {
+  "validateHook - given valid stored access token" should {
 
     "succeed with HookExists if there's a hook" in new TestCase {
 
-      val storedAccessToken = assumeGivenAccessTokenInvalid()
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(true.pure[Try])
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = true.pure[Try])
 
       validator.validateHook(projectId, None) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }
+
     "succeed with HookMissing and delete the stored access token if there's no hook" in new TestCase {
 
-      val storedAccessToken = assumeGivenAccessTokenInvalid()
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(false.pure[Try])
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = false.pure[Try])
 
-      (accessTokenRemover
-        .removeAccessToken(_: GitLabId))
-        .expects(projectId)
-        .returning(().pure[Try])
+      givenTokenRemoving(returning = ().pure[Try])
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe HookMissing.pure[Try]
 
       logger.expectNoLogs()
     }
 
-    "fail if finding hook verification fails" in new TestCase {
+    "fail if verifying hook validity fails" in new TestCase {
 
-      val storedAccessToken = assumeGivenAccessTokenInvalid()
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(error)
+      val exception = exceptions.generateOne
+      val error     = exception.raiseError[Try, Nothing]
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = error)
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
 
     "fail if access token removal fails" in new TestCase {
 
-      val storedAccessToken = assumeGivenAccessTokenInvalid()
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
 
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
-        .returning(false.pure[Try])
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = false.pure[Try])
 
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = exception.raiseError[Try, Nothing]
-      (accessTokenRemover
-        .removeAccessToken(_: GitLabId))
-        .expects(projectId)
-        .returning(error)
+      val exception = exceptions.generateOne
+      val error     = exception.raiseError[Try, Nothing]
+      givenTokenRemoving(returning = error)
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
 
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
+      logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
   }
 
   private trait TestCase {
     val givenAccessToken = accessTokens.generateOne
     val projectHookUrl   = projectHookUrls.generateOne
+    val projectId        = projectIds.generateOne
 
-    val projectInfo = projectInfos.generateOne
-    val projectId   = projectInfo.id
-
-    val projectHookVerifier   = mock[ProjectHookVerifier[Try]]
-    val accessTokenFinder     = mock[AccessTokenFinder[Try]]
-    val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
-    val accessTokenRemover    = mock[AccessTokenRemover[Try]]
+    private val projectHookVerifier   = mock[ProjectHookVerifier[Try]]
+    private val accessTokenFinder     = mock[AccessTokenFinder[Try]]
+    private val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
+    private val accessTokenRemover    = mock[AccessTokenRemover[Try]]
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val validator = new HookValidatorImpl[Try](
       projectHookUrl,
@@ -266,13 +209,28 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       accessTokenRemover
     )
 
-    def assumeGivenAccessTokenInvalid(): AccessToken = {
-      val storedAccessToken = accessTokens.generateOne
+    def givenAccessTokenFinding(returning: Try[Option[AccessToken]]) =
       (accessTokenFinder
         .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(projectId, projectIdToPath)
-        .returning(Some(storedAccessToken).pure[Try])
-      storedAccessToken
-    }
+        .returning(returning)
+
+    def givenHookVerification(identifier: HookIdentifier, accessToken: AccessToken, returning: Try[Boolean]) =
+      (projectHookVerifier
+        .checkHookPresence(_: HookIdentifier, _: AccessToken))
+        .expects(identifier, accessToken)
+        .returning(returning)
+
+    def givenTokenAssociation(accessToken: AccessToken, returning: Try[Unit]) =
+      (accessTokenAssociator
+        .associate(_: GitLabId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(returning)
+
+    def givenTokenRemoving(returning: Try[Unit]) =
+      (accessTokenRemover
+        .removeAccessToken(_: GitLabId))
+        .expects(projectId)
+        .returning(returning)
   }
 }

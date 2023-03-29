@@ -26,8 +26,8 @@ import Generators._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.projects
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectPaths, projectViewedDates}
+import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds, projectPaths, projectViewedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -43,7 +43,7 @@ class ProjectViewedEventSpec
 
   "forProject" should {
 
-    "instantiate a new event with the current timestamp" in {
+    "instantiate a new event with the current timestamp and no user" in {
 
       val currentTime = Instant.now()
       val now         = mockFunction[Instant]
@@ -51,29 +51,82 @@ class ProjectViewedEventSpec
 
       val path = projectPaths.generateOne
 
-      ProjectViewedEvent.forProject(path, now) shouldBe ProjectViewedEvent(path, currentTime)
+      ProjectViewedEvent.forProject(path, now) shouldBe
+        ProjectViewedEvent(path, currentTime, maybeUserId = None)
+    }
+  }
+
+  "forProjectAndUserId" should {
+
+    "instantiate a new event with the current timestamp and user GL id" in {
+
+      val currentTime = Instant.now()
+      val now         = mockFunction[Instant]
+      now.expects().returning(currentTime)
+
+      val path     = projectPaths.generateOne
+      val userGLId = personGitLabIds.generateSome
+
+      ProjectViewedEvent.forProjectAndUserId(path, userGLId, now) shouldBe
+        ProjectViewedEvent(path, currentTime, userGLId.map(UserId(_)))
+    }
+  }
+
+  "forProjectAndUserEmail" should {
+
+    "instantiate a new event with the current timestamp and user email" in {
+
+      val currentTime = Instant.now()
+      val now         = mockFunction[Instant]
+      now.expects().returning(currentTime)
+
+      val path      = projectPaths.generateOne
+      val userEmail = personEmails.generateOne
+
+      ProjectViewedEvent.forProjectAndUserEmail(path, userEmail, now) shouldBe
+        ProjectViewedEvent(path, currentTime, UserId(userEmail).some)
     }
   }
 
   "json codec" should {
 
     "encode and decode" in {
-
-      val event = projectViewedEvents.generateOne
-
-      event.asJson.hcursor.as[ProjectViewedEvent].value shouldBe event
+      forAll(projectViewedEvents) { event =>
+        event.asJson.hcursor.as[ProjectViewedEvent].value shouldBe event
+      }
     }
 
-    "be able to decode json valid from the contract point of view" in {
+    "be able to decode json valid from the contract point of view - user GL id case" in {
       json"""{
         "categoryName": "PROJECT_VIEWED",
         "project": {
           "path": "project/path"
         },
-        "date": "1988-11-04T00:00:00.000Z"
+        "date": "1988-11-04T00:00:00.000Z",
+        "user": {
+          "id": 123
+        }
       }""".hcursor.as[ProjectViewedEvent].value shouldBe ProjectViewedEvent(
         projects.Path("project/path"),
-        projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z"))
+        projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
+        maybeUserId = Some(UserId(persons.GitLabId(123)))
+      )
+    }
+
+    "be able to decode json valid from the contract point of view - user email case" in {
+      json"""{
+        "categoryName": "PROJECT_VIEWED",
+        "project": {
+          "path": "project/path"
+        },
+        "date": "1988-11-04T00:00:00.000Z",
+        "user": {
+          "email": "a@a.com"
+        }
+      }""".hcursor.as[ProjectViewedEvent].value shouldBe ProjectViewedEvent(
+        projects.Path("project/path"),
+        projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
+        maybeUserId = Some(UserId(persons.Email("a@a.com")))
       )
     }
 
@@ -98,7 +151,8 @@ class ProjectViewedEventSpec
 
       val event = projectViewedEvents.generateOne
 
-      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}"
+      val userShow = event.maybeUserId.map(u => show", user = $u").getOrElse("")
+      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}$userShow"
     }
   }
 }

@@ -192,7 +192,8 @@ lazy val knowledgeGraph = project
   .dependsOn(
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
-    triplesGeneratorApi % "compile->compile; test->test"
+    triplesGeneratorApi % "compile->compile; test->test",
+    entitiesViewingsCollector
   )
   .enablePlugins(
     JavaAppPackaging,

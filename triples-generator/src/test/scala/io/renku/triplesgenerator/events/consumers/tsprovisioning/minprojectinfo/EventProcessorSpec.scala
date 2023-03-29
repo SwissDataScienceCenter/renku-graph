@@ -69,6 +69,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(event, returning = rightT(project))
 
+        givenProjectExistenceCheck(project, returning = false.pure[Try])
+
         successfulTriplesTransformationAndUpload(project)
 
         givenProjectActivatedEventSent(event.project.path, returning = ().pure[Try])
@@ -76,8 +78,24 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         eventProcessor.process(event) shouldBe ().pure[Try]
 
         logger.logged(Info(s"${commonLogMessage(event)} accepted"))
-        logSummary(event, isSuccessful = true)
+        logSummary(event, message = "success")
       }
+
+    "do nothing if the project already exists in the TS" in new TestCase {
+
+      givenFetchingAccessToken(forProjectPath = event.project.path)
+        .returning(maybeAccessToken.pure[Try])
+
+      val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
+      givenEntityBuilding(event, returning = rightT(project))
+
+      givenProjectExistenceCheck(project, returning = true.pure[Try])
+
+      eventProcessor.process(event) shouldBe ().pure[Try]
+
+      logger.logged(Info(s"${commonLogMessage(event)} accepted"))
+      logSummary(event, message = "skipped")
+    }
 
     "log an error if entity building fails with LogWorthyRecoverableError" in new TestCase {
 
@@ -90,7 +108,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, processingError, processingError.getMessage)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "log an error if entity building fails with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
@@ -104,7 +122,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, exception, exception.getMessage)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "do not log an error if entity building fails with SilentRecoverableError" in new TestCase {
@@ -117,7 +135,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "do not log an error if entity building fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
@@ -130,7 +148,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
       logger.expectNoLogs(severity = Error)
     }
 
@@ -142,6 +160,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val processingRecoverableError = logWorthyRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
       successfulStepsCreation(project, failure.pure[Try])
@@ -149,7 +169,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, failure.error, failure.message)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "do not log an error if transforming triples fails with a SilentRecoverableError" in new TestCase {
@@ -160,13 +180,15 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val processingRecoverableError = silentRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
       successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "do not log an error if transforming triples fails with SilentRecoverableError" in new TestCase {
@@ -177,6 +199,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val failure =
         TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
       successfulStepsCreation(project, failure.pure[Try])
@@ -184,7 +208,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logger.getMessages(Error).isEmpty shouldBe true
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "log an error if transforming triples fails with an unknown Exception" in new TestCase {
@@ -195,13 +219,15 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val exception = exceptions.generateOne
       successfulStepsCreation(project, exception.raiseError[Try, TriplesUploadResult])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, exception, exception.getMessage)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "log an error if uploading triples fails with RecoverableFailure" in new TestCase {
@@ -212,6 +238,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val failure =
         nonEmptyStrings().map(message => RecoverableFailure(LogWorthyRecoverableError(message))).generateOne
       successfulStepsCreation(project, failure.pure[Try])
@@ -219,7 +247,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, failure.error, failure.message)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "log an error if uploading triples to the store fails with a NonRecoverableFailure" in new TestCase {
@@ -230,13 +258,15 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       val failure = NonRecoverableFailure("error")
       successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
       logError(event, failure, failure.message)
-      logSummary(event, isSuccessful = false)
+      logSummary(event, message = "failure")
     }
 
     "log an error if finding project access token fails" in new TestCase {
@@ -258,6 +288,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
+      givenProjectExistenceCheck(project, returning = false.pure[Try])
+
       successfulTriplesTransformationAndUpload(project)
 
       val exception = exceptions.generateOne
@@ -269,7 +301,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         Info(s"${commonLogMessage(event)} accepted"),
         Error(s"${commonLogMessage(event)} sending ${ProjectActivated.categoryName} event failed", exception)
       )
-      logSummary(event, isSuccessful = true)
+      logSummary(event, message = "success")
     }
   }
 
@@ -281,13 +313,19 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
     implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
-    private val stepsCreator          = mock[TransformationStepsCreator[Try]]
-    private val stepsRunner           = mock[TransformationStepsRunner[Try]]
-    private val entityBuilder         = mock[EntityBuilder[Try]]
-    private val tgClient              = mock[triplesgenerator.api.events.Client[Try]]
-    private val executionTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val eventProcessor =
-      new EventProcessorImpl[Try](stepsCreator, stepsRunner, entityBuilder, tgClient, executionTimeRecorder)
+    private val stepsCreator            = mock[TransformationStepsCreator[Try]]
+    private val stepsRunner             = mock[TransformationStepsRunner[Try]]
+    private val projectExistenceChecker = mock[ProjectExistenceChecker[Try]]
+    private val entityBuilder           = mock[EntityBuilder[Try]]
+    private val tgClient                = mock[triplesgenerator.api.events.Client[Try]]
+    private val executionTimeRecorder   = TestExecutionTimeRecorder[Try](maybeHistogram = None)
+    val eventProcessor = new EventProcessorImpl[Try](stepsCreator,
+                                                     stepsRunner,
+                                                     entityBuilder,
+                                                     projectExistenceChecker,
+                                                     tgClient,
+                                                     executionTimeRecorder
+    )
 
     def givenFetchingAccessToken(forProjectPath: Path) =
       (accessTokenFinder
@@ -314,6 +352,11 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       .expects(steps, project)
       .returning(returning)
 
+    def givenProjectExistenceCheck(project: Project, returning: Try[Boolean]) =
+      (projectExistenceChecker.checkProjectExists _)
+        .expects(project.resourceId)
+        .returning(returning)
+
     def givenEntityBuilding(event: MinProjectInfoEvent, returning: EitherT[Try, ProcessingRecoverableError, Project]) =
       (entityBuilder
         .buildEntity(_: MinProjectInfoEvent)(_: Option[AccessToken]))
@@ -326,11 +369,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects(where((ev: ProjectActivated) => ev.path == path))
         .returning(returning)
 
-    def logSummary(event: MinProjectInfoEvent, isSuccessful: Boolean): Assertion = logger.logged(
-      Info(
-        s"${commonLogMessage(event)} processed in ${executionTimeRecorder.elapsedTime}ms: " +
-          s"${if (isSuccessful) "success" else "failure"}"
-      )
+    def logSummary(event: MinProjectInfoEvent, message: String): Assertion = logger.logged(
+      Info(s"${commonLogMessage(event)} processed in ${executionTimeRecorder.elapsedTime}ms: $message")
     )
 
     def logError(event: MinProjectInfoEvent, exception: Throwable, message: String = "failed"): Assertion =

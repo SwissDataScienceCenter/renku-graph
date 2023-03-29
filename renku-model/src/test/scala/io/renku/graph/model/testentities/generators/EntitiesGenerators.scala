@@ -75,6 +75,8 @@ trait EntitiesGenerators
 
   implicit lazy val personEntities: Gen[Person] = personEntities()
 
+  lazy val removeOrcidId: Person => Person = _.copy(maybeOrcidId = None)
+
   val cliShapedPersons: Gen[Person] = personEntities(withoutGitLabId)
 
   def personEntities(

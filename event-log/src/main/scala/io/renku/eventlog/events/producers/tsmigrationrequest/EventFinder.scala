@@ -38,13 +38,16 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class EventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
+private trait EventFinder[F[_]] extends producers.EventFinder[F, MigrationRequestEvent]
+
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
-    with producers.EventFinder[F, MigrationRequestEvent]
+    with EventFinder[F]
     with TSMigtationTypeSerializers {
 
-  import EventFinder._
+  private val SentStatusTimeout        = Duration ofHours 1
+  private val RecoverableStatusTimeout = Duration ofMinutes 2
 
   override def popEvent(): F[Option[MigrationRequestEvent]] =
     SessionResource[F].useWithTransactionK[Option[MigrationRequestEvent]] {
@@ -65,7 +68,7 @@ private class EventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
     case _           => Kleisli.pure(Option.empty[MigrationRequestEvent])
   }
 
-  type SubscriptionRecord = (SubscriberUrl, ServiceVersion, MigrationStatus, ChangeDate)
+  private type SubscriptionRecord = (SubscriberUrl, ServiceVersion, MigrationStatus, ChangeDate)
 
   private def findEvent = findEvents.map(findCandidate).map(toEvent)
 
@@ -165,11 +168,6 @@ private class EventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
 }
 
 private object EventFinder {
-  private val SentStatusTimeout        = Duration ofHours 1
-  private val RecoverableStatusTimeout = Duration ofMinutes 2
-
-  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, MigrationRequestEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new EventFinder[F]()
-    }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventFinder[F]] =
+    MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

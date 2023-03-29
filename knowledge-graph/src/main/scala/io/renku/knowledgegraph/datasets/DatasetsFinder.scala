@@ -27,19 +27,19 @@ import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.{projects, GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, Keyword, Name, Title}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.http.rest.Sorting
-import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
+import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.DatasetSearchResult.ExemplarProject
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.model.OrderBy
 import io.renku.triplesstore.client.sparql.SparqlEncoder
 import org.typelevel.log4cats.Logger

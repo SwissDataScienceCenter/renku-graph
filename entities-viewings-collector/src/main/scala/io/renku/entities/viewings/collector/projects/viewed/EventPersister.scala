@@ -32,10 +32,15 @@ private[viewings] trait EventPersister[F[_]] {
 
 private[viewings] object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new EventPersisterImpl[F](_))
+    ProjectsConnectionConfig[F]()
+      .map(TSClient[F](_))
+      .map(tsClient => new EventPersisterImpl[F](tsClient, PersonViewedProjectPersister(tsClient)))
 }
 
-private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends EventPersister[F] {
+private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
+    tsClient:                     TSClient[F],
+    personViewedProjectPersister: PersonViewedProjectPersister[F]
+) extends EventPersister[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -52,7 +57,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
   override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {
       case None            => ().pure[F]
-      case Some(projectId) => persistIfOlderOrNone(event, projectId)
+      case Some(projectId) => persistIfOlderOrNone(event, projectId) >> persistPersonViewedProject(event, projectId)
     }
 
   private def persistIfOlderOrNone(event: ProjectViewedEvent, projectId: projects.ResourceId) =
@@ -128,4 +133,10 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[
     upload(
       encode(ProjectViewing(projectId, event.dateViewed))
     )
+
+  private def persistPersonViewedProject(event: ProjectViewedEvent, projectId: projects.ResourceId) =
+    event.maybeUserId
+      .map(GLUserViewedProject(_, Project(projectId, event.path), event.dateViewed))
+      .map(personViewedProjectPersister.persist)
+      .getOrElse(().pure[F])
 }

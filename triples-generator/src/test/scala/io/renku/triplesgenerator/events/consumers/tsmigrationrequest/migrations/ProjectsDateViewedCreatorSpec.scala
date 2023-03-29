@@ -68,7 +68,7 @@ class ProjectsDateViewedCreatorSpec
         }
 
         val events = projects.zip(eventDates) map { case (project, eventDate) =>
-          ProjectViewedEvent(project.path, DateViewed(eventDate.value))
+          ProjectViewedEvent(project.path, DateViewed(eventDate.value), maybeUserId = None)
         }
 
         events foreach (givenProjectViewedEventSent(_, returning = ().pure[IO]))
@@ -86,7 +86,7 @@ class ProjectsDateViewedCreatorSpec
         projects foreach (givenSuccessfulFindingLatestEventInfo(_, returning = Option.empty[EventDate]))
 
         val events = projects map { project =>
-          ProjectViewedEvent(project.path, DateViewed(project.dateCreated.value))
+          ProjectViewedEvent(project.path, DateViewed(project.dateCreated.value), maybeUserId = None)
         }
 
         events foreach (givenProjectViewedEventSent(_, returning = ().pure[IO]))

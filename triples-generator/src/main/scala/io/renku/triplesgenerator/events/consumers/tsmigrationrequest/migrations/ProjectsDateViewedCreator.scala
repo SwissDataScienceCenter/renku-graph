@@ -88,7 +88,7 @@ private class ProjectsDateViewedCreator[F[_]: Async: Logger](
     implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       (extract[projects.Path]("path") -> extract[projects.DateViewed]("date"))
-        .mapN(ProjectViewedEvent.apply)
+        .mapN(ProjectViewedEvent(_, _, maybeUserId = None))
   }
 
   private def updateDateWithLatestEvent(event: ProjectViewedEvent): F[ProjectViewedEvent] = {

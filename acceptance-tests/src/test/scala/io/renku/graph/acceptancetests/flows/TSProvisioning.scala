@@ -69,7 +69,7 @@ trait TSProvisioning
         .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
 
-      sleep((3 second).toMillis)
+      sleep((5 seconds).toMillis)
     }
 
     `wait for events to be processed`(project.id)

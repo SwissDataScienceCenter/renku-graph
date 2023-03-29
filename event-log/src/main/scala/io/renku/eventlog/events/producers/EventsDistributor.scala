@@ -85,8 +85,9 @@ private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, Category
     case result @ TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event, result) recoverWith logError(event))
     case result @ Misdelivered =>
-      Logger[F].info(show"$categoryName: $event, subscriber = $subscriber -> $result")
-      (delete(subscriber) recover withNothing) >> (returnToQueue(event, result) recoverWith logError(event))
+      Logger[F].info(show"$categoryName: $event, subscriber = $subscriber -> $result") >>
+        (delete(subscriber) recover withNothing) >>
+        (returnToQueue(event, result) recoverWith logError(event))
   }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }

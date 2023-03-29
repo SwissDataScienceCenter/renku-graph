@@ -19,9 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
+import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.generators.Generators.Implicits.GenOps
+import io.renku.graph.model.{entities, persons, GraphClass}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.GraphClass
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestExecutionTimeRecorder
@@ -31,32 +32,40 @@ import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.OptionValues
 
 class TriplesRemoverSpec
     extends AnyWordSpec
-    with IOSpec
     with should.Matchers
+    with OptionValues
+    with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
   "removeAllTriples" should {
 
-    "remove all graphs from the projects DS except from the renku:ProjectViewedTime" in new TestCase {
+    "remove all graphs from the projects DS except from the renku:ProjectViewedTime and renku:PersonViewing" in new TestCase {
 
-      val someProject = anyRenkuProjectEntities.generateOne
-      upload(to = projectsDataset, someProject, anyRenkuProjectEntities.generateOne)
-      insertViewTime(someProject)
+      val someProject = anyRenkuProjectEntities
+        .map(replaceProjectCreator(personEntities(personGitLabIds.generateSome).generateSome))
+        .generateOne
+        .to[entities.RenkuProject]
+      upload(to = projectsDataset, someProject, anyRenkuProjectEntities.generateOne.to[entities.RenkuProject])
+      insertViewTime(someProject, someProject.maybeCreator.value.resourceId)
 
       triplesCount(on = projectsDataset) should be > 0L
 
-      val viewingGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id)
-      viewingGraphTriples should be > 0L
+      val projectViewedGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id)
+      projectViewedGraphTriples should be > 0L
+      val personViewingsGraphTriples = triplesCount(projectsDataset, GraphClass.PersonViewings.id)
+      personViewingsGraphTriples should be > 0L
 
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      triplesCount(on = projectsDataset) shouldBe viewingGraphTriples
+      triplesCount(on = projectsDataset) shouldBe projectViewedGraphTriples + personViewingsGraphTriples
 
-      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id) shouldBe viewingGraphTriples
+      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id) shouldBe projectViewedGraphTriples
+      triplesCount(projectsDataset, GraphClass.PersonViewings.id)     shouldBe personViewingsGraphTriples
     }
   }
 
@@ -67,13 +76,24 @@ class TriplesRemoverSpec
     val triplesRemover = new TriplesRemoverImpl[IO](projectsDSConnectionInfo)
   }
 
-  private def insertViewTime(project: Project) =
+  private def insertViewTime(project: entities.Project, viewerId: persons.ResourceId): Unit = {
+
     insert(
       to = projectsDataset,
       Quad(GraphClass.ProjectViewedTimes.id,
            project.resourceId.asEntityId,
-           renku / "dateViewed",
-           projectViewedDates().generateOne.asObject
+           renku / "prop",
+           nonEmptyStrings().generateOne.asTripleObject
       )
     )
+
+    insert(
+      to = projectsDataset,
+      Quad(GraphClass.PersonViewings.id,
+           viewerId.asEntityId,
+           renku / "prop",
+           nonEmptyStrings().generateOne.asTripleObject
+      )
+    )
+  }
 }

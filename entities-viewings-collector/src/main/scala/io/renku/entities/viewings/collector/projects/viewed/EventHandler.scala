@@ -21,10 +21,8 @@ package io.renku.entities.viewings.collector.projects.viewed
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
-import io.renku.events.consumers.EventDecodingTools.JsonOps
+import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers.ProcessExecutor
-import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -39,15 +37,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode,
+      _.event.as[ProjectViewedEvent],
       process
     )
-
-  private lazy val decode: EventRequestContent => Either[Exception, ProjectViewedEvent] = { req =>
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-    (req.event.getProjectPath, req.event.hcursor.downField("date").as[projects.DateViewed])
-      .mapN(ProjectViewedEvent.apply)
-  }
 
   private def process(event: Event) =
     Logger[F].info(show"$categoryName: $event accepted") >>

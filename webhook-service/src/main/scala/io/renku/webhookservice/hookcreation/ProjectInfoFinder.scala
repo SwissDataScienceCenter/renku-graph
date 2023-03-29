@@ -16,56 +16,48 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.hookcreation.project
+package io.renku.webhookservice.hookcreation
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.projects.Visibility.Public
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.webhookservice.model.Project
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
-private[hookcreation] trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
+private trait ProjectInfoFinder[F[_]] {
+  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Project]
 }
 
-private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectInfoFinder[F] {
+private class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectInfoFinder[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import org.http4s.Status.Unauthorized
   import org.http4s._
+  import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.circe._
-  import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
+  def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Project] =
     GitLabClient[F].get(uri"projects" / projectId.show, "single-project")(mapResponse)
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
-    case (Ok, _, response)    => response.as[ProjectInfo]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Project]] = {
+    case (Ok, _, response)    => response.as[Project]
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
-  private implicit lazy val projectInfoDecoder: EntityDecoder[F, ProjectInfo] = {
-    implicit val hookNameDecoder: Decoder[ProjectInfo] = (cursor: HCursor) =>
-      for {
-        id         <- cursor.downField("id").as[projects.GitLabId]
-        visibility <- cursor.downField("visibility").as[Option[Visibility]] map defaultToPublic
-        path       <- cursor.downField("path_with_namespace").as[projects.Path]
-      } yield ProjectInfo(id, visibility, path)
+  private implicit lazy val projectEntityDecoder: EntityDecoder[F, Project] = {
+    implicit val projectDecoder: Decoder[Project] = cursor =>
+      (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Path])
+        .mapN(Project(_, _))
 
-    jsonOf[F, ProjectInfo]
+    jsonOf[F, Project]
   }
-
-  private def defaultToPublic(maybeVisibility: Option[Visibility]): Visibility =
-    maybeVisibility getOrElse Public
 }
 
-private[hookcreation] object ProjectInfoFinder {
+private object ProjectInfoFinder {
   def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectInfoFinder[F]] =
     new ProjectInfoFinderImpl[F].pure[F].widen[ProjectInfoFinder[F]]
 }

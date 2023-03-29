@@ -30,10 +30,11 @@ import io.renku.graph.model.events
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.http.server.EndpointTester.{jsonEntityDecoder, JsonOps}
 import io.renku.webhookservice.model
-import knowledgegraph.{DatasetsApiEncoders, fullJson}
+import knowledgegraph.{fullJson, DatasetsApiEncoders}
 import org.http4s.Status._
+import org.scalatest.EitherValues
 import tooling.{AcceptanceSpec, ApplicationServices}
 
 import java.lang.Thread.sleep
@@ -43,13 +44,14 @@ class CommitHistoryChangesSpec
     extends AcceptanceSpec
     with ApplicationServices
     with TSProvisioning
-    with DatasetsApiEncoders {
+    with DatasetsApiEncoders
+    with EitherValues {
 
   private val user = authUsers.generateOne
 
-  Feature("Changes in the commit history to trigger re-provisioning") {
+  Feature("Changes in the commit history to trigger re-provisioning for the Project") {
 
-    Scenario("A change in the commit history should trigger the re-provisioning process") {
+    Scenario("A change in the commit history should trigger the re-provisioning process for the Project") {
 
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers())
@@ -109,6 +111,10 @@ class CommitHistoryChangesSpec
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
       `data in the Triples Store`(project, commits, user.accessToken)
 
+      eventually {
+        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
+      }
+
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
       When("the project is removed from GitLab")
@@ -125,7 +131,7 @@ class CommitHistoryChangesSpec
 
       knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", user.accessToken).status shouldBe NotFound
 
-      project.entitiesProject.datasets.foreach { dataset =>
+      project.entitiesProject.datasets foreach { dataset =>
         knowledgeGraphClient
           .GET(s"knowledge-graph/datasets/${dataset.identification.identifier}", user.accessToken)
           .status shouldBe NotFound
@@ -141,18 +147,17 @@ class CommitHistoryChangesSpec
     val projectDetails = projectDetailsResponse.jsonBody
     projectDetails shouldBe fullJson(project)
 
-    val datasetsLink = projectDetails._links
-      .fold(throw _, identity)
+    val datasetsLink = projectDetails._links.value
       .get(Links.Rel("datasets"))
       .getOrElse(fail("No link with rel 'datasets'"))
 
-    val datasetsResponse = restClient
+    val responseStatus -> responseBody = restClient
       .GET(datasetsLink.href.show, accessToken)
       .flatMap(response => response.as[Json].map(json => response.status -> json))
       .unsafeRunSync()
 
-    datasetsResponse._1 shouldBe Ok
-    val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
+    responseStatus shouldBe Ok
+    val foundDatasets = responseBody.as[List[Json]].value
     foundDatasets should contain theSameElementsAs testProject.datasets.map(briefJson(_, project.path))
   }
 

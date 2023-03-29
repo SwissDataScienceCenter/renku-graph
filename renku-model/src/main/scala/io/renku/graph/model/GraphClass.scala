@@ -53,5 +53,10 @@ object GraphClass {
   }
   type ProjectViewedTimes = ProjectViewedTimes.type
 
+  case object PersonViewings extends GraphClass {
+    lazy val id: EntityId = EntityId of renku / "PersonViewing"
+  }
+  type PersonViewings = PersonViewings.type
+
   implicit val show: Show[GraphClass] = Show.show(_.productPrefix)
 }

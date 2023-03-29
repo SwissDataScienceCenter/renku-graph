@@ -46,22 +46,25 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
+  import io.renku.triplesstore.client.syntax._
+
+  private lazy val rowsSeparator = '\u0000'
 
   private def query(id: datasets.Identifier) = SparqlQuery.of(
     name = "authorise - dataset id",
     Prefixes of (renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?projectId ?path ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
+    s"""|SELECT DISTINCT ?projectId ?path ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator='$rowsSeparator') AS ?memberGitLabIds)
         |WHERE {
         |  GRAPH ?projectGraph {
         |    ?projectId a schema:Project;
-        |               renku:hasDataset/schema:identifier '$id';
+        |               renku:hasDataset/schema:identifier ${id.asObject.asSparql.sparql};
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility
         |    OPTIONAL {
         |      ?projectId schema:member ?memberId.
-        |      GRAPH <${GraphClass.Persons.id}> {
+        |      GRAPH ${GraphClass.Persons.id.sparql} {
         |        ?memberId schema:sameAs ?sameAsId.
-        |        ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |        ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject.asSparql.sparql};
         |                  schema:identifier ?maybeMemberGitLabId
         |      }
         |    }
@@ -80,7 +83,7 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         visibility <- extract[Visibility]("visibility")
         path       <- extract[projects.Path]("path")
         userIds <- extract[Option[String]]("memberGitLabIds")
-                     .map(_.map(_.split(",").toList).getOrElse(List.empty))
+                     .map(_.map(_.split(rowsSeparator).toList).getOrElse(List.empty))
                      .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                      .map(_.toSet)
       } yield (visibility, path, userIds)
