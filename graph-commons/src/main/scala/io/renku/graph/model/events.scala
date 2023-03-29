@@ -37,13 +37,11 @@ import scala.math.BigDecimal.RoundingMode
 object events {
 
   final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
-
   object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture[CreatedDate]
 
   final case class CompoundEventId(id: EventId, projectId: projects.GitLabId) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
-
   object CompoundEventId {
     implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
   }
@@ -84,6 +82,19 @@ object events {
 
       import io.circe.parser.parse
       import io.circe.{Decoder, DecodingFailure, Json}
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+
+      lazy val maybeAuthorEmail: Option[persons.Email] =
+        bodyAsJson
+          .flatMap(_.hcursor.downField("author").downField("email").as[Option[persons.Email]])
+          .toOption
+          .flatten
+
+      lazy val maybeCommitterEmail: Option[persons.Email] =
+        bodyAsJson
+          .flatMap(_.hcursor.downField("committer").downField("email").as[Option[persons.Email]])
+          .toOption
+          .flatten
 
       def decodeAs[O](implicit decoder: Decoder[O]): Either[DecodingFailure, O] =
         bodyAsJson flatMap (_.as[O])

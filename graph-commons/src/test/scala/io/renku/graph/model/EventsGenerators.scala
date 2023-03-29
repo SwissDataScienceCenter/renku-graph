@@ -18,14 +18,16 @@
 
 package io.renku.graph.model
 
-import io.renku.generators.Generators.Implicits._
+import io.circe.literal._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
+import io.renku.graph.model.events.EventStatus._
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Duration
+import scala.util.Random
 
 object EventsGenerators {
 
@@ -34,9 +36,28 @@ object EventsGenerators {
   implicit val committedDates:     Gen[CommittedDate]                = timestampsNotInTheFuture map CommittedDate.apply
   implicit val eventIds:           Gen[EventId]                      = shas map EventId.apply
   implicit val batchDates:         Gen[BatchDate]                    = timestampsNotInTheFuture map BatchDate.apply
-  implicit val eventBodies:        Gen[EventBody]                    = jsons.map(_.noSpaces).map(EventBody.apply)
   implicit val eventStatuses:      Gen[EventStatus]                  = Gen.oneOf(EventStatus.all)
   implicit val processingStatuses: Gen[EventStatus.ProcessingStatus] = Gen.oneOf(ProcessingStatus.all)
+  implicit val eventBodies: Gen[EventBody] =
+    personEmails.toGeneratorOfOptions
+      .map {
+        case None => jsons.generateOne
+        case Some(email) =>
+          if (Random.nextBoolean())
+            json"""{
+              "author": {
+                "email": $email
+              }
+            }"""
+          else
+            json"""{
+              "committer": {
+                "email": $email
+              }
+            }"""
+      }
+      .map(_.noSpaces)
+      .map(EventBody.apply)
   val failureEventStatuses: Gen[FailureStatus] = Gen.oneOf(
     GenerationNonRecoverableFailure,
     GenerationRecoverableFailure,

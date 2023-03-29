@@ -46,9 +46,9 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
 
   "handlingDefinition.process" should {
 
-    "be the TSUploader.uploadToTS" in new TestCase {
+    "be the eventPersister.persist" in new TestCase {
 
-      (tsUploader.persist _).expects(event).returns(().pure[IO])
+      (eventPersister.persist _).expects(event).returns(().pure[IO])
 
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
     }
@@ -73,7 +73,7 @@ class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with
     val event = projectViewedEvents.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tsUploader = mock[EventPersister[IO]]
-    val handler    = new EventHandler[IO](tsUploader, mock[ProcessExecutor[IO]])
+    val eventPersister = mock[EventPersister[IO]]
+    val handler        = new EventHandler[IO](eventPersister, mock[ProcessExecutor[IO]])
   }
 }

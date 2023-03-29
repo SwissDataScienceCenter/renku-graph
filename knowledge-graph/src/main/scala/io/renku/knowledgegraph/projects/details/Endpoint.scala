@@ -75,16 +75,16 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   ): F[Response[F]] = measureExecutionTime {
     projectFinder
       .findProject(path, maybeAuthUser)
-      .flatTap(sendProjectViewedEvent)
+      .flatTap(sendProjectViewedEvent(maybeAuthUser))
       .flatMap(toHttpResult(path))
       .recoverWith(httpResult(path))
   } map logExecutionTimeWhen(finishedSuccessfully(path))
 
-  private lazy val sendProjectViewedEvent: Option[Project] => F[Unit] = {
+  private def sendProjectViewedEvent(maybeAuthUser: Option[AuthUser]): Option[Project] => F[Unit] = {
     case None => ().pure[F]
     case Some(proj) =>
       tgClient
-        .send(ProjectViewedEvent.forProject(proj.path, now))
+        .send(ProjectViewedEvent.forProjectAndUserId(proj.path, maybeAuthUser.map(_.id), now))
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${ProjectViewedEvent.categoryName} event failed"))
   }
 

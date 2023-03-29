@@ -111,6 +111,10 @@ class CommitHistoryChangesSpec
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
       `data in the Triples Store`(project, commits, user.accessToken)
 
+      eventually {
+        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
+      }
+
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
       When("the project is removed from GitLab")
@@ -147,13 +151,13 @@ class CommitHistoryChangesSpec
       .get(Links.Rel("datasets"))
       .getOrElse(fail("No link with rel 'datasets'"))
 
-    val datasetsResponse = restClient
+    val responseStatus -> responseBody = restClient
       .GET(datasetsLink.href.show, accessToken)
       .flatMap(response => response.as[Json].map(json => response.status -> json))
       .unsafeRunSync()
 
-    datasetsResponse._1 shouldBe Ok
-    val foundDatasets = datasetsResponse._2.as[List[Json]].value
+    responseStatus shouldBe Ok
+    val foundDatasets = responseBody.as[List[Json]].value
     foundDatasets should contain theSameElementsAs testProject.datasets.map(briefJson(_, project.path))
   }
 

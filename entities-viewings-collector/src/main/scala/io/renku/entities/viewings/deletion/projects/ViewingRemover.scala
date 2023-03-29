@@ -45,20 +45,72 @@ private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
   import tsClient._
 
   override def removeViewing(event: ProjectViewingDeletion): F[Unit] =
-    deleteViewing(event.path)
+    deleteFromPersonViewings(event.path) >>
+      deleteFromProjectViewedTimes(event.path) >>
+      deleteOrphanPersonViewings()
 
-  private def deleteViewing(path: projects.Path): F[Unit] = updateWithNoResult(
+  private def deleteFromProjectViewedTimes(path: projects.Path): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: delete",
+      show"${categoryName.show.toLowerCase}: delete project viewings",
       Prefixes of renku -> "renku",
-      s"""|DELETE { GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} { ?id ?p ?o } }
-          |WHERE {
-          |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
-          |    ?id ?p ?o
-          |    FILTER (STRENDS(STR(?id), ${path.asObject.asSparql.sparql}))
-          |  }
-          |}
-          |""".stripMargin
+      sparql"""|DELETE { GRAPH ${GraphClass.ProjectViewedTimes.id} { ?id ?p ?o } }
+               |WHERE {
+               |  GRAPH ${GraphClass.ProjectViewedTimes.id} {
+               |    ?id ?p ?o
+               |    FILTER (STRENDS(STR(?id), ${path.asObject}))
+               |  }
+               |}
+               |""".stripMargin
+    )
+  )
+
+  private def deleteFromPersonViewings(path: projects.Path): F[Unit] = updateWithNoResult(
+    SparqlQuery.ofUnsafe(
+      show"${categoryName.show.toLowerCase}: delete person viewings",
+      Prefixes of renku -> "renku",
+      sparql"""|DELETE {
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?userId renku:viewedProject ?viewingId.
+               |    ?viewingId ?p ?o.
+               |  }
+               |}
+               |WHERE {
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    ?userId renku:viewedProject ?viewingId.
+               |    ?viewingId renku:project ?projectId.
+               |    ?viewingId ?p ?o.
+               |    FILTER (STRENDS(STR(?projectId), ${path.asObject}))
+               |  }
+               |}
+               |""".stripMargin
+    )
+  )
+
+  private def deleteOrphanPersonViewings(): F[Unit] = updateWithNoResult(
+    SparqlQuery.ofUnsafe(
+      show"${categoryName.show.toLowerCase}: delete orphan person viewings",
+      Prefixes of renku -> "renku",
+      sparql"""|DELETE { GRAPH ${GraphClass.PersonViewings.id} { ?userId ?p ?o } }
+               |WHERE {
+               |  {
+               |    SELECT ?userId
+               |    WHERE {
+               |      GRAPH ${GraphClass.PersonViewings.id} {
+               |        ?userId ?p ?o.
+               |      }
+               |    }
+               |    GROUP BY ?userId
+               |    HAVING (COUNT(?o) = 1)
+               |  } {
+               |    SELECT ?userId ?p ?o
+               |    WHERE {
+               |      GRAPH ${GraphClass.PersonViewings.id} {
+               |        ?userId ?p ?o
+               |      }
+               |    }
+               |  }
+               |}
+               |""".stripMargin
     )
   )
 }

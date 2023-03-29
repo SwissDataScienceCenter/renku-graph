@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.ontology
 
 import cats.data.NonEmptyList
 import io.renku.entities.searchgraphs.SearchInfoOntology
+import io.renku.entities.viewings.collector.projects.{PersonViewingOntology, ProjectViewedTimeOntology}
 import io.renku.graph.model.Schemas
 import io.renku.graph.model.entities.{CompositePlan, Project}
 import io.renku.jsonld.JsonLD
@@ -31,7 +32,12 @@ private trait OntologyGenerator {
 
 private object OntologyGenerator {
   private val types =
-    NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, SearchInfoOntology.typeDef)
+    NonEmptyList.of(Project.Ontology.typeDef,
+                    CompositePlan.Ontology.typeDef,
+                    SearchInfoOntology.typeDef,
+                    ProjectViewedTimeOntology.typeDef,
+                    PersonViewingOntology.typeDef
+    )
 
   private val instance = new OntologyGeneratorImpl(generateOntology(types, Schemas.renku))
 
