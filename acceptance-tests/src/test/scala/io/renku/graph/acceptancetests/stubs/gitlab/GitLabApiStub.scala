@@ -100,7 +100,6 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   private def projectRoutes: HttpRoutes[F] =
     GitLabAuth.authOptF(stateRef) { maybeAuthedReq =>
-
       HttpRoutes.of {
 
         case req @ GET -> Root :? Membership(true) +& MinAccessLevel(AccessLevel.Maintainer) =>
