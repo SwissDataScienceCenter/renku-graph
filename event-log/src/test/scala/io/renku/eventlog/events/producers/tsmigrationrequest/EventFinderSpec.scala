@@ -323,7 +323,7 @@ class EventFinderSpec
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val currentTime = mockFunction[Instant]
-    val finder      = new EventFinder[IO](currentTime)
+    val finder      = new EventFinderImpl[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
