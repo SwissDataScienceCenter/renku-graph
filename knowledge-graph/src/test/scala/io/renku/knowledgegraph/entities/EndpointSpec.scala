@@ -66,7 +66,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
     "respond with OK and the found entities" in new TestCase {
       forAll(pagingResponses(modelEntities)) { results =>
-        (finder.findEntities _).expects(criteria).returning(results.pure[IO])
+        (finder.findEntities(_: Criteria)(_: RenkuUrl)).expects(criteria, *).returning(results.pure[IO])
 
         val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
@@ -80,7 +80,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
     "respond with OK with an empty list if no entities found" in new TestCase {
       val results = PagingResponse.empty[model.Entity](pagingRequests.generateOne)
-      (finder.findEntities _).expects(criteria).returning(results.pure[IO])
+      (finder.findEntities(_: Criteria)(_: RenkuUrl)).expects(criteria, *).returning(results.pure[IO])
 
       val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
@@ -93,7 +93,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
     "respond with INTERNAL_SERVER_ERROR when finding entities fails" in new TestCase {
       val exception = exceptions.generateOne
-      (finder.findEntities _).expects(criteria).returning(exception.raiseError[IO, PagingResponse[model.Entity]])
+      (finder.findEntities(_: Criteria)(_: RenkuUrl)).expects(criteria, *).returning(exception.raiseError[IO, PagingResponse[model.Entity]])
 
       val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
