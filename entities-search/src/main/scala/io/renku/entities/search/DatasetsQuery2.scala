@@ -271,13 +271,17 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
              |  WHERE {
              |    Graph schema:Dataset {
              |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
-             |     # {
-             |     #   ?id a renku:DiscoverableDatasetPerson.
-             |     #   $sameAsVar schema:creator ?id
-             |     # } UNION {
-             |     #   ?id a renku:DiscoverableDataset
-             |     #   BIND (?id AS $sameAsVar)
-             |     # }
+             |     {
+             |       ?id a schema:Person.
+             |       $sameAsVar schema:creator ?id
+             |     } UNION
+             |     {
+             |       ?id a renku:DiscoverableDatasetPerson.
+             |       $sameAsVar schema:creator ?id
+             |     } UNION {
+             |       ?id a renku:DiscoverableDataset
+             |       BIND (?id AS $sameAsVar)
+             |     }
              |    }
              |  }
              | group by $sameAsVar ?id

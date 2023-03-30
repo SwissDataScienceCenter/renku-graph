@@ -22,11 +22,13 @@ import Criteria.{Filters, Sort}
 import EntityConverters._
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
@@ -43,6 +45,8 @@ class DatasetsEntitiesFinderSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDataset
+    with SearchDiffInstances
+    with AdditionalMatchers
     with IOSpec {
 
   implicit val ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
@@ -58,12 +62,16 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      upload(to = projectsDataset, originalDSProject, importedDSProject)
+      val result = IOBody(
+        List(originalDSProject, importedDSProject)
+          .traverse_(provisionTestProject)
+          .flatMap(_ =>
+            finder
+              .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
+          )
+      )
 
-      finder
-        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
-        .unsafeRunSync()
-        .results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
+      result.results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
     }
 
     "de-duplicate datasets having equal sameAs - case of an Exported DS" in new TestCase {
@@ -81,14 +89,15 @@ class DatasetsEntitiesFinderSpec
         .importDataset(importedDS1)
         .generateOne
 
-      upload(to = projectsDataset, project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
+      val result = IOBody {
+        provisionTestProjects(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
+          .flatMap(_ =>
+            finder
+              .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
+          )
+      }
 
-      val results = finder
-        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
-        .unsafeRunSync()
-        .results
-
-      results should {
+      result.results should {
         be(List(importedDSAndProject1.to[model.Entity.Dataset])) or
           be(List(importedDSAndProject2.to[model.Entity.Dataset])) or
           be(List(importedDSAndProject3.to[model.Entity.Dataset]))
@@ -107,16 +116,16 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      upload(to = projectsDataset, originalDSProject, importedDSProject)
-
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
-                   sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc))
+      val result = IOBody {
+        provisionTestProjects(originalDSProject, importedDSProject) >> finder
+          .findEntities(
+            Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
+                     sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc))
+            )
           )
-        )
-        .unsafeRunSync()
-        .results shouldBe List(
+      }
+
+      result.results shouldMatchTo List(
         (modifiedDS -> originalDSProject).to[model.Entity.Dataset],
         importedDSAndProject.to[model.Entity.Dataset]
       ).sortBy(_.dateAsInstant)
@@ -134,12 +143,14 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      upload(to = projectsDataset, originalDSProject, importedDSProject)
+      val result = IOBody {
+        provisionTestProjects(originalDSProject, importedDSProject).flatMap(_ =>
+          finder
+            .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
+        )
+      }
 
-      finder
-        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
-        .unsafeRunSync()
-        .results shouldBe List(importedDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
+      result.results shouldBe List(importedDSAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
     }
   }
 
@@ -152,14 +163,12 @@ class DatasetsEntitiesFinderSpec
 
       val original -> fork = originalDSProject.forkOnce()
 
-      upload(to = projectsDataset, original, fork)
+      val result = IOBody {
+        provisionTestProjects(original, fork) >>
+          finder.findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
+      }
 
-      val results = finder
-        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
-        .unsafeRunSync()
-        .results
-
-      results should {
+      result.results should {
         be(List((modifiedDS -> original).to[model.Entity.Dataset])) or
           be(List((modifiedDS -> fork).to[model.Entity.Dataset]))
       }
@@ -181,14 +190,16 @@ class DatasetsEntitiesFinderSpec
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
 
-      upload(to = projectsDataset, original, fork)
+      val result = IOBody {
+        provisionTestProjects(original, fork) >> finder
+          .findEntities(
+            Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
+                     maybeUser = member.toAuthUser.some
+            )
+          )
+      }
 
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
-        )
-        .unsafeRunSync()
-        .results shouldBe List(dsAndPublicProject.to[model.Entity.Dataset])
+      result.results shouldBe List(dsAndPublicProject.to[model.Entity.Dataset])
     }
 
     "favour dataset on internal projects over private projects if exist" in new TestCase {
@@ -205,14 +216,16 @@ class DatasetsEntitiesFinderSpec
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
 
-      upload(to = projectsDataset, original, fork)
+      val result = IOBody {
+        provisionTestProjects(original, fork) >> finder
+          .findEntities(
+            Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
+                     maybeUser = member.toAuthUser.some
+            )
+          )
+      }
 
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
-        )
-        .unsafeRunSync()
-        .results shouldBe List(dsAndInternalProject.to[model.Entity.Dataset])
+      result.results shouldBe List(dsAndInternalProject.to[model.Entity.Dataset])
     }
 
     "select dataset on private project if there's no project with broader visibility" in new TestCase {
@@ -224,14 +237,16 @@ class DatasetsEntitiesFinderSpec
         .importDataset(externalDS)
         .generateOne
 
-      upload(to = projectsDataset, privateProject)
+      val result = IOBody {
+        provisionTestProjects(privateProject) >> finder
+          .findEntities(
+            Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
+                     maybeUser = member.toAuthUser.some
+            )
+          )
+      }
 
-      finder
-        .findEntities(
-          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
-        )
-        .unsafeRunSync()
-        .results shouldBe List(dsAndProject.to[model.Entity.Dataset])
+      result.results shouldBe List(dsAndProject.to[model.Entity.Dataset])
     }
   }
 }
