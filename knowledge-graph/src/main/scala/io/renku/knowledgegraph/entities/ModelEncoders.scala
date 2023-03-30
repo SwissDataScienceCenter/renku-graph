@@ -23,10 +23,11 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
-import io.renku.entities.search.{model, Criteria}
+import io.renku.entities.search.{Criteria, model}
+import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{projects, GitLabUrl}
-import io.renku.http.rest.Links.{_links, Href, Link, Rel}
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
@@ -106,7 +107,7 @@ private object ModelEncoders {
           _links(
             Link(
               Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl,
-                                                                              RequestedDataset(ds.sameAs)
+                                                                              RequestedDataset(SameAs(ds.sameAs.value))
               )
             )
           )
