@@ -19,7 +19,7 @@
 package io.renku.entities.viewings.collector
 package persons
 
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.triplesgenerator.api.events.UserId
 
 private[collector] final case class GLUserViewedProject(userId: UserId, project: Project, date: projects.DateViewed)
@@ -28,3 +28,14 @@ private[collector] final case class PersonViewedProject(userId:     persons.Reso
                                                         project:    Project,
                                                         dateViewed: projects.DateViewed
 )
+
+private[collector] final case class Project(id: projects.ResourceId, path: projects.Path)
+
+private[collector] final case class GLUserViewedDataset(userId: UserId, dataset: Dataset, date: datasets.DateViewed)
+
+private[collector] final case class PersonViewedDataset(userId:     persons.ResourceId,
+                                                        dataset:    Dataset,
+                                                        dateViewed: datasets.DateViewed
+)
+
+private[collector] final case class Dataset(id: datasets.ResourceId, identifier: datasets.Identifier)

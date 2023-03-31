@@ -26,7 +26,7 @@ import cats.MonadThrow
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-import persons.{GLUserViewedProject, PersonViewedProjectPersister}
+import persons.{GLUserViewedProject, PersonViewedProjectPersister, Project}
 
 private[viewings] trait EventPersister[F[_]] {
   def persist(event: ProjectViewedEvent): F[Unit]

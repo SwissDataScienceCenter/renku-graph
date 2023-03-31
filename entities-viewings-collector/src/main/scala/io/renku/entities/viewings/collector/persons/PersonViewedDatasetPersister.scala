@@ -19,20 +19,29 @@
 package io.renku.entities.viewings.collector.persons
 
 import cats.MonadThrow
-import io.renku.graph.model.{persons, projects}
-import io.renku.triplesstore.TSClient
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.graph.model.{datasets, persons}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import org.typelevel.log4cats.Logger
 
-private[viewings] trait PersonViewedProjectPersister[F[_]] {
-  def persist(event: GLUserViewedProject): F[Unit]
+private[viewings] trait PersonViewedDatasetPersister[F[_]] {
+  def persist(event: GLUserViewedDataset): F[Unit]
 }
 
-private[viewings] object PersonViewedProjectPersister {
-  def apply[F[_]: MonadThrow](tsClient: TSClient[F]): PersonViewedProjectPersister[F] =
-    new PersonViewedProjectPersisterImpl[F](tsClient, PersonFinder(tsClient))
+private[viewings] object PersonViewedDatasetPersister {
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PersonViewedDatasetPersister[F]] =
+    ProjectsConnectionConfig[F]()
+      .map(TSClient[F](_))
+      .map(apply[F](_))
+
+  def apply[F[_]: MonadThrow](tsClient: TSClient[F]): PersonViewedDatasetPersister[F] =
+    new PersonViewedDatasetPersisterImpl[F](tsClient, PersonFinder(tsClient))
 }
 
-private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], personFinder: PersonFinder[F])
-    extends PersonViewedProjectPersister[F] {
+private class PersonViewedDatasetPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], personFinder: PersonFinder[F])
+    extends PersonViewedDatasetPersister[F] {
 
   import cats.syntax.all._
   import eu.timepit.refined.auto._
@@ -48,33 +57,33 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
   import Encoder._
   import personFinder._
 
-  override def persist(event: GLUserViewedProject): F[Unit] =
+  override def persist(event: GLUserViewedDataset): F[Unit] =
     findPersonId(event.userId) >>= {
       case None           => ().pure[F]
       case Some(personId) => persistIfOlderOrNone(personId, event)
     }
 
-  private def persistIfOlderOrNone(personId: persons.ResourceId, event: GLUserViewedProject) =
-    findStoredDate(personId, event.project.id) >>= {
+  private def persistIfOlderOrNone(personId: persons.ResourceId, event: GLUserViewedDataset) =
+    findStoredDate(personId, event.dataset.id) >>= {
       case None => insert(personId, event)
       case Some(date) if date < event.date =>
-        deleteOldViewedDate(personId, event.project.id) >> insert(personId, event)
+        deleteOldViewedDate(personId, event.dataset.id) >> insert(personId, event)
       case _ => ().pure[F]
     }
 
   private def findStoredDate(personId:  persons.ResourceId,
-                             projectId: projects.ResourceId
-  ): F[Option[projects.DateViewed]] =
+                             datasetId: datasets.ResourceId
+  ): F[Option[datasets.DateViewed]] =
     queryExpecting {
       SparqlQuery.ofUnsafe(
-        show"${GraphClass.PersonViewings}: find project viewed date",
+        show"${GraphClass.PersonViewings}: find dataset viewed date",
         Prefixes of renku -> "renku",
         sparql"""|SELECT (MAX(?date) AS ?mostRecentDate)
                  |WHERE {
                  |  GRAPH ${GraphClass.PersonViewings.id} {
                  |    BIND (${personId.asEntityId} AS ?personId)
-                 |    ?personId renku:viewedProject ?viewingId.
-                 |    ?viewingId renku:project ${projectId.asEntityId};
+                 |    ?personId renku:viewedDataset ?viewingId.
+                 |    ?viewingId renku:dataset ${datasetId.asEntityId};
                  |               renku:dateViewed ?date.
                  |  }
                  |}
@@ -83,14 +92,14 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
       )
     }(dateDecoder)
 
-  private lazy val dateDecoder: Decoder[Option[projects.DateViewed]] = ResultsDecoder[Option, projects.DateViewed] {
-    Decoder.instance[projects.DateViewed] { implicit cur =>
+  private lazy val dateDecoder: Decoder[Option[datasets.DateViewed]] = ResultsDecoder[Option, datasets.DateViewed] {
+    Decoder.instance[datasets.DateViewed] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
-      extract[projects.DateViewed]("mostRecentDate")
+      extract[datasets.DateViewed]("mostRecentDate")
     }
   }
 
-  private def deleteOldViewedDate(personId: persons.ResourceId, projectId: projects.ResourceId): F[Unit] =
+  private def deleteOldViewedDate(personId: persons.ResourceId, datasetId: datasets.ResourceId): F[Unit] =
     updateWithNoResult(
       SparqlQuery.ofUnsafe(
         show"${GraphClass.PersonViewings}: delete",
@@ -102,8 +111,8 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
                  |}
                  |WHERE {
                  |  GRAPH ${GraphClass.PersonViewings.id} {
-                 |    ${personId.asEntityId} renku:viewedProject ?viewingId.
-                 |    ?viewingId renku:project ${projectId.asEntityId};
+                 |    ${personId.asEntityId} renku:viewedDataset ?viewingId.
+                 |    ?viewingId renku:dataset ${datasetId.asEntityId};
                  |               ?p ?o.
                  |  }
                  |}
@@ -111,8 +120,8 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
       )
     )
 
-  private def insert(personId: persons.ResourceId, event: GLUserViewedProject): F[Unit] =
+  private def insert(personId: persons.ResourceId, event: GLUserViewedDataset): F[Unit] =
     upload(
-      encode(PersonViewedProject(personId, event.project, event.date))
+      encode(PersonViewedDataset(personId, event.dataset, event.date))
     )
 }

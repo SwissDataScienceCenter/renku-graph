@@ -136,7 +136,7 @@ class EventPersisterSpec
       event.maybeUserId.map(userId =>
         (personViewingPersister.persist _)
           .expects(
-            GLUserViewedProject(userId, collector.Project(project.resourceId, project.path), event.dateViewed)
+            GLUserViewedProject(userId, collector.persons.Project(project.resourceId, project.path), event.dateViewed)
           )
           .returning(returning)
       )

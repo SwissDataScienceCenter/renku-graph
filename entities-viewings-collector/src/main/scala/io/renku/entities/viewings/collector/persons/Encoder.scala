@@ -31,6 +31,12 @@ private object Encoder {
       viewing.asJsonLD
     )
 
+  def encode(viewing: PersonViewedDataset): NamedGraph =
+    NamedGraph.fromJsonLDsUnsafe(
+      GraphClass.PersonViewings.id,
+      viewing.asJsonLD
+    )
+
   private implicit lazy val personViewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
     JsonLDEncoder.instance { case ev @ PersonViewedProject(userId, _, _) =>
       JsonLD.entity(
@@ -47,6 +53,25 @@ private object Encoder {
         EntityTypes of PersonViewedProjectOntology.classType,
         PersonViewedProjectOntology.projectProperty       -> id.asJsonLD,
         PersonViewedProjectOntology.dateViewedProperty.id -> date.asJsonLD
+      )
+    }
+
+  private implicit lazy val personViewedDatasetEncoder: JsonLDEncoder[PersonViewedDataset] =
+    JsonLDEncoder.instance { case ev @ PersonViewedDataset(userId, _, _) =>
+      JsonLD.entity(
+        userId.asEntityId,
+        EntityTypes of PersonViewingOntology.classType,
+        PersonViewingOntology.viewedDatasetProperty -> ev.asJsonLD(viewedDatasetEncoder)
+      )
+    }
+
+  private lazy val viewedDatasetEncoder: JsonLDEncoder[PersonViewedDataset] =
+    JsonLDEncoder.instance { case PersonViewedDataset(userId, Dataset(id, identifier), date) =>
+      JsonLD.entity(
+        EntityId.of(s"$userId/datasets/$identifier"),
+        EntityTypes of PersonViewedProjectOntology.classType,
+        PersonViewedDatasetOntology.datasetProperty       -> id.asJsonLD,
+        PersonViewedDatasetOntology.dateViewedProperty.id -> date.asJsonLD
       )
     }
 }

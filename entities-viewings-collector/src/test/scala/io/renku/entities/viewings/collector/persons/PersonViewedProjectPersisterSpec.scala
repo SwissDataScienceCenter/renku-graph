@@ -188,7 +188,8 @@ class PersonViewedProjectPersisterSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val persister = new PersonViewedProjectPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+    private val tsClient = TSClient[IO](projectsDSConnectionInfo)
+    val persister        = new PersonViewedProjectPersisterImpl[IO](tsClient, PersonFinder(tsClient))
   }
 
   private def generateProjectWithCreator(userId: UserId) = {
@@ -235,5 +236,5 @@ class PersonViewedProjectPersisterSpec
   )
 
   private def toCollectorProject(project: entities.Project) =
-    collector.Project(project.resourceId, project.path)
+    collector.persons.Project(project.resourceId, project.path)
 }
