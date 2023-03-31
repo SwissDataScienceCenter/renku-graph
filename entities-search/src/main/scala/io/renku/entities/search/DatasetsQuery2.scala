@@ -40,6 +40,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
   val maybeDatePublishedVar   = VarName("maybeDatePublished")
+  val maybeDateModified       = VarName("maybeDateModified")
   val dateVar                 = VarName("date")
   val creatorsNamesVar        = VarName("creatorsNames")
   val maybeDescriptionVar     = VarName("maybeDescription")
@@ -54,6 +55,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     sameAsVar,
     maybeDateCreatedVar,
     maybeDatePublishedVar,
+    maybeDateModified,
     dateVar,
     creatorsNamesVar,
     maybeDescriptionVar,
@@ -71,6 +73,7 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
           |       $sameAsVar
           |       $maybeDateCreatedVar
           |       $maybeDatePublishedVar
+          |       $maybeDateModified
           |       $dateVar
           |       $creatorsNamesVar
           |       $maybeDescriptionVar
@@ -217,12 +220,20 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
     // localdate without a timezone
     fr"""|    OPTIONAL {
          |      $sameAsVar schema:dateCreated $maybeDateCreatedVar.
-         |      BIND (xsd:date(substr(str($maybeDateCreatedVar), 1, 10)) AS $dateVar)
+         |      BIND (xsd:date(substr(str($maybeDateCreatedVar), 1, 10)) AS ?createdAt)
          |    }
          |    OPTIONAL {
          |      $sameAsVar schema:datePublished $maybeDatePublishedVar
-         |      BIND (xsd:date($maybeDatePublishedVar) AS $dateVar)
+         |      BIND (xsd:date($maybeDatePublishedVar) AS ?publishedAt)
          |    }
+         |    OPTIONAL {
+         |      $sameAsVar schema:dateModified $maybeDateModified.
+         |      BIND (xsd:date(substr(str($maybeDateModified), 1, 10)) AS ?modifiedAt)
+         |    }
+         |    BIND(IF (BOUND(?modifiedAt), ?modifiedAt,
+         |            IF (BOUND(?createdAt), ?createdAt, ?publishedAt)) AS $dateVar
+         |        )
+         |
          |    $dateCond
          |""".stripMargin
   }
@@ -332,8 +343,11 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
                              .map(_.toList.maxBy(_._2))
       maybeDateCreated   <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
       maybeDatePublished <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
+      maybeDateModified  <- extract[Option[datasets.DateCreated]]("maybeDateModified")
       date <-
-        Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
+        Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
+                          ifNone = DecodingFailure("No dataset date", Nil)
+        )
       creators <- extract[Option[String]]("creatorsNames") >>= toListOf[persons.Name, persons.Name.type](persons.Name)
       keywords <-
         extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
