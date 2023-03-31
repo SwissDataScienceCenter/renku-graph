@@ -111,15 +111,6 @@ package object search {
           s"FILTER (IF (BOUND($variableName), LCASE($variableName) IN ${creators.map(_.toLowerCase.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
       }
 
-    def maybeOnCreatorsNames(variableName: String): String =
-      filters.creators match {
-        case creators if creators.isEmpty => ""
-        case creators =>
-          s"""FILTER (IF (BOUND($variableName), ${creators
-              .map(c => s"CONTAINS (LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
-              .mkString(" || ")} , false))"""
-      }
-
     def maybeOnNamespace(variableName: String): String =
       filters.namespaces match {
         case set if set.isEmpty => ""
@@ -143,50 +134,11 @@ package object search {
              |FILTER (${conditions.mkString(" && ")})""".stripMargin
       }
 
-    def maybeOnDatasetDates(dateCreatedVariable: String, datePublishedVariable: String): String =
-      List(
-        filters.maybeSince map { since =>
-          (
-            s"""|BIND (${since.encodeAsXsdZonedDate} AS ?sinceZoned)
-                |BIND (${since.encodeAsXsdNotZonedDate} AS ?sinceNotZoned)""".stripMargin,
-            s"xsd:date($dateCreatedVariable) >= ?sinceZoned",
-            s"xsd:date($datePublishedVariable) >= ?sinceNotZoned"
-          )
-        },
-        filters.maybeUntil map { until =>
-          (
-            s"""|BIND (${until.encodeAsXsdZonedDate} AS ?untilZoned)
-                |BIND (${until.encodeAsXsdNotZonedDate} AS ?untilNotZoned)""".stripMargin,
-            s"xsd:date($dateCreatedVariable) <= ?untilZoned",
-            s"xsd:date($datePublishedVariable) <= ?untilNotZoned"
-          )
-        }
-      ).flatten.foldLeft(List.empty[String], List.empty[String], List.empty[String]) {
-        case ((binds, zonedConditions, notZonedConditions), (bind, zonedCondition, notZonedCondition)) =>
-          (bind :: binds, zonedCondition :: zonedConditions, notZonedCondition :: notZonedConditions)
-      } match {
-        case (Nil, Nil, Nil) => ""
-        case (binds, zonedConditions, notZonedConditions) =>
-          s"""${binds.mkString("\n")}
-             |FILTER (
-             |  IF (
-             |    BOUND($dateCreatedVariable),
-             |      ${zonedConditions.mkString(" && ")},
-             |      (IF (
-             |        BOUND($datePublishedVariable),
-             |          ${notZonedConditions.mkString(" && ")},
-             |          false
-             |      ))
-             |  )
-             |)""".stripMargin
-      }
-
     private implicit class DateOps(date: LocalDateTinyType) {
 
       lazy val encodeAsXsdZonedDate: String =
         s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"
 
-      lazy val encodeAsXsdNotZonedDate: String = s"xsd:date('$date')"
     }
 
     private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
