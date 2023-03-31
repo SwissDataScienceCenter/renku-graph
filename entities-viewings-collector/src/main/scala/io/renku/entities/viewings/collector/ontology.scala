@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector
 
 import io.renku.graph.model.Schemas.{renku, xsd}
 import io.renku.graph.model.entities.Project

@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
-package viewed
+package io.renku.entities.viewings.collector.persons
 
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.viewings.collector
 import io.renku.generators.Generators.{fixed, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
@@ -60,7 +60,7 @@ class PersonViewedProjectPersisterSpec
         upload(to = projectsDataset, project)
 
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
-        val event      = GLUserViewedProject(userId, toEncoderProject(project), dateViewed)
+        val event      = GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
         persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -78,7 +78,7 @@ class PersonViewedProjectPersisterSpec
         upload(to = projectsDataset, project)
 
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
-        val event      = GLUserViewedProject(userId, toEncoderProject(project), dateViewed)
+        val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
         persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -97,7 +97,7 @@ class PersonViewedProjectPersisterSpec
         upload(to = projectsDataset, project)
 
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
-        val event      = GLUserViewedProject(userId, toEncoderProject(project), dateViewed)
+        val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
         persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -120,7 +120,7 @@ class PersonViewedProjectPersisterSpec
       upload(to = projectsDataset, project)
 
       val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
-      val event      = GLUserViewedProject(userId, toEncoderProject(project), dateViewed)
+      val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
       persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -145,11 +145,13 @@ class PersonViewedProjectPersisterSpec
         upload(to = projectsDataset, project1, project2)
 
         val project1DateViewed = projectViewedDates(project1.dateCreated.value).generateOne
-        val project1Event      = GLUserViewedProject(userId, toEncoderProject(project1), project1DateViewed)
+        val project1Event =
+          collector.persons.GLUserViewedProject(userId, toCollectorProject(project1), project1DateViewed)
         persister.persist(project1Event).unsafeRunSync() shouldBe ()
 
         val project2DateViewed = projectViewedDates(project2.dateCreated.value).generateOne
-        val project2Event      = GLUserViewedProject(userId, toEncoderProject(project2), project2DateViewed)
+        val project2Event =
+          collector.persons.GLUserViewedProject(userId, toCollectorProject(project2), project2DateViewed)
         persister.persist(project2Event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -172,9 +174,9 @@ class PersonViewedProjectPersisterSpec
 
       val project = generateProjectWithCreator(userIds.generateOne)
 
-      val event = GLUserViewedProject(userIds.generateOne,
-                                      toEncoderProject(project),
-                                      projectViewedDates(project.dateCreated.value).generateOne
+      val event = collector.persons.GLUserViewedProject(userIds.generateOne,
+                                                        toCollectorProject(project),
+                                                        projectViewedDates(project.dateCreated.value).generateOne
       )
 
       persister.persist(event).unsafeRunSync() shouldBe ()
@@ -232,6 +234,6 @@ class PersonViewedProjectPersisterSpec
                                    date:      projects.DateViewed
   )
 
-  private def toEncoderProject(project: entities.Project) =
-    ProjectViewingEncoder.Project(project.resourceId, project.path)
+  private def toCollectorProject(project: entities.Project) =
+    collector.Project(project.resourceId, project.path)
 }

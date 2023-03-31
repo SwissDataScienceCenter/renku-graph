@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
-package viewed
+package io.renku.entities.viewings.collector.persons
 
 import cats.MonadThrow
 import io.renku.graph.model.{persons, projects}
@@ -48,7 +47,7 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import tsClient._
-  import ProjectViewingEncoder._
+  import Encoder._
 
   override def persist(event: GLUserViewedProject): F[Unit] =
     findPersonId(event.userId) >>= {
@@ -66,7 +65,7 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
 
   private def userResourceIdByGLId(glId: persons.GitLabId) =
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: find user id by glid",
+      show"${GraphClass.PersonViewings}: find user id by glid",
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?id
                |WHERE {
@@ -81,7 +80,7 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
     )
   private def userResourceIdByEmail(email: persons.Email) =
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: find user id by email",
+      show"${GraphClass.PersonViewings}: find user id by email",
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?id
                |WHERE {
@@ -113,7 +112,7 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
   ): F[Option[projects.DateViewed]] =
     queryExpecting {
       SparqlQuery.ofUnsafe(
-        show"${categoryName.show.toLowerCase}: find date",
+        show"${GraphClass.PersonViewings}: find project viewed date",
         Prefixes of renku -> "renku",
         sparql"""|SELECT (MAX(?date) AS ?mostRecentDate)
                  |WHERE {
@@ -139,7 +138,7 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
   private def deleteOldViewedDate(personId: persons.ResourceId, projectId: projects.ResourceId): F[Unit] =
     updateWithNoResult(
       SparqlQuery.ofUnsafe(
-        show"${categoryName.show.toLowerCase}: delete",
+        show"${GraphClass.PersonViewings}: delete",
         Prefixes of renku -> "renku",
         sparql"""|DELETE {
                  |  GRAPH ${GraphClass.PersonViewings.id} {
