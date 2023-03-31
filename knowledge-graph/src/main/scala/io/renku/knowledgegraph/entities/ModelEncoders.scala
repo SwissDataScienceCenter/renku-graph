@@ -32,7 +32,9 @@ import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 
-private object ModelEncoders {
+private[entities] object ModelEncoders extends ModelEncoders
+
+private[entities] trait ModelEncoders {
   implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
     Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
       Json.arr(imageUris.map {
@@ -135,5 +137,13 @@ private object ModelEncoders {
         "matchingScore": ${person.matchingScore},
         "name":          ${person.name}
       }"""
+    }
+
+  implicit def modelEncoder(implicit apiUrl: renku.ApiUrl, glUrl: GitLabUrl): Encoder[model.Entity] =
+    Encoder.instance {
+      case project:  model.Entity.Project  => project.asJson
+      case ds:       model.Entity.Dataset  => ds.asJson
+      case workflow: model.Entity.Workflow => workflow.asJson
+      case person:   model.Entity.Person   => person.asJson
     }
 }
