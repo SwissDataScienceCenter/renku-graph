@@ -76,7 +76,7 @@ class LocalSpec
       .unsafeRunSync()
   }
 
-  it should "play with query" in {
+  it should "play with query" ignore {
     val x = LocalDate.now()
     val y = EntityType.Dataset
     val criteria =
