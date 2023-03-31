@@ -335,24 +335,24 @@ object DatasetsQuery2 extends EntityQuery[Entity.Dataset] {
         }
 
     for {
-      matchingScore <- extract[MatchingScore]("matchingScore")
-      name          <- extract[datasets.Name]("name")
-      sameAs        <- extract[datasets.TopmostSameAs]("sameAs")
-      pathAndVisibility <- extract[Option[String]]("idsPathsVisibilities")
+      matchingScore <- read[MatchingScore](matchingScoreVar)
+      name          <- read[datasets.Name](nameVar)
+      sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
+      pathAndVisibility <- read[Option[String]](idsPathsVisibilitiesVar)
                              .flatMap(toListOfIdsPathsAndVisibilities)
                              .map(_.toList.maxBy(_._2))
-      maybeDateCreated   <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
-      maybeDatePublished <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
-      maybeDateModified  <- extract[Option[datasets.DateCreated]]("maybeDateModified")
+      maybeDateCreated   <- read[Option[datasets.DateCreated]](maybeDateCreatedVar)
+      maybeDatePublished <- read[Option[datasets.DatePublished]](maybeDatePublishedVar)
+      maybeDateModified  <- read[Option[datasets.DateCreated]](maybeDateModified)
       date <-
         Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
                           ifNone = DecodingFailure("No dataset date", Nil)
         )
-      creators <- extract[Option[String]]("creatorsNames") >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
       keywords <-
-        extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
-      maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
-      images    <- extract[Option[String]]("images") >>= toListOfImageUris
+        read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+      maybeDesc <- read[Option[datasets.Description]](maybeDescriptionVar)
+      images    <- read[Option[String]](imagesVar) >>= toListOfImageUris
     } yield Entity.Dataset(
       matchingScore,
       sameAs,
