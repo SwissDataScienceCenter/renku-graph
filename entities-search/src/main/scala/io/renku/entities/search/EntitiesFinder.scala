@@ -18,22 +18,21 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.RenkuUrl
+import io.renku.entities.search.Criteria.Filters._
+import io.renku.entities.search.model._
 import io.renku.http.rest.Sorting
-import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.triplesstore.client.model.OrderBy
 import io.renku.triplesstore.client.sparql.SparqlEncoder
-import model._
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 trait EntitiesFinder[F[_]] {
-  def findEntities(criteria: Criteria)(implicit renkuUrl: RenkuUrl): F[PagingResponse[Entity]]
+  def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
 }
 
 object EntitiesFinder {
@@ -54,7 +53,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.SparqlQuery.Prefixes
 
-  override def findEntities(criteria: Criteria)(implicit renkuUrl: RenkuUrl): F[PagingResponse[Entity]] = {
+  override def findEntities(criteria: Criteria): F[PagingResponse[Entity]] = {
     implicit val resultsFinder: PagedResultsFinder[F, Entity] = pagedResultsFinder(query(criteria))
     findPage[F](criteria.paging)
   }
@@ -82,7 +81,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     encoder(sorting.toOrderBy(mapPropertyName)).sparql
   }
 
-  private implicit def recordDecoder(implicit renkuUrl: RenkuUrl): Decoder[Entity] = { implicit cursor =>
+  private implicit def recordDecoder: Decoder[Entity] = { implicit cursor =>
     import io.circe.DecodingFailure
     import io.renku.triplesstore.ResultsDecoder._
 

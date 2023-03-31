@@ -306,7 +306,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
             """.stripMargin
     }
 
-  override def decoder[EE >: Entity.Dataset](implicit renkuUrl: RenkuUrl): Decoder[EE] = { implicit cursor =>
+  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 

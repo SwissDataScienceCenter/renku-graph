@@ -18,17 +18,16 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters.EntityType
 import io.circe.Decoder
-import io.renku.graph.model.RenkuUrl
+import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.triplesstore.ResultsDecoder
 
 private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder {
   val entityType:      EntityType
   val selectVariables: Set[String]
-  def query(criteria:                     Criteria): Option[String]
-  def decoder[EE >: E](implicit renkuUrl: RenkuUrl): Decoder[EE]
+  def query(criteria: Criteria): Option[String]
+  def decoder[EE >: E]: Decoder[EE]
 
-  def getDecoder[EE >: E](entityType: EntityType)(implicit renkuUrl: RenkuUrl): Option[Decoder[EE]] =
+  def getDecoder[EE >: E](entityType: EntityType): Option[Decoder[EE]] =
     Option.when(entityType == this.entityType)(decoder[EE])
 }

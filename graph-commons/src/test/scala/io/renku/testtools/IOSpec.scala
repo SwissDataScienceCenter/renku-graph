@@ -30,8 +30,4 @@ trait IOSpec {
   object IOBody {
     def apply[A](code: IO[A]): A = code.unsafeRunSync()
   }
-
-//  implicit class GeneratorOps[A](self: Gen[A]) extends GenOps[A](self) {
-//    def generateOneIO: IO[A] = IO.delay(generateExample(self))
-//  }
 }
