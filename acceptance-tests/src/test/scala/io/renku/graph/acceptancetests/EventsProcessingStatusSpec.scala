@@ -18,9 +18,8 @@
 
 package io.renku.graph.acceptancetests
 
-import cats.syntax.all._
-import data.Project.Statistics.CommitsCount
 import data._
+import data.Project.Statistics.CommitsCount
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -57,14 +56,18 @@ class EventsProcessingStatusSpec
                      CommitsCount(numberOfEvents.value)
         ).map(addMemberWithId(user.id)).generateOne
 
-      When("there's no webhook for a given project in GitLab")
-      Then("the status endpoint should return NOT_FOUND")
-      webhookServiceClient.fetchProcessingStatus(project.id, user.accessToken).status shouldBe NotFound
+      gitLabStub.addAuthenticated(user)
 
-      When("there is a webhook created")
+      When("there's no webhook for a given project in GitLab")
+      Then("the status endpoint should return OK with 'activated' = false")
+
+      val response = webhookServiceClient.fetchProcessingStatus(project.id, user.accessToken)
+      response.status                                                    shouldBe Ok
+      response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
+
+      When("a webhook created for the project")
       And("there are events under processing")
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
-      gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), allCommitIds)
       `data in the Triples Store`(project, allCommitIds, user.accessToken)
@@ -76,16 +79,16 @@ class EventsProcessingStatusSpec
         response.status shouldBe Ok
 
         val responseJson = response.jsonBody.hcursor
-        responseJson.downField("activated").as[Boolean] shouldBe true.asRight
+        responseJson.downField("activated").as[Boolean].value shouldBe true
 
         val progressObjCursor = responseJson.downField("progress").as[Json].fold(throw _, identity).hcursor
-        progressObjCursor.downField("done").as[Int]         shouldBe EventStatusProgress.Stage.Final.value.asRight
-        progressObjCursor.downField("total").as[Int]        shouldBe EventStatusProgress.Stage.Final.value.asRight
-        progressObjCursor.downField("percentage").as[Float] shouldBe 100f.asRight
+        progressObjCursor.downField("done").as[Int].value         shouldBe EventStatusProgress.Stage.Final.value
+        progressObjCursor.downField("total").as[Int].value        shouldBe EventStatusProgress.Stage.Final.value
+        progressObjCursor.downField("percentage").as[Float].value shouldBe 100f
 
         val detailsObjCursor = responseJson.downField("details").as[Json].fold(throw _, identity).hcursor
-        detailsObjCursor.downField("status").as[String]  shouldBe "success".asRight
-        detailsObjCursor.downField("message").as[String] shouldBe "triples store".asRight
+        detailsObjCursor.downField("status").as[String].value  shouldBe "success"
+        detailsObjCursor.downField("message").as[String].value shouldBe "triples store"
       }
     }
   }
