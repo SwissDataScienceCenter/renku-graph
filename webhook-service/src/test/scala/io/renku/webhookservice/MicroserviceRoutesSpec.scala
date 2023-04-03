@@ -118,8 +118,8 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (eventStatusEndpoint
-        .fetchProcessingStatus(_: projects.GitLabId))
-        .expects(projectId)
+        .fetchProcessingStatus(_: projects.GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
       routes.call(request).status shouldBe responseStatus
