@@ -23,8 +23,7 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility._
 import io.renku.http.server.security.EndpointSecurityException
@@ -37,7 +36,7 @@ trait Authorizer[F[_], Key] {
 }
 
 object Authorizer {
-  type SecurityRecord                  = (Visibility, projects.Path, Set[GitLabId])
+  type SecurityRecord                  = (Visibility, projects.Path, Set[persons.GitLabId])
   type SecurityRecordFinder[F[_], Key] = Key => F[List[SecurityRecord]]
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
