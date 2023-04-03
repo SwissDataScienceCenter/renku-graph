@@ -36,8 +36,8 @@ trait Authorizer[F[_], Key] {
 }
 
 object Authorizer {
-  type SecurityRecord                  = (Visibility, projects.Path, Set[persons.GitLabId])
-  type SecurityRecordFinder[F[_], Key] = Key => F[List[SecurityRecord]]
+  type SecurityRecord = (Visibility, projects.Path, Set[persons.GitLabId])
+  trait SecurityRecordFinder[F[_], Key] extends (Key => F[List[SecurityRecord]])
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
     def addAllowedProject(path: projects.Path): AuthContext[Key] = copy(allowedProjects = allowedProjects + path)
