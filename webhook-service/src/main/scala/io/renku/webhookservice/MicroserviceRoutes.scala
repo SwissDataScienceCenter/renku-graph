@@ -61,16 +61,16 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: off
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
+      case GET    -> Root / "projects" / ProjectId(projectId) / "events" / "status" as _              => fetchProcessingStatus(projectId)
       case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => createHook(projectId, authUser)
       case DELETE -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => deleteHook(projectId, authUser)
       case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" as authUser => validateHook(projectId, authUser)
     }
   }
 
-  lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case           GET  -> Root / "ping"                                                        => Ok("pong")
-    case request @ POST -> Root / "webhooks" / "events"                                         => processPushEvent(request)
-    case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
+  private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
+    case           GET  -> Root / "ping"                => Ok("pong")
+    case request @ POST -> Root / "webhooks" / "events" => processPushEvent(request)
   }
   // format: on
 
