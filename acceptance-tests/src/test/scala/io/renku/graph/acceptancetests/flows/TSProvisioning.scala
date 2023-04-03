@@ -33,7 +33,7 @@ import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
@@ -46,7 +46,9 @@ trait TSProvisioning
     with AccessTokenPresence
     with Eventually
     with AcceptanceTestPatience
-    with should.Matchers {
+    with should.Matchers
+    with EitherValues {
+
   self: ApplicationServices with IOSpec =>
 
   def `data in the Triples Store`(
@@ -72,21 +74,22 @@ trait TSProvisioning
       sleep((5 seconds).toMillis)
     }
 
-    `wait for events to be processed`(project.id)
+    `wait for events to be processed`(project.id, accessToken)
   }
 
-  def `wait for events to be processed`(projectId: projects.GitLabId): Assertion = eventually {
-    val response = fetchProcessingStatus(projectId)
-    response.status                                                                    shouldBe Ok
-    response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double] shouldBe Right(100d)
+  def `wait for events to be processed`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion =
+    eventually {
+      val response = fetchProcessingStatus(projectId, accessToken)
+      response.status                                                                          shouldBe Ok
+      response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
+    }
+
+  def `check no hook exists`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
+    fetchProcessingStatus(projectId, accessToken).status shouldBe NotFound
   }
 
-  def `check no hook exists`(projectId: projects.GitLabId): Assertion = eventually {
-    fetchProcessingStatus(projectId).status shouldBe NotFound
-  }
-
-  private def fetchProcessingStatus(projectId: projects.GitLabId) =
-    webhookServiceClient.fetchProcessingStatus(projectId)
+  private def fetchProcessingStatus(projectId: projects.GitLabId, accessToken: AccessToken) =
+    webhookServiceClient.fetchProcessingStatus(projectId, accessToken)
 
   def `wait for the Fast Tract event`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Unit = eventually {
 

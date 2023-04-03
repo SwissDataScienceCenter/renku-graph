@@ -477,7 +477,7 @@ class DatasetsResourcesSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
-      `wait for events to be processed`(project.id)
+      `wait for events to be processed`(project.id, creator.accessToken)
 
       When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")
       val detailsResponse =
