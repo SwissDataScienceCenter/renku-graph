@@ -29,7 +29,7 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.events.CommitId
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, QueryParamDecoder, Request, Response}
+import org.http4s.{EntityEncoder, Header, HttpApp, HttpRoutes, QueryParamDecoder, Request, Response, Status}
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.{OptionalQueryParamDecoderMatcher, QueryParamDecoderMatcher}
@@ -75,6 +75,9 @@ private[gitlab] trait Http4sDslUtils {
 
     payload.map(Ok(_)).getOrElse(Response.notFound[F].pure[F])
   }
+
+  def EmptyOkOrNotFound[F[_]: Applicative](payload: Option[Any]): F[Response[F]] =
+    Response[F](payload.map(_ => Status.Ok).getOrElse(Status.NotFound)).pure[F]
 
   object Membership extends QueryParamDecoderMatcher[Boolean]("membership")
 
