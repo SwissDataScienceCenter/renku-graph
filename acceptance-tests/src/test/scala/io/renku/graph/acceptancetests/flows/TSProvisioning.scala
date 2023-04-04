@@ -81,6 +81,7 @@ trait TSProvisioning
     eventually {
       val response = fetchProcessingStatus(projectId, accessToken)
       response.status                                                                          shouldBe Ok
+      response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
       response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
     }
 
