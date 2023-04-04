@@ -26,6 +26,7 @@ import io.renku.graph.model.{datasets, projects, GraphClass}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
+import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -41,7 +42,7 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 ) extends TSClientImpl(storeConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
-  override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =
+  override def apply(id: datasets.Identifier, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
     queryExpecting[List[SecurityRecord]](selectQuery = query(id))(recordsDecoder)
 
   import eu.timepit.refined.auto._

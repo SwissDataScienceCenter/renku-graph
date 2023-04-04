@@ -19,6 +19,7 @@
 package io.renku.graph.http.server.security
 
 import cats.effect.IO
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -44,7 +45,7 @@ class DatasetIdRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
+      recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
@@ -59,7 +60,7 @@ class DatasetIdRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
+      recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
       )
     }
@@ -75,18 +76,22 @@ class DatasetIdRecordsFinderSpec
 
       upload(to = projectsDataset, parentProject, project)
 
-      recordsFinder(dataset.identification.identifier).unsafeRunSync() should contain theSameElementsAs List(
+      recordsFinder(dataset.identification.identifier, maybeAuthUser)
+        .unsafeRunSync() should contain theSameElementsAs List(
         (parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
     "nothing if there's no project with the given path" in new TestCase {
-      recordsFinder(datasetIdentifiers.generateOne).unsafeRunSync() shouldBe Nil
+      recordsFinder(datasetIdentifiers.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }
 
   private trait TestCase {
+
+    val maybeAuthUser = authUsers.generateOption
+
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val recordsFinder = new DatasetIdRecordsFinderImpl[IO](projectsDSConnectionInfo)

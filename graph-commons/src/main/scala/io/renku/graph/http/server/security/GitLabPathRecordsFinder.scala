@@ -24,6 +24,7 @@ import cats.MonadThrow
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
+import io.renku.http.server.security.model.AuthUser
 import org.typelevel.log4cats.Logger
 
 object GitLabPathRecordsFinder {
@@ -31,8 +32,9 @@ object GitLabPathRecordsFinder {
     new GitLabPathRecordsFinderImpl[F].pure[F].widen
 }
 
-private class GitLabPathRecordsFinderImpl[F[_]: MonadThrow: GitLabClient] extends SecurityRecordFinder[F, projects.Path] {
+private class GitLabPathRecordsFinderImpl[F[_]: MonadThrow: GitLabClient]
+    extends SecurityRecordFinder[F, projects.Path] {
 
-  override def apply(path: projects.Path): F[List[SecurityRecord]] =
-    GitLabClient[F].head()
+  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] = ???
+//    GitLabClient[F].head()
 }

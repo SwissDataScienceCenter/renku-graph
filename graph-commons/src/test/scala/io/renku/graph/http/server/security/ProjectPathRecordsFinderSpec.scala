@@ -19,6 +19,7 @@
 package io.renku.graph.http.server.security
 
 import cats.effect.IO
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
@@ -43,7 +44,7 @@ class ProjectPathRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(project.path).unsafeRunSync() shouldBe List(
+      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
@@ -53,17 +54,20 @@ class ProjectPathRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(project.path).unsafeRunSync() shouldBe List(
+      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
       )
     }
 
     "nothing if there's no project with the given path" in new TestCase {
-      recordsFinder(projectPaths.generateOne).unsafeRunSync() shouldBe Nil
+      recordsFinder(projectPaths.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }
 
   private trait TestCase {
+
+    val maybeAuthUser = authUsers.generateOption
+
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val recordsFinder = new ProjectPathRecordsFinderImpl[IO](projectsDSConnectionInfo)

@@ -29,6 +29,7 @@ import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{ResourceId, Visibility}
 import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.views.RdfResource
+import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -47,7 +48,7 @@ private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
     extends TSClientImpl(storeConfig)
     with SecurityRecordFinder[F, projects.Path] {
 
-  override def apply(path: projects.Path): F[List[SecurityRecord]] =
+  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
     queryExpecting[List[SecurityRecord]](query(ResourceId(path)))(recordsDecoder(path))
 
   import eu.timepit.refined.auto._
