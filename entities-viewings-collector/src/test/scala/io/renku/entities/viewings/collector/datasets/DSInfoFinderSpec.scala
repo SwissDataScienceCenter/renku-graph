@@ -20,6 +20,7 @@ package io.renku.entities.viewings.collector.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.viewings.collector
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -31,7 +32,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.OptionValues
 
-class ProjectFinderSpec
+class DSInfoFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
@@ -39,18 +40,19 @@ class ProjectFinderSpec
     with ProjectsDataset
     with OptionValues {
 
-  "findProject" should {
+  "findDSInfo" should {
 
-    "return path of the project where the non-modified DS with the given identifier exists" in new TestCase {
+    "return the Project info of the project where the non-modified DS with the given identifier exists" in new TestCase {
 
       val ds -> project = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
-        .map(_.to[entities.Project])
+        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
 
       upload(to = projectsDataset, project)
 
-      finder.findProject(ds.identification.identifier).unsafeRunSync().value shouldBe project.path
+      finder.findDSInfo(ds.identification.identifier).unsafeRunSync().value shouldBe
+        DSInfo(project.path, toCollectorDataset(ds))
     }
 
     "return path of the project where the modified DS with the given identifier exists" in new TestCase {
@@ -62,7 +64,8 @@ class ProjectFinderSpec
 
       upload(to = projectsDataset, project)
 
-      finder.findProject(modifiedDS.identification.identifier).unsafeRunSync().value shouldBe project.path
+      finder.findDSInfo(modifiedDS.identification.identifier).unsafeRunSync().value shouldBe
+        DSInfo(project.path, toCollectorDataset(modifiedDS.to[entities.Dataset[entities.Dataset.Provenance.Modified]]))
     }
 
     "return path of the parent project where the DS with the given identifier exists" in new TestCase {
@@ -80,13 +83,17 @@ class ProjectFinderSpec
 
       val ds = project.datasets.headOption.value
 
-      finder.findProject(ds.identification.identifier).unsafeRunSync().value shouldBe parentProject.path
+      finder.findDSInfo(ds.identification.identifier).unsafeRunSync().value shouldBe
+        DSInfo(parentProject.path, toCollectorDataset(parentProject.datasets.headOption.value))
     }
   }
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder = new ProjectFinderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
+    val finder = new DSInfoFinderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
   }
+
+  private def toCollectorDataset(ds: entities.Dataset[entities.Dataset.Provenance]) =
+    collector.persons.Dataset(ds.resourceId, ds.identification.identifier)
 }

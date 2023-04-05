@@ -50,9 +50,11 @@ class ConcurrentProcessExecutorSpec
         val nonSchedulableValue = ints(processesCount.value + 1).generateOne
         val nonSchedulable      = executor.tryExecuting(slowProcess(nonSchedulableValue))
 
-        (schedulable :+ nonSchedulable).parSequence
+        schedulable.parSequence
           .unsafeRunSync()
-          .distinct should contain theSameElementsAs Set(Accepted, Busy)
+          .distinct
+          .toSet                       shouldBe Set(Accepted)
+        nonSchedulable.unsafeRunSync() shouldBe Busy
 
         eventually {
           executionRegister.get.unsafeRunSync() should contain theSameElementsAs schedulableValues
