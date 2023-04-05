@@ -20,12 +20,15 @@ package io.renku.entities.viewings.collector
 package datasets
 
 import cats.syntax.all._
+import io.renku.entities.viewings.collector
+import io.renku.entities.viewings.collector.persons.{GLUserViewedDataset, PersonViewedDatasetPersister}
 import io.renku.generators.Generators.Implicits._
 import projects.viewed.EventPersister
 import io.renku.graph.model.{datasets, projects}
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetIdentifiers, datasetResourceIds, personGitLabIds, projectPaths}
+import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
 import io.renku.triplesgenerator.api.events.Generators.datasetViewedEvents
-import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,16 +40,42 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
 
   "upload" should {
 
-    "find the project which the event DS viewing should be accounted for " +
-      "and store a relevant ProjectViewedEvent" in new TestCase {
+    "find the project which the event DS viewing should be accounted for, " +
+      "store a relevant ProjectViewedEvent and " +
+      "a UserViewedDataset event if userId given" in new TestCase {
 
-        val event = datasetViewedEvents.generateOne
+        val event = datasetViewedEvents.generateOne.copy(maybeUserId = personGitLabIds.generateSome)
 
-        val path = projectPaths.generateOne
-        givenProjectFinding(event.identifier, returning = path.some.pure[Try])
+        val dsInfo = dsInfos.generateOne
+        givenProjectFinding(event.identifier, returning = dsInfo.some.pure[Try])
 
         givenEventPersisting(
-          ProjectViewedEvent(path, projects.DateViewed(event.dateViewed.value), event.maybeUserId.map(UserId(_))),
+          ProjectViewedEvent(dsInfo.projectPath,
+                             projects.DateViewed(event.dateViewed.value),
+                             event.maybeUserId.map(UserId(_))
+          ),
+          returning = ().pure[Try]
+        )
+
+        givenPersistingUserViewedEvent(event, dsInfo, returning = ().pure[Try])
+
+        uploader.upload(event).success.value shouldBe ()
+      }
+
+    "find the project which the event DS viewing should be accounted for " +
+      "and store a relevant ProjectViewedEvent " +
+      "without sending a UserViewedDataset event if userId not given" in new TestCase {
+
+        val event = datasetViewedEvents.generateOne.copy(maybeUserId = None)
+
+        val dsInfo = dsInfos.generateOne
+        givenProjectFinding(event.identifier, returning = dsInfo.some.pure[Try])
+
+        givenEventPersisting(
+          ProjectViewedEvent(dsInfo.projectPath,
+                             projects.DateViewed(event.dateViewed.value),
+                             event.maybeUserId.map(UserId(_))
+          ),
           returning = ().pure[Try]
         )
 
@@ -65,14 +94,26 @@ class EventUploaderSpec extends AnyWordSpec with should.Matchers with MockFactor
 
   private trait TestCase {
 
-    private val projectFinder  = mock[ProjectFinder[Try]]
-    private val eventPersister = mock[EventPersister[Try]]
-    val uploader               = new EventUploaderImpl[Try](projectFinder, eventPersister)
+    private val projectFinder                = mock[DSInfoFinder[Try]]
+    private val eventPersister               = mock[EventPersister[Try]]
+    private val personViewedDatasetPersister = mock[PersonViewedDatasetPersister[Try]]
+    val uploader = new EventUploaderImpl[Try](projectFinder, eventPersister, personViewedDatasetPersister)
 
-    def givenProjectFinding(identifier: datasets.Identifier, returning: Try[Option[projects.Path]]) =
-      (projectFinder.findProject _).expects(identifier).returning(returning)
+    def givenProjectFinding(identifier: datasets.Identifier, returning: Try[Option[DSInfo]]) =
+      (projectFinder.findDSInfo _).expects(identifier).returning(returning)
 
     def givenEventPersisting(event: ProjectViewedEvent, returning: Try[Unit]) =
       (eventPersister.persist _).expects(event).returning(returning)
+
+    def givenPersistingUserViewedEvent(event: DatasetViewedEvent, dsInfo: DSInfo, returning: Try[Unit]) =
+      event.maybeUserId
+        .map(UserId(_))
+        .map(GLUserViewedDataset(_, dsInfo.dataset, event.dateViewed))
+        .map((personViewedDatasetPersister.persist _).expects(_).returning(returning))
   }
+
+  private lazy val dsInfos: Gen[DSInfo] =
+    (projectPaths         ->
+      (datasetResourceIds -> datasetIdentifiers).mapN(collector.persons.Dataset))
+      .mapN(DSInfo)
 }
