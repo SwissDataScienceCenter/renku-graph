@@ -42,7 +42,7 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
   import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import ProjectViewingEncoder._
+  import Encoder._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
   import io.renku.triplesstore.client.syntax._

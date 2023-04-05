@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector
 
 import io.renku.graph.model.Schemas.{renku, xsd}
-import io.renku.graph.model.entities.Project
+import io.renku.graph.model.entities.{Dataset, Project}
 import io.renku.jsonld.ontology.{Class, DataProperties, DataProperty, ObjectProperties, ObjectProperty, Type}
 import io.renku.jsonld.Property
 
@@ -38,10 +38,12 @@ object PersonViewingOntology {
 
   val classType:             Property = renku / "PersonViewing"
   val viewedProjectProperty: Property = renku / "viewedProject"
+  val viewedDatasetProperty: Property = renku / "viewedDataset"
 
   lazy val typeDef: Type = Type.Def(
     Class(classType),
-    ObjectProperty(viewedProjectProperty, PersonViewedProjectOntology.typeDef)
+    ObjectProperty(viewedProjectProperty, PersonViewedProjectOntology.typeDef),
+    ObjectProperty(viewedDatasetProperty, PersonViewedDatasetOntology.typeDef)
   )
 }
 
@@ -55,6 +57,23 @@ object PersonViewedProjectOntology {
     Class(classType),
     ObjectProperties(
       ObjectProperty(projectProperty, Project.Ontology.typeDef)
+    ),
+    DataProperties(
+      dateViewedProperty
+    )
+  )
+}
+
+object PersonViewedDatasetOntology {
+
+  val classType:          Property         = renku / "ViewedDataset"
+  val datasetProperty:    Property         = renku / "dataset"
+  val dateViewedProperty: DataProperty.Def = DataProperty(renku / "dateViewed", xsd / "dateTime")
+
+  lazy val typeDef: Type = Type.Def(
+    Class(classType),
+    ObjectProperties(
+      ObjectProperty(datasetProperty, Dataset.Ontology.typeDef)
     ),
     DataProperties(
       dateViewedProperty

@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector
+package projects
 package viewed
 
 import cats.effect.Async
@@ -25,6 +26,7 @@ import cats.MonadThrow
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
+import persons.{GLUserViewedProject, PersonViewedProjectPersister, Project}
 
 private[viewings] trait EventPersister[F[_]] {
   def persist(event: ProjectViewedEvent): F[Unit]
@@ -52,7 +54,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
   import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import tsClient.{queryExpecting, updateWithNoResult, upload}
-  import ProjectViewingEncoder._
+  import Encoder._
 
   override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {

@@ -16,29 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects
+package io.renku.entities.viewings.collector
+package projects
 
-import io.renku.graph.model.{persons, projects, GraphClass}
+import io.renku.graph.model.{projects, GraphClass}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-private object ProjectViewingEncoder {
+private object Encoder {
 
   final case class ProjectViewing(projectId: projects.ResourceId, dateViewed: projects.DateViewed)
-
-  final case class Project(id: projects.ResourceId, path: projects.Path)
-
-  final case class PersonViewedProject(userId: persons.ResourceId, project: Project, dateViewed: projects.DateViewed)
 
   def encode(viewing: ProjectViewing): NamedGraph =
     NamedGraph.fromJsonLDsUnsafe(
       GraphClass.ProjectViewedTimes.id,
-      viewing.asJsonLD
-    )
-
-  def encode(viewing: PersonViewedProject): NamedGraph =
-    NamedGraph.fromJsonLDsUnsafe(
-      GraphClass.PersonViewings.id,
       viewing.asJsonLD
     )
 
@@ -48,25 +39,6 @@ private object ProjectViewingEncoder {
         entityId.asEntityId,
         EntityTypes of ProjectViewedTimeOntology.classType,
         ProjectViewedTimeOntology.dataViewedProperty.id -> date.asJsonLD
-      )
-    }
-
-  private implicit lazy val personViewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
-    JsonLDEncoder.instance { case ev @ PersonViewedProject(userId, _, _) =>
-      JsonLD.entity(
-        userId.asEntityId,
-        EntityTypes of PersonViewingOntology.classType,
-        PersonViewingOntology.viewedProjectProperty -> ev.asJsonLD(viewedProjectEncoder)
-      )
-    }
-
-  private lazy val viewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
-    JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, path), date) =>
-      JsonLD.entity(
-        EntityId.of(s"$userId/$path"),
-        EntityTypes of PersonViewedProjectOntology.classType,
-        PersonViewedProjectOntology.projectProperty       -> id.asJsonLD,
-        PersonViewedProjectOntology.dateViewedProperty.id -> date.asJsonLD
       )
     }
 }

@@ -22,6 +22,8 @@ package viewed
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.viewings.collector
+import io.renku.entities.viewings.collector.persons.{GLUserViewedProject, PersonViewedProjectPersister}
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{projects, GraphClass}
@@ -134,10 +136,7 @@ class EventPersisterSpec
       event.maybeUserId.map(userId =>
         (personViewingPersister.persist _)
           .expects(
-            GLUserViewedProject(userId,
-                                ProjectViewingEncoder.Project(project.resourceId, project.path),
-                                event.dateViewed
-            )
+            GLUserViewedProject(userId, collector.persons.Project(project.resourceId, project.path), event.dateViewed)
           )
           .returning(returning)
       )

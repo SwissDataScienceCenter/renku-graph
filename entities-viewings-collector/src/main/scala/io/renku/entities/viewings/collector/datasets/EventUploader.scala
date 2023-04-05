@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.datasets
+package io.renku.entities.viewings.collector
+package datasets
 
 import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import cats.data.OptionT
+import io.renku.entities.viewings.collector.persons.{GLUserViewedDataset, PersonViewedDatasetPersister}
 import io.renku.entities.viewings.collector.projects.viewed.EventPersister
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
@@ -34,22 +36,39 @@ private trait EventUploader[F[_]] {
 
 private object EventUploader {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventUploader[F]] =
-    (ProjectFinder[F], EventPersister[F])
-      .mapN(new EventUploaderImpl[F](_, _))
+    (DSInfoFinder[F], EventPersister[F], PersonViewedDatasetPersister[F])
+      .mapN(new EventUploaderImpl[F](_, _, _))
 }
 
 private class EventUploaderImpl[F[_]: MonadThrow](
-    projectFinder:  ProjectFinder[F],
-    eventPersister: EventPersister[F]
+    dsInfoFinder:                 DSInfoFinder[F],
+    projectViewedEventPersister:  EventPersister[F],
+    personViewedDatasetPersister: PersonViewedDatasetPersister[F]
 ) extends EventUploader[F] {
 
-  import eventPersister._
-  import projectFinder._
+  import dsInfoFinder._
 
   override def upload(event: DatasetViewedEvent): F[Unit] =
-    OptionT(findProject(event.identifier))
-      .map(ProjectViewedEvent(_, projects.DateViewed(event.dateViewed.value), event.maybeUserId.map(UserId(_))))
-      .semiflatMap(persist)
+    OptionT(findDSInfo(event.identifier))
+      .semiflatTap(persistProjectViewedEvent(_, event))
+      .semiflatTap(persistPersonViewedDataset(_, event))
       .value
       .void
+
+  private def persistProjectViewedEvent(dsInfo: DSInfo, event: DatasetViewedEvent) =
+    projectViewedEventPersister.persist(
+      ProjectViewedEvent(dsInfo.projectPath,
+                         projects.DateViewed(event.dateViewed.value),
+                         event.maybeUserId.map(UserId(_))
+      )
+    )
+
+  private def persistPersonViewedDataset(dsInfo: DSInfo, event: DatasetViewedEvent) =
+    event.maybeUserId match {
+      case None => ().pure[F]
+      case Some(glId) =>
+        personViewedDatasetPersister.persist(
+          GLUserViewedDataset(UserId(glId), dsInfo.dataset, event.dateViewed)
+        )
+    }
 }
