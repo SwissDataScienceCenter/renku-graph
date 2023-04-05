@@ -86,8 +86,8 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
 
       Then("they should get Ok response with project lineage in Json")
       response.status shouldBe Ok
-      val lineageJson = response.jsonBody.hcursor
 
+      val lineageJson = response.jsonBody.hcursor
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(exemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
     }

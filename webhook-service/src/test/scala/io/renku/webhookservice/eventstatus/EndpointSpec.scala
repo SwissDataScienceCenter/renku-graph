@@ -29,6 +29,7 @@ import hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissin
 import hookvalidation.HookValidator.NoAccessTokenException
 import io.circe.Json
 import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectIds
@@ -38,6 +39,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -55,12 +57,12 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return OK with the status info if webhook for the project exists" in new TestCase {
 
-      givenHookValidation(projectId, returning = HookExists.pure[IO])
+      givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val statusInfo = statusInfos.generateOne
       givenStatusInfoFinding(projectId, returning = rightT(statusInfo))
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -73,9 +75,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return OK with activated = false if the webhook does not exist" in new TestCase {
 
-      givenHookValidation(projectId, returning = HookMissing.pure[IO])
+      givenHookValidation(projectId, authUser, returning = HookMissing.pure[IO])
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -85,9 +87,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return NOT_FOUND if no Access Token found for the project" in new TestCase {
 
       val exception = NoAccessTokenException("error")
-      givenHookValidation(projectId, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
+      givenHookValidation(projectId, authUser, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe NotFound
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -97,9 +99,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenHookValidation(projectId, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
+      givenHookValidation(projectId, authUser, returning = exception.raiseError[IO, HookValidator.HookValidationResult])
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -110,12 +112,12 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return INTERNAL_SERVER_ERROR when finding status returns a failure" in new TestCase {
 
-      givenHookValidation(projectId, returning = HookExists.pure[IO])
+      givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val exception = exceptions.generateOne
       givenStatusInfoFinding(projectId, returning = leftT(exception))
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -126,12 +128,12 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return INTERNAL_SERVER_ERROR when finding status info fails" in new TestCase {
 
-      givenHookValidation(projectId, returning = HookExists.pure[IO])
+      givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val exception = exceptions.generateOne
       givenStatusInfoFinding(projectId, returning = right(exception.raiseError[IO, StatusInfo]))
 
-      val response = endpoint.fetchProcessingStatus(projectId).unsafeRunSync()
+      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(application.json))
@@ -142,6 +144,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
   }
 
   private trait TestCase {
+
+    val authUser  = authUsers.generateOne
     val projectId = projectIds.generateOne
 
     private val hookValidator    = mock[HookValidator[IO]]
@@ -152,10 +156,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
 
-    def givenHookValidation(projectId: projects.GitLabId, returning: IO[HookValidator.HookValidationResult]) =
+    def givenHookValidation(projectId: projects.GitLabId,
+                            authUser:  AuthUser,
+                            returning: IO[HookValidator.HookValidationResult]
+    ) =
       (hookValidator
         .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, None)
+        .expects(projectId, authUser.accessToken.some)
         .returning(returning)
 
     def givenStatusInfoFinding(projectId: projects.GitLabId, returning: EitherT[IO, Throwable, StatusInfo]) =
