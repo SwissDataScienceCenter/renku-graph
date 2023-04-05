@@ -33,14 +33,14 @@ import io.renku.http.client.RestClientError._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
+import org.http4s._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
-import org.http4s._
 import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.core.EmberException
-import org.http4s.headers.{Authorization, `Content-Disposition`, `Content-Type`}
+import org.http4s.headers.{`Content-Disposition`, `Content-Type`, Authorization}
 import org.http4s.multipart.{Multiparts, Part}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -109,11 +109,9 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       request: HttpRequest[F]
   )(mapResponse: ResponseMapping[ResultType]): F[ResultType] =
     httpClientBuilder.build.use { httpClient =>
-      for {
-        _          <- throttler.acquire()
-        callResult <- measureExecutionTime(callRemote(httpClient, request, mapResponse, attempt = 1), request)
-        _          <- throttler.release()
-      } yield callResult
+      throttler.throttle {
+        measureExecutionTime(callRemote(httpClient, request, mapResponse, attempt = 1), request)
+      }
     }
 
   private def httpClientBuilder: EmberClientBuilder[F] = {
@@ -181,7 +179,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
                                  mapResponse: ResponseMapping[T],
                                  attempt:     Int
   ): PartialFunction[Throwable, F[T]] = {
-    case error: RestClientError => throttler.release() >> error.raiseError[F, T]
+    case error: RestClientError => error.raiseError[F, T]
     case ConnectionError(exception) if attempt <= maxRetries.value =>
       for {
         _      <- Logger[F].warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
@@ -189,12 +187,12 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
         result <- callRemote(httpClient, request, mapResponse, attempt + 1)
       } yield result
     case ConnectionError(exception) if attempt > maxRetries.value =>
-      throttler.release() >> ConnectivityException(LogMessage(request.request, exception), exception).raiseError[F, T]
+      ConnectivityException(LogMessage(request.request, exception), exception).raiseError[F, T]
     case NonFatal(exception) =>
-      throttler.release() >> ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
+      ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
   }
 
-  object ConnectionError {
+  private object ConnectionError {
     def unapply(ex: Throwable): Option[Throwable] =
       ex match {
         case _: ConnectionFailure | _: ConnectException | _: SocketException | _: UnknownHostException =>
