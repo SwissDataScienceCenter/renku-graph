@@ -66,7 +66,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override def query(criteria: Criteria): Option[String] =
     criteria.filters.whenRequesting(entityType) {
       fr"""{
-          |SELECT $entityTypeVar
+          |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
           |       $nameVar
           |       $idsPathsVisibilitiesVar
