@@ -1,0 +1,151 @@
+openapi: 3.0.0
+
+info:
+  version: "1.0.0"
+  title: "KG REST API"
+  description: |
+    Remote API to the KG component.
+
+externalDocs:
+  description: Renku Documentation
+  url: https://renku.readthedocs.io/en/stable/
+
+servers:
+  - url: /knowledge-graph
+    description: current host
+
+paths:
+  /recent-entities:
+    get:
+      operationId: "recent-entities-get"
+      tags: [ "Entity Search" ]
+      description: |
+        Return the most recently viewed entities.
+      parameters:
+        - $ref: "#/components/parameters/limit"
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrossEntitySearchResult"
+        
+  /entities:
+    get:
+      operationId: "entities-get"
+      tags: [ "Entity Search" ]
+      description: |
+        Searching across entities.
+    parameters:
+      - $ref: "#/components/parameters/searchQuery"
+      - $ref: "#/components/parameters/searchTypes"
+      - $ref: "#/components/parameters/searchCreatorNames"
+    responses:
+      200:
+        description: Ok
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrossEntitySearchResult"
+
+components:
+  schemas:
+    CrossEntityData:
+      description: |
+        Data for some entity.
+      required:
+        - itemId
+      properties:
+        itemId:
+          type: string
+          format: ident
+
+    CrossEntitySearchResult:
+      description: |
+        A list of entities.
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CrossEntityData"
+    
+  parameters:
+    searchQuery:
+      name: query
+      in: query
+      description: |
+        Text query searching in various entity properties
+      required: false
+      schema:
+        type: string
+    searchTypes:
+      name: type
+      in: query
+      description: |
+        Specifies which kind of entities to return
+      required: false
+      schema:
+        type: string
+        enum:
+          - project
+          - dataset
+          - person
+          - workflow
+    searchCreatorNames:
+      name: creator
+      in: query
+      description: |
+        Search in creator names.
+      required: false
+      schema:
+        type: string
+    searchProjectVisibility:
+      name: visibility
+      in: query
+      description: |
+        Specify a project visibility
+      required: false
+      schema:
+        type: string
+        enum:
+          - public
+          - internal
+          - private
+    searchNamespace:
+      name: namespace
+      in: query
+      description: |
+        Filter on namespaces
+      require: false
+      schema:
+        type: string
+    searchSince:
+      name: since
+      in: query
+      description: |
+        Filter on created since.
+      required: false
+      schema:
+        type: string
+        format: local-date
+    searchUntil:
+      name: until
+      in: query
+      description: |
+        Filter on created until.
+      required: false
+      schema:
+        type: string
+        format: local-date
+    searchSortBy:
+      name: sort
+      in: query
+      description:
+        Sort by property asc/desc.
+      required: false
+      schema:
+        type: string
+        format: sort-by
