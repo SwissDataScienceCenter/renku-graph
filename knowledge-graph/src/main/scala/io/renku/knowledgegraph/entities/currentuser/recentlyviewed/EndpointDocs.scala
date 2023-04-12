@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
+package io.renku.knowledgegraph.entities.currentuser.recentlyviewed
 
-import ModelEncoders._
 import cats.MonadThrow
 import cats.implicits._
 import io.circe.Json
@@ -31,26 +30,20 @@ import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
+import io.renku.knowledgegraph.entities.ModelEncoders._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
 import java.time.Instant
 
-object EndpointDocs {
-  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-    apiUrl <- renku.ApiUrl[F]()
-  } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
-}
-
-private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
+final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Cross-Entity search",
-    "Finds entities by the given criteria".some,
+    "User recent entities search",
+    "Finds recent projects and datasets of the user with the given userId".some,
     GET(
-      Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
+      Uri / "entities" / "current-user" / "recently-viewed" :? state,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -69,69 +62,20 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     )
   )
 
-  private lazy val query = Parameter.Query(
-    "query",
-    Schema.String,
-    "to filter by matching value in name/title, namespace, creator, keyword and description".some,
-    required = false
-  )
-  private lazy val `type` = Parameter.Query(
-    "type",
-    Schema.String,
-    "to filter by entity type(s); allowed values: project, dataset, workflow, and person; multiple type parameters allowed".some,
-    required = false
-  )
-  private lazy val creator = Parameter.Query(
-    "creator",
-    Schema.String,
-    "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
-    required = false
-  )
-  private lazy val visibility = Parameter.Query(
-    "visibility",
-    Schema.String,
-    "to filter by visibility(ies) (restricted vs. public); allowed values: 'public', 'internal', 'private'; multiple visibility parameters allowed".some,
-    required = false
-  )
-  private lazy val namespace = Parameter.Query(
-    "namespace",
-    Schema.String,
-    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. 'group/subgroup'".some,
-    required = false
-  )
-  private lazy val since = Parameter.Query(
-    "since",
-    Schema.String,
-    "to filter by entity's creation date to >= the given date".some,
-    required = false
-  )
-  private lazy val until = Parameter.Query(
-    "until",
-    Schema.String,
-    "to filter by entity's creation date to <= the given date".some,
-    required = false
-  )
-  private lazy val sort = Parameter.Query(
-    "sort",
-    Schema.String,
-    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name` and `date`".some,
-    required = false
-  )
-  private lazy val page = Parameter.Query(
-    "page",
+  private lazy val userId = Parameter.Path(
+    "userId",
     Schema.Integer,
-    "the page query parameter is optional and defaults to 1.".some,
-    required = false
+    "User's GitLab identifier".some
   )
-  private lazy val perPage = Parameter.Query(
-    "per_page",
-    Schema.Integer,
-    "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+  private lazy val state = Parameter.Query(
+    "state",
+    Schema.String,
+    "to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'".some,
     required = false
   )
 
   private lazy val responseHeaders = Map(
-    "Total"       -> Header("The total number of entities".some, Schema.Integer),
+    "Total"       -> Header("The total number of projects".some, Schema.Integer),
     "Total-Pages" -> Header("The total number of pages".some, Schema.Integer),
     "Per-Page"    -> Header("The number of items per page".some, Schema.Integer),
     "Page"        -> Header("The index of the current page (starting at 1)".some, Schema.Integer),
@@ -154,7 +98,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     ).asJson,
     Dataset(
       MatchingScore(1),
-      Left(datasets.Identifier("123444")),
+      datasets.Identifier("123444"),
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
@@ -163,19 +107,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       datasets.Description("Some project").some,
       List(ImageUri("image.png")),
       projects.Path("group/subgroup/name")
-    ).asJson,
-    Workflow(
-      MatchingScore(1),
-      plans.Name("name"),
-      projects.Visibility.Public,
-      plans.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-      List(plans.Keyword("key")),
-      plans.Description("description").some,
-      Workflow.WorkflowType.Step
-    ).asJson,
-    Person(
-      MatchingScore(1),
-      persons.Name("name")
     ).asJson
   )
+}
+
+object EndpointDocs {
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+    apiUrl    <- renku.ApiUrl[F]()
+  } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }

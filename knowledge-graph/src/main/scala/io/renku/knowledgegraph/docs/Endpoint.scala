@@ -87,6 +87,7 @@ object Endpoint {
     projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
     userProjectsEndpoint       <- users.projects.EndpointDocs[F]
+    userRecentEntitiesEndpoint <- entities.currentuser.recentlyviewed.EndpointDocs[F]
     docsEndpointEndpoint       <- EndpointDocs[F]
     serviceVersion             <- ServiceVersion.readFromConfig[F]()
   } yield new EndpointImpl[F](
@@ -101,6 +102,7 @@ object Endpoint {
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,
     docsEndpointEndpoint,
-    userProjectsEndpoint
+    userProjectsEndpoint,
+    userRecentEntitiesEndpoint
   )
 }

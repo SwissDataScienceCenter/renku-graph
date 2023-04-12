@@ -32,9 +32,10 @@ import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 
-private[entities] object ModelEncoders extends ModelEncoders
+object ModelEncoders extends ModelEncoders
 
-private[entities] trait ModelEncoders {
+trait ModelEncoders {
+
   implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
     Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
       Json.arr(imageUris.map {

@@ -189,6 +189,14 @@ lazy val knowledgeGraph = project
   .in(file("knowledge-graph"))
   .withId("knowledge-graph")
   .settings(commonSettings)
+  .settings(
+    reStart / envVars := Map(
+      "JENA_RENKU_PASSWORD"      -> "renku",
+      "RENKU_URL"                -> "http://localhost:3000",
+      "RENKU_API_URL"            -> "http://localhost:3000/api",
+      "RENKU_CLIENT_CERTIFICATE" -> ""
+    )
+  )
   .dependsOn(
     graphCommons        % "compile->compile; test->test",
     entitiesSearch      % "compile->compile; test->test",
