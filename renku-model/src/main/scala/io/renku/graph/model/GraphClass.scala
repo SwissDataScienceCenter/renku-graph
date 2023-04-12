@@ -28,7 +28,7 @@ object GraphClass {
 
   import io.renku.jsonld.syntax._
 
-  lazy val all: Set[GraphClass] = Set(Default, Project, Persons, Datasets, ProjectViewedTimes)
+  lazy val all: Set[GraphClass] = Set(Default, Project, Persons, Datasets, ProjectViewedTimes, PersonViewings)
 
   case object Default extends GraphClass
   type Default = Default.type
