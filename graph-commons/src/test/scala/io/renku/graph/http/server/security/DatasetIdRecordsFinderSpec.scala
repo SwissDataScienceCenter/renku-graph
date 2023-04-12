@@ -21,6 +21,7 @@ package io.renku.graph.http.server.security
 import cats.effect.IO
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.http.server.security.Authorizer.SecurityRecord
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -46,7 +47,7 @@ class DatasetIdRecordsFinderSpec
       upload(to = projectsDataset, project)
 
       recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
@@ -61,7 +62,7 @@ class DatasetIdRecordsFinderSpec
       upload(to = projectsDataset, project)
 
       recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, Set.empty)
+        SecurityRecord(project.visibility, project.path, Set.empty)
       )
     }
 
@@ -78,8 +79,8 @@ class DatasetIdRecordsFinderSpec
 
       recordsFinder(dataset.identification.identifier, maybeAuthUser)
         .unsafeRunSync() should contain theSameElementsAs List(
-        (parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
-        (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+        SecurityRecord(parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
+        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 

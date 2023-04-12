@@ -81,6 +81,6 @@ private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
                          .map(_.map(_.split(",").toList).getOrElse(List.empty))
                          .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                          .map(_.toSet)
-      } yield (visibility, path, maybeUserId)
+      } yield SecurityRecord(visibility, path, maybeUserId)
     }
 }

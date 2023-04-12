@@ -87,6 +87,6 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
                      .map(_.map(_.split(rowsSeparator).toList).getOrElse(List.empty))
                      .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                      .map(_.toSet)
-      } yield (visibility, path, userIds)
+      } yield SecurityRecord(visibility, path, userIds)
   }
 }

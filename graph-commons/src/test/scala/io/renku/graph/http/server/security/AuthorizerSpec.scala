@@ -22,7 +22,6 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecordFinder}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
@@ -32,6 +31,7 @@ import org.scalacheck.Arbitrary
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import Authorizer._
 
 import scala.util.Try
 
@@ -44,7 +44,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       val projectPath = projectPaths.generateOne
       (securityRecordsFinder.apply _)
         .expects(key, None)
-        .returning(List((Visibility.Public, projectPath, Set.empty[GitLabId])).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Public, projectPath, Set.empty[GitLabId])).pure[Try])
 
       authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](None, key, Set(projectPath))
@@ -58,7 +58,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser.some)
-        .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
+        .returning(
+          List(SecurityRecord(Visibility.Public, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
+        )
 
       authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](authUser.some, key, Set(projectPath))
@@ -72,7 +74,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Public, projectPath, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](authUser, key, Set(projectPath))
@@ -88,7 +90,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         val projectPath = projectPaths.generateOne
         (securityRecordsFinder.apply _)
           .expects(key, None)
-          .returning(List((visibility, projectPath, Set.empty[GitLabId])).pure[Try])
+          .returning(List(SecurityRecord(visibility, projectPath, Set.empty[GitLabId])).pure[Try])
 
         authorizer.authorize(key, maybeAuthUser = None) shouldBe leftT[Try, Unit](AuthorizationFailure)
       }
@@ -102,7 +104,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
         (securityRecordsFinder.apply _)
           .expects(key, authUser.some)
-          .returning(List((visibility, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
+          .returning(
+            List(SecurityRecord(visibility, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
+          )
 
         authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
           AuthContext[Key](authUser.some, key, Set(projectPath))
@@ -117,7 +121,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List((Visibility.Internal, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Internal, projectPath, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](authUser, key, Set(projectPath))
@@ -131,7 +135,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List((Visibility.Private, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Private, projectPath, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe leftT[Try, Unit](AuthorizationFailure)
     }
@@ -156,9 +160,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key, None)
         .returning(
           List(
-            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
-            (Visibility.Internal, projectPaths.generateOne, personGitLabIds.generateSet()),
-            (Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+            SecurityRecord(Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Internal, projectPaths.generateOne, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
           ).pure[Try]
         )
 
@@ -177,9 +181,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key, authUser.some)
         .returning(
           List(
-            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
-            (Visibility.Internal, internalProject, personGitLabIds.generateSet()),
-            (Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+            SecurityRecord(Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Internal, internalProject, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
           ).pure[Try]
         )
 
@@ -199,9 +203,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key, authUser.some)
         .returning(
           List(
-            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
-            (Visibility.Internal, internalProject, personGitLabIds.generateSet()),
-            (Visibility.Private, privateProject, personGitLabIds.generateSet() + authUser.id)
+            SecurityRecord(Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Internal, internalProject, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Private, privateProject, personGitLabIds.generateSet() + authUser.id)
           ).pure[Try]
         )
 

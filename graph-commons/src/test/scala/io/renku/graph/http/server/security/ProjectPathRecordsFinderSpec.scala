@@ -21,6 +21,7 @@ package io.renku.graph.http.server.security
 import cats.effect.IO
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.http.server.security.Authorizer.SecurityRecord
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -45,7 +46,7 @@ class ProjectPathRecordsFinderSpec
       upload(to = projectsDataset, project)
 
       recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
@@ -55,7 +56,7 @@ class ProjectPathRecordsFinderSpec
       upload(to = projectsDataset, project)
 
       recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, Set.empty)
+        SecurityRecord(project.visibility, project.path, Set.empty)
       )
     }
 

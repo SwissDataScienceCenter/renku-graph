@@ -36,7 +36,10 @@ trait Authorizer[F[_], Key] {
 }
 
 object Authorizer {
-  type SecurityRecord = (Visibility, projects.Path, Set[persons.GitLabId])
+  final case class SecurityRecord(visibility:     Visibility,
+                                  projectPath:    projects.Path,
+                                  allowedPersons: Set[persons.GitLabId]
+  )
   trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]])
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
@@ -75,9 +78,9 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
 
   private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Path] =
     _.foldLeft(Set.empty[projects.Path]) {
-      case (allowed, (Public, path, _))                                          => allowed + path
-      case (allowed, (Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
-      case (allowed, (Private, path, members))
+      case (allowed, SecurityRecord(Public, path, _))                                          => allowed + path
+      case (allowed, SecurityRecord(Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
+      case (allowed, SecurityRecord(Private, path, members))
           if (members intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
         allowed + path
       case (allowed, _) => allowed
