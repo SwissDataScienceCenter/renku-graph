@@ -143,7 +143,7 @@ trait ModelEncoders {
       }"""
     }
 
-  implicit def modelEncoder(implicit apiUrl: renku.ApiUrl, glUrl: GitLabUrl): Encoder[model.Entity] =
+  implicit def modelEncoder(implicit renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl): Encoder[model.Entity] =
     Encoder.instance {
       case project:  model.Entity.Project  => project.asJson
       case ds:       model.Entity.Dataset  => ds.asJson
