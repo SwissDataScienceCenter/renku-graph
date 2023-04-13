@@ -27,17 +27,17 @@ import io.renku.entities.viewings.collector.persons.{GLUserViewedDataset, Person
 import io.renku.entities.viewings.collector.projects.viewed.EventPersister
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
-import io.renku.triplesstore.{SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
-private[viewings] trait EventUploader[F[_]] {
+trait EventUploader[F[_]] {
   def upload(event: DatasetViewedEvent): F[Unit]
 }
 
-private[viewings] object EventUploader {
+object EventUploader {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventUploader[F]] =
-    (DSInfoFinder[F], EventPersister[F], PersonViewedDatasetPersister[F])
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connConfig: ProjectsConnectionConfig): F[EventUploader[F]] =
+    (DSInfoFinder[F](connConfig), EventPersister[F](connConfig), PersonViewedDatasetPersister[F](connConfig))
       .mapN(new EventUploaderImpl[F](_, _, _))
 
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): EventUploader[F] =

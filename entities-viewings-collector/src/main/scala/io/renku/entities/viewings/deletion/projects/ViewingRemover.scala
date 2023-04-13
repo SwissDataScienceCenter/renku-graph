@@ -30,8 +30,12 @@ private trait ViewingRemover[F[_]] {
 }
 
 private object ViewingRemover {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ViewingRemover[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new ViewingRemoverImpl[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectsConnectionConfig: ProjectsConnectionConfig
+  ): F[ViewingRemover[F]] = {
+    val remover: ViewingRemover[F] = new ViewingRemoverImpl[F](TSClient[F](projectsConnectionConfig))
+    remover.pure[F]
+  }
 }
 
 private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends ViewingRemover[F] {

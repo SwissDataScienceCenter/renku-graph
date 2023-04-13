@@ -28,12 +28,11 @@ import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-private[viewings] trait EventPersister[F[_]] {
+trait EventPersister[F[_]] {
   def persist(event: ProjectViewedEvent): F[Unit]
 }
 
-private[viewings] object EventPersister {
-
+object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
 
@@ -42,6 +41,20 @@ private[viewings] object EventPersister {
                               EventDeduplicator[F](tsClient, categoryName),
                               PersonViewedProjectPersister(tsClient)
     )
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): F[EventPersister[F]] = {
+    val client = TSClient[F](connectionConfig)
+    val persister: EventPersister[F] =
+      new EventPersisterImpl[F](
+        client,
+        EventDeduplicator[F](client, categoryName),
+        PersonViewedProjectPersister(client)
+      )
+
+    persister.pure[F]
+  }
 }
 
 private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
