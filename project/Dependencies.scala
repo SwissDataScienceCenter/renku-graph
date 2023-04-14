@@ -10,7 +10,7 @@ object Dependencies {
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
-    val diffx                  = "0.8.2"
+    val diffx                  = "0.8.3"
     val http4s                 = "0.23.18"
     val http4sEmber            = "0.23.18"
     val http4sPrometheus       = "0.24.3"
