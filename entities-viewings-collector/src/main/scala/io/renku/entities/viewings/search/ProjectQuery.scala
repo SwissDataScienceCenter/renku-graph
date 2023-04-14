@@ -86,7 +86,7 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |      }
                |    }
                |  }
-               |  group by ${v.all.dropRight(2)}
+               |  GROUP BY ${v.all.dropRight(2)}
                |""".stripMargin
     )
 }

@@ -32,7 +32,7 @@ import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
-private class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
+private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
 ) extends RecentEntitiesFinder[F]
     with Paging[SearchEntity] /* why is this using subtyping? */ {
@@ -70,8 +70,9 @@ private class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: Sp
                 |WHERE {
                 |  $bodies
                 |}
-                |ORDER BY DESC(${Variables.viewedDate})
-                |LIMIT $limit
+                |ORDER BY DESC(${Variables.viewedDate}) 
+                |
+                |### LIMIT $limit
                 |""".stripMargin
       }
     )

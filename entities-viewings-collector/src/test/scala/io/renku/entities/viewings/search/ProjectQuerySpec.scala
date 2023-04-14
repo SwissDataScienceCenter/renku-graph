@@ -21,21 +21,17 @@ package io.renku.entities.viewings.search
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
-import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.http.server.security.model.AuthUser
 
 import java.time.Instant
 
 class ProjectQuerySpec extends SearchTestBase {
-  val token: UserAccessToken = AccessToken.PersonalAccessToken("nonblank")
 
   it should "find and decode projects" in {
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
-    val entitiesProject = project.to[entities.RenkuProject.WithoutParent]
 
     val person = personGen.generateOne
     upload(projectsDataset, person)
@@ -43,8 +39,7 @@ class ProjectQuerySpec extends SearchTestBase {
     val userId = person.maybeGitLabId.get
 
     provisionTestProjects(project).unsafeRunSync()
-    storeProjectViewed(userId, Instant.now(), entitiesProject.path)
-    storeDatasetViewed(userId, Instant.now(), entitiesProject.datasets.head.identification.identifier)
+    storeProjectViewed(userId, Instant.now(), project.path)
 
     val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
 
@@ -57,9 +52,44 @@ class ProjectQuerySpec extends SearchTestBase {
         visibility = project.visibility,
         date = project.dateCreated,
         maybeCreator = project.maybeCreator.map(_.name),
-        keywords = project.keywords.toList,
+        keywords = project.keywords.toList.sorted,
         maybeDescription = project.maybeDescription,
         images = project.images
+      )
+  }
+
+  it should "only return projects for the given user" in {
+    val project1 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+    val project2 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+
+    val person1 = personGen.generateOne
+    val person2 = personGen.generateOne
+    upload(projectsDataset, person1, person2)
+    provisionTestProjects(project1, project2).unsafeRunSync()
+
+    storeProjectViewed(person1.maybeGitLabId.get, Instant.now(), project1.path)
+    storeProjectViewed(person2.maybeGitLabId.get, Instant.now(), project2.path)
+
+    val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(person1.maybeGitLabId.get, token), 5))
+
+    val decoded = tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).unsafeRunSync()
+    decoded.head shouldMatchTo
+      SearchEntity.Project(
+        matchingScore = MatchingScore(1f),
+        path = project1.path,
+        name = project1.name,
+        visibility = project1.visibility,
+        date = project1.dateCreated,
+        maybeCreator = project1.maybeCreator.map(_.name),
+        keywords = project1.keywords.toList.sorted,
+        maybeDescription = project1.maybeDescription,
+        images = project1.images
       )
   }
 }

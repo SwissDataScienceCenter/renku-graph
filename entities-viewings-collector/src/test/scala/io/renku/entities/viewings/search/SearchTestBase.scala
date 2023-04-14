@@ -32,6 +32,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.{Person => TestPerson}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{datasets, projects}
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
@@ -60,6 +61,8 @@ abstract class SearchTestBase
 
   implicit val queryTimeRecorder: SparqlQueryTimeRecorder[IO] =
     TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+
+  val token: UserAccessToken = AccessToken.PersonalAccessToken("nonblank")
 
   lazy val eventUploader: EventUploader[IO] =
     EventUploader[IO](projectsDSConnectionInfo)

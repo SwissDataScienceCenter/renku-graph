@@ -18,25 +18,87 @@
 
 package io.renku.entities.viewings.search
 
+import cats.effect.IO
+import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
+import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
+import io.renku.http.server.security.model.AuthUser
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 class RecentEntitiesFinderSpec extends SearchTestBase {
+  val finder = new RecentEntitiesFinderImpl[IO](projectsDSConnectionInfo)
 
-  it should "find things" in {
-    val project = renkuProjectEntities(visibilityPublic)
+  it should "return projects in most recently viewed order" in {
+    val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
-    val entitiesProject = project.to[entities.RenkuProject.WithoutParent]
-    val user = entitiesProject.maybeCreator.get.maybeGitLabId.get
+    val project2 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
 
-    provisionTestProjects(project).unsafeRunSync()
-    storeDatasetViewed(user, Instant.now(), entitiesProject.datasets.head.identification.identifier)
-    storeProjectViewed(user, Instant.now(), entitiesProject.path)
+    val person = personGen.generateOne
 
+    upload(projectsDataset, person)
+    provisionTestProjects(project1, project2).unsafeRunSync()
+
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.path)
+
+    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 5)
+    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+
+    result.pagingInfo.total.value shouldBe 2
+    result.results.head shouldMatchTo
+      SearchEntity.Project(
+        matchingScore = MatchingScore(1f),
+        path = project2.path,
+        name = project2.name,
+        visibility = project2.visibility,
+        date = project2.dateCreated,
+        maybeCreator = project2.maybeCreator.map(_.name),
+        keywords = project2.keywords.toList.sorted,
+        maybeDescription = project2.maybeDescription,
+        images = project2.images
+      )
   }
 
+  it should "return apply limit when returning projects" in {
+    val project1 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+    val project2 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+
+    val person = personGen.generateOne
+
+    upload(projectsDataset, person)
+    provisionTestProjects(project1, project2).unsafeRunSync()
+
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now(), project2.path)
+
+    val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 1)
+    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+
+    result.pagingInfo.total.value shouldBe 1
+    result.results.head shouldMatchTo
+      SearchEntity.Project(
+        matchingScore = MatchingScore(1f),
+        path = project2.path,
+        name = project2.name,
+        visibility = project2.visibility,
+        date = project2.dateCreated,
+        maybeCreator = project2.maybeCreator.map(_.name),
+        keywords = project2.keywords.toList.sorted,
+        maybeDescription = project2.maybeDescription,
+        images = project2.images
+      )
+  }
 }
