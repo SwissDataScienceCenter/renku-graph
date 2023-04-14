@@ -77,7 +77,7 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
   import tsClient.{queryExpecting, updateWithNoResult, upload}
 
   override def persist(event: ProjectViewedEvent): F[Unit] =
-    findProjectId(event) >>= {
+    findProjectId(event.path) >>= {
       case None            => ().pure[F]
       case Some(projectId) => persistIfOlderOrNone(event, projectId) >> persistPersonViewedProject(event, projectId)
     }
@@ -90,18 +90,18 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
       case _ => ().pure[F]
     }
 
-  private def findProjectId(event: ProjectViewedEvent) = queryExpecting {
+  private def findProjectId(path: projects.Path) = queryExpecting {
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: find id",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""|SELECT DISTINCT ?id
-          |WHERE {
-          |  GRAPH ?id {
-          |    ?id a schema:Project;
-          |        renku:projectPath ${event.path.asObject.asSparql.sparql}
-          |  }
-          |}
-          |""".stripMargin
+      sparql"""|SELECT DISTINCT ?id
+               |WHERE {
+               |  GRAPH ?id {
+               |    ?id a schema:Project;
+               |        renku:projectPath ${path.asObject}
+               |  }
+               |}
+               |""".stripMargin
     )
   }(idDecoder)
 

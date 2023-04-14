@@ -24,11 +24,10 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.entities.search.model.{Entity => SearchEntity}
-import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
-import io.renku.graph.model.Schemas
+import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
@@ -36,7 +35,7 @@ import org.typelevel.log4cats.Logger
 private class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
 ) extends RecentEntitiesFinder[F]
-    with Paging[SearchEntity] /* why is this modelled using subtyping? */ {
+    with Paging[SearchEntity] /* why is this using subtyping? */ {
   private[this] val client = TSClient(storeConfig)
 
   def findRecentlyViewedEntities(criteria: Criteria): F[PagingResponse[SearchEntity]] = {
@@ -55,18 +54,34 @@ private class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: Sp
       .fold(Async[F].raiseError(_), _.pure[F])
 
   def makeQuery(criteria: Criteria): SparqlQuery =
+    combineQuery(criteria.limit, List(ProjectQuery, DatasetQuery).flatMap(_.apply(criteria)))
+
+  private def combineQuery(limit: Int, qs: List[SparqlQuery]): SparqlQuery =
     SparqlQuery.of(
-      name = "recent-entity search",
-      Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
-      sparql"""|SELECT *
-               |WHERE {
-               |  ?s ?p ?o
-               |  /* $criteria */
-               |}
-               |ORDER BY ?s
-               |""".stripMargin
+      "recent entity search - complete query",
+      qs.flatMap(_.prefixes).toSet, {
+        val bodies = qs
+          .map(_.body)
+          .map(Fragment.apply)
+          .foldSmash(Fragment("{"), Fragment("} UNION {"), Fragment("}"))
+
+        sparql"""SELECT
+                | ${Variables.all}
+                |WHERE {
+                |  $bodies
+                |}
+                |ORDER BY DESC(${Variables.viewedDate})
+                |LIMIT $limit
+                |""".stripMargin
+      }
     )
 
-  implicit def modelDecoder: Decoder[SearchEntity] =
-    ???
+  private implicit lazy val searchEntityDecoder: Decoder[SearchEntity] = { implicit cursor =>
+    import io.renku.triplesstore.ResultsDecoder._
+
+    extract[EntityType]("entityType") >>= {
+      case EntityType.Dataset => Variables.datasetDecoder.tryDecode(cursor)
+      case EntityType.Project => Variables.projectDecoder.tryDecode(cursor)
+    }
+  }
 }

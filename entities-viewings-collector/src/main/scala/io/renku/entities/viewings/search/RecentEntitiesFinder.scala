@@ -20,6 +20,7 @@ package io.renku.entities.viewings.search
 
 import cats.NonEmptyParallel
 import cats.effect._
+import io.circe.Decoder
 import io.renku.entities.search.model.Entity
 import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
@@ -33,17 +34,30 @@ trait RecentEntitiesFinder[F[_]] {
 }
 
 object RecentEntitiesFinder {
-  sealed trait EntityType
+  sealed trait EntityType extends Product {
+    final val name: String = productPrefix.toLowerCase
+  }
   object EntityType {
     case object Project extends EntityType
     case object Dataset extends EntityType
+
+    val all: List[EntityType] = List(Project, Dataset)
+
+    def fromString(str: String): Either[String, EntityType] =
+      all.find(_.name.equalsIgnoreCase(str)).toRight(s"Invalid entity type: $str")
+
+    implicit val jsonDecoder: Decoder[EntityType] =
+      Decoder.decodeString.emap(fromString)
   }
 
   final case class Criteria(
       entityTypes: Set[EntityType],
       authUser:    AuthUser,
       limit:       Int
-  )
+  ) {
+    def forType(et: EntityType): Boolean =
+      entityTypes.isEmpty || entityTypes.contains(et)
+  }
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
       connConfig: ProjectsConnectionConfig
