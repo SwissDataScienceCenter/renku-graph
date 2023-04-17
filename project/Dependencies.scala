@@ -6,7 +6,7 @@ object Dependencies {
   object V {
     val ammonite               = "2.4.1"
     val catsCore               = "2.9.0"
-    val catsEffect             = "3.4.8"
+    val catsEffect             = "3.4.9"
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
