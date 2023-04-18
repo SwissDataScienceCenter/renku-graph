@@ -27,7 +27,7 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 
 object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
-  private[this] val v = Variables
+  private[this] val v = Variables.Project
 
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Project))(makeQuery(criteria))
@@ -49,7 +49,7 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |                renku:viewedProject ?viewedProject.
                |
                |      ?viewedProject a renku:ViewedProject;
-               |                     renku:project ${v.projectId};
+               |                     renku:project ?projectId;
                |                     renku:dateViewed ${v.viewedDate}
                |    }
                |    Graph ${GraphClass.Persons.id} {
@@ -59,27 +59,27 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |                    schema:identifier ${criteria.authUser.id.value}.
                |    }
                |
-               |    graph ${v.projectId} {
-               |      ${v.projectId} a schema:Project;
+               |    Graph ?projectId {
+               |      ?projectId a schema:Project;
                |               schema:name ${v.projectName};
                |               renku:projectPath ${v.projectPath};
                |               renku:projectVisibility ${v.visibility};
-               |               schema:dateCreated ${v.dateCreated}.
+               |               schema:dateCreated ${v.date}.
                |
                |      Optional {
-               |        ${v.projectId} schema:creator ?creator.
+               |        ?projectId schema:creator ?creator.
                |        Graph ${GraphClass.Persons.id} {
-               |          ?creator schema:name ${v.creatorName}
+               |          ?creator schema:name ${v.creatorNames}
                |        }
                |      }
                |      Optional {
-               |        ${v.projectId}  schema:description ${v.description}
+               |        ?projectId schema:description ${v.description}
                |      }
                |      Optional {
-               |        ${v.projectId} schema:keywords ?keyword
+               |        ?projectId schema:keywords ?keyword
                |      }
                |      Optional {
-               |        ${v.projectId} schema:image ?imageId.
+               |        ?projectId schema:image ?imageId.
                |        ?imageId schema:position ?imagePosition;
                |                 schema:contentUrl ?imageUrl.
                |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)

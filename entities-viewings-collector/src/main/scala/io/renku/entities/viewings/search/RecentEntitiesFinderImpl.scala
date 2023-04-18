@@ -54,9 +54,9 @@ private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Lo
       .fold(Async[F].raiseError(_), _.pure[F])
 
   def makeQuery(criteria: Criteria): SparqlQuery =
-    combineQuery(criteria.limit, List(ProjectQuery, DatasetQuery).flatMap(_.apply(criteria)))
+    combineQuery(List(ProjectQuery, DatasetQuery).flatMap(_.apply(criteria)))
 
-  private def combineQuery(limit: Int, qs: List[SparqlQuery]): SparqlQuery =
+  private def combineQuery(qs: List[SparqlQuery]): SparqlQuery =
     SparqlQuery.of(
       "recent entity search - complete query",
       qs.flatMap(_.prefixes).toSet, {
@@ -71,8 +71,6 @@ private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Lo
                 |  $bodies
                 |}
                 |ORDER BY DESC(${Variables.viewedDate}) 
-                |
-                |### LIMIT $limit
                 |""".stripMargin
       }
     )
@@ -81,8 +79,8 @@ private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Lo
     import io.renku.triplesstore.ResultsDecoder._
 
     extract[EntityType]("entityType") >>= {
-      case EntityType.Dataset => Variables.datasetDecoder.tryDecode(cursor)
-      case EntityType.Project => Variables.projectDecoder.tryDecode(cursor)
+      case EntityType.Dataset => Variables.Dataset.datasetDecoder.tryDecode(cursor)
+      case EntityType.Project => Variables.Project.projectDecoder.tryDecode(cursor)
     }
   }
 }

@@ -87,7 +87,8 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
     val criteria = Criteria(Set(EntityType.Project), AuthUser(person.maybeGitLabId.get, token), 1)
     val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
 
-    result.pagingInfo.total.value shouldBe 1
+    result.results.size         shouldBe 1
+    result.pagingInfo.total.value should (be >= 1)
     result.results.head shouldMatchTo
       SearchEntity.Project(
         matchingScore = MatchingScore(1f),
