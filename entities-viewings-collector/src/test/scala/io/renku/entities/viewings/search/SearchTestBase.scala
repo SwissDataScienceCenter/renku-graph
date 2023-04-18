@@ -20,6 +20,7 @@ package io.renku.entities.viewings.search
 
 import cats.effect.IO
 import cats.syntax.all._
+import com.softwaremill.diffx.Diff
 import io.circe.Decoder
 import io.renku.entities.search.FinderSpecOps
 import io.renku.entities.search.diff.SearchDiffInstances
@@ -27,6 +28,7 @@ import io.renku.entities.search.model.{Entity => SearchEntity}
 import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.entities.viewings.collector.datasets.EventUploader
 import io.renku.entities.viewings.collector.projects.viewed.EventPersister
+import io.renku.entities.viewings.search.RecentEntitiesFinder.EntityType
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.{Person => TestPerson}
@@ -94,4 +96,7 @@ abstract class SearchTestBase
     _.downField("results")
       .downField("bindings")
       .as(Decoder.decodeList[SearchEntity.Dataset](Variables.Dataset.decoder))
+
+  implicit val searchCriteriaEntityTypeDiff: Diff[EntityType] =
+    Diff.diffForString.contramap(_.name)
 }

@@ -28,7 +28,7 @@ import io.renku.triplesstore.ResultsDecoder.read
 import io.renku.triplesstore.client.sparql.VarName
 
 /** Top level variables returned from the query */
-private object Variables {
+object Variables {
 
   val viewedDate = VarName("viewedDate")
 
@@ -48,7 +48,7 @@ private object Variables {
     val images            = VarName("images")
     val projectPath       = VarName("projectPath")
     val projectVisibility = VarName("projectVisibility")
-    val viewedDate        = Variables.viewedDate
+    lazy val viewedDate   = Variables.viewedDate
 
     lazy val all: List[VarName] = List(
       matchingScore,
@@ -104,17 +104,17 @@ private object Variables {
 
   object Project {
 
-    val matchingScore = VarName("matchingScore")
-    val entityType    = VarName("entityType")
-    val projectName   = VarName("projectName")
-    val projectPath   = VarName("projectPath")
-    val visibility    = VarName("visibility")
-    val creatorNames  = VarName("creatorNames")
-    val date          = VarName("date")
-    val description   = VarName("description")
-    val keywords      = VarName("keywords")
-    val images        = VarName("images")
-    val viewedDate    = Variables.viewedDate
+    val matchingScore   = VarName("matchingScore")
+    val entityType      = VarName("entityType")
+    val projectName     = VarName("projectName")
+    val projectPath     = VarName("projectPath")
+    val visibility      = VarName("visibility")
+    val creatorNames    = VarName("creatorNames")
+    val date            = VarName("date")
+    val description     = VarName("description")
+    val keywords        = VarName("keywords")
+    val images          = VarName("images")
+    lazy val viewedDate = Variables.viewedDate
 
     lazy val all: List[VarName] = List(
       matchingScore,

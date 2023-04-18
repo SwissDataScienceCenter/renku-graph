@@ -27,13 +27,12 @@ import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax.FragmentStringContext
 
 object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
-  private[this] val v = Variables
+  private[this] val v = Variables.Dataset
 
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Dataset))(makeQuery(criteria))
 
-  def makeQuery(criteria: Criteria): SparqlQuery = {
-    val v = Variables.Dataset
+  def makeQuery(criteria: Criteria): SparqlQuery =
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
@@ -124,6 +123,5 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |  }
         """.stripMargin
     )
-  }
 
 }
