@@ -32,9 +32,6 @@ private object Variables {
 
   val viewedDate = VarName("viewedDate")
 
-  val all: List[VarName] =
-    (Project.all.toSet ++ Dataset.all.toSet).toList
-
   object Dataset {
 
     val matchingScore     = VarName("matchingScore")
@@ -53,7 +50,7 @@ private object Variables {
     val projectVisibility = VarName("projectVisibility")
     val viewedDate        = Variables.viewedDate
 
-    val all: List[VarName] = List(
+    lazy val all: List[VarName] = List(
       matchingScore,
       entityType,
       datasetName,
@@ -71,7 +68,7 @@ private object Variables {
       viewedDate
     )
 
-    def datasetDecoder: Decoder[SearchEntity.Dataset] = { implicit cursor =>
+    def decoder: Decoder[SearchEntity.Dataset] = { implicit cursor =>
       for {
         matchingScore      <- read[MatchingScore](matchingScore)
         name               <- read[datasets.Name](datasetName)
@@ -94,13 +91,13 @@ private object Variables {
         matchingScore,
         sameAs,
         name,
-        projectVisibility,
+        visibility,
         date,
         creators,
         keywords,
         maybeDesc,
         images,
-        projectPath
+        path
       )
     }
   }
@@ -119,7 +116,7 @@ private object Variables {
     val images        = VarName("images")
     val viewedDate    = Variables.viewedDate
 
-    val all: List[VarName] = List(
+    lazy val all: List[VarName] = List(
       matchingScore,
       entityType,
       projectName,
@@ -133,7 +130,7 @@ private object Variables {
       images
     )
 
-    def projectDecoder: Decoder[SearchEntity.Project] = { implicit cursor =>
+    def decoder: Decoder[SearchEntity.Project] = { implicit cursor =>
       for {
         matchingScore    <- read[MatchingScore](matchingScore)
         name             <- read[projects.Name](projectName)
@@ -158,4 +155,7 @@ private object Variables {
       )
     }
   }
+
+  val all: List[VarName] =
+    (Project.all.toSet ++ Dataset.all.toSet).toList
 }

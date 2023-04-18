@@ -50,7 +50,7 @@ abstract class SearchTestBase
     with should.Matchers
     with EntitiesGenerators
     with FinderSpecOps
-    with ExternalJenaForSpec
+    with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDataset
     with AdditionalMatchers
@@ -86,5 +86,12 @@ abstract class SearchTestBase
     println(q.toString.split('\n').zipWithIndex.map(t => f"${t._2}%2d ${t._1}").mkString("\n"))
 
   def projectDecoder: Decoder[List[SearchEntity.Project]] =
-    _.downField("results").downField("bindings").as(Decoder.decodeList[SearchEntity.Project](Variables.projectDecoder))
+    _.downField("results")
+      .downField("bindings")
+      .as(Decoder.decodeList[SearchEntity.Project](Variables.Project.decoder))
+
+  def datasetDecoder: Decoder[List[SearchEntity.Dataset]] =
+    _.downField("results")
+      .downField("bindings")
+      .as(Decoder.decodeList[SearchEntity.Dataset](Variables.Dataset.decoder))
 }

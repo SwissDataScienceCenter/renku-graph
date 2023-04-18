@@ -79,8 +79,8 @@ private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Lo
     import io.renku.triplesstore.ResultsDecoder._
 
     extract[EntityType]("entityType") >>= {
-      case EntityType.Dataset => Variables.Dataset.datasetDecoder.tryDecode(cursor)
-      case EntityType.Project => Variables.Project.projectDecoder.tryDecode(cursor)
+      case EntityType.Dataset => Variables.Dataset.decoder.tryDecode(cursor)
+      case EntityType.Project => Variables.Project.decoder.tryDecode(cursor)
     }
   }
 }

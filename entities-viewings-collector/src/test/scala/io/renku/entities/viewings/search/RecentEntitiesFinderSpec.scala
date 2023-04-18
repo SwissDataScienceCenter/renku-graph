@@ -19,6 +19,7 @@
 package io.renku.entities.viewings.search
 
 import cats.effect.IO
+import io.renku.graph.model.entities
 import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
 import io.renku.generators.Generators.Implicits._
@@ -28,7 +29,51 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class RecentEntitiesFinderSpec extends SearchTestBase {
-  val finder = new RecentEntitiesFinderImpl[IO](projectsDSConnectionInfo)
+  def finder = new RecentEntitiesFinderImpl[IO](projectsDSConnectionInfo)
+
+  it should "datasets and projects in one result" in {
+    val project1 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+    val project2 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+
+    val dataset1 = project1.to[entities.RenkuProject.WithoutParent].datasets.head
+    val dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
+
+    val person = personGen.generateOne
+
+    upload(projectsDataset, person)
+    provisionTestProjects(project1, project2).unsafeRunSync()
+
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeDatasetViewed(person.maybeGitLabId.get,
+                       Instant.now().minus(2, ChronoUnit.DAYS),
+                       dataset1.identification.identifier
+    )
+    storeProjectViewed(person.maybeGitLabId.get, Instant.now().minus(3, ChronoUnit.DAYS), project2.path)
+    storeDatasetViewed(person.maybeGitLabId.get,
+                       Instant.now().minus(4, ChronoUnit.DAYS),
+                       dataset2.identification.identifier
+    )
+
+    val criteria = Criteria(Set(EntityType.Project, EntityType.Dataset), AuthUser(person.maybeGitLabId.get, token), 5)
+    val result   = finder.findRecentlyViewedEntities(criteria).unsafeRunSync()
+
+    result.pagingInfo.total.value shouldBe 4
+    result.results.collect {
+      case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.value
+      case e: SearchEntity.Project => EntityType.Project -> e.path.value
+    }.toList shouldBe List(
+      EntityType.Project -> project1.path.value,
+      EntityType.Dataset -> dataset1.provenance.topmostSameAs.value,
+      EntityType.Project -> project2.path.value,
+      EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
+    )
+  }
 
   it should "return projects in most recently viewed order" in {
     val project1 = renkuProjectEntities(visibilityPublic)

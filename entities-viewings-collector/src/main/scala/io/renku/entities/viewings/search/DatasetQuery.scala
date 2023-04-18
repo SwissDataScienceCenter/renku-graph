@@ -20,7 +20,8 @@ package io.renku.entities.viewings.search
 
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.search.RecentEntitiesFinder.{Criteria, EntityType}
-import io.renku.graph.model.Schemas
+import io.renku.graph.model.entities.Person
+import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax.FragmentStringContext
@@ -31,111 +32,98 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
   def apply(criteria: Criteria): Option[SparqlQuery] =
     Option.when(criteria.forType(EntityType.Dataset))(makeQuery(criteria))
 
-  def makeQuery(criteria: Criteria): SparqlQuery =
+  def makeQuery(criteria: Criteria): SparqlQuery = {
+    val v = Variables.Dataset
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
       sparql"""|SELECT
-               |  ?matchingScore
-               |  ?entityType
-               |  ?datasetName
-               |  ?datasetSameAs
-               |  ?maybeDateCreated
-               |  ?maybeDatePublished
-               |  ?maybeDateModified
-               |  ?date
-               |  ?creatorNames
-               |  ?description
-               |  ?keywords
-               |  ?images
-               |  ?projectPath
-               |  ?projectVisibility
-               |  ?dateViewed
+               |  ${v.all}
                |
                |  WHERE {
-               |    Bind(1.0 AS ?matchingScore)
-               |    Bind('dataset' as ?entityType)
+               |    Bind(1.0 AS ${v.matchingScore})
+               |    Bind('dataset' as ${v.entityType})
                |
-               |    Graph renku:PersonViewing {
+               |    Graph ${GraphClass.PersonViewings.id} {
                |      ?personId a renku:PersonViewing;
                |                renku:viewedDataset ?viewedDataset.
                |
                |      ?viewedDataset renku:dataset ?datasetId;
-               |                     renku:dateViewed ?dateViewed
+               |                     renku:dateViewed ${v.viewedDate}
                |    }
                |
-               |    Graph schema:Person {
+               |    Graph ${GraphClass.Persons.id} {
                |      ?personId a schema:Person;
                |                schema:sameAs ?personSameAs.
-               |      ?personSameAs schema:additionalType 'GitLab';
-               |                    schema:identifier 5624782.
+               |      ?personSameAs schema:additionalType ${Person.gitLabSameAsAdditionalType};
+               |                    schema:identifier ${criteria.authUser.id.value}.
                |    }
                |
                |    {
                |      SELECT
-               |        ?datasetSameAs
+               |        ${v.datasetSameAs}
                |        ?projectId
-               |        ?datasetId
-               |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorNames)
-               |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-               |        (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
+               |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ${v.creatorNames})
+               |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
+               |        (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ${v.images})
                |      WHERE {
                |        Graph schema:Dataset {
-               |          ?datasetSameAs a renku:DiscoverableDataset;
+               |          ${v.datasetSameAs} a renku:DiscoverableDataset;
                |                         renku:datasetProjectLink ?projectLink.
                |
                |          ?projectLink renku:dataset ?datasetId;
                |                       renku:project ?projectId.
                |
                |          Optional {
-               |            ?datasetSameAs schema:image ?imageId.
+               |            ${v.datasetSameAs} schema:image ?imageId.
                |            ?imageId schema:position ?imagePosition;
-               |                     schema:imageUrl ?imageUrl.
+               |                     schema:contentUrl ?imageUrl.
                |            BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
                |          }
                |
                |          Optional {
-               |            ?datasetSameAs schema:creator / schema:name ?creatorName.
+               |            ${v.datasetSameAs} schema:creator / schema:name ?creatorName.
                |          }
                |          Optional {
-               |            ?datasetSameAs schema:keywords ?keyword
+               |            ${v.datasetSameAs} schema:keywords ?keyword
                |          }
                |        }
                |      }
-               |      GROUP BY ?datasetSameAs ?projectId ?datasetId
+               |      GROUP BY ${v.datasetSameAs} ?projectId
                |    }
                |
                |    Graph schema:Dataset {
-               |      ?datasetSameAs renku:slug ?datasetName.
+               |      ${v.datasetSameAs} renku:slug ${v.datasetName}.
                |
                |      Optional {
-               |        ?datasetSameAs schema:description ?description.
+               |        ${v.datasetSameAs} schema:description ${v.description}.
                |      }
                |
                |      Optional {
-               |        ?datasetSameAs schema:dateCreated ?maybeDateCreated.
-               |        BIND(xsd:date(substr(str(?maybeDateCreated), 1, 10)) AS ?createdAt)
+               |        ${v.datasetSameAs} schema:dateCreated ${v.dateCreated}.
+               |        BIND(xsd:date(substr(str(${v.dateCreated}), 1, 10)) AS ?createdAt)
                |      }
                |      Optional {
-               |        ?datasetSameAs schema:datePublished ?maybeDatePublished.
-               |        BIND(xsd:date(?maybeDatePublished) AS ?publishedAt)
+               |        ${v.datasetSameAs} schema:datePublished ${v.datePublished}.
+               |        BIND(xsd:date(${v.datePublished}) AS ?publishedAt)
                |      }
                |      Optional {
-               |        ?datasetSameAs schema:dateModified ?maybeDateModified.
-               |        BIND(xsd:date(substr(str(?maybeDateModified),1,10)) AS ?modifiedAt)
+               |        ${v.datasetSameAs} schema:dateModified ${v.dateModified}.
+               |        BIND(xsd:date(substr(str(${v.dateModified}),1,10)) AS ?modifiedAt)
                |      }
                |      BIND(IF (BOUND(?modifiedAt), ?modifiedAt,
-               |               IF (BOUND(?createdAt), ?createdAt, ?publishedAt)) AS ?date
+               |               IF (BOUND(?createdAt), ?createdAt, ?publishedAt)) AS ${v.date}
                |           )
                |    }
                |
                |    Graph ?projectId {
                |      ?projectId a schema:Project;
-               |                 renku:projectPath ?projectPath;
-               |                 renku:projectVisibility ?projectVisibility.
+               |                 renku:projectPath ${v.projectPath};
+               |                 renku:projectVisibility ${v.projectVisibility}.
                |    }
                |  }
         """.stripMargin
     )
+  }
 
 }
