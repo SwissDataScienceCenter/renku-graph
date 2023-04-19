@@ -70,7 +70,7 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
       EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
     )
 
-    // result.pagingInfo.total.value shouldBe 4
+    result.pagingInfo.total.value shouldBe 4
 
     result.results
       .collect {

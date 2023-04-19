@@ -36,7 +36,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
-      sparql"""|SELECT
+      sparql"""|SELECT DISTINCT
                |  ${v.all}
                |
                |  WHERE {
@@ -50,7 +50,14 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |      ?viewedDataset renku:dataset ?datasetId;
                |                     renku:dateViewed ${v.viewedDate}
                |    }
+               |    Graph schema:Dataset {
+               |      ${v.datasetSameAs} a renku:DiscoverableDataset;
+               |                         renku:datasetProjectLink ?projectLink.
                |
+               |      ?projectLink renku:dataset ?datasetId;
+               |                    renku:project ?projectId.
+               |    }
+               |    
                |    Graph ${GraphClass.Persons.id} {
                |      ?personId a schema:Person;
                |                schema:sameAs ?personSameAs.
@@ -59,19 +66,14 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |    }
                |
                |    {
-               |      SELECT
+               |      SELECT DISTINCT
                |        ${v.datasetSameAs}
-               |        ?projectId
                |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ${v.creatorNames})
                |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
                |        (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ${v.images})
                |      WHERE {
                |        Graph schema:Dataset {
                |          ${v.datasetSameAs} a renku:DiscoverableDataset;
-               |                         renku:datasetProjectLink ?projectLink.
-               |
-               |          ?projectLink renku:dataset ?datasetId;
-               |                       renku:project ?projectId.
                |
                |          Optional {
                |            ${v.datasetSameAs} schema:image ?imageId.
@@ -88,7 +90,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |          }
                |        }
                |      }
-               |      GROUP BY ${v.datasetSameAs} ?projectId
+               |      GROUP BY ${v.datasetSameAs}
                |    }
                |
                |    Graph schema:Dataset {

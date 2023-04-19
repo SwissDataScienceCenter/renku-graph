@@ -65,7 +65,7 @@ private[search] class RecentEntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Lo
           .map(Fragment.apply)
           .foldSmash(Fragment("{"), Fragment("} UNION {"), Fragment("}"))
 
-        sparql"""SELECT
+        sparql"""SELECT DISTINCT
                 | ${Variables.all}
                 |WHERE {
                 |  $bodies

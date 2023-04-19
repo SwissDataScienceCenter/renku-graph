@@ -52,7 +52,7 @@ abstract class SearchTestBase
     with should.Matchers
     with EntitiesGenerators
     with FinderSpecOps
-    with InMemoryJenaForSpec
+    with ExternalJenaForSpec
     with ProjectsDataset
     with SearchInfoDataset
     with AdditionalMatchers

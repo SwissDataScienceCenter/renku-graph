@@ -25,8 +25,40 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.security.model.AuthUser
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 class DatasetQuerySpec extends SearchTestBase {
+
+  it should "return multiple datasets" in {
+    val project1 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+    val project2 = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+
+    val dataset1 = project1.to[entities.RenkuProject.WithoutParent].datasets.head
+    val dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
+
+    val person = personGen.generateOne
+    val userId = person.maybeGitLabId.get
+
+    upload(projectsDataset, person)
+    provisionTestProjects(project1, project2).unsafeRunSync()
+
+    storeProjectViewed(userId, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeDatasetViewed(userId, Instant.now().minus(2, ChronoUnit.DAYS), dataset1.identification.identifier)
+    storeProjectViewed(userId, Instant.now().minus(3, ChronoUnit.DAYS), project2.path)
+    storeDatasetViewed(userId, Instant.now().minus(4, ChronoUnit.DAYS), dataset2.identification.identifier)
+
+    val query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+
+    val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
+
+    decoded.size shouldBe 2
+  }
 
   it should "find and decode datasets" in {
     val project = renkuProjectEntities(visibilityPublic)
@@ -62,7 +94,7 @@ class DatasetQuerySpec extends SearchTestBase {
       )
   }
 
-  it should "return datasets for the given user onyl" in {
+  it should "return datasets for the given user only" in {
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
