@@ -25,6 +25,8 @@ import io.renku.config.renku
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
 import io.renku.knowledgegraph.entities.ModelEncoders._
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
@@ -37,16 +39,26 @@ trait Endpoint[F[_]] {
 }
 
 object Endpoint {
+  def create[F[_]: Async: Logger](
+      renkuApiUrl: renku.ApiUrl,
+      gitLabUrl:   GitLabUrl,
+      finder:      RecentEntitiesFinder[F]
+  ): Endpoint[F] =
+    new Impl[F](finder)(Async[F], Logger[F], renkuApiUrl, gitLabUrl)
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      finder: RecentEntitiesFinder[F]
+  ): F[Endpoint[F]] = for {
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl()
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+  } yield new Impl[F](finder)
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
-  ): F[Endpoint[F]] = for {
-    entitiesFinder                       <- RecentEntitiesFinder[F](connectionConfig)
-    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl()
-    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
-  } yield new Impl[F](entitiesFinder)
+  ): F[Endpoint[F]] =
+    RecentEntitiesFinder[F](connectionConfig).flatMap(apply(_))
 
-  private class Impl[F[_]: Async](finder: RecentEntitiesFinder[F])(implicit
+  private class Impl[F[_]: Async: Logger](finder: RecentEntitiesFinder[F])(implicit
       renkuApiUrl:  renku.ApiUrl,
       gitLabApiUrl: GitLabUrl
   ) extends Endpoint[F]
@@ -56,5 +68,9 @@ object Endpoint {
       finder
         .findRecentlyViewedEntities(criteria)
         .flatMap(r => Ok(r.results))
+        .recoverWith(ex =>
+          Logger[F].error(ex)("Recent entity search failed!") *>
+            InternalServerError(ErrorMessage("Recent entity search failed!"))
+        )
   }
 }

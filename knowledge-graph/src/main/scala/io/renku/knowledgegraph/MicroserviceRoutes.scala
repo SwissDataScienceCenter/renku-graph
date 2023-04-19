@@ -24,6 +24,7 @@ import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import cats.Parallel
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
+import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
@@ -41,8 +42,9 @@ import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
+import io.renku.knowledgegraph.entities.QueryParamDecoders._
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
@@ -57,6 +59,7 @@ private class MicroserviceRoutes[F[_]: Async](
     projectDetailsEndpoint:     projects.details.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
+    recentEntitiesEndpoint:     entities.currentuser.recentlyviewed.Endpoint[F],
     lineageEndpoint:            projects.files.lineage.Endpoint[F],
     docsEndpoint:               docs.Endpoint[F],
     usersProjectsEndpoint:      users.projects.Endpoint[F],
@@ -87,8 +90,23 @@ private class MicroserviceRoutes[F[_]: Async](
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
-    `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*`
+    `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*` <+> getRecentEntities
   }
+
+  private lazy val getRecentEntities: AuthedRoutes[MaybeAuthUser, F] =
+    AuthedRoutes.of {
+      case GET -> Root / "knowledge-graph" / "current-user" / "recently-viewed" :?
+          recentlyViewedEntityTypes(types) +& LimitQueryParam(limit) as maybeUser =>
+        val validatedUser = maybeUser.toValidNel(ParseFailure("Not authenticated!", ""))
+        val defaultLimit  = Validated.validNel[ParseFailure, Int](10)
+        val response =
+          (validatedUser, types, limit.getOrElse(defaultLimit)).mapN { (user, ets, count) =>
+            val criteria = RecentEntitiesFinder.Criteria(ets.toSet, user, count)
+            recentEntitiesEndpoint.getRecentlyViewedEntities(criteria)
+          }
+        response.fold(toBadRequest, identity)
+    }
+
 
   private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] = {
     import datasets.Endpoint.Query.query
@@ -298,27 +316,31 @@ private class MicroserviceRoutes[F[_]: Async](
 
 private object MicroserviceRoutes {
 
-  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[MicroserviceRoutes[F]] = for {
+  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      projectConnConfig: ProjectsConnectionConfig
+  ): F[MicroserviceRoutes[F]] = for {
     implicit0(gv: GitLabClient[F])       <- GitLabClient[F]()
     implicit0(atf: AccessTokenFinder[F]) <- AccessTokenFinder[F]()
     implicit0(ru: RenkuUrl)              <- RenkuUrlLoader[F]()
-    datasetsSearchEndpoint               <- datasets.Endpoint[F]
-    datasetDetailsEndpoint               <- datasets.details.Endpoint[F]
-    entitiesEndpoint                     <- entities.Endpoint[F]
-    ontologyEndpoint                     <- ontology.Endpoint[F]
-    projectDeleteEndpoint                <- projects.delete.Endpoint[F]
-    projectDetailsEndpoint               <- projects.details.Endpoint[F]
-    projectDatasetsEndpoint              <- projects.datasets.Endpoint[F]
-    projectDatasetTagsEndpoint           <- projects.datasets.tags.Endpoint[F]
-    lineageEndpoint                      <- projects.files.lineage.Endpoint[F]
-    docsEndpoint                         <- docs.Endpoint[F]
-    usersProjectsEndpoint                <- users.projects.Endpoint[F]
-    authenticator                        <- GitLabAuthenticator[F]
-    authMiddleware                       <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer                <- Authorizer.using(ProjectPathRecordsFinder[F])
-    datasetIdAuthorizer                  <- Authorizer.using(DatasetIdRecordsFinder[F])
-    datasetSameAsAuthorizer              <- Authorizer.using(DatasetSameAsRecordsFinder[F])
-    versionRoutes                        <- version.Routes[F]
+
+    datasetsSearchEndpoint     <- datasets.Endpoint[F]
+    datasetDetailsEndpoint     <- datasets.details.Endpoint[F]
+    entitiesEndpoint           <- entities.Endpoint[F]
+    recentEntitiesEndpoint     <- entities.currentuser.recentlyviewed.Endpoint[F](projectConnConfig)
+    ontologyEndpoint           <- ontology.Endpoint[F]
+    projectDeleteEndpoint      <- projects.delete.Endpoint[F]
+    projectDetailsEndpoint     <- projects.details.Endpoint[F]
+    projectDatasetsEndpoint    <- projects.datasets.Endpoint[F]
+    projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[F]
+    lineageEndpoint            <- projects.files.lineage.Endpoint[F]
+    docsEndpoint               <- docs.Endpoint[F]
+    usersProjectsEndpoint      <- users.projects.Endpoint[F]
+    authenticator              <- GitLabAuthenticator[F]
+    authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+    projectPathAuthorizer      <- Authorizer.using(ProjectPathRecordsFinder[F])
+    datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[F])
+    datasetSameAsAuthorizer    <- Authorizer.using(DatasetSameAsRecordsFinder[F])
+    versionRoutes              <- version.Routes[F]
   } yield new MicroserviceRoutes(
     datasetsSearchEndpoint,
     datasetDetailsEndpoint,
@@ -328,6 +350,7 @@ private object MicroserviceRoutes {
     projectDetailsEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,
+    recentEntitiesEndpoint,
     lineageEndpoint,
     docsEndpoint,
     usersProjectsEndpoint,

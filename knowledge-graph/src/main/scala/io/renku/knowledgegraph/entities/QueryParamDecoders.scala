@@ -18,9 +18,12 @@
 
 package io.renku.knowledgegraph.entities
 
+import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.entities.search.Criteria
+import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.model._
+import io.renku.http.rest.paging.model.PerPage
 import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue}
 
@@ -43,6 +46,37 @@ object QueryParamDecoders {
 
   object entityTypes extends OptionalMultiQueryParamDecoderMatcher[EntityType]("type") {
     val parameterName: String = "type"
+  }
+
+  private implicit val recentlyViewedEntityTypesParamDecoder: QueryParamDecoder[RecentEntitiesFinder.EntityType] =
+    (value: QueryParameterValue) =>
+      RecentEntitiesFinder.EntityType
+        .fromString(value.value)
+        .leftMap(_ => parsingFailure(entityTypes.parameterName))
+        .toValidatedNel
+
+  object recentlyViewedEntityTypes
+      extends OptionalMultiQueryParamDecoderMatcher[RecentEntitiesFinder.EntityType]("type") {}
+
+  object LimitQueryParam {
+    def unapply(
+        params: Map[String, collection.Seq[String]]
+    ): Some[Option[ValidatedNel[ParseFailure, Int]]] =
+      Some {
+        params
+          .get("limit")
+          .flatMap(_.headOption)
+          .fold[Option[ValidatedNel[ParseFailure, Int]]](None) { s =>
+            Some(QueryParamDecoder[Int].decode(QueryParameterValue(s)))
+              .map(_.andThen {
+                case n if n <= 0 => Validated.invalidNel(ParseFailure(s"Invalid limit value: $n", ""))
+                case n if n > PerPage.max.value =>
+                  Validated.invalidNel(ParseFailure(s"Invalid (too large) limit value: $n", ""))
+                case n => Validated.validNel(n)
+              })
+          }
+
+      }
   }
 
   private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =

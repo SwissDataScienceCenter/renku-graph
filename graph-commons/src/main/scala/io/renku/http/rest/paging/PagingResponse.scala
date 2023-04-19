@@ -42,6 +42,25 @@ object PagingResponse {
   def empty[Result](pagingRequest: PagingRequest): PagingResponse[Result] =
     new PagingResponse[Result](Nil, new PagingInfo(pagingRequest, Total(0)))
 
+  def apply[Result](
+      results:       List[Result],
+      pagingRequest: PagingRequest
+  ): PagingResponse[Result] = {
+    val total = Total(results.size)
+    create(results, pagingRequest, total)
+  }
+
+  def apply[Result](
+      results:       List[Result],
+      pagingRequest: PagingRequest,
+      total:         Total
+  ): Either[String, PagingResponse[Result]] =
+    if (results.size > pagingRequest.perPage.value)
+      Left(
+        s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
+      )
+    else create(results, pagingRequest, total).asRight
+
   def from[F[_]: MonadThrow, Result](
       results:       List[Result],
       pagingRequest: PagingRequest
@@ -63,20 +82,25 @@ object PagingResponse {
       results:       List[Result],
       pagingRequest: PagingRequest,
       total:         Total
-  ): F[PagingResponse[Result]] = {
+  ): F[PagingResponse[Result]] =
+    apply(results, pagingRequest, total).fold(
+      err => new IllegalArgumentException(err).raiseError[F, PagingResponse[Result]],
+      _.pure[F]
+    )
 
-    import pagingRequest._
-
-    if (results.size > perPage.value)
-      new IllegalArgumentException(
-        s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
-      ).raiseError[F, PagingResponse[Result]]
-    else if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size > total.value))
-      new PagingResponse[Result](results,
-                                 new PagingInfo(pagingRequest, Total((page.value - 1) * perPage.value + results.size))
-      ).pure[F]
+  private def create[Result](
+      results:       List[Result],
+      pagingRequest: PagingRequest,
+      total:         Total
+  ): PagingResponse[Result] = {
+    val (page, perPage) = (pagingRequest.page, pagingRequest.perPage)
+    if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size > total.value))
+      new PagingResponse[Result](
+        results,
+        new PagingInfo(pagingRequest, Total((page.value - 1) * perPage.value + results.size))
+      )
     else
-      new PagingResponse[Result](results, new PagingInfo(pagingRequest, total)).pure[F]
+      new PagingResponse[Result](results, new PagingInfo(pagingRequest, total))
   }
 
   final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {

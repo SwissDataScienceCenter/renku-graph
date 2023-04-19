@@ -40,7 +40,7 @@ import java.time.Instant
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
-    apiUrl <- renku.ApiUrl[F]()
+    apiUrl    <- renku.ApiUrl[F]()
   } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
