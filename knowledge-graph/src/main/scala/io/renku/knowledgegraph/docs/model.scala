@@ -257,6 +257,9 @@ object model {
 
     def `application/json`[P](exampleName: String, example: P)(implicit encoder: Encoder[P]): MediaType =
       MediaType("application/json", Map(exampleName -> JsonExample(encoder(example))))
+
+    def `application/json`: MediaType =
+      MediaType("application/json", Map.empty)
   }
 
   final case class Response(
