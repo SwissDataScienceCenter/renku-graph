@@ -42,8 +42,7 @@ class CapacityFinderSpec extends AnyWordSpec with should.Matchers with CapacityF
       createEvent(EventStatus.GeneratingTriples)
       createEvent(Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
 
-      val finder = CapacityFinder
-        .queryBased[IO](s"SELECT COUNT(event_id) FROM event WHERE status='${EventStatus.GeneratingTriples.value}'")
+      val finder = CapacityFinder.ofStatus[IO](EventStatus.GeneratingTriples)
 
       finder.findUsedCapacity.unsafeRunSync() shouldBe UsedCapacity(1)
 
