@@ -36,7 +36,7 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
     SparqlQuery.of(
       name = "recent-entity projects",
       Prefixes.of(Schemas.prov -> "prov", Schemas.renku -> "renku", Schemas.schema -> "schema", Schemas.xsd -> "xsd"),
-      sparql"""|SELECT
+      sparql"""|SELECT DISTINCT
                |  ${v.all.dropRight(2)}
                |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
                |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ${v.images})

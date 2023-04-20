@@ -27,6 +27,39 @@ import java.time.Instant
 
 class ProjectQuerySpec extends SearchTestBase {
 
+  it should "return one project entry if viewed multiple times" in {
+    val project = renkuProjectEntities(visibilityPublic)
+      .withActivities(activityEntities(stepPlanEntities()))
+      .withDatasets(datasetEntities(provenanceNonModified))
+      .generateOne
+
+    val person = personGen.generateOne
+    upload(projectsDataset, person)
+
+    val userId = person.maybeGitLabId.get
+
+    provisionTestProjects(project).unsafeRunSync()
+    storeProjectViewed(userId, Instant.now().minusSeconds(60), project.path)
+    storeProjectViewed(userId, Instant.now().minusSeconds(30), project.path)
+    storeProjectViewed(userId, Instant.now(), project.path)
+
+    val query = ProjectQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
+
+    val decoded = tsClient.queryExpecting[List[SearchEntity.Project]](query)(projectDecoder).unsafeRunSync()
+    decoded.head shouldMatchTo
+      SearchEntity.Project(
+        matchingScore = MatchingScore(1f),
+        path = project.path,
+        name = project.name,
+        visibility = project.visibility,
+        date = project.dateCreated,
+        maybeCreator = project.maybeCreator.map(_.name),
+        keywords = project.keywords.toList.sorted,
+        maybeDescription = project.maybeDescription,
+        images = project.images
+      )
+  }
+
   it should "find and decode projects" in {
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
