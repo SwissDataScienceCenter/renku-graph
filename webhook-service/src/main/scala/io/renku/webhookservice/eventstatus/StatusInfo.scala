@@ -23,6 +23,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
 import EventStatus._
+import io.renku.graph.model.events.EventStatusProgress.Stage
 
 private sealed trait StatusInfo {
   val activated: Boolean
@@ -48,7 +49,7 @@ private object StatusInfo {
       "activated": ${info.activated},
       "progress": {
         "done":       ${progress.statusProgress.stage.value},
-        "total":      ${progress.finalStage.value},
+        "total":      ${Stage.Final.value},
         "percentage": ${progress.statusProgress.completion.value}
       },
       "details": {
@@ -60,16 +61,14 @@ private object StatusInfo {
       "activated": ${info.activated},
       "progress": {
          "done":       0,
-         "total":      ${info.progress.finalStage.value},
+         "total":      ${Stage.Final.value},
          "percentage": 0.00
        }
     }"""
   }
 }
 
-private sealed trait Progress extends Product with Serializable {
-  lazy val finalStage: EventStatusProgress.Stage = EventStatusProgress.Stage.Final
-}
+private sealed trait Progress extends Product
 
 private object Progress {
 
