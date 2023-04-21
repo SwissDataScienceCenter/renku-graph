@@ -43,11 +43,8 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     "User recent entities search",
     "Finds recent projects and datasets of the user with the given userId".some,
     GET(
-      Uri / "entities" / "current-user" / "recently-viewed" :? state,
-      Status.Ok -> Response("Found entities",
-                            Contents(MediaType.`application/json`("Sample response", example)),
-                            responseHeaders
-      ),
+      Uri / "entities" / "current-user" / "recently-viewed" :? limit :? entityType,
+      Status.Ok -> Response("Found entities", Contents(MediaType.`application/json`("Sample response", example))),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
         Contents(MediaType.`application/json`("Reason", InfoMessage("Invalid parameters")))
@@ -62,26 +59,18 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     )
   )
 
-  private lazy val userId = Parameter.Path(
-    "userId",
+  private lazy val limit = Parameter.Query(
+    "limit",
     Schema.Integer,
-    "User's GitLab identifier".some
-  )
-  private lazy val state = Parameter.Query(
-    "state",
-    Schema.String,
-    "to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'".some,
+    "Limit the results by this amount. Must be > 0 and <= 200".some,
     required = false
   )
 
-  private lazy val responseHeaders = Map(
-    "Total"       -> Header("The total number of projects".some, Schema.Integer),
-    "Total-Pages" -> Header("The total number of pages".some, Schema.Integer),
-    "Per-Page"    -> Header("The number of items per page".some, Schema.Integer),
-    "Page"        -> Header("The index of the current page (starting at 1)".some, Schema.Integer),
-    "Next-Page"   -> Header("The index of the next page (optional)".some, Schema.Integer),
-    "Prev-Page"   -> Header("The index of the previous page (optional)".some, Schema.Integer),
-    "Link" -> Header("The set of prev/next/first/last link headers (prev and next are optional)".some, Schema.String)
+  private lazy val entityType = Parameter.Query(
+    "entityType",
+    Schema.String,
+    "One of 'project' or 'dataset'. Can be given multiple times. If non-existent, all types are returned.".some,
+    required = false
   )
 
   private lazy val example = Json.arr(
