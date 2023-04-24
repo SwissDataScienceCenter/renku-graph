@@ -161,12 +161,12 @@ private object NodeDetailsFinder {
                  |                                      a ?type.
                  |        OPTIONAL { ?planId renku:command ?maybeCommand. }
                  |      }
-                 |      BIND (IF(bound(?maybeCommand), CONCAT(STR(?maybeCommand), STR(' ')), '') AS ?command).
+                 |      BIND (IF(BOUND(?maybeCommand), CONCAT(STR(?maybeCommand), STR(' ')), '') AS ?command).
                  |      BIND ($activityId AS ?location)
                  |    }
                  |  } {
-                 |    SELECT ?position ?commandParameter
-                 |     WHERE {
+                 |    SELECT ?commandParameter
+                 |    WHERE {
                  |      { # inputs
                  |        GRAPH ${GraphClass.Project.id(projectId)} {
                  |          $activityId prov:qualifiedAssociation/prov:hadPlan ?planId.
@@ -174,14 +174,14 @@ private object NodeDetailsFinder {
                  |          ?paramValue a renku:ParameterValue ;
                  |                      schema:valueReference ?input .
                  |          ?paramValue schema:value ?value .
-                 |          OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
-                 |          ?input renku:position ?position.
+                 |          OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType }
+                 |          OPTIONAL { ?input renku:position ?maybePosition }
                  |          OPTIONAL { ?input renku:prefix ?maybePrefix }
                  |        }
-                 |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
+                 |        BIND (IF(BOUND(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
                  |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
-                 |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
-                 |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+                 |        BIND (IF(BOUND(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
+                 |        BIND (IF(BOUND(?maybePosition), CONCAT(?prefix, ?streamOperator, STR(?value)), '') AS ?commandParameter) .
                  |      } UNION { # outputs
                  |        GRAPH ${GraphClass.Project.id(projectId)} {
                  |          $activityId prov:qualifiedAssociation/prov:hadPlan ?planId.
@@ -189,14 +189,14 @@ private object NodeDetailsFinder {
                  |          ?paramValue a renku:ParameterValue ;
                  |                      schema:valueReference ?output .
                  |          ?paramValue schema:value ?value .
-                 |          ?output renku:position ?position.
-                 |          OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
+                 |          OPTIONAL { ?output renku:position ?maybePosition }
+                 |          OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType }
                  |          OPTIONAL { ?output renku:prefix ?maybePrefix }
                  |        }
-                 |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
+                 |        BIND (IF(BOUND(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
                  |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
-                 |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-                 |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+                 |        BIND (IF(BOUND(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+                 |        BIND (IF(BOUND(?maybePosition), CONCAT(?prefix, ?streamOperator, STR(?value)), '') AS ?commandParameter) .
                  |      } UNION { # parameters
                  |        GRAPH ${GraphClass.Project.id(projectId)} {
                  |          $activityId prov:qualifiedAssociation/prov:hadPlan ?planId.
@@ -204,16 +204,16 @@ private object NodeDetailsFinder {
                  |          ?paramValue a renku:ParameterValue;
                  |                      schema:valueReference ?parameter .
                  |          ?paramValue schema:value ?value .
-                 |          ?parameter renku:position ?position .
+                 |          OPTIONAL { ?parameter renku:position ?maybePosition }
                  |          OPTIONAL { ?parameter renku:prefix ?maybePrefix }
                  |        }
-                 |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-                 |        BIND (CONCAT(?prefix, STR(?value)) AS ?commandParameter) .
+                 |        BIND (IF(BOUND(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+                 |        BIND (IF(BOUND(?maybePosition), CONCAT(?prefix, STR(?value)), '') AS ?commandParameter) .
                  |      }
                  |    }
-                 |    GROUP BY ?position ?commandParameter
+                 |    GROUP BY ?maybePosition ?commandParameter
                  |    HAVING (COUNT(*) > 0)
-                 |    ORDER BY ?position
+                 |    ORDER BY ?maybePosition
                  |  }
                  |}
                  |GROUP BY ?command ?type ?location
