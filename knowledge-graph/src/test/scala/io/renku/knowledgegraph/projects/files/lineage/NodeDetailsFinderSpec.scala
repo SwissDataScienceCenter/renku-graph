@@ -252,7 +252,7 @@ class NodeDetailsFinderSpec
       }
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"No plan with $missingPlan"
+      exception.getMessage shouldBe s"No activity with $missingPlan"
     }
   }
 
