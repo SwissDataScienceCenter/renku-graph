@@ -22,7 +22,7 @@ import cats.effect.IO
 import io.renku.eventlog.events.producers.{CapacityFinder, CapacityFindingQuerySpec, UsedCapacity}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus
-import io.renku.graph.model.events.EventStatus.GeneratingTriples
+import io.renku.graph.model.events.EventStatus.TransformingTriples
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -31,13 +31,13 @@ class SubscriptionCategorySpec extends AnyWordSpec with should.Matchers with Cap
 
   "capacityFindingQuery" should {
 
-    s"count events in the $GeneratingTriples status" in {
+    s"count events in the $TransformingTriples status" in {
 
       createEvent(EventStatus.TransformingTriples)
-      createEvent(Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
+      createEvent(Gen.oneOf(EventStatus.all - EventStatus.TransformingTriples).generateOne)
 
       CapacityFinder
-        .queryBased[IO](SubscriptionCategory.capacityFindingQuery)
+        .ofStatus[IO](EventStatus.TransformingTriples)
         .findUsedCapacity
         .unsafeRunSync() shouldBe UsedCapacity(1)
     }

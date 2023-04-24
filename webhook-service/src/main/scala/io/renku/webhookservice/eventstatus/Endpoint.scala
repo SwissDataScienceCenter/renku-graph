@@ -25,9 +25,10 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
-import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator
@@ -39,7 +40,7 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def fetchProcessingStatus(projectId: GitLabId): F[Response[F]]
+  def fetchProcessingStatus(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
 private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
@@ -52,8 +53,8 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: GitLabId): F[Response[F]] = measureExecutionTime {
-    validateHook(projectId)
+  def fetchProcessingStatus(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = measureExecutionTime {
+    validateHook(projectId, authUser)
       .semiflatMap {
         case HookExists  => findStatus(projectId)
         case HookMissing => Ok(StatusInfo.NotActivated.asJson)
@@ -62,12 +63,13 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
       .recoverWith(internalServerError(projectId))
   } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
 
-  private def validateHook(projectId: GitLabId): EitherT[F, Response[F], HookValidationResult] = EitherT {
-    hookValidator
-      .validateHook(projectId, maybeAccessToken = None)
-      .map(_.asRight[Response[F]])
-      .recoverWith(noAccessTokenToNotFound)
-  }
+  private def validateHook(projectId: GitLabId, authUser: AuthUser): EitherT[F, Response[F], HookValidationResult] =
+    EitherT {
+      hookValidator
+        .validateHook(projectId, authUser.accessToken.some)
+        .map(_.asRight[Response[F]])
+        .recoverWith(noAccessTokenToNotFound)
+    }
 
   private lazy val noAccessTokenToNotFound: PartialFunction[Throwable, F[Either[Response[F], HookValidationResult]]] = {
     case _: NoAccessTokenException => NotFound(InfoMessage("Info about project cannot be found")).map(_.asLeft)

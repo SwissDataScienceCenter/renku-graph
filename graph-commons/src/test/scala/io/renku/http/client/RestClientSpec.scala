@@ -18,7 +18,7 @@
 
 package io.renku.http.client
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault
@@ -30,8 +30,8 @@ import io.circe.{Decoder, DecodingFailure, Json}
 import io.prometheus.client.Histogram
 import io.renku.config.ServiceUrl
 import io.renku.control.Throttler
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClientError._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
@@ -41,13 +41,14 @@ import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.TestTinyTypes.ByteArrayTestType
 import io.renku.tinytypes.contenttypes.ZippedContent
+import org.http4s.{multipart => _, _}
 import org.http4s.MediaType._
 import org.http4s.Method.{GET, POST}
 import org.http4s.circe.jsonOf
-import org.http4s.{multipart => _, _}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.OptionValues
 import org.typelevel.log4cats.Logger
 
 import java.net.ConnectException
@@ -62,7 +63,8 @@ class RestClientSpec
     with IOSpec
     with ExternalServiceStubbing
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with OptionValues {
 
   "send" should {
 
@@ -74,26 +76,26 @@ class RestClientSpec
             .willReturn(ok("1"))
         }
 
-        verifyThrottling()
-
         client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
+
+        verifyThrottling()
 
         logger.loggedOnly(Warn(s"GET $hostUrl/resource finished${executionTimeRecorder.executionTimeInfo}"))
       }
 
     "succeed returning value calculated with the given response mapping rules " +
-      "and do not measure execution time if Time Recorder not given" in new TestCase {
+      "and do not measure execution time if TimeRecorder not given" in new TestCase {
 
         stubFor {
           get("/resource")
             .willReturn(ok("1"))
         }
 
-        verifyThrottling()
-
         override val client = new TestRestClient(hostUrl, throttler, maybeTimeRecorder = None)
 
         client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
+
+        verifyThrottling()
 
         logger.expectNoLogs()
       }
@@ -106,10 +108,10 @@ class RestClientSpec
             .willReturn(ok("1"))
         }
 
-        verifyThrottling()
-
         val requestName: String Refined NonEmpty = "some request"
         client.callRemote(requestName).unsafeRunSync() shouldBe 1
+
+        verifyThrottling()
 
         logger.loggedOnly(Warn(s"$requestName finished${executionTimeRecorder.executionTimeInfo}"))
       }
@@ -121,12 +123,12 @@ class RestClientSpec
           .willReturn(ok("1"))
       }
 
-      verifyThrottling()
-
       val requestName: String Refined NonEmpty = "some request"
       client.callRemote(requestName).unsafeRunSync() shouldBe 1
 
-      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      verifyThrottling()
+
+      val sample = histogram.collect().asScala.flatMap(_.samples.asScala).last
       sample.value               should be >= 0d
       sample.labelNames.asScala  should contain only histogramLabel.value
       sample.labelValues.asScala should contain only requestName.value
@@ -139,13 +141,13 @@ class RestClientSpec
           .willReturn(ok("1"))
       }
 
-      verifyThrottling()
-
       override val histogram = Histogram.build("histogram", "help").create()
 
       client.callRemote(mapResponseToInt).unsafeRunSync() shouldBe 1
 
-      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
+      verifyThrottling()
+
+      val sample = histogram.collect().asScala.flatMap(_.samples.asScala).last
       sample.value                 should be >= 0d
       sample.labelNames.asScala  shouldBe empty
       sample.labelValues.asScala shouldBe empty
@@ -162,11 +164,11 @@ class RestClientSpec
           )
       }
 
-      verifyThrottling()
-
       intercept[UnexpectedResponseException] {
         client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NotFound}; body: some body"
+
+      verifyThrottling()
     }
 
     "fail if remote responds with an empty body and status which doesn't match the response mapping rules" in new TestCase {
@@ -176,11 +178,11 @@ class RestClientSpec
           .willReturn(noContent())
       }
 
-      verifyThrottling()
-
       intercept[UnexpectedResponseException] {
         client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.NoContent}; body: "
+
+      verifyThrottling()
     }
 
     "fail if remote responds with a BAD_REQUEST and it's not mapped in the given response mapping rules" in new TestCase {
@@ -191,11 +193,11 @@ class RestClientSpec
           .willReturn(aResponse.withStatus(Status.BadRequest.code).withBody(responseBody))
       }
 
-      verifyThrottling()
-
       intercept[BadRequestException] {
         client.callRemote(mapResponseToInt).unsafeRunSync()
       }.getMessage shouldBe s"GET $hostUrl/resource returned ${Status.BadRequest}; body: $responseBody"
+
+      verifyThrottling()
     }
 
     "fail if remote responds with a body which causes exception during mapping" in new TestCase {
@@ -205,11 +207,11 @@ class RestClientSpec
           .willReturn(ok("non int"))
       }
 
-      verifyThrottling()
-
       val exception = intercept[MappingException] {
         client.callRemote(mapResponseToInt).unsafeRunSync()
       }
+
+      verifyThrottling()
 
       exception.getMessage shouldBe s"""GET $hostUrl/resource returned ${Status.Ok}; error: For input string: "non int""""
       exception.getCause shouldBe a[NumberFormatException]
@@ -223,8 +225,6 @@ class RestClientSpec
           .willReturn(okJson(jsonBody))
       }
 
-      verifyThrottling()
-
       val customDecodingFailure = nonEmptyStrings().generateOne
       implicit val decoder: Decoder[Boolean] = Decoder.instance(_ => DecodingFailure(customDecodingFailure, Nil).asLeft)
       implicit val entityDecoder: EntityDecoder[IO, Boolean] = jsonOf[IO, Boolean]
@@ -237,12 +237,15 @@ class RestClientSpec
         client.callRemote(mapResponseToBoolean).unsafeRunSync()
       }
 
+      verifyThrottling()
+
       exception.getMessage should startWith(s"""GET $hostUrl/resource returned ${Status.Ok}; error: """)
       exception.getMessage should include(s" $jsonBody")
       exception.getMessage should endWith(s" $customDecodingFailure")
     }
 
     "fail after retrying if there is a persistent connectivity problem" in {
+
       implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
       val exceptionMessage = "Connection refused"
@@ -269,11 +272,11 @@ class RestClientSpec
             .willReturn(aResponse withFault fault)
         }
 
-        verifyThrottling()
-
         val exception = intercept[ConnectivityException] {
           client.callRemote(mapResponseToInt).unsafeRunSync()
         }
+
+        verifyThrottling()
 
         val causeMessage = exception.getCause.getMessage
 
@@ -364,27 +367,31 @@ class RestClientSpec
           .willReturn(ok("1"))
       }
 
-      verifyThrottling()
-
       client.callMultipartEndpoint(jsonPart, textPart, zippedPart).unsafeRunSync() shouldBe 1
+
       verify {
         postRequestedFor(urlEqualTo("/resource"))
       }
+
+      verifyThrottling()
     }
   }
 
   private trait TestCase {
     val histogramLabel: String Refined NonEmpty = "label"
-    val histogram = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
-    val throttler = mock[Throttler[IO, Any]]
+    val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
+    private val throttlerUsed = Ref.unsafe[IO, Boolean](false)
+    val throttler = new Throttler[IO, Any] {
+      override def throttle[O](value: IO[O]): IO[O] = throttlerUsed.set(true) >> value
+    }
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](Some(histogram))
     val client                = new TestRestClient(hostUrl, throttler, Some(executionTimeRecorder))
 
-    def verifyThrottling() = inSequence {
-      (throttler.acquire _).expects().returning(IO.unit)
-      (throttler.release _).expects().returning(IO.unit)
-    }
+    def verifyThrottling() =
+      withClue("throttler called:") {
+        throttlerUsed.get.unsafeRunSync() shouldBe true
+      }
   }
 
   private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)

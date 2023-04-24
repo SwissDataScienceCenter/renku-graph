@@ -52,6 +52,7 @@ private[entities] object CliProjectConverter {
       case s              => s
     }
     val dateCreated = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
+    val gitlabImage = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.path), _))
     val all         = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
     all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
@@ -65,7 +66,7 @@ private[entities] object CliProjectConverter {
         activities.sortBy(_.startTime),
         datasets,
         plans,
-        cliProject.images
+        (cliProject.images ::: gitlabImage.toList).distinct
       )
     }
   }
