@@ -183,7 +183,8 @@ class NodeDetailsFinderSpec
               ),
               project
             ).map(
-              _.planParameterValues(parameter -> ValueOverride(parameter.value))
+              _.replaceCommand(planCommands.generateSome)
+                .planParameterValues(parameter -> ValueOverride(parameter.value))
                 .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
                 .buildProvenanceUnsafe()
             )
@@ -196,9 +197,7 @@ class NodeDetailsFinderSpec
 
         nodeDetailsFinder
           .findDetails(
-            Set(
-              ExecutionInfo(activity.asEntityId.show, activity.startTime.value)
-            ),
+            Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
             project.path
           )
           .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
