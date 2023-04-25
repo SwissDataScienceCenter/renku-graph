@@ -41,9 +41,9 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
         info.asJson shouldBe json"""{
           "activated": true,
           "progress": {
-            "done":       ${info.progress.currentStage.value},
-            "total":      ${info.progress.finalStage.value},
-            "percentage": ${info.progress.completion.value}
+            "done":       ${info.progress.done},
+            "total":      ${info.progress.total},
+            "percentage": ${info.progress.percentage}
           },
           "details": {
              "status":  ${info.details.status},
@@ -61,7 +61,7 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
         "activated": false,
         "progress": {
           "done":       0,
-          "total":      ${info.progress.finalStage.value},
+          "total":      ${info.progress.total},
           "percentage": 0.00
         }
       }"""
@@ -78,14 +78,14 @@ class ProgressSpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
         val progressStatus = Progress.from(eventStatus)
 
         progressStatus.currentStage shouldBe EventStatusProgress(eventStatus).stage
-        progressStatus.finalStage   shouldBe EventStatusProgress.Stage.Final
+        progressStatus.total        shouldBe EventStatusProgress.Stage.Final.value
         progressStatus.completion   shouldBe EventStatusProgress(eventStatus).completion
       }
     }
   }
 
   "Progress.Zero to have final stage set to EventStatusProgress.Stage.Final" in {
-    Progress.Zero.finalStage shouldBe EventStatusProgress.Stage.Final
+    Progress.Zero.total shouldBe EventStatusProgress.Stage.Final.value
   }
 }
 
@@ -111,7 +111,7 @@ class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPrope
       )
     ) { (eventStatus, status, message) =>
       show"provide '$status' as status and '$message' as message for the '$eventStatus' status" in {
-        val details = Details(eventStatus)
+        val details = Details.fromStatus(eventStatus)
 
         details.status  shouldBe status
         details.message shouldBe message
