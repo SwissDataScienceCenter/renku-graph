@@ -23,12 +23,13 @@ import cats.data.Nested
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.circe.{Decoder, DecodingFailure}
+import io.circe.Decoder
 import io.renku.graph.model.{datasets, projects, GraphClass}
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
 import io.renku.jsonld.{EntityId, NamedGraph}
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
@@ -77,17 +78,15 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "find DS projects",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        s"""
-        SELECT DISTINCT ?allProjectIds
-        WHERE {
-          GRAPH <$graphId> {
-            ?datasetId ^renku:hasDataset <$graphId>
-          }
-          GRAPH ?projectGraphs {
-            ?datasetId ^renku:hasDataset ?allProjectIds
-          }
-        }
-        """
+        sparql"""|SELECT DISTINCT ?allProjectIds
+                 |WHERE {
+                 |  GRAPH $graphId {
+                 |    ?datasetId ^renku:hasDataset $graphId
+                 |  }
+                 |  GRAPH ?projectGraphs {
+                 |    ?datasetId ^renku:hasDataset ?allProjectIds
+                 |  }
+                 |}""".stripMargin
       )
     }
   }
@@ -105,28 +104,25 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "find proj DS topmostSameAs",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        s"""
-        SELECT ?projectId ?datasetId ?topmostSameAs ?sameAs
-        WHERE {
-          GRAPH ?g {
-            ?projectId renku:projectPath '$path'.
-            ?datasetId ^renku:hasDataset ?projectId;
-                       a schema:Dataset;
-                       renku:topmostSameAs ?topmostSameAs.
-            OPTIONAL { ?datasetId schema:sameAs/schema:url ?sameAs }
-          }
-        }
-        """
+        sparql"""|SELECT ?projectId ?datasetId ?topmostSameAs ?sameAs
+                 |WHERE {
+                 |  GRAPH ?g {
+                 |    ?projectId renku:projectPath ${path.asObject}.
+                 |    ?datasetId ^renku:hasDataset ?projectId;
+                 |               a schema:Dataset;
+                 |               renku:topmostSameAs ?topmostSameAs.
+                 |    OPTIONAL { ?datasetId schema:sameAs/schema:url ?sameAs }
+                 |  }
+                 |}""".stripMargin
       )
     }
   }
 
-  private case class DirectDescendantInfo(graphId:            EntityId,
-                                          dsId:               datasets.ResourceId,
-                                          topmostSameAs:      TopmostSameAs,
-                                          sameAs:             SameAs,
-                                          createdOrPublished: CreatedOrPublished,
-                                          modified:           Boolean
+  private case class DirectDescendantInfo(graphId:       EntityId,
+                                          dsId:          datasets.ResourceId,
+                                          topmostSameAs: TopmostSameAs,
+                                          sameAs:        SameAs,
+                                          modified:      Boolean
   )
 
   private def collectDirectDescendants(dsInfo: DSInfo): Nested[F, List, DirectDescendantInfo] = Nested {
@@ -136,21 +132,14 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       implicit cursor =>
         for {
           graphId             <- extract[projects.ResourceId]("graphId").map(GraphClass.Project.id)
-          dsId                <- extract[datasets.ResourceId]("descendantId")
-          topmostSameAs       <- extract[TopmostSameAs]("descendantTopmostSameAs")
+          descId              <- extract[datasets.ResourceId]("descendantId")
+          descTopmostSameAs   <- extract[TopmostSameAs]("descendantTopmostSameAs")
           sameAs              <- extract[SameAs]("descendantSameAs")
-          maybeDatePublished  <- extract[Option[DatePublished]]("datePublished")
-          maybeDateCreated    <- extract[Option[DateCreated]]("dateCreated")
           maybeModificationId <- extract[Option[ResourceId]]("modificationId")
-          date <- maybeDatePublished
-                    .orElse(maybeDateCreated)
-                    .map(_.asRight)
-                    .getOrElse(DecodingFailure(s"No dates on DS $dsId", Nil).asLeft)
         } yield DirectDescendantInfo(graphId,
-                                     dsId,
-                                     topmostSameAs,
+                                     descId,
+                                     descTopmostSameAs,
                                      sameAs,
-                                     date,
                                      modified = maybeModificationId.nonEmpty
         )
     }
@@ -159,20 +148,15 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "find DS descendants info",
         Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-        s"""
-        SELECT ?graphId ?descendantId ?descendantTopmostSameAs ?descendantSameAs 
-          ?datePublished ?dateCreated ?modificationId
-        WHERE {
-          GRAPH ?graphId {
-            ?descendantId schema:sameAs/schema:url <${dsId.show}>;
-                          renku:topmostSameAs ?descendantTopmostSameAs;
-                          schema:sameAs/schema:url ?descendantSameAs.
-            OPTIONAL { ?descendantId schema:datePublished ?datePublished }
-            OPTIONAL { ?descendantId schema:dateCreated ?dateCreated }
-            OPTIONAL { ?modificationId prov:wasDerivedFrom/schema:url ?descendantId }
-          }
-        }
-        """
+        sparql"""|SELECT ?graphId ?descendantId ?descendantTopmostSameAs ?descendantSameAs ?modificationId
+                 |WHERE {
+                 |  GRAPH ?graphId {
+                 |    ?descendantId schema:sameAs/schema:url ${dsId.asEntityId};
+                 |                  renku:topmostSameAs ?descendantTopmostSameAs;
+                 |                  schema:sameAs/schema:url ?descendantSameAs.
+                 |    OPTIONAL { ?modificationId prov:wasDerivedFrom/schema:url ?descendantId }
+                 |  }
+                 |}""".stripMargin
       )
     }
   }
@@ -210,36 +194,32 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     SparqlQuery.of(
       name = "clean-up DS descendant SameAs",
       Prefixes of schema -> "schema",
-      s"""
-      DELETE {
-        GRAPH <${descendant.graphId}> {
-          ?descendantSameAs ?p ?s.
-          <${descendant.dsId.show}> schema:sameAs ?descendantSameAs
-        }
-      }
-      WHERE {
-        GRAPH <${descendant.graphId}> {
-          <${descendant.dsId.show}> schema:sameAs ?descendantSameAs.
-          ?descendantSameAs ?p ?s
-        }
-      }
-      """
+      sparql"""|DELETE {
+               |  GRAPH ${descendant.graphId} {
+               |    ?descendantSameAs ?p ?s.
+               |    ${descendant.dsId.asEntityId} schema:sameAs ?descendantSameAs
+               |  }
+               |}
+               |WHERE {
+               |  GRAPH ${descendant.graphId} {
+               |    ${descendant.dsId.asEntityId} schema:sameAs ?descendantSameAs.
+               |    ?descendantSameAs ?p ?s
+               |  }
+               |}""".stripMargin
     )
   }
 
   private def cleanUpDescendantTopmostSameAs(descendant: DirectDescendantInfo) = updateWithNoResult {
-    val DirectDescendantInfo(graphId, descendantId, topmostSameAs, _, _, _) = descendant
+    val DirectDescendantInfo(graphId, descendantId, topmostSameAs, _, _) = descendant
 
     SparqlQuery.of(
       name = "clean-up DS descendant TopmostSameAs",
       Prefixes of renku -> "renku",
-      s"""
-      DELETE DATA {
-        GRAPH <$graphId> {
-          <${descendantId.show}> renku:topmostSameAs <${topmostSameAs.show}>
-        }
-      }
-      """
+      sparql"""|DELETE DATA {
+               |  GRAPH $graphId {
+               |    ${descendantId.asEntityId} renku:topmostSameAs ${topmostSameAs.asEntityId}
+               |  }
+               |}""".stripMargin
     )
   }
 
@@ -247,13 +227,11 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     SparqlQuery.of(
       name = "link DS to itself",
       Prefixes of renku -> "renku",
-      s"""
-      INSERT DATA {
-        GRAPH <${nominated.graphId}> {
-          <${nominated.dsId.show}> renku:topmostSameAs <${nominated.dsId.show}>
-        }
-      }
-      """
+      sparql"""|INSERT DATA {
+               |  GRAPH ${nominated.graphId} {
+               |    ${nominated.dsId.asEntityId} renku:topmostSameAs ${nominated.dsId.asEntityId}
+               |  }
+               |}""".stripMargin
     )
   }
 
@@ -275,18 +253,16 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       linkDescendant(descendant, newTop)
 
   private def linkDescendant(descendantInfo: DirectDescendantInfo, newTop: DirectDescendantInfo) = updateWithNoResult {
-    val DirectDescendantInfo(_, _, newTopmostSameAs, newSameAs, _, _) = newTop
+    val DirectDescendantInfo(_, _, newTopmostSameAs, newSameAs, _) = newTop
     SparqlQuery.of(
       name = "link DS to new top",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""
-      INSERT DATA {
-        GRAPH <${descendantInfo.graphId}> {
-          <${descendantInfo.dsId.show}> renku:topmostSameAs <${newTopmostSameAs.show}>.
-          <${descendantInfo.dsId.show}> schema:sameAs <${newSameAs.asEntityId}>
-        }
-      }
-      """
+      sparql"""|INSERT DATA {
+               |  GRAPH ${descendantInfo.graphId} {
+               |    ${descendantInfo.dsId.asEntityId} renku:topmostSameAs ${newTopmostSameAs.asEntityId}.
+               |    ${descendantInfo.dsId.asEntityId} schema:sameAs ${newSameAs.asEntityId}
+               |  }
+               |}""".stripMargin
     )
   }
 
@@ -311,15 +287,13 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "find DS descendants info",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        s"""
-        SELECT ?graphId ?descendantId ?descendantSameAs
-        WHERE {
-          GRAPH ?graphId {
-            ?descendantId renku:topmostSameAs <${dsId.show}>;
-                          schema:sameAs/schema:url ?descendantSameAs
-          }
-        }
-        """
+        sparql"""|SELECT ?graphId ?descendantId ?descendantSameAs
+                 |WHERE {
+                 |  GRAPH ?graphId {
+                 |    ?descendantId renku:topmostSameAs ${dsId.asEntityId};
+                 |                  schema:sameAs/schema:url ?descendantSameAs
+                 |  }
+                 |}""".stripMargin
       )
     }
   }
@@ -330,18 +304,16 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     SparqlQuery.of(
       name = "clean-up DS descendant",
       Prefixes of renku -> "renku",
-      s"""
-      DELETE {
-        GRAPH <$graphId> {
-          <${descendantId.show}> renku:topmostSameAs ?topmost
-        }
-      }
-      WHERE {
-        GRAPH <$graphId> {
-          <${descendantId.show}> renku:topmostSameAs ?topmost
-        }
-      }
-      """
+      sparql"""|DELETE {
+               |  GRAPH $graphId {
+               |    ${descendantId.asEntityId} renku:topmostSameAs ?topmost
+               |  }
+               |}
+               |WHERE {
+               |  GRAPH $graphId {
+               |    ${descendantId.asEntityId} renku:topmostSameAs ?topmost
+               |  }
+               |}""".stripMargin
     )
   }
 
@@ -355,13 +327,11 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "insert new topmostSameAs",
         Prefixes of renku -> "renku",
-        s"""
-        INSERT DATA {
-          GRAPH <$graphId> {
-            <${descendantId.show}> renku:topmostSameAs <${newTopmostSameAs.show}>
-          }
-        }
-        """
+        sparql"""|INSERT DATA {
+                 |  GRAPH $graphId {
+                 |    ${descendantId.asEntityId} renku:topmostSameAs ${newTopmostSameAs.asEntityId}
+                 |  }
+                 |}""".stripMargin
       )
     }
 
@@ -383,13 +353,11 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "insert new SameAs",
         Prefixes of schema -> "schema",
-        s"""
-        INSERT DATA {
-          GRAPH <${descendantInfo.graphId}> {
-            <${descendantInfo.dsId.show}> schema:sameAs <${sameAs.asEntityId}>
-          }
-        }
-        """
+        sparql"""|INSERT DATA {
+                 |  GRAPH ${descendantInfo.graphId} {
+                 |    ${descendantInfo.dsId.asEntityId} schema:sameAs ${sameAs.asEntityId}
+                 |  }
+                 |}""".stripMargin
       )
     }
 
@@ -413,16 +381,14 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
       SparqlQuery.of(
         name = "find TopmostSameAs by SameAs",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        s"""
-        SELECT ?topmostSameAs
-        WHERE {
-          GRAPH <$graphId> {
-            ?dsId schema:sameAs <${sameAs.asEntityId}>;
-                  renku:topmostSameAs ?topmostSameAs
-          }
-        }
-        LIMIT 1
-        """
+        sparql"""|SELECT ?topmostSameAs
+                 |WHERE {
+                 |  GRAPH $graphId {
+                 |    ?dsId schema:sameAs ${sameAs.asEntityId};
+                 |          renku:topmostSameAs ?topmostSameAs
+                 |  }
+                 |}
+                 |LIMIT 1""".stripMargin
       )
     }(decoder)
   }
