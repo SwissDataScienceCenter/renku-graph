@@ -19,6 +19,7 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
+import cats.Show
 import io.renku.graph.model.entityModel.Location.FileOrFolder.from
 import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld.JsonLDDecoder.decodeString
@@ -80,6 +81,11 @@ object entityModel {
     }
 
     implicit lazy val jsonLDEncoder: JsonLDEncoder[Location] = encodeString.contramap(_.value)
+
+    implicit val show: Show[Location] = Show.show {
+      case Location.File(v)   => v
+      case Location.Folder(v) => v
+    }
   }
 
   final class Checksum private (val value: String) extends AnyVal with StringTinyType

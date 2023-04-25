@@ -21,11 +21,11 @@ package io.renku.graph.model.testentities
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.cli.model.{CliCommandInput, CliCommandOutput}
+import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
-import io.renku.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import io.renku.graph.model.commandParameters._
+import io.renku.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import io.renku.graph.model.entityModel.Location
-import io.renku.graph.model.{RenkuUrl, commandParameters, entities, plans}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -71,6 +71,17 @@ object StepPlanCommandParameter {
                                    maybePrefix = None,
                                    defaultValue = value,
                                    plan.id
+          )
+
+    def implicitFrom(value: ParameterDefaultValue): Position => Plan => ImplicitCommandParameter =
+      _ =>
+        plan =>
+          ImplicitCommandParameter(
+            Name(value.show),
+            maybeDescription = None,
+            maybePrefix = None,
+            value,
+            plan.id
           )
 
     implicit def toEntitiesCommandParameter(implicit
@@ -119,6 +130,17 @@ object StepPlanCommandParameter {
 
     def streamedFromLocation(defaultValue: Location): Position => Plan => CommandInput =
       streamedFrom(InputDefaultValue(defaultValue))
+
+    def implicitFromLocation(location: Location): Position => Plan => ImplicitCommandInput =
+      _ =>
+        plan =>
+          ImplicitCommandInput(
+            Name(location.show),
+            maybePrefix = None,
+            InputDefaultValue(location),
+            maybeEncodingFormat = None,
+            plan.id
+          )
 
     def from(defaultValue: InputDefaultValue): Position => Plan => LocationCommandInput =
       position =>
@@ -248,6 +270,18 @@ object StepPlanCommandParameter {
 
     def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
       streamedFrom(OutputDefaultValue(defaultValue), stream)
+
+    def implicitFromLocation(location: Location): Position => Plan => ImplicitCommandOutput =
+      _ =>
+        plan =>
+          ImplicitCommandOutput(
+            Name(location.show),
+            maybePrefix = None,
+            OutputDefaultValue(location),
+            FolderCreation.no,
+            maybeEncodingFormat = None,
+            plan.id
+          )
 
     def stdOut(implicit renkuUrl: RenkuUrl): IOStream.StdOut =
       IOStream.StdOut(IOStream.ResourceId((renkuUrl / "iostreams" / StdOut.name).value))
