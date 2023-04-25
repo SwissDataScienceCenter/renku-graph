@@ -74,7 +74,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
   )(implicit encoder: SparqlEncoder[OrderBy]): String = {
     def mapPropertyName(property: Criteria.Sort.SortProperty) = property match {
       case Criteria.Sort.ByName          => OrderBy.Property("LCASE(?name)")
-      case Criteria.Sort.ByDate          => OrderBy.Property("?date")
+      case Criteria.Sort.ByDate          => OrderBy.Property("xsd:dateTime(?date)")
       case Criteria.Sort.ByMatchingScore => OrderBy.Property("?matchingScore")
     }
 
