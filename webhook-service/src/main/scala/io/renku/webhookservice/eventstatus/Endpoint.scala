@@ -76,8 +76,12 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
   }
 
   private def findStatus(projectId: GitLabId) =
-    statusInfoFinder
-      .findStatusInfo(projectId)
+    EitherT(
+      statusInfoFinder
+        .findStatusInfo(projectId)
+        .map(_.getOrElse(StatusInfo.webhookReady))
+        .attempt
+    )
       .biSemiflatMap(internalServerError(projectId), status => Ok(status.asJson))
       .merge
 

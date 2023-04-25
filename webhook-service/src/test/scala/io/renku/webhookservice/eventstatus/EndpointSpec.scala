@@ -19,14 +19,8 @@
 package io.renku.webhookservice
 package eventstatus
 
-import Generators._
-import cats.data.EitherT
-import cats.data.EitherT.{leftT, right, rightT}
 import cats.effect.IO
 import cats.syntax.all._
-import hookvalidation.HookValidator
-import hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-import hookvalidation.HookValidator.NoAccessTokenException
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.authUsers
@@ -38,12 +32,16 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.webhookservice.eventstatus.Generators._
+import io.renku.webhookservice.hookvalidation.HookValidator
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -60,7 +58,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val statusInfo = statusInfos.generateOne
-      givenStatusInfoFinding(projectId, returning = rightT(statusInfo))
+      givenStatusInfoFinding(projectId, returning = IO.pure(statusInfo.some))
 
       val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -115,7 +113,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val exception = exceptions.generateOne
-      givenStatusInfoFinding(projectId, returning = leftT(exception))
+      givenStatusInfoFinding(projectId, returning = IO.raiseError(exception))
 
       val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -131,7 +129,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
       val exception = exceptions.generateOne
-      givenStatusInfoFinding(projectId, returning = right(exception.raiseError[IO, StatusInfo]))
+      givenStatusInfoFinding(projectId, returning = IO.raiseError(exception))
 
       val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -165,7 +163,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(projectId, authUser.accessToken.some)
         .returning(returning)
 
-    def givenStatusInfoFinding(projectId: projects.GitLabId, returning: EitherT[IO, Throwable, StatusInfo]) =
+    def givenStatusInfoFinding(projectId: projects.GitLabId, returning: IO[Option[StatusInfo]]) =
       (statusInfoFinder
         .findStatusInfo(_: GitLabId))
         .expects(projectId)
