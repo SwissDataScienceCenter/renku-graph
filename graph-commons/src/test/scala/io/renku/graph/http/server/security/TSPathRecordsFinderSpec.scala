@@ -30,7 +30,7 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathRecordsFinderSpec
+class TSPathRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
     with EntitiesGenerators
@@ -71,6 +71,6 @@ class ProjectPathRecordsFinderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
+    val recordsFinder = new TSPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

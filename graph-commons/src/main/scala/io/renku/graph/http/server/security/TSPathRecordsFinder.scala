@@ -35,14 +35,14 @@ import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
-object ProjectPathRecordsFinder {
+object TSPathRecordsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, projects.Path]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     storeConfig                   <- ProjectsConnectionConfig[F]()
-  } yield new ProjectPathRecordsFinderImpl[F](storeConfig)
+  } yield new TSPathRecordsFinderImpl[F](storeConfig)
 }
 
-private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class TSPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl(storeConfig)

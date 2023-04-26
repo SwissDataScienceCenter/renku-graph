@@ -313,7 +313,7 @@ private object MicroserviceRoutes {
     usersProjectsEndpoint                <- users.projects.Endpoint[F]
     authenticator                        <- GitLabAuthenticator[F]
     authMiddleware                       <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer                <- Authorizer.using(ProjectPathRecordsFinder[F])
+    projectPathAuthorizer                <- Authorizer.using(TSPathRecordsFinder[F])
     datasetIdAuthorizer                  <- Authorizer.using(DatasetIdRecordsFinder[F])
     datasetSameAsAuthorizer              <- Authorizer.using(DatasetSameAsRecordsFinder[F])
     versionRoutes                        <- version.Routes[F]
