@@ -23,15 +23,15 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
-import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.implicits._
+import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectFinder[F[_]] {
@@ -131,5 +131,4 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
     } yield ProjectMember(name, username, gitLabId)
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
-  private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 }
