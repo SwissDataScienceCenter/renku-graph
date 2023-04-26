@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.{projects, GraphClass, RenkuUrl}
+import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{ResourceId, Visibility}
@@ -35,8 +35,10 @@ import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
 
+trait TSPathRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Path]
+
 object TSPathRecordsFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, projects.Path]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSPathRecordsFinder[F]] = for {
     implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
     storeConfig                   <- ProjectsConnectionConfig[F]()
   } yield new TSPathRecordsFinderImpl[F](storeConfig)
@@ -46,7 +48,7 @@ private class TSPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
     storeConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends TSClientImpl(storeConfig)
-    with SecurityRecordFinder[F, projects.Path] {
+    with TSPathRecordsFinder[F] {
 
   override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
     queryExpecting[List[SecurityRecord]](query(ResourceId(path)))(recordsDecoder(path))

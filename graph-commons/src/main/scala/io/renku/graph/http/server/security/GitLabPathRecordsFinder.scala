@@ -36,14 +36,16 @@ import org.http4s.implicits._
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
+trait GitLabPathRecordsFinder[F[_]] extends SecurityRecordFinder[F, projects.Path]
+
 object GitLabPathRecordsFinder {
-  def apply[F[_]: Async: Parallel: Logger: GitLabClient]: F[SecurityRecordFinder[F, projects.Path]] =
+  def apply[F[_]: Async: Parallel: Logger: GitLabClient]: F[GitLabPathRecordsFinder[F]] =
     new GitLabPathRecordsFinderImpl[F](new VisibilityFinderImpl[F], new MembersFinderImpl[F]).pure[F].widen
 }
 
 private class GitLabPathRecordsFinderImpl[F[_]: Async: Parallel](visibilityFinder: VisibilityFinder[F],
                                                                  membersFinder: MembersFinder[F]
-) extends SecurityRecordFinder[F, projects.Path] {
+) extends GitLabPathRecordsFinder[F] {
 
   import membersFinder.findMembers
   import visibilityFinder.findVisibility
