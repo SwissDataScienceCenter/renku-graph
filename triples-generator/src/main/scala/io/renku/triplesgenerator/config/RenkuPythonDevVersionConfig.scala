@@ -18,11 +18,14 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadThrow
+import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-final case class RenkuPythonDevVersion(version: String) extends Product with Serializable
+final case class RenkuPythonDevVersion(version: String)
+object RenkuPythonDevVersion {
+  implicit lazy val show: Show[RenkuPythonDevVersion] = Show.show(_.version)
+}
 
 object RenkuPythonDevVersionConfig {
 

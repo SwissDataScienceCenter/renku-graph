@@ -18,31 +18,38 @@
 
 package io.renku.triplesgenerator.init
 
-import cats.MonadThrow
-import cats.effect.kernel.Async
+import cats.effect.Async
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import com.typesafe.config.Config
 import io.renku.graph.model.versions.CliVersion
-import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
+import io.renku.triplesgenerator.config.{RenkuPythonDevVersion, RenkuPythonDevVersionConfig, TriplesGeneration, VersionCompatibilityConfig}
 import org.typelevel.log4cats.Logger
 
 trait CliVersionCompatibilityVerifier[F[_]] {
   def run: F[Unit]
 }
 
-private class CliVersionCompatibilityVerifierImpl[F[_]: MonadThrow](
-    cliVersion:    CliVersion,
-    compatibility: VersionCompatibilityConfig
+private class CliVersionCompatibilityVerifierImpl[F[_]: MonadThrow: Logger](
+    cliVersion:           CliVersion,
+    compatibility:        VersionCompatibilityConfig,
+    maybeRenkuDevVersion: Option[RenkuPythonDevVersion]
 ) extends CliVersionCompatibilityVerifier[F] {
-  override def run: F[Unit] =
-    if (cliVersion != compatibility.cliVersion)
-      MonadThrow[F].raiseError(
+
+  private val applicative: Applicative[F] = Applicative[F]
+  import applicative.whenA
+
+  override def run: F[Unit] = maybeRenkuDevVersion match {
+    case Some(version) =>
+      Logger[F].warn(show"Service running dev version of CLI: $version")
+    case None =>
+      whenA(cliVersion != compatibility.cliVersion) {
         new IllegalStateException(
-          s"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatibility.cliVersion}"
-        )
-      )
-    else ().pure[F]
+          show"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatibility.cliVersion}"
+        ).raiseError[F, Unit]
+      }
+  }
 }
 
 object CliVersionCompatibilityChecker {
@@ -55,5 +62,6 @@ object CliVersionCompatibilityChecker {
                     case RenkuLog                => CliVersionLoader[F]()
                     case RemoteTriplesGeneration => compatConfig.cliVersion.pure[F]
                   }
-  } yield new CliVersionCompatibilityVerifierImpl[F](cliVersion, compatConfig)
+    renkuDevVersion <- RenkuPythonDevVersionConfig[F](config)
+  } yield new CliVersionCompatibilityVerifierImpl[F](cliVersion, compatConfig, renkuDevVersion)
 }
