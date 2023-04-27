@@ -21,9 +21,9 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{CategoryName, consumers}
-import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
@@ -35,7 +35,6 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     eventProcessor:            EventProcessor[F],
-    eventDecoder:              EventDecoder,
     subscriptionMechanism:     SubscriptionMechanism[F],
     processExecutor:           ProcessExecutor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
@@ -44,7 +43,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      eventDecoder.decode,
+      _.event.as[CleanUpEvent],
       e => eventProcessor.process(e.project),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
@@ -59,11 +58,5 @@ private object EventHandler {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F]
     processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
-  } yield new EventHandler[F](categoryName,
-                              tsReadinessChecker,
-                              eventProcessor,
-                              EventDecoder,
-                              subscriptionMechanism,
-                              processExecutor
-  )
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, eventProcessor, subscriptionMechanism, processExecutor)
 }
