@@ -25,6 +25,7 @@ import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder

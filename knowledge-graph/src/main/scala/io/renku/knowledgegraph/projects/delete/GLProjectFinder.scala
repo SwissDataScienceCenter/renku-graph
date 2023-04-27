@@ -24,15 +24,15 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
-private trait ProjectFinder[F[_]] {
+private trait GLProjectFinder[F[_]] {
   def findProject(path: projects.Path)(implicit at: AccessToken): F[Option[Project]]
 }
 
-private object ProjectFinder {
-  def apply[F[_]: Async: GitLabClient]: ProjectFinder[F] = new ProjectFinderImpl[F]
+private object GLProjectFinder {
+  def apply[F[_]: Async: GitLabClient]: GLProjectFinder[F] = new GLProjectFinderImpl[F]
 }
 
-private class ProjectFinderImpl[F[_]: Async: GitLabClient] extends ProjectFinder[F] {
+private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder

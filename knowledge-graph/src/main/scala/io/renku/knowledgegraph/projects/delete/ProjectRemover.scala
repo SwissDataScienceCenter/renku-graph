@@ -24,7 +24,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait ProjectRemover[F[_]] {
-  def deleteProject(id: projects.GitLabId)(implicit at: AccessToken): F[Unit]
+  def deleteProject(path: projects.Path)(implicit at: AccessToken): F[Unit]
 }
 
 private object ProjectRemover {
@@ -39,8 +39,8 @@ private class ProjectRemoverImpl[F[_]: Async: GitLabClient] extends ProjectRemov
   import org.http4s.dsl.io._
   import org.http4s.implicits._
 
-  override def deleteProject(id: projects.GitLabId)(implicit at: AccessToken): F[Unit] =
-    GitLabClient[F].delete(uri"projects" / id, "project-delete")(mapResponse)(at.some)
+  override def deleteProject(path: projects.Path)(implicit at: AccessToken): F[Unit] =
+    GitLabClient[F].delete(uri"projects" / path, "project-delete")(mapResponse)(at.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
     case (status, _, _) if status.responseClass == Status.Successful => ().pure[F]

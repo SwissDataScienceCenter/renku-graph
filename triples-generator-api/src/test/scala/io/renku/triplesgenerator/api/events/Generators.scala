@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.api.events
 
 import cats.syntax.all._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.RenkuTinyTypeGenerators._
@@ -40,4 +41,7 @@ object Generators {
 
   val projectViewingDeletions: Gen[ProjectViewingDeletion] =
     projectPaths.map(ProjectViewingDeletion.apply)
+
+  val cleanUpEvents: Gen[CleanUpEvent] =
+    consumerProjects.map(CleanUpEvent.apply)
 }

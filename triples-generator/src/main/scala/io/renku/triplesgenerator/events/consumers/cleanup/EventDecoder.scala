@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 import cats.syntax.all._
 import io.circe.{DecodingFailure, Error, Json}
 import io.renku.events.EventRequestContent
+import io.renku.triplesgenerator.api.events.CleanUpEvent
 
 private trait EventDecoder {
   val decode: EventRequestContent => Either[Exception, CleanUpEvent]
