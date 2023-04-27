@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.init
 
-import cats.MonadError
+import cats.MonadThrow
 import io.renku.graph.model.versions.CliVersion
 import pureconfig.ConfigReader
 
@@ -28,19 +28,17 @@ private[init] object CliVersionLoader {
 
   private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 
-  def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): F[CliVersion] = apply(findRenkuVersion)
+  def apply[F[_]: MonadThrow](): F[CliVersion] = apply(findRenkuVersion)
 
-  private[init] def apply[F[_]](renkuVersionFinder: F[CliVersion])(implicit
-      ME: MonadError[F, Throwable]
-  ): F[CliVersion] = renkuVersionFinder
+  private[init] def apply[F[_]: MonadThrow](renkuVersionFinder: F[CliVersion]): F[CliVersion] = renkuVersionFinder
 
-  private def findRenkuVersion[F[_]](implicit ME: MonadError[F, Throwable]): F[CliVersion] = {
+  private def findRenkuVersion[F[_]: MonadThrow]: F[CliVersion] = {
     import ammonite.ops._
     import cats.syntax.all._
 
     for {
-      versionAsString <- ME.catchNonFatal(%%("renku", "--version")(pwd).out.string.trim)
-      version         <- ME.fromEither(CliVersion.from(versionAsString))
+      versionAsString <- MonadThrow[F].catchNonFatal(%%("renku", "--version")(pwd).out.string.trim)
+      version         <- MonadThrow[F].fromEither(CliVersion.from(versionAsString))
     } yield version
   }
 }
