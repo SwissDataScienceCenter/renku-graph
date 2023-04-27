@@ -44,9 +44,7 @@ object ConfigLoader {
     ConfigSource.fromConfig(config).at(key).load[T]
   }
 
-  private def fromEither[F[_]: MonadThrow, T](
-      loadedConfig: ConfigReaderFailures Either T
-  ): F[T] =
+  private def fromEither[F[_]: MonadThrow, T](loadedConfig: ConfigReaderFailures Either T): F[T] =
     MonadThrow[F].fromEither[T] {
       loadedConfig leftMap (new ConfigLoadingException(_))
     }
@@ -77,6 +75,5 @@ object ConfigLoader {
               .leftMap(exception => CannotConvert(stringValue, ttApply.getClass.toString, exception.getMessage))
           }
           .getOrElse(Left(CannotConvert(stringValue, ttApply.getClass.toString, "Not an int value")))
-
       }
 }
