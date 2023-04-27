@@ -46,6 +46,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     hookDeletionEndpoint:   HookDeletionEndpoint[F],
     eventStatusEndpoint:    eventstatus.Endpoint[F],
     authMiddleware:         AuthMiddleware[F, AuthUser],
+    optAuthMiddleware:      AuthMiddleware[F, Option[AuthUser]],
     routesMetrics:          RoutesMetrics[F],
     versionRoutes:          version.Routes[F]
 ) extends Http4sDsl[F] {
@@ -61,11 +62,20 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: off
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
-      case GET    -> Root / "projects" / ProjectId(projectId) / "events" / "status" as authUser       => fetchProcessingStatus(projectId, authUser)
       case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => createHook(projectId, authUser)
       case DELETE -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => deleteHook(projectId, authUser)
       case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" as authUser => validateHook(projectId, authUser)
+      case _ => NotFound()
     }
+  }
+
+  private lazy val optionalAuthorizedRoutes: HttpRoutes[F] = {
+    val x = AuthedRoutes.of[Option[AuthUser], F] {
+      case GET -> Root / "projects" / ProjectId(projectId) / "events" / "status" as authUser =>
+        fetchProcessingStatus(projectId, authUser)
+    }
+
+    optAuthMiddleware(x)
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -75,7 +85,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: on
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
-    (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+    (versionRoutes() <+> nonAuthorizedRoutes <+> optionalAuthorizedRoutes <+> authorizedRoutes).withMetrics
 }
 
 private object MicroserviceRoutes {
@@ -89,6 +99,7 @@ private object MicroserviceRoutes {
     hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl)
     authenticator          <- GitLabAuthenticator[F]
     authMiddleware         <- Authentication.middleware(authenticator)
+    optAuthMiddleware      <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](
     webhookEventsEndpoint,
@@ -97,6 +108,7 @@ private object MicroserviceRoutes {
     hookDeletionEndpoint,
     eventStatusEndpoint,
     authMiddleware,
+    optAuthMiddleware,
     new RoutesMetrics[F],
     versionRoutes
   )

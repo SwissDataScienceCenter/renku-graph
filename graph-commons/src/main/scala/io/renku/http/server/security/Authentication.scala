@@ -48,13 +48,10 @@ private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[
       }
     }
 
-  override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] =
-    Kleisli { request =>
-      request.getBearerToken orElse request.getPrivateAccessToken match {
-        case Some(token) => authenticator.authenticate(token)
-        case None        => (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser].pure[F]
-      }
-    }
+  override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] = {
+    val ifNone = (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser]
+    authenticateIfNeeded.map(_.flatMap(_.fold(ifNone)(_.asRight)))
+  }
 
   private implicit class RequestOps(request: Request[F]) {
 

@@ -118,8 +118,21 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (eventStatusEndpoint
-        .fetchProcessingStatus(_: projects.GitLabId, _: AuthUser))
-        .expects(projectId, authUser)
+        .fetchProcessingStatus(_: projects.GitLabId, _: Option[AuthUser]))
+        .expects(projectId, authUser.some)
+        .returning(IO.pure(Response[IO](responseStatus)))
+
+      routes.call(request).status shouldBe responseStatus
+    }
+
+    "return Ok response from the endpoint without a user" in new TestCase {
+
+      val projectId      = projectIds.generateOne
+      val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
+      val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
+      (eventStatusEndpoint
+        .fetchProcessingStatus(_: projects.GitLabId, _: Option[AuthUser]))
+        .expects(projectId, None)
         .returning(IO.pure(Response[IO](responseStatus)))
 
       routes.call(request).status shouldBe responseStatus
@@ -199,15 +212,16 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val authUser               = authUsers.generateOne
-    val authenticationResponse = OptionT.some[IO](authUser)
-    val webhookEventsEndpoint  = mock[webhookevents.Endpoint[IO]]
-    val hookCreationEndpoint   = mock[HookCreationEndpoint[IO]]
-    val hookDeletionEndpoint   = mock[HookDeletionEndpoint[IO]]
-    val hookValidationEndpoint = mock[HookValidationEndpoint[IO]]
-    val eventStatusEndpoint    = mock[eventstatus.Endpoint[IO]]
-    private val routesMetrics  = TestRoutesMetrics()
-    private val versionRoutes  = mock[version.Routes[IO]]
+    val authUser                  = authUsers.generateOne
+    val authenticationResponse    = OptionT.some[IO](authUser)
+    val authenticationResponseOpt = OptionT.some[IO](Gen.option(authUsers).generateOne)
+    val webhookEventsEndpoint     = mock[webhookevents.Endpoint[IO]]
+    val hookCreationEndpoint      = mock[HookCreationEndpoint[IO]]
+    val hookDeletionEndpoint      = mock[HookDeletionEndpoint[IO]]
+    val hookValidationEndpoint    = mock[HookValidationEndpoint[IO]]
+    val eventStatusEndpoint       = mock[eventstatus.Endpoint[IO]]
+    private val routesMetrics     = TestRoutesMetrics()
+    private val versionRoutes     = mock[version.Routes[IO]]
     lazy val routes = new MicroserviceRoutes[IO](
       webhookEventsEndpoint,
       hookCreationEndpoint,
@@ -215,6 +229,7 @@ class MicroserviceRoutesSpec
       hookDeletionEndpoint,
       eventStatusEndpoint,
       givenAuthMiddleware(returning = authenticationResponse),
+      givenAuthIfNeededMiddleware(returning = authenticationResponseOpt),
       routesMetrics,
       versionRoutes
     ).routes.map(_.or(notAvailableResponse))
