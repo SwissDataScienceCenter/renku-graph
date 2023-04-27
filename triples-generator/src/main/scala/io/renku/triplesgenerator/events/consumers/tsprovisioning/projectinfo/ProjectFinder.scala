@@ -55,9 +55,9 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
 
   private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
 
-  override def findProject(path: projects.Path)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
+  override def findProject(
+      path: projects.Path
+  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
     {
       for {
         (project, maybeCreatorId) <- fetchProject(path)
@@ -130,5 +130,5 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
       username <- cursor.downField("username").as[persons.Username]
     } yield ProjectMember(name, username, gitLabId)
 
-  private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
+  private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember] = jsonOf[F, ProjectMember]
 }
