@@ -29,7 +29,7 @@ ENV TZ UTC
 # Installing Renku dependencies other tools
 RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --ignore-installed 'packaging==21.3 '&& \
-    python3 -m pip install --upgrade 'pip==23.0.1' && \
+    python3 -m pip install --upgrade 'pip==23.1.2' && \
     python3 -m pip install jinja2 && \
     chown -R daemon:daemon .
 
@@ -41,6 +41,8 @@ RUN adduser --disabled-password -g "$GID" -D -u 1000 tguser && \
     chmod 555 -R /entrypoint.sh
 
 USER tguser
+
+ENV PATH=$PATH:/home/tguser/.local/bin
 
 # Installing Renku
 RUN python3 -m pip install 'renku==2.3.2' 'sentry-sdk==1.5.11'
