@@ -26,12 +26,11 @@ COPY --from=builder /work/triples-generator/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-# Installing Renku and other dependencies
+# Installing Renku dependencies other tools
 RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --ignore-installed 'packaging==21.3 '&& \
     python3 -m pip install --upgrade 'pip==23.0.1' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'renku==2.3.2' 'sentry-sdk==1.5.11'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
@@ -42,6 +41,9 @@ RUN adduser --disabled-password -g "$GID" -D -u 1000 tguser && \
     chmod 555 -R /entrypoint.sh
 
 USER tguser
+
+# Installing Renku
+RUN python3 -m pip install 'renku==2.3.2' 'sentry-sdk==1.5.11'
 
 RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \
