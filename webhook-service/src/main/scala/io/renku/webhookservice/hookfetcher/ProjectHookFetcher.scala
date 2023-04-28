@@ -18,7 +18,8 @@
 
 package io.renku.webhookservice.hookfetcher
 
-import cats.effect.{Async, MonadCancelThrow}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
@@ -46,19 +47,19 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
-  import org.http4s.Status.Unauthorized
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
+  import org.http4s.Status.{NotFound, Ok, Unauthorized}
   import org.http4s._
   import org.http4s.circe._
-  import org.http4s.dsl.io._
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[HookIdAndUrl]]] = {
     case (Ok, _, response)    => response.as[List[HookIdAndUrl]]
     case (NotFound, _, _)     => List.empty[HookIdAndUrl].pure[F]
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => MonadThrow[F].raiseError(UnauthorizedException)
   }
 
   override def fetchProjectHooks(projectId: projects.GitLabId, accessToken: AccessToken): F[List[HookIdAndUrl]] =
-    GitLabClient[F].get(uri"projects" / projectId.show / "hooks", "project-hooks")(mapResponse)(accessToken.some)
+    GitLabClient[F].get(uri"projects" / projectId / "hooks", "project-hooks")(mapResponse)(accessToken.some)
 
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
     implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>

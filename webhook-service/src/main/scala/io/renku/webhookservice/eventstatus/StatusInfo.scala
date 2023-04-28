@@ -81,8 +81,8 @@ private object Progress {
     lazy val currentStage: EventStatusProgress.Stage      = statusProgress.stage
     lazy val completion:   EventStatusProgress.Completion = statusProgress.completion
 
-    lazy val done       = currentStage.value
-    lazy val percentage = completion.value
+    lazy val done:       Int   = currentStage.value
+    lazy val percentage: Float = completion.value
   }
 
   def from(eventStatus: EventStatus): Progress.NonZero =

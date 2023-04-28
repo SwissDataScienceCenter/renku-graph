@@ -40,7 +40,7 @@ import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def fetchProcessingStatus(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
+  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]]
 }
 
 private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
@@ -53,7 +53,7 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = measureExecutionTime {
+  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
     validateHook(projectId, authUser)
       .semiflatMap {
         case HookExists  => findStatus(projectId)
@@ -63,10 +63,13 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
       .recoverWith(internalServerError(projectId))
   } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
 
-  private def validateHook(projectId: GitLabId, authUser: AuthUser): EitherT[F, Response[F], HookValidationResult] =
+  private def validateHook(
+      projectId: GitLabId,
+      authUser:  Option[AuthUser]
+  ): EitherT[F, Response[F], HookValidationResult] =
     EitherT {
       hookValidator
-        .validateHook(projectId, authUser.accessToken.some)
+        .validateHook(projectId, authUser.map(_.accessToken))
         .map(_.asRight[Response[F]])
         .recoverWith(noAccessTokenToNotFound)
     }

@@ -25,7 +25,7 @@ import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.Authentication
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.MaybeAuthUser
 import io.renku.http.server.version
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
@@ -45,7 +45,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     hookValidationEndpoint: HookValidationEndpoint[F],
     hookDeletionEndpoint:   HookDeletionEndpoint[F],
     eventStatusEndpoint:    eventstatus.Endpoint[F],
-    authMiddleware:         AuthMiddleware[F, AuthUser],
+    optAuthMiddleware:      AuthMiddleware[F, MaybeAuthUser],
     routesMetrics:          RoutesMetrics[F],
     versionRoutes:          version.Routes[F]
 ) extends Http4sDsl[F] {
@@ -58,24 +58,29 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import eventStatusEndpoint._
   import routesMetrics._
 
-  // format: off
-  private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
+  private lazy val optionalAuthorizedRoutes: HttpRoutes[F] = optAuthMiddleware {
     AuthedRoutes.of {
-      case GET    -> Root / "projects" / ProjectId(projectId) / "events" / "status" as authUser       => fetchProcessingStatus(projectId, authUser)
-      case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => createHook(projectId, authUser)
-      case DELETE -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => deleteHook(projectId, authUser)
-      case POST   -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" as authUser => validateHook(projectId, authUser)
+      case GET -> Root / "projects" / ProjectId(projectId) / "events" / "status" as authUser =>
+        fetchProcessingStatus(projectId, authUser.option)
+
+      case POST -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser =>
+        authUser.withAuthenticatedUser(createHook(projectId, _))
+
+      case DELETE -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser =>
+        authUser.withAuthenticatedUser(deleteHook(projectId, _))
+
+      case POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" as authUser =>
+        authUser.withAuthenticatedUser(validateHook(projectId, _))
     }
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case           GET  -> Root / "ping"                => Ok("pong")
+    case GET -> Root / "ping"                           => Ok("pong")
     case request @ POST -> Root / "webhooks" / "events" => processPushEvent(request)
   }
-  // format: on
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
-    (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+    (versionRoutes() <+> nonAuthorizedRoutes <+> optionalAuthorizedRoutes).withMetrics
 }
 
 private object MicroserviceRoutes {
@@ -88,7 +93,7 @@ private object MicroserviceRoutes {
     hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl)
     hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl)
     authenticator          <- GitLabAuthenticator[F]
-    authMiddleware         <- Authentication.middleware(authenticator)
+    optAuthMiddleware      <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](
     webhookEventsEndpoint,
@@ -96,7 +101,7 @@ private object MicroserviceRoutes {
     hookValidationEndpoint,
     hookDeletionEndpoint,
     eventStatusEndpoint,
-    authMiddleware,
+    optAuthMiddleware,
     new RoutesMetrics[F],
     versionRoutes
   )

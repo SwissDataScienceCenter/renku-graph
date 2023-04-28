@@ -27,7 +27,7 @@ import io.circe._
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.json.JsonOps.JsonExt
 import org.http4s._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
@@ -96,17 +96,23 @@ object EndpointTester {
       } yield link.href
   }
 
-  def givenAuthIfNeededMiddleware(returning: OptionT[IO, Option[AuthUser]]): AuthMiddleware[IO, Option[AuthUser]] =
+  def givenAuthIfNeededMiddleware(returning: IO[MaybeAuthUser]): AuthMiddleware[IO, MaybeAuthUser] =
     AuthMiddleware {
-      Kleisli liftF returning
+      Kleisli.liftF(OptionT.liftF(returning))
     }
+
+  def givenAuthAsUnauthorized: AuthMiddleware[IO, MaybeAuthUser] =
+    AuthMiddleware.noSpider[IO, MaybeAuthUser](
+      Kleisli.liftF(OptionT.none[IO, MaybeAuthUser]),
+      AuthMiddleware.defaultAuthFailure[IO]
+    )
 
   def givenAuthMiddleware(returning: OptionT[IO, AuthUser]): AuthMiddleware[IO, AuthUser] =
     AuthMiddleware {
       Kleisli liftF returning
     }
 
-  def givenAuthFailing(): AuthMiddleware[IO, Option[AuthUser]] = AuthMiddleware {
+  def givenAuthFailing(): AuthMiddleware[IO, MaybeAuthUser] = AuthMiddleware {
     Kleisli(_ => OptionT.none)
   }
 

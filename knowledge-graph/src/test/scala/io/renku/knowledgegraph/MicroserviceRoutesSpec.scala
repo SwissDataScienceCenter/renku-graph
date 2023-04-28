@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{EitherT, Kleisli, OptionT}
+import cats.data.{EitherT, Kleisli}
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
@@ -42,7 +42,7 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
@@ -80,14 +80,14 @@ class MicroserviceRoutesSpec
 
     s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
       val phrase        = nonEmptyStrings().generateOne
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Phrase(phrase).some,
                  Sorting(Sort.By(TitleProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
-                 maybeAuthUser
+                 maybeAuthUser.option
         )
         .returning(IO.pure(Response[IO](Ok)))
 
@@ -98,14 +98,14 @@ class MicroserviceRoutesSpec
 
     s"return $Ok when no ${query.parameterName} parameter given" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Option.empty[Phrase],
                  Sorting(Sort.By(TitleProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
-                 maybeAuthUser
+                 maybeAuthUser.option
         )
         .returning(IO.pure(Response[IO](Ok)))
 
@@ -122,7 +122,7 @@ class MicroserviceRoutesSpec
       val sortBy = Sort.By(sortProperty, Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc).generateOne)
 
       s"return $Ok when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
-        val maybeAuthUser = authUsers.generateOption
+        val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
         val phrase = phrases.generateOne
         val request = Request[IO](
@@ -133,7 +133,7 @@ class MicroserviceRoutesSpec
         )
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
-          .expects(phrase.some, Sorting(sortBy), PagingRequest.default, maybeAuthUser)
+          .expects(phrase.some, Sorting(sortBy), PagingRequest.default, maybeAuthUser.option)
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes(maybeAuthUser).call(request)
@@ -146,7 +146,7 @@ class MicroserviceRoutesSpec
 
     s"return $Ok when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
       forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
-        val maybeAuthUser = authUsers.generateOption
+        val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
         val request = Request[IO](
           GET,
@@ -160,7 +160,7 @@ class MicroserviceRoutesSpec
           .expects(phrase.some,
                    Sorting(Sort.By(TitleProperty, Direction.Asc)),
                    PagingRequest(page, perPage),
-                   maybeAuthUser
+                   maybeAuthUser.option
           )
           .returning(IO.pure(Response[IO](Ok)))
 
@@ -214,10 +214,14 @@ class MicroserviceRoutesSpec
     } { (dsIdType, requestedDS) =>
       s"return $Ok when a valid $dsIdType given" in new TestCase {
 
-        val maybeAuthUser = authUsers.generateOption
+        val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
-        val authContext = AuthContext(maybeAuthUser, requestedDS, projectPaths.generateSet())
-        givenDSAuthorizer(requestedDS, maybeAuthUser, returning = rightT[IO, EndpointSecurityException](authContext))
+        val authContext = AuthContext(maybeAuthUser.option, requestedDS, projectPaths.generateSet())
+        givenDSAuthorizer(
+          requestedDS,
+          maybeAuthUser.option,
+          returning = rightT[IO, EndpointSecurityException](authContext)
+        )
 
         (datasetDetailsEndpoint.`GET /datasets/:id` _)
           .expects(requestedDS, authContext)
@@ -236,7 +240,7 @@ class MicroserviceRoutesSpec
     }
 
     s"return $Unauthorized when user authentication failed" in new TestCase {
-      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+      routes(givenAuthAsUnauthorized)
         .call(Request(GET, uri"/knowledge-graph/datasets" / RequestedDataset(datasetIdentifiers.generateOne)))
         .status shouldBe Unauthorized
     }
@@ -244,11 +248,12 @@ class MicroserviceRoutesSpec
     s"return $NotFound when user has no rights for the project the dataset belongs to" in new TestCase {
 
       val id            = datasetIdentifiers.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
 
-      givenDSIdAuthorizer(id,
-                          maybeAuthUser,
-                          returning = leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure)
+      givenDSIdAuthorizer(
+        id,
+        maybeAuthUser.option,
+        returning = leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure)
       )
 
       val response = routes(maybeAuthUser).call(Request(GET, uri"/knowledge-graph/datasets" / RequestedDataset(id)))
@@ -414,12 +419,12 @@ class MicroserviceRoutesSpec
     }
 
     "authenticate user from the request if given" in new TestCase {
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser.apply(authUsers.generateOption)
       val request       = Request[IO](GET, uri"/knowledge-graph/entities")
 
       val responseBody = jsons.generateOne
       (entitiesEndpoint.`GET /entities` _)
-        .expects(Criteria(maybeUser = maybeAuthUser), request)
+        .expects(Criteria(maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -454,41 +459,41 @@ class MicroserviceRoutesSpec
 
     s"return $Accepted for valid path parameters and user" in new TestCase {
 
-      val authUser = authUsers.generateOne
+      val authUser = MaybeAuthUser.apply(authUsers.generateOne)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, authUser.some)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.some, projectPath, Set(projectPath))))
+        .expects(projectPath, authUser.option)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectPath, Set(projectPath))))
 
       (projectDeleteEndpoint
         .`DELETE /projects/:path`(_: model.projects.Path, _: AuthUser))
-        .expects(projectPath, authUser)
+        .expects(projectPath, authUser.option.get)
         .returning(Response[IO](Accepted).pure[IO])
 
-      routes(authUser.some).call(request).status shouldBe Accepted
+      routes(authUser).call(request).status shouldBe Accepted
 
       routesMetrics.clearRegistry()
     }
 
     s"return $Unauthorized when authentication fails" in new TestCase {
-      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+      routes(givenAuthAsUnauthorized)
         .call(request)
         .status shouldBe Unauthorized
     }
 
     s"return $NotFound when no auth header" in new TestCase {
-      routes(maybeAuthUser = None).call(request).status shouldBe NotFound
+      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
     }
 
     s"return $NotFound when the user has no rights to the project" in new TestCase {
 
-      val authUser = authUsers.generateOne
+      val authUser = MaybeAuthUser(authUsers.generateOne)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, authUser.some)
+        .expects(projectPath, authUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
-      val response = routes(authUser.some).call(request)
+      val response = routes(authUser).call(request)
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
@@ -500,17 +505,19 @@ class MicroserviceRoutesSpec
 
     s"return $Ok for valid path parameters" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val projectPath   = projectPaths.generateOne
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
       (projectDetailsEndpoint
         .`GET /projects/:path`(_: model.projects.Path, _: Option[AuthUser])(_: Request[IO]))
-        .expects(projectPath, maybeAuthUser, request)
+        .expects(projectPath, maybeAuthUser.option, request)
         .returning(Response[IO](Ok).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -520,7 +527,7 @@ class MicroserviceRoutesSpec
 
     s"return $NotFound for invalid project paths" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val namespace     = nonBlankStrings().generateOne.value
 
       val response = routes(maybeAuthUser).call(
@@ -533,18 +540,18 @@ class MicroserviceRoutesSpec
     }
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
-      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+      routes(givenAuthAsUnauthorized)
         .call(Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}")))
         .status shouldBe Unauthorized
     }
 
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val projectPath   = projectPaths.generateOne
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
+        .expects(projectPath, maybeAuthUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser).call(
@@ -561,11 +568,13 @@ class MicroserviceRoutesSpec
 
     s"return $Ok for valid path parameters" in new TestCase {
       val projectPath   = projectPaths.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
@@ -577,7 +586,7 @@ class MicroserviceRoutesSpec
     }
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
-      routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
+      routes(givenAuthAsUnauthorized)
         .call(
           Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}/datasets"))
         )
@@ -586,10 +595,10 @@ class MicroserviceRoutesSpec
 
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
       val projectPath   = projectPaths.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
+        .expects(projectPath, maybeAuthUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser)
@@ -668,17 +677,19 @@ class MicroserviceRoutesSpec
 
     "authenticate user from the request if given" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val request       = Request[IO](GET, projectDsTagsUri)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       val responseBody = jsons.generateOne
       (projectDatasetTagsEndpoint
         .`GET /projects/:path/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
-        .expects(Criteria(projectPath, datasetName, maybeUser = maybeAuthUser), request)
+        .expects(Criteria(projectPath, datasetName, maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -696,18 +707,20 @@ class MicroserviceRoutesSpec
     s"return $Ok when the lineage is found" in new TestCase {
       val projectPath   = projectPaths.generateOne
       val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val uri           = lineageUri(projectPath, location)
       val request       = Request[IO](GET, uri)
 
       val responseBody = jsons.generateOne
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
+        .expects(projectPath, location, maybeAuthUser.option)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       val response = routes(maybeAuthUser).call(request)
@@ -720,15 +733,17 @@ class MicroserviceRoutesSpec
     s"return $NotFound for a lineage which isn't found" in new TestCase {
       val projectPath   = projectPaths.generateOne
       val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val uri           = lineageUri(projectPath, location)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
+        .expects(projectPath, location, maybeAuthUser.option)
         .returning(Response[IO](NotFound).pure[IO])
 
       val response = routes(maybeAuthUser).call(Request[IO](GET, uri))
@@ -740,17 +755,19 @@ class MicroserviceRoutesSpec
 
       val projectPath   = projectPaths.generateOne
       val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val request       = Request[IO](GET, lineageUri(projectPath, location))
 
       val responseBody = jsons.generateOne
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+        .expects(projectPath, maybeAuthUser.option)
+        .returning(
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+        )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
+        .expects(projectPath, location, maybeAuthUser.option)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -836,12 +853,12 @@ class MicroserviceRoutesSpec
 
     "authenticate user from the request if given" in new TestCase {
 
-      val maybeAuthUser = authUsers.generateOption
+      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
       val request       = Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects")
 
       val responseBody = jsons.generateOne
       (usersProjectsEndpoint.`GET /users/:id/projects` _)
-        .expects(Criteria(userId, maybeUser = maybeAuthUser), request)
+        .expects(Criteria(userId, maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -900,11 +917,13 @@ class MicroserviceRoutesSpec
     val routesMetrics                   = TestRoutesMetrics()
     private val versionRoutes           = mock[version.Routes[IO]]
 
-    def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
-      givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))
+    def routes(
+        maybeAuthUser: MaybeAuthUser = MaybeAuthUser.noUser
+    ): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
+      givenAuthIfNeededMiddleware(returning = IO.pure(maybeAuthUser))
     )
 
-    def routes(middleware: AuthMiddleware[IO, Option[AuthUser]]): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] =
+    def routes(middleware: AuthMiddleware[IO, MaybeAuthUser]): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] =
       new MicroserviceRoutes[IO](
         datasetsSearchEndpoint,
         datasetDetailsEndpoint,

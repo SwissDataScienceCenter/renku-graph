@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice
 
-import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.{authUsers, httpStatuses}
@@ -26,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestRoutesMetrics
@@ -118,8 +117,22 @@ class MicroserviceRoutesSpec
       val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
       val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
       (eventStatusEndpoint
-        .fetchProcessingStatus(_: projects.GitLabId, _: AuthUser))
-        .expects(projectId, authUser)
+        .fetchProcessingStatus(_: projects.GitLabId, _: Option[AuthUser]))
+        .expects(projectId, authUser.some)
+        .returning(IO.pure(Response[IO](responseStatus)))
+
+      routes.call(request).status shouldBe responseStatus
+    }
+
+    "return Ok response from the endpoint without a user" in new TestCase {
+      override val authenticationResponse = IO.pure(MaybeAuthUser.noUser)
+
+      val projectId      = projectIds.generateOne
+      val request        = Request[IO](Method.GET, uri"/projects" / projectId / "events" / "status")
+      val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
+      (eventStatusEndpoint
+        .fetchProcessingStatus(_: projects.GitLabId, _: Option[AuthUser]))
+        .expects(projectId, None)
         .returning(IO.pure(Response[IO](responseStatus)))
 
       routes.call(request).status shouldBe responseStatus
@@ -127,15 +140,6 @@ class MicroserviceRoutesSpec
 
     "return NotFound when no :id path parameter given" in new TestCase {
       routes.call(Request(Method.GET, uri"/projects/")).status shouldBe NotFound
-    }
-
-    "return Unauthorized when user is not authorized" in new TestCase {
-
-      override val authenticationResponse = OptionT.none[IO, AuthUser]
-
-      val request = Request[IO](Method.GET, uri"/projects" / projectIds.generateOne / "events" / "status")
-
-      routes.call(request).status shouldBe Unauthorized
     }
 
     "return response from the endpoint" in new TestCase {
@@ -156,7 +160,7 @@ class MicroserviceRoutesSpec
 
     "return Unauthorized when the user is not authorized" in new TestCase {
 
-      override val authenticationResponse = OptionT.none[IO, AuthUser]
+      override val authenticationResponse = IO.pure(MaybeAuthUser.noUser)
 
       val projectId = projectIds.generateOne
       val request   = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks")
@@ -182,7 +186,7 @@ class MicroserviceRoutesSpec
 
     "return Unauthorized when user is not authorized" in new TestCase {
 
-      override val authenticationResponse = OptionT.none[IO, AuthUser]
+      override val authenticationResponse = IO.pure(MaybeAuthUser.noUser)
 
       val projectId = projectIds.generateOne
       val request   = Request[IO](Method.POST, uri"/projects" / projectId / "webhooks" / "validation")
@@ -199,8 +203,9 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val authUser               = authUsers.generateOne
-    val authenticationResponse = OptionT.some[IO](authUser)
+    val authUser = authUsers.generateOne
+
+    val authenticationResponse = IO.pure(MaybeAuthUser(authUser))
     val webhookEventsEndpoint  = mock[webhookevents.Endpoint[IO]]
     val hookCreationEndpoint   = mock[HookCreationEndpoint[IO]]
     val hookDeletionEndpoint   = mock[HookDeletionEndpoint[IO]]
@@ -214,7 +219,7 @@ class MicroserviceRoutesSpec
       hookValidationEndpoint,
       hookDeletionEndpoint,
       eventStatusEndpoint,
-      givenAuthMiddleware(returning = authenticationResponse),
+      givenAuthIfNeededMiddleware(returning = authenticationResponse),
       routesMetrics,
       versionRoutes
     ).routes.map(_.or(notAvailableResponse))
