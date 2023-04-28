@@ -66,7 +66,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder
       case None =>
         NotFound(InfoMessage("Project does not exist"))
       case Some(project) =>
-        deleteProject(project.path) >>
+        deleteProject(project.id) >>
           Spawn[F].start(waitForDeletion(project.path) >> sendEvents(project)) >>
           Accepted(InfoMessage("Project deleted"))
     }

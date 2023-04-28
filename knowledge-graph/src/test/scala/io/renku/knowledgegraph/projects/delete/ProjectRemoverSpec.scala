@@ -26,7 +26,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -50,9 +50,9 @@ class ProjectRemoverSpec
 
     "call the Delete Project GL API" in new TestCase {
 
-      givenDeleteAPICall(path, returning = ().pure[IO])
+      givenDeleteAPICall(id, returning = ().pure[IO])
 
-      remover.deleteProject(path).unsafeRunSync() shouldBe ()
+      remover.deleteProject(id).unsafeRunSync() shouldBe ()
     }
 
     Set(Ok, Accepted, NoContent, NotFound) foreach { status =>
@@ -71,20 +71,20 @@ class ProjectRemoverSpec
   private trait TestCase {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val path = projectPaths.generateOne
+    val id = projectIds.generateOne
 
     private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val remover = new ProjectRemoverImpl[IO]
 
-    def givenDeleteAPICall(path: projects.Path, returning: IO[Unit]) = {
+    def givenDeleteAPICall(id: projects.GitLabId, returning: IO[Unit]) = {
       val endpointName: String Refined NonEmpty = "project-delete"
       (glClient
         .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
-        .expects(uri"projects" / path, endpointName, *, accessToken.some)
+        .expects(uri"projects" / id, endpointName, *, accessToken.some)
         .returning(returning)
     }
 
     lazy val mapResponse: ResponseMappingF[IO, Unit] =
-      captureMapping(glClient)(remover.deleteProject(projectPaths.generateOne).unsafeRunSync(), (), method = DELETE)
+      captureMapping(glClient)(remover.deleteProject(projectIds.generateOne).unsafeRunSync(), (), method = DELETE)
   }
 }

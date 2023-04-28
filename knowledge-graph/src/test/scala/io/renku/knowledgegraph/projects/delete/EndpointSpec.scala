@@ -56,7 +56,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       "and return 202 Accepted" in new TestCase {
 
         givenProjectFindingInGL(project.path, returning = project.some.pure[IO])
-        givenProjectDelete(project.path, returning = ().pure[IO])
+        givenProjectDelete(project.id, returning = ().pure[IO])
         givenProjectFindingInGL(project.path, returning = None.pure[IO])
         givenCommitSyncRequestSent(project, returning = ().pure[IO])
         givenCleanUpRequestSent(project, returning = ().pure[IO])
@@ -79,7 +79,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
         givenProjectFindingInGL(project.path, returning = None.pure[IO]).atLeastOnce()
         givenProjectFindingInEL(project.path, returning = project.some.pure[IO])
-        givenProjectDelete(project.path, returning = ().pure[IO])
+        givenProjectDelete(project.id, returning = ().pure[IO])
         givenCommitSyncRequestSent(project, returning = ().pure[IO])
         givenCleanUpRequestSent(project, returning = ().pure[IO])
 
@@ -108,7 +108,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     "be sure the project gets deleted from GL before the COMMIT_SYNC_REQUEST event is sent to EL" in new TestCase {
 
       givenProjectFindingInGL(project.path, returning = project.some.pure[IO])
-      givenProjectDelete(project.path, returning = ().pure[IO])
+      givenProjectDelete(project.id, returning = ().pure[IO])
       givenProjectFindingInGL(project.path, returning = project.some.pure[IO])
       givenProjectFindingInGL(project.path, returning = None.pure[IO])
       givenCommitSyncRequestSent(project, returning = ().pure[IO])
@@ -124,7 +124,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
       givenProjectFindingInGL(project.path, returning = project.some.pure[IO])
       val exception = exceptions.generateOne
-      givenProjectDelete(project.path, returning = exception.raiseError[IO, Unit])
+      givenProjectDelete(project.id, returning = exception.raiseError[IO, Unit])
 
       val response = endpoint.`DELETE /projects/:path`(project.path, authUser).unsafeRunSync()
 
@@ -162,10 +162,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         .expects(path)
         .returning(returning)
 
-    def givenProjectDelete(path: projects.Path, returning: IO[Unit]) =
+    def givenProjectDelete(id: projects.GitLabId, returning: IO[Unit]) =
       (projectRemover
-        .deleteProject(_: projects.Path)(_: AccessToken))
-        .expects(path, authUser.accessToken)
+        .deleteProject(_: projects.GitLabId)(_: AccessToken))
+        .expects(id, authUser.accessToken)
         .returning(returning)
 
     val ensureCommitSyncSent = Deferred.unsafe[IO, Boolean]
