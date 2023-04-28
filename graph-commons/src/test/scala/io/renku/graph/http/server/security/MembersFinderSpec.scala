@@ -113,7 +113,7 @@ class MembersFinderSpec
       val endpointName: String Refined NonEmpty = "project-members"
 
       val uri = {
-        val uri = uri"projects" / projectPath / "members"
+        val uri = uri"projects" / projectPath / "members" / "all"
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri

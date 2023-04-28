@@ -32,15 +32,21 @@ import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.typelevel.log4cats.Logger
+import scala.concurrent.duration._
 
 private trait KGProjectMembersFinder[F[_]] {
   def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]]
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    connectionConfig: ProjectsConnectionConfig
+    connectionConfig: ProjectsConnectionConfig,
+    idleTimeout:      Duration = 21 minutes,
+    requestTimeout:   Duration = 20 minutes
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClientImpl(connectionConfig)
+    extends TSClientImpl(connectionConfig,
+                         idleTimeoutOverride = idleTimeout.some,
+                         requestTimeoutOverride = requestTimeout.some
+    )
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
