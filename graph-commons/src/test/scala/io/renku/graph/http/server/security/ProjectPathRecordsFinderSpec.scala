@@ -18,54 +18,59 @@
 
 package io.renku.graph.http.server.security
 
-import cats.effect.IO
+import cats.syntax.all._
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.graph.http.server.security.Authorizer.SecurityRecord
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personGitLabIds, projectPaths, projectVisibilities}
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathRecordsFinderSpec
-    extends AnyWordSpec
-    with IOSpec
-    with EntitiesGenerators
-    with InMemoryJenaForSpec
-    with ProjectsDataset
-    with should.Matchers {
+import scala.util.Try
+
+class ProjectPathRecordsFinderSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
 
   "apply" should {
 
-    "return SecurityRecords with project visibility and all project members" in new TestCase {
-      val project = anyProjectEntities.generateOne
+    "return SecurityRecords from the TS when found" in new TestCase {
 
-      upload(to = projectsDataset, project)
+      val securityRecords = securityRecordsGen.generateList(min = 1)
+      givenTSPathRecordsFinder(returning = securityRecords.pure[Try])
 
-      recordsFinder(project.path).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
-      )
+      recordsFinder(projectPath, maybeAuthUser).success.value shouldBe securityRecords
     }
 
-    "return SecurityRecords with project visibility and no member is project has none" in new TestCase {
-      val project = renkuProjectEntities(anyVisibility).generateOne.copy(members = Set.empty)
+    "return SecurityRecords from the GL when no records found in TS" in new TestCase {
 
-      upload(to = projectsDataset, project)
+      givenTSPathRecordsFinder(returning = Nil.pure[Try])
 
-      recordsFinder(project.path).unsafeRunSync() shouldBe List(
-        (project.visibility, project.path, Set.empty)
-      )
-    }
+      val securityRecords = securityRecordsGen.generateList(min = 1)
+      givenGLPathRecordsFinder(returning = securityRecords.pure[Try])
 
-    "nothing if there's no project with the given path" in new TestCase {
-      recordsFinder(projectPaths.generateOne).unsafeRunSync() shouldBe Nil
+      recordsFinder(projectPath, maybeAuthUser).success.value shouldBe securityRecords
     }
   }
 
   private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
+
+    val projectPath   = projectPaths.generateOne
+    val maybeAuthUser = authUsers.generateOption
+
+    private val tsPathRecordsFinder = mock[TSPathRecordsFinder[Try]]
+    private val glPathRecordsFinder = mock[GitLabPathRecordsFinder[Try]]
+    val recordsFinder               = new ProjectPathRecordsFinderImpl[Try](tsPathRecordsFinder, glPathRecordsFinder)
+
+    def givenTSPathRecordsFinder(returning: Try[List[SecurityRecord]]) =
+      (tsPathRecordsFinder.apply _).expects(projectPath, maybeAuthUser).returning(returning)
+
+    def givenGLPathRecordsFinder(returning: Try[List[SecurityRecord]]) =
+      (glPathRecordsFinder.apply _).expects(projectPath, maybeAuthUser).returning(returning)
+
+    val securityRecordsGen: Gen[SecurityRecord] =
+      (projectVisibilities, personGitLabIds.toGeneratorOfSet(min = 0))
+        .mapN(SecurityRecord(_, projectPath, _))
   }
 }
