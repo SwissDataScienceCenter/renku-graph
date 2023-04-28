@@ -21,9 +21,8 @@ package io.renku.http.server.security
 import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.http.client.UserAccessToken
 import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
-import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
+import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.model._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -32,7 +31,7 @@ import org.http4s.{AuthedRoutes, Request}
 import org.typelevel.ci._
 
 private trait Authentication[F[_]] {
-  def authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, Option[AuthUser]]]
+  def authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, MaybeAuthUser]]
   def authenticate:         Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]]
 }
 
@@ -40,18 +39,16 @@ private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[
 
   import org.http4s.{Header, Request}
 
-  override val authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, Option[AuthUser]]] =
+  override val authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, MaybeAuthUser]] =
     Kleisli { request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
-        case Some(token) => authenticator.authenticate(token).map(_.map(Option.apply))
-        case None        => Option.empty[AuthUser].asRight[EndpointSecurityException].pure[F]
+        case Some(token) => authenticator.authenticate(token).map(_.map(MaybeAuthUser.apply))
+        case None        => MaybeAuthUser.noUser.asRight[EndpointSecurityException].pure[F]
       }
     }
 
-  override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] = {
-    val ifNone = (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser]
-    authenticateIfNeeded.map(_.flatMap(_.fold(ifNone)(_.asRight)))
-  }
+  override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] =
+    authenticateIfNeeded.map(_.flatMap(_.required))
 
   private implicit class RequestOps(request: Request[F]) {
 
@@ -77,14 +74,14 @@ object Authentication {
 
   def middlewareAuthenticatingIfNeeded[F[_]: MonadThrow](
       authenticator: Authenticator[F]
-  ): F[AuthMiddleware[F, Option[AuthUser]]] = MonadThrow[F].catchNonFatal {
+  ): F[AuthMiddleware[F, MaybeAuthUser]] = MonadThrow[F].catchNonFatal {
     middlewareAuthenticatingIfNeeded[F](new AuthenticationImpl[F](authenticator))
   }
 
   private[security] def middlewareAuthenticatingIfNeeded[F[_]: MonadThrow](
       authentication: Authentication[F]
-  ): AuthMiddleware[F, Option[AuthUser]] =
-    AuthMiddleware[F, EndpointSecurityException, Option[AuthUser]](authentication.authenticateIfNeeded, onFailure)
+  ): AuthMiddleware[F, MaybeAuthUser] =
+    AuthMiddleware[F, EndpointSecurityException, MaybeAuthUser](authentication.authenticateIfNeeded, onFailure)
 
   def middleware[F[_]: MonadThrow](
       authenticator: Authenticator[F]
