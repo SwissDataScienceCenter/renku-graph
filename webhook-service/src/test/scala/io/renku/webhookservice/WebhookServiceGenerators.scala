@@ -28,15 +28,6 @@ import org.scalacheck.Gen
 
 object WebhookServiceGenerators {
 
-  implicit val commitSyncRequests: Gen[CommitSyncRequest] = for {
-    project <- projects
-  } yield CommitSyncRequest(project)
-
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
-
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings() map Refined.unsafeApply
 
   implicit val hookTokens: Gen[HookToken] = for {

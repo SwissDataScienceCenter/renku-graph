@@ -31,6 +31,8 @@ private sealed trait StatusInfo extends Product {
   def progress:  Progress
 
   def fold[A](activated: StatusInfo.ActivatedProject => A, whenNotActivated: => A): A
+
+  lazy val widen: StatusInfo = this
 }
 
 private object StatusInfo {
