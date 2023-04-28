@@ -89,7 +89,7 @@ private trait MembersFinder[F[_]] {
 private class MembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends MembersFinder[F] {
 
   override def findMembers(path: projects.Path)(implicit mat: Option[AccessToken]): F[Set[persons.GitLabId]] =
-    fetch(uri"projects" / path / "members")
+    fetch(uri"projects" / path / "members" / "all")
 
   private def fetch(
       uri:        Uri,

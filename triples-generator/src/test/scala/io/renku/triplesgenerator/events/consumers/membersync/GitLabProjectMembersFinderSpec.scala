@@ -51,6 +51,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester.jsonEntityEncoder
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -63,7 +64,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import org.typelevel.ci.CIStringSyntax
+import org.typelevel.ci._
 
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
@@ -76,36 +77,29 @@ class GitLabProjectMembersFinderSpec
 
   "findProjectMembers" should {
 
-    "return a set of project members and users" in new TestCase {
-      forAll { (gitLabProjectUsers: Set[GitLabProjectMember], gitLabProjectMembers: Set[GitLabProjectMember]) =>
-        setGitLabClientExpectation(path, "users", "project-users", None, returning = (gitLabProjectUsers, None))
-        setGitLabClientExpectation(path, "members", "project-members", None, returning = (gitLabProjectMembers, None))
+    "return a set of all project members" in new TestCase {
+      forAll { gitLabProjectMembers: Set[GitLabProjectMember] =>
+        setGitLabClientExpectation(path, None, returning = (gitLabProjectMembers, None))
 
-        finder.findProjectMembers(path).unsafeRunSync() shouldBe (gitLabProjectUsers ++ gitLabProjectMembers)
+        finder.findProjectMembers(path).unsafeRunSync() shouldBe gitLabProjectMembers
       }
     }
 
-    "collect users from paged results" in new TestCase {
-      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+    "collect members from all pages of results" in new TestCase {
+
       val projectMembers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
 
-      setGitLabClientExpectation(path, "users", "project-users", None, returning = (Set(projectUsers.head), 2.some))
-      setGitLabClientExpectation(path, "users", "project-users", 2.some, returning = (projectUsers.tail, None))
-      setGitLabClientExpectation(path,
-                                 "members",
-                                 "project-members",
-                                 None,
-                                 returning = (Set(projectMembers.head), 2.some)
-      )
-      setGitLabClientExpectation(path, "members", "project-members", 2.some, returning = (projectMembers.tail, None))
+      setGitLabClientExpectation(path, None, returning = (Set(projectMembers.head), 2.some))
+      setGitLabClientExpectation(path, 2.some, returning = (projectMembers.tail, None))
 
-      finder.findProjectMembers(path).unsafeRunSync() shouldBe (projectUsers ++ projectMembers)
+      finder.findProjectMembers(path).unsafeRunSync() shouldBe projectMembers
     }
 
     // test map response
 
     "parse results and request next page" in new TestCase {
-      val projectUsers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+
+      val members = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
 
       val nextPage   = 2
       val totalPages = 2
@@ -113,8 +107,8 @@ class GitLabProjectMembersFinderSpec
         List(Header.Raw(ci"X-Next-Page", nextPage.toString), Header.Raw(ci"X-Total-Pages", totalPages.toString))
       )
 
-      mapResponse(Status.Ok, Request(), Response().withEntity(projectUsers.asJson).withHeaders(headers))
-        .unsafeRunSync() shouldBe (projectUsers, Some(2))
+      mapResponse(Status.Ok, Request(), Response().withEntity(members.asJson).withHeaders(headers))
+        .unsafeRunSync() shouldBe (members, Some(2))
     }
 
     "return an empty set when service responds with NOT_FOUND" in new TestCase {
@@ -124,6 +118,7 @@ class GitLabProjectMembersFinderSpec
 
     Forbidden +: Unauthorized +: Nil foreach { status =>
       s"try without an access token when service responds with $status" in new TestCase {
+
         val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
 
         implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
@@ -135,18 +130,13 @@ class GitLabProjectMembersFinderSpec
             expectedNumberOfCalls = 2
           )
 
-        setGitLabClientExpectation(path,
-                                   "members",
-                                   "project-members",
-                                   maybePage = None,
-                                   maybeAccessTokenOverride = None,
-                                   returning = (members, None)
-        )
+        setGitLabClientExpectation(path, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
 
         mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (members, None)
       }
 
       s"return an empty set when service responds with $status without access token" in new TestCase {
+
         implicit override val maybeAccessToken: Option[AccessToken] = Option.empty[AccessToken]
 
         override val mapResponse =
@@ -173,14 +163,14 @@ class GitLabProjectMembersFinderSpec
     val finder = new GitLabProjectMembersFinderImpl[IO]
 
     def setGitLabClientExpectation(projectPath:              projects.Path,
-                                   path:                     String,
-                                   endpointName:             String Refined NonEmpty,
                                    maybePage:                Option[Int] = None,
                                    maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
                                    returning:                (Set[GitLabProjectMember], Option[Int])
     ) = {
+      val endpointName: String Refined NonEmpty = "project-members"
+
       val uri = {
-        val uri = uri"projects" / projectPath.show / path
+        val uri = uri"projects" / projectPath / "members" / "all"
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri
@@ -206,9 +196,9 @@ class GitLabProjectMembersFinderSpec
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
     member =>
       json"""{
-        "id":        ${member.gitLabId.value},
-        "username":  ${member.name.value},
-        "name":      ${member.name.value}
+        "id":       ${member.gitLabId.value},
+        "username": ${member.name.value},
+        "name":     ${member.name.value}
       }"""
   }
 }
