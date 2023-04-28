@@ -36,8 +36,8 @@ private[membersync] object KGSynchronizer {
       updatesCreator         <- UpdatesCreator[F]
       connectionConfig       <- ProjectsConnectionConfig[F]()
       tsClient <- TSClient[F](connectionConfig,
-                              idleTimeoutOverride = (11 minutes).some,
-                              requestTimeoutOverride = (10 minutes).some
+                              idleTimeoutOverride = (21 minutes).some,
+                              requestTimeoutOverride = (20 minutes).some
                   ).pure[F]
     } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, tsClient)
 
