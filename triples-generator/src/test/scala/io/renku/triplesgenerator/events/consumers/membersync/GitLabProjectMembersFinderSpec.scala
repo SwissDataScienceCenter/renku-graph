@@ -126,8 +126,7 @@ class GitLabProjectMembersFinderSpec
         override val mapResponse =
           captureMapping(gitLabClient)(
             finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-            expectedNumberOfCalls = 2
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
           )
 
         setGitLabClientExpectation(path, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
@@ -142,8 +141,7 @@ class GitLabProjectMembersFinderSpec
         override val mapResponse =
           captureMapping(gitLabClient)(
             finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
-            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-            expectedNumberOfCalls = 2
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
           )
 
         val actual   = mapResponse(status, Request(), Response()).unsafeRunSync()
@@ -188,8 +186,7 @@ class GitLabProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
-        Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
-        expectedNumberOfCalls = 2
+        Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
       )
   }
 

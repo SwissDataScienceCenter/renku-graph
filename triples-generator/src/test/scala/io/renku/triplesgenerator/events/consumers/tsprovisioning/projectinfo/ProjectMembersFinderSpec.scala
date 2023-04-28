@@ -150,8 +150,7 @@ class ProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(projectPath)(maybeAccessToken).value.unsafeRunSync(),
-        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int])),
-        expectedNumberOfCalls = 2
+        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int]))
       )
   }
 
