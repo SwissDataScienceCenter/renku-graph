@@ -33,6 +33,7 @@ trait Client[F[_]] {
   def send(event: ProjectViewedEvent):     F[Unit]
   def send(event: DatasetViewedEvent):     F[Unit]
   def send(event: ProjectViewingDeletion): F[Unit]
+  def send(event: CleanUpEvent):           F[Unit]
 }
 
 object Client {
@@ -58,6 +59,9 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
 
   override def send(event: ProjectViewingDeletion): F[Unit] =
     send(event, ProjectViewingDeletion.categoryName)
+
+  override def send(event: CleanUpEvent): F[Unit] =
+    send(event, CleanUpEvent.categoryName)
 
   private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
     eventSender.sendEvent(

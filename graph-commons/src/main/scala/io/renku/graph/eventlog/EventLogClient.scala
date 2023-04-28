@@ -125,6 +125,7 @@ object EventLogClient {
   }
 
   object SearchCriteria {
+
     def forStatus(status: EventStatus): SearchCriteria =
       SearchCriteria(Ior.right(status), None, None)
 

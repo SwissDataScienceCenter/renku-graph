@@ -18,33 +18,59 @@
 
 package io.renku.triplesgenerator.init
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.interpreters.TestLogger
+import io.renku.triplesgenerator.config.RenkuPythonDevVersion
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
 
   "run" should {
-    "return Unit if the cli version matches the cli version from the compatibility config" in {
+
+    "succeed if the cli version matches the cli version from the compatibility config" in {
+
       val cliVersion   = cliVersions.generateOne
       val compatConfig = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
-      val checker      = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
 
-      checker.run shouldBe Success(())
+      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, maybeRenkuDevVersion = None)
+
+      checker.run.success.value shouldBe ()
     }
 
     "fail if the cli version does not match the cli version from the compatibility config" in {
-      val cliVersion         = cliVersions.generateOne
-      val compatConfig       = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
-      val checker            = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig)
-      val Failure(exception) = checker.run
-      exception shouldBe a[IllegalStateException]
-      exception.getMessage shouldBe s"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
+
+      val cliVersion   = cliVersions.generateOne
+      val compatConfig = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
+
+      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, maybeRenkuDevVersion = None)
+
+      val failure = checker.run.failure
+
+      failure.exception shouldBe a[IllegalStateException]
+      failure.exception.getMessage shouldBe show"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
+    }
+
+    "succeed if there's CliDevVersion configured even if the versions does not match" in {
+
+      val cliVersion      = cliVersions.generateOne
+      val compatConfig    = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
+      val renkuDevVersion = RenkuPythonDevVersion(cliVersions.generateOne.value)
+
+      assume(cliVersion.value != renkuDevVersion.version)
+
+      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, renkuDevVersion.some)
+
+      checker.run.success.value shouldBe ()
     }
   }
+
+  private implicit lazy val logger: TestLogger[Try] = TestLogger[Try]()
 }

@@ -28,8 +28,8 @@ import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Path
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
-import org.http4s._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
+import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
@@ -41,30 +41,27 @@ private trait GitLabProjectMembersFinder[F[_]] {
 
 private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectMembersFinder[F] {
 
-  override def findProjectMembers(
-      path: Path
-  )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
-    users   <- fetch(uri"projects" / path.show / "users", "project-users")
-    members <- fetch(uri"projects" / path.show / "members", "project-members")
-  } yield users ++ members
+  override def findProjectMembers(path: Path)(implicit mat: Option[AccessToken]): F[Set[GitLabProjectMember]] =
+    fetch(uri"projects" / path.show / "members" / "all")
+
+  private val glApiName: String Refined NonEmpty = "project-members"
 
   private def fetch(
-      uri:          Uri,
-      endpointName: NonEmptyString,
-      maybePage:    Option[Int] = None,
-      allUsers:     Set[GitLabProjectMember] = Set.empty
+      uri:        Uri,
+      maybePage:  Option[Int] = None,
+      allMembers: Set[GitLabProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse(uri, endpointName))
-    allUsers                <- addNextPage(uri, endpointName, allUsers, fetchedUsersAndNextPage)
-  } yield allUsers
+    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, glApiName)(mapResponse(uri))
+    allResults              <- addNextPage(uri, allMembers, fetchedUsersAndNextPage)
+  } yield allResults
 
   private def addPageToUrl(uri: Uri, maybePage: Option[Int] = None) = maybePage match {
     case Some(page) => uri.withQueryParam("page", page.toString)
     case None       => uri
   }
 
-  private def mapResponse(uri: Uri, endpointName: NonEmptyString)(implicit
+  private def mapResponse(uri: Uri)(implicit
       maybeAccessToken: Option[AccessToken]
   ): PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
@@ -75,19 +72,18 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
       (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
     case (Unauthorized | Forbidden, _, _) =>
       maybeAccessToken match {
-        case Some(_) => fetch(uri, endpointName)(maybeAccessToken = None).map(_ -> None)
+        case Some(_) => fetch(uri)(maybeAccessToken = None).map(_ -> None)
         case None    => (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
       }
   }
 
   private def addNextPage(
       uri:                          Uri,
-      endpointName:                 NonEmptyString,
       allUsers:                     Set[GitLabProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
-      case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(uri, endpointName, maybeNextPage, allUsers ++ fetchedUsers)
+      case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(uri, maybeNextPage, allUsers ++ fetchedUsers)
       case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[F]
     }
 
@@ -98,16 +94,12 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
     import io.renku.graph.model.persons
 
     implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
-      for {
-        id   <- cursor.downField("id").as[GitLabId]
-        name <- cursor.downField("name").as[persons.Name]
-      } yield GitLabProjectMember(id, name)
+      (cursor.downField("id").as[GitLabId] -> cursor.downField("name").as[persons.Name])
+        .mapN(GitLabProjectMember)
     }
 
     jsonOf[F, List[GitLabProjectMember]]
   }
-
-  type NonEmptyString = String Refined NonEmpty
 }
 
 private object GitLabProjectMembersFinder {

@@ -20,23 +20,32 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import io.circe.syntax._
+import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.{consumerProjects, eventSchedulingResults}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with should.Matchers {
+class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with should.Matchers with EitherValues {
 
   "handlingDefinition.decode" should {
 
     "be the eventDecoder.decode" in new TestCase {
-      handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
+
+      val event = consumerProjects.map(CleanUpEvent(_)).generateOne
+
+      handler
+        .createHandlingDefinition()
+        .decode(EventRequestContent.NoPayload(event.asJson)).value shouldBe event
     }
   }
 
@@ -44,7 +53,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
 
     "be the EventProcessor.process" in new TestCase {
 
-      val event = consumerProjects.map(CleanUpEvent).generateOne
+      val event = consumerProjects.map(CleanUpEvent(_)).generateOne
 
       (eventProcessor.process _).expects(event.project).returns(().pure[IO])
 
@@ -86,7 +95,6 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     val handler = new EventHandler[IO](categoryName,
                                        tsReadinessChecker,
                                        eventProcessor,
-                                       EventDecoder,
                                        subscriptionMechanism,
                                        mock[ProcessExecutor[IO]]
     )

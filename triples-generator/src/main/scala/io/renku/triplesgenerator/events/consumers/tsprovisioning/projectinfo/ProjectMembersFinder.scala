@@ -26,8 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
@@ -53,15 +53,13 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectMembersFinder[F] {
 
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def findProjectMembers(path: projects.Path)(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
-    (
-      fetch(uri"projects" / path.show / "members", "project-members"),
-      fetch(uri"projects" / path.show / "users", "project-users")
-    ).parMapN(_ ++ _)
+  override def findProjectMembers(
+      path: projects.Path
+  )(implicit mat: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
+    fetch(uri"projects" / path / "members" / "all")
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
@@ -73,18 +71,18 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
       username <- cursor.downField("username").as[persons.Username]
     } yield ProjectMember(name, username, gitLabId)
 
-  private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
-  private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
+  private implicit lazy val membersDecoder: EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
+
+  private val endpointName: String Refined NonEmpty = "project-members"
 
   private def fetch(
-      uri:          Uri,
-      endpointName: String Refined NonEmpty,
-      maybePage:    Option[Int] = None,
-      allMembers:   Set[ProjectMember] = Set.empty
+      uri:        Uri,
+      maybePage:  Option[Int] = None,
+      allMembers: Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
     fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse)
-    allMembers              <- addNextPage(uri, endpointName, allMembers, fetchedUsersAndNextPage)
+    allMembers              <- addNextPage(uri, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 
   private def uriWithPage(uri: Uri, maybePage: Option[Int]) = maybePage match {
@@ -102,13 +100,11 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClie
 
   private def addNextPage(
       url:                          Uri,
-      endpointName:                 String Refined NonEmpty,
       allMembers:                   Set[ProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[ProjectMember], Option[Int])
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
-      case (fetchedUsers, maybeNextPage @ Some(_)) =>
-        fetch(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
-      case (fetchedUsers, None) => (allMembers ++ fetchedUsers).pure[F]
+      case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allMembers ++ fetchedUsers)
+      case (fetchedUsers, None)                    => (allMembers ++ fetchedUsers).pure[F]
     }
 }

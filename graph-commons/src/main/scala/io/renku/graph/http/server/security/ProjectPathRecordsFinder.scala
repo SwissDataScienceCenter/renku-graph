@@ -20,66 +20,28 @@ package io.renku.graph.http.server.security
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure}
-import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.{projects, GraphClass, RenkuUrl}
-import io.renku.graph.model.entities.Person
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.{ResourceId, Visibility}
-import io.renku.graph.model.projects.Visibility._
-import io.renku.graph.model.views.RdfResource
-import io.renku.triplesstore._
-import io.renku.triplesstore.ResultsDecoder._
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import cats.{MonadThrow, Parallel}
+import io.renku.graph.http.server.security.Authorizer.SecurityRecordFinder
+import io.renku.graph.model.projects
+import io.renku.http.client.GitLabClient
+import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object ProjectPathRecordsFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, projects.Path]] = for {
-    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
-    storeConfig                   <- ProjectsConnectionConfig[F]()
-  } yield new ProjectPathRecordsFinderImpl[F](storeConfig)
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient]
+      : F[SecurityRecordFinder[F, projects.Path]] =
+    (TSPathRecordsFinder[F] -> GitLabPathRecordsFinder[F])
+      .mapN(new ProjectPathRecordsFinderImpl[F](_, _))
 }
 
-private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig: ProjectsConnectionConfig
-)(implicit renkuUrl: RenkuUrl)
-    extends TSClientImpl(storeConfig)
-    with SecurityRecordFinder[F, projects.Path] {
+private class ProjectPathRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSPathRecordsFinder[F],
+                                                             glPathRecordsFinder: GitLabPathRecordsFinder[F]
+) extends SecurityRecordFinder[F, projects.Path] {
 
-  override def apply(path: projects.Path): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](query(ResourceId(path)))(recordsDecoder(path))
-
-  import eu.timepit.refined.auto._
-  import io.renku.graph.model.Schemas._
-
-  private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
-    name = "authorise - project path",
-    Prefixes of (renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
-        |FROM <${GraphClass.Persons.id}>
-        |FROM ${resourceId.showAs[RdfResource]} {
-        |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
-        |  ?projectId a schema:Project;
-        |             renku:projectVisibility ?visibility.
-        |  OPTIONAL {
-        |    ?projectId schema:member/schema:sameAs ?sameAsId.
-        |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-        |              schema:identifier ?maybeMemberGitLabId.
-        |  }
-        |}
-        |GROUP BY ?projectId ?visibility
-        |""".stripMargin
-  )
-
-  private def recordsDecoder(path: projects.Path): Decoder[List[SecurityRecord]] =
-    ResultsDecoder[List, SecurityRecord] { implicit cur =>
-      for {
-        visibility <- extract[Visibility]("visibility")
-        maybeUserId <- extract[Option[String]]("memberGitLabIds")
-                         .map(_.map(_.split(",").toList).getOrElse(List.empty))
-                         .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
-                         .map(_.toSet)
-      } yield (visibility, path, maybeUserId)
+  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[Authorizer.SecurityRecord]] =
+    tsPathRecordsFinder(path, maybeAuthUser) >>= {
+      case Nil      => glPathRecordsFinder(path, maybeAuthUser)
+      case nonEmpty => nonEmpty.pure[F]
     }
 }

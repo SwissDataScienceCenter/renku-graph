@@ -22,7 +22,7 @@ import cats.effect.IO
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.SecurityRecord
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
@@ -30,62 +30,38 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetIdRecordsFinderSpec
+class TSPathRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
+    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
     with should.Matchers {
 
   "apply" should {
 
-    "return SecurityRecord with project visibility, path and all project members" in new TestCase {
-
-      val (dataset, project) =
-        renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
+    "return SecurityRecords with project visibility and all project members" in new TestCase {
+      val project = anyProjectEntities.generateOne
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
+      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
         SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
-    "return SecurityRecord with project visibility, path and no member if project has none" in new TestCase {
-
-      val (dataset, project) =
-        renkuProjectEntities(anyVisibility)
-          .modify(removeMembers())
-          .addDataset(datasetEntities(provenanceNonModified))
-          .generateOne
+    "return SecurityRecords with project visibility and no member is project has none" in new TestCase {
+      val project = renkuProjectEntities(anyVisibility).generateOne.copy(members = Set.empty)
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(dataset.identification.identifier, maybeAuthUser).unsafeRunSync() shouldBe List(
+      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
         SecurityRecord(project.visibility, project.path, Set.empty)
       )
     }
 
-    "return SecurityRecords with projects visibilities, paths and members in case of forks" in new TestCase {
-
-      val (dataset, (parentProject, project)) =
-        renkuProjectEntities(anyVisibility)
-          .modify(removeMembers())
-          .addDataset(datasetEntities(provenanceNonModified))
-          .forkOnce()
-          .generateOne
-
-      upload(to = projectsDataset, parentProject, project)
-
-      recordsFinder(dataset.identification.identifier, maybeAuthUser)
-        .unsafeRunSync() should contain theSameElementsAs List(
-        SecurityRecord(parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
-        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
-      )
-    }
-
     "nothing if there's no project with the given path" in new TestCase {
-      recordsFinder(datasetIdentifiers.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
+      recordsFinder(projectPaths.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }
 
@@ -95,6 +71,6 @@ class DatasetIdRecordsFinderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](projectsDSConnectionInfo)
+    val recordsFinder = new TSPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }
