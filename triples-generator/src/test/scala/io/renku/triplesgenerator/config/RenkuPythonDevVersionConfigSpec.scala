@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.config
 
 import com.typesafe.config.ConfigFactory
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.generators.Generators.{blankStrings, nonEmptyStrings}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -28,13 +28,19 @@ import scala.jdk.CollectionConverters._
 import scala.util.{Success, Try}
 
 class RenkuPythonDevVersionConfigSpec extends AnyWordSpec with should.Matchers {
+
   "apply" should {
+
     "return Some(version) if there is a value set" in {
       val version = nonEmptyStrings().generateOne
       val config = ConfigFactory.parseMap(
         Map("renku-python-dev-version" -> version).asJava
       )
       RenkuPythonDevVersionConfig[Try](config) shouldBe Success(Some(RenkuPythonDevVersion(version)))
+    }
+
+    "return None if there is no entry" in {
+      RenkuPythonDevVersionConfig[Try](ConfigFactory.empty) shouldBe Success(None)
     }
 
     "return None if there is no value set" in {
@@ -47,7 +53,7 @@ class RenkuPythonDevVersionConfigSpec extends AnyWordSpec with should.Matchers {
     "return None if there is an empty string" in {
 
       val config = ConfigFactory.parseMap(
-        Map("renku-python-dev-version" -> nonEmptyStrings().generateOne.map(_ => ' ')).asJava
+        Map("renku-python-dev-version" -> blankStrings().generateOne).asJava
       )
       RenkuPythonDevVersionConfig[Try](config) shouldBe Success(None)
     }
