@@ -20,41 +20,45 @@ package io.renku.entities.viewings.collector
 package projects
 package viewed
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import cats.MonadThrow
+import io.renku.entities.viewings.collector.persons.{GLUserViewedProject, PersonViewedProjectPersister, Project}
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-import persons.{GLUserViewedProject, PersonViewedProjectPersister, Project}
 
 private[viewings] trait EventPersister[F[_]] {
   def persist(event: ProjectViewedEvent): F[Unit]
 }
 
 private[viewings] object EventPersister {
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
-    ProjectsConnectionConfig[F]()
-      .map(TSClient[F](_))
-      .map(tsClient => new EventPersisterImpl[F](tsClient, PersonViewedProjectPersister(tsClient)))
+    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
+
+  def apply[F[_]: Async](tsClient: TSClient[F]): EventPersister[F] =
+    new EventPersisterImpl[F](tsClient, EventDeduplicator[F](tsClient), PersonViewedProjectPersister(tsClient))
 }
 
 private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
     tsClient:                     TSClient[F],
+    eventDeduplicator:            EventDeduplicator[F],
     personViewedProjectPersister: PersonViewedProjectPersister[F]
 ) extends EventPersister[F] {
 
+  import Encoder._
   import eu.timepit.refined.auto._
+  import eventDeduplicator.deduplicate
   import io.circe.Decoder
-  import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.{GraphClass, projects}
   import io.renku.jsonld.syntax._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
-  import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
+  import io.renku.triplesstore.client.syntax._
   import tsClient.{queryExpecting, updateWithNoResult, upload}
-  import Encoder._
 
   override def persist(event: ProjectViewedEvent): F[Unit] =
     findProjectId(event) >>= {
@@ -64,9 +68,9 @@ private[viewings] class EventPersisterImpl[F[_]: MonadThrow](
 
   private def persistIfOlderOrNone(event: ProjectViewedEvent, projectId: projects.ResourceId) =
     findStoredDate(projectId) >>= {
-      case None => insert(projectId, event)
+      case None => insert(projectId, event) >> deduplicate(projectId)
       case Some(date) if date < event.dateViewed =>
-        deleteOldViewedDate(projectId) >> insert(projectId, event)
+        deleteOldViewedDate(projectId) >> insert(projectId, event) >> deduplicate(projectId)
       case _ => ().pure[F]
     }
 
