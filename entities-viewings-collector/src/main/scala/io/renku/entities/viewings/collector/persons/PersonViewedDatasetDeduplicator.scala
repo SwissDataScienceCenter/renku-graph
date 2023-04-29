@@ -16,21 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects.viewed
+package io.renku.entities.viewings.collector.persons
 
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import io.renku.graph.model.{datasets, persons}
 import io.renku.triplesstore.TSClient
 
-private trait EventDeduplicator[F[_]] {
-  def deduplicate(projectId: projects.ResourceId): F[Unit]
+private trait PersonViewedDatasetDeduplicator[F[_]] {
+  def deduplicate(personId: persons.ResourceId, datasetId: datasets.ResourceId): F[Unit]
 }
 
-private object EventDeduplicator {
-  def apply[F[_]](tsClient: TSClient[F]): EventDeduplicator[F] = new EventDeduplicatorImpl[F](tsClient)
+private object PersonViewedDatasetDeduplicator {
+  def apply[F[_]](tsClient: TSClient[F]): PersonViewedDatasetDeduplicator[F] =
+    new PersonViewedDatasetDeduplicatorImpl[F](tsClient)
 }
 
-private class EventDeduplicatorImpl[F[_]](tsClient: TSClient[F]) extends EventDeduplicator[F] {
+private class PersonViewedDatasetDeduplicatorImpl[F[_]](tsClient: TSClient[F])
+    extends PersonViewedDatasetDeduplicator[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.GraphClass
@@ -41,25 +43,28 @@ private class EventDeduplicatorImpl[F[_]](tsClient: TSClient[F]) extends EventDe
   import io.renku.triplesstore.client.syntax._
   import tsClient.updateWithNoResult
 
-  override def deduplicate(projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
+  override def deduplicate(personId: persons.ResourceId, datasetId: datasets.ResourceId): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
-      show"${categoryName.show.toLowerCase}: deduplicate",
+      show"${GraphClass.PersonViewings}: deduplicate",
       Prefixes of renku -> "renku",
       sparql"""|DELETE {
-               |  GRAPH ${GraphClass.ProjectViewedTimes.id} { ?id renku:dateViewed ?date }
+               |  GRAPH ${GraphClass.PersonViewings.id} { ?viewingId renku:dateViewed ?date }
                |}
                |WHERE {
-               |  GRAPH ${GraphClass.ProjectViewedTimes.id} {
-               |    BIND (${projectId.asEntityId} AS ?id)
+               |  GRAPH ${GraphClass.PersonViewings.id} {
+               |    BIND (${personId.asEntityId} AS ?personId)
+               |
                |    {
-               |      SELECT ?id (MAX(?date) AS ?maxDate)
+               |      SELECT ?viewingId (MAX(?date) AS ?maxDate)
                |      WHERE {
-               |        ?id renku:dateViewed ?date
+               |        ?personId renku:viewedDataset ?viewingId.
+               |        ?viewingId renku:dataset ${datasetId.asEntityId};
+               |                   renku:dateViewed ?date.
                |      }
-               |      GROUP BY ?id
+               |      GROUP BY ?viewingId
                |      HAVING (COUNT(?date) > 1)
                |    }
-               |    ?id renku:dateViewed ?date.
+               |    ?viewingId renku:dateViewed ?date.
                |    FILTER (?date != ?maxDate)
                |  }
                |}

@@ -22,19 +22,21 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector
-import io.renku.generators.Generators.{fixed, timestamps, timestampsNotInTheFuture}
+import io.renku.entities.viewings.collector.persons.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators.userIds
 import io.renku.triplesgenerator.api.events.UserId
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,12 +49,14 @@ class PersonViewedDatasetPersisterSpec
     with OptionValues
     with IOSpec
     with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with ProjectsDataset
+    with MockFactory {
 
   "persist" should {
 
-    "insert the given GLUserViewedDataset to the TS if it doesn't exist yet " +
-      "case with a user identified with GitLab id" in new TestCase {
+    "insert the given GLUserViewedDataset to the TS and run the deduplicate query " +
+      "if the viewing doesn't exist yet " +
+      "- case with a user identified with GitLab id" in new TestCase {
 
         val userId             = UserId(personGitLabIds.generateOne)
         val dataset -> project = generateProjectWithCreator(userId)
@@ -62,6 +66,8 @@ class PersonViewedDatasetPersisterSpec
         val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
         val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -69,8 +75,9 @@ class PersonViewedDatasetPersisterSpec
         )
       }
 
-    "insert the given GLUserViewedDataset to the TS if it doesn't exist yet " +
-      "case with a user identified with email" in new TestCase {
+    "insert the given GLUserViewedDataset to the TS and run the deduplicate query " +
+      "if the viewing doesn't exist yet " +
+      "- case with a user identified with email" in new TestCase {
 
         val userId             = UserId(personEmails.generateOne)
         val dataset -> project = generateProjectWithCreator(userId)
@@ -80,6 +87,8 @@ class PersonViewedDatasetPersisterSpec
         val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
         val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -87,7 +96,7 @@ class PersonViewedDatasetPersisterSpec
         )
       }
 
-    "update the date for the user and ds from the GLUserViewedDataset " +
+    "update the date for the user and ds from the GLUserViewedDataset and run the deduplicate query " +
       "if an event for the ds already exists in the TS " +
       "and the date from the new event is newer than this in the TS" in new TestCase {
 
@@ -99,6 +108,8 @@ class PersonViewedDatasetPersisterSpec
         val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
         val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -106,6 +117,8 @@ class PersonViewedDatasetPersisterSpec
         )
 
         val newDate = timestampsNotInTheFuture(butYoungerThan = event.date.value).generateAs(datasets.DateViewed)
+
+        givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
 
         persister.persist(event.copy(date = newDate)).unsafeRunSync() shouldBe ()
 
@@ -122,6 +135,8 @@ class PersonViewedDatasetPersisterSpec
       val dateViewed = datasetViewedDates(dataset.provenance.date.instant).generateOne
       val event      = GLUserViewedDataset(userId, toCollectorDataset(dataset), dateViewed)
 
+      givenEventDeduplication(project.maybeCreator.value.resourceId, dataset.resourceId, returning = ().pure[IO])
+
       persister.persist(event).unsafeRunSync() shouldBe ()
 
       findAllViewings shouldBe Set(
@@ -135,7 +150,7 @@ class PersonViewedDatasetPersisterSpec
       findAllViewings shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, dataset.resourceId, dateViewed))
     }
 
-    "update the date for the user and project from the GLUserViewedProject " +
+    "update the date for the user and project from the GLUserViewedProject and run the deduplicate query" +
       "and leave other user viewings if they exist" in new TestCase {
 
         val userId               = userIds.generateOne
@@ -147,11 +162,13 @@ class PersonViewedDatasetPersisterSpec
         val dataset1DateViewed = datasetViewedDates(dataset1.provenance.date.instant).generateOne
         val dataset1Event =
           collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset1), dataset1DateViewed)
+        givenEventDeduplication(project1.maybeCreator.value.resourceId, dataset1.resourceId, returning = ().pure[IO])
         persister.persist(dataset1Event).unsafeRunSync() shouldBe ()
 
         val dataset2DateViewed = datasetViewedDates(dataset2.provenance.date.instant).generateOne
         val dataset2Event =
           collector.persons.GLUserViewedDataset(userId, toCollectorDataset(dataset2), dataset2DateViewed)
+        givenEventDeduplication(project2.maybeCreator.value.resourceId, dataset2.resourceId, returning = ().pure[IO])
         persister.persist(dataset2Event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -162,6 +179,7 @@ class PersonViewedDatasetPersisterSpec
         val newDate =
           timestampsNotInTheFuture(butYoungerThan = dataset1Event.date.value).generateAs(datasets.DateViewed)
 
+        givenEventDeduplication(project1.maybeCreator.value.resourceId, dataset1.resourceId, returning = ().pure[IO])
         persister.persist(dataset1Event.copy(date = newDate)).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -188,27 +206,16 @@ class PersonViewedDatasetPersisterSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val persister        = new PersonViewedDatasetPersisterImpl[IO](tsClient, PersonFinder(tsClient))
-  }
+    private val tsClient          = TSClient[IO](projectsDSConnectionInfo)
+    private val eventDeduplicator = mock[PersonViewedDatasetDeduplicator[IO]]
+    val persister = new PersonViewedDatasetPersisterImpl[IO](tsClient, PersonFinder(tsClient), eventDeduplicator)
 
-  private def generateProjectWithCreator(userId: UserId) = {
-
-    val creator = userId
-      .fold(
-        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
-        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
-      )
-      .generateSome
-
-    anyRenkuProjectEntities
-      .map(replaceProjectCreator(creator))
-      .addDataset(datasetEntities(provenanceInternal))
-      .generateOne
-      .bimap(
-        _.to[entities.Dataset[entities.Dataset.Provenance.Internal]],
-        _.to[entities.Project]
-      )
+    def givenEventDeduplication(personResourceId:  persons.ResourceId,
+                                datasetResourceId: datasets.ResourceId,
+                                returning:         IO[Unit]
+    ) = (eventDeduplicator.deduplicate _)
+      .expects(personResourceId, datasetResourceId)
+      .returning(returning)
   }
 
   private def findAllViewings =
