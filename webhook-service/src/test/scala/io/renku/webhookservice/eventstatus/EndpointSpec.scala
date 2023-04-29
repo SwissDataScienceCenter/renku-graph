@@ -23,9 +23,13 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.graph.eventlog
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
@@ -58,10 +62,11 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return OK with the status info if webhook for the project exists" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
         val statusInfo = statusInfos.generateOne
-        givenStatusInfoFinding(projectId, returning = IO.pure(statusInfo.some))
+        givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -75,9 +80,35 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       }
     }
 
+    "send COMMIT_SYNC_REQUEST message and return OK with the status info " +
+      "if webhook for the project exists but no status info can be found" in new TestCase {
+
+        val authUser = authUserGen.generateOne
+
+        givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
+
+        givenStatusInfoFinding(projectId, returning = None.pure[IO])
+
+        val project = consumerProjects.generateOne.copy(id = projectId)
+        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+
+        givenCommitSyncRequestSend(project, returning = ().pure[IO])
+
+        val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
+
+        response.status                   shouldBe Ok
+        response.contentType              shouldBe Some(`Content-Type`(application.json))
+        response.as[Json].unsafeRunSync() shouldBe StatusInfo.webhookReady.asJson
+
+        logger.loggedOnly(
+          Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
+        )
+      }
+
     "return OK with activated = false if the webhook does not exist" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         givenHookValidation(projectId, authUser, returning = HookMissing.pure[IO])
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
@@ -91,6 +122,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return NOT_FOUND if no Access Token found for the project" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         val exception = NoAccessTokenException("error")
         givenHookValidation(projectId,
                             authUser,
@@ -108,6 +140,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         val exception = exceptions.generateOne
         givenHookValidation(projectId,
                             authUser,
@@ -124,9 +157,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       }
     }
 
-    "return INTERNAL_SERVER_ERROR when finding status returns a failure" in new TestCase {
+    "return INTERNAL_SERVER_ERROR when finding status info returns a failure" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
         val exception = exceptions.generateOne
@@ -145,6 +179,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     "return INTERNAL_SERVER_ERROR when finding status info fails" in new TestCase {
       forAll(authUserGen) { authUser =>
         logger.reset()
+
         givenHookValidation(projectId, authUser, returning = HookExists.pure[IO])
 
         val exception = exceptions.generateOne
@@ -168,11 +203,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     val projectId = projectIds.generateOne
 
-    private val hookValidator    = mock[HookValidator[IO]]
-    private val statusInfoFinder = mock[StatusInfoFinder[IO]]
+    private val hookValidator     = mock[HookValidator[IO]]
+    private val statusInfoFinder  = mock[StatusInfoFinder[IO]]
+    private val projectInfoFinder = mock[ProjectInfoFinder[IO]]
+    private val elClient          = mock[eventlog.api.events.Client[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder)
+    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder, projectInfoFinder, elClient)
 
     lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
 
@@ -189,6 +226,18 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       (statusInfoFinder
         .findStatusInfo(_: GitLabId))
         .expects(projectId)
+        .returning(returning)
+
+    def givenProjectInfoFinding(projectId: projects.GitLabId, authUser: Option[AuthUser], returning: IO[Project]) =
+      (projectInfoFinder
+        .findProjectInfo(_: projects.GitLabId)(_: Option[AccessToken]))
+        .expects(projectId, authUser.map(_.accessToken))
+        .returning(returning)
+
+    def givenCommitSyncRequestSend(project: Project, returning: IO[Unit]) =
+      (elClient
+        .send(_: CommitSyncRequest))
+        .expects(CommitSyncRequest(project))
         .returning(returning)
   }
 }

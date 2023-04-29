@@ -22,16 +22,18 @@ import cats.data.NonEmptyList
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Decoder
+import io.renku.events.consumers.Project
+import io.renku.graph.eventlog
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
-import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, Project}
+import io.renku.webhookservice.model.HookToken
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -45,13 +47,12 @@ trait Endpoint[F[_]] {
 }
 
 class EndpointImpl[F[_]: Concurrent: Logger](
-    hookTokenCrypto:         HookTokenCrypto[F],
-    commitSyncRequestSender: CommitSyncRequestSender[F]
+    hookTokenCrypto: HookTokenCrypto[F],
+    elClient:        eventlog.api.events.Client[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
   import Endpoint._
-  import commitSyncRequestSender._
   import hookTokenCrypto._
 
   def processPushEvent(request: Request[F]): F[Response[F]] = {
@@ -60,7 +61,7 @@ class EndpointImpl[F[_]: Concurrent: Logger](
       authToken                          <- findHookToken(request)
       hookToken                          <- decrypt(authToken) recoverWith unauthorizedException
       _                                  <- validate(hookToken, commitSyncRequest)
-      _                                  <- Spawn[F].start(sendCommitSyncRequest(commitSyncRequest, "HookEvent"))
+      _                                  <- Spawn[F].start(elClient.send(commitSyncRequest))
       _                                  <- logInfo(pushEvent)
       response                           <- Accepted(InfoMessage("Event accepted"))
     } yield response
@@ -116,18 +117,15 @@ class EndpointImpl[F[_]: Concurrent: Logger](
 
 object Endpoint {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      hookTokenCrypto: HookTokenCrypto[F]
-  ): F[Endpoint[F]] = for {
-    commitSyncRequestSender <- CommitSyncRequestSender[F]
-  } yield new EndpointImpl[F](hookTokenCrypto, commitSyncRequestSender)
+  def apply[F[_]: Async: Logger: MetricsRegistry](hookTokenCrypto: HookTokenCrypto[F]): F[Endpoint[F]] =
+    eventlog.api.events
+      .Client[F]
+      .map(new EndpointImpl[F](hookTokenCrypto, _))
 
   private implicit val projectDecoder: Decoder[Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    for {
-      id   <- cursor.downField("id").as[GitLabId]
-      path <- cursor.downField("path_with_namespace").as[Path]
-    } yield Project(id, path)
+    (cursor.downField("id").as[GitLabId], cursor.downField("path_with_namespace").as[Path])
+      .mapN(Project(_, _))
   }
 
   implicit val pushEventDecoder: Decoder[(CommitId, CommitSyncRequest)] = cursor => {

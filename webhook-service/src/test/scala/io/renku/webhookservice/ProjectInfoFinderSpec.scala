@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.hookcreation
+package io.renku.webhookservice
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -24,19 +24,20 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.webhookservice.WebhookServiceGenerators.projects
-import io.renku.webhookservice.model.Project
-import org.http4s.{Request, Response, Status, Uri}
 import org.http4s.circe.jsonEncoder
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -89,11 +90,9 @@ class ProjectInfoFinderSpec
   }
 
   private trait TestCase {
-    val project     = projects.generateOne
-    val projectId   = project.id
-    val projectPath = project.path
-
-    val uri:          Uri                     = uri"projects" / projectId.show
+    val project   = consumerProjects.generateOne
+    val projectId = project.id
+    val uri:          Uri                     = uri"projects" / projectId
     val endpointName: String Refined NonEmpty = "single-project"
 
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
@@ -104,7 +103,7 @@ class ProjectInfoFinderSpec
 
     lazy val projectJson: String = json"""{
       "id":                  $projectId,
-      "path_with_namespace": $projectPath
+      "path_with_namespace": ${project.path}
     }""".noSpaces
 
     lazy val mapResponse = captureMapping(gitLabClient)(

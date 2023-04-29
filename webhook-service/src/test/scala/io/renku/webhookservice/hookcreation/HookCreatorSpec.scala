@@ -21,24 +21,28 @@ package io.renku.webhookservice.hookcreation
 import cats.effect.IO
 import cats.effect.std.Queue
 import cats.syntax.all._
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
+import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.eventlog
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.CommitSyncRequestSender
+import io.renku.webhookservice.ProjectInfoFinder
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.hookvalidation.HookValidator
-import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
-import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, Project}
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import io.renku.webhookservice.model.HookToken
 import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -171,7 +175,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
   }
 
   private trait TestCase {
-    val projectInfo         = projects.generateOne
+    val projectInfo         = consumerProjects.generateOne
     val projectId           = projectInfo.id
     val serializedHookToken = serializedHookTokens.generateOne
     val accessToken         = accessTokens.generateOne
@@ -188,9 +192,8 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         projectInfoFinderResponse.take.flatten
     }
     private val commitSyncRequestSenderResponse = Queue.bounded[IO, IO[Unit]](1).unsafeRunSync()
-    private val commitSyncRequestSender = new CommitSyncRequestSender[IO] {
-      override def sendCommitSyncRequest(commitSyncRequest: CommitSyncRequest, processName: String): IO[Unit] =
-        commitSyncRequestSenderResponse.take.flatten
+    private val elClient = new eventlog.api.events.Client[IO] {
+      override def send(event: CommitSyncRequest): IO[Unit] = commitSyncRequestSenderResponse.take.flatten
     }
 
     val hookCreation = new HookCreatorImpl[IO](
@@ -200,7 +203,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       hookTokenCrypto,
       projectHookCreator,
       accessTokenAssociator,
-      commitSyncRequestSender
+      elClient
     )
 
     def givenHookValidation(returning: IO[HookValidationResult]) =
