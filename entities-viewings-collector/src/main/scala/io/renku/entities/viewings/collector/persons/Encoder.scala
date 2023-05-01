@@ -49,7 +49,7 @@ private object Encoder {
   private lazy val viewedProjectEncoder: JsonLDEncoder[PersonViewedProject] =
     JsonLDEncoder.instance { case PersonViewedProject(userId, Project(id, path), date) =>
       JsonLD.entity(
-        EntityId.of(s"$userId/$path"),
+        EntityId of s"$userId/$path",
         EntityTypes of PersonViewedProjectOntology.classType,
         PersonViewedProjectOntology.projectProperty       -> id.asJsonLD,
         PersonViewedProjectOntology.dateViewedProperty.id -> date.asJsonLD
@@ -68,7 +68,7 @@ private object Encoder {
   private lazy val viewedDatasetEncoder: JsonLDEncoder[PersonViewedDataset] =
     JsonLDEncoder.instance { case PersonViewedDataset(userId, Dataset(id, identifier), date) =>
       JsonLD.entity(
-        EntityId.of(s"$userId/datasets/$identifier"),
+        EntityId of s"$userId/datasets/$identifier",
         EntityTypes of PersonViewedProjectOntology.classType,
         PersonViewedDatasetOntology.datasetProperty       -> id.asJsonLD,
         PersonViewedDatasetOntology.dateViewedProperty.id -> date.asJsonLD

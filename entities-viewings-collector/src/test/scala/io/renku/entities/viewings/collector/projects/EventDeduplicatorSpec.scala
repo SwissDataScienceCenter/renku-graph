@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.entities.viewings.collector.ProjectViewedTimeOntology.dataViewedProperty
 import io.renku.entities.viewings.collector.persons.PersonViewedProjectPersister
 import io.renku.entities.viewings.collector.projects.viewed.EventPersisterImpl
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
@@ -119,7 +120,7 @@ class EventDeduplicatorSpec
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val deduplicator     = new EventDeduplicatorImpl[IO](tsClient)
+    val deduplicator     = new EventDeduplicatorImpl[IO](tsClient, categoryNames.generateOne)
 
     private val personViewingPersister = mock[PersonViewedProjectPersister[IO]]
     (personViewingPersister.persist _).expects(*).returning(().pure[IO]).anyNumberOfTimes()

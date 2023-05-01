@@ -42,6 +42,7 @@ private[tsmigrationrequest] object Migrations {
     migrationToV10                 <- v10migration.MigrationToV10[F]
     v10VersionSetter               <- V10VersionUpdater[F]
     projectsDateViewedCreator      <- ProjectsDateViewedCreator[F]
+    projectDateViewedDeduplicator  <- ProjectDateViewedDeduplicator[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -51,7 +52,8 @@ private[tsmigrationrequest] object Migrations {
                     addRenkuPlanWhereMissing,
                     migrationToV10,
                     v10VersionSetter,
-                    projectsDateViewedCreator
+                    projectsDateViewedCreator,
+                    projectDateViewedDeduplicator
                   )
   } yield migrations
 
