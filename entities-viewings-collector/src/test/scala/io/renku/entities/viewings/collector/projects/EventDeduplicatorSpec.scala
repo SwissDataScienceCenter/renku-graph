@@ -20,22 +20,18 @@ package io.renku.entities.viewings.collector.projects
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.entities.viewings.collector.ProjectViewedTimeOntology.dataViewedProperty
 import io.renku.entities.viewings.collector.persons.PersonViewedProjectPersister
 import io.renku.entities.viewings.collector.projects.viewed.EventPersisterImpl
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.{entities, projects}
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.model.Quad
-import io.renku.triplesstore.client.syntax._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -53,7 +49,7 @@ class EventDeduplicatorSpec
 
     "do nothing if there's only one date for the project" in new TestCase {
 
-      val project = anyProjectEntities.generateOne
+      val project = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project)
 
       val event = projectViewedEvents.generateOne.copy(path = project.path)
@@ -67,7 +63,7 @@ class EventDeduplicatorSpec
 
     "leave only the latest date if there are many" in new TestCase {
 
-      val project = anyProjectEntities.generateOne
+      val project = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project)
 
       val event = projectViewedEvents.generateOne.copy(path = project.path)
@@ -91,9 +87,9 @@ class EventDeduplicatorSpec
 
     "do not remove dates for other projects" in new TestCase {
 
-      val project1 = anyProjectEntities.generateOne
+      val project1 = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project1)
-      val project2 = anyProjectEntities.generateOne
+      val project2 = anyProjectEntities.generateOne.to[entities.Project]
       upload(to = projectsDataset, project2)
 
       val event1 = projectViewedEvents.generateOne.copy(path = project1.path)
@@ -126,10 +122,4 @@ class EventDeduplicatorSpec
     (personViewingPersister.persist _).expects(*).returning(().pure[IO]).anyNumberOfTimes()
     val persister = new EventPersisterImpl[IO](tsClient, deduplicator, personViewingPersister)
   }
-
-  private def insertOtherDate(project: Project, dateViewed: projects.DateViewed) =
-    insert(
-      to = projectsDataset,
-      Quad(GraphClass.ProjectViewedTimes.id, project.resourceId.asEntityId, dataViewedProperty.id, dateViewed.asObject)
-    )
 }

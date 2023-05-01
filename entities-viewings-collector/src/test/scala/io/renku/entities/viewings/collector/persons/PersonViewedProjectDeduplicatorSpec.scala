@@ -19,21 +19,16 @@
 package io.renku.entities.viewings.collector.persons
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector.persons.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
-import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.UserId
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
@@ -146,23 +141,4 @@ class PersonViewedProjectDeduplicatorSpec
 
     val persister = PersonViewedProjectPersister[IO](tsClient)
   }
-
-  private def insertOtherDate(projectId: projects.ResourceId, dateViewed: projects.DateViewed) = runUpdate(
-    on = projectsDataset,
-    SparqlQuery.of(
-      "test add another user project dateViewed",
-      Prefixes of renku -> "renku",
-      sparql"""|INSERT {
-               |  GRAPH ${GraphClass.PersonViewings.id} {
-               |    ?viewingId renku:dateViewed ${dateViewed.asObject}
-               |  }
-               |}
-               |WHERE {
-               |  GRAPH ${GraphClass.PersonViewings.id} {
-               |    ?viewingId renku:project ${projectId.asEntityId}
-               |  }
-               |}
-               |""".stripMargin
-    )
-  ).unsafeRunSync()
 }

@@ -25,7 +25,7 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.api.events.UserId
 
-private object Generators {
+object Generators {
 
   def generateProjectWithCreatorAndDataset(userId: UserId) =
     anyRenkuProjectEntities

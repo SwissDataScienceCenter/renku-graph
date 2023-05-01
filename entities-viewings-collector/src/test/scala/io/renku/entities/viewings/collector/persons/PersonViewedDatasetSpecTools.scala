@@ -22,6 +22,7 @@ import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{GraphClass, datasets, entities, persons}
+import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -62,4 +63,24 @@ trait PersonViewedDatasetSpecTools {
 
   protected def toCollectorDataset(ds: entities.Dataset[entities.Dataset.Provenance]) =
     collector.persons.Dataset(ds.resourceId, ds.identification.identifier)
+
+  protected def insertOtherDate(datasetId: datasets.ResourceId, dateViewed: datasets.DateViewed) =
+    runUpdate(
+      on = projectsDataset,
+      SparqlQuery.of(
+        "test add another user dataset dateViewed",
+        Prefixes of renku -> "renku",
+        sparql"""|INSERT {
+                 |  GRAPH ${GraphClass.PersonViewings.id} {
+                 |    ?viewingId renku:dateViewed ${dateViewed.asObject}
+                 |  }
+                 |}
+                 |WHERE {
+                 |  GRAPH ${GraphClass.PersonViewings.id} {
+                 |    ?viewingId renku:dataset ${datasetId.asEntityId}
+                 |  }
+                 |}
+                 |""".stripMargin
+      )
+    ).unsafeRunSync()
 }

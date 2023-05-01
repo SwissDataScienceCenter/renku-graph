@@ -18,18 +18,14 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
-import io.renku.entities.viewings.collector.ProjectViewedTimeOntology
+import io.renku.entities.viewings.EntityViewings
 import io.renku.entities.viewings.collector.projects.EventPersisterSpecTools
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, projects}
-import io.renku.jsonld.syntax._
+import io.renku.graph.model.{entities, projects}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators.projectViewedEvents
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesstore.client.model.Quad
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,47 +36,40 @@ class ProjectDateViewedDeduplicatorSpec
     with IOSpec
     with InMemoryJenaForSpec
     with EventPersisterSpecTools
-    with ProjectsDataset {
+    with ProjectsDataset
+    with EntityViewings {
 
   "run" should {
 
     "remove obsolete project viewing dates when multiple exist for a single project" in {
 
-      val event1Project1 = projectViewedEvents.generateOne
-      insertEvent(event1Project1)
+      val project1 = anyProjectEntities.generateOne.to[entities.Project]
+      upload(to = projectsDataset, project1)
 
-      val event2Project1 = projectViewedEvents.generateOne.copy(
-        path = event1Project1.path,
-        dateViewed = timestamps(max = event1Project1.dateViewed.value).generateAs(projects.DateViewed)
-      )
-      insertEvent(event2Project1)
+      val eventProject1 = projectViewedEvents.generateOne.copy(path = project1.path)
+      provision(eventProject1).unsafeRunSync()
 
-      val eventProject2 = projectViewedEvents.generateOne
-      insertEvent(eventProject2)
+      val otherProject1Date = timestamps(max = eventProject1.dateViewed.value).generateAs(projects.DateViewed)
+      insertOtherDate(project1, otherProject1Date)
+
+      val project2 = anyProjectEntities.generateOne.to[entities.Project]
+      upload(to = projectsDataset, project2)
+
+      val eventProject2 = projectViewedEvents.generateOne.copy(path = project2.path)
+      provision(eventProject2).unsafeRunSync()
 
       findAllViewings shouldBe Set(
-        projects.ResourceId(event1Project1.path) -> event1Project1.dateViewed,
-        projects.ResourceId(event2Project1.path) -> event2Project1.dateViewed,
-        projects.ResourceId(eventProject2.path)  -> eventProject2.dateViewed
+        project1.resourceId -> eventProject1.dateViewed,
+        project1.resourceId -> otherProject1Date,
+        project2.resourceId -> eventProject2.dateViewed
       )
 
       runUpdate(projectsDataset, ProjectDateViewedDeduplicator.query).unsafeRunSync()
 
       findAllViewings shouldBe Set(
-        projects.ResourceId(event1Project1.path) -> event1Project1.dateViewed,
-        projects.ResourceId(eventProject2.path)  -> eventProject2.dateViewed
+        project1.resourceId -> eventProject1.dateViewed,
+        project2.resourceId -> eventProject2.dateViewed
       )
     }
   }
-
-  private def insertEvent(event: ProjectViewedEvent) =
-    insert(
-      to = projectsDataset,
-      Quad(
-        GraphClass.ProjectViewedTimes.id,
-        projects.ResourceId(event.path).asEntityId,
-        ProjectViewedTimeOntology.dataViewedProperty.id,
-        event.dateViewed.asObject
-      )
-    )
 }

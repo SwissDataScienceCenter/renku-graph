@@ -37,7 +37,7 @@ private[viewings] object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
 
-  def apply[F[_]: Async](tsClient: TSClient[F]): EventPersister[F] =
+  def apply[F[_]: MonadThrow](tsClient: TSClient[F]): EventPersister[F] =
     new EventPersisterImpl[F](tsClient,
                               EventDeduplicator[F](tsClient, categoryName),
                               PersonViewedProjectPersister(tsClient)

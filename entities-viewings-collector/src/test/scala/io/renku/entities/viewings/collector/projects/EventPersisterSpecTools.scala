@@ -19,11 +19,14 @@
 package io.renku.entities.viewings.collector.projects
 
 import eu.timepit.refined.auto._
+import io.renku.entities.viewings.collector.ProjectViewedTimeOntology.dataViewedProperty
 import io.renku.graph.model.Schemas.renku
-import io.renku.graph.model.{GraphClass, projects}
+import io.renku.graph.model.{GraphClass, entities, projects}
+import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.Quad
 import io.renku.triplesstore.client.syntax._
 
 import java.time.Instant
@@ -37,7 +40,7 @@ trait EventPersisterSpecTools {
       SparqlQuery.of(
         "test find project viewing",
         Prefixes of renku -> "renku",
-        sparql"""|SELECT ?id ?date
+        sparql"""|SELECT DISTINCT ?id ?date
                  |FROM ${GraphClass.ProjectViewedTimes.id} {
                  |  ?id renku:dateViewed ?date.
                  |}
@@ -46,4 +49,10 @@ trait EventPersisterSpecTools {
     ).unsafeRunSync()
       .map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date"))))
       .toSet
+
+  protected def insertOtherDate(project: entities.Project, dateViewed: projects.DateViewed) =
+    insert(
+      to = projectsDataset,
+      Quad(GraphClass.ProjectViewedTimes.id, project.resourceId.asEntityId, dataViewedProperty.id, dateViewed.asObject)
+    )
 }
