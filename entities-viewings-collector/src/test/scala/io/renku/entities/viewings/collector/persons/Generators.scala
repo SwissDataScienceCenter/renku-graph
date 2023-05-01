@@ -27,23 +27,27 @@ import io.renku.triplesgenerator.api.events.UserId
 
 private object Generators {
 
-  def generateProjectWithCreator(userId: UserId) = {
-
-    val creator = userId
-      .fold(
-        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
-        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
-      )
-      .generateSome
-
+  def generateProjectWithCreatorAndDataset(userId: UserId) =
     anyRenkuProjectEntities
-      .map(replaceProjectCreator(creator))
+      .map(replaceProjectCreator(generateSomeCreator(userId)))
       .addDataset(datasetEntities(provenanceInternal))
       .generateOne
       .bimap(
         _.to[entities.Dataset[entities.Dataset.Provenance.Internal]],
         _.to[entities.Project]
       )
-  }
 
+  def generateProjectWithCreator(userId: UserId) =
+    anyProjectEntities
+      .map(replaceProjectCreator(generateSomeCreator(userId)))
+      .generateOne
+      .to[entities.Project]
+
+  private def generateSomeCreator(userId: UserId) =
+    userId
+      .fold(
+        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
+        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
+      )
+      .generateSome
 }

@@ -28,25 +28,28 @@ private[viewings] trait PersonViewedProjectPersister[F[_]] {
 
 private[viewings] object PersonViewedProjectPersister {
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): PersonViewedProjectPersister[F] =
-    new PersonViewedProjectPersisterImpl[F](tsClient, PersonFinder(tsClient))
+    new PersonViewedProjectPersisterImpl[F](tsClient, PersonFinder(tsClient), PersonViewedProjectDeduplicator(tsClient))
 }
 
-private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], personFinder: PersonFinder[F])
-    extends PersonViewedProjectPersister[F] {
+private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F],
+                                                                 personFinder: PersonFinder[F],
+                                                                 deduplicator: PersonViewedProjectDeduplicator[F]
+) extends PersonViewedProjectPersister[F] {
 
+  import Encoder._
   import cats.syntax.all._
+  import deduplicator._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.GraphClass
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import io.renku.triplesstore.{ResultsDecoder, SparqlQuery}
   import io.renku.triplesstore.ResultsDecoder._
-  import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
-  import tsClient._
-  import Encoder._
+  import io.renku.triplesstore.client.syntax._
+  import io.renku.triplesstore.{ResultsDecoder, SparqlQuery}
   import personFinder._
+  import tsClient._
 
   override def persist(event: GLUserViewedProject): F[Unit] =
     findPersonId(event.userId) >>= {
@@ -56,9 +59,12 @@ private class PersonViewedProjectPersisterImpl[F[_]: MonadThrow](tsClient: TSCli
 
   private def persistIfOlderOrNone(personId: persons.ResourceId, event: GLUserViewedProject) =
     findStoredDate(personId, event.project.id) >>= {
-      case None => insert(personId, event)
+      case None =>
+        insert(personId, event) >> deduplicate(personId, event.project.id)
       case Some(date) if date < event.date =>
-        deleteOldViewedDate(personId, event.project.id) >> insert(personId, event)
+        deleteOldViewedDate(personId, event.project.id) >>
+          insert(personId, event) >>
+          deduplicate(personId, event.project.id)
       case _ => ().pure[F]
     }
 

@@ -39,11 +39,11 @@ import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class PersonViewedDatasetDeduplicatorSpec
+class PersonViewedProjectDeduplicatorSpec
     extends AnyWordSpec
     with should.Matchers
     with OptionValues
-    with PersonViewedDatasetSpecTools
+    with PersonViewedProjectSpecTools
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
@@ -51,88 +51,88 @@ class PersonViewedDatasetDeduplicatorSpec
 
   "deduplicate" should {
 
-    "do nothing if there's only one date for the user and dataset" in new TestCase {
+    "do nothing if there's only one date for the user and project" in new TestCase {
 
-      val userId             = UserId(personGitLabIds.generateOne)
-      val dataset -> project = generateProjectWithCreatorAndDataset(userId)
+      val userId  = UserId(personGitLabIds.generateOne)
+      val project = generateProjectWithCreator(userId)
       upload(to = projectsDataset, project)
 
-      val event = GLUserViewedDataset(userId,
-                                      toCollectorDataset(dataset),
-                                      datasetViewedDates(dataset.provenance.date.instant).generateOne
-      )
+      val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
+      val event      = GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
       persister.persist(event).unsafeRunSync() shouldBe ()
 
       val userResourceId = project.maybeCreator.value.resourceId
-      deduplicator.deduplicate(userResourceId, dataset.resourceId).unsafeRunSync() shouldBe ()
+      deduplicator.deduplicate(userResourceId, project.resourceId).unsafeRunSync() shouldBe ()
 
-      findAllViewings shouldBe Set(ViewingRecord(userResourceId, dataset.resourceId, event.date))
+      findAllViewings shouldBe Set(
+        ViewingRecord(project.maybeCreator.value.resourceId, project.resourceId, dateViewed)
+      )
     }
 
     "leave only the latest date if there are many" in new TestCase {
 
-      val userId             = UserId(personGitLabIds.generateOne)
-      val dataset -> project = generateProjectWithCreatorAndDataset(userId)
+      val userId  = UserId(personGitLabIds.generateOne)
+      val project = generateProjectWithCreator(userId)
       upload(to = projectsDataset, project)
 
-      val event = GLUserViewedDataset(userId,
-                                      toCollectorDataset(dataset),
-                                      datasetViewedDates(dataset.provenance.date.instant).generateOne
+      val event = GLUserViewedProject(userId,
+                                      toCollectorProject(project),
+                                      projectViewedDates(project.dateCreated.value).generateOne
       )
       persister.persist(event).unsafeRunSync() shouldBe ()
 
-      val olderDateViewed1 = timestamps(max = event.date.value).generateAs(datasets.DateViewed)
-      insertOtherDate(dataset.resourceId, olderDateViewed1)
-      val olderDateViewed2 = timestamps(max = event.date.value).generateAs(datasets.DateViewed)
-      insertOtherDate(dataset.resourceId, olderDateViewed2)
+      val olderDateViewed1 = timestamps(max = event.date.value).generateAs(projects.DateViewed)
+      insertOtherDate(project.resourceId, olderDateViewed1)
+      val olderDateViewed2 = timestamps(max = event.date.value).generateAs(projects.DateViewed)
+      insertOtherDate(project.resourceId, olderDateViewed2)
 
       val userResourceId = project.maybeCreator.value.resourceId
 
       findAllViewings shouldBe Set(
-        ViewingRecord(userResourceId, dataset.resourceId, event.date),
-        ViewingRecord(userResourceId, dataset.resourceId, olderDateViewed1),
-        ViewingRecord(userResourceId, dataset.resourceId, olderDateViewed2)
+        ViewingRecord(userResourceId, project.resourceId, event.date),
+        ViewingRecord(userResourceId, project.resourceId, olderDateViewed1),
+        ViewingRecord(userResourceId, project.resourceId, olderDateViewed2)
       )
 
-      deduplicator.deduplicate(userResourceId, dataset.resourceId).unsafeRunSync() shouldBe ()
+      deduplicator.deduplicate(userResourceId, project.resourceId).unsafeRunSync() shouldBe ()
 
-      findAllViewings shouldBe Set(ViewingRecord(userResourceId, dataset.resourceId, event.date))
+      findAllViewings shouldBe Set(ViewingRecord(userResourceId, project.resourceId, event.date))
     }
 
     "do not remove dates for other projects" in new TestCase {
 
       val userId = UserId(personGitLabIds.generateOne)
 
-      val dataset1 -> project1 = generateProjectWithCreatorAndDataset(userId)
+      val project1 = generateProjectWithCreator(userId)
       upload(to = projectsDataset, project1)
 
-      val dataset2 -> project2 = generateProjectWithCreatorAndDataset(userId)
+      val project2 = generateProjectWithCreator(userId)
       upload(to = projectsDataset, project2)
 
-      val event1 = GLUserViewedDataset(userId,
-                                       toCollectorDataset(dataset1),
-                                       datasetViewedDates(dataset1.provenance.date.instant).generateOne
+      val event1 = GLUserViewedProject(userId,
+                                       toCollectorProject(project1),
+                                       projectViewedDates(project1.dateCreated.value).generateOne
       )
       persister.persist(event1).unsafeRunSync() shouldBe ()
 
-      val event2 = GLUserViewedDataset(userId,
-                                       toCollectorDataset(dataset2),
-                                       datasetViewedDates(dataset2.provenance.date.instant).generateOne
+      val event2 = GLUserViewedProject(userId,
+                                       toCollectorProject(project2),
+                                       projectViewedDates(project2.dateCreated.value).generateOne
       )
       persister.persist(event2).unsafeRunSync() shouldBe ()
 
       val userResourceId = project1.maybeCreator.value.resourceId
 
       findAllViewings shouldBe Set(
-        ViewingRecord(userResourceId, dataset1.resourceId, event1.date),
-        ViewingRecord(userResourceId, dataset2.resourceId, event2.date)
+        ViewingRecord(userResourceId, project1.resourceId, event1.date),
+        ViewingRecord(userResourceId, project2.resourceId, event2.date)
       )
 
-      deduplicator.deduplicate(userResourceId, dataset1.resourceId).unsafeRunSync() shouldBe ()
+      deduplicator.deduplicate(userResourceId, project1.resourceId).unsafeRunSync() shouldBe ()
 
       findAllViewings shouldBe Set(
-        ViewingRecord(userResourceId, dataset1.resourceId, event1.date),
-        ViewingRecord(userResourceId, dataset2.resourceId, event2.date)
+        ViewingRecord(userResourceId, project1.resourceId, event1.date),
+        ViewingRecord(userResourceId, project2.resourceId, event2.date)
       )
     }
   }
@@ -142,15 +142,15 @@ class PersonViewedDatasetDeduplicatorSpec
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val deduplicator     = new PersonViewedDatasetDeduplicatorImpl[IO](tsClient)
+    val deduplicator     = new PersonViewedProjectDeduplicatorImpl[IO](tsClient)
 
-    val persister = PersonViewedDatasetPersister[IO](tsClient)
+    val persister = PersonViewedProjectPersister[IO](tsClient)
   }
 
-  private def insertOtherDate(datasetId: datasets.ResourceId, dateViewed: datasets.DateViewed) = runUpdate(
+  private def insertOtherDate(projectId: projects.ResourceId, dateViewed: projects.DateViewed) = runUpdate(
     on = projectsDataset,
     SparqlQuery.of(
-      "test add another user dataset dateViewed",
+      "test add another user project dateViewed",
       Prefixes of renku -> "renku",
       sparql"""|INSERT {
                |  GRAPH ${GraphClass.PersonViewings.id} {
@@ -159,7 +159,7 @@ class PersonViewedDatasetDeduplicatorSpec
                |}
                |WHERE {
                |  GRAPH ${GraphClass.PersonViewings.id} {
-               |    ?viewingId renku:dataset ${datasetId.asEntityId}
+               |    ?viewingId renku:project ${projectId.asEntityId}
                |  }
                |}
                |""".stripMargin

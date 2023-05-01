@@ -19,20 +19,20 @@
 package io.renku.entities.viewings.collector.persons
 
 import cats.syntax.all._
-import io.renku.graph.model.{datasets, persons}
+import io.renku.graph.model.{persons, projects}
 import io.renku.triplesstore.TSClient
 
-private trait PersonViewedDatasetDeduplicator[F[_]] {
-  def deduplicate(personId: persons.ResourceId, datasetId: datasets.ResourceId): F[Unit]
+private trait PersonViewedProjectDeduplicator[F[_]] {
+  def deduplicate(personId: persons.ResourceId, projectId: projects.ResourceId): F[Unit]
 }
 
-private object PersonViewedDatasetDeduplicator {
-  def apply[F[_]](tsClient: TSClient[F]): PersonViewedDatasetDeduplicator[F] =
-    new PersonViewedDatasetDeduplicatorImpl[F](tsClient)
+private object PersonViewedProjectDeduplicator {
+  def apply[F[_]](tsClient: TSClient[F]): PersonViewedProjectDeduplicator[F] =
+    new PersonViewedProjectDeduplicatorImpl[F](tsClient)
 }
 
-private class PersonViewedDatasetDeduplicatorImpl[F[_]](tsClient: TSClient[F])
-    extends PersonViewedDatasetDeduplicator[F] {
+private class PersonViewedProjectDeduplicatorImpl[F[_]](tsClient: TSClient[F])
+    extends PersonViewedProjectDeduplicator[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.GraphClass
@@ -43,9 +43,9 @@ private class PersonViewedDatasetDeduplicatorImpl[F[_]](tsClient: TSClient[F])
   import io.renku.triplesstore.client.syntax._
   import tsClient.updateWithNoResult
 
-  override def deduplicate(personId: persons.ResourceId, datasetId: datasets.ResourceId): F[Unit] = updateWithNoResult(
+  override def deduplicate(personId: persons.ResourceId, projectId: projects.ResourceId): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
-      show"${GraphClass.PersonViewings}: deduplicate dataset viewings",
+      show"${GraphClass.PersonViewings}: deduplicate project viewings",
       Prefixes of renku -> "renku",
       sparql"""|DELETE {
                |  GRAPH ${GraphClass.PersonViewings.id} { ?viewingId renku:dateViewed ?date }
@@ -56,8 +56,8 @@ private class PersonViewedDatasetDeduplicatorImpl[F[_]](tsClient: TSClient[F])
                |    {
                |      SELECT ?viewingId (MAX(?date) AS ?maxDate)
                |      WHERE {
-               |        ?personId renku:viewedDataset ?viewingId.
-               |        ?viewingId renku:dataset ${datasetId.asEntityId};
+               |        ?personId renku:viewedProject ?viewingId.
+               |        ?viewingId renku:project ${projectId.asEntityId};
                |                   renku:dateViewed ?date.
                |      }
                |      GROUP BY ?viewingId
