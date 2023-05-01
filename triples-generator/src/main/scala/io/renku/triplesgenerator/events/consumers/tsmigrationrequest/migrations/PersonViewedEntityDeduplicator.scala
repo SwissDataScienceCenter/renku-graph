@@ -36,7 +36,7 @@ private object PersonViewedEntityDeduplicator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Remove Project DateViewed duplicates")
+  private lazy val name = Migration.Name("Remove Person Viewed Entity duplicates")
 
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
