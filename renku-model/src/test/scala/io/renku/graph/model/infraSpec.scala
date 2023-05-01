@@ -18,55 +18,62 @@
 
 package io.renku.graph.model
 
-import GraphModelGenerators.cliVersions
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.cliVersions
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class GitLabUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class GitLabUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
 
   "from" should {
 
     "instantiate GitLabUrl when valid url is given" in {
       forAll(httpUrls()) { path =>
-        GitLabUrl.from(path).map(_.value) shouldBe path.asRight
+        GitLabUrl.from(path).map(_.value).value shouldBe path
       }
     }
 
     "instantiate GitLabUrl when valid url is given with a slash at the end" in {
       val path = httpUrls().generateOne
-      GitLabUrl.from(s"$path/").map(_.value) shouldBe path.asRight
+      GitLabUrl.from(s"$path/").map(_.value).value shouldBe path
     }
 
     "fail instantiation for invalid url" in {
       val value = nonEmptyStrings().generateOne
 
-      val Left(ex) = GitLabUrl.from(value).map(_.value)
+      val res = GitLabUrl.from(value).map(_.value)
 
-      ex          shouldBe an[IllegalArgumentException]
-      ex.getMessage should include(s"Cannot instantiate ${GitLabUrl.typeName} with '$value'")
+      res.left.value          shouldBe an[IllegalArgumentException]
+      res.left.value.getMessage should include(s"Cannot instantiate ${GitLabUrl.typeName} with '$value'")
     }
   }
 }
 
-class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with EitherValues {
 
   "from" should {
 
     "return Right for a valid released version" in {
       forAll(semanticVersions) { version =>
-        CliVersion.from(version).map(_.show) shouldBe version.asRight
+        CliVersion.from(version).map(_.show).value shouldBe version
+      }
+    }
+
+    "return Right for a valid rc version" in {
+      forAll(rcVersions()) { version =>
+        CliVersion.from(version).map(_.show).value shouldBe version
       }
     }
 
     "return Right for a valid dev version" in {
       forAll(devVersions()) { version =>
-        CliVersion.from(version).map(_.show) shouldBe version.asRight
+        CliVersion.from(version).map(_.show).value shouldBe version
       }
     }
   }
@@ -75,6 +82,16 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "extract the relevant version parts from a released version" in {
       forAll(semanticVersions) { version =>
+        val cli                      = CliVersion(version)
+        val s"$major.$minor.$bugfix" = version
+        cli.major  shouldBe major
+        cli.minor  shouldBe minor
+        cli.bugfix shouldBe bugfix
+      }
+    }
+
+    "extract the relevant version parts from an rc version" in {
+      forAll(rcVersions()) { version =>
         val cli                      = CliVersion(version)
         val s"$major.$minor.$bugfix" = version
         cli.major  shouldBe major
@@ -136,6 +153,18 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       }
     }
 
+    "consider the rc part if all majors, minors and bugfix are the same" in {
+      val semanticVersion = semanticVersions.generateOne
+      forAll(rcVersions(fixed(semanticVersion)), rcVersions(fixed(semanticVersion))) { (version1, version2) =>
+        whenever(version1 != version2) {
+          val list = List(version1, version2)
+
+          if ((version1.show compareTo version2.show) < 0) list.sorted shouldBe list
+          else list.sorted                                             shouldBe list.reverse
+        }
+      }
+    }
+
     "consider the dev part if all majors, minors and bugfix are the same" in {
       val semanticVersion = semanticVersions.generateOne
       forAll(devVersions(fixed(semanticVersion)), devVersions(fixed(semanticVersion))) { (version1, version2) =>
@@ -148,6 +177,10 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       }
     }
   }
+
+  private def rcVersions(semanticVersionsGen: Gen[String] = semanticVersions) =
+    (semanticVersionsGen, positiveInts(999))
+      .mapN((version, rcNumber) => s"${version}rc$rcNumber")
 
   private def devVersions(semanticVersionsGen: Gen[String] = semanticVersions) =
     (semanticVersionsGen, positiveInts(999), shas.map(_.take(7)))
