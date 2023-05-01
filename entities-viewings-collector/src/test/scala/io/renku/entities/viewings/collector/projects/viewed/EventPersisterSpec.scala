@@ -21,31 +21,26 @@ package viewed
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector
 import io.renku.entities.viewings.collector.persons.{GLUserViewedProject, PersonViewedProjectPersister}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.Schemas.renku
+import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
-
 class EventPersisterSpec
     extends AnyWordSpec
     with should.Matchers
+    with EventPersisterSpecTools
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
@@ -155,20 +150,4 @@ class EventPersisterSpec
           .returning(returning)
       )
   }
-
-  private def findAllViewings =
-    runSelect(
-      on = projectsDataset,
-      SparqlQuery.of(
-        "test find project viewing",
-        Prefixes of renku -> "renku",
-        s"""|SELECT ?id ?date
-            |FROM ${GraphClass.ProjectViewedTimes.id.asSparql.sparql} {
-            |  ?id renku:dateViewed ?date.
-            |}
-            |""".stripMargin
-      )
-    ).unsafeRunSync()
-      .map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date"))))
-      .toSet
 }

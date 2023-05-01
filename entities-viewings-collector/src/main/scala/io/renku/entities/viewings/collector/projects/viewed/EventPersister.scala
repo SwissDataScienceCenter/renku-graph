@@ -38,7 +38,10 @@ private[viewings] object EventPersister {
     ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
 
   def apply[F[_]: Async](tsClient: TSClient[F]): EventPersister[F] =
-    new EventPersisterImpl[F](tsClient, EventDeduplicator[F](tsClient), PersonViewedProjectPersister(tsClient))
+    new EventPersisterImpl[F](tsClient,
+                              EventDeduplicator[F](tsClient, categoryName),
+                              PersonViewedProjectPersister(tsClient)
+    )
 }
 
 private[viewings] class EventPersisterImpl[F[_]: MonadThrow](

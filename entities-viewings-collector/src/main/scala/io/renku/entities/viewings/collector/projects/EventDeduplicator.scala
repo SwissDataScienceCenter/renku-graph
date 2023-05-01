@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects.viewed
+package io.renku.entities.viewings.collector.projects
 
 import cats.syntax.all._
+import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 import io.renku.triplesstore.TSClient
 
@@ -27,10 +28,12 @@ private trait EventDeduplicator[F[_]] {
 }
 
 private object EventDeduplicator {
-  def apply[F[_]](tsClient: TSClient[F]): EventDeduplicator[F] = new EventDeduplicatorImpl[F](tsClient)
+  def apply[F[_]](tsClient: TSClient[F], categoryName: CategoryName): EventDeduplicator[F] =
+    new EventDeduplicatorImpl[F](tsClient, categoryName)
 }
 
-private class EventDeduplicatorImpl[F[_]](tsClient: TSClient[F]) extends EventDeduplicator[F] {
+private class EventDeduplicatorImpl[F[_]](tsClient: TSClient[F], categoryName: CategoryName)
+    extends EventDeduplicator[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.GraphClass
