@@ -37,7 +37,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with should.Matchers with Cap
       createEvent(Gen.oneOf(EventStatus.all - EventStatus.GeneratingTriples).generateOne)
 
       CapacityFinder
-        .queryBased[IO](SubscriptionCategory.capacityFindingQuery)
+        .ofStatus[IO](EventStatus.GeneratingTriples)
         .findUsedCapacity
         .unsafeRunSync() shouldBe UsedCapacity(1)
     }

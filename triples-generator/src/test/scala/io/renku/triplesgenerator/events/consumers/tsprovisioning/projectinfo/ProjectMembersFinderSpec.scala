@@ -36,6 +36,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnexpectedResponseException
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -46,17 +47,17 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
-import scala.util.Random
 
 class ProjectMembersFinderSpec
     extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
     with should.Matchers
+    with EitherValues
     with GitLabClientTools[IO]
     with MockFactory
     with ScalaCheckPropertyChecks {
@@ -64,41 +65,28 @@ class ProjectMembersFinderSpec
   "findProject" should {
 
     "fetch and merge project users and members" in new TestCase {
-      forAll { (members: Set[ProjectMemberNoEmail], users: Set[ProjectMemberNoEmail]) =>
-        setGitLabClientExpectationUsers(projectPath, returning = (users, None).pure[IO])
-        setGitLabClientExpectationMembers(projectPath, returning = (members, None).pure[IO])
+      forAll { members: Set[ProjectMemberNoEmail] =>
+        setGitLabClientExpectation(projectPath, returning = (members, None).pure[IO])
 
-        finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe (members ++ users).asRight
+        finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe members
       }
     }
 
     "collect members from all the pages" in new TestCase {
-      val allMembers = projectMembersNoEmail.generateFixedSizeList(4)
 
-      val (users, members) = allMembers.splitAt(allMembers.size / 2)
+      val members = projectMembersNoEmail.generateFixedSizeSet(ofSize = 4)
 
-      setGitLabClientExpectationUsers(projectPath, returning = (Set(users.head), 2.some).pure[IO])
-      setGitLabClientExpectationUsers(projectPath, maybePage = 2.some, returning = (users.tail.toSet, None).pure[IO])
-      setGitLabClientExpectationMembers(projectPath, returning = (Set(members.head), 2.some).pure[IO])
-      setGitLabClientExpectationMembers(projectPath,
-                                        maybePage = 2.some,
-                                        returning = (members.tail.toSet, None).pure[IO]
-      )
+      setGitLabClientExpectation(projectPath, returning = (Set(members.head), 2.some).pure[IO])
+      setGitLabClientExpectation(projectPath, maybePage = 2.some, returning = (members.tail, None).pure[IO])
 
-      finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe allMembers.toSet.asRight
+      finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe members
     }
 
-    "return members even if one of the endpoints responds with NOT_FOUND" in new TestCase {
-      val members = projectMembersNoEmail.generateSet()
-      if (Random.nextBoolean()) {
-        setGitLabClientExpectationUsers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
-        setGitLabClientExpectationMembers(projectPath, returning = (members, None).pure[IO])
-      } else {
-        setGitLabClientExpectationUsers(projectPath, returning = (members, None).pure[IO])
-        setGitLabClientExpectationMembers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
-      }
+    "return an empty set even if GL endpoint responds with NOT_FOUND" in new TestCase {
 
-      finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe members.asRight
+      setGitLabClientExpectation(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
+
+      finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe Set.empty
     }
 
     val errorMessage = nonEmptyStrings().generateOne
@@ -108,19 +96,11 @@ class ProjectMembersFinderSpec
       "Forbidden"          -> UnexpectedResponseException(Forbidden, errorMessage),
       "Unauthorized"       -> UnexpectedResponseException(Unauthorized, errorMessage)
     ) foreach { case (problemName, error) =>
-      s"return a Recoverable Failure for $problemName when fetching project members or users" in new TestCase {
-        if (Random.nextBoolean()) {
-          setGitLabClientExpectationUsers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
-            .noMoreThanOnce()
-          setGitLabClientExpectationMembers(projectPath, returning = IO.raiseError(error))
-        } else {
-          setGitLabClientExpectationUsers(projectPath, returning = IO.raiseError(error))
-          setGitLabClientExpectationMembers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
-            .noMoreThanOnce()
-        }
+      s"return a Recoverable Failure for $problemName when fetching project members" in new TestCase {
 
-        val Left(failure) = finder.findProjectMembers(projectPath).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
+        setGitLabClientExpectation(projectPath, returning = IO.raiseError(error))
+
+        finder.findProjectMembers(projectPath).value.unsafeRunSync().left.value shouldBe a[ProcessingRecoverableError]
       }
     }
 
@@ -146,24 +126,13 @@ class ProjectMembersFinderSpec
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new ProjectMembersFinderImpl[IO]
 
-    def setGitLabClientExpectationUsers(projectPath: projects.Path,
-                                        maybePage:   Option[Int] = None,
-                                        returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation(projectPath, "users", "project-users", maybePage, returning)
-
-    def setGitLabClientExpectationMembers(projectPath: projects.Path,
-                                          maybePage:   Option[Int] = None,
-                                          returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation(projectPath, "members", "project-members", maybePage, returning)
-
-    private def setGitLabClientExpectation(projectPath:  projects.Path,
-                                           endpoint:     String,
-                                           endpointName: String Refined NonEmpty,
-                                           maybePage:    Option[Int] = None,
-                                           returning:    IO[(Set[ProjectMemberNoEmail], Option[Int])]
+    def setGitLabClientExpectation(projectPath: projects.Path,
+                                   maybePage:   Option[Int] = None,
+                                   returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
     ) = {
+      val endpointName: String Refined NonEmpty = "project-members"
       val uri = {
-        val uri = uri"projects" / projectPath.show / endpoint
+        val uri = uri"projects" / projectPath / "members" / "all"
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri
@@ -181,8 +150,7 @@ class ProjectMembersFinderSpec
     val mapResponse =
       captureMapping(gitLabClient)(
         finder.findProjectMembers(projectPath)(maybeAccessToken).value.unsafeRunSync(),
-        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int])),
-        expectedNumberOfCalls = 2
+        Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int]))
       )
   }
 
@@ -193,5 +161,4 @@ class ProjectMembersFinderSpec
       "username": ${member.username}
     }"""
   }
-
 }

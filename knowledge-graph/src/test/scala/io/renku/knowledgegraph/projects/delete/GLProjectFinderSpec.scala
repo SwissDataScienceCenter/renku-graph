@@ -42,7 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectFinderSpec
+class GLProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with MockFactory
@@ -86,7 +86,7 @@ class ProjectFinderSpec
     val project = consumerProjects.generateOne
 
     private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-    val finder = new ProjectFinderImpl[IO]
+    val finder = new GLProjectFinderImpl[IO]
 
     def givenSingleProjectAPICall(path: projects.Path, returning: IO[Option[Project]]) = {
       val endpointName: String Refined NonEmpty = "single-project"

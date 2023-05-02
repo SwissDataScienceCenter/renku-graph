@@ -19,7 +19,6 @@
 package io.renku.webhookservice.eventstatus
 
 import cats.MonadThrow
-import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.eventlog.EventLogClient
@@ -29,7 +28,7 @@ import io.renku.http.rest.paging.model.PerPage
 import org.typelevel.log4cats.Logger
 
 private trait StatusInfoFinder[F[_]] {
-  def findStatusInfo(projectId: projects.GitLabId): EitherT[F, Throwable, StatusInfo]
+  def findStatusInfo(projectId: projects.GitLabId): F[Option[StatusInfo]]
 }
 
 private object StatusInfoFinder {
@@ -40,7 +39,7 @@ private object StatusInfoFinder {
 
 private class StatusInfoFinderImpl[F[_]: MonadThrow](eventLogClient: EventLogClient[F]) extends StatusInfoFinder[F] {
 
-  override def findStatusInfo(projectId: projects.GitLabId): EitherT[F, Throwable, StatusInfo] = EitherT {
+  override def findStatusInfo(projectId: projects.GitLabId): F[Option[StatusInfo]] =
     eventLogClient
       .getEvents(
         EventLogClient.SearchCriteria
@@ -48,12 +47,12 @@ private class StatusInfoFinderImpl[F[_]: MonadThrow](eventLogClient: EventLogCli
           .withPerPage(PerPage(1))
           .sortBy(EventLogClient.SearchCriteria.Sort.EventDateDesc)
       )
-      .map(toStatusInfo)
-  }
+      .map(_.toEither.map(toStatusInfo))
+      .rethrow
 
-  private lazy val toStatusInfo: EventLogClient.Result[List[EventInfo]] => Either[Throwable, StatusInfo] =
-    _.toEither.map {
-      case Nil        => StatusInfo.NotActivated
-      case event :: _ => StatusInfo.activated(event.status)
+  private def toStatusInfo(events: List[EventInfo]): Option[StatusInfo] =
+    events match {
+      case Nil        => None
+      case event :: _ => StatusInfo.activated(event.status).some
     }
 }

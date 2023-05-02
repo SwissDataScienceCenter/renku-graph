@@ -233,6 +233,7 @@ object NodeDef {
       .sortBy(_._2)
       .map(_._1.show)
       .mkString(start = commandComponent, sep = " ", end = "")
+      .trim
   }
 
   private implicit def parameterValueShow[P <: ParameterValue]: Show[P] = Show.show {

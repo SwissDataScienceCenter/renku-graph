@@ -19,25 +19,32 @@
 package io.renku.entities.viewings.collector
 package datasets
 
-import cats.effect.Async
-import cats.syntax.all._
 import cats.MonadThrow
 import cats.data.OptionT
+import cats.effect.Async
+import cats.syntax.all._
 import io.renku.entities.viewings.collector.persons.{GLUserViewedDataset, PersonViewedDatasetPersister}
 import io.renku.entities.viewings.collector.projects.viewed.EventPersister
 import io.renku.graph.model.projects
 import io.renku.triplesgenerator.api.events.{DatasetViewedEvent, ProjectViewedEvent, UserId}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
-private trait EventUploader[F[_]] {
+private[viewings] trait EventUploader[F[_]] {
   def upload(event: DatasetViewedEvent): F[Unit]
 }
 
-private object EventUploader {
+private[viewings] object EventUploader {
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventUploader[F]] =
     (DSInfoFinder[F], EventPersister[F], PersonViewedDatasetPersister[F])
       .mapN(new EventUploaderImpl[F](_, _, _))
+
+  def apply[F[_]: MonadThrow](tsClient: TSClient[F]): EventUploader[F] =
+    new EventUploaderImpl[F](DSInfoFinder[F](tsClient),
+                             EventPersister[F](tsClient),
+                             PersonViewedDatasetPersister[F](tsClient)
+    )
 }
 
 private class EventUploaderImpl[F[_]: MonadThrow](

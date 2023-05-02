@@ -35,7 +35,7 @@ private trait ProjectHookVerifier[F[_]] {
 
 private object ProjectHookVerifier {
 
-  def apply[F[_]: Async: GitLabClient: Logger] =
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookVerifierImpl[F]] =
     ProjectHookFetcher[F] map (new ProjectHookVerifierImpl[F](_))
 }
 
@@ -44,9 +44,9 @@ private class ProjectHookVerifierImpl[F[_]: Async: Logger](
 ) extends ProjectHookVerifier[F] {
 
   override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Boolean] =
-    projectHookFetcher.fetchProjectHooks(projectHookId.projectId, accessToken) map checkProjectHookExists(
-      projectHookId.projectHookUrl
-    )
+    projectHookFetcher
+      .fetchProjectHooks(projectHookId.projectId, accessToken)
+      .map(checkProjectHookExists(projectHookId.projectHookUrl))
 
   private def checkProjectHookExists(urlToFind: ProjectHookUrl): List[HookIdAndUrl] => Boolean = hooksIdsAndUrls =>
     hooksIdsAndUrls.map(_.url.value) contains urlToFind.value

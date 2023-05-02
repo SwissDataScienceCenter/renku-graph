@@ -24,11 +24,13 @@ import io.renku.events.consumers.Project
 import io.renku.graph.eventlog
 import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
-import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.http.InfoMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.InfoMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.CleanUpEvent
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -41,20 +43,20 @@ trait Endpoint[F[_]] {
 
 object Endpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    eventlog.api.events
-      .Client[F]
-      .map(new EndpointImpl(ProjectFinder[F], ProjectRemover[F], _))
+    (ELProjectFinder[F], eventlog.api.events.Client[F], triplesgenerator.api.events.Client[F]).mapN(
+      new EndpointImpl(GLProjectFinder[F], _, ProjectRemover[F], _, _)
+    )
 }
 
-private class EndpointImpl[F[_]: Async: Logger](projectFinder: ProjectFinder[F],
+private class EndpointImpl[F[_]: Async: Logger](glProjectFinder: GLProjectFinder[F],
+                                                elProjectFinder:     ELProjectFinder[F],
                                                 projectRemover:      ProjectRemover[F],
                                                 elClient:            eventlog.api.events.Client[F],
+                                                tgClient:            triplesgenerator.api.events.Client[F],
                                                 waitBeforeNextCheck: Duration = 1 second
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
-  import elClient.send
-  import projectFinder.findProject
   import projectRemover.deleteProject
 
   override def `DELETE /projects/:path`(path: projects.Path, authUser: AuthUser): F[Response[F]] = {
@@ -65,16 +67,25 @@ private class EndpointImpl[F[_]: Async: Logger](projectFinder: ProjectFinder[F],
         NotFound(InfoMessage("Project does not exist"))
       case Some(project) =>
         deleteProject(project.id) >>
-          Spawn[F].start(waitForDeletion(project) >> send(CommitSyncRequest(project))) >>
+          Spawn[F].start(waitForDeletion(project.path) >> sendEvents(project)) >>
           Accepted(InfoMessage("Project deleted"))
     }
   }.handleErrorWith(httpResult(path))
 
-  private def waitForDeletion(project: Project)(implicit ac: AccessToken): F[Unit] =
-    findProject(project.path) >>= {
+  private def waitForDeletion(path: projects.Path)(implicit ac: AccessToken): F[Unit] =
+    glProjectFinder.findProject(path) >>= {
       case None    => ().pure[F]
-      case Some(_) => Temporal[F].delayBy(waitForDeletion(project), waitBeforeNextCheck)
+      case Some(_) => Temporal[F].delayBy(waitForDeletion(path), waitBeforeNextCheck)
     }
+
+  private def findProject(path: projects.Path)(implicit ac: AccessToken): F[Option[Project]] =
+    glProjectFinder.findProject(path) >>= {
+      case None        => elProjectFinder.findProject(path)
+      case someProject => someProject.pure[F]
+    }
+
+  private def sendEvents(project: Project): F[Unit] =
+    elClient.send(CommitSyncRequest(project)) >> tgClient.send(CleanUpEvent(project))
 
   private def httpResult(path: projects.Path): Throwable => F[Response[F]] = { exception =>
     Logger[F].error(exception)(show"Deleting '$path' project failed") >>

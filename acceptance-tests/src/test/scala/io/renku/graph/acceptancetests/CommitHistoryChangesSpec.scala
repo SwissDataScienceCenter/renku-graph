@@ -86,7 +86,7 @@ class CommitHistoryChangesSpec
 
       sleep((10 seconds).toMillis)
 
-      `wait for events to be processed`(project.id)
+      `wait for events to be processed`(project.id, user.accessToken)
 
       eventually {
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet
@@ -125,7 +125,7 @@ class CommitHistoryChangesSpec
 
       sleep((1 second).toMillis)
 
-      `check no hook exists`(project.id)
+      `check no hook exists`(project.id, user.accessToken)
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 

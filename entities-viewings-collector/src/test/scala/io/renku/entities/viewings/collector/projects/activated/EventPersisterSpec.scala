@@ -16,44 +16,45 @@
  * limitations under the License.
  */
 
-package io.renku.entities.viewings.collector.projects.activated
+package io.renku.entities.viewings.collector.projects
+package activated
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.{projects, GraphClass}
+import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators._
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import java.time.Instant
 
 class EventPersisterSpec
     extends AnyWordSpec
     with should.Matchers
+    with EventPersisterSpecTools
+    with MockFactory
     with IOSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
   "persist" should {
 
-    "insert the given ProjectActivated event into the TS " +
+    "insert the given ProjectActivated event into the TS and run the deduplication query " +
       "if there's no event for the project yet" in new TestCase {
 
         val project = anyProjectEntities.generateOne
         upload(to = projectsDataset, project)
 
         val event = projectActivatedEvents.generateOne.copy(path = project.path)
+
+        givenEventDeduplication(project, returning = ().pure[IO])
 
         persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -66,6 +67,8 @@ class EventPersisterSpec
       upload(to = projectsDataset, project)
 
       val event = projectActivatedEvents.generateOne.copy(path = project.path)
+
+      givenEventDeduplication(project, returning = ().pure[IO])
 
       persister.persist(event).unsafeRunSync() shouldBe ()
 
@@ -82,22 +85,12 @@ class EventPersisterSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val persister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-  }
+    private val eventDeduplicator = mock[EventDeduplicator[IO]]
+    val persister = new EventPersisterImpl[IO](TSClient[IO](projectsDSConnectionInfo), eventDeduplicator)
 
-  private def findAllViewings =
-    runSelect(
-      on = projectsDataset,
-      SparqlQuery.of(
-        "test find project viewing",
-        Prefixes of renku -> "renku",
-        s"""|SELECT ?id ?date
-            |FROM ${GraphClass.ProjectViewedTimes.id.asSparql.sparql} {
-            |  ?id renku:dateViewed ?date.
-            |}
-            |""".stripMargin
-      )
-    ).unsafeRunSync()
-      .map(row => projects.ResourceId(row("id")) -> projects.DateViewed(Instant.parse(row("date"))))
-      .toSet
+    def givenEventDeduplication(project: Project, returning: IO[Unit]) =
+      (eventDeduplicator.deduplicate _)
+        .expects(project.resourceId)
+        .returning(returning)
+  }
 }

@@ -42,6 +42,9 @@ final case class ExecutionPlanner(plan:                     StepPlan,
                                   projectDateCreated:       projects.DateCreated
 ) {
 
+  def replaceCommand(maybeCommand: Option[plans.Command]): ExecutionPlanner =
+    this.copy(plan = plan.fold(_.copy(maybeCommand = maybeCommand), _.copy(maybeCommand = maybeCommand)))
+
   def planParameterValues(
       valuesOverrides: (ParameterDefaultValue, ValueOverride)*
   ): ExecutionPlanner = this.copy(parametersValueOverrides = parametersValueOverrides ::: valuesOverrides.toList)

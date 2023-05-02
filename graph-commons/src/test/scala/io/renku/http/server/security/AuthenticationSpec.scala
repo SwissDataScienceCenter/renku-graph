@@ -27,7 +27,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken.UserOAuthAccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.testtools.IOSpec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{AuthedRoutes, Request, Response}
@@ -59,14 +59,16 @@ class AuthenticationSpec
 
           authentication.authenticateIfNeeded(
             request.withHeaders(accessToken.toHeader)
-          ) shouldBe authUser.some.asRight[EndpointSecurityException].pure[Try]
+          ) shouldBe MaybeAuthUser(authUser.some).asRight[EndpointSecurityException].pure[Try]
         }
     }
 
     "return a function which succeeds authenticating given request and return no user " +
       "if the request does not contain an Authorization token" in new TestCase {
         authentication
-          .authenticateIfNeeded(request) shouldBe Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Try]
+          .authenticateIfNeeded(request) shouldBe MaybeAuthUser.noUser
+          .asRight[EndpointSecurityException]
+          .pure[Try]
       }
 
     "return a function which fails authenticating the given request " +
@@ -127,8 +129,8 @@ class AuthenticationSpec
       val authentication = mock[Authentication[IO]]
 
       val exception = securityExceptions.generateOne
-      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, Option[AuthUser]]] =
-        Kleisli.liftF(exception.asLeft[Option[AuthUser]].pure[IO])
+      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, MaybeAuthUser]] =
+        Kleisli.liftF(exception.asLeft[MaybeAuthUser].pure[IO])
 
       (() => authentication.authenticateIfNeeded)
         .expects()

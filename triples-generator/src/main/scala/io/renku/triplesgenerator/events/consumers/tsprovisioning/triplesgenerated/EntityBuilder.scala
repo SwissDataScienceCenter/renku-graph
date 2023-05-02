@@ -48,7 +48,6 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
   private val applicative:               Applicative[F] = Applicative[F]
 
   import applicative._
-  import projectInfoFinder._
 
   override def buildEntity(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken: Option[AccessToken]
@@ -59,7 +58,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
 
   private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken: Option[AccessToken]
-  ) = findProjectInfo(event.project.path) semiflatMap {
+  ) = projectInfoFinder.findProjectInfo(event.project.path) semiflatMap {
     case Some(projectInfo) => projectInfo.pure[F]
     case None =>
       ProcessingNonRecoverableError

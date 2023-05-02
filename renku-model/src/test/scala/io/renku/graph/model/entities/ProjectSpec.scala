@@ -33,6 +33,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -77,6 +78,27 @@ class ProjectSpec
   }
 
   "fromCli" should {
+
+    "add images from gitlab project avatar" in new TestCase {
+      val projectInfo =
+        gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).suchThat(_.avatarUrl.isDefined).generateOne
+      val testProject: testentities.Project =
+        createRenkuProject(projectInfo, cliVersion, schemaVersion)
+          .asInstanceOf[testentities.RenkuProject.WithoutParent]
+          .copy(images = Nil)
+
+      val cliProject = testProject.to[CliProject]
+      cliProject.images shouldBe Nil
+
+      val modelProject = entities.Project
+        .fromCli(cliProject, Set.empty, projectInfo)
+        .toEither
+        .fold(errs => sys.error(errs.toString()), identity)
+
+      modelProject.images shouldBe List(
+        Image.projectImage(modelProject.resourceId, projectInfo.avatarUrl.get)
+      )
+    }
 
     "turn CliProject entity without parent into the Project object" in new TestCase {
       forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>

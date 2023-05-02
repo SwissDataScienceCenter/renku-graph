@@ -73,10 +73,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
       }
       .onError(logError(projectId))
 
-  private def findToken(
-      projectId:        GitLabId,
-      maybeAccessToken: Option[AccessToken]
-  ): F[Token] =
+  private def findToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Token] =
     maybeAccessToken
       .map(GivenToken(_).widen.pure[F])
       .getOrElse(findStoredToken(projectId))

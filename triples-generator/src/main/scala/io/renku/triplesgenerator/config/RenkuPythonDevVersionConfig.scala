@@ -18,22 +18,43 @@
 
 package io.renku.triplesgenerator.config
 
-import cats.MonadThrow
+import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
-import pureconfig.ConfigReader
+import pureconfig.ConfigReader.Result
+import pureconfig.error.ConfigReaderException
+import pureconfig.{ConfigCursor, ConfigReader, ConfigSource, ReadsMissingKeys}
 
-final case class RenkuPythonDevVersion(version: String) extends Product with Serializable
+final case class RenkuPythonDevVersion(version: String)
+object RenkuPythonDevVersion {
+  implicit lazy val show: Show[RenkuPythonDevVersion] = Show.show(_.version)
+}
 
 object RenkuPythonDevVersionConfig {
 
-  import io.renku.config.ConfigLoader._
+  private val optionalStringReader: ConfigReader[Option[String]] =
+    new ConfigReader[Option[String]] with ReadsMissingKeys {
+      override def from(cur: ConfigCursor): Result[Option[String]] =
+        if (cur.isUndefined)
+          Right(Option.empty[String])
+        else
+          ConfigReader[Option[String]].from(cur) >>= {
+            case None                                  => None.asRight
+            case Some(version) if version.trim.isEmpty => None.asRight
+            case Some(version)                         => version.trim.some.asRight
+          }
+    }
 
-  implicit val reader: ConfigReader[Option[RenkuPythonDevVersion]] = ConfigReader[Option[String]].map {
-    case Some(version) if version.trim.isEmpty => None
-    case Some(version)                         => Some(RenkuPythonDevVersion(version.trim))
-    case None                                  => None
-  }
+  private implicit val reader: ConfigReader[Option[RenkuPythonDevVersion]] =
+    ConfigReader.forProduct1[Option[RenkuPythonDevVersion], Option[String]]("renku-python-dev-version") {
+      _.map(RenkuPythonDevVersion(_))
+    }(optionalStringReader)
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Option[RenkuPythonDevVersion]] =
-    find[F, Option[RenkuPythonDevVersion]]("renku-python-dev-version", config)
+    MonadThrow[F].fromEither(
+      ConfigSource
+        .fromConfig(config)
+        .load[Option[RenkuPythonDevVersion]]
+        .leftMap(ConfigReaderException(_))
+    )
 }
