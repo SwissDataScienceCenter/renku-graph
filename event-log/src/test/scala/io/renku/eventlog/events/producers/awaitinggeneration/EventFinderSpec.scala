@@ -19,12 +19,12 @@
 package io.renku.eventlog.events.producers
 package awaitinggeneration
 
-import ProjectPrioritisation.Priority.MaxPriority
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.events.producers.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
 import io.renku.generators.Generators.Implicits._
@@ -137,9 +137,6 @@ private class EventFinderSpec
         }
 
         // 2nd event with the same event date
-        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -2
-        gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 2
-
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, currentOccupancy = 1)),
           totalOccupancy = 1,
@@ -150,6 +147,9 @@ private class EventFinderSpec
           be(AwaitingGenerationEvent(event1Id, projectPath, event1Body).some) or
             be(AwaitingGenerationEvent(event2Id, projectPath, event2Body).some)
         }
+
+        gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -2
+        gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 2
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate should contain theSameElementsAs List(
           event1Id -> executionDate,

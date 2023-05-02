@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.producers
 package triplesgenerated
 
-import ProjectPrioritisation.{Priority, ProjectInfo}
 import cats.MonadThrow
 import cats.data._
 import cats.effect.Async
@@ -31,6 +30,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
+import io.renku.eventlog.events.producers.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}

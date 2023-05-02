@@ -34,6 +34,8 @@ final class TotalCapacity private (val value: Int) extends AnyVal with IntTinyTy
     if (c > 0) FreeCapacity(c)
     else FreeCapacity(0)
   }
+
+  def *(v: Double): Double = value * v
 }
 object TotalCapacity extends TinyTypeFactory[TotalCapacity](new TotalCapacity(_)) with NonNegativeInt[TotalCapacity] {
   implicit val decoder: Decoder[TotalCapacity] = intDecoder(TotalCapacity)

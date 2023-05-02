@@ -23,8 +23,9 @@ import io.renku.generators.Generators.{ints, nonNegativeInts}
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class TotalCapacitySpec extends AnyWordSpec with should.Matchers {
+class TotalCapacitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "-" should {
 
@@ -42,6 +43,15 @@ class TotalCapacitySpec extends AnyWordSpec with should.Matchers {
       val usedCapacity  = ints(min = totalCapacity.value).generateAs(UsedCapacity)
 
       (totalCapacity - usedCapacity) shouldBe FreeCapacity(0)
+    }
+  }
+
+  "*" should {
+
+    "multiple the Capacity's value by the given value" in {
+      forAll { (totalCapacity: TotalCapacity, value: Double) =>
+        totalCapacity * value shouldBe totalCapacity.value * value
+      }
     }
   }
 }
