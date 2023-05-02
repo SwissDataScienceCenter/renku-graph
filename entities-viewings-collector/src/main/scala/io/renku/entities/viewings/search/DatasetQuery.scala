@@ -50,7 +50,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |      ?viewedDataset renku:dataset ?datasetId;
                |                     renku:dateViewed ${v.viewedDate}
                |    }
-               |    Graph schema:Dataset {
+               |    Graph ${GraphClass.Datasets.id} {
                |      ${v.datasetSameAs} a renku:DiscoverableDataset;
                |                         renku:datasetProjectLink ?projectLink.
                |
@@ -72,7 +72,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ${v.keywords})
                |        (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ${v.images})
                |      WHERE {
-               |        Graph schema:Dataset {
+               |        Graph ${GraphClass.Datasets.id} {
                |          ${v.datasetSameAs} a renku:DiscoverableDataset;
                |
                |          Optional {
@@ -93,7 +93,7 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |      GROUP BY ${v.datasetSameAs}
                |    }
                |
-               |    Graph schema:Dataset {
+               |    Graph ${GraphClass.Datasets.id} {
                |      ${v.datasetSameAs} renku:slug ${v.datasetName}.
                |
                |      Optional {

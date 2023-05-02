@@ -97,16 +97,16 @@ private class MicroserviceRoutes[F[_]: Async](
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "current-user" / "recently-viewed" :?
           recentlyViewedEntityTypes(types) +& LimitQueryParam(limit) as maybeUser =>
-        val validatedUser = maybeUser.toValidNel(ParseFailure("Not authenticated!", ""))
-        val defaultLimit  = Validated.validNel[ParseFailure, Int](10)
-        val response =
-          (validatedUser, types, limit.getOrElse(defaultLimit)).mapN { (user, ets, count) =>
-            val criteria = RecentEntitiesFinder.Criteria(ets.toSet, user, count)
-            recentEntitiesEndpoint.getRecentlyViewedEntities(criteria)
-          }
-        response.fold(toBadRequest, identity)
+        maybeUser.withAuthenticatedUser { user =>
+          val defaultLimit = Validated.validNel[ParseFailure, Int](10)
+          val response =
+            (types, limit.getOrElse(defaultLimit)).mapN { (ets, count) =>
+              val criteria = RecentEntitiesFinder.Criteria(ets.toSet, user, count)
+              recentEntitiesEndpoint.getRecentlyViewedEntities(criteria)
+            }
+          response.fold(toBadRequest, identity)
+        }
     }
-
 
   private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] = {
     import datasets.Endpoint.Query.query

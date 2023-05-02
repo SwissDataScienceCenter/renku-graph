@@ -37,7 +37,7 @@ private final case class DSInfo(projectPath: projects.Path, dataset: Dataset)
 private object DSInfoFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DSInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
+    ProjectsConnectionConfig[F]().flatMap(apply(_))
 
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): DSInfoFinder[F] =
     new DSInfoFinderImpl[F](tsClient)

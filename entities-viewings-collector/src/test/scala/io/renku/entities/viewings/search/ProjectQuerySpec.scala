@@ -30,7 +30,6 @@ class ProjectQuerySpec extends SearchTestBase {
   it should "return one project entry if viewed multiple times" in {
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
-      .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
     val person = personGen.generateOne
@@ -63,7 +62,6 @@ class ProjectQuerySpec extends SearchTestBase {
   it should "find and decode projects" in {
     val project = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
-      .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
     val person = personGen.generateOne
@@ -94,11 +92,9 @@ class ProjectQuerySpec extends SearchTestBase {
   it should "only return projects for the given user" in {
     val project1 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
-      .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
     val project2 = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(stepPlanEntities()))
-      .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
     val person1 = personGen.generateOne

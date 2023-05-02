@@ -23,19 +23,18 @@ import io.renku.entities.search.model.{MatchingScore, Entity => SearchEntity}
 import io.renku.entities.viewings.search.RecentEntitiesFinder.Criteria
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.security.model.AuthUser
+import org.scalatest.OptionValues
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class DatasetQuerySpec extends SearchTestBase {
+class DatasetQuerySpec extends SearchTestBase with OptionValues {
 
   it should "return multiple datasets" in {
     val project1 = renkuProjectEntities(visibilityPublic)
-      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
     val project2 = renkuProjectEntities(visibilityPublic)
-      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
@@ -43,7 +42,7 @@ class DatasetQuerySpec extends SearchTestBase {
     val dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
 
     val person = personGen.generateOne
-    val userId = person.maybeGitLabId.get
+    val userId = person.maybeGitLabId.value
 
     upload(projectsDataset, person)
     provisionTestProjects(project1, project2).unsafeRunSync()
@@ -62,7 +61,6 @@ class DatasetQuerySpec extends SearchTestBase {
 
   it should "find and decode datasets" in {
     val project = renkuProjectEntities(visibilityPublic)
-      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
@@ -96,11 +94,9 @@ class DatasetQuerySpec extends SearchTestBase {
 
   it should "return datasets for the given user only" in {
     val project1 = renkuProjectEntities(visibilityPublic)
-      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
     val project2 = renkuProjectEntities(visibilityPublic)
-      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
@@ -111,8 +107,8 @@ class DatasetQuerySpec extends SearchTestBase {
 
     val dataset1 = project1.to[entities.RenkuProject.WithoutParent].datasets.head
     val dataset2 = project2.to[entities.RenkuProject.WithoutParent].datasets.head
-    val userId1  = person1.maybeGitLabId.get
-    val userId2  = person2.maybeGitLabId.get
+    val userId1  = person1.maybeGitLabId.value
+    val userId2  = person2.maybeGitLabId.value
 
     storeDatasetViewed(userId1, Instant.now(), dataset1.identification.identifier)
     storeDatasetViewed(userId2, Instant.now(), dataset2.identification.identifier)

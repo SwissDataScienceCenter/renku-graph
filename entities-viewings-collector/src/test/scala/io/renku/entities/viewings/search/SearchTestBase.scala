@@ -26,8 +26,7 @@ import io.renku.entities.search.FinderSpecOps
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.{Entity => SearchEntity}
 import io.renku.entities.searchgraphs.SearchInfoDataset
-import io.renku.entities.viewings.collector.datasets.EventUploader
-import io.renku.entities.viewings.collector.projects.viewed.EventPersister
+import io.renku.entities.viewings.EntityViewings
 import io.renku.entities.viewings.search.RecentEntitiesFinder.EntityType
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -57,6 +56,7 @@ abstract class SearchTestBase
     with SearchInfoDataset
     with AdditionalMatchers
     with SearchDiffInstances
+    with EntityViewings
     with IOSpec {
 
   implicit override def ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
@@ -64,22 +64,15 @@ abstract class SearchTestBase
   implicit val queryTimeRecorder: SparqlQueryTimeRecorder[IO] =
     TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
 
+  lazy val tsClient = tsClientIO.unsafeRunSync()
+
   val token: UserAccessToken = AccessToken.PersonalAccessToken("nonblank")
 
-  lazy val eventUploader: EventUploader[IO] =
-    EventUploader[IO](projectsDSConnectionInfo)
-      .unsafeRunSync()
-
-  lazy val eventPersister: EventPersister[IO] =
-    EventPersister[IO](projectsDSConnectionInfo).unsafeRunSync()
-
-  lazy val tsClient = TSClient[IO](projectsDSConnectionInfo)
-
   def storeProjectViewed(userId: GitLabId, dateViewed: Instant, path: projects.Path): Unit =
-    eventPersister.persist(ProjectViewedEvent(path, dateViewed, UserId.GLId(userId).some)).unsafeRunSync()
+    provision(ProjectViewedEvent(path, dateViewed, UserId.GLId(userId).some)).unsafeRunSync()
 
   def storeDatasetViewed(userId: GitLabId, dateViewed: Instant, ident: datasets.Identifier): Unit =
-    eventUploader.upload(DatasetViewedEvent(ident, dateViewed, userId.some)).unsafeRunSync()
+    provision(DatasetViewedEvent(ident, dateViewed, userId.some)).unsafeRunSync()
 
   def personGen: Gen[TestPerson] =
     personEntities(maybeGitLabIds = personGitLabIds.map(Some(_)))
@@ -88,14 +81,10 @@ abstract class SearchTestBase
     println(q.toString.split('\n').zipWithIndex.map(t => f"${t._2}%2d ${t._1}").mkString("\n"))
 
   def projectDecoder: Decoder[List[SearchEntity.Project]] =
-    _.downField("results")
-      .downField("bindings")
-      .as(Decoder.decodeList[SearchEntity.Project](Variables.Project.decoder))
+    ResultsDecoder[List, SearchEntity.Project](Variables.Project.decoder)
 
   def datasetDecoder: Decoder[List[SearchEntity.Dataset]] =
-    _.downField("results")
-      .downField("bindings")
-      .as(Decoder.decodeList[SearchEntity.Dataset](Variables.Dataset.decoder))
+    ResultsDecoder[List, SearchEntity.Dataset](Variables.Dataset.decoder)
 
   implicit val searchCriteriaEntityTypeDiff: Diff[EntityType] =
     Diff.diffForString.contramap(_.name)
