@@ -21,11 +21,12 @@ package io.renku.knowledgegraph.projects.files.lineage
 import LineageGenerators._
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.testentities.StepPlanCommandParameter._
+import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -165,7 +166,45 @@ class NodeDetailsFinderSpec
         .unsafeRunSync() shouldBe Set(NodeDef(activity1).toNode, NodeDef(activity2).toNode)
     }
 
+    "find details of a Plan with implicit command parameters " +
+      "- no implicit params, inputs and outputs to be included in the node's label" in new TestCase {
+
+        val parameter = commandParameterDefaultValueGen.generateOne
+        val input     = entityLocations.generateOne
+        val output    = entityLocations.generateOne
+
+        val project = anyRenkuProjectEntities
+          .addActivity(project =>
+            executionPlanners(
+              stepPlanEntities(
+                CommandParameter.implicitFrom(parameter),
+                CommandInput.implicitFromLocation(input),
+                CommandOutput.implicitFromLocation(output)
+              ),
+              project
+            ).map(
+              _.replaceCommand(planCommands.generateSome)
+                .planParameterValues(parameter -> ValueOverride(parameter.value))
+                .planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne)
+                .buildProvenanceUnsafe()
+            )
+          )
+          .generateOne
+
+        upload(to = projectsDataset, project)
+
+        val activity :: Nil = project.activities
+
+        nodeDetailsFinder
+          .findDetails(
+            Set(ExecutionInfo(activity.asEntityId.show, activity.startTime.value)),
+            project.path
+          )
+          .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
+      }
+
     "find details of a Plan with mapped command parameters" in new TestCase {
+
       val input +: output +: errOutput +: Nil =
         entityLocations.generateNonEmptyList(min = 3, max = 3).toList
 
@@ -252,7 +291,7 @@ class NodeDetailsFinderSpec
       }
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"No plan with $missingPlan"
+      exception.getMessage shouldBe s"No activity with $missingPlan"
     }
   }
 

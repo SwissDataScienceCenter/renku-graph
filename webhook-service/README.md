@@ -44,6 +44,13 @@ Verifies service health.
 
 Returns information about activation and processing progress of project events.
 
+**request format**
+
+The endpoint accepts an authorization headers passed in the request:
+- `Authorization: Bearer <token>` with oauth token obtained from gitlab
+- `PRIVATE-TOKEN: <token>` with user's personal access token in gitlab
+The headers are not required.
+
 **Response**
 
 | Status                      | Description                                            |
@@ -86,18 +93,18 @@ creates a webhook for a project with the given `project id`.
 
 **request format**
 
-the endpoint requires an authorization token passed in the request header as:
-- `authorization: bearer <token>` with oauth token obtained from gitlab
-- `private-token: <token>` with user's personal access token in gitlab
+The endpoint requires an authorization token passed in the request header as:
+- `Authorization: Bearer <token>` with oauth token obtained from gitlab
+- `PRIVATE-TOKEN: <token>` with user's personal access token in gitlab
 
 **response**
 
-| status                     | description                                                                                     |
-|----------------------------|-------------------------------------------------------------------------------------------------|
-| ok (200)                   | when hook already exists for the project                                                        |
-| created (201)              | when a new hook was created                                                                     |
-| unauthorized (401)         | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
-| internal server error (500)| when there are problems with webhook creation                                                   |
+| status                      | description                                                                                     |
+|-----------------------------|-------------------------------------------------------------------------------------------------|
+| OK (200)                    | when hook already exists for the project                                                        |
+| CREATED (201)               | when a new hook was created                                                                     |
+| UNAUTHORIZED (401)          | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
+| INTERNAL_SERVER_ERROR (500) | when there are problems with webhook creation                                                   |
 
 #### DELETE /projects/:id/webhooks
 
@@ -105,26 +112,25 @@ deletes a webhook for a project with the given `project id`.
 
 **request format**
 
-the endpoint requires an authorization token passed in the request header as:
-- `authorization: bearer <token>` with oauth token obtained from gitlab
-- `private-token: <token>` with user's personal access token in gitlab
+The endpoint requires an authorization token passed in the request header as:
+- `Authorization: Bearer <token>` with oauth token obtained from gitlab
+- `PRIVATE-TOKEN: <token>` with user's personal access token in gitlab
 
 **response**
 
-| status                     | description                                                                                     |
-|----------------------------|-------------------------------------------------------------------------------------------------|
-| ok (200)                   | when hook is successfully deleted                                                               |
-| not found (404)            | when the project does not exists                                                                | 
-| unauthorized (401)         | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
-| internal server error (500)| when there are problems with webhook creation                                                   |
+| status                      | description                                                                                     |
+|-----------------------------|-------------------------------------------------------------------------------------------------|
+| OK (200)                    | when hook is successfully deleted                                                               |
+| NOT_FOUND (404)             | when the project does not exists                                                                | 
+| UNAUTHORIZED (401)          | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
+| INTERNAL_SERVER_ERROR (500) | when there are problems with webhook creation                                                   |
 
 
 #### POST /projects/:id/webhooks/validation
 
 **Notice**
-This endpoint is under development and works just for public projects. For non-public projects it responds with INTERNAL SERVER ERROR (500).
-
-Validates the webhook for the project with the given `project id`. It succeeds (OK) if either the project is public and there's a hook for it or it's private, there's a hook for it and a Personal Access Token (PAT). If either there's no webhook or there's no PAT in case of a private project, the call results with NOT_FOUND. In case of private projects, if there's a hook created for a project but no PAT available (or the PAT doesn't work), the hook will be removed as part of the validation process.
+This API validates the renku webhook for the project with the given `id`.
+It succeeds (OK) if the hook exists. If there's no webhook the call responds with NOT_FOUND.
 
 **Request format**
 
@@ -134,12 +140,12 @@ The endpoint requires an authorization token passed in the request header as:
 
 **Response**
 
-| Status                     | Description                                                                                                                                                       |
-|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| OK (200)                   | When the hook exists for the project and the project is either public or there's a Personal Access Token available for it                                         |
-| NOT_FOUND (404)            | When the hook either does not exists or there's no Personal Access Token available for it. If the hook exists but there's no PAT for it, the hook will be removed |
-| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid                                                                   |
-| INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                                                                                         |
+| Status                     | Description                                                                                     |
+|----------------------------|-------------------------------------------------------------------------------------------------|
+| OK (200)                   | When the hook exists for the project                                                            |
+| NOT_FOUND (404)            | When there's no hook for the project                                                            |
+| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid |
+| INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                       |
 
 #### GET /version
 

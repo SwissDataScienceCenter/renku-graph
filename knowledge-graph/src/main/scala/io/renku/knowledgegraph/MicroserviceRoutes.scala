@@ -27,7 +27,7 @@ import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
-import io.renku.graph.model.{persons, RenkuUrl}
+import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -38,7 +38,7 @@ import io.renku.http.rest.paging.PagingRequest.Decoders._
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
@@ -60,7 +60,7 @@ private class MicroserviceRoutes[F[_]: Async](
     lineageEndpoint:            projects.files.lineage.Endpoint[F],
     docsEndpoint:               docs.Endpoint[F],
     usersProjectsEndpoint:      users.projects.Endpoint[F],
-    authMiddleware:             AuthMiddleware[F, Option[AuthUser]],
+    authMiddleware:             AuthMiddleware[F, MaybeAuthUser],
     projectPathAuthorizer:      Authorizer[F, model.projects.Path],
     datasetIdAuthorizer:        Authorizer[F, model.datasets.Identifier],
     datasetSameAsAuthorizer:    Authorizer[F, model.datasets.SameAs],
@@ -90,21 +90,21 @@ private class MicroserviceRoutes[F[_]: Async](
     `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*`
   }
 
-  private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
+  private lazy val `GET /datasets/*` : AuthedRoutes[MaybeAuthUser, F] = {
     import datasets.Endpoint.Query.query
     import datasets.Endpoint.Sort.sort
 
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "datasets"
           :? query(maybePhrase) +& sort(sortBy) +& page(page) +& perPage(perPage) as maybeUser =>
-        searchForDatasets(maybePhrase, sortBy, page, perPage, maybeUser)
+        searchForDatasets(maybePhrase, sortBy, page, perPage, maybeUser.option)
       case GET -> Root / "knowledge-graph" / "datasets" / RequestedDataset(dsId) as maybeUser =>
-        fetchDataset(dsId, maybeUser)
+        fetchDataset(dsId, maybeUser.option)
     }
   }
 
   // format: off
-  private lazy val `GET /entities/*`: AuthedRoutes[Option[AuthUser], F] = {
+  private lazy val `GET /entities/*`: AuthedRoutes[MaybeAuthUser, F] = {
     import io.renku.entities.search.Criteria._
     import Sort.sort
     import entities.QueryParamDecoders._
@@ -116,12 +116,12 @@ private class MicroserviceRoutes[F[_]: Async](
         +& since(maybeSince) +& until(maybeUntil) 
         +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
         searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities, maybeNamespaces,
-          maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
+          maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser.option, req.req)
     }
   }
   // format: on
 
-  private lazy val `GET /users/*` : AuthedRoutes[Option[AuthUser], F] = {
+  private lazy val `GET /users/*` : AuthedRoutes[MaybeAuthUser, F] = {
     import users.binders._
     import users.projects.Endpoint._
     import users.projects.Endpoint.Criteria.Filters
@@ -134,26 +134,28 @@ private class MicroserviceRoutes[F[_]: Async](
           :? activationState(maybeState) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
         (maybeState getOrElse ActivationState.All.validNel, PagingRequest(maybePage, maybePerPage))
           .mapN { (activationState, paging) =>
-            `GET /users/:id/projects`(Criteria(userId = id, Filters(activationState), paging, maybeUser), req.req)
+            `GET /users/:id/projects`(Criteria(userId = id, Filters(activationState), paging, maybeUser.option),
+                                      req.req
+            )
           }
           .fold(toBadRequest, identity)
     }
   }
 
-  private lazy val `GET /projects/*` : AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
+  private lazy val `GET /projects/*` : AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
 
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
-      routeToProjectsEndpoints(path, maybeUser)(authReq.req)
+      routeToProjectsEndpoints(path, maybeUser.option)(authReq.req)
 
-    case DELETE -> "knowledge-graph" /: "projects" /: path as Some(user) =>
-      path.segments.toList
-        .map(_.toString)
-        .toProjectPath
-        .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
-        .semiflatMap(`DELETE /projects/:path`(_, user))
-        .merge
-
-    case DELETE -> "knowledge-graph" /: "projects" /: _ as None => resourceNotFound[F]
+    case DELETE -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      maybeUser.withUserOrNotFound { user =>
+        path.segments.toList
+          .map(_.toString)
+          .toProjectPath
+          .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
+          .semiflatMap(`DELETE /projects/:path`(_, user))
+          .merge
+      }
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {

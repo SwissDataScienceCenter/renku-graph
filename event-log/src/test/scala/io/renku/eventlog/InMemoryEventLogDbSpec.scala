@@ -50,9 +50,8 @@ trait InMemoryEventLogDbSpec
   }
 
   protected def prepareDbForTest(): Unit = execute[Unit] {
-    Kleisli { session =>
-      val query: Command[Void] = sql"TRUNCATE TABLE #${findAllTables().mkString(", ")} CASCADE".command
-      session.execute(query).void
-    }
+    val tables = findAllTables().mkString(", ")
+    val query: Command[Void] = sql"TRUNCATE TABLE #$tables CASCADE".command
+    Kleisli(_.execute(query).void)
   }
 }

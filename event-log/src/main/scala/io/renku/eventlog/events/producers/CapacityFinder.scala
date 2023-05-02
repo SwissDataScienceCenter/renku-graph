@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.graph.model.events.EventStatus
 
 private trait CapacityFinder[F[_]] {
   def findUsedCapacity: F[UsedCapacity]
@@ -35,26 +36,32 @@ private object CapacityFinder {
     override lazy val findUsedCapacity = UsedCapacity.zero.pure[F]
   }
 
-  def queryBased[F[_]: Async: SessionResource: QueriesExecutionTimes](query: String): CapacityFinder[F] =
-    new QueryBasedCapacityFinder[F](query)
-}
+  def ofStatus[F[_]: Async: SessionResource: QueriesExecutionTimes](status: EventStatus): CapacityFinder[F] =
+    new StatusCapacityFinder[F](status)
 
-private class QueryBasedCapacityFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](query: String)
-    extends DbClient(Some(QueriesExecutionTimes[F]))
-    with CapacityFinder[F] {
+  private class StatusCapacityFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](status: EventStatus)
+      extends DbClient[F](Some(QueriesExecutionTimes[F]))
+      with CapacityFinder[F] {
 
-  import skunk._
-  import skunk.codec.numeric._
-  import skunk.implicits._
+    import skunk.Encoder
+    import skunk.codec.all.varchar
+    import skunk.codec.numeric._
+    import skunk.implicits._
 
-  override def findUsedCapacity: F[UsedCapacity] = SessionResource[F].useK(statement)
+    implicit val statusVarchar: Encoder[EventStatus] =
+      varchar.values.contramap(_.value)
 
-  private lazy val statement = measureExecutionTime {
-    SqlStatement
-      .named("find capacity")
-      .select[Void, Long](sql"""#$query""".query(int8))
-      .arguments(Void)
-      .build[Id](_.unique)
-      .mapResult(v => UsedCapacity(v.toInt))
+    val statement = measureExecutionTime {
+      SqlStatement
+        .named(s"find capacity for ${status.value}")
+        .select[EventStatus, Long](
+          sql"SELECT COUNT(event_id) FROM event WHERE status = $statusVarchar".query(int8)
+        )
+        .arguments(status)
+        .build[Id](_.unique)
+        .mapResult(v => UsedCapacity(v.toInt))
+    }
+
+    override def findUsedCapacity: F[UsedCapacity] = SessionResource[F].useK(statement)
   }
 }

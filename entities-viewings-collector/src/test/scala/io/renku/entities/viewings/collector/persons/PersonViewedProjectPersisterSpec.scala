@@ -20,39 +20,38 @@ package io.renku.entities.viewings.collector.persons
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.entities.viewings.collector
-import io.renku.generators.Generators.{fixed, timestamps, timestampsNotInTheFuture}
+import io.renku.entities.viewings.collector.persons.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.Schemas.renku
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators.userIds
 import io.renku.triplesgenerator.api.events.UserId
 import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import java.time.Instant
 
 class PersonViewedProjectPersisterSpec
     extends AnyWordSpec
     with should.Matchers
     with OptionValues
+    with PersonViewedProjectSpecTools
     with IOSpec
     with InMemoryJenaForSpec
-    with ProjectsDataset {
+    with ProjectsDataset
+    with MockFactory {
 
   "persist" should {
 
-    "insert the given GLUserViewedProject to the TS if it doesn't exist yet " +
-      "case with a user identified with GitLab id" in new TestCase {
+    "insert the given GLUserViewedProject to the TS and run the deduplication query " +
+      "if it doesn't exist yet " +
+      "- case with a user identified with GitLab id" in new TestCase {
 
         val userId  = UserId(personGitLabIds.generateOne)
         val project = generateProjectWithCreator(userId)
@@ -62,6 +61,8 @@ class PersonViewedProjectPersisterSpec
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
         val event      = GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, project.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -69,8 +70,9 @@ class PersonViewedProjectPersisterSpec
         )
       }
 
-    "insert the given GLUserViewedProject to the TS if it doesn't exist yet " +
-      "case with a user identified with email" in new TestCase {
+    "insert the given GLUserViewedProject to the TS and run the deduplication query " +
+      "if it doesn't exist yet " +
+      "- case with a user identified with email" in new TestCase {
 
         val userId  = UserId(personEmails.generateOne)
         val project = generateProjectWithCreator(userId)
@@ -80,6 +82,8 @@ class PersonViewedProjectPersisterSpec
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
         val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, project.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -87,7 +91,7 @@ class PersonViewedProjectPersisterSpec
         )
       }
 
-    "update the date for the user and project from the GLUserViewedProject " +
+    "update the date for the user and project from the GLUserViewedProject and run the deduplicate query " +
       "if an event for the project already exists in the TS " +
       "and the date from the new event is newer than this in the TS" in new TestCase {
 
@@ -99,6 +103,8 @@ class PersonViewedProjectPersisterSpec
         val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
         val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
+        givenEventDeduplication(project.maybeCreator.value.resourceId, project.resourceId, returning = ().pure[IO])
+
         persister.persist(event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -106,6 +112,8 @@ class PersonViewedProjectPersisterSpec
         )
 
         val newDate = timestampsNotInTheFuture(butYoungerThan = event.date.value).generateAs(projects.DateViewed)
+
+        givenEventDeduplication(project.maybeCreator.value.resourceId, project.resourceId, returning = ().pure[IO])
 
         persister.persist(event.copy(date = newDate)).unsafeRunSync() shouldBe ()
 
@@ -122,6 +130,8 @@ class PersonViewedProjectPersisterSpec
       val dateViewed = projectViewedDates(project.dateCreated.value).generateOne
       val event      = collector.persons.GLUserViewedProject(userId, toCollectorProject(project), dateViewed)
 
+      givenEventDeduplication(project.maybeCreator.value.resourceId, project.resourceId, returning = ().pure[IO])
+
       persister.persist(event).unsafeRunSync() shouldBe ()
 
       findAllViewings shouldBe Set(
@@ -135,7 +145,7 @@ class PersonViewedProjectPersisterSpec
       findAllViewings shouldBe Set(ViewingRecord(project.maybeCreator.value.resourceId, project.resourceId, dateViewed))
     }
 
-    "update the date for the user and project from the GLUserViewedProject " +
+    "update the date for the user and project from the GLUserViewedProject, run the deduplicate query " +
       "and leave other user viewings if they exist" in new TestCase {
 
         val userId   = userIds.generateOne
@@ -147,11 +157,13 @@ class PersonViewedProjectPersisterSpec
         val project1DateViewed = projectViewedDates(project1.dateCreated.value).generateOne
         val project1Event =
           collector.persons.GLUserViewedProject(userId, toCollectorProject(project1), project1DateViewed)
+        givenEventDeduplication(project1.maybeCreator.value.resourceId, project1.resourceId, returning = ().pure[IO])
         persister.persist(project1Event).unsafeRunSync() shouldBe ()
 
         val project2DateViewed = projectViewedDates(project2.dateCreated.value).generateOne
         val project2Event =
           collector.persons.GLUserViewedProject(userId, toCollectorProject(project2), project2DateViewed)
+        givenEventDeduplication(project2.maybeCreator.value.resourceId, project2.resourceId, returning = ().pure[IO])
         persister.persist(project2Event).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -162,6 +174,7 @@ class PersonViewedProjectPersisterSpec
         val newDate =
           timestampsNotInTheFuture(butYoungerThan = project1Event.date.value).generateAs(projects.DateViewed)
 
+        givenEventDeduplication(project1.maybeCreator.value.resourceId, project1.resourceId, returning = ().pure[IO])
         persister.persist(project1Event.copy(date = newDate)).unsafeRunSync() shouldBe ()
 
         findAllViewings shouldBe Set(
@@ -188,53 +201,15 @@ class PersonViewedProjectPersisterSpec
   private trait TestCase {
     private implicit val logger: TestLogger[IO]              = TestLogger[IO]()
     private implicit val sqtr:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val tsClient = TSClient[IO](projectsDSConnectionInfo)
-    val persister        = new PersonViewedProjectPersisterImpl[IO](tsClient, PersonFinder(tsClient))
+    private val tsClient          = TSClient[IO](projectsDSConnectionInfo)
+    private val eventDeduplicator = mock[PersonViewedProjectDeduplicator[IO]]
+    val persister = new PersonViewedProjectPersisterImpl[IO](tsClient, PersonFinder(tsClient), eventDeduplicator)
+
+    def givenEventDeduplication(personResourceId:  persons.ResourceId,
+                                projectResourceId: projects.ResourceId,
+                                returning:         IO[Unit]
+    ) = (eventDeduplicator.deduplicate _)
+      .expects(personResourceId, projectResourceId)
+      .returning(returning)
   }
-
-  private def generateProjectWithCreator(userId: UserId) = {
-
-    val creator = userId
-      .fold(
-        glId => personEntities(maybeGitLabIds = fixed(glId.some)).map(removeOrcidId),
-        email => personEntities(withoutGitLabId, maybeEmails = fixed(email.some)).map(removeOrcidId)
-      )
-      .generateSome
-
-    anyProjectEntities
-      .map(replaceProjectCreator(creator))
-      .generateOne
-      .to[entities.Project]
-  }
-
-  private def findAllViewings =
-    runSelect(
-      on = projectsDataset,
-      SparqlQuery.of(
-        "test find user project viewings",
-        Prefixes of renku -> "renku",
-        sparql"""|SELECT ?id ?projectId ?date
-                 |FROM ${GraphClass.PersonViewings.id} {
-                 |  ?id renku:viewedProject ?viewingId.
-                 |  ?viewingId renku:project ?projectId;
-                 |             renku:dateViewed ?date.
-                 |}
-                 |""".stripMargin
-      )
-    ).unsafeRunSync()
-      .map(row =>
-        ViewingRecord(persons.ResourceId(row("id")),
-                      projects.ResourceId(row("projectId")),
-                      projects.DateViewed(Instant.parse(row("date")))
-        )
-      )
-      .toSet
-
-  private case class ViewingRecord(userId:    persons.ResourceId,
-                                   projectId: projects.ResourceId,
-                                   date:      projects.DateViewed
-  )
-
-  private def toCollectorProject(project: entities.Project) =
-    collector.persons.Project(project.resourceId, project.path)
 }

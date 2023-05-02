@@ -42,14 +42,14 @@ class StatusInfoFinderSpec extends AnyWordSpec with should.Matchers with MockFac
       val eventInfo = eventInfos(projectIdGen = fixed(projectId)).generateOne
       givenGetEvents(projectId, returning = EventLogClient.Result.Success(List(eventInfo)).pure[Try])
 
-      fetcher.findStatusInfo(projectId).value shouldBe StatusInfo.activated(eventInfo.status).asRight.pure[Try]
+      fetcher.findStatusInfo(projectId) shouldBe StatusInfo.activated(eventInfo.status).some.pure[Try]
     }
 
-    "return non-activated project StatusInfo when no events found for the project" in new TestCase {
+    "return activated project StatusInfo when no events found for the project" in new TestCase {
 
       givenGetEvents(projectId, returning = EventLogClient.Result.Success(List.empty).pure[Try])
 
-      fetcher.findStatusInfo(projectId).value shouldBe StatusInfo.NotActivated.asRight.pure[Try]
+      fetcher.findStatusInfo(projectId) shouldBe Option.empty[StatusInfo].pure[Try]
     }
 
     "return an Exception if EL responds with a failure" in new TestCase {
@@ -57,7 +57,7 @@ class StatusInfoFinderSpec extends AnyWordSpec with should.Matchers with MockFac
       val message = nonEmptyStrings().generateOne
       givenGetEvents(projectId, returning = EventLogClient.Result.failure(message).pure[Try])
 
-      val Success(result) = fetcher.findStatusInfo(projectId).value
+      val Success(result) = fetcher.findStatusInfo(projectId).attempt
 
       result                       shouldBe a[Left[_, _]]
       result.leftMap(_.getMessage) shouldBe message.asLeft
@@ -67,7 +67,7 @@ class StatusInfoFinderSpec extends AnyWordSpec with should.Matchers with MockFac
 
       givenGetEvents(projectId, returning = EventLogClient.Result.unavailable.pure[Try])
 
-      val Success(result) = fetcher.findStatusInfo(projectId).value
+      val Success(result) = fetcher.findStatusInfo(projectId).attempt
 
       result shouldBe a[Left[_, _]]
       result shouldBe EventLogClient.Result.Unavailable.asLeft

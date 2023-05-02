@@ -16,15 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.hookcreation
+package io.renku.webhookservice
 
-import cats.effect.{Async, MonadCancelThrow}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.webhookservice.model.Project
-import org.http4s.implicits.http4sLiteralsSyntax
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
+import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoFinder[F[_]] {
@@ -36,16 +38,16 @@ private class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import org.http4s._
   import org.http4s.Status.{Ok, Unauthorized}
+  import org.http4s._
   import org.http4s.circe._
 
   def findProjectInfo(projectId: projects.GitLabId)(implicit maybeAccessToken: Option[AccessToken]): F[Project] =
-    GitLabClient[F].get(uri"projects" / projectId.show, "single-project")(mapResponse)
+    GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Project]] = {
     case (Ok, _, response)    => response.as[Project]
-    case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+    case (Unauthorized, _, _) => MonadThrow[F].raiseError(UnauthorizedException)
   }
 
   private implicit lazy val projectEntityDecoder: EntityDecoder[F, Project] = {

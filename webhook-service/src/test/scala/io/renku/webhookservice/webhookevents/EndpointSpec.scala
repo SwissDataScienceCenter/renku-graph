@@ -25,6 +25,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.eventlog
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
+import io.renku.graph.eventlog.api.events.Generators.commitSyncRequests
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
@@ -35,11 +38,9 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
-import io.renku.webhookservice.CommitSyncRequestSender
-import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import io.renku.webhookservice.model.{CommitSyncRequest, HookToken}
+import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -54,9 +55,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
-      (commitSyncRequestSender
-        .sendCommitSyncRequest(_: CommitSyncRequest, _: String))
-        .expects(syncRequest, "HookEvent")
+      (elClient
+        .send(_: CommitSyncRequest))
+        .expects(syncRequest)
         .returning(().pure[IO])
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
@@ -150,16 +151,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
-        .fold(
-          exception => throw exception,
-          identity
-        )
+        .fold(exception => throw exception, identity)
     }.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
-    val hookTokenCrypto         = mock[HookTokenCrypto[IO]]
-    val endpoint                = new EndpointImpl[IO](hookTokenCrypto, commitSyncRequestSender)
+    val elClient        = mock[eventlog.api.events.Client[IO]]
+    val hookTokenCrypto = mock[HookTokenCrypto[IO]]
+    val endpoint        = new EndpointImpl[IO](hookTokenCrypto, elClient)
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto
@@ -170,10 +168,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
   private def pushEventPayloadFrom(commitId: CommitId, syncRequest: CommitSyncRequest) =
     json"""{                                                      
-      "after":                 ${commitId.value},
+      "after": $commitId,
       "project": {
-        "id":                  ${syncRequest.project.id.value},
-        "path_with_namespace": ${syncRequest.project.path.value}
+        "id":                  ${syncRequest.project.id},
+        "path_with_namespace": ${syncRequest.project.path}
       }
     }"""
 }

@@ -35,8 +35,12 @@ private trait DSInfoFinder[F[_]] {
 private final case class DSInfo(projectPath: projects.Path, dataset: Dataset)
 
 private object DSInfoFinder {
+
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DSInfoFinder[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new DSInfoFinderImpl[F](_))
+    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(apply(_))
+
+  def apply[F[_]: MonadThrow](tsClient: TSClient[F]): DSInfoFinder[F] =
+    new DSInfoFinderImpl[F](tsClient)
 }
 
 private class DSInfoFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends DSInfoFinder[F] {

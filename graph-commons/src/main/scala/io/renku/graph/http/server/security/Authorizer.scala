@@ -23,8 +23,7 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects
+import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility._
 import io.renku.http.server.security.EndpointSecurityException
@@ -37,8 +36,11 @@ trait Authorizer[F[_], Key] {
 }
 
 object Authorizer {
-  type SecurityRecord                  = (Visibility, projects.Path, Set[GitLabId])
-  type SecurityRecordFinder[F[_], Key] = Key => F[List[SecurityRecord]]
+  final case class SecurityRecord(visibility:     Visibility,
+                                  projectPath:    projects.Path,
+                                  allowedPersons: Set[persons.GitLabId]
+  )
+  trait SecurityRecordFinder[F[_], Key] extends ((Key, Option[AuthUser]) => F[List[SecurityRecord]])
 
   final case class AuthContext[Key](maybeAuthUser: Option[AuthUser], key: Key, allowedProjects: Set[projects.Path]) {
     def addAllowedProject(path: projects.Path): AuthContext[Key] = copy(allowedProjects = allowedProjects + path)
@@ -61,7 +63,7 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
   override def authorize(key:           Key,
                          maybeAuthUser: Option[AuthUser]
   ): EitherT[F, EndpointSecurityException, AuthContext[Key]] = for {
-    records     <- EitherT.right(securityRecordsFinder(key))
+    records     <- EitherT.right(securityRecordsFinder(key, maybeAuthUser))
     authContext <- validate(AuthContext[Key](maybeAuthUser, key, Set.empty), records)
   } yield authContext
 
@@ -76,9 +78,9 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
 
   private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Path] =
     _.foldLeft(Set.empty[projects.Path]) {
-      case (allowed, (Public, path, _))                                          => allowed + path
-      case (allowed, (Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
-      case (allowed, (Private, path, members))
+      case (allowed, SecurityRecord(Public, path, _))                                          => allowed + path
+      case (allowed, SecurityRecord(Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
+      case (allowed, SecurityRecord(Private, path, members))
           if (members intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
         allowed + path
       case (allowed, _) => allowed

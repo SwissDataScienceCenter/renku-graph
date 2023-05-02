@@ -22,8 +22,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.MonadThrow
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.{datasets, GraphClass}
+import io.renku.graph.model.{GraphClass, datasets}
 import io.renku.graph.model.entities.Person
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
@@ -36,7 +37,7 @@ object DatasetSameAsRecordsFinder {
 private class DatasetSameAsRecordsFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F])
     extends SecurityRecordFinder[F, datasets.SameAs] {
 
-  override def apply(sameAs: datasets.SameAs): F[List[SecurityRecord]] =
+  override def apply(sameAs: datasets.SameAs, maybeAuthUser: Option[AuthUser]): F[List[SecurityRecord]] =
     tsClient.queryExpecting[List[SecurityRecord]](selectQuery = query(sameAs))
 
   import eu.timepit.refined.auto._
@@ -90,6 +91,6 @@ private class DatasetSameAsRecordsFinderImpl[F[_]: MonadThrow](tsClient: TSClien
         visibility <- extract[projects.Visibility]("visibility")
         path       <- extract[projects.Path]("path")
         userIds    <- extract[Option[String]]("memberGitLabIds") >>= toSetOfGitLabIds
-      } yield (visibility, path, userIds)
+      } yield SecurityRecord(visibility, path, userIds)
   }
 }

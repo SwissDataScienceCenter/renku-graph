@@ -56,12 +56,10 @@ private[producers] object SubscriptionCategory {
                                            EventEncoder(encodeEvent, encodePayload),
                                            dispatchRecovery
                          )
-  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](categoryName,
-                                                             subscribers,
-                                                             eventsDistributor,
-                                                             CapacityFinder.queryBased(capacityFindingQuery)
+  } yield new SubscriptionCategoryImpl[F, DefaultSubscriber](
+    categoryName,
+    subscribers,
+    eventsDistributor,
+    CapacityFinder.ofStatus(EventStatus.GeneratingTriples)
   )
-
-  private[awaitinggeneration] val capacityFindingQuery =
-    s"SELECT COUNT(event_id) FROM event WHERE status='${EventStatus.GeneratingTriples.value}'"
 }

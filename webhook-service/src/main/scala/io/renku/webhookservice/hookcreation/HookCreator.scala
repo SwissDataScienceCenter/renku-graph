@@ -18,14 +18,15 @@
 
 package io.renku.webhookservice.hookcreation
 
+import cats.Show
 import cats.effect._
 import cats.syntax.all._
-import cats.Show
+import io.renku.graph.eventlog
+import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
-import io.renku.webhookservice.{hookvalidation, CommitSyncRequestSender}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -33,6 +34,7 @@ import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model._
 import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
+import io.renku.webhookservice.{ProjectInfoFinder, hookvalidation}
 import org.typelevel.log4cats.Logger
 
 private trait HookCreator[F[_]] {
@@ -40,18 +42,17 @@ private trait HookCreator[F[_]] {
 }
 
 private class HookCreatorImpl[F[_]: Spawn: Logger](
-    projectHookUrl:          ProjectHookUrl,
-    projectHookValidator:    HookValidator[F],
-    projectInfoFinder:       ProjectInfoFinder[F],
-    hookTokenCrypto:         HookTokenCrypto[F],
-    projectHookCreator:      ProjectHookCreator[F],
-    accessTokenAssociator:   AccessTokenAssociator[F],
-    commitSyncRequestSender: CommitSyncRequestSender[F]
+    projectHookUrl:        ProjectHookUrl,
+    projectHookValidator:  HookValidator[F],
+    projectInfoFinder:     ProjectInfoFinder[F],
+    hookTokenCrypto:       HookTokenCrypto[F],
+    projectHookCreator:    ProjectHookCreator[F],
+    accessTokenAssociator: AccessTokenAssociator[F],
+    elClient:              eventlog.api.events.Client[F]
 ) extends HookCreator[F] {
 
   import HookCreator.CreationResult._
   import accessTokenAssociator._
-  import commitSyncRequestSender._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookValidator._
@@ -88,8 +89,8 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
           s"Hook creation - sending COMMIT_SYNC_REQUEST failure; finding project info for projectId $projectId failed"
         )
       )
-      .map(CommitSyncRequest)
-      .flatMap(sendCommitSyncRequest(_, "HookCreation"))
+      .map(CommitSyncRequest(_))
+      .flatMap(elClient.send)
 
   private def loggingError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
     Logger[F].error(exception)(s"Hook creation failed for project with id $projectId")
@@ -114,11 +115,11 @@ private object HookCreator {
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl:  ProjectHookUrl,
                                                                 hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] = for {
-    commitSyncRequestSender <- CommitSyncRequestSender[F]
-    hookValidator           <- hookvalidation.HookValidator(projectHookUrl)
-    projectInfoFinder       <- ProjectInfoFinder[F]
-    hookCreator             <- ProjectHookCreator[F]
-    tokenAssociator         <- AccessTokenAssociator[F]
+    hookValidator     <- hookvalidation.HookValidator(projectHookUrl)
+    projectInfoFinder <- ProjectInfoFinder[F]
+    hookCreator       <- ProjectHookCreator[F]
+    tokenAssociator   <- AccessTokenAssociator[F]
+    elClient          <- eventlog.api.events.Client[F]
   } yield new HookCreatorImpl[F](
     projectHookUrl,
     hookValidator,
@@ -126,6 +127,6 @@ private object HookCreator {
     hookTokenCrypto,
     hookCreator,
     tokenAssociator,
-    commitSyncRequestSender
+    elClient
   )
 }

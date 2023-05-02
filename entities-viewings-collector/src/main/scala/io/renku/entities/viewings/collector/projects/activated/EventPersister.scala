@@ -19,9 +19,9 @@
 package io.renku.entities.viewings.collector.projects
 package activated
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import cats.MonadThrow
 import io.renku.triplesgenerator.api.events.ProjectActivated
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -32,21 +32,25 @@ private trait EventPersister[F[_]] {
 
 private object EventPersister {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EventPersister[F]] =
-    ProjectsConnectionConfig[F]().map(TSClient[F](_)).map(new EventPersisterImpl[F](_))
+    ProjectsConnectionConfig[F]()
+      .map(TSClient[F](_))
+      .map(tsClient => new EventPersisterImpl[F](tsClient, EventDeduplicator(tsClient, categoryName)))
 }
 
-private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends EventPersister[F] {
+private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], deduplicator: EventDeduplicator[F])
+    extends EventPersister[F] {
 
+  import Encoder._
+  import deduplicator.deduplicate
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.{projects, GraphClass}
   import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.{GraphClass, projects}
   import io.renku.jsonld.syntax._
-  import Encoder._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery
-  import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.SparqlQuery.Prefixes
+  import io.renku.triplesstore.client.syntax._
   import tsClient.{queryExpecting, upload}
 
   override def persist(event: ProjectActivated): F[Unit] =
@@ -54,7 +58,7 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
       case None => ().pure[F]
       case Some(projectId) =>
         eventExists(projectId) >>= {
-          case false => insert(projectId, event)
+          case false => insert(projectId, event) >> deduplicate(projectId)
           case true  => ().pure[F]
         }
     }
@@ -63,14 +67,14 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: find id",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""|SELECT DISTINCT ?id
-          |WHERE {
-          |  GRAPH ?id {
-          |    ?id a schema:Project;
-          |        renku:projectPath ${event.path.asObject.asSparql.sparql}
-          |  }
-          |}
-          |""".stripMargin
+      sparql"""|SELECT DISTINCT ?id
+               |WHERE {
+               |  GRAPH ?id {
+               |    ?id a schema:Project;
+               |        renku:projectPath ${event.path.asObject}
+               |  }
+               |}
+               |""".stripMargin
     )
   }(idDecoder)
 
@@ -85,14 +89,14 @@ private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: check exists",
       Prefixes of renku -> "renku",
-      s"""|SELECT ?date
-          |WHERE {
-          |  GRAPH ${GraphClass.ProjectViewedTimes.id.sparql} {
-          |    ${projectId.asEntityId.sparql} renku:dateViewed ?date
-          |  }
-          |}
-          |LIMIT 1
-          |""".stripMargin
+      sparql"""|SELECT ?date
+               |WHERE {
+               |  GRAPH ${GraphClass.ProjectViewedTimes.id} {
+               |    ${projectId.asEntityId} renku:dateViewed ?date
+               |  }
+               |}
+               |LIMIT 1
+               |""".stripMargin
     )
   }(dateDecoder)
     .map(_.isDefined)

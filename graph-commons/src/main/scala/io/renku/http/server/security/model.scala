@@ -18,12 +18,44 @@
 
 package io.renku.http.server.security
 
+import cats.Applicative
+import cats.syntax.all._
 import io.renku.graph.model.persons
+import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.client.UserAccessToken
-import org.http4s.Response
+import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
+import io.renku.http.{ErrorMessage, InfoMessage}
+import org.http4s.{Response, Status}
+
+import java.util.Objects
 
 object model {
   final case class AuthUser(id: persons.GitLabId, accessToken: UserAccessToken)
+
+  final class MaybeAuthUser(private val user: Option[AuthUser]) {
+    val option: Option[AuthUser] = user
+    val required: Either[EndpointSecurityException, AuthUser] =
+      user.toRight(AuthenticationFailure: EndpointSecurityException)
+
+    def withAuthenticatedUser[F[_]: Applicative](code: AuthUser => F[Response[F]]): F[Response[F]] =
+      required.fold(_.toHttpResponse[F].pure[F], code)
+
+    def withUserOrNotFound[F[_]: Applicative](code: AuthUser => F[Response[F]]): F[Response[F]] =
+      required.fold(_ => Response.notFound[F].withEntity(InfoMessage("Resource not found")).pure[F], code)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case o: MaybeAuthUser => o.user == user
+      case _ => false
+    }
+
+    override def hashCode(): Int = Objects.hashCode(user, "MaybeUser")
+  }
+
+  object MaybeAuthUser {
+    val noUser: MaybeAuthUser = new MaybeAuthUser(None)
+    def apply(user: Option[AuthUser]): MaybeAuthUser = new MaybeAuthUser(user)
+    def apply(user: AuthUser):         MaybeAuthUser = apply(Some(user))
+  }
 }
 
 sealed trait EndpointSecurityException extends Exception with Product with Serializable {
@@ -31,10 +63,6 @@ sealed trait EndpointSecurityException extends Exception with Product with Seria
 }
 
 object EndpointSecurityException {
-
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
-  import org.http4s.{Response, Status}
 
   final case object AuthenticationFailure extends EndpointSecurityException {
 
