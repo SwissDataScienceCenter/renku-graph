@@ -168,7 +168,7 @@ lazy val triplesGenerator = project
   .dependsOn(
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
-    entitiesViewingsCollector
+    entitiesViewingsCollector % "compile->compile; test->test"
   )
   .enablePlugins(
     JavaAppPackaging,
