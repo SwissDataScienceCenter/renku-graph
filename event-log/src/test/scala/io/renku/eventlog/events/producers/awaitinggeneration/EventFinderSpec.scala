@@ -20,7 +20,6 @@ package io.renku.eventlog.events.producers
 package awaitinggeneration
 
 import cats.effect.IO
-import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.ProjectPrioritisation.Priority.MaxPriority
@@ -39,6 +38,7 @@ import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -50,12 +50,14 @@ private class EventFinderSpec
     with IOSpec
     with InMemoryEventLogDbSpec
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with OptionValues {
 
   "popEvent" should {
 
     s"find the most recent event in status $New or $GenerationRecoverableFailure " +
       s"and mark it as $GeneratingTriples" in new TestCase {
+
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
@@ -81,9 +83,7 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          AwaitingGenerationEvent(event2Id, projectPath, event2Body)
-        )
+        finder.popEvent().unsafeRunSync().value shouldBe AwaitingGenerationEvent(event2Id, projectPath, event2Body)
 
         gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
         gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 1
@@ -97,6 +97,7 @@ private class EventFinderSpec
 
     s"find the most recent event in status $New or $GenerationRecoverableFailure " +
       "if there are multiple latest events with the same date" in new TestCase {
+
         val projectId       = projectIds.generateOne
         val projectPath     = projectPaths.generateOne
         val latestEventDate = eventDates.generateOne
@@ -124,9 +125,9 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() should {
-          be(AwaitingGenerationEvent(event1Id, projectPath, event1Body).some) or
-            be(AwaitingGenerationEvent(event2Id, projectPath, event2Body).some)
+        finder.popEvent().unsafeRunSync().value should {
+          be(AwaitingGenerationEvent(event1Id, projectPath, event1Body)) or
+            be(AwaitingGenerationEvent(event2Id, projectPath, event2Body))
         }
 
         gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
@@ -143,9 +144,9 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        finder.popEvent().unsafeRunSync() should {
-          be(AwaitingGenerationEvent(event1Id, projectPath, event1Body).some) or
-            be(AwaitingGenerationEvent(event2Id, projectPath, event2Body).some)
+        finder.popEvent().unsafeRunSync().value should {
+          be(AwaitingGenerationEvent(event1Id, projectPath, event1Body)) or
+            be(AwaitingGenerationEvent(event2Id, projectPath, event2Body))
         }
 
         gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -2
@@ -165,6 +166,7 @@ private class EventFinderSpec
     Set(GenerationNonRecoverableFailure, TransformationNonRecoverableFailure, Skipped) foreach { latestEventStatus =>
       s"find the most recent event in status $New or $GenerationRecoverableFailure " +
         s"if the latest event is in status $latestEventStatus" in new TestCase {
+
           val projectId   = projectIds.generateOne
           val projectPath = projectPaths.generateOne
 
@@ -190,9 +192,7 @@ private class EventFinderSpec
             returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
           )
 
-          finder.popEvent().unsafeRunSync() shouldBe Some(
-            AwaitingGenerationEvent(event1Id, projectPath, event1Body)
-          )
+          finder.popEvent().unsafeRunSync().value shouldBe AwaitingGenerationEvent(event1Id, projectPath, event1Body)
 
           gauges.awaitingGeneration.getValue(projectPath).unsafeRunSync() shouldBe -1
           gauges.underGeneration.getValue(projectPath).unsafeRunSync()    shouldBe 1
@@ -349,10 +349,10 @@ private class EventFinderSpec
     val currentTime   = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    implicit val gauges: EventStatusGauges[IO] = TestEventStatusGauges[IO]
-    val projectPrioritisation = mock[ProjectPrioritisation[IO]]
+    implicit val gauges:                  EventStatusGauges[IO]     = TestEventStatusGauges[IO]
     private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val projectPrioritisation = mock[ProjectPrioritisation[IO]]
 
     def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
