@@ -31,9 +31,9 @@ import org.scalacheck.Gen
 
 object Generators {
 
-  val totalCapacities: Gen[TotalCapacity] = positiveInts() map (v => TotalCapacity(v.value))
-  val freeCapacities:  Gen[FreeCapacity]  = positiveInts() map (v => FreeCapacity(v.value))
-  val usedCapacities:  Gen[UsedCapacity]  = positiveInts() map (v => UsedCapacity(v.value))
+  implicit val totalCapacities: Gen[TotalCapacity] = positiveInts() map (v => TotalCapacity(v.value))
+  val freeCapacities:           Gen[FreeCapacity]  = positiveInts() map (v => FreeCapacity(v.value))
+  val usedCapacities:           Gen[UsedCapacity]  = positiveInts() map (v => UsedCapacity(v.value))
 
   private[producers] final case class TestSubscriber(url: SubscriberUrl, id: SubscriberId, capacity: SubscriberCapacity)
       extends Subscription.Subscriber

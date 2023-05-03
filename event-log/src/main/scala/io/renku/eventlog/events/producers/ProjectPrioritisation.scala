@@ -17,15 +17,14 @@
  */
 
 package io.renku.eventlog.events.producers
-package awaitinggeneration
 
-import ProjectPrioritisation._
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import DefaultSubscribers.DefaultSubscribers
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
+import io.renku.eventlog.events.producers.ProjectPrioritisation._
 import io.renku.graph.model.events.EventDate
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
@@ -42,30 +41,30 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
   private val FreeSpotsRatio = .15
 
   override def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)] =
-    ((rejectProjectsAboveOccupancyThreshold _).tupled >>>
+    (rejectProjectsAboveOccupancyThreshold >>>
       findPrioritiesBasedOnLatestEventDate >>>
       correctPrioritiesUsingOccupancyPerProject)(projects, totalOccupancy)
 
-  private def rejectProjectsAboveOccupancyThreshold(projects:       List[ProjectInfo],
-                                                    totalOccupancy: Long
-  ): List[ProjectInfo] =
-    DefaultSubscribers[F].getTotalCapacity
-      .map(_.value)
-      .map { totalCapacity =>
-        val freeSpots =
-          if ((totalCapacity * FreeSpotsRatio).ceil.intValue() < 2) 2
-          else (totalCapacity * FreeSpotsRatio).ceil.intValue()
-        projects match {
-          case Nil => Nil
-          case projects =>
-            projects.foldLeft(List.empty[ProjectInfo]) { (acc, project) =>
-              if (project.currentOccupancy.value == 0) acc :+ project
-              else if (totalOccupancy < totalCapacity - freeSpots) acc :+ project
-              else acc
-            }
+  private lazy val rejectProjectsAboveOccupancyThreshold: ((List[ProjectInfo], Long)) => List[ProjectInfo] = {
+    case (projects, totalOccupancy) =>
+      DefaultSubscribers[F].getTotalCapacity
+        .map { totalCapacity =>
+          val freeSpots =
+            if ((totalCapacity * FreeSpotsRatio).ceil.intValue() < 2) 2
+            else (totalCapacity * FreeSpotsRatio).ceil.intValue()
+
+          projects match {
+            case Nil => Nil
+            case projects =>
+              projects.foldLeft(List.empty[ProjectInfo]) { (acc, project) =>
+                if (project.currentOccupancy.value == 0) acc :+ project
+                else if (totalOccupancy < totalCapacity.value - freeSpots) acc :+ project
+                else acc
+              }
+          }
         }
-      }
-      .getOrElse(projects)
+        .getOrElse(projects)
+  }
 
   private lazy val findPrioritiesBasedOnLatestEventDate
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {

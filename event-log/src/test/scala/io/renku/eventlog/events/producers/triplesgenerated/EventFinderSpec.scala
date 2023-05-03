@@ -23,6 +23,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.events.producers.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes, TestEventStatusGauges}
 import io.renku.generators.Generators.Implicits._
@@ -37,10 +39,9 @@ import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import triplesgenerated.ProjectPrioritisation.Priority.MaxPriority
-import triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 
 import java.time.Instant
 
@@ -49,12 +50,12 @@ private class EventFinderSpec
     with IOSpec
     with InMemoryEventLogDbSpec
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with OptionValues {
 
   "popEvent" should {
 
-    "return an event with the latest event date " +
-      s"and status $TriplesGenerated or $TransformationRecoverableFailure " +
+    s"return the most recent event in status $TriplesGenerated or $TransformationRecoverableFailure " +
       s"and mark it as $TransformingTriples" in new TestCase {
 
         val projectId   = projectIds.generateOne
@@ -78,17 +79,18 @@ private class EventFinderSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          totalOccupancy = 0,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
+        val TriplesGeneratedEvent(actualEventId, actualPath, actualPayload) = finder.popEvent().unsafeRunSync().value
         actualEventId     shouldBe event1Id
         actualPath        shouldBe projectPath
         actualPayload.value should contain theSameElementsAs eventPayload1.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
-        givenPrioritisation(takes = Nil, returns = Nil)
+        givenPrioritisation(takes = Nil, totalOccupancy = 1, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -123,10 +125,11 @@ private class EventFinderSpec
       // 1st event with the same event date
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+        totalOccupancy = 0,
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
       )
 
-      val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
+      val TriplesGeneratedEvent(actualEventId, actualPath, actualPayload) = finder.popEvent().unsafeRunSync().value
       if (actualEventId == event1Id) {
         actualEventId     shouldBe event1Id
         actualPath        shouldBe projectPath
@@ -141,17 +144,18 @@ private class EventFinderSpec
         be(List((event1Id, executionDate))) or be(List((event2Id, executionDate)))
       }
 
-      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
-      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
+      gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -1d
+      gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
       // 2nd event with the same event date
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+        totalOccupancy = 1,
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
       )
 
-      val Some(TriplesGeneratedEvent(nextActualEventId, nextActualPath, nextActualPayload)) =
-        finder.popEvent().unsafeRunSync()
+      val TriplesGeneratedEvent(nextActualEventId, nextActualPath, nextActualPayload) =
+        finder.popEvent().unsafeRunSync().value
       if (nextActualEventId == event1Id) {
         nextActualEventId     shouldBe event1Id
         nextActualPath        shouldBe projectPath
@@ -166,11 +170,11 @@ private class EventFinderSpec
                                                                                         event2Id -> executionDate
       )
 
-      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -2d
-      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 2d
+      gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -2d
+      gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 2d
 
       // no more events left
-      givenPrioritisation(takes = Nil, returns = Nil)
+      givenPrioritisation(takes = Nil, totalOccupancy = 2, returns = Nil)
 
       finder.popEvent().unsafeRunSync() shouldBe None
     }
@@ -194,18 +198,19 @@ private class EventFinderSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          totalOccupancy = 0,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        val Some(TriplesGeneratedEvent(actualEvent1Id, actualEvent1Path, actualEvent1Payload)) =
-          finder.popEvent().unsafeRunSync()
+        val TriplesGeneratedEvent(actualEvent1Id, actualEvent1Path, actualEvent1Payload) =
+          finder.popEvent().unsafeRunSync().value
 
         actualEvent1Id          shouldBe event1Id
         actualEvent1Path        shouldBe projectPath
         actualEvent1Payload.value should contain theSameElementsAs eventPayload1.value
 
-        gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -1d
+        gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -218,23 +223,25 @@ private class EventFinderSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, newerLatestEventDate, 1)),
+          totalOccupancy = 1,
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        val Some(TriplesGeneratedEvent(actualEvent2Id, actualEvent2Path, actualEvent2Payload)) =
-          finder.popEvent().unsafeRunSync()
+        val TriplesGeneratedEvent(actualEvent2Id, actualEvent2Path, actualEvent2Payload) =
+          finder.popEvent().unsafeRunSync().value
 
         actualEvent2Id          shouldBe event2Id
         actualEvent2Path        shouldBe projectPath
         actualEvent2Payload.value should contain theSameElementsAs eventPayload2.value
 
-        gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -2d
-        gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 2d
+        gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -2d
+        gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 2d
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
       }
 
     s"skip events in $TriplesGenerated status which do not have payload - within a project" in new TestCase {
+
       val projectId   = projectIds.generateOne
       val projectPath = projectPaths.generateOne
 
@@ -259,23 +266,25 @@ private class EventFinderSpec
 
       givenPrioritisation(
         takes = List(ProjectInfo(projectId, projectPath, event1Date, 0)),
+        totalOccupancy = 0,
         returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
       )
 
-      val Some(TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload)) =
-        finder.popEvent().unsafeRunSync()
+      val TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload) =
+        finder.popEvent().unsafeRunSync().value
 
       actualEventId          shouldBe event2Id
       actualEventPath        shouldBe projectPath
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
 
-      gauges.awaitingDeletion.getValue(projectPath).unsafeRunSync() shouldBe -1d
-      gauges.underDeletion.getValue(projectPath).unsafeRunSync()    shouldBe 1d
+      gauges.awaitingTransformation.getValue(projectPath).unsafeRunSync() shouldBe -1d
+      gauges.underTransformation.getValue(projectPath).unsafeRunSync()    shouldBe 1d
 
       findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
     }
 
     s"skip projects with events in $TriplesGenerated status which do not have payload" in new TestCase {
+
       val event1ProjectId   = projectIds.generateOne
       val event1ProjectPath = projectPaths.generateOne
 
@@ -303,19 +312,20 @@ private class EventFinderSpec
 
       givenPrioritisation(
         takes = List(ProjectInfo(event2ProjectId, event2ProjectPath, event2Date, 0)),
+        totalOccupancy = 0,
         returns = List(ProjectIds(event2ProjectId, event2ProjectPath) -> MaxPriority)
       )
 
-      val Some(TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload)) =
-        finder.popEvent().unsafeRunSync()
+      val TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload) =
+        finder.popEvent().unsafeRunSync().value
       actualEventId          shouldBe event2Id
       actualEventPath        shouldBe event2ProjectPath
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
 
       findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
-      gauges.awaitingDeletion.getValue(event2ProjectPath).unsafeRunSync() shouldBe -1d
-      gauges.underDeletion.getValue(event2ProjectPath).unsafeRunSync()    shouldBe 1d
+      gauges.awaitingTransformation.getValue(event2ProjectPath).unsafeRunSync() shouldBe -1d
+      gauges.underTransformation.getValue(event2ProjectPath).unsafeRunSync()    shouldBe 1d
     }
 
     "return no event when execution date is in the future " +
@@ -349,7 +359,7 @@ private class EventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        givenPrioritisation(takes = Nil, returns = Nil)
+        givenPrioritisation(takes = Nil, totalOccupancy = 0, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
@@ -358,14 +368,15 @@ private class EventFinderSpec
 
       val events = readyStatuses
         .generateNonEmptyList(min = 2)
-        .map(status => createEvent(status))
+        .map(createEvent(_))
         .toList
 
       findEvents(TransformingTriples) shouldBe List.empty
 
-      events foreach { case (eventId, _, eventDate, projectPath, _) =>
+      events.sortBy(_._3).reverse.zipWithIndex foreach { case ((eventId, _, eventDate, projectPath, _), idx) =>
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
+          totalOccupancy = idx,
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
@@ -375,8 +386,8 @@ private class EventFinderSpec
       }
 
       events foreach { case (_, _, _, path, _) =>
-        gauges.awaitingDeletion.getValue(path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingTransformation.getValue(path).unsafeRunSync() shouldBe -1d
+        gauges.underTransformation.getValue(path).unsafeRunSync()    shouldBe 1d
       }
 
       findEvents(status = TransformingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
@@ -400,12 +411,12 @@ private class EventFinderSpec
 
       val eventsGroupedByProjects = events.groupBy(_._1.projectId)
 
-      eventsGroupedByProjects foreach {
-        case (projectId, (_, _, _, projectPath, _) :: _) =>
+      eventsGroupedByProjects.zipWithIndex foreach {
+        case ((projectId, (_, _, _, projectPath, _) :: _), idx) =>
           (projectPrioritisation.prioritise _)
-            .expects(*)
+            .expects(*, idx)
             .returning(List(ProjectIds(projectId, projectPath) -> MaxPriority))
-        case (_, Nil) => ()
+        case ((_, Nil), _) => ()
       }
 
       eventsGroupedByProjects foreach { _ =>
@@ -414,15 +425,15 @@ private class EventFinderSpec
 
       eventsGroupedByProjects foreach { case (_, list) =>
         val path = list.head._4
-        gauges.awaitingDeletion.getValue(path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingTransformation.getValue(path).unsafeRunSync() shouldBe -1d
+        gauges.underTransformation.getValue(path).unsafeRunSync()    shouldBe 1d
       }
 
       findEvents(TransformingTriples).eventIdsOnly should contain theSameElementsAs eventsGroupedByProjects.map {
         case (_, projectEvents) => projectEvents.maxBy(_._3)._1
       }.toList
 
-      givenPrioritisation(takes = Nil, returns = Nil)
+      givenPrioritisation(takes = Nil, totalOccupancy = eventsGroupedByProjects.size, returns = Nil)
 
       eventLogFind.popEvent().unsafeRunSync() shouldBe None
     }
@@ -434,14 +445,14 @@ private class EventFinderSpec
     val currentTime   = mockFunction[Instant]
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    val projectPrioritisation = mock[ProjectPrioritisation]
     implicit val gauges:                  EventStatusGauges[IO]     = TestEventStatusGauges[IO]
     private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val projectPrioritisation = mock[ProjectPrioritisation[IO]]
 
-    def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
+    def givenPrioritisation(takes: List[ProjectInfo], totalOccupancy: Long, returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
-        .expects(takes)
+        .expects(takes, totalOccupancy)
         .returning(returns)
   }
 
