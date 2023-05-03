@@ -188,7 +188,7 @@ object persons {
     )
   }
 
-  final class Email private (val value: String) extends AnyVal with StringTinyType
+  final class Email private (val value: String) extends AnyVal with StringTinyType with Sensitive
   implicit object Email
       extends TinyTypeFactory[Email](new Email(_))
       with NonBlank[Email]
