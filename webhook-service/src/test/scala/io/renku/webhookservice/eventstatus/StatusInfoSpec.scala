@@ -22,9 +22,10 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators.{eventInfos, eventMessages}
 import io.renku.graph.model.EventsGenerators.eventStatuses
-import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
-import EventStatus._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{EventMessage, EventStatus, EventStatusProgress}
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,8 +36,9 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
   "encode" should {
 
     "produce Json from a StatusInfo of an activated project with a NonZero progress" in {
-      forAll { eventStatus: EventStatus =>
-        val info = StatusInfo.activated(eventStatus)
+
+      forAll(eventInfos()) { eventInfo =>
+        val info = StatusInfo.activated(eventInfo)
 
         info.asJson shouldBe json"""{
           "activated": true,
@@ -46,10 +48,11 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
             "percentage": ${info.progress.percentage}
           },
           "details": {
-             "status":  ${info.details.status},
-             "message": ${info.details.message}
+             "status":     ${info.details.status},
+             "message":    ${info.details.message},
+             "stacktrace": ${info.details.maybeDetails}
           }
-        }"""
+        }""".deepDropNullValues
       }
     }
 
@@ -95,26 +98,36 @@ class DetailsSpec extends AnyWordSpec with should.Matchers with TableDrivenPrope
 
     forAll(
       Table(
-        ("eventStatus", "status", "message"),
-        (New, "in-progress", "new"),
-        (Skipped, "success", "skipped"),
-        (GeneratingTriples, "in-progress", "generating triples"),
-        (GenerationRecoverableFailure, "in-progress", "generation recoverable failure"),
-        (GenerationNonRecoverableFailure, "failure", "generation non recoverable failure"),
-        (TriplesGenerated, "in-progress", "triples generated"),
-        (TransformingTriples, "in-progress", "transforming triples"),
-        (TransformationRecoverableFailure, "in-progress", "transformation recoverable failure"),
-        (TransformationNonRecoverableFailure, "failure", "transformation non recoverable failure"),
-        (TriplesStore, "success", "triples store"),
-        (AwaitingDeletion, "in-progress", "awaiting deletion"),
-        (Deleting, "in-progress", "deleting")
+        ("eventStatus", "status", "message", "maybeMessage"),
+        (New, "in-progress", "new", Option.empty[EventMessage]),
+        (Skipped, "success", "skipped", eventMessages.generateSome),
+        (GeneratingTriples, "in-progress", "generating triples", Option.empty[EventMessage]),
+        (GenerationRecoverableFailure, "in-progress", "generation recoverable failure", eventMessages.generateSome),
+        (GenerationNonRecoverableFailure, "failure", "generation non recoverable failure", eventMessages.generateSome),
+        (TriplesGenerated, "in-progress", "triples generated", Option.empty[EventMessage]),
+        (TransformingTriples, "in-progress", "transforming triples", Option.empty[EventMessage]),
+        (TransformationRecoverableFailure,
+         "in-progress",
+         "transformation recoverable failure",
+         eventMessages.generateSome
+        ),
+        (TransformationNonRecoverableFailure,
+         "failure",
+         "transformation non recoverable failure",
+         eventMessages.generateSome
+        ),
+        (TriplesStore, "success", "triples store", Option.empty[EventMessage]),
+        (AwaitingDeletion, "in-progress", "awaiting deletion", Option.empty[EventMessage]),
+        (Deleting, "in-progress", "deleting", Option.empty[EventMessage])
       )
-    ) { (eventStatus, status, message) =>
+    ) { (eventStatus, status, message, maybeEventMessage) =>
       show"provide '$status' as status and '$message' as message for the '$eventStatus' status" in {
-        val details = Details.fromStatus(eventStatus)
+        val details =
+          Details.from(eventInfos().generateOne.copy(status = eventStatus, maybeMessage = maybeEventMessage))
 
-        details.status  shouldBe status
-        details.message shouldBe message
+        details.status       shouldBe status
+        details.message      shouldBe message
+        details.maybeDetails shouldBe maybeEventMessage.map(_.value)
       }
     }
   }
