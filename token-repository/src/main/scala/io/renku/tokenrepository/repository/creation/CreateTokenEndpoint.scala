@@ -66,7 +66,7 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
     case BadRequestError(exception) =>
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
+      val errorMessage = ErrorMessage(show"Associating token with projectId: $projectId failed")
       Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
   }
 }

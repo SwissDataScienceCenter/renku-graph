@@ -27,12 +27,15 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
+import org.http4s.Method.POST
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
@@ -46,13 +49,10 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "respond with NO_CONTENT if the Personal Access Token association was successful" in new TestCase {
 
-      val accessToken: AccessToken = personalAccessTokens.generateOne
-      (tokensCreator
-        .create(_: GitLabId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(IO.unit)
+      val accessToken = personalAccessTokens.generateOne
+      givenTokenCreation(projectId, accessToken, returning = ().pure[IO])
 
-      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
+      val request = Request(POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
@@ -65,14 +65,10 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "respond with NO_CONTENT if the OAuth Access Token association was successful" in new TestCase {
 
-      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
+      val accessToken = userOAuthAccessTokens.generateOne
+      givenTokenCreation(projectId, accessToken, returning = ().pure[IO])
 
-      (tokensCreator
-        .create(_: GitLabId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(IO.unit)
-
-      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
+      val request = Request(POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
@@ -85,7 +81,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "respond with BAD_REQUEST if the request body is invalid" in new TestCase {
 
-      val request = Request[IO](Method.PUT, uri"projects" / projectId.toString / "tokens")
+      val request = Request[IO](POST, uri"projects" / projectId / "tokens")
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
@@ -100,15 +96,11 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "respond with INTERNAL_SERVER_ERROR if Access Token association fails" in new TestCase {
 
-      val accessToken: AccessToken = personalAccessTokens.generateOne
+      val accessToken = personalAccessTokens.generateOne
+      val exception   = exceptions.generateOne
+      givenTokenCreation(projectId, accessToken, returning = exception.raiseError[IO, Unit])
 
-      val exception = exceptions.generateOne
-      (tokensCreator
-        .create(_: GitLabId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(exception.raiseError[IO, Unit])
-
-      val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
+      val request = Request(POST, uri"projects" / projectId / "tokens")
         .withEntity(accessToken.asJson)
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
@@ -126,8 +118,14 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     val projectId = projectIds.generateOne
 
-    val tokensCreator = mock[TokensCreator[IO]]
+    private val tokensCreator = mock[TokensCreator[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val endpoint = new CreateTokenEndpointImpl[IO](tokensCreator)
+
+    def givenTokenCreation(projectId: projects.GitLabId, accessToken: AccessToken, returning: IO[Unit]) =
+      (tokensCreator
+        .create(_: GitLabId, _: AccessToken))
+        .expects(projectId, accessToken)
+        .returning(returning)
   }
 }
