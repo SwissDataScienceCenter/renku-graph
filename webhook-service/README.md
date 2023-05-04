@@ -81,9 +81,9 @@ Response examples:
     "percentage": 40.00
   },
   "details": {
-    "status":  "in-progress|success|failure",
-    "message": "generating triples",
-    "details": "some stack trace" // optional
+    "status":     "in-progress|success|failure",
+    "message":    "generating triples",
+    "stacktrace": "some stack trace" // optional
   }
 }
 ```

@@ -121,7 +121,7 @@ private object Details {
   implicit val jsonEncoder: Encoder[Details] =
     Encoder.instance { d =>
       Json
-        .obj("status" -> d.status.asJson, "message" -> d.message.asJson, "details" -> d.maybeDetails.asJson)
+        .obj("status" -> d.status.asJson, "message" -> d.message.asJson, "stacktrace" -> d.maybeDetails.asJson)
         .deepDropNullValues
     }
 }

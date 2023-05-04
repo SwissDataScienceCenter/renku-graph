@@ -48,9 +48,9 @@ class StatusInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
             "percentage": ${info.progress.percentage}
           },
           "details": {
-             "status":  ${info.details.status},
-             "message": ${info.details.message},
-             "details": ${info.details.maybeDetails}
+             "status":     ${info.details.status},
+             "message":    ${info.details.message},
+             "stacktrace": ${info.details.maybeDetails}
           }
         }""".deepDropNullValues
       }
