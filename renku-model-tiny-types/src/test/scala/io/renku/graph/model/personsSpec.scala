@@ -23,6 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.persons.{Email, ResourceId}
 import io.renku.graph.model.views.RdfResource
+import io.renku.tinytypes.Sensitive
 import io.renku.tinytypes.constraints.NonBlank
 import org.apache.jena.util.URIref
 import org.scalacheck.Gen
@@ -37,6 +38,10 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
     "be a NonBlank" in {
       Email shouldBe a[NonBlank[_]]
+    }
+
+    "be Sensitive" in {
+      personEmails.generateOne shouldBe a[Sensitive]
     }
   }
 
@@ -117,7 +122,7 @@ class PersonResourceIdSpec
   "apply(Email)" should {
     "generate 'mailto:email' ResourceId" in {
       val email = personEmails.generateOne
-      ResourceId(email).show shouldBe show"mailto:$email"
+      ResourceId(email).show shouldBe show"mailto:${email.value}"
     }
   }
 
