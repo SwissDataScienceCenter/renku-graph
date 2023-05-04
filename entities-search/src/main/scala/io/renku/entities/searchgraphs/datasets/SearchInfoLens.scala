@@ -16,25 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.ontology
+package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
-import io.renku.entities.searchgraphs.datasets.SearchInfoOntology
-import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.{CompositePlan, Project}
-import io.renku.jsonld.ontology._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.graph.model.projects
+import monocle.Lens
 
-class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
+private object SearchInfoLens {
 
-  "getOntology" should {
-
-    "return generated Renku ontology" in {
-      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, SearchInfoOntology.typeDef)
-      val ontology = generateOntology(types, Schemas.renku)
-
-      new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology
-    }
+  val searchInfoLinks: Lens[SearchInfo, NonEmptyList[Link]] = Lens[SearchInfo, NonEmptyList[Link]](_.links) {
+    links => info => info.copy(links = links)
   }
+
+  val linkProjectId: Lens[Link, projects.ResourceId] =
+    Lens[Link, projects.ResourceId](_.projectId) { projectId =>
+      {
+        case link: Link.OriginalDataset => link.copy(projectId = projectId)
+        case link: Link.ImportedDataset => link.copy(projectId = projectId)
+      }
+    }
 }

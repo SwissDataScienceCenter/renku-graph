@@ -21,7 +21,7 @@ package details
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchInfoDataset
+import io.renku.entities.searchgraphs.datasets.SearchInfoDataset
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext

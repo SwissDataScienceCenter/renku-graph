@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.DatasetsGraphCleaner
+import io.renku.entities.searchgraphs.datasets.DatasetsGraphCleaner
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.TopmostSameAs

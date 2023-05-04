@@ -16,25 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.ontology
+package io.renku.entities.searchgraphs.datasets.commands
 
-import cats.data.NonEmptyList
-import io.renku.entities.searchgraphs.datasets.SearchInfoOntology
-import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.{CompositePlan, Project}
-import io.renku.jsonld.ontology._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.triplesstore.client.model.Quad
 
-class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
+private[searchgraphs] trait UpdateCommand extends Product with Serializable {
+  val quad: Quad
+}
+private[searchgraphs] object UpdateCommand {
 
-  "getOntology" should {
-
-    "return generated Renku ontology" in {
-      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, SearchInfoOntology.typeDef)
-      val ontology = generateOntology(types, Schemas.renku)
-
-      new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology
-    }
-  }
+  final case class Insert(quad: Quad) extends UpdateCommand
+  final case class Delete(quad: Quad) extends UpdateCommand
 }

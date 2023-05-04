@@ -16,25 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.ontology
+package io.renku.entities.searchgraphs.datasets.commands
 
-import cats.data.NonEmptyList
-import io.renku.entities.searchgraphs.datasets.SearchInfoOntology
-import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.{CompositePlan, Project}
-import io.renku.jsonld.ontology._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.graph.model.GraphClass
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityIdEncoder, Property}
+import io.renku.triplesstore.client.model
+import io.renku.triplesstore.client.model.{Quad, TripleObject}
 
-class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
-
-  "getOntology" should {
-
-    "return generated Renku ontology" in {
-      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, SearchInfoOntology.typeDef)
-      val ontology = generateOntology(types, Schemas.renku)
-
-      new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology
-    }
-  }
+private object DatasetsQuad {
+  def apply[ID](subject: ID, predicate: Property, obj: TripleObject)(implicit subjectEnc: EntityIdEncoder[ID]): Quad =
+    model.Quad(GraphClass.Datasets.id, subject.asEntityId, predicate, obj)
 }

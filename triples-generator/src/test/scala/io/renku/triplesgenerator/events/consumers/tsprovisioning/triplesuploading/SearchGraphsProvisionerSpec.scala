@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploadi
 
 import cats.data.EitherT
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.DatasetsGraphProvisioner
+import io.renku.entities.searchgraphs.datasets.DatasetsGraphProvisioner
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.entities

@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.entities.searchgraphs.DatasetsGraphCleaner
+import io.renku.entities.searchgraphs.datasets.DatasetsGraphCleaner
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}

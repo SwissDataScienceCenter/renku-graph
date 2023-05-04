@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.ontology
 
 import cats.data.NonEmptyList
-import io.renku.entities.searchgraphs.SearchInfoOntology
+import io.renku.entities.searchgraphs.datasets.SearchInfoOntology
 import io.renku.entities.viewings.collector.{PersonViewingOntology, ProjectViewedTimeOntology}
 import io.renku.graph.model.Schemas
 import io.renku.graph.model.entities.{CompositePlan, Project}
