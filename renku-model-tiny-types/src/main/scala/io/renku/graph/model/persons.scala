@@ -108,7 +108,7 @@ object persons {
     def apply(orcidId: OrcidId)(implicit renkuUrl: RenkuUrl, ev: OrcidId.type): OrcidIdBased =
       new OrcidIdBased((renkuUrl / "persons" / "orcid" / orcidId.id).show)
 
-    def apply(email: Email): EmailBased = new EmailBased(show"mailto:$email")
+    def apply(email: Email): EmailBased = new EmailBased(show"mailto:${email.value}")
 
     def apply(name: Name)(implicit renkuUrl: RenkuUrl): NameBased =
       new NameBased((renkuUrl / "persons" / name).show)

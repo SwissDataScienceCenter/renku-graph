@@ -122,7 +122,7 @@ class PersonResourceIdSpec
   "apply(Email)" should {
     "generate 'mailto:email' ResourceId" in {
       val email = personEmails.generateOne
-      ResourceId(email).show shouldBe show"mailto:$email"
+      ResourceId(email).show shouldBe show"mailto:${email.value}"
     }
   }
 
