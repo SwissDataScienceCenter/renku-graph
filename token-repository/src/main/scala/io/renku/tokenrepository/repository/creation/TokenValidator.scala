@@ -18,30 +18,42 @@
 
 package io.renku.tokenrepository.repository.creation
 
-import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.Json
+import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private[tokenrepository] trait TokenValidator[F[_]] {
-  def checkValid(token: AccessToken): F[Boolean]
+  def checkValid(projectId: projects.GitLabId, token: AccessToken): F[Boolean]
 }
 
 private[tokenrepository] object TokenValidator {
-  def apply[F[_]: MonadThrow: GitLabClient]: F[TokenValidator[F]] = new TokenValidatorImpl[F].pure[F].widen
+  def apply[F[_]: Async: GitLabClient]: F[TokenValidator[F]] = new TokenValidatorImpl[F].pure[F].widen
 }
 
-private class TokenValidatorImpl[F[_]: MonadThrow: GitLabClient] extends TokenValidator[F] {
+private class TokenValidatorImpl[F[_]: Async: GitLabClient] extends TokenValidator[F] {
 
+  import io.circe.Decoder
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
+  import org.http4s.circe.jsonOf
   import org.http4s.implicits._
 
-  override def checkValid(token: AccessToken): F[Boolean] =
-    GitLabClient[F].head(uri"user", "user")(mapResponse)(token.some)
+  override def checkValid(projectId: projects.GitLabId, token: AccessToken): F[Boolean] =
+    GitLabClient[F].get(uri"projects" / projectId, "single-project")(mapResponse)(token.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
-    case (Ok, _, _)                                  => true.pure[F]
+    case (Ok, _, resp)                               => resp.as[Boolean]
     case (Unauthorized | Forbidden | NotFound, _, _) => false.pure[F]
+  }
+
+  private implicit lazy val permissionsExistenceChecker: EntityDecoder[F, Boolean] = {
+    implicit val permissionsExists: Decoder[Boolean] = Decoder.instance {
+      _.downField("permissions").as[Option[Json]].map(_.isDefined)
+    }
+    jsonOf[F, Boolean]
   }
 }

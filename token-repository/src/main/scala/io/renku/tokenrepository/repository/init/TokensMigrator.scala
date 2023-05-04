@@ -110,7 +110,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
       .recoverWith { case _ => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F] }
 
   private def deleteWhenInvalidWithRetry(project: Project, token: AccessToken): F[Option[(Project, AccessToken)]] = {
-    checkValid(token) >>= {
+    checkValid(project.id, token) >>= {
       case true  => (project, token).some.pure[F]
       case false => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F]
     }

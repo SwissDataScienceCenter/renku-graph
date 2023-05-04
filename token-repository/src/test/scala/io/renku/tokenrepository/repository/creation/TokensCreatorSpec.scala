@@ -379,7 +379,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     def givenTokenValidation(of: ProjectAccessToken, returning: Try[Boolean]) =
       (tokenValidator.checkValid _)
-        .expects(of)
+        .expects(projectId, of)
         .returning(returning)
 
     def givenTokenDueCheck(projectId: projects.GitLabId, returning: Try[Boolean]) =

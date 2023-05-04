@@ -68,7 +68,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 
   override def create(projectId: projects.GitLabId, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
-      .flatMapF(decrypt >=> validate >=> checkIfDue(projectId))
+      .flatMapF(decrypt >=> validate(projectId) >=> checkIfDue(projectId))
       .semiflatMap(replacePathIfChanged(projectId))
       .getOrElseF(createOrDelete(projectId, userToken))
 
@@ -78,8 +78,8 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       case _ => Option.empty[ProjectAccessToken]
     }
 
-  private lazy val validate: Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
-    case Some(token) => checkValid(token).map(Option.when(_)(token))
+  private def validate(projectId: projects.GitLabId): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
+    case Some(token) => checkValid(projectId, token).map(Option.when(_)(token)) // if not, remove?
     case _           => Option.empty[ProjectAccessToken].pure[F]
   }
 
