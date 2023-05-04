@@ -226,15 +226,15 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         images                                       <- extract[Option[String]]("images") >>= toListOfImages
         links                                        <- extract[String]("links") >>= toListOfLinks
       } yield searchgraphs.datasets.SearchInfo(topSameAs,
-                         name,
-                         visibility,
-                         createdOrPublished,
-                         maybeDateModified,
-                         creators,
-                         keywords,
-                         maybeDescription,
-                         images,
-                         links
+                                               name,
+                                               visibility,
+                                               createdOrPublished,
+                                               maybeDateModified,
+                                               creators,
+                                               keywords,
+                                               maybeDescription,
+                                               images,
+                                               links
       )
   }
 }
