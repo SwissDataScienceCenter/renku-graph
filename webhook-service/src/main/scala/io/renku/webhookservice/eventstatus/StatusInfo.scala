@@ -19,12 +19,12 @@
 package io.renku.webhookservice.eventstatus
 
 import cats.syntax.all._
-import io.circe.{Encoder, Json}
 import io.circe.literal._
-import io.renku.graph.model.events.{EventStatus, EventStatusProgress}
-import EventStatus._
 import io.circe.syntax.EncoderOps
+import io.circe.{Encoder, Json}
+import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.EventStatusProgress.Stage
+import io.renku.graph.model.events.{EventInfo, EventStatus, EventStatusProgress}
 
 private sealed trait StatusInfo extends Product {
   def activated: Boolean
@@ -42,11 +42,11 @@ private object StatusInfo {
     def fold[A](whenActivated: StatusInfo.ActivatedProject => A, notActivated: => A): A = whenActivated(this)
   }
 
-  def activated(eventStatus: EventStatus): StatusInfo.ActivatedProject =
-    ActivatedProject(Progress.from(eventStatus), Details.fromStatus(eventStatus))
+  def activated(event: EventInfo): StatusInfo.ActivatedProject =
+    ActivatedProject(Progress.from(event.status), Details.from(event))
 
   def webhookReady: StatusInfo.ActivatedProject =
-    ActivatedProject(Progress.Zero, Details("in-progress", "Webhook has been installed."))
+    ActivatedProject(Progress.Zero, Details("in-progress", "Webhook has been installed.", maybeDetails = None))
 
   final case object NotActivated extends StatusInfo {
     override val activated: Boolean  = false
@@ -99,11 +99,13 @@ private object Progress {
   }
 }
 
-private final case class Details(status: String, message: String)
+private final case class Details(status: String, message: String, maybeDetails: Option[String])
 
 private object Details {
-  def fromStatus(eventStatus: EventStatus): Details = {
-    val status: String = eventStatus match {
+
+  def from(event: EventInfo): Details = {
+
+    val status: String = event.status match {
       case New | GeneratingTriples | GenerationRecoverableFailure | TriplesGenerated | TransformingTriples |
           TransformationRecoverableFailure | AwaitingDeletion | Deleting =>
         "in-progress"
@@ -111,10 +113,15 @@ private object Details {
       case GenerationNonRecoverableFailure | TransformationNonRecoverableFailure => "failure"
     }
 
-    val message: String = eventStatus.show.toLowerCase.replace('_', ' ')
-    Details(status, message)
+    val message: String = event.status.show.toLowerCase.replace('_', ' ')
+
+    Details(status, message, event.maybeMessage.map(_.value))
   }
 
   implicit val jsonEncoder: Encoder[Details] =
-    Encoder.instance(d => Json.obj("status" -> d.status.asJson, "message" -> d.message.asJson))
+    Encoder.instance { d =>
+      Json
+        .obj("status" -> d.status.asJson, "message" -> d.message.asJson, "stacktrace" -> d.maybeDetails.asJson)
+        .deepDropNullValues
+    }
 }

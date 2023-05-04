@@ -42,7 +42,7 @@ class StatusInfoFinderSpec extends AnyWordSpec with should.Matchers with MockFac
       val eventInfo = eventInfos(projectIdGen = fixed(projectId)).generateOne
       givenGetEvents(projectId, returning = EventLogClient.Result.Success(List(eventInfo)).pure[Try])
 
-      fetcher.findStatusInfo(projectId) shouldBe StatusInfo.activated(eventInfo.status).some.pure[Try]
+      fetcher.findStatusInfo(projectId) shouldBe StatusInfo.activated(eventInfo).some.pure[Try]
     }
 
     "return activated project StatusInfo when no events found for the project" in new TestCase {
