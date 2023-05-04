@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice.eventstatus
 
-import io.renku.graph.model.EventsGenerators.eventStatuses
+import io.renku.graph.model.EventContentGenerators.eventInfos
 import org.scalacheck.Gen
 
 private object Generators {
@@ -26,7 +26,7 @@ private object Generators {
   implicit val statusInfos: Gen[StatusInfo] =
     Gen
       .either(
-        eventStatuses.map(StatusInfo.activated),
+        eventInfos().map(StatusInfo.activated),
         StatusInfo.NotActivated
       )
       .map(_.merge)

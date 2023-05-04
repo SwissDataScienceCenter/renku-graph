@@ -82,7 +82,8 @@ Response examples:
   },
   "details": {
     "status":  "in-progress|success|failure",
-    "message": "generating triples"
+    "message": "generating triples",
+    "details": "some stack trace" // optional
   }
 }
 ```
