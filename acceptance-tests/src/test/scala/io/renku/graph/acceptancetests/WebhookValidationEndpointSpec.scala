@@ -18,7 +18,7 @@
 
 package io.renku.graph.acceptancetests
 
-import io.circe.syntax.EncoderOps
+import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
@@ -34,11 +34,11 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
 
+      val user = authUsers.generateOne
       val project =
         dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                      CommitsCount.zero
-        ).generateOne
-      val user = authUsers.generateOne
+        ).map(addMemberWithId(user.id)).generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
@@ -55,11 +55,11 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
+      val user = authUsers.generateOne
       val project =
         dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
                      CommitsCount.zero
-        ).generateOne
-      val user = authUsers.generateOne
+        ).map(addMemberWithId(user.id)).generateOne
 
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)

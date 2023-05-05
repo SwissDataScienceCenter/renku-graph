@@ -92,8 +92,12 @@ private class MemberRightsCheckerImpl[F[_]: Async: GitLabClient] extends MemberR
   }
 
   private implicit lazy val roleChecker: EntityDecoder[F, Boolean] = {
-    implicit val permissionsExists: Decoder[Boolean] = Decoder.instance {
-      _.downField("access_level").as[Option[Int]].map(_.exists(_ >= 40))
+    implicit val permissionsExists: Decoder[Boolean] = Decoder.instance { cur =>
+      (cur.downField("access_level").as[Option[Int]] -> cur.downField("state").as[Option[String]])
+        .mapN {
+          case (Some(role), Some("active")) => role >= 40
+          case _                            => false
+        }
     }
     jsonOf[F, Boolean]
   }

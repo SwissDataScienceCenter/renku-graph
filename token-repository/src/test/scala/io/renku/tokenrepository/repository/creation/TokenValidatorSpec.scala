@@ -192,9 +192,26 @@ class MemberRightsCheckerSpec
     forAll {
       Table(
         ("Case", "Response", "Expected Result"),
-        ("ok role 30", Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Developer.value}}"""), false),
-        ("ok role 40", Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Maintainer.value}}"""), true),
-        ("ok role 50", Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}}"""), true),
+        ("ok role 30 and active",
+         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Developer.value}, "state": "active"}"""),
+         false
+        ),
+        ("ok role 40 and active",
+         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Maintainer.value}, "state": "active"}"""),
+         true
+        ),
+        ("ok role 40 and non-active",
+         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}, "state": "waiting"}"""),
+         false
+        ),
+        ("ok role 40 and no state",
+         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}}"""),
+         false
+        ),
+        ("ok role 50 and active",
+         Response[IO](Ok).withEntity(json"""{"access_level": ${Role.Owner.value}, "state": "active"}"""),
+         true
+        ),
         ("ok invalid", Response[IO](Ok).withEntity(json"""{}"""), false),
         ("unauthorized", Response[IO](Unauthorized), false),
         ("forbidden", Response[IO](Forbidden), false),

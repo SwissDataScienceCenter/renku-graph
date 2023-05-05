@@ -42,24 +42,28 @@ trait JsonEncoders {
   }
 
   implicit val projectMemberEncoder: Encoder[ProjectMember] = Encoder.instance { pm =>
-    Map("id" -> pm.gitLabId.asJson, "username" -> pm.username.asJson, "name" -> pm.name.asJson).asJson
+    Map("id"           -> pm.gitLabId.asJson,
+        "username"     -> pm.username.asJson,
+        "name"         -> pm.name.asJson,
+        "access_level" -> 40.asJson,
+        "state"        -> "active".asJson
+    ).asJson
   }
 
-  implicit val pushEventEncoder: Encoder[PushEvent] =
-    Encoder.instance { ev =>
-      Map(
-        "project_id" -> ev.projectId.asJson,
-        "push_data" -> Json.obj(
-          "commit_from" -> Json.Null,
-          "commit_to"   -> ev.commitId.asJson
-        ),
-        "author" ->
-          Json.obj(
-            "id"   -> ev.authorId.asJson,
-            "name" -> ev.authorName.asJson
-          )
-      ).asJson
-    }
+  implicit val pushEventEncoder: Encoder[PushEvent] = Encoder.instance { ev =>
+    Map(
+      "project_id" -> ev.projectId.asJson,
+      "push_data" -> Json.obj(
+        "commit_from" -> Json.Null,
+        "commit_to"   -> ev.commitId.asJson
+      ),
+      "author" ->
+        Json.obj(
+          "id"   -> ev.authorId.asJson,
+          "name" -> ev.authorName.asJson
+        )
+    ).asJson
+  }
 
   implicit val commitDataEncoder: Encoder[CommitData] =
     Encoder.instance { c =>

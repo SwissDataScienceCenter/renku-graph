@@ -41,9 +41,8 @@ trait HookValidationEndpoint[F[_]] {
   def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
-class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
-    hookValidator: HookValidator[F]
-) extends Http4sDsl[F]
+class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](hookValidator: HookValidator[F])
+    extends Http4sDsl[F]
     with HookValidationEndpoint[F] {
 
   def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
