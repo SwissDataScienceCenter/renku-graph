@@ -19,20 +19,20 @@
 package io.renku.tokenrepository.repository
 package creation
 
-import AccessTokenCrypto.EncryptedAccessToken
-import ProjectsTokensDB.SessionResource
 import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
-import deletion.TokenRemover
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
-import fetching.PersistedTokensFinder
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.deletion.TokenRemover
+import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
@@ -68,47 +68,62 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 
   override def create(projectId: projects.GitLabId, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
-      .flatMapF(decrypt >=> validate(projectId) >=> checkIfDue(projectId))
-      .semiflatMap(replacePathIfChanged(projectId))
-      .getOrElseF(createOrDelete(projectId, userToken))
-
-  private lazy val decrypt: EncryptedAccessToken => F[Option[ProjectAccessToken]] = encryptedToken =>
-    accessTokenCrypto.decrypt(encryptedToken) map {
-      case token: ProjectAccessToken => token.some
-      case _ => Option.empty[ProjectAccessToken]
-    }
-
-  private def validate(projectId: projects.GitLabId): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
-    case Some(token) => checkValid(projectId, token).map(Option.when(_)(token)) // if not, remove?
-    case _           => Option.empty[ProjectAccessToken].pure[F]
-  }
-
-  private def checkIfDue(projectId: projects.GitLabId): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
-    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
-    case _           => Option.empty[ProjectAccessToken].pure[F]
-  }
-
-  private def replacePathIfChanged(projectId: projects.GitLabId)(token: ProjectAccessToken): F[Unit] =
-    projectPathFinder
-      .findProjectPath(projectId, token)
-      .semiflatMap(actualPath =>
-        findPersistedProjectPath(projectId).flatMap {
-          case `actualPath` => ().pure[F]
-          case _            => updatePath(Project(projectId, actualPath))
-        }
+      .flatMapF(
+        decrypt >=> removeWhenInvalid(projectId) >=> replacePathIfChangedOrRemove(projectId) >=> checkIfDue(projectId)
       )
-      .getOrElseF(tokenRemover.delete(projectId))
+      .void
+      .getOrElseF(createNew(projectId, userToken))
 
-  private def createOrDelete(projectId: projects.GitLabId, userToken: AccessToken) =
-    (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
-      .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
-      .getOrElseF(tokenRemover.delete(projectId))
+  private lazy val decrypt: EncryptedAccessToken => F[Option[AccessToken]] = encryptedToken =>
+    accessTokenCrypto.decrypt(encryptedToken).map(_.some)
+
+  private def removeWhenInvalid(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
+    case None => Option.empty[AccessToken].pure[F]
+    case Some(token) =>
+      checkValid(projectId, token) >>= {
+        case true  => token.some.pure[F]
+        case false => tokenRemover.delete(projectId).as(Option.empty)
+      }
+  }
+
+  private def replacePathIfChangedOrRemove(
+      projectId: projects.GitLabId
+  ): Option[AccessToken] => F[Option[AccessToken]] = {
+    case None => Option.empty[AccessToken].pure[F]
+    case Some(token) =>
+      projectPathFinder
+        .findProjectPath(projectId, token)
+        .semiflatMap(actualPath =>
+          findPersistedProjectPath(projectId).flatMap {
+            case `actualPath` => ().pure[F]
+            case _            => updatePath(Project(projectId, actualPath))
+          }
+        )
+        .cataF(
+          default = tokenRemover.delete(projectId).as(Option.empty),
+          _ => token.some.pure[F]
+        )
+  }
+
+  private def checkIfDue(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
+    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
+    case _           => Option.empty[AccessToken].pure[F]
+  }
+
+  private def createNew(projectId: projects.GitLabId, userToken: AccessToken) =
+    tokenValidator.checkValid(projectId, userToken) >>= {
+      case false => ().pure[F]
+      case true =>
+        (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
+          .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
+          .getOrElse(())
+    }
 
   private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
     projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
-    createPersonalAccessToken(project.id, userToken).map(project -> _)
+    createProjectAccessToken(project.id, userToken).map(project -> _)
 
   private lazy val encrypt: ((Project, TokenCreationInfo)) => F[(Project, TokenCreationInfo, EncryptedAccessToken)] = {
     case (project, creationInfo) =>

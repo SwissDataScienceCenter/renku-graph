@@ -117,7 +117,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 
   private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] =
-    createPersonalAccessToken(project.id, token)
+    createProjectAccessToken(project.id, token)
       .map(project -> _)
       .flatTapNone(
         Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >> tokenRemover.delete(project.id)

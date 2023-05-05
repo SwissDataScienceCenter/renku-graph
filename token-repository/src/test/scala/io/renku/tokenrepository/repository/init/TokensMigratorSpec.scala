@@ -306,7 +306,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     def givenProjectTokenCreator(projectId:       projects.GitLabId,
                                  userAccessToken: AccessToken,
                                  returning:       OptionT[IO, TokenCreationInfo]
-    ) = (tokensCreator.createPersonalAccessToken _)
+    ) = (tokensCreator.createProjectAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
   }
