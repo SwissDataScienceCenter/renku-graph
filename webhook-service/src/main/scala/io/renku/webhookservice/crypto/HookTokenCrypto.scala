@@ -23,7 +23,6 @@ import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 import io.circe.parser._
 import io.circe.{Decoder, HCursor, Json}

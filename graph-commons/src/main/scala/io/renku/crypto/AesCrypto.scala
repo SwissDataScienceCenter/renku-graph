@@ -19,10 +19,8 @@
 package io.renku.crypto
 
 import cats.MonadThrow
-import eu.timepit.refined.W
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.MinSize
 import io.renku.crypto.AesCrypto.Secret
+import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
@@ -37,7 +35,6 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
   private val base64Decoder = Base64.getDecoder
   private val base64Encoder = Base64.getEncoder
   private val algorithm     = "AES/CBC/PKCS5Padding"
-  private def key           = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
   private val ivSpec        = new IvParameterSpec(new Array[Byte](16))
 
   def encrypt(nonEncrypted: NONENCRYPTED): F[ENCRYPTED]
@@ -45,15 +42,12 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
 
   private def cipher(mode: Int): Cipher = {
     val c = Cipher.getInstance(algorithm)
-    c.init(mode, key, ivSpec)
+    c.init(mode, new SecretKeySpec(secret.value.toArray, "AES"), ivSpec)
     c
   }
 
   protected def encryptAndEncode(toEncryptAndEncode: String): F[String] = MonadThrow[F].catchNonFatal {
-    new String(
-      base64Encoder.encode(cipher(ENCRYPT_MODE).doFinal(toEncryptAndEncode.getBytes(UTF_8))),
-      UTF_8
-    )
+    base64Encoder.encodeToString(cipher(ENCRYPT_MODE).doFinal(toEncryptAndEncode.getBytes(UTF_8)))
   }
 
   protected def decodeAndDecrypt(toDecodeAndDecrypt: String): F[String] = MonadThrow[F].catchNonFatal {
@@ -65,5 +59,16 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
 }
 
 object AesCrypto {
-  type Secret = String Refined MinSize[W.`16`.T]
+  final class Secret private (val value: ByteVector) extends AnyVal {
+    override def toString: String = "Secret(***)"
+
+    def toBase64 = value.toBase64
+  }
+  object Secret {
+    def apply(value: ByteVector): Either[String, Secret] =
+      if (value.length == 16) Right(new Secret(value))
+      else Left(s"Expected 16 bytes, but got ${value.length}")
+
+    def unsafe(value: ByteVector): Secret = apply(value).fold(sys.error, identity)
+  }
 }
