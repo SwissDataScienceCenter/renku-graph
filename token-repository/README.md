@@ -59,7 +59,7 @@ Response for a case when the token is an OAuth Access Token
 { "oauthAccessToken": "<some-token-value>" }
 ```
 
-#### PUT /projects/:id/tokens
+#### POST /projects/:id/tokens
 
 Associates the given token and project id. It succeeds regardless of the association is newly created, it existed before or it got updated. 
 
