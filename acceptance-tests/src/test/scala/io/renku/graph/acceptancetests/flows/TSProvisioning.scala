@@ -86,9 +86,7 @@ trait TSProvisioning
     }
 
   def `check no hook exists`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
-    val response = fetchProcessingStatus(projectId, accessToken)
-    response.status                                                    shouldBe Ok
-    response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
+    fetchProcessingStatus(projectId, accessToken).status shouldBe NotFound
   }
 
   private def fetchProcessingStatus(projectId: projects.GitLabId, accessToken: AccessToken) =
