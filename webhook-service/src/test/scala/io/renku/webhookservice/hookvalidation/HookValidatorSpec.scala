@@ -22,8 +22,8 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -34,9 +34,9 @@ import io.renku.webhookservice.hookvalidation.HookValidator.NoAccessTokenExcepti
 import io.renku.webhookservice.model.HookIdentifier
 import io.renku.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.TryValues
 
 import scala.util.Try
 
@@ -72,20 +72,28 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
   "validateHook - given access token" should {
 
-    "succeed with HookExists and re-associate access token if there's a hook" in new TestCase {
-
-      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = true.pure[Try])
+    "re-associate access token and succeed with HookExists if there's a valid hook" in new TestCase {
 
       givenTokenAssociation(givenAccessToken, returning = ().pure[Try])
+
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
+
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = true.pure[Try])
 
       validator.validateHook(projectId, givenAccessToken.some) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }
 
-    "succeed with HookMissing and delete the access token if there's no hook" in new TestCase {
+    "re-associate access token, delete the access token and succeed with HookMissing if there's no hook" in new TestCase {
 
-      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = false.pure[Try])
+      givenTokenAssociation(givenAccessToken, returning = ().pure[Try])
+
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
+
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = false.pure[Try])
 
       givenTokenRemoving(returning = ().pure[Try])
 
@@ -96,37 +104,45 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     "fail if hook verification step fails" in new TestCase {
 
+      givenTokenAssociation(givenAccessToken, returning = ().pure[Try])
+
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
+
       val exception = exceptions.generateOne
       val error     = exception.raiseError[Try, Nothing]
-      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = error)
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = error)
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
+      validator.validateHook(projectId, givenAccessToken.some) shouldBe error
 
       logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
 
     "fail if access token re-association fails" in new TestCase {
 
-      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = true.pure[Try])
-
       val exception = exceptions.generateOne
       val error     = exception.raiseError[Try, Nothing]
       givenTokenAssociation(givenAccessToken, returning = error)
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
+      validator.validateHook(projectId, givenAccessToken.some) shouldBe error
 
       logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
 
     "fail if access token removal fails" in new TestCase {
 
-      givenHookVerification(HookIdentifier(projectId, projectHookUrl), givenAccessToken, returning = false.pure[Try])
+      givenTokenAssociation(givenAccessToken, returning = ().pure[Try])
+
+      val storedAccessToken = accessTokens.generateOne
+      givenAccessTokenFinding(returning = storedAccessToken.some.pure[Try])
+
+      givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = false.pure[Try])
 
       val exception = exceptions.generateOne
       val error     = exception.raiseError[Try, Nothing]
       givenTokenRemoving(returning = error)
 
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
+      validator.validateHook(projectId, givenAccessToken.some) shouldBe error
 
       logger.loggedOnly(Error(s"Hook validation failed for projectId $projectId", exception))
     }
@@ -141,7 +157,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenHookVerification(HookIdentifier(projectId, projectHookUrl), storedAccessToken, returning = true.pure[Try])
 
-      validator.validateHook(projectId, None) shouldBe HookExists.pure[Try]
+      validator.validateHook(projectId, maybeAccessToken = None) shouldBe HookExists.pure[Try]
 
       logger.expectNoLogs()
     }

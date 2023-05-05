@@ -27,10 +27,7 @@ import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookVerifier[F[_]] {
-  def checkHookPresence(
-      projectHookId: HookIdentifier,
-      accessToken:   AccessToken
-  ): F[Boolean]
+  def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Boolean]
 }
 
 private object ProjectHookVerifier {
