@@ -21,9 +21,11 @@ package io.renku.config
 import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.Config
+import io.renku.crypto.AesCrypto.Secret
 import io.renku.tinytypes._
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
+import scodec.bits.ByteVector
 
 abstract class ConfigLoader[F[_]: MonadThrow] {
 
@@ -76,4 +78,17 @@ object ConfigLoader {
           }
           .getOrElse(Left(CannotConvert(stringValue, ttApply.getClass.toString, "Not an int value")))
       }
+
+  implicit def base64ByteVectorReader: ConfigReader[ByteVector] =
+    ConfigReader.fromString { str =>
+      ByteVector
+        .fromBase64Descriptive(str)
+        .left
+        .map(err => CannotConvert(str, "ByteVector", s"Cannot convert base64: $err"))
+    }
+
+  implicit def secretReader: ConfigReader[Secret] =
+    base64ByteVectorReader.emap(bv =>
+      Secret(bv).leftMap(err => CannotConvert(bv.toBase64, "Secret", s"Cannot create AES secret: $err"))
+    )
 }
