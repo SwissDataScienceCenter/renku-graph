@@ -58,6 +58,18 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "HookToken decryption failed"
     }
+
+    "decrypt existing values" in {
+      val usedSecret      = Secret.unsafeFromBase64("YWJjZGVmZzEyMzQ1Njc4OQ==")
+      val hookTokenCrypto = new HookTokenCryptoImpl[Try](usedSecret)
+
+      val plain =
+        hookTokenCrypto.decrypt(
+          SerializedHookToken.from("4TV8A81+1+U3dfa8sVO9TUuMvGHLaerySYpxEIkVT/U=").fold(throw _, identity)
+        )
+
+      plain shouldBe Success(HookToken(123456))
+    }
   }
 
   "apply" should {

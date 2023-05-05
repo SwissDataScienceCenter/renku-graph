@@ -70,5 +70,11 @@ object AesCrypto {
       else Left(s"Expected 16 bytes, but got ${value.length}")
 
     def unsafe(value: ByteVector): Secret = apply(value).fold(sys.error, identity)
+
+    def fromBase64(b64: String): Either[String, Secret] =
+      ByteVector.fromBase64Descriptive(b64).flatMap(apply)
+
+    def unsafeFromBase64(b64: String): Secret =
+      fromBase64(b64).fold(sys.error, identity)
   }
 }

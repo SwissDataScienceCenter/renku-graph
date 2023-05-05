@@ -26,6 +26,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import org.scalatest.matchers.should
@@ -59,6 +60,23 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
 
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "AccessToken decryption failed"
+    }
+
+    "decrypt existing values" in {
+      val usedSecret  = Secret.unsafeFromBase64("YWJjZGVmZzEyMzQ1Njc4OQ==")
+      val tokenCrypto = new AccessTokenCryptoImpl[Try](usedSecret)
+      val token1      = PersonalAccessToken("lhcrr5dkerm69osrrujlubkkw0ysx8io0e")
+      val encToken1 = EncryptedAccessToken
+        .from("jmamuPCm4R0Rr/ZuVRrYffwBHWdJt8siwuVYJ7WVrLgDIR6RzcCJcpuuvCWcVnlPRsXi2wFHfM+OBOsbt2erZQ==")
+        .fold(throw _, identity)
+
+      val token2 = UserOAuthAccessToken("q2f4t4ph7atcfh08eau1g35")
+      val encToken2 = EncryptedAccessToken
+        .from("QXK4EOJLgdqQdh8MLkS+vCtsJFU0wsnpD9QZuu5qyWROFCzFfUr81xv6f1mN1r3T")
+        .fold(throw _, identity)
+
+      tokenCrypto.decrypt(encToken1) shouldBe Success(token1)
+      tokenCrypto.decrypt(encToken2) shouldBe Success(token2)
     }
   }
 
