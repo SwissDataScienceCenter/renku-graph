@@ -57,6 +57,7 @@ class EventsProcessingStatusSpec
         ).map(addMemberWithId(user.id)).generateOne
 
       gitLabStub.addAuthenticated(user)
+      gitLabStub.addProject(project)
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return OK with 'activated' = false")
@@ -65,7 +66,7 @@ class EventsProcessingStatusSpec
       response.status                                                    shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
 
-      When("a webhook created for the project")
+      When("there's a webhook created for the project")
       And("there are events under processing")
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
