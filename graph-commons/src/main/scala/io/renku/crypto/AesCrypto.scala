@@ -34,13 +34,11 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
     secret: Secret
 ) {
 
-  private val base64Decoder    = Base64.getDecoder
-  private val base64Encoder    = Base64.getEncoder
-  private val algorithm        = "AES/CBC/PKCS5Padding"
-  private val key              = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
-  private val ivSpec           = new IvParameterSpec(new Array[Byte](16))
-  private val encryptingCipher = cipher(ENCRYPT_MODE)
-  private val decryptingCipher = cipher(DECRYPT_MODE)
+  private val base64Decoder = Base64.getDecoder
+  private val base64Encoder = Base64.getEncoder
+  private val algorithm     = "AES/CBC/PKCS5Padding"
+  private def key           = new SecretKeySpec(base64Decoder.decode(secret.value).takeWhile(_ != 10), "AES")
+  private val ivSpec        = new IvParameterSpec(new Array[Byte](16))
 
   def encrypt(nonEncrypted: NONENCRYPTED): F[ENCRYPTED]
   def decrypt(encrypted:    ENCRYPTED):    F[NONENCRYPTED]
@@ -53,14 +51,14 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
 
   protected def encryptAndEncode(toEncryptAndEncode: String): F[String] = MonadThrow[F].catchNonFatal {
     new String(
-      base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(UTF_8))),
+      base64Encoder.encode(cipher(ENCRYPT_MODE).doFinal(toEncryptAndEncode.getBytes(UTF_8))),
       UTF_8
     )
   }
 
   protected def decodeAndDecrypt(toDecodeAndDecrypt: String): F[String] = MonadThrow[F].catchNonFatal {
     new String(
-      decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(UTF_8))),
+      cipher(DECRYPT_MODE).doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(UTF_8))),
       UTF_8
     )
   }
