@@ -65,7 +65,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
             .modify(replaceDSName(sentenceContaining(commonPhrase).generateAs[datasets.Name]))
         )
         .generateOne
-    val project = dataProjects(testProject).generateOne
+    val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne
 
     Scenario("As a user I would like to be able to do cross-entity search by calling a REST endpoint") {
 
