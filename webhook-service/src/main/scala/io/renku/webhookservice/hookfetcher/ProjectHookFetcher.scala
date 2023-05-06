@@ -18,7 +18,6 @@
 
 package io.renku.webhookservice.hookfetcher
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -31,41 +30,40 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private[webhookservice] trait ProjectHookFetcher[F[_]] {
-  def fetchProjectHooks(
-      projectId:   projects.GitLabId,
-      accessToken: AccessToken
-  ): F[List[HookIdAndUrl]]
+  def fetchProjectHooks(projectId: projects.GitLabId, accessToken: AccessToken): F[Option[List[HookIdAndUrl]]]
 }
 
 private[webhookservice] object ProjectHookFetcher {
-  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookFetcher[F]] = new ProjectHookFetcherImpl[F].pure[F].widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookFetcher[F]] =
+    new ProjectHookFetcherImpl[F].pure[F].widen
 
-  final case class HookIdAndUrl(id: String, url: ProjectHookUrl)
+  final case class HookIdAndUrl(id: Int, url: ProjectHookUrl)
 }
 
 private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookFetcher[F] {
 
   import io.circe._
-  import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
-  import org.http4s.Status.{NotFound, Ok, Unauthorized}
+  import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
   import org.http4s.circe._
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[HookIdAndUrl]]] = {
-    case (Ok, _, response)    => response.as[List[HookIdAndUrl]]
-    case (NotFound, _, _)     => List.empty[HookIdAndUrl].pure[F]
-    case (Unauthorized, _, _) => MonadThrow[F].raiseError(UnauthorizedException)
-  }
-
-  override def fetchProjectHooks(projectId: projects.GitLabId, accessToken: AccessToken): F[List[HookIdAndUrl]] =
+  override def fetchProjectHooks(projectId:   projects.GitLabId,
+                                 accessToken: AccessToken
+  ): F[Option[List[HookIdAndUrl]]] =
     GitLabClient[F].get(uri"projects" / projectId / "hooks", "project-hooks")(mapResponse)(accessToken.some)
 
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[List[HookIdAndUrl]]]] = {
+    case (Ok, _, response)                => response.as[List[HookIdAndUrl]].map(_.some)
+    case (NotFound, _, _)                 => List.empty[HookIdAndUrl].some.pure[F]
+    case (Unauthorized | Forbidden, _, _) => Option.empty[List[HookIdAndUrl]].pure[F]
+  }
+
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
-    implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
+    implicit val decoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>
       for {
         url <- cursor.downField("url").as[String].map(ProjectHookUrl.fromGitlab)
-        id  <- cursor.downField("id").as[String] orElse cursor.downField("id").as[Long].map(_.toString)
+        id  <- cursor.downField("id").as[Int]
       } yield HookIdAndUrl(id, url)
     }
 

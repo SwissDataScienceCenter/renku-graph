@@ -18,6 +18,7 @@
 
 package io.renku.webhookservice.hookvalidation
 
+import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
@@ -30,7 +31,7 @@ import io.renku.webhookservice.tokenrepository._
 import org.typelevel.log4cats.Logger
 
 trait HookValidator[F[_]] {
-  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[HookValidationResult]
+  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]]
 }
 
 class HookValidatorImpl[F[_]: MonadThrow: Logger](
@@ -51,7 +52,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   import applicative._
   import projectHookVerifier._
 
-  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[HookValidationResult] = {
+  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
     persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId)
   }.onError(logError(projectId))
 
@@ -60,26 +61,23 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .map(associate(projectId, _))
       .getOrElse(().pure[F])
 
-  private def validateHookExistence(projectId: GitLabId): F[HookValidationResult] =
-    for {
-      accessToken      <- fetchToken(projectId)
-      hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), accessToken)
-      _                <- whenA(!hookPresent)(removeAccessToken(projectId))
-      validationResult <- toValidationResult(hookPresent).pure[F]
-    } yield validationResult
+  private def validateHookExistence(projectId: GitLabId): F[Option[HookValidationResult]] =
+    fetchToken(projectId)
+      .flatMapF(at => checkHookPresence(HookIdentifier(projectId, projectHookUrl), at))
+      .cataF(
+        default = Option.empty[HookValidationResult].pure[F],
+        hookPresent => whenA(!hookPresent)(removeAccessToken(projectId)).as(validationResultFrom(hookPresent).some)
+      )
 
-  private def fetchToken(projectId: GitLabId): F[AccessToken] =
+  private def fetchToken(projectId: GitLabId): OptionT[F, AccessToken] = OptionT {
     findAccessToken(projectId)
       .adaptError(storedAccessTokenError(projectId))
-      .flatMap(errorIfNone(projectId))
+  }
 
   private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] = exception =>
     new Exception(s"Finding stored access token for $projectId failed", exception)
 
-  private def errorIfNone(projectId: GitLabId): Option[AccessToken] => F[AccessToken] =
-    _.liftTo[F](NoAccessTokenException(s"No stored access token found for projectId $projectId"))
-
-  private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
+  private def validationResultFrom(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing
 
   private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = {

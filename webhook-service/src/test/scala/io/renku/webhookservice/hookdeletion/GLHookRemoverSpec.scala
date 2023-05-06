@@ -28,12 +28,12 @@ import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls, serializedHookTokens}
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
-import io.renku.webhookservice.hookdeletion.ProjectHookDeletor.ProjectHook
+import io.renku.webhookservice.WebhookServiceGenerators.hookIdAndUrls
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
 import org.http4s.Method.DELETE
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
@@ -42,7 +42,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectHookDeletorSpec
+class GLHookRemoverSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
@@ -53,16 +53,16 @@ class ProjectHookDeletorSpec
   "delete" should {
 
     "return the DeletionResult from GitLabClient" in new TestCase {
-      val accessToken = accessTokens.generateOne
 
-      val result = deletionResults.generateOne
+      val accessToken = accessTokens.generateOne
+      val result      = deletionResults.generateOne
 
       (gitLabClient
         .delete(_: Uri, _: NonEmptyString)(_: ResponseMappingF[IO, DeletionResult])(_: Option[AccessToken]))
         .expects(uri, endpointName, *, accessToken.some)
         .returning(result.pure[IO])
 
-      hookDeletor
+      remover
         .delete(projectId, hookIdAndUrl, accessToken)
         .unsafeRunSync() shouldBe result
     }
@@ -78,13 +78,15 @@ class ProjectHookDeletorSpec
       mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe DeletionResult.HookNotFound
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      intercept[UnauthorizedException] {
-        mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
+    Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"return an UnauthorizedException if remote client responds with $status" in new TestCase {
+        intercept[UnauthorizedException] {
+          mapResponse(status, Request(), Response()).unsafeRunSync()
+        }
       }
     }
 
-    "return an Exception if remote client responds with status neither OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
+    "return an Exception if remote client responds with status neither OK, NOT_FOUND, UNAUTHORIZED or FORBIDDEN" in new TestCase {
       intercept[Exception] {
         mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
       }
@@ -94,26 +96,20 @@ class ProjectHookDeletorSpec
   private trait TestCase {
     val hookIdAndUrl = hookIdAndUrls.generateOne
     val projectId    = projectIds.generateOne
-    val uri          = uri"projects" / projectId.show / "hooks" / hookIdAndUrl.id.show
+    val uri          = uri"projects" / projectId / "hooks" / hookIdAndUrl.id
     val endpointName: NonEmptyString = "delete-hook"
 
     implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-    val hookDeletor = new ProjectHookDeletorImpl[IO]
+    val remover = new GLHookRemoverImpl[IO]
 
     lazy val mapResponse =
       captureMapping(gitLabClient)(
-        hookDeletor.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
+        remover.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
         Gen.const(DeletionResult.HookDeleted),
         method = DELETE
       )
 
     val deletionResults: Gen[DeletionResult] = Gen.oneOf(DeletionResult.HookDeleted, DeletionResult.HookNotFound)
   }
-
-  private implicit lazy val projectHooks: Gen[ProjectHook] = for {
-    projectId           <- projectIds
-    hookUrl             <- projectHookUrls
-    serializedHookToken <- serializedHookTokens
-  } yield ProjectHook(projectId, hookUrl, serializedHookToken)
 }

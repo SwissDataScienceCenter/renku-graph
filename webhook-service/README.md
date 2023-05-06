@@ -122,7 +122,7 @@ The endpoint requires an authorization token passed in the request header as:
 | status                      | description                                                                                     |
 |-----------------------------|-------------------------------------------------------------------------------------------------|
 | OK (200)                    | when hook is successfully deleted                                                               |
-| NOT_FOUND (404)             | when the project does not exists                                                                | 
+| NOT_FOUND (404)             | when the project or its hook does not exists                                                    | 
 | UNAUTHORIZED (401)          | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
 | INTERNAL_SERVER_ERROR (500) | when there are problems with webhook creation                                                   |
 
@@ -141,12 +141,12 @@ The endpoint requires an authorization token passed in the request header as:
 
 **Response**
 
-| Status                     | Description                                                                                     |
-|----------------------------|-------------------------------------------------------------------------------------------------|
-| OK (200)                   | When the hook exists for the project                                                            |
-| NOT_FOUND (404)            | When there's no hook for the project                                                            |
-| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid |
-| INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                       |
+| Status                     | Description                                                      |
+|----------------------------|------------------------------------------------------------------|
+| OK (200)                   | When the hook exists for the project                             |
+| NOT_FOUND (404)            | When there's no hook for the project or the hook cannot be found |
+| UNAUTHORIZED (401)         | When using does not have access to the project                   |
+| INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence        |
 
 #### GET /version
 

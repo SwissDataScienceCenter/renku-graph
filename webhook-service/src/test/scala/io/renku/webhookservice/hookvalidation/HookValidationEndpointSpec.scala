@@ -26,11 +26,10 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.GitLabId
+import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -50,29 +49,43 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return OK when the hook exists for the project with the given id" in new TestCase {
 
       (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
+        .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
-        .returning(HookExists.pure[IO])
+        .returning(HookExists.some.pure[IO])
 
-      val response = validateHook(projectId, authUser).unsafeRunSync()
+      val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook valid"}"""
     }
 
-    "return NOT_FOUND the hook does not exist" in new TestCase {
+    "return NOT_FOUND when the hook does not exist" in new TestCase {
 
       (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
+        .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
-        .returning(HookMissing.pure[IO])
+        .returning(HookMissing.some.pure[IO])
 
-      val response = validateHook(projectId, authUser).unsafeRunSync()
+      val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe NotFound
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook not found"}"""
+    }
+
+    "return UNAUTHORIZED when validation cannot determine hook existence" in new TestCase {
+
+      (hookValidator
+        .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
+        .expects(projectId, Some(authUser.accessToken))
+        .returning(None.pure[IO])
+
+      val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
+
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Unauthorized"}"""
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook validation and log the error" in new TestCase {
@@ -80,33 +93,17 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
       val errorMessage      = ErrorMessage("some error")
       private val exception = new Exception(errorMessage.toString())
       (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
+        .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))
-        .returning(IO.raiseError(exception))
+        .returning(exception.raiseError[IO, Nothing])
 
-      val response = validateHook(projectId, authUser).unsafeRunSync()
+      val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe errorMessage.asJson
 
-      logger.loggedOnly(
-        Error(exception.getMessage, exception)
-      )
-    }
-
-    "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook validation" in new TestCase {
-
-      (hookValidator
-        .validateHook(_: GitLabId, _: Option[AccessToken]))
-        .expects(projectId, Some(authUser.accessToken))
-        .returning(IO.raiseError(UnauthorizedException))
-
-      val response = validateHook(projectId, authUser).unsafeRunSync()
-
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
+      logger.loggedOnly(Error(exception.getMessage, exception))
     }
   }
 
@@ -117,6 +114,6 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     implicit val logger = TestLogger[IO]()
     val hookValidator   = mock[HookValidator[IO]]
-    val validateHook    = new HookValidationEndpointImpl[IO](hookValidator).validateHook _
+    val endpoint        = new HookValidationEndpointImpl[IO](hookValidator)
   }
 }
