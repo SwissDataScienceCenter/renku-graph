@@ -34,7 +34,28 @@ trait HookValidator[F[_]] {
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]]
 }
 
-class HookValidatorImpl[F[_]: MonadThrow: Logger](
+object HookValidator {
+
+  sealed trait HookValidationResult
+  object HookValidationResult {
+    final case object HookExists  extends HookValidationResult
+    final case object HookMissing extends HookValidationResult
+  }
+
+  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] = for {
+    tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
+    projectHookVerifier   <- ProjectHookVerifier[F]
+    accessTokenAssociator <- AccessTokenAssociator[F]
+    accessTokenRemover    <- AccessTokenRemover[F]
+  } yield new HookValidatorImpl[F](projectHookUrl,
+                                   projectHookVerifier,
+                                   new AccessTokenFinderImpl(tokenRepositoryUrl),
+                                   accessTokenAssociator,
+                                   accessTokenRemover
+  )
+}
+
+private class HookValidatorImpl[F[_]: MonadThrow: Logger](
     projectHookUrl:        ProjectHookUrl,
     projectHookVerifier:   ProjectHookVerifier[F],
     accessTokenFinder:     AccessTokenFinder[F],
@@ -80,33 +101,7 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
   private def validationResultFrom(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing
 
-  private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = {
-    case NoAccessTokenException(message) =>
-      Logger[F].info(s"Hook validation failed: $message")
-    case exception =>
-      Logger[F].error(exception)(s"Hook validation failed for projectId $projectId")
+  private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>
+    Logger[F].error(exception)(s"Hook validation failed for projectId $projectId")
   }
-}
-
-object HookValidator {
-
-  sealed trait HookValidationResult
-  object HookValidationResult {
-    final case object HookExists  extends HookValidationResult
-    final case object HookMissing extends HookValidationResult
-  }
-
-  final case class NoAccessTokenException(message: String) extends RuntimeException(message)
-
-  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] = for {
-    tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
-    projectHookVerifier   <- ProjectHookVerifier[F]
-    accessTokenAssociator <- AccessTokenAssociator[F]
-    accessTokenRemover    <- AccessTokenRemover[F]
-  } yield new HookValidatorImpl[F](projectHookUrl,
-                                   projectHookVerifier,
-                                   new AccessTokenFinderImpl(tokenRepositoryUrl),
-                                   accessTokenAssociator,
-                                   accessTokenRemover
-  )
 }

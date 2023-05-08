@@ -18,24 +18,26 @@
 
 package io.renku.graph.acceptancetests
 
-import data._
-import data.Project.Statistics.CommitsCount
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import flows.{AccessTokenPresence, TSProvisioning}
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
+import io.renku.graph.acceptancetests.data._
+import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning}
+import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatusProgress
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Status._
+import org.http4s.implicits._
 import org.scalatest.concurrent.Eventually
-import testing.AcceptanceTestPatience
-import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
-class EventsProcessingStatusSpec
+class ProjectStatusResourceSpec
     extends AcceptanceSpec
     with ModelImplicits
     with ApplicationServices
@@ -46,23 +48,51 @@ class EventsProcessingStatusSpec
 
   private val numberOfEvents: Int Refined Positive = 5
 
-  Feature("Status of processing for a given project") {
+  Feature("Project Status API for a given project") {
 
-    Scenario("As a user I would like to see processing status of my project") {
+    val memberUser = authUsers.generateOne
+    val project =
+      dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                   CommitsCount(numberOfEvents.value)
+      ).map(addMemberWithId(memberUser.id)).generateOne
 
-      val user = authUsers.generateOne
-      val project =
-        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
-                     CommitsCount(numberOfEvents.value)
-        ).map(addMemberWithId(user.id)).generateOne
+    Scenario("Call be a user who is not a member of the project") {
 
-      gitLabStub.addAuthenticated(user)
       gitLabStub.addProject(project)
 
       When("there's no webhook for a given project in GitLab")
-      Then("the status endpoint should return OK with 'activated' = false")
+      And("project hasn't been activated (no trace of it in the EL)")
 
-      val response = webhookServiceClient.fetchProcessingStatus(project.id, user.accessToken)
+      Given("the user is authenticated")
+      val someAuthUser = authUsers.generateOne
+      gitLabStub.addAuthenticated(someAuthUser)
+
+      When("the user who is not a member of the project is calling the Status API")
+      Then("the Status API should return NOT_FOUND")
+      webhookServiceClient.fetchProcessingStatus(project.id, someAuthUser.accessToken).status shouldBe NotFound
+
+      When("a member of the project activates it")
+      gitLabStub.addAuthenticated(memberUser)
+      webhookServiceClient
+        .POST((uri"projects" / project.id / "webhooks").renderString, memberUser.accessToken)
+        .status shouldBe Created
+
+      Then("the non-member user should get OK with 'activated' = true")
+      val authUserResponse = webhookServiceClient.fetchProcessingStatus(project.id, someAuthUser.accessToken)
+      authUserResponse.status                                                    shouldBe Ok
+      authUserResponse.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
+    }
+
+    Scenario("Call be a user who is a member of the project") {
+
+      When("there's no webhook for a given project in GitLab")
+
+      Given("the member is authenticated")
+      gitLabStub.addAuthenticated(memberUser)
+      gitLabStub.addProject(project)
+
+      Then("the member of the project calling the Status API should get OK with 'activated' = false")
+      val response = webhookServiceClient.fetchProcessingStatus(project.id, memberUser.accessToken)
       response.status                                                    shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
 
@@ -71,11 +101,11 @@ class EventsProcessingStatusSpec
       val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), allCommitIds)
-      `data in the Triples Store`(project, allCommitIds, user.accessToken)
+      `data in the Triples Store`(project, allCommitIds, memberUser.accessToken)
 
-      Then("the status endpoint should return OK with some progress info")
+      Then("the Status API should return OK with some status info")
       eventually {
-        val response = webhookServiceClient.fetchProcessingStatus(project.id, user.accessToken)
+        val response = webhookServiceClient.fetchProcessingStatus(project.id, memberUser.accessToken)
 
         response.status shouldBe Ok
 

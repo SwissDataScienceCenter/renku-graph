@@ -26,6 +26,7 @@ import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
@@ -33,53 +34,55 @@ import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model._
-import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import io.renku.webhookservice.{ProjectInfoFinder, hookvalidation}
 import org.typelevel.log4cats.Logger
 
 private trait HookCreator[F[_]] {
-  def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult]
+  def createHook(projectId: GitLabId, authUser: AuthUser): F[Option[CreationResult]]
 }
 
 private class HookCreatorImpl[F[_]: Spawn: Logger](
-    projectHookUrl:        ProjectHookUrl,
-    projectHookValidator:  HookValidator[F],
-    projectInfoFinder:     ProjectInfoFinder[F],
-    hookTokenCrypto:       HookTokenCrypto[F],
-    projectHookCreator:    ProjectHookCreator[F],
-    accessTokenAssociator: AccessTokenAssociator[F],
-    elClient:              eventlog.api.events.Client[F]
+    projectHookUrl:       ProjectHookUrl,
+    projectHookValidator: HookValidator[F],
+    projectInfoFinder:    ProjectInfoFinder[F],
+    hookTokenCrypto:      HookTokenCrypto[F],
+    projectHookCreator:   ProjectHookCreator[F],
+    elClient:             eventlog.api.events.Client[F]
 ) extends HookCreator[F] {
 
   import HookCreator.CreationResult._
-  import accessTokenAssociator._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookValidator._
   import projectInfoFinder.findProjectInfo
 
-  override def createHook(projectId: GitLabId, accessToken: AccessToken): F[CreationResult] = {
+  override def createHook(projectId: GitLabId, authUser: AuthUser): F[Option[CreationResult]] = {
 
-    def createIfMissing(hvr: HookValidationResult): F[CreationResult] =
-      hvr match {
-        case HookValidationResult.HookMissing =>
+    val accessToken = authUser.accessToken
+
+    val createIfMissing: HookValidationResult => F[CreationResult] = {
+      case HookValidationResult.HookMissing =>
+        encrypt(HookToken(projectId))
+          .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
+          .as(HookCreated.widen)
+      case HookValidationResult.HookExists =>
+        HookExisted.widen.pure[F]
+    }
+
+    validateHook(projectId, accessToken.some)
+      .flatMap {
+        case Some(validationResult) =>
           for {
-            _                   <- associate(projectId, accessToken)
-            serializedHookToken <- encrypt(HookToken(projectId))
-            _                   <- create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken)
-          } yield HookCreated
-        case HookValidationResult.HookExists =>
-          associate(projectId, accessToken).map(_ => HookExisted.widen)
+            creationResult <- createIfMissing(validationResult)
+            _              <- Logger[F].info(show"Hook $creationResult for projectId $projectId")
+            _              <- Spawn[F].start(sendCommitSyncReq(projectId, accessToken))
+          } yield creationResult.some
+        case None =>
+          Logger[F]
+            .info(show"Hook on projectId $projectId cannot be created by user ${authUser.id}")
+            .as(Option.empty[CreationResult])
       }
-
-    {
-      for {
-        validationResult <- validateHook(projectId, accessToken.some)
-        creationResult   <- createIfMissing(validationResult)
-        _                <- Logger[F].info(show"Hook $creationResult for projectId $projectId")
-        _                <- Spawn[F].start(sendCommitSyncReq(projectId, accessToken))
-      } yield creationResult
-    }.onError(loggingError(projectId))
+      .onError(loggingError(projectId))
   }
 
   private def sendCommitSyncReq(projectId: projects.GitLabId, accessToken: AccessToken) =
@@ -118,7 +121,6 @@ private object HookCreator {
     hookValidator     <- hookvalidation.HookValidator(projectHookUrl)
     projectInfoFinder <- ProjectInfoFinder[F]
     hookCreator       <- ProjectHookCreator[F]
-    tokenAssociator   <- AccessTokenAssociator[F]
     elClient          <- eventlog.api.events.Client[F]
   } yield new HookCreatorImpl[F](
     projectHookUrl,
@@ -126,7 +128,6 @@ private object HookCreator {
     projectInfoFinder,
     hookTokenCrypto,
     hookCreator,
-    tokenAssociator,
     elClient
   )
 }

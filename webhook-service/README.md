@@ -53,11 +53,12 @@ The headers are not required.
 
 **Response**
 
-| Status                      | Description                                            |
-|-----------------------------|--------------------------------------------------------|
-| OK (200)                    | When there is a hook for the project                   |
-| NOT_FOUND (404)             | When project (or a valid access token) cannot be found |
-| INTERNAL SERVER ERROR (500) | When there are problems with finding the status        |
+| Status                      | Description                                                          |
+|-----------------------------|----------------------------------------------------------------------|
+| OK (200)                    | When there is a hook for the project                                 |
+| UNAUTHORIZED (401)          | When the given `private-token` or `authorization: bearer` is invalid |
+| NOT_FOUND (404)             | When project (or a valid access token) cannot be found               |
+| INTERNAL SERVER ERROR (500) | When there are problems with finding the status                      |
 
 Response examples:
 - project not activated
@@ -90,7 +91,7 @@ Response examples:
 
 #### POST /projects/:id/webhooks
 
-creates a webhook for a project with the given `project id`.
+Creates a webhook for a project with the given `project id`.
 
 **request format**
 
@@ -105,6 +106,7 @@ The endpoint requires an authorization token passed in the request header as:
 | OK (200)                    | when hook already exists for the project                                                        |
 | CREATED (201)               | when a new hook was created                                                                     |
 | UNAUTHORIZED (401)          | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
+| NOT_FOUND (404)             | when project does not exists or user has not access to it                                       |
 | INTERNAL_SERVER_ERROR (500) | when there are problems with webhook creation                                                   |
 
 #### DELETE /projects/:id/webhooks
