@@ -34,6 +34,7 @@ import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model._
+import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import io.renku.webhookservice.{ProjectInfoFinder, hookvalidation}
 import org.typelevel.log4cats.Logger
 
@@ -44,6 +45,7 @@ private trait HookCreator[F[_]] {
 private class HookCreatorImpl[F[_]: Spawn: Logger](
     projectHookUrl:       ProjectHookUrl,
     projectHookValidator: HookValidator[F],
+    tokenAssociator:      AccessTokenAssociator[F],
     projectInfoFinder:    ProjectInfoFinder[F],
     hookTokenCrypto:      HookTokenCrypto[F],
     projectHookCreator:   ProjectHookCreator[F],
@@ -53,7 +55,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
   import HookCreator.CreationResult._
   import hookTokenCrypto._
   import projectHookCreator.create
-  import projectHookValidator._
+  import projectHookValidator.validateHook
   import projectInfoFinder.findProjectInfo
 
   override def createHook(projectId: GitLabId, authUser: AuthUser): F[Option[CreationResult]] = {
@@ -62,9 +64,10 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
 
     val createIfMissing: HookValidationResult => F[CreationResult] = {
       case HookValidationResult.HookMissing =>
-        encrypt(HookToken(projectId))
-          .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
-          .as(HookCreated.widen)
+        tokenAssociator.associate(projectId, accessToken) >>
+          encrypt(HookToken(projectId))
+            .flatMap(t => create(ProjectHook(projectId, projectHookUrl, t), accessToken))
+            .as(HookCreated.widen)
       case HookValidationResult.HookExists =>
         HookExisted.widen.pure[F]
     }
@@ -119,12 +122,14 @@ private object HookCreator {
                                                                 hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] = for {
     hookValidator     <- hookvalidation.HookValidator(projectHookUrl)
+    tokenAssociator   <- AccessTokenAssociator[F]
     projectInfoFinder <- ProjectInfoFinder[F]
     hookCreator       <- ProjectHookCreator[F]
     elClient          <- eventlog.api.events.Client[F]
   } yield new HookCreatorImpl[F](
     projectHookUrl,
     hookValidator,
+    tokenAssociator,
     projectInfoFinder,
     hookTokenCrypto,
     hookCreator,

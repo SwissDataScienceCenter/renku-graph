@@ -32,9 +32,7 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatusProgress
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Status._
-import org.http4s.implicits._
 import org.scalatest.concurrent.Eventually
 
 class ProjectStatusResourceSpec
@@ -69,30 +67,35 @@ class ProjectStatusResourceSpec
 
       When("the user who is not a member of the project is calling the Status API")
       Then("the Status API should return NOT_FOUND")
-      webhookServiceClient.fetchProcessingStatus(project.id, someAuthUser.accessToken).status shouldBe NotFound
+      webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken).status shouldBe NotFound
 
       When("a member of the project activates it")
       gitLabStub.addAuthenticated(memberUser)
-      webhookServiceClient
-        .POST((uri"projects" / project.id / "webhooks").renderString, memberUser.accessToken)
-        .status shouldBe Created
+      val commitId = commitIds.generateOne
+      gitLabStub.replaceCommits(project.id, commitId)
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+
+      webhookServiceClient.`POST projects/:id/webhooks`(project.id, memberUser.accessToken).status shouldBe Created
 
       Then("the non-member user should get OK with 'activated' = true")
-      val authUserResponse = webhookServiceClient.fetchProcessingStatus(project.id, someAuthUser.accessToken)
-      authUserResponse.status                                                    shouldBe Ok
-      authUserResponse.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
+      eventually {
+        val authUserResponse = webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
+        authUserResponse.status                                                    shouldBe Ok
+        authUserResponse.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
+      }
     }
 
     Scenario("Call be a user who is a member of the project") {
 
       When("there's no webhook for a given project in GitLab")
+      gitLabStub.addProject(project)
 
       Given("the member is authenticated")
       gitLabStub.addAuthenticated(memberUser)
-      gitLabStub.addProject(project)
 
       Then("the member of the project calling the Status API should get OK with 'activated' = false")
-      val response = webhookServiceClient.fetchProcessingStatus(project.id, memberUser.accessToken)
+      val response = webhookServiceClient.`GET projects/:id/events/status`(project.id, memberUser.accessToken)
       response.status                                                    shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
 
@@ -105,7 +108,7 @@ class ProjectStatusResourceSpec
 
       Then("the Status API should return OK with some status info")
       eventually {
-        val response = webhookServiceClient.fetchProcessingStatus(project.id, memberUser.accessToken)
+        val response = webhookServiceClient.`GET projects/:id/events/status`(project.id, memberUser.accessToken)
 
         response.status shouldBe Ok
 
