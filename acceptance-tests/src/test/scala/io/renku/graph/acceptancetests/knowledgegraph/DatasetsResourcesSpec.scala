@@ -66,8 +66,12 @@ class DatasetsResourcesSpec
           creatorGen = cliShapedPersons
         )
         .generateOne
+    val creatorPerson = cliShapedPersons.generateOne
     val project =
-      dataProjects(testProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
+      dataProjects(testProject)
+        .map(replaceCreatorFrom(creatorPerson, creator.id))
+        .map(addMemberFrom(creatorPerson, creator.id) >>> addMemberWithId(user.id))
+        .generateOne
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
@@ -180,8 +184,12 @@ class DatasetsResourcesSpec
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
+      val creatorPerson = cliShapedPersons.generateOne
       val privateProject =
-        dataProjects(testPrivateProject).map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id)).generateOne
+        dataProjects(testPrivateProject)
+          .map(replaceCreatorFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id))
+          .generateOne
 
       Given("there's a private project in KG")
       val commitId = commitIds.generateOne
@@ -212,13 +220,13 @@ class DatasetsResourcesSpec
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
-      val project1 = dataProjects(testProject1).generateOne
+      val project1 = dataProjects(testProject1).map(addMemberWithId(creator.id)).generateOne
 
       val (dataset2, testProject2) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeDescContaining(text)))
         .generateOne
-      val project2 = dataProjects(testProject2).generateOne
+      val project2 = dataProjects(testProject2).map(addMemberWithId(creator.id)).generateOne
       val (dataset3, testProject3) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(
@@ -226,27 +234,28 @@ class DatasetsResourcesSpec
             .modify(_.makeCreatorNameContaining(text)(creatorUsernameUpdaterInternal(cliShapedPersons)))
         )
         .generateOne
-      val project3 = dataProjects(testProject3).generateOne
+      val project3 = dataProjects(testProject3).map(addMemberWithId(creator.id)).generateOne
       val (dataset4, testProject4 ::~ testProject4Fork) =
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
           .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeKeywordsContaining(text)))
           .forkOnce(creatorGen = cliShapedPersons)
           .generateOne
           .bimap(identity, _.bimap(removeMembers(), removeMembers()))
-      val project4     = dataProjects(testProject4).generateOne
-      val project4Fork = dataProjects(testProject4Fork).generateOne
+      val project4     = dataProjects(testProject4).map(addMemberWithId(creator.id)).generateOne
+      val project4Fork = dataProjects(testProject4Fork).map(addMemberWithId(creator.id)).generateOne
       val (dataset5WithoutText, testProject5) = renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
-      val project5 = dataProjects(testProject5).generateOne
+      val project5 = dataProjects(testProject5).map(addMemberWithId(creator.id)).generateOne
       val (_, testProject6Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
+      val project6CreatorPerson = cliShapedPersons.generateOne
       val project6Private = dataProjects(testProject6Private)
-        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
-        .map(addMemberWithId(user.id))
+        .map(replaceCreatorFrom(project6CreatorPerson, creator.id))
+        .map(addMemberFrom(project6CreatorPerson, creator.id))
         .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -376,16 +385,20 @@ class DatasetsResourcesSpec
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
+      val project1CreatorPerson = cliShapedPersons.generateOne
       val project1 = dataProjects(testProject1)
-        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
+        .map(replaceCreatorFrom(project1CreatorPerson, creator.id))
+        .map(addMemberWithId(user.id) >>> addMemberFrom(project1CreatorPerson, creator.id))
         .generateOne
 
       val (_, testProject2Private) = renkuProjectEntities(visibilityPrivate, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
         .generateOne
+      val project2CreatorPerson = cliShapedPersons.generateOne
       val project2Private = dataProjects(testProject2Private)
-        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
+        .map(replaceCreatorFrom(project2CreatorPerson, creator.id))
+        .map(addMemberFrom(project2CreatorPerson, creator.id))
         .generateOne
 
       val (dataset3PrivateWithAccess, testProject3PrivateWithAccess) =
@@ -393,9 +406,10 @@ class DatasetsResourcesSpec
           .modify(removeMembers())
           .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)).modify(_.makeTitleContaining(text)))
           .generateOne
+      val project3CreatorPerson = cliShapedPersons.generateOne
       val project3PrivateWithAccess = dataProjects(testProject3PrivateWithAccess)
-        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
-        .map(addMemberWithId(user.id))
+        .map(replaceCreatorFrom(project3CreatorPerson, creator.id))
+        .map(addMemberWithId(user.id) >>> addMemberFrom(project3CreatorPerson, creator.id))
         .generateOne
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -438,7 +452,7 @@ class DatasetsResourcesSpec
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
-      val project = dataProjects(testProject).generateOne
+      val project = dataProjects(testProject).map(addMemberWithId(creator.id)).generateOne
 
       Given("some data in the Triples Store")
       gitLabStub.addAuthenticated(creator)
@@ -464,9 +478,10 @@ class DatasetsResourcesSpec
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
         .generateOne
 
+      val projectCreatorPerson = cliShapedPersons.generateOne
       val project = dataProjects(testProject)
-        .map(replaceCreatorFrom(cliShapedPersons.generateOne, creator.id))
-        .map(addMemberWithId(user.id))
+        .map(replaceCreatorFrom(projectCreatorPerson, creator.id))
+        .map(addMemberWithId(user.id) >>> addMemberFrom(projectCreatorPerson, creator.id))
         .generateOne
 
       Given("I am authenticated")

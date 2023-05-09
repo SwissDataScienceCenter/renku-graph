@@ -22,51 +22,39 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
-import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
-import org.http4s.Status.{NoContent, NotFound, Ok}
+import org.http4s.Status.{Forbidden, NoContent, NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
-private trait ProjectHookDeletor[F[_]] {
-  def delete(
-      projectId:     projects.GitLabId,
-      projectHookId: HookIdAndUrl,
-      accessToken:   AccessToken
-  ): F[DeletionResult]
+private trait GLHookRemover[F[_]] {
+  def delete(projectId: projects.GitLabId, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult]
 }
 
-private class ProjectHookDeletorImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookDeletor[F] {
+private class GLHookRemoverImpl[F[_]: Async: GitLabClient: Logger] extends GLHookRemover[F] {
 
   import cats.effect._
   import io.renku.http.client.RestClientError.UnauthorizedException
+  import io.renku.http.tinytypes.TinyTypeURIEncoder._
   import org.http4s.Status.Unauthorized
   import org.http4s.{Request, Response}
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[DeletionResult]] = {
-    case (Ok | NoContent, _, _) => DeletionResult.HookDeleted.pure[F].widen[DeletionResult]
-    case (NotFound, _, _)       => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
-    case (Unauthorized, _, _)   => MonadCancelThrow[F].raiseError(UnauthorizedException)
-  }
-
   def delete(projectId: projects.GitLabId, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
-    GitLabClient[F].delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete-hook")(
+    GitLabClient[F].delete(uri"projects" / projectId / "hooks" / projectHookId.id, "delete-hook")(
       mapResponse
     )(accessToken.some)
+
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[DeletionResult]] = {
+    case (Ok | NoContent, _, _)           => DeletionResult.HookDeleted.pure[F].widen[DeletionResult]
+    case (NotFound, _, _)                 => DeletionResult.HookNotFound.pure[F].widen[DeletionResult]
+    case (Unauthorized | Forbidden, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
+  }
 }
 
-private object ProjectHookDeletor {
-  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookDeletor[F]] =
-    new ProjectHookDeletorImpl[F].pure[F].widen[ProjectHookDeletor[F]]
-
-  final case class ProjectHook(
-      projectId:           GitLabId,
-      projectHookUrl:      ProjectHookUrl,
-      serializedHookToken: SerializedHookToken
-  )
+private object GLHookRemover {
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GLHookRemover[F]] =
+    new GLHookRemoverImpl[F].pure[F].widen[GLHookRemover[F]]
 }

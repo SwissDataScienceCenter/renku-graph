@@ -19,10 +19,9 @@
 package io.renku.webhookservice
 package eventstatus
 
-import cats.MonadThrow
-import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel}
 import io.circe.syntax._
 import io.renku.graph.eventlog
 import io.renku.graph.eventlog.api.events.CommitSyncRequest
@@ -36,7 +35,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator
-import io.renku.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Response
 import org.http4s.circe._
@@ -47,7 +46,7 @@ trait Endpoint[F[_]] {
   def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]]
 }
 
-private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
+private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: ExecutionTimeRecorder](
     hookValidator:     HookValidator[F],
     statusInfoFinder:  StatusInfoFinder[F],
     projectInfoFinder: ProjectInfoFinder[F],
@@ -56,44 +55,27 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
     with Endpoint[F] {
 
   import HookValidationResult._
+  import hookValidator.validateHook
   import projectInfoFinder.findProjectInfo
   import statusInfoFinder.findStatusInfo
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
-    validateHook(projectId, authUser)
-      .semiflatMap {
-        case HookMissing =>
-          Ok(StatusInfo.NotActivated.asJson)
-        case HookExists =>
-          findStatusInfo(projectId)
-            .flatTap(sendCommitSyncIfNone(projectId, authUser))
-            .map(_.getOrElse(StatusInfo.webhookReady.widen))
-            .flatMap(si => Ok(si.asJson))
+    (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
+      .parFlatMapN {
+        case (Some(HookMissing), _)       => Ok(StatusInfo.NotActivated.asJson)
+        case (Some(HookExists), Some(si)) => Ok(si.asJson)
+        case (Some(HookExists), None) => sendCommitSync(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
+        case (None, Some(si))         => Ok(si.asJson)
+        case (None, None)             => NotFound(InfoMessage("Info about project cannot be found"))
       }
-      .merge
       .recoverWith(internalServerError(projectId))
   } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
 
-  private def validateHook(projectId: GitLabId, authUser: Option[AuthUser]) =
-    EitherT {
-      hookValidator
-        .validateHook(projectId, authUser.map(_.accessToken))
-        .map(_.asRight[Response[F]])
-        .recoverWith(noAccessTokenToNotFound)
-    }
-
-  private lazy val noAccessTokenToNotFound: PartialFunction[Throwable, F[Either[Response[F], HookValidationResult]]] = {
-    case _: NoAccessTokenException => NotFound(InfoMessage("Info about project cannot be found")).map(_.asLeft)
-  }
-
-  private def sendCommitSyncIfNone(projectId: GitLabId, authUser: Option[AuthUser]): Option[StatusInfo] => F[Unit] = {
-    case Some(_) => ().pure[F]
-    case None =>
-      findProjectInfo(projectId)(authUser.map(_.accessToken)).map(CommitSyncRequest(_)) >>=
-        elClient.send
-  }
+  private def sendCommitSync(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] =
+    findProjectInfo(projectId)(authUser.map(_.accessToken)).map(CommitSyncRequest(_)) >>=
+      elClient.send
 
   private def internalServerError(projectId: projects.GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case exception =>
@@ -103,7 +85,7 @@ private class EndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
 }
 
 object Endpoint {
-  def apply[F[_]: Async: GitLabClient: ExecutionTimeRecorder: Logger: MetricsRegistry](
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: ExecutionTimeRecorder: Logger: MetricsRegistry](
       projectHookUrl: ProjectHookUrl
   ): F[Endpoint[F]] = for {
     hookValidator     <- hookvalidation.HookValidator(projectHookUrl)

@@ -24,48 +24,37 @@ import cats.syntax.all._
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.ProjectHookUrl
+import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{Response, Status}
 import org.typelevel.log4cats.Logger
-
-import scala.util.control.NonFatal
 
 trait HookValidationEndpoint[F[_]] {
   def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]]
 }
 
-class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
-    hookValidator: HookValidator[F]
-) extends Http4sDsl[F]
+class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](hookValidator: HookValidator[F])
+    extends Http4sDsl[F]
     with HookValidationEndpoint[F] {
 
   def validateHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
-    for {
-      creationResult <- hookValidator.validateHook(projectId, Some(authUser.accessToken))
-      response       <- toHttpResponse(creationResult)
-    } yield response
-  } recoverWith withHttpResult
+    hookValidator.validateHook(projectId, Some(authUser.accessToken)).flatMap(toHttpResponse(_))
+  } handleErrorWith withHttpResult
 
-  private lazy val toHttpResponse: HookValidationResult => F[Response[F]] = {
-    case HookExists  => Ok(InfoMessage("Hook valid"))
-    case HookMissing => NotFound(InfoMessage("Hook not found"))
+  private lazy val toHttpResponse: Option[HookValidationResult] => F[Response[F]] = {
+    case Some(HookExists)  => Ok(InfoMessage("Hook valid"))
+    case Some(HookMissing) => NotFound(InfoMessage("Hook not found"))
+    case None              => Response[F](Unauthorized).withEntity[ErrorMessage](ErrorMessage("Unauthorized")).pure[F]
   }
 
-  private lazy val withHttpResult: PartialFunction[Throwable, F[Response[F]]] = {
-    case ex @ UnauthorizedException =>
-      Response[F](Status.Unauthorized)
-        .withEntity[ErrorMessage](ErrorMessage(ex))
-        .pure[F]
-    case NonFatal(exception) =>
-      Logger[F].error(exception)(exception.getMessage) >>
-        InternalServerError(ErrorMessage(exception))
+  private lazy val withHttpResult: Throwable => F[Response[F]] = { exception =>
+    Logger[F].error(exception)(exception.getMessage) >>
+      InternalServerError(ErrorMessage(exception))
   }
 }
 

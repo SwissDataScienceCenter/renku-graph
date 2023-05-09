@@ -48,6 +48,10 @@ jena:
   additionalEnvironmentVariables:
     - name: JVM_ARGS
       value: -Xmx2G -Xms2G
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 3Gi
   additionalVolumeMounts:
     - name: shiro
       mountPath: /fuseki/shiro.ini
@@ -72,6 +76,7 @@ webhookService:
     port: 80
   resources:
     requests:
+      cpu: 500m
       memory: 256Mi
   jvmXmx: 128M
   gitlab:
@@ -91,6 +96,7 @@ tokenRepository:
     port: 9003
   resources:
     requests:
+      cpu: 500m
       memory: 256Mi
   jvmXmx: 128M
   gitlab:

@@ -52,7 +52,7 @@ object AccessToken {
   private val base64Decoder = Base64.getDecoder
   private val base64Encoder = Base64.getEncoder
 
-  implicit val accessTokenEncoder: Encoder[AccessToken] = {
+  implicit def accessTokenEncoder[A <: AccessToken]: Encoder[A] = {
     case ProjectAccessToken(token) =>
       Json.obj("projectAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
     case UserOAuthAccessToken(token) =>

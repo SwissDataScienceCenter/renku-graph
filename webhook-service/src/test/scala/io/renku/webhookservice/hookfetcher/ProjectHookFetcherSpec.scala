@@ -19,21 +19,19 @@
 package io.renku.webhookservice.hookfetcher
 
 import cats.effect.IO
-import cats.implicits.toShow
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
-import io.circe.syntax.EncoderOps
-import io.circe.{Encoder, Json}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester.jsonEntityEncoder
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -43,6 +41,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -52,52 +51,53 @@ class ProjectHookFetcherSpec
     with ExternalServiceStubbing
     with GitLabClientTools[IO]
     with should.Matchers
+    with OptionValues
     with IOSpec {
 
   "fetchProjectHooks" should {
 
-    "return the list of hooks of the project" in new TestCase {
+    "return list of project hooks" in new TestCase {
 
       val idAndUrls = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
       (gitLabClient
-        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, Some(accessToken))
-        .returning(IO.pure(idAndUrls))
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[List[HookIdAndUrl]]])(
+          _: Option[AccessToken]
+        ))
+        .expects(uri, endpointName, *, accessToken.some)
+        .returning(idAndUrls.some.pure[IO])
 
-      fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync() shouldBe idAndUrls
+      fetcher
+        .fetchProjectHooks(projectId, accessToken)
+        .unsafeRunSync()
+        .value should contain theSameElementsAs idAndUrls
     }
 
-    // mapResponse
-
     "return the list of hooks if the response is Ok" in new TestCase {
-      val id  = nonNegativeInts().generateOne.value
+
+      val id  = positiveInts().generateOne.value
       val url = projectHookUrls.generateOne
       mapResponse((Status.Ok, Request(), Response().withEntity(json"""[{"id":$id, "url":${url.value}}]""")))
-        .unsafeRunSync() shouldBe List(HookIdAndUrl(id.toString, url))
+        .unsafeRunSync() shouldBe List(HookIdAndUrl(id, url)).some
     }
 
     "return an empty list of hooks if the project does not exists" in new TestCase {
-
-      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe List.empty[HookIdAndUrl]
+      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe List.empty[HookIdAndUrl].some
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      intercept[UnauthorizedException] {
-        mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
+    Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      show"return None if remote client responds with $status" in new TestCase {
+        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe None
       }
     }
 
-    "return an Exception if remote client responds with status neither OK , NOT_FOUND nor UNAUTHORIZED" in new TestCase {
-
+    "return an Exception if remote client responds with status any of OK , NOT_FOUND, UNAUTHORIZED or FORBIDDEN" in new TestCase {
       intercept[Exception] {
         mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
       }
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-
       intercept[RuntimeException] {
         mapResponse((Status.Ok, Request(), Response().withEntity("""{}"""))).unsafeRunSync()
       }.getMessage should include("Could not decode JSON")
@@ -106,7 +106,7 @@ class ProjectHookFetcherSpec
 
   private trait TestCase {
     val projectId = projectIds.generateOne
-    val uri       = uri"projects" / projectId.show / "hooks"
+    val uri       = uri"projects" / projectId / "hooks"
     val endpointName: String Refined NonEmpty = "project-hooks"
     val accessToken = accessTokens.generateOne
 
@@ -115,14 +115,7 @@ class ProjectHookFetcherSpec
     val fetcher = new ProjectHookFetcherImpl[IO]
 
     val mapResponse = captureMapping(gitLabClient)(fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
-                                                   Gen.const(List.empty[HookIdAndUrl])
-    )
-  }
-
-  private implicit val idsAndUrlsEncoder: Encoder[HookIdAndUrl] = Encoder.instance { idAndUrl =>
-    Json.obj(
-      "id"  -> idAndUrl.id.asJson,
-      "url" -> idAndUrl.url.value.asJson
+                                                   Gen.const(Option.empty[List[HookIdAndUrl]])
     )
   }
 }

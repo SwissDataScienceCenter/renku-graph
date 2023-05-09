@@ -27,10 +27,7 @@ import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookVerifier[F[_]] {
-  def checkHookPresence(
-      projectHookId: HookIdentifier,
-      accessToken:   AccessToken
-  ): F[Boolean]
+  def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Option[Boolean]]
 }
 
 private object ProjectHookVerifier {
@@ -43,10 +40,10 @@ private class ProjectHookVerifierImpl[F[_]: Async: Logger](
     projectHookFetcher: ProjectHookFetcher[F]
 ) extends ProjectHookVerifier[F] {
 
-  override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Boolean] =
+  override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Option[Boolean]] =
     projectHookFetcher
       .fetchProjectHooks(projectHookId.projectId, accessToken)
-      .map(checkProjectHookExists(projectHookId.projectHookUrl))
+      .map(_.map(checkProjectHookExists(projectHookId.projectHookUrl)))
 
   private def checkProjectHookExists(urlToFind: ProjectHookUrl): List[HookIdAndUrl] => Boolean = hooksIdsAndUrls =>
     hooksIdsAndUrls.map(_.url.value) contains urlToFind.value

@@ -25,11 +25,12 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 
 import java.time.{LocalDate, Period}
 
 private[tokenrepository] trait NewTokensCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
+  def createProjectAccessToken(projectId: projects.GitLabId, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
 }
 
 private[tokenrepository] object NewTokensCreator {
@@ -61,13 +62,12 @@ private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def createPersonalAccessToken(projectId:   projects.GitLabId,
-                                         accessToken: AccessToken
+  override def createProjectAccessToken(projectId:   projects.GitLabId,
+                                        accessToken: AccessToken
   ): OptionT[F, TokenCreationInfo] = OptionT {
-    GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",
-                         "create-project-access-token",
-                         createPayload()
-    )(mapResponse)(accessToken.some)
+    GitLabClient[F].post(uri"projects" / projectId / "access_tokens", "create-project-access-token", createPayload())(
+      mapResponse
+    )(accessToken.some)
   }
 
   private def createPayload() = json"""{
