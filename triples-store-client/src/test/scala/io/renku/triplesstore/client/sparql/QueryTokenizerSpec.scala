@@ -18,29 +18,24 @@
 
 package io.renku.triplesstore.client.sparql
 
-import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should
 
-final class LuceneQuery(val query: String) extends AnyVal {
-  def isQueryAll: Boolean = query == LuceneQuery.queryAll.query
-}
+class QueryTokenizerSpec extends AnyFlatSpec with should.Matchers {
+  val tokenizer = QueryTokenizer.luceneStandard
 
-object LuceneQuery {
-  val queryAll: LuceneQuery = LuceneQuery("*")
+  it should "split on whitespace" in {
+    val input = "  one two\tthree   four\nfive "
+    tokenizer.split(input) shouldBe List("one", "two", "three", "four", "five")
+  }
 
-  def apply(str: String): LuceneQuery = new LuceneQuery(str)
+  it should "split on dashes" in {
+    val input = "one-two-three-"
+    tokenizer.split(input) shouldBe List("one", "two", "three")
+  }
 
-  def escape(str: String): LuceneQuery = LuceneQuery(LuceneQueryEncoder.queryAsString(str))
-
-  def fuzzy(str: String): LuceneQuery =
-    new LuceneQuery(
-      QueryTokenizer.luceneStandard
-        .split(str)
-        .map(_.trim)
-        .map(QueryParserUtil.escape)
-        .map(word => s"$word~")
-        .mkString(" ")
-    )
-
-  implicit val sparqlEncoder: SparqlEncoder[LuceneQuery] =
-    SparqlEncoder.instance(q => Fragment(s"'${q.query}'"))
+  it should "return different data" in {
+    val input = "one 1 two 2-3-4 \"http://hello.com\" next~"
+    tokenizer.split(input) shouldBe List("one", "1", "two", "2", "3", "4", "http", "hello.com", "next")
+  }
 }
