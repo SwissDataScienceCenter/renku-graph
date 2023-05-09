@@ -19,6 +19,7 @@
 package io.renku.webhookservice.eventstatus
 
 import io.renku.graph.model.EventContentGenerators.eventInfos
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import org.scalacheck.Gen
 
 private object Generators {
@@ -30,4 +31,7 @@ private object Generators {
         StatusInfo.NotActivated
       )
       .map(_.merge)
+
+  implicit val hookValidationResults: Gen[HookValidationResult] =
+    Gen.oneOf(HookValidationResult.HookExists, HookValidationResult.HookMissing)
 }

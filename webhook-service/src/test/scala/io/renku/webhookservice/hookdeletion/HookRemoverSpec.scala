@@ -29,64 +29,78 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookIds}
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult.{HookDeleted, HookNotFound}
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult.{HookDeleted, HookNotFound}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookDeletorSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class HookRemoverSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "deleteHook" should {
 
     "return HookeDeleted if hook exists and it was successfully deleted" in new TestCase {
+
       val hookToDelete = hookIdAndUrls.generateOne.copy(url = projectHookId.projectHookUrl)
       val idsAndUrls   = hookIdAndUrls.generateNonEmptyList().toList :+ hookToDelete
 
       (projectHookFetcher.fetchProjectHooks _)
         .expects(projectHookId.projectId, accessToken)
-        .returns(idsAndUrls.pure[IO])
+        .returns(idsAndUrls.some.pure[IO])
 
-      (projectHookDeletor
+      (glHookRemover
         .delete(_: GitLabId, _: HookIdAndUrl, _: AccessToken))
         .expects(projectHookId.projectId, hookToDelete, accessToken)
         .returning(HookDeleted.pure[IO])
 
-      hookDeletor.deleteHook(projectHookId, accessToken).unsafeRunSync() shouldBe HookDeleted
+      remover.deleteHook(projectHookId, accessToken).unsafeRunSync() shouldBe HookDeleted.some
 
       logger.expectNoLogs()
     }
 
     "return HookNotFound if hook was already removed for that project" in new TestCase {
+
       val idsAndUrls = hookIdAndUrls.generateNonEmptyList().toList
 
       (projectHookFetcher.fetchProjectHooks _)
         .expects(projectHookId.projectId, accessToken)
-        .returns(idsAndUrls.pure[IO])
+        .returns(idsAndUrls.some.pure[IO])
 
-      hookDeletor.deleteHook(projectHookId, accessToken).unsafeRunSync() shouldBe HookNotFound
+      remover.deleteHook(projectHookId, accessToken).unsafeRunSync() shouldBe HookNotFound.some
+
+      logger.expectNoLogs()
+    }
+
+    "return None if hooks finding returns None" in new TestCase {
+
+      (projectHookFetcher.fetchProjectHooks _)
+        .expects(projectHookId.projectId, accessToken)
+        .returns(None.pure[IO])
+
+      remover.deleteHook(projectHookId, accessToken).unsafeRunSync() shouldBe None
 
       logger.expectNoLogs()
     }
 
     "log an error if hook deletion fails" in new TestCase {
+
       val hookToDelete = hookIdAndUrls.generateOne.copy(url = projectHookId.projectHookUrl)
       val idsAndUrls   = hookIdAndUrls.generateNonEmptyList().toList :+ hookToDelete
 
       (projectHookFetcher.fetchProjectHooks _)
         .expects(projectHookId.projectId, accessToken)
-        .returns(idsAndUrls.pure[IO])
+        .returns(idsAndUrls.some.pure[IO])
 
       val exception = exceptions.generateOne
-      (projectHookDeletor
+      (glHookRemover
         .delete(_: GitLabId, _: HookIdAndUrl, _: AccessToken))
         .expects(projectHookId.projectId, hookToDelete, accessToken)
         .returning(exception.raiseError[IO, DeletionResult])
 
       intercept[Exception] {
-        hookDeletor.deleteHook(projectHookId, accessToken).unsafeRunSync()
+        remover.deleteHook(projectHookId, accessToken).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook deletion failed for project with id ${projectHookId.projectId}", exception))
@@ -99,8 +113,8 @@ class HookDeletorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectHookFetcher = mock[ProjectHookFetcher[IO]]
-    val projectHookDeletor = mock[ProjectHookDeletor[IO]]
+    val glHookRemover      = mock[GLHookRemover[IO]]
 
-    val hookDeletor = new HookDeletorImpl[IO](projectHookFetcher, projectHookDeletor)
+    val remover = new HookRemoverImpl[IO](projectHookFetcher, glHookRemover)
   }
 }

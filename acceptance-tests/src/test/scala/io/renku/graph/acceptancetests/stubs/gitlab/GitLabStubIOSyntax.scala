@@ -55,6 +55,11 @@ trait GitLabStubIOSyntax { self: IOSpec =>
     def addProject(project: Project): Unit =
       self.update(GitLabStateUpdates.addProject(project)).unsafeRunSync()
 
+    /** Adds a webhook to a gitlab project. The assumption is the project is already added to GitLab
+     */
+    def addWebhook(projectId: projects.GitLabId): Unit =
+      self.update(GitLabStateUpdates.addWebhook(projectId, webhookUri)).unsafeRunSync()
+
     /** Adds the given project and associates the given commits. It also installs the `webhook/events` webhook to
      *  integrate with the triples generator. 
      */

@@ -30,15 +30,14 @@ object WebhookServiceGenerators {
 
   implicit val serializedHookTokens: Gen[SerializedHookToken] = nonEmptyStrings() map Refined.unsafeApply
 
-  implicit val hookTokens: Gen[HookToken] = for {
-    projectId <- projectIds
-  } yield HookToken(projectId)
+  implicit val hookTokens: Gen[HookToken] =
+    projectIds.map(HookToken)
 
   implicit val selfUrls:        Gen[SelfUrl]        = validatedUrls map (url => SelfUrl.apply(url.value))
   implicit val projectHookUrls: Gen[ProjectHookUrl] = selfUrls map ProjectHookUrl.from
 
   lazy val hookIdAndUrls: Gen[HookIdAndUrl] = for {
-    id      <- nonEmptyStrings()
+    id      <- positiveInts().map(_.value)
     hookUrl <- projectHookUrls
   } yield HookIdAndUrl(id, hookUrl)
 

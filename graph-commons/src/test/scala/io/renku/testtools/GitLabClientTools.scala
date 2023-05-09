@@ -30,6 +30,7 @@ import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
+import org.scalamock.matchers.MockParameter
 import org.scalamock.scalatest.MockFactory
 
 trait GitLabClientTools[F[_]] {
@@ -39,6 +40,7 @@ trait GitLabClientTools[F[_]] {
       findingMethod:         => Any,
       resultGenerator:       Gen[ResultType],
       method:                Method = GET,
+      maybeEndpointName:     Option[String Refined NonEmpty] = None,
       expectedNumberOfCalls: Int = 1
   )(implicit applicative: Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
@@ -49,7 +51,7 @@ trait GitLabClientTools[F[_]] {
           .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, capture(responseMapping), *)
+          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
       case HEAD =>
@@ -57,7 +59,7 @@ trait GitLabClientTools[F[_]] {
           .head(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, capture(responseMapping), *)
+          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
       case POST =>
@@ -65,7 +67,7 @@ trait GitLabClientTools[F[_]] {
           .post(_: Uri, _: String Refined NonEmpty, _: Json)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, *, capture(responseMapping), *)
+          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), *, capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
       case DELETE =>
@@ -73,7 +75,7 @@ trait GitLabClientTools[F[_]] {
           .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, capture(responseMapping), *)
+          .expects(*, maybeEndpointName.map(new MockParameter(_)).getOrElse(*), capture(responseMapping), *)
           .returning(resultGenerator.generateOne.pure[F])
           .repeat(expectedNumberOfCalls)
     }

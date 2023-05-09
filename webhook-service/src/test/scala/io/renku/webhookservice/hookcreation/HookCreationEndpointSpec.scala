@@ -19,6 +19,7 @@
 package io.renku.webhookservice.hookcreation
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
@@ -28,9 +29,9 @@ import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
-import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -46,12 +47,12 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
   "createHook" should {
 
-    "return CREATED when webhook is successfully created for project with the given id in in GitLab" in new TestCase {
+    "return CREATED when webhook is successfully created for project with the given id" in new TestCase {
 
       (hookCreator
-        .createHook(_: GitLabId, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
-        .returning(IO.pure(HookCreated))
+        .createHook(_: GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
+        .returning(HookCreated.some.pure[IO])
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
@@ -63,9 +64,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return OK when hook was already created" in new TestCase {
 
       (hookCreator
-        .createHook(_: GitLabId, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
-        .returning(IO.pure(HookExisted))
+        .createHook(_: GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
+        .returning(HookExisted.some.pure[IO])
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
@@ -74,13 +75,27 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
       response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook already existed"}"""
     }
 
+    "return NOT_FOUND when hook creation returns None" in new TestCase {
+
+      (hookCreator
+        .createHook(_: GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
+        .returning(None.pure[IO])
+
+      val response = createHook(projectId, authUser).unsafeRunSync()
+
+      response.status                   shouldBe NotFound
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Project not found"}"""
+    }
+
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation and log the error" in new TestCase {
 
       val errorMessage = ErrorMessage("some error")
       val exception    = new Exception(errorMessage.toString())
       (hookCreator
-        .createHook(_: GitLabId, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .createHook(_: GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
         .returning(IO.raiseError(exception))
 
       val response = createHook(projectId, authUser).unsafeRunSync()
@@ -89,16 +104,14 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe errorMessage.asJson
 
-      logger.loggedOnly(
-        Error(exception.getMessage, exception)
-      )
+      logger.loggedOnly(Error(exception.getMessage, exception))
     }
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
 
       (hookCreator
-        .createHook(_: GitLabId, _: AccessToken))
-        .expects(projectId, authUser.accessToken)
+        .createHook(_: GitLabId, _: AuthUser))
+        .expects(projectId, authUser)
         .returning(IO.raiseError(UnauthorizedException))
 
       val response = createHook(projectId, authUser).unsafeRunSync()
