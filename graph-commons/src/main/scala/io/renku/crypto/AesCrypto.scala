@@ -19,7 +19,11 @@
 package io.renku.crypto
 
 import cats.MonadThrow
+import cats.syntax.all._
+import io.renku.config.ConfigLoader.base64ByteVectorReader
 import io.renku.crypto.AesCrypto.Secret
+import pureconfig.ConfigReader
+import pureconfig.error.FailureReason
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets.UTF_8
@@ -28,9 +32,7 @@ import javax.crypto.Cipher
 import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
-abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
-    secret: Secret
-) {
+abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](secret: Secret) {
 
   private val base64Decoder = Base64.getDecoder
   private val base64Encoder = Base64.getEncoder
@@ -59,15 +61,19 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
 }
 
 object AesCrypto {
-  final class Secret private (val value: ByteVector) extends AnyVal {
-    override def toString: String = "Secret(***)"
 
-    def toBase64 = value.toBase64
+  final class Secret private (val value: ByteVector) extends AnyVal {
+    override def toString: String = "<sensitive>"
+    def toBase64:          String = value.toBase64
   }
+
   object Secret {
-    def apply(value: ByteVector): Either[String, Secret] =
-      if (value.length == 16) Right(new Secret(value))
-      else Left(s"Expected 16 bytes, but got ${value.length}")
+
+    def apply(value: ByteVector): Either[String, Secret] = {
+      val expectedLength = 16
+      if (value.length == expectedLength) Right(new Secret(value))
+      else Left(s"Expected $expectedLength bytes, but got ${value.length}")
+    }
 
     def unsafe(value: ByteVector): Secret = apply(value).fold(sys.error, identity)
 
@@ -76,5 +82,12 @@ object AesCrypto {
 
     def unsafeFromBase64(b64: String): Secret =
       fromBase64(b64).fold(sys.error, identity)
+
+    implicit def secretReader: ConfigReader[Secret] =
+      base64ByteVectorReader.emap(bv =>
+        Secret(bv.takeWhile(_ != 10)).leftMap(err =>
+          new FailureReason { override lazy val description: String = s"Cannot read AES secret: $err" }
+        )
+      )
   }
 }

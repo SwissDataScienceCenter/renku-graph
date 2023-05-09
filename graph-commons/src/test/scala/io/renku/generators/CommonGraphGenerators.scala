@@ -62,6 +62,7 @@ object CommonGraphGenerators {
       .listOfN(32, Gen.hexChar)
       .map(_.mkString.toLowerCase)
       .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
+      .retryUntil(_.takeWhile(_ != 10.toByte).length == 16)
       .map(Secret.unsafe)
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
