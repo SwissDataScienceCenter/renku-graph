@@ -52,7 +52,7 @@ class NewTokensCreatorSpec
     with IOSpec
     with should.Matchers {
 
-  "createPersonalAccessToken" should {
+  "createProjectAccessToken" should {
 
     "do POST projects/:id/access_tokens with relevant payload" in new TestCase {
 
@@ -70,7 +70,7 @@ class NewTokensCreatorSpec
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, payload, *, Option(accessToken))
         .returning(creationInfo.some.pure[IO])
 
-      tokensCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
+      tokensCreator.createProjectAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
@@ -106,7 +106,7 @@ class NewTokensCreatorSpec
     val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, renkuTokenName, currentDate)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = tokensCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
+      findingMethod = tokensCreator.createProjectAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
       method = POST
     )

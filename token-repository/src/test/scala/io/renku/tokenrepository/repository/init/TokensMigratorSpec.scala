@@ -110,7 +110,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val oldToken = accessTokens.generateOne
       givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
 
-      givenTokenValidation(oldToken, returning = false.pure[IO])
+      givenTokenValidation(oldTokenProject.id, oldToken, returning = false.pure[IO])
 
       migration.run.unsafeRunSync() shouldBe ()
 
@@ -127,7 +127,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val oldToken = accessTokens.generateOne
       givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
 
-      givenTokenValidation(oldToken, returning = true.pure[IO])
+      givenTokenValidation(oldTokenProject.id, oldToken, returning = true.pure[IO])
 
       givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.none)
 
@@ -157,8 +157,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
 
       val exception = exceptions.generateOne
-      givenTokenValidation(oldToken, returning = exception.raiseError[IO, Boolean])
-      givenTokenValidation(oldToken, returning = true.pure[IO])
+      givenTokenValidation(oldTokenProject.id, oldToken, returning = exception.raiseError[IO, Boolean])
+      givenTokenValidation(oldTokenProject.id, oldToken, returning = true.pure[IO])
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
@@ -188,7 +188,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val oldToken = accessTokens.generateOne
       givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
 
-      givenTokenValidation(oldToken, returning = true.pure[IO])
+      givenTokenValidation(oldTokenProject.id, oldToken, returning = true.pure[IO])
 
       val exception = exceptions.generateOne
       givenProjectTokenCreator(oldTokenProject.id,
@@ -226,11 +226,11 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tokenCrypto     = mock[AccessTokenCrypto[IO]]
-    val tokenValidator  = mock[TokenValidator[IO]]
-    val tokenRemover    = TokenRemover[IO]
-    val tokensCreator   = mock[NewTokensCreator[IO]]
-    val tokensPersister = TokensPersister[IO]
+    private val tokenCrypto     = mock[AccessTokenCrypto[IO]]
+    private val tokenValidator  = mock[TokenValidator[IO]]
+    private val tokenRemover    = TokenRemover[IO]
+    private val tokensCreator   = mock[NewTokensCreator[IO]]
+    private val tokensPersister = TokensPersister[IO]
     val migration = new TokensMigrator[IO](tokenCrypto,
                                            tokenValidator,
                                            tokenRemover,
@@ -256,8 +256,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         val command: Command[projects.GitLabId ~ projects.Path ~ EncryptedAccessToken] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
-        """.command
+          VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)""".command
         session
           .prepare(command)
           .flatMap(_.execute(project.id ~ project.path ~ encryptedToken))
@@ -272,7 +271,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val oldToken = accessTokens.generateOne
       givenDecryption(oldTokenEnc, returning = oldToken.pure[IO])
 
-      givenTokenValidation(oldToken, returning = true.pure[IO])
+      givenTokenValidation(project.id, oldToken, returning = true.pure[IO])
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo = TokenCreationInfo(
@@ -299,15 +298,15 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         .expects(token)
         .returning(returning)
 
-    def givenTokenValidation(token: AccessToken, returning: IO[Boolean]) =
+    def givenTokenValidation(projectId: projects.GitLabId, token: AccessToken, returning: IO[Boolean]) =
       (tokenValidator.checkValid _)
-        .expects(token)
+        .expects(projectId, token)
         .returning(returning)
 
     def givenProjectTokenCreator(projectId:       projects.GitLabId,
                                  userAccessToken: AccessToken,
                                  returning:       OptionT[IO, TokenCreationInfo]
-    ) = (tokensCreator.createPersonalAccessToken _)
+    ) = (tokensCreator.createProjectAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
   }

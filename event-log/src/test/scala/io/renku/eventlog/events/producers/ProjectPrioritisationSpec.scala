@@ -17,15 +17,14 @@
  */
 
 package io.renku.eventlog.events.producers
-package awaitinggeneration
 
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventDate

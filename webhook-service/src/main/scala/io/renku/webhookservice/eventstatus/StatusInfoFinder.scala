@@ -53,6 +53,6 @@ private class StatusInfoFinderImpl[F[_]: MonadThrow](eventLogClient: EventLogCli
   private def toStatusInfo(events: List[EventInfo]): Option[StatusInfo] =
     events match {
       case Nil        => None
-      case event :: _ => StatusInfo.activated(event.status).some
+      case event :: _ => StatusInfo.activated(event).some
     }
 }

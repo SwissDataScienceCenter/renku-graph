@@ -45,10 +45,10 @@ private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: 
 
   override def delete(projectId: GitLabId): F[Unit] =
     SessionResource[F].useK {
-      measureExecutionTime(query(projectId))
-    } >> Logger[F].info(show"token removed for $projectId")
+      query(projectId)
+    }
 
-  private def query(projectId: GitLabId) =
+  private def query(projectId: GitLabId) = measureExecutionTime {
     SqlStatement
       .named("remove token")
       .command[GitLabId](sql"""DELETE FROM projects_tokens
@@ -56,9 +56,11 @@ private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: 
       .arguments(projectId)
       .build
       .flatMapResult(failIfMultiUpdate(projectId))
+  }
 
   private def failIfMultiUpdate(projectId: GitLabId): Completion => F[Unit] = {
-    case Completion.Delete(0 | 1) => ().pure[F]
+    case Completion.Delete(0) => ().pure[F]
+    case Completion.Delete(1) => Logger[F].info(show"token removed for $projectId")
     case Completion.Delete(n) =>
       new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
         .raiseError[F, Unit]

@@ -18,11 +18,6 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import GitLabApiStub.State
-import GitLabStateGenerators._
-import GitLabStateQueries._
-import GitLabStateUpdates._
-import JsonEncoders._
 import cats.data.{EitherT, NonEmptyList, OptionT}
 import cats.effect._
 import cats.syntax.all._
@@ -33,11 +28,16 @@ import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.data.Project.Permissions.AccessLevel
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateGenerators._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateQueries._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateUpdates._
+import io.renku.graph.acceptancetests.stubs.gitlab.JsonEncoders._
 import io.renku.graph.model
-import io.renku.graph.model.{persons, projects}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.UserAccessToken
 import org.http4s._
@@ -124,6 +124,11 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
           query(findProjectByPath(path, maybeAuthedReq))
             .map(_.toList.flatMap(_.members.toList))
             .flatMap(Ok(_))
+
+        case GET -> Root / ProjectId(projectId) / "members" / "all" / UserGitLabId(userId) =>
+          query(findProjectById(projectId, maybeAuthedReq))
+            .map(_.toList.flatMap(_.members.toList).find(_.gitLabId == userId))
+            .flatMap(OkOrNotFound(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" =>
           query(commitsFor(id, maybeAuthedReq)).flatMap(Ok(_))

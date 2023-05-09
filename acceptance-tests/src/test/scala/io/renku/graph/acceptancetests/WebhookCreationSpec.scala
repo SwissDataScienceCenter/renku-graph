@@ -18,22 +18,58 @@
 
 package io.renku.graph.acceptancetests
 
-import data.Project.Statistics.CommitsCount
-import data._
-import flows.AccessTokenPresence
 import io.circe.syntax.EncoderOps
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
+import io.renku.graph.acceptancetests.data._
+import io.renku.graph.acceptancetests.flows.AccessTokenPresence
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import org.http4s.Status._
-import tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 
 class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with ApplicationServices with AccessTokenPresence {
 
   Feature("A Graph Services hook can be created for a project") {
+
+    Scenario("No Graph Services webhook present on the project in GitLab") {
+
+      val user = authUsers.generateOne
+      val project =
+        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
+                     CommitsCount.one
+        ).map(addMemberWithId(user.id)).generateOne
+
+      Given("api user is authenticated")
+      gitLabStub.addAuthenticated(user)
+
+      Given("project is present in GitLab but no Graph Services hook is present")
+      gitLabStub.addProject(project)
+
+      Given("some Commit exists for the project in GitLab")
+      val commitId = commitIds.generateOne
+      gitLabStub.replaceCommits(project.id, commitId)
+      // making the triples generation be happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+
+      When("the user does POST webhook-service/projects/:id/webhooks")
+      val response = webhookServiceClient.`POST projects/:id/webhooks`(project.id, user.accessToken)
+
+      Then("he should get CREATED response back")
+      response.status shouldBe Created
+
+      And("a Project Access Token should created for the Project and added to the token repository")
+      tokenRepositoryClient
+        .GET(s"projects/${project.id}/tokens")
+        .jsonBody shouldBe gitLabStub
+        .query(_.projectAccessTokens(project.id).token)
+        .unsafeRunSync()
+        .asInstanceOf[AccessToken]
+        .asJson
+    }
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
@@ -50,48 +86,10 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       gitLabStub.setupProject(project)
 
       When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", user.accessToken)
+      val response = webhookServiceClient.`POST projects/:id/webhooks`(project.id, user.accessToken)
 
       Then("he should get OK response back")
       response.status shouldBe Ok
-    }
-
-    Scenario("No Graph Services webhook on the project in GitLab") {
-
-      val user = authUsers.generateOne
-      val project =
-        dataProjects(renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons).modify(removeMembers()),
-                     CommitsCount.one
-        ).map(addMemberWithId(user.id)).generateOne
-
-      Given("api user is authenticated")
-      gitLabStub.addAuthenticated(user)
-
-      Given("project is present in GitLab but no Graph Services hook is present")
-      gitLabStub.addProject(project)
-
-      Given("some Commit exists for the project in GitLab")
-      givenAccessTokenPresentFor(project, user.accessToken)
-      val commitId = commitIds.generateOne
-      gitLabStub.replaceCommits(project.id, commitId)
-
-      // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
-
-      When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", user.accessToken)
-
-      Then("he should get CREATED response back")
-      response.status shouldBe Created
-
-      And("a Project Access Token should created for the Project and added to the token repository")
-      tokenRepositoryClient
-        .GET(s"projects/${project.id}/tokens")
-        .jsonBody shouldBe gitLabStub
-        .query(_.projectAccessTokens(project.id).token)
-        .unsafeRunSync()
-        .asInstanceOf[AccessToken]
-        .asJson
     }
   }
 }

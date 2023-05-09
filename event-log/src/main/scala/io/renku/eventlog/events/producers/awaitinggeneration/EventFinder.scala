@@ -30,8 +30,8 @@ import io.renku.db.implicits._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.events.producers.EventFinder
-import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.events.producers.{EventFinder, ProjectPrioritisation}
+import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}

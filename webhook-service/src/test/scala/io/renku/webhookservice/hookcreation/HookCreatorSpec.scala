@@ -45,17 +45,24 @@ import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.HookToken
 import io.renku.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec with Eventually {
+class HookCreatorSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with OptionValues
+    with IOSpec
+    with Eventually {
 
   "createHook" should {
 
     "return HookCreated if hook does not exists and it was successfully created" in new TestCase {
 
-      givenHookValidation(returning = HookMissing.pure[IO])
+      givenHookValidation(returning = HookMissing.some.pure[IO])
 
       givenTokenAssociation(returning = IO.unit)
 
@@ -67,7 +74,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       givenCommitSyncRequestSending(returning = IO.unit)
 
-      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
+      hookCreation.createHook(projectId, authUser).unsafeRunSync().value shouldBe HookCreated
 
       validateCommitSyncRequestSent
 
@@ -76,28 +83,35 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     "return HookExisted if hook was already created for that project" in new TestCase {
 
-      givenHookValidation(returning = HookExists.pure[IO])
-
-      givenTokenAssociation(returning = IO.unit)
+      givenHookValidation(returning = HookExists.some.pure[IO])
 
       givenProjectInfoFinding(returning = projectInfo.pure[IO])
 
       givenCommitSyncRequestSending(returning = ().pure[IO])
 
-      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
+      hookCreation.createHook(projectId, authUser).unsafeRunSync().value shouldBe HookExisted
 
       validateCommitSyncRequestSent
 
       logger.loggedOnly(Info(show"Hook existed for projectId $projectId"))
     }
 
+    "return None if hook validation returns None" in new TestCase {
+
+      givenHookValidation(returning = None.pure[IO])
+
+      hookCreation.createHook(projectId, authUser).unsafeRunSync() shouldBe None
+
+      logger.loggedOnly(Info(show"Hook on projectId $projectId cannot be created by user ${authUser.id}"))
+    }
+
     "log an error if hook validation fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenHookValidation(returning = exception.raiseError[IO, HookValidationResult])
+      givenHookValidation(returning = exception.raiseError[IO, Nothing])
 
       intercept[Exception] {
-        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+        hookCreation.createHook(projectId, authUser).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
@@ -105,13 +119,13 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     "log an error if associating projectId with accessToken fails" in new TestCase {
 
-      givenHookValidation(returning = HookMissing.pure[IO])
+      givenHookValidation(returning = HookMissing.some.pure[IO])
 
       val exception = exceptions.generateOne
       givenTokenAssociation(returning = exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+        hookCreation.createHook(projectId, authUser).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
@@ -119,15 +133,15 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     "log an error if hook token encryption fails" in new TestCase {
 
-      givenHookValidation(returning = HookMissing.pure[IO])
+      givenHookValidation(returning = HookMissing.some.pure[IO])
 
-      givenTokenAssociation(returning = IO.unit)
+      givenTokenAssociation(returning = ().pure[IO])
 
       val exception = exceptions.generateOne
       givenTokenEncryption(returning = exception.raiseError[IO, HookTokenCrypto.SerializedHookToken])
 
       intercept[Exception] {
-        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+        hookCreation.createHook(projectId, authUser).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
@@ -135,9 +149,9 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     "log an error if hook creation fails" in new TestCase {
 
-      givenHookValidation(returning = HookMissing.pure[IO])
+      givenHookValidation(returning = HookMissing.some.pure[IO])
 
-      givenTokenAssociation(returning = IO.unit)
+      givenTokenAssociation(returning = ().pure[IO])
 
       givenTokenEncryption(returning = serializedHookToken.pure[IO])
 
@@ -145,7 +159,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       givenHookCreation(returning = exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        hookCreation.createHook(projectId, accessToken).unsafeRunSync()
+        hookCreation.createHook(projectId, authUser).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
@@ -153,14 +167,12 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     "log an error and do not send a COMMIT_SYNC_REQUEST if project info fetching fails" in new TestCase {
 
-      givenHookValidation(returning = HookExists.pure[IO])
-
-      givenTokenAssociation(returning = IO.unit)
+      givenHookValidation(returning = HookExists.some.pure[IO])
 
       val exception = exceptions.generateOne
       givenProjectInfoFinding(returning = exception.raiseError[IO, Project])
 
-      hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
+      hookCreation.createHook(projectId, authUser).unsafeRunSync().value shouldBe HookExisted
 
       eventually {
         logger.loggedOnly(
@@ -175,17 +187,18 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
   }
 
   private trait TestCase {
-    val projectInfo         = consumerProjects.generateOne
-    val projectId           = projectInfo.id
-    val serializedHookToken = serializedHookTokens.generateOne
-    val accessToken         = accessTokens.generateOne
-    val projectHookUrl      = projectHookUrls.generateOne
+    val projectInfo            = consumerProjects.generateOne
+    val projectId              = projectInfo.id
+    val serializedHookToken    = serializedHookTokens.generateOne
+    val authUser               = authUsers.generateOne
+    private val accessToken    = authUser.accessToken
+    private val projectHookUrl = projectHookUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val projectHookValidator      = mock[HookValidator[IO]]
+    private val tokenAssociator           = mock[AccessTokenAssociator[IO]]
     private val projectHookCreator        = mock[ProjectHookCreator[IO]]
     private val hookTokenCrypto           = mock[HookTokenCrypto[IO]]
-    private val accessTokenAssociator     = mock[AccessTokenAssociator[IO]]
     private val projectInfoFinderResponse = Queue.bounded[IO, IO[Project]](1).unsafeRunSync()
     private val projectInfoFinder = new ProjectInfoFinder[IO] {
       override def findProjectInfo(projectId: GitLabId)(implicit maybeAccessToken: Option[AccessToken]): IO[Project] =
@@ -199,21 +212,21 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
     val hookCreation = new HookCreatorImpl[IO](
       projectHookUrl,
       projectHookValidator,
+      tokenAssociator,
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,
-      accessTokenAssociator,
       elClient
     )
 
-    def givenHookValidation(returning: IO[HookValidationResult]) =
+    def givenHookValidation(returning: IO[Option[HookValidationResult]]) =
       (projectHookValidator
         .validateHook(_: GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(returning)
 
     def givenTokenAssociation(returning: IO[Unit]) =
-      (accessTokenAssociator
+      (tokenAssociator
         .associate(_: GitLabId, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(returning)

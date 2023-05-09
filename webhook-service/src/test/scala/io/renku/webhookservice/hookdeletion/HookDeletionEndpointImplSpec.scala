@@ -34,7 +34,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators.projectHookIds
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult.{HookDeleted, HookNotFound}
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult.{HookDeleted, HookNotFound}
 import io.renku.webhookservice.model.HookIdentifier
 import org.http4s.MediaType
 import org.http4s.Status.{InternalServerError, NotFound, Ok, Unauthorized}
@@ -44,14 +44,15 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+
   "deleteHook" should {
 
     "return OK when webhook is successfully deleted for project with the given id in GitLab" in new TestCase {
 
-      (hookDeletor
+      (hookRemover
         .deleteHook(_: HookIdentifier, _: AccessToken))
         .expects(projectHookId, authUser.accessToken)
-        .returning(HookDeleted.pure[IO])
+        .returning(HookDeleted.some.pure[IO])
 
       val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
@@ -61,25 +62,27 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
 
     }
 
-    "return NOT_FOUND when hook was already deleted" in new TestCase {
+    HookNotFound.some :: None :: Nil foreach { deletionResult =>
+      s"return NOT_FOUND when hook deletion returned $deletionResult" in new TestCase {
 
-      (hookDeletor
-        .deleteHook(_: HookIdentifier, _: AccessToken))
-        .expects(projectHookId, authUser.accessToken)
-        .returning(HookNotFound.pure[IO])
+        (hookRemover
+          .deleteHook(_: HookIdentifier, _: AccessToken))
+          .expects(projectHookId, authUser.accessToken)
+          .returning(HookNotFound.some.pure[IO])
 
-      val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
+        val response = deleteHook(projectHookId.projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe NotFound
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook already deleted"}"""
+        response.status                   shouldBe NotFound
+        response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook not found"}"""
+      }
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook deletion and log the error" in new TestCase {
 
       val errorMessage = ErrorMessage("some error")
       val exception    = new Exception(errorMessage.toString())
-      (hookDeletor
+      (hookRemover
         .deleteHook(_: HookIdentifier, _: AccessToken))
         .expects(projectHookId, authUser.accessToken)
         .returning(IO.raiseError(exception))
@@ -95,7 +98,7 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
 
-      (hookDeletor
+      (hookRemover
         .deleteHook(_: HookIdentifier, _: AccessToken))
         .expects(projectHookId, authUser.accessToken)
         .returning(IO.raiseError(UnauthorizedException))
@@ -114,8 +117,8 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
     val authUser      = authUsers.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val hookDeletor = mock[HookDeletor[IO]]
+    val hookRemover = mock[HookRemover[IO]]
 
-    val deleteHook = new HookDeletionEndpointImpl[IO](projectHookId.projectHookUrl, hookDeletor).deleteHook _
+    val deleteHook = new HookDeletionEndpointImpl[IO](projectHookId.projectHookUrl, hookRemover).deleteHook _
   }
 }

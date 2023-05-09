@@ -189,12 +189,12 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "RollbackToNew",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
-  },
-  "subCategory": "RollbackToNew"
+  }
 }
 ```
 
@@ -207,14 +207,14 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "ToFailure",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
   },
   "message":   "<failure message>",
-  "newStatus": <failure status>,
-  "subCategory": "ToFailure"
+  "newStatus": <failure status>
 }
 ```
 
@@ -227,12 +227,12 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "RollbackToTriplesGenerated",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
-  },
-  "newStatus": "RollbackToTriplesGenerated"
+  }
 }
 ```
 
@@ -245,10 +245,10 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "RedoProjectTransformation",
   "project": {
     "path": "namespace/project-name"
-  },
-  "subCategory": "RedoProjectTransformation"
+  }
 }
 ```
 
@@ -261,12 +261,12 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "ToAwaitingDeletion",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
-  },
-  "subCategory": "ToAwaitingDeletion"
+  }
 }
 ```
 
@@ -279,12 +279,12 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "ToTriplesGenerated",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
   },
-  "subCategory": "ToTriplesGenerated",
   "processingTime": "PT2.023S"
 }
 ```
@@ -300,12 +300,12 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "ToTriplesStore",
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
   },
-  "subCategory": "ToTriplesStore",
   "processingTime": "PT2.023S"
 }
 ```
@@ -319,11 +319,11 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory": "ProjectEventsToNew",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
-  },
-  "subCategory": "ProjectEventsToNew"
+  }
 }
 ```
 
@@ -336,11 +336,11 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
+  "subCategory":  "RollbackToAwaitingDeletion",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
-  },
-  "subCategory": "RollbackToAwaitingDeletion"
+  }
 }
 ```
 
@@ -353,7 +353,7 @@ payload needed for processing.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "subCategory":    "AllEventsToNew"
+  "subCategory":  "AllEventsToNew"
 }
 ```
 

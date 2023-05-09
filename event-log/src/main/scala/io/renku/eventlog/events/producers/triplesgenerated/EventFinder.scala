@@ -19,8 +19,7 @@
 package io.renku.eventlog.events.producers
 package triplesgenerated
 
-import ProjectPrioritisation.{Priority, ProjectInfo}
-import cats.MonadThrow
+import cats.Id
 import cats.data._
 import cats.effect.Async
 import cats.syntax.all._
@@ -31,6 +30,8 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
+import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
+import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
@@ -47,7 +48,7 @@ import scala.util.Random
 private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges](
     now:                   () => Instant = () => Instant.now,
     projectsFetchingLimit: Int Refined Positive,
-    projectPrioritisation: ProjectPrioritisation,
+    projectPrioritisation: ProjectPrioritisation[F],
     pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get((Random nextInt ids.size).toLong)
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, TriplesGeneratedEvent]
@@ -57,17 +58,23 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
 
   override def popEvent(): F[Option[TriplesGeneratedEvent]] = SessionResource[F].useK {
     for {
-      (maybeProject, maybeTriplesGeneratedEvent) <- findEventAndUpdateForProcessing()
+      (maybeProject, maybeTriplesGeneratedEvent) <- findEventAndUpdateForProcessing
       _ <- Kleisli.liftF(maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent))
     } yield maybeTriplesGeneratedEvent
   }
 
-  private def findEventAndUpdateForProcessing() = for {
-    maybeProject <- findProjectsWithEventsInQueue.map(prioritise).map(selectProject)
-    maybeIdAndProjectAndBody <-
-      maybeProject.map(findNewestEvent).getOrElse(Kleisli.pure(Option.empty[TriplesGeneratedEvent]))
+  private def findEventAndUpdateForProcessing = for {
+    maybeProject <- selectCandidateProject
+    maybeIdAndProjectAndBody <- maybeProject
+                                  .map(findNewestEvent)
+                                  .getOrElse(Kleisli.pure(Option.empty[TriplesGeneratedEvent]))
     maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
+
+  private def selectCandidateProject = for {
+    projects       <- findProjectsWithEventsInQueue
+    totalOccupancy <- findTotalOccupancy
+  } yield ((prioritise _).tupled >>> selectProject)(projects, totalOccupancy)
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement
@@ -113,6 +120,16 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
       )
       .arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
+  }
+
+  private def findTotalOccupancy = measureExecutionTime {
+    SqlStatement
+      .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find total occupancy")
+      .select[Void, Long](
+        sql"""SELECT COUNT(event_id) FROM event WHERE status = '#${TransformingTriples.value}'""".query(int8)
+      )
+      .arguments(Void)
+      .build[Id](_.unique)
   }
 
   private def findNewestEvent(idAndPath: ProjectIds) = measureExecutionTime {
@@ -163,10 +180,10 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
     case None =>
       Kleisli.pure(Option.empty[TriplesGeneratedEvent])
     case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
-      measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
+      updateStatus(id) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateStatus(commitEventId: CompoundEventId) =
+  private def updateStatus(commitEventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
       .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](
@@ -185,6 +202,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
           TransformingTriples
       )
       .build
+  }
 
   private def toNoneIfEventAlreadyTaken(event: TriplesGeneratedEvent): Completion => Option[TriplesGeneratedEvent] = {
     case Completion.Update(1) => Some(event)
@@ -204,11 +222,8 @@ private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes: EventStatusGauges]
-      : F[producers.EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl[F](
-      projectsFetchingLimit = ProjectsFetchingLimit,
-      projectPrioritisation = new ProjectPrioritisation()
-    )
-  }
+  def apply[F[_]: Async: DefaultSubscribers: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[producers.EventFinder[F, TriplesGeneratedEvent]] =
+    ProjectPrioritisation[F]
+      .map(pp => new EventFinderImpl(projectsFetchingLimit = ProjectsFetchingLimit, projectPrioritisation = pp))
 }
