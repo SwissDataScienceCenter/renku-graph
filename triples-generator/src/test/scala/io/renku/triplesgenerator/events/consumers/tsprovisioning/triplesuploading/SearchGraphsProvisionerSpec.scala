@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploadi
 
 import cats.data.EitherT
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.DatasetsGraphProvisioner
+import io.renku.entities.searchgraphs
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.entities
@@ -40,7 +40,7 @@ class SearchGraphsProvisionerSpec extends AnyWordSpec with should.Matchers with 
 
     "perform Datasets graph provisioning" in new TestCase {
 
-      givenDatasetsGraphProvisioning(project, returning = ().pure[Try])
+      givenGraphsProvisioning(project, returning = ().pure[Try])
 
       provisioner.provisionSearchGraphs(project) shouldBe EitherT.rightT[Try, ProcessingRecoverableError](())
     }
@@ -48,7 +48,7 @@ class SearchGraphsProvisionerSpec extends AnyWordSpec with should.Matchers with 
     "fail with RecoverableFailure if provisioning fails with a Recoverable Failure" in new TestCase {
 
       val exception = recoverableClientErrors.generateOne
-      givenDatasetsGraphProvisioning(project, returning = exception.raiseError[Try, Unit])
+      givenGraphsProvisioning(project, returning = exception.raiseError[Try, Unit])
 
       val result = provisioner.provisionSearchGraphs(project).value
 
@@ -62,7 +62,7 @@ class SearchGraphsProvisionerSpec extends AnyWordSpec with should.Matchers with 
     "fail with NonRecoverableFailure if provisioning fails with an unknown exception" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenDatasetsGraphProvisioning(project, returning = exception.raiseError[Try, Unit])
+      givenGraphsProvisioning(project, returning = exception.raiseError[Try, Unit])
 
       provisioner.provisionSearchGraphs(project).value shouldBe exception.raiseError[Try, Unit]
     }
@@ -72,11 +72,11 @@ class SearchGraphsProvisionerSpec extends AnyWordSpec with should.Matchers with 
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
-    private val datasetsGraphProvisioner = mock[DatasetsGraphProvisioner[Try]]
-    val provisioner                      = new SearchGraphsProvisionerImpl[Try](datasetsGraphProvisioner)
+    private val underlyingGraphProvisioner = mock[searchgraphs.SearchGraphsProvisioner[Try]]
+    val provisioner                        = new SearchGraphsProvisionerImpl[Try](underlyingGraphProvisioner)
 
-    def givenDatasetsGraphProvisioning(project: entities.Project, returning: Try[Unit]) =
-      (datasetsGraphProvisioner.provisionDatasetsGraph _)
+    def givenGraphsProvisioning(project: entities.Project, returning: Try[Unit]) =
+      (underlyingGraphProvisioner.provisionSearchGraphs _)
         .expects(project)
         .returning(returning)
   }

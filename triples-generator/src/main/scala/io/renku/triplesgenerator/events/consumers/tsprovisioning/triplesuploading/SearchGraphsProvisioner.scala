@@ -23,7 +23,7 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.DatasetsGraphProvisioner
+import io.renku.entities.searchgraphs
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -37,23 +37,23 @@ private object SearchGraphsProvisioner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): SearchGraphsProvisioner[F] =
-    new SearchGraphsProvisionerImpl[F](DatasetsGraphProvisioner[F](connectionConfig))
+    new SearchGraphsProvisionerImpl[F](searchgraphs.SearchGraphsProvisioner[F](connectionConfig))
 
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchGraphsProvisioner[F]] =
     ProjectsConnectionConfig[F]().map(apply(_))
 }
 
-private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](datasetsGraphProvisioner: DatasetsGraphProvisioner[F],
-                                                            recoverableErrorsRecovery: RecoverableErrorsRecovery =
-                                                              RecoverableErrorsRecovery
+private class SearchGraphsProvisionerImpl[F[_]: MonadThrow](
+    underlyingGraphProvisioner: searchgraphs.SearchGraphsProvisioner[F],
+    recoverableErrorsRecovery:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends SearchGraphsProvisioner[F] {
 
-  import datasetsGraphProvisioner._
   import recoverableErrorsRecovery._
 
   override def provisionSearchGraphs(project: Project): EitherT[F, ProcessingRecoverableError, Unit] =
     EitherT {
-      provisionDatasetsGraph(project)
+      underlyingGraphProvisioner
+        .provisionSearchGraphs(project)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError("Problem while provisioning Search Graphs"))
     }

@@ -20,8 +20,9 @@ package io.renku.entities.searchgraphs.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.graph.model.{entities, testentities, RenkuUrl}
+import io.renku.entities.searchgraphs.SearchGraphsProvisioner
 import io.renku.graph.model.entities.EntityFunctions
+import io.renku.graph.model.{RenkuUrl, entities, testentities}
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -54,13 +55,13 @@ trait SearchInfoDataset {
     uploadIO(projectsDataset, graphsProducer(project): _*) >> insertSearchInfo(project)
 
   def insertSearchInfo(project: entities.Project): IO[Unit] =
-    createDatasetsGraphProvisioner.flatMap(_.provisionDatasetsGraph(project))
+    createSearchGraphsProvisioner.flatMap(_.provisionSearchGraphs(project))
 
-  def createDatasetsGraphProvisioner: IO[DatasetsGraphProvisioner[IO]] = {
+  def createSearchGraphsProvisioner: IO[SearchGraphsProvisioner[IO]] = {
     val execTimeRecorder: ExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
     implicit val sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[IO] =
       new SparqlQueryTimeRecorder[IO](execTimeRecorder)
 
-    IO(DatasetsGraphProvisioner[IO](projectsDSConnectionInfo))
+    IO(SearchGraphsProvisioner[IO](projectsDSConnectionInfo))
   }
 }
