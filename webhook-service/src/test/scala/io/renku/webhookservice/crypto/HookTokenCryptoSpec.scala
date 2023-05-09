@@ -19,7 +19,7 @@
 package io.renku.webhookservice.crypto
 
 import com.typesafe.config.ConfigFactory
-import eu.timepit.refined.api.RefType
+import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -29,9 +29,9 @@ import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.security.InvalidKeyException
 import java.util.Base64
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
@@ -58,6 +58,18 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "HookToken decryption failed"
     }
+
+    "decrypt existing values" in {
+      val usedSecret      = Secret.unsafeFromBase64("YWJjZGVmZzEyMzQ1Njc4OQ==")
+      val hookTokenCrypto = new HookTokenCryptoImpl[Try](usedSecret)
+
+      val plain =
+        hookTokenCrypto.decrypt(
+          SerializedHookToken.from("4TV8A81+1+U3dfa8sVO9TUuMvGHLaerySYpxEIkVT/U=").fold(throw _, identity)
+        )
+
+      plain shouldBe Success(HookToken(123456))
+    }
   }
 
   "apply" should {
@@ -67,7 +79,7 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
         Map(
           "services" -> Map(
             "gitlab" -> Map(
-              "hook-token-secret" -> aesCryptoSecrets.generateOne.value
+              "hook-token-secret" -> aesCryptoSecrets.generateOne.toBase64
             ).asJava
           ).asJava
         ).asJava
@@ -93,18 +105,14 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
 
       val Failure(exception) = HookTokenCrypto[Try](config)
 
-      exception            shouldBe a[InvalidKeyException]
-      exception.getMessage shouldBe "Invalid AES key length: 15 bytes"
+      exception          shouldBe a[ConfigLoadingException]
+      exception.getMessage should include("Expected 16 bytes, but got 15")
     }
   }
 
   private trait TestCase {
 
-    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
-    val hookTokenCrypto = new HookTokenCryptoImpl[Try](
-      RefType
-        .applyRef[Secret](secret)
-        .getOrElse(throw new IllegalArgumentException("Wrong secret"))
-    )
+    private val secret  = Secret.unsafe(ByteVector.fromValidHex(List.fill(4)("caffee00").mkString))
+    val hookTokenCrypto = new HookTokenCryptoImpl[Try](secret)
   }
 }

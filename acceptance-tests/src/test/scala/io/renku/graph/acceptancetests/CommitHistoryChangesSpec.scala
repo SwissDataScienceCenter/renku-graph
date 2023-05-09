@@ -125,7 +125,7 @@ class CommitHistoryChangesSpec
 
       sleep((1 second).toMillis)
 
-      `check no hook exists`(project.id, user.accessToken)
+      `check hook cannot be found`(project.id, user.accessToken)
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 

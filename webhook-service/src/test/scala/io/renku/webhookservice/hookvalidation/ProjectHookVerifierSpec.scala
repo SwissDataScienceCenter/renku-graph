@@ -42,36 +42,47 @@ class ProjectHookVerifierSpec
 
   "checkHookPresence" should {
 
-    "return true if there's a hook with url pointing to expected project hook url - personal access token case" in new TestCase {
-      val idsAndUrls = hookIdAndUrls.generateNonEmptyList().toList :+ HookIdAndUrl(nonEmptyStrings().generateOne,
-                                                                                   projectHookId.projectHookUrl
-      )
-      val accessToken = accessTokens.generateOne
-      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.pure[IO])
+    "return true if there's a hook with url pointing to expected project hook url" in new TestCase {
 
-      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe true
+      val idsAndUrls =
+        hookIdAndUrls.generateList() :+ HookIdAndUrl(positiveInts().generateOne.value, projectHookId.projectHookUrl)
+      val accessToken = accessTokens.generateOne
+      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.some.pure[IO])
+
+      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe true.some
     }
 
     "return false if there's no hook with url pointing to expected project hook url" in new TestCase {
+
       val idsAndUrls  = hookIdAndUrls.generateNonEmptyList().toList
       val accessToken = accessTokens.generateOne
-      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.pure[IO])
+      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.some.pure[IO])
 
-      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe false
+      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe false.some
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+    "return None if finding hooks returns None" in new TestCase {
+
+      val accessToken = accessTokens.generateOne
+      (projectHookFetcher.fetchProjectHooks _)
+        .expects(projectId, accessToken)
+        .returns(None.pure[IO])
+
+      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe None
+    }
+
+    "fail if finding hooks fails" in new TestCase {
+
       val exception   = exceptions.generateOne
       val accessToken = accessTokens.generateOne
       (projectHookFetcher.fetchProjectHooks _)
         .expects(projectId, accessToken)
-        .returns(exception.raiseError[IO, List[HookIdAndUrl]])
+        .returns(exception.raiseError[IO, Nothing])
 
       intercept[Exception] {
         verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync()
       }.getMessage shouldBe exception.getMessage
     }
-
   }
 
   private trait TestCase {

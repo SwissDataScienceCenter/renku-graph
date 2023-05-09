@@ -30,7 +30,7 @@ import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabI
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{jsonEntityDecoder, JsonOps}
+import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import org.http4s.Status._
 import org.scalatest.EitherValues
 
@@ -57,7 +57,7 @@ class ProjectsResourcesSpec
 
     val parentDataProject = dataProjects(parent)
       .map(replaceCreatorFrom(creator, creatorGitLabId))
-      .map(addMemberFrom(creator, creatorGitLabId))
+      .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
       .generateOne
 
     val childDataProject =

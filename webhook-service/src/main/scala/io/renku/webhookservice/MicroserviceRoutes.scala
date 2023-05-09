@@ -18,7 +18,7 @@
 
 package io.renku.webhookservice
 
-import cats.MonadThrow
+import cats.{MonadThrow, NonEmptyParallel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.ProjectId
@@ -84,7 +84,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[MicroserviceRoutes[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[MicroserviceRoutes[F]] = for {
     projectHookUrl         <- ProjectHookUrl.fromConfig[F]()
     hookTokenCrypto        <- HookTokenCrypto[F]()
     webhookEventsEndpoint  <- webhookevents.Endpoint(hookTokenCrypto)

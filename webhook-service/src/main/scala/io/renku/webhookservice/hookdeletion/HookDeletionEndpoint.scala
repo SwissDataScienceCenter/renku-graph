@@ -27,8 +27,8 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
-import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult.{HookDeleted, HookNotFound}
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult
+import io.renku.webhookservice.hookdeletion.HookRemover.DeletionResult.HookDeleted
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
@@ -42,13 +42,17 @@ trait HookDeletionEndpoint[F[_]] {
 
 class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
     projectHookUrl: ProjectHookUrl,
-    hookDeletor:    HookDeletor[F]
+    hookDeletor:    HookRemover[F]
 ) extends Http4sDsl[F]
     with HookDeletionEndpoint[F] {
 
-  private lazy val toHttpResponse: DeletionResult => F[Response[F]] = {
-    case HookNotFound => NotFound(InfoMessage("Hook already deleted"))
-    case HookDeleted  => Ok(InfoMessage("Hook deleted"))
+  def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
+    hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken).flatMap(toHttpResponse(_))
+  } recoverWith httpResponse
+
+  private lazy val toHttpResponse: Option[DeletionResult] => F[Response[F]] = {
+    case Some(HookDeleted) => Ok(InfoMessage("Hook deleted"))
+    case _                 => NotFound(InfoMessage("Hook not found"))
   }
   private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
@@ -58,17 +62,10 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
     case NonFatal(exception) =>
       Logger[F].error(exception)(exception.getMessage) >> InternalServerError(ErrorMessage(exception))
   }
-
-  def deleteHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
-    for {
-      deletionResult <- hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
-      response       <- toHttpResponse(deletionResult)
-    } yield response
-  } recoverWith httpResponse
 }
 
 object HookDeletionEndpoint {
   def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookDeletionEndpoint[F]] = for {
-    hookDeletor <- HookDeletor[F]
+    hookDeletor <- HookRemover[F]
   } yield new HookDeletionEndpointImpl[F](projectHookUrl, hookDeletor)
 }

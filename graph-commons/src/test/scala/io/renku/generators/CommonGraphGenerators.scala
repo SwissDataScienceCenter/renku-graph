@@ -26,7 +26,7 @@ import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
 import io.renku.control.{RateLimit, RateLimitUnit}
-import io.renku.crypto.AesCrypto
+import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
@@ -49,20 +49,21 @@ import io.renku.triplesstore._
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
+import scodec.bits.Bases.Alphabets
+import scodec.bits.ByteVector
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Base64
 import scala.language.implicitConversions
 import scala.util.Try
 
 object CommonGraphGenerators {
 
-  implicit val aesCryptoSecrets: Gen[AesCrypto.Secret] =
-    stringsOfLength(16)
-      .map(_.getBytes(UTF_8))
-      .map(Base64.getEncoder.encode)
-      .map(new String(_, UTF_8))
-      .map(Refined.unsafeApply)
+  implicit val aesCryptoSecrets: Gen[Secret] =
+    Gen
+      .listOfN(32, Gen.hexChar)
+      .map(_.mkString.toLowerCase)
+      .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
+      .retryUntil(_.takeWhile(_ != 10.toByte).length == 16)
+      .map(Secret.unsafe)
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)

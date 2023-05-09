@@ -65,8 +65,13 @@ object WebhookServiceClient {
       } yield response
     }.unsafeRunSync()
 
-    def fetchProcessingStatus(projectId: projects.GitLabId, accessToken: AccessToken)(implicit
+    def `POST projects/:id/webhooks`(projectId: projects.GitLabId, accessToken: AccessToken)(implicit
         ior: IORuntime
+    ): ClientResponse =
+      POST((uri"projects" / projectId / "webhooks").renderString, accessToken)
+
+    def `GET projects/:id/events/status`(projectId: projects.GitLabId, accessToken: AccessToken)(implicit
+                                                                                                 ior: IORuntime
     ): ClientResponse =
       GET((uri"projects" / projectId / "events" / "status").renderString, accessToken)
   }

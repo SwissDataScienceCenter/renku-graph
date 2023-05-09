@@ -79,20 +79,15 @@ trait TSProvisioning
 
   def `wait for events to be processed`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion =
     eventually {
-      val response = fetchProcessingStatus(projectId, accessToken)
+      val response = webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken)
       response.status                                                                          shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
       response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
     }
 
-  def `check no hook exists`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
-    val response = fetchProcessingStatus(projectId, accessToken)
-    response.status                                                    shouldBe Ok
-    response.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe false
+  def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
+    webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken).status shouldBe NotFound
   }
-
-  private def fetchProcessingStatus(projectId: projects.GitLabId, accessToken: AccessToken) =
-    webhookServiceClient.fetchProcessingStatus(projectId, accessToken)
 
   def `wait for the Fast Tract event`(projectId: projects.GitLabId)(implicit ioRuntime: IORuntime): Unit = eventually {
 

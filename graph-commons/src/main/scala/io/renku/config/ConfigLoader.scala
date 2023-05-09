@@ -23,7 +23,8 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.tinytypes._
 import pureconfig._
-import pureconfig.error.{CannotConvert, ConfigReaderFailures}
+import pureconfig.error.{CannotConvert, ConfigReaderFailures, FailureReason}
+import scodec.bits.ByteVector
 
 abstract class ConfigLoader[F[_]: MonadThrow] {
 
@@ -76,4 +77,11 @@ object ConfigLoader {
           }
           .getOrElse(Left(CannotConvert(stringValue, ttApply.getClass.toString, "Not an int value")))
       }
+
+  implicit def base64ByteVectorReader: ConfigReader[ByteVector] =
+    ConfigReader.fromString { str =>
+      ByteVector
+        .fromBase64Descriptive(str)
+        .leftMap(err => new FailureReason { override lazy val description: String = s"Cannot read base64: $err" })
+    }
 }

@@ -110,14 +110,14 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
       .recoverWith { case _ => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F] }
 
   private def deleteWhenInvalidWithRetry(project: Project, token: AccessToken): F[Option[(Project, AccessToken)]] = {
-    checkValid(token) >>= {
+    checkValid(project.id, token) >>= {
       case true  => (project, token).some.pure[F]
       case false => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F]
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 
   private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] =
-    createPersonalAccessToken(project.id, token)
+    createProjectAccessToken(project.id, token)
       .map(project -> _)
       .flatTapNone(
         Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >> tokenRemover.delete(project.id)

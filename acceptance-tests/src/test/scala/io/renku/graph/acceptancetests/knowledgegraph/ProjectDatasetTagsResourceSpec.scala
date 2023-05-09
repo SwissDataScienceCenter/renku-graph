@@ -20,20 +20,25 @@ package io.renku.graph.acceptancetests
 package knowledgegraph
 
 import cats.syntax.all._
-import data._
-import flows.TSProvisioning
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data._
+import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds}
 import io.renku.graph.model.publicationEvents
 import io.renku.graph.model.testentities._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
-import tooling.{AcceptanceSpec, ApplicationServices}
+import org.scalatest.EitherValues
 
-class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
+class ProjectDatasetTagsResourceSpec
+    extends AcceptanceSpec
+    with ApplicationServices
+    with TSProvisioning
+    with EitherValues {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets/:dsName/tags to find project dataset's tags") {
 
@@ -58,7 +63,7 @@ class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServ
 
         val project = dataProjects(testProject)
           .map(replaceCreatorFrom(creator, creatorGitLabId))
-          .map(addMemberFrom(creator, creatorGitLabId))
+          .map(addMemberFrom(creator, creatorGitLabId) >>> addMemberWithId(user.id))
           .generateOne
 
         ds -> project
@@ -78,11 +83,11 @@ class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServ
 
       Then("he should get OK response with the relevant tags")
       response.status shouldBe Ok
-      val Right(tags) = response.jsonBody.as[List[Json]]
+      val tags = response.jsonBody.as[List[Json]].value
       tags
         .map(_.hcursor.downField("name").as[publicationEvents.Name])
         .sequence
-        .fold(fail(_), identity) shouldBe dataset.publicationEvents.sortBy(_.startDate).reverse.map(_.name)
+        .value shouldBe dataset.publicationEvents.sortBy(_.startDate).reverse.map(_.name)
     }
   }
 }

@@ -49,15 +49,13 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
     with HookCreationEndpoint[F] {
 
   def createHook(projectId: GitLabId, authUser: AuthUser): F[Response[F]] = {
-    for {
-      creationResult <- hookCreator.createHook(projectId, authUser.accessToken)
-      response       <- toHttpResponse(creationResult)
-    } yield response
+    hookCreator.createHook(projectId, authUser) >>= toHttpResponse
   } recoverWith httpResponse
 
-  private lazy val toHttpResponse: CreationResult => F[Response[F]] = {
-    case HookCreated => Created(InfoMessage("Hook created"))
-    case HookExisted => Ok(InfoMessage("Hook already existed"))
+  private lazy val toHttpResponse: Option[CreationResult] => F[Response[F]] = {
+    case Some(HookCreated) => Created(InfoMessage("Hook created"))
+    case Some(HookExisted) => Ok(InfoMessage("Hook already existed"))
+    case None              => NotFound(InfoMessage("Project not found"))
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {

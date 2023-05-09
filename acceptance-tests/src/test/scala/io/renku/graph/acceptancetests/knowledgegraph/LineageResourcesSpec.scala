@@ -20,12 +20,13 @@ package io.renku.graph.acceptancetests
 package knowledgegraph
 
 import cats.syntax.all._
-import data._
-import flows.TSProvisioning
 import io.circe.literal._
 import io.circe.{ACursor, Json}
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data._
+import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
@@ -36,11 +37,14 @@ import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef, cliShape
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import org.http4s.Status.{NotFound, Ok}
-import tooling.{AcceptanceSpec, ApplicationServices}
 
 class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/files/<location>/lineage to find a file's lineage") {
+
+    val user  = authUsers.generateOne
+    val token = user.accessToken
+
     val (exemplarData, project) = {
       val lineageData = LineageExemplarData(
         renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
@@ -54,7 +58,7 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
           .generateOne,
         personGen = cliShapedPersons
       )
-      (lineageData, dataProjects(lineageData.project).generateOne)
+      (lineageData, dataProjects(lineageData.project).map(addMemberWithId(user.id)).generateOne)
     }
 
     /** Expected data structure when looking for the grid_plot file
@@ -70,8 +74,6 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
      *                grid_plot
      */
     Scenario("As a user I would like to find a public project's lineage") {
-      val user  = authUsers.generateOne
-      val token = user.accessToken
 
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
@@ -141,7 +143,10 @@ class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with 
       )
       val commitId = commitIds.generateOne
       val project =
-        dataProjects(privateExemplarData.project).map(replaceCreatorFrom(creatorPerson, creator.id)).generateOne
+        dataProjects(privateExemplarData.project)
+          .map(replaceCreatorFrom(creatorPerson, creator.id))
+          .map(addMemberFrom(creatorPerson, creator.id))
+          .generateOne
 
       Given("I am authenticated")
       gitLabStub.addAuthenticated(creator)

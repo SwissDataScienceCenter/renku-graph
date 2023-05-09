@@ -20,24 +20,26 @@ package io.renku.tokenrepository.repository
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
-import eu.timepit.refined.api.RefType
+import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets.UTF_8
-import java.security.InvalidKeyException
 import java.util.Base64
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
+class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks with IOSpec {
 
   "encrypt/decrypt" should {
 
@@ -59,6 +61,23 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "AccessToken decryption failed"
     }
+
+    "decrypt existing values" in {
+      val usedSecret  = Secret.unsafeFromBase64("YWJjZGVmZzEyMzQ1Njc4OQ==")
+      val tokenCrypto = new AccessTokenCryptoImpl[Try](usedSecret)
+      val token1      = PersonalAccessToken("lhcrr5dkerm69osrrujlubkkw0ysx8io0e")
+      val encToken1 = EncryptedAccessToken
+        .from("jmamuPCm4R0Rr/ZuVRrYffwBHWdJt8siwuVYJ7WVrLgDIR6RzcCJcpuuvCWcVnlPRsXi2wFHfM+OBOsbt2erZQ==")
+        .fold(throw _, identity)
+
+      val token2 = UserOAuthAccessToken("q2f4t4ph7atcfh08eau1g35")
+      val encToken2 = EncryptedAccessToken
+        .from("QXK4EOJLgdqQdh8MLkS+vCtsJFU0wsnpD9QZuu5qyWROFCzFfUr81xv6f1mN1r3T")
+        .fold(throw _, identity)
+
+      tokenCrypto.decrypt(encToken1) shouldBe Success(token1)
+      tokenCrypto.decrypt(encToken2) shouldBe Success(token2)
+    }
   }
 
   "apply" should {
@@ -67,7 +86,7 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
       val config = ConfigFactory.parseMap(
         Map(
           "projects-tokens" -> Map(
-            "secret" -> aesCryptoSecrets.generateOne.value
+            "secret" -> aesCryptoSecrets.generateOne.toBase64
           ).asJava
         ).asJava
       )
@@ -90,19 +109,15 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
 
       val Failure(exception) = AccessTokenCrypto[Try](config)
 
-      exception            shouldBe a[InvalidKeyException]
-      exception.getMessage shouldBe "Invalid AES key length: 15 bytes"
+      exception          shouldBe a[ConfigLoadingException]
+      exception.getMessage should include("Expected 16 bytes, but got 15")
     }
   }
 
   private trait TestCase {
 
-    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes(UTF_8)), UTF_8)
-    val hookTokenCrypto = new AccessTokenCryptoImpl[Try](
-      RefType
-        .applyRef[Secret](secret)
-        .getOrElse(throw new IllegalArgumentException("Wrong secret"))
-    )
+    private val secret  = Secret.unsafe(ByteVector.view("1234567890123456".getBytes(UTF_8)))
+    val hookTokenCrypto = new AccessTokenCryptoImpl[Try](secret)
   }
 
   private lazy val tokenScenarios = Table(
