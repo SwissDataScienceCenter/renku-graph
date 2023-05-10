@@ -43,7 +43,7 @@ private object EntityConverters {
   ): ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
       MatchingScore.min,
-      dataset.provenance.topmostSameAs,
+      Right(dataset.provenance.topmostSameAs),
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,

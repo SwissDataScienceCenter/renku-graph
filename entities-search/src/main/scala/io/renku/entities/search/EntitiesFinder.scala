@@ -36,13 +36,19 @@ trait EntitiesFinder[F[_]] {
 }
 
 object EntitiesFinder {
+  private[search] val newFinders = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+  private[search] val oldFinders = List(ProjectsQuery, DatasetsQueryOld, WorkflowsQuery, PersonsQuery)
+
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, newFinders))
+
+  def createOld[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, oldFinders))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     storeConfig:   ProjectsConnectionConfig,
-    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+    entityQueries: List[EntityQuery[Entity]]
 ) extends TSClientImpl[F](storeConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {

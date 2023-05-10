@@ -18,7 +18,9 @@
 
 package io.renku.triplesstore.client.sparql
 
-final class LuceneQuery(val query: String) extends AnyVal
+final class LuceneQuery(val query: String) extends AnyVal {
+  def isQueryAll: Boolean = query == LuceneQuery.queryAll.query
+}
 
 object LuceneQuery {
   val queryAll: LuceneQuery = LuceneQuery("*")

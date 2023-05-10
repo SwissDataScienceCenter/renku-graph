@@ -355,7 +355,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       images    <- read[Option[String]](imagesVar) >>= toListOfImageUris
     } yield Entity.Dataset(
       matchingScore,
-      sameAs,
+      Right(sameAs),
       name,
       pathAndVisibility._2,
       date,

@@ -108,9 +108,12 @@ private[entities] trait ModelEncoders {
         .deepMerge(
           _links(
             Link(
-              Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl,
-                                                                              RequestedDataset(SameAs(ds.sameAs.value))
-              )
+              Rel("details") ->
+                ds.sameAs.fold(
+                  ident => knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(ident)),
+                  sameAs =>
+                    knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(SameAs(sameAs.value)))
+                )
             )
           )
         )

@@ -59,7 +59,7 @@ object model {
 
     final case class Dataset(
         matchingScore:       MatchingScore,
-        sameAs:              datasets.TopmostSameAs,
+        sameAs:              Either[datasets.Identifier, datasets.TopmostSameAs],
         name:                datasets.Name,
         visibility:          projects.Visibility,
         date:                datasets.CreatedOrPublished,
