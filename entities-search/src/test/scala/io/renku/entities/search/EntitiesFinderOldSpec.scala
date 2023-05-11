@@ -18,72 +18,70 @@
 
 package io.renku.entities.search
 
+import Criteria.Filters._
+import Criteria.{Filters, Sort}
+import EntityConverters._
+import Generators._
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.entities.search
-import io.renku.entities.search.Criteria.Filters._
-import io.renku.entities.search.Criteria.{Filters, Sort}
-import io.renku.entities.search.EntityConverters._
-import io.renku.entities.search.Generators._
-import io.renku.entities.search.diff.SearchDiffInstances
-import io.renku.entities.searchgraphs.SearchInfoDataset
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.testentities.{Dataset, RenkuProject, StepPlan}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.testentities.{Dataset, StepPlan}
-import io.renku.graph.model.tools.AdditionalMatchers
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
-import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
-class EntitiesFinderSpec
+class EntitiesFinderOldSpec
     extends AnyWordSpec
     with should.Matchers
     with EntitiesGenerators
     with FinderSpecOps
-    with SearchDiffInstances
-    with AdditionalMatchers
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with SearchInfoDataset
     with IOSpec {
 
-  implicit val ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  protected[search] override def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
+    List(project.to[model.Entity.Project])
+      .addAllDatasetsFromOld(project)
+      .addAllPlansFrom(project)
+      .addAllPersonsFrom(project)
+      .distinct
+
+  class OldTestCase extends TestCase {
+    override val finder: EntitiesFinder[IO] =
+      new EntitiesFinderImpl[IO](projectsDSConnectionInfo, EntitiesFinder.oldFinders)
+  }
 
   "findEntities - no filters" should {
 
-    "return all entities sorted by name if no query is given" in new TestCase {
+    "return all entities sorted by name if no query is given" in new OldTestCase {
       val project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      IOBody {
-        for {
-          _     <- provisionTestProject(project)
-          found <- finder.findEntities(Criteria())
+      upload(to = projectsDataset, project)
 
-          expected = allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
-          _        = found.results shouldMatchTo expected
-        } yield ()
-      }
+      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe allEntitiesFrom(project).sortBy(_.name)(
+        nameOrdering
+      )
     }
 
-    "return all entities sorted by name if no query is given with modified plans" in new TestCase {
+    "return all entities sorted by name if no query is given with modified plans" in new OldTestCase {
       val projectBase = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
@@ -92,18 +90,15 @@ class EntitiesFinderSpec
       val newPlan = projectBase.plans.head.createModification()
       val project = projectBase.copy(unlinkedPlans = newPlan.asInstanceOf[StepPlan] :: projectBase.unlinkedPlans)
 
-      IOBody {
-        for {
-          _       <- provisionTestProject(project)
-          results <- finder.findEntities(Criteria())
-          _ = results.results shouldMatchTo allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
-        } yield ()
-      }
+      upload(to = projectsDataset, project)
+      val results =
+        finder.findEntities(Criteria()).unsafeRunSync().results
+      results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with query filter" should {
-    "return all entities sorted by two sorting parameters" in new TestCase {
+    "return all entities sorted by two sorting parameters" in new OldTestCase {
       val projectDate = Instant.parse("2020-10-10T12:00:00Z")
       val otherDate   = Instant.parse("2021-06-15T00:00:00Z")
       val projectBase = renkuProjectEntities(
@@ -126,27 +121,27 @@ class EntitiesFinderSpec
         .replacePlanName(plans.Name("hello 3"))
       val project = projectBase.copy(unlinkedPlans = newPlan :: projectBase.unlinkedPlans)
 
-      val results = IOBody {
-        provisionTestProject(project) >>
-          finder
-            .findEntities(
-              Criteria(
-                filters = Criteria.Filters(maybeQuery = Query("hello").some),
-                sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc), Sort.byNameAsc)
-              )
+      upload(to = projectsDataset, project)
+      val results =
+        finder
+          .findEntities(
+            Criteria(
+              filters = Criteria.Filters(maybeQuery = Query("hello").some),
+              sorting = Sorting(Sort.By(Sort.ByDate, SortBy.Direction.Asc), Sort.byNameAsc)
             )
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+          )
+          .unsafeRunSync()
+          .resultsWithSkippedMatchingScore
 
       implicit val entityOrdering: Ordering[model.Entity] =
         Ordering.by(e => s"${e.date}, ${e.name}".toLowerCase)
 
       val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
 
-      results shouldMatchTo expected
+      results shouldBe expected
     }
 
-    "return entities which name matches the given query, sorted by name" in new TestCase {
+    "return entities which name matches the given query, sorted by name" in new OldTestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val person = personEntities
@@ -180,22 +175,20 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(loneProject, dsProject, planProject, notMatchingProject).traverse_(provisionTestProject(_)) *>
-          finder
-            .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+      upload(to = projectsDataset, loneProject, dsProject, planProject, notMatchingProject)
 
-      results shouldMatchTo List(
+      finder
+        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
         loneProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         (plan -> planProject).to[model.Entity.Workflow],
         person.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return entities which keywords matches the given query, sorted by name" in new TestCase {
+    "return entities which keywords matches the given query, sorted by name" in new OldTestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -229,22 +222,19 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = planProject.plans
 
-      val results = IOBody {
-        List(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
-          .traverse_(provisionTestProject(_)) *>
-          finder
-            .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
-      results shouldMatchTo List(
+      finder
+        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         (plan -> planProject).to[model.Entity.Workflow]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return entities which description matches the given query, sorted by name" in new TestCase {
+    "return entities which description matches the given query, sorted by name" in new OldTestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -270,39 +260,36 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = planProject.plans
 
-      val results = IOBody {
-        List(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
-          .traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
-      results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         (plan -> planProject).to[model.Entity.Workflow]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return project entities which namespace matches the given query, sorted by name" in new TestCase {
+    "return project entities which namespace matches the given query, sorted by name" in new OldTestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
-      val results = IOBody {
-        List(soleProject, projectEntities(visibilityPublic).generateOne).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+      upload(to = projectsDataset, soleProject, projectEntities(visibilityPublic).generateOne)
 
-      results shouldMatchTo List(soleProject.to[model.Entity.Project]).sortBy(_.name)(nameOrdering)
+      finder
+        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
+        soleProject.to[model.Entity.Project]
+      ).sortBy(_.name)(nameOrdering)
     }
 
-    "return entities which creator name matches the given query, sorted by name" in new TestCase {
+    "return entities which creator name matches the given query, sorted by name" in new OldTestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val projectCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
@@ -319,115 +306,103 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
-          .traverse_(provisionTestProject(_)) *>
-          finder
-            .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
-            .map(_.resultsWithSkippedMatchingScore)
-      }
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
-      val expected = List(
+      finder
+        .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         projectCreator.to[model.Entity.Person],
         dsCreator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
-
-      results shouldMatchTo expected
     }
   }
 
   "findEntities - with entity type filter" should {
 
-    "return only projects when 'project' type given" in new TestCase {
+    "return only projects when 'project' type given" in new OldTestCase {
       val project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        provisionTestProject(project) *>
-          finder
-            .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
-            .map(_.results)
-      }
+      upload(to = projectsDataset, project)
 
-      results shouldMatchTo List(project.to[model.Entity.Project]).sortBy(_.name)(nameOrdering)
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
+        .unsafeRunSync()
+        .results shouldBe List(project.to[model.Entity.Project]).sortBy(_.name)(nameOrdering)
     }
 
-    "return only datasets when 'dataset' type given" in new TestCase {
+    "return only datasets when 'dataset' type given" in new OldTestCase {
       val dsAndProject @ _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldMatchTo List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name)(nameOrdering)
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier))
+      ).sortBy(_.name)(nameOrdering)
     }
 
-    "return only workflows when 'workflow' type given" in new TestCase {
+    "return only workflows when 'workflow' type given" in new OldTestCase {
       val project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe project.plans
-        .map(_ -> project)
-        .map(_.to[model.Entity.Workflow])
-        .sortBy(_.name)(nameOrdering)
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
+        .unsafeRunSync()
+        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).sortBy(_.name)(nameOrdering)
     }
 
-    "return entities of many types when multiple types given" in new TestCase {
+    "return entities of many types when multiple types given" in new OldTestCase {
       val person = personEntities.generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => person.some))
         .modify(removeMembers())
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
+        .unsafeRunSync()
+        .results shouldBe List(
         project.to[model.Entity.Project],
         person.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return multiple types datasets when 'person' type given" in new TestCase {
+    "return multiple types datasets when 'person' type given" in new OldTestCase {
       val person = personEntities.generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => person.some))
         .modify(removeMembers())
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
+        .unsafeRunSync()
+        .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with creator filter" should {
 
-    "return entities with matching creator only" in new TestCase {
+    "return entities with matching creator only" in new OldTestCase {
       val creator = personEntities.generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -444,22 +419,19 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(soleProject, dsProject, projectEntities(visibilityPublic).generateOne).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(creators = Set(creator.name))))
-      }
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
-      val expected = List(
+      finder
+        .findEntities(Criteria(Filters(creators = Set(creator.name))))
+        .unsafeRunSync()
+        .results shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         creator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
-
-      results.results shouldMatchTo expected
     }
 
-    "return entities creator matches in a case-insensitive way" in new TestCase {
+    "return entities creator matches in a case-insensitive way" in new OldTestCase {
       val creator = personEntities.generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -476,20 +448,19 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(soleProject, dsProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
-      }
+      upload(to = projectsDataset, soleProject, dsProject)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
+        .unsafeRunSync()
+        .results shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         creator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return entities that matches at least one of the given creators" in new TestCase {
+    "return entities that matches at least one of the given creators" in new OldTestCase {
 
       val projectCreator = personEntities.generateOne
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -507,38 +478,36 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(soleProject, dsProject, projectEntities(visibilityPublic).generateOne).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
-      }
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
+        .unsafeRunSync()
+        .results shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset],
+        dsAndProject.to[model.Entity.Dataset].copy(sameAs = Left(dsAndProject._1.identification.identifier)),
         projectCreator.to[model.Entity.Person],
         dsCreator.to[model.Entity.Person]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return no entities when there's no match on creator" in new TestCase {
+    "return no entities when there's no match on creator" in new OldTestCase {
       val _ -> project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe Nil
+      finder
+        .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
+        .unsafeRunSync()
+        .results shouldBe Nil
     }
   }
 
   "findEntities - with visibility filter" should {
 
-    "return entities with matching visibility only" in new TestCase {
+    "return entities with matching visibility only" in new OldTestCase {
 
       val publicProject = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
@@ -557,43 +526,41 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(publicProject, internalProject, privateProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(
-                Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
-                maybeUser = member.toAuthUser.some,
-                paging = PagingRequest(Page.first, PerPage(50))
-              )
-            )
-      }
+      upload(to = projectsDataset, publicProject, internalProject, privateProject)
 
-      results.results shouldBe allEntitiesFrom(publicProject)
-        .addAllEntitiesFrom(privateProject)
+      finder
+        .findEntities(
+          Criteria(
+            Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
+            maybeUser = member.toAuthUser.some,
+            paging = PagingRequest(Page.first, PerPage(50))
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe allEntitiesFrom(publicProject)
+        .addAllEntitiesOldFrom(privateProject)
         .addAllPersonsFrom(internalProject)
         .sortBy(_.name)(nameOrdering)
     }
 
-    "return no entities when no match on visibility" in new TestCase {
+    "return no entities when no match on visibility" in new OldTestCase {
       val _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe Nil
+      finder
+        .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
+        .unsafeRunSync()
+        .results shouldBe Nil
     }
   }
 
   "findEntities - with namespace filter" should {
 
-    "return entities with matching namespace only" in new TestCase {
+    "return entities with matching namespace only" in new OldTestCase {
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
@@ -605,41 +572,39 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(matchingProject, nonMatchingProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(
-                Filters(namespaces = Set(matchingProject.path.toNamespace)),
-                paging = PagingRequest(Page.first, PerPage(50))
-              )
-            )
-      }
+      upload(to = projectsDataset, matchingProject, nonMatchingProject)
 
-      results.results shouldBe allEntitiesFrom(matchingProject)
+      finder
+        .findEntities(
+          Criteria(
+            Filters(namespaces = Set(matchingProject.path.toNamespace)),
+            paging = PagingRequest(Page.first, PerPage(50))
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe allEntitiesFrom(matchingProject)
         .removeAllPersons()
         .sortBy(_.name)(nameOrdering)
     }
 
-    "return no namespace aware entities when no match on namespace" in new TestCase {
+    "return no namespace aware entities when no match on namespace" in new OldTestCase {
       val _ -> project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(namespaces = projectNamespaces.generateFixedSizeSet(1))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe Nil
+      finder
+        .findEntities(Criteria(Filters(namespaces = projectNamespaces.generateFixedSizeSet(1))))
+        .unsafeRunSync()
+        .results shouldBe Nil
     }
   }
 
   "findEntities - with 'since' filter" should {
 
-    "return entities with date >= 'since'" in new TestCase {
+    "return entities with date >= 'since'" in new OldTestCase {
       val since          = Filters.Since(sinceParams.generateOne.value minusDays 1)
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
@@ -668,20 +633,19 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeSince = since.some)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
         project.to[model.Entity.Project],
-        (ds   -> project).to[model.Entity.Dataset],
+        (ds -> project).to[model.Entity.Dataset].copy(sameAs = Left(ds.identification.identifier)),
         (plan -> project).to[model.Entity.Workflow]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return no entities with date < 'since'" in new TestCase {
+    "return no entities with date < 'since'" in new OldTestCase {
       val since          = sinceParams.generateOne
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
@@ -723,16 +687,15 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeSince = since.some)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe Nil
+      finder
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
+        .unsafeRunSync()
+        .results shouldBe Nil
     }
 
-    "return entities with date >= 'since' - case of DatePublished" in new TestCase {
+    "return entities with date >= 'since' - case of DatePublished" in new OldTestCase {
       val since          = sinceParams.generateOne
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
@@ -757,21 +720,20 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(dsProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeSince = since.some)))
-      }
+      upload(to = projectsDataset, dsProject)
 
-      results.results shouldBe List(
-        (matchingDS -> dsProject).to[model.Entity.Dataset]
+      finder
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
+        (matchingDS -> dsProject).to[model.Entity.Dataset].copy(sameAs = Left(matchingDS.identification.identifier))
       ).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with 'until' filter" should {
 
-    "return entities with date <= 'until'" in new TestCase {
+    "return entities with date <= 'until'" in new OldTestCase {
       val until          = untilParams.generateOne
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
@@ -800,20 +762,19 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeUntil = until.some)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
         project.to[model.Entity.Project],
-        (ds   -> project).to[model.Entity.Dataset],
+        (ds -> project).to[model.Entity.Dataset].copy(sameAs = Left(ds.identification.identifier)),
         (plan -> project).to[model.Entity.Workflow]
       ).sortBy(_.name)(nameOrdering)
     }
 
-    "return no entities with date > 'until'" in new TestCase {
+    "return no entities with date > 'until'" in new OldTestCase {
       val until          = Until(untilParams.generateOne.value minusDays 2)
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
@@ -854,16 +815,15 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeUntil = until.some)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe Nil
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe Nil
     }
 
-    "return entities with date <= 'until' - case of DatePublished" in new TestCase {
+    "return entities with date <= 'until' - case of DatePublished" in new OldTestCase {
       val until          = Until(untilParams.generateOne.value minusDays 2)
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
@@ -888,21 +848,20 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      val results = IOBody {
-        List(dsProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeUntil = until.some)))
-      }
+      upload(to = projectsDataset, dsProject)
 
-      results.results shouldBe List(
-        (matchingDS -> dsProject).to[model.Entity.Dataset]
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
+        (matchingDS -> dsProject).to[model.Entity.Dataset].copy(sameAs = Left(matchingDS.identification.identifier))
       ).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with both 'since' and 'until' filter" should {
 
-    "return entities with date >= 'since' && date <= 'until'" in new TestCase {
+    "return entities with date >= 'since' && date <= 'until'" in new OldTestCase {
       val sinceValue :: untilValue :: Nil = localDatesNotInTheFuture
         .generateFixedSizeList(ofSize = 2)
         .map(_ minusDays 1) // to prevent other parts of the test not to go into the future
@@ -963,24 +922,23 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans
 
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(Filters(maybeSince = since.some, maybeUntil = until.some)))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe List(
+      finder
+        .findEntities(Criteria(Filters(maybeSince = since.some, maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
         project.to[model.Entity.Project],
-        (dsInternal -> project).to[model.Entity.Dataset],
-        (dsExternal -> project).to[model.Entity.Dataset],
-        (plan       -> project).to[model.Entity.Workflow]
+        (dsInternal -> project).to[model.Entity.Dataset].copy(sameAs = Left(dsInternal.identification.identifier)),
+        (dsExternal -> project).to[model.Entity.Dataset].copy(sameAs = Left(dsExternal.identification.identifier)),
+        (plan -> project).to[model.Entity.Workflow]
       ).sortBy(_.name)(nameOrdering)
     }
   }
 
   "findEntities - with sorting" should {
 
-    "be sorting by Name if requested in case-insensitive way" in new TestCase {
+    "be sorting by Name if requested in case-insensitive way" in new OldTestCase {
       val commonPart = nonEmptyStrings().generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(projects.Name(s"a$commonPart")))
@@ -988,33 +946,36 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSName(datasets.Name(s"B$commonPart"))))
         .generateOne
 
-      val direction = sortingDirections.generateOne
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByName, direction))))
-      }
+      upload(to = projectsDataset, project)
 
-      results.results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering).use(direction)
+      val direction = sortingDirections.generateOne
+
+      finder
+        .findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByName, direction))))
+        .unsafeRunSync()
+        .results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering).use(direction)
     }
 
-    "be sorting by Date if requested" in new TestCase {
+    "be sorting by Date if requested" in new OldTestCase {
       val project = renkuProjectEntities(visibilityPublic)
         .withActivities(activityEntities(stepPlanEntities()), activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceImportedExternal))
         .withDatasets(datasetEntities(provenanceInternal))
         .generateOne
 
+      upload(to = projectsDataset, project)
+
       val direction = sortingDirections.generateOne
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder.findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByDate, direction)))).map(_.results)
-      }
+
+      val results = finder
+        .findEntities(Criteria(sorting = Sorting(Sort.By(Sort.ByDate, direction))))
+        .unsafeRunSync()
+        .results
 
       val expectedPersons = List.empty[model.Entity].addAllPersonsFrom(project).toSet
 
       val expectedSorted = List(project.to[model.Entity])
-        .addAllDatasetsFrom(project)
+        .addAllDatasetsFromOld(project)
         .addAllPlansFrom(project)
         .sortBy(_.dateAsInstant)
         .use(direction)
@@ -1028,7 +989,7 @@ class EntitiesFinderSpec
       persons.toSet shouldBe expectedPersons
     }
 
-    "be sorting by Matching Score if requested" in new TestCase {
+    "be sorting by Matching Score if requested" in new OldTestCase {
 
       val query = nonBlankStrings(minLength = 3).generateOne
 
@@ -1042,21 +1003,21 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = project.plans
 
-      val direction = sortingDirections.generateOne
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(Filters(maybeQuery = Filters.Query(query.value).some),
-                       Sorting(Sort.By(Sort.ByMatchingScore, direction))
-              )
-            )
-      }
+      upload(to = projectsDataset, project)
 
-      results.resultsWithSkippedMatchingScore shouldBe List(
+      val direction = sortingDirections.generateOne
+
+      finder
+        .findEntities(
+          Criteria(Filters(maybeQuery = Filters.Query(query.value).some),
+                   Sorting(Sort.By(Sort.ByMatchingScore, direction))
+          )
+        )
+        .unsafeRunSync()
+        .resultsWithSkippedMatchingScore shouldBe List(
         project.to[model.Entity.Project], // should have the highest score as its name is the query
         (plan -> project).to[model.Entity.Workflow], // should have higher score as its name is the query with a prefix
-        (ds   -> project).to[model.Entity.Dataset]
+        (ds -> project).to[model.Entity.Dataset].copy(sameAs = Left(ds.identification.identifier))
       ).use(direction).reverse
     }
   }
@@ -1070,51 +1031,57 @@ class EntitiesFinderSpec
       )
       .generateOne
 
-    "return the only page" in new TestCase {
+    "return the only page" in new OldTestCase {
+
+      upload(to = projectsDataset, project)
+
       val paging = PagingRequest(Page(1), PerPage(3))
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
-            )
-      }
+
+      val results = finder
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
+        .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
       results.results shouldBe List(project.to[model.Entity.Project])
-        .addAllDatasetsFrom(project)
+        .addAllDatasetsFromOld(project)
         .sortBy(_.name)(nameOrdering)
     }
 
-    "return the requested page with info if there are more" in new TestCase {
+    "return the requested page with info if there are more" in new OldTestCase {
+
+      upload(to = projectsDataset, project)
+
       val paging = PagingRequest(Page(Random.nextInt(3) + 1), PerPage(1))
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
-            )
-      }
+
+      val results = finder
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
+        .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
-      results.results shouldMatchTo List(project.to[model.Entity.Project])
-        .addAllDatasetsFrom(project)
+      results.results shouldBe List(project.to[model.Entity.Project])
+        .addAllDatasetsFromOld(project)
         .sortBy(_.name)(nameOrdering)
         .get(paging.page.value - 1)
         .toList
     }
 
-    "return no results if non-existing page requested" in new TestCase {
+    "return no results if non-existing page requested" in new OldTestCase {
+
+      upload(to = projectsDataset, project)
+
       val paging = PagingRequest(Page(4), PerPage(1))
-      val results = IOBody {
-        List(project).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
-            )
-      }
+
+      val results = finder
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
+        .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
@@ -1124,12 +1091,14 @@ class EntitiesFinderSpec
 
   "findEntities - with images" should {
 
-    "return images if present" in new TestCase {
+    "return images if present" in new OldTestCase {
       val project = renkuProjectEntities(visibilityPublic)
         .suchThat(_.images.nonEmpty)
         .generateOne
 
-      val results = IOBody(provisionTestProject(project) *> finder.findEntities(Criteria()))
+      upload(to = projectsDataset, project)
+
+      val results = finder.findEntities(Criteria()).unsafeRunSync()
       val images  = results.results.collect { case e: search.model.Entity.Project => e.images }.flatten
       images shouldBe project.images
     }
@@ -1157,54 +1126,51 @@ class EntitiesFinderSpec
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
-    "return public entities only if no auth user is given" in new TestCase {
-      val results = IOBody {
-        List(privateProject, internalProject, publicProject).traverse_(provisionTestProject) *>
-          finder.findEntities(Criteria())
-      }
-      results.results shouldBe List
+    "return public entities only if no auth user is given" in new OldTestCase {
+
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
+
+      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List
         .empty[model.Entity]
-        .addAllEntitiesFrom(publicProject)
+        .addAllEntitiesOldFrom(publicProject)
         .addAllPersonsFrom(internalProject)
         .addAllPersonsFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
     }
 
-    "return public and internal entities only if auth user is given" in new TestCase {
+    "return public and internal entities only if auth user is given" in new OldTestCase {
 
-      val results = IOBody {
-        List(privateProject, internalProject, publicProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(maybeUser = personEntities(personGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser),
-                       paging = PagingRequest.default.copy(perPage = PerPage(50))
-              )
-            )
-      }
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
-      results.results shouldBe List
+      finder
+        .findEntities(
+          Criteria(maybeUser = personEntities(personGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser),
+                   paging = PagingRequest.default.copy(perPage = PerPage(50))
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe List
         .empty[model.Entity]
-        .addAllEntitiesFrom(publicProject)
-        .addAllEntitiesFrom(internalProject)
+        .addAllEntitiesOldFrom(publicProject)
+        .addAllEntitiesOldFrom(internalProject)
         .addAllPersonsFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
     }
 
-    "return any visibility entities if the given auth user has access to them" in new TestCase {
+    "return any visibility entities if the given auth user has access to them" in new OldTestCase {
 
-      val results = IOBody {
-        List(privateProject, internalProject, publicProject).traverse_(provisionTestProject) *>
-          finder
-            .findEntities(
-              Criteria(maybeUser = member.toAuthUser.some, paging = PagingRequest.default.copy(perPage = PerPage(50)))
-            )
-      }
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
-      results.results shouldBe List
+      finder
+        .findEntities(
+          Criteria(maybeUser = member.toAuthUser.some, paging = PagingRequest.default.copy(perPage = PerPage(50)))
+        )
+        .unsafeRunSync()
+        .results shouldBe List
         .empty[model.Entity]
-        .addAllEntitiesFrom(publicProject)
-        .addAllEntitiesFrom(internalProject)
-        .addAllEntitiesFrom(privateProject)
+        .addAllEntitiesOldFrom(publicProject)
+        .addAllEntitiesOldFrom(internalProject)
+        .addAllEntitiesOldFrom(privateProject)
         .sortBy(_.name)(nameOrdering)
     }
   }

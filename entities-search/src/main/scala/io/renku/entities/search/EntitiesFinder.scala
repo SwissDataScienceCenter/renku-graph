@@ -18,17 +18,17 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.entities.search.Criteria.Filters._
+import io.renku.entities.search.model._
 import io.renku.http.rest.Sorting
-import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.triplesstore.client.model.OrderBy
 import io.renku.triplesstore.client.sparql.SparqlEncoder
-import model._
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 trait EntitiesFinder[F[_]] {
@@ -36,13 +36,19 @@ trait EntitiesFinder[F[_]] {
 }
 
 object EntitiesFinder {
+  private[search] val newFinders = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+  private[search] val oldFinders = List(ProjectsQuery, DatasetsQueryOld, WorkflowsQuery, PersonsQuery)
+
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, newFinders))
+
+  def createOld[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, oldFinders))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     storeConfig:   ProjectsConnectionConfig,
-    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+    entityQueries: List[EntityQuery[Entity]]
 ) extends TSClientImpl[F](storeConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
@@ -81,7 +87,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     encoder(sorting.toOrderBy(mapPropertyName)).sparql
   }
 
-  private implicit lazy val recordDecoder: Decoder[Entity] = { implicit cursor =>
+  private implicit def recordDecoder: Decoder[Entity] = { implicit cursor =>
     import io.circe.DecodingFailure
     import io.renku.triplesstore.ResultsDecoder._
 
