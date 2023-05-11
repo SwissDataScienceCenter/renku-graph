@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 153,
+  "id": 56,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -110,7 +110,9 @@
           ],
           "displayMode": "table",
           "placement": "right",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "orientation": "auto",
         "showValue": "auto",
@@ -228,7 +230,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -357,7 +359,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -485,7 +487,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -600,7 +602,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -716,7 +718,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -848,7 +850,7 @@
             "last"
           ],
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "showLegend": true
         },
         "tooltip": {
@@ -1164,8 +1166,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1209,7 +1210,7 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "sortBy": "Last",
+          "sortBy": "Last *",
           "sortDesc": true
         },
         "tooltip": {
@@ -1283,8 +1284,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1416,9 +1416,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": "renku-kg-dev",
+          "value": "renku-kg-dev"
         },
         "datasource": {
           "type": "prometheus",
@@ -1443,9 +1443,9 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
+          "selected": true,
+          "text": "renku-kg-dev",
+          "value": "renku-kg-dev"
         },
         "datasource": {
           "type": "prometheus",
@@ -1478,6 +1478,6 @@
   "timezone": "",
   "title": "Knowledge Graph Overview",
   "uid": "L4dremUVz",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
