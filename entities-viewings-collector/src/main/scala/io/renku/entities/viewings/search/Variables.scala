@@ -89,7 +89,7 @@ object Variables {
         images    <- read[Option[String]](images) >>= toListOfImageUris
       } yield SearchEntity.Dataset(
         matchingScore,
-        sameAs,
+        Right(sameAs),
         name,
         visibility,
         date,
