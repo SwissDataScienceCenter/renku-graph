@@ -18,8 +18,11 @@
 
 package io.renku.entities.searchgraphs
 
+import cats.MonadThrow
 import cats.effect.Async
+import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.DatasetsGraphProvisioner
+import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
 import io.renku.graph.model.entities.Project
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
@@ -32,12 +35,32 @@ object SearchGraphsProvisioner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): SearchGraphsProvisioner[F] =
-    new SearchGraphsProvisionerImpl(DatasetsGraphProvisioner[F](connectionConfig))
+    new SearchGraphsProvisionerImpl(ProjectsGraphProvisioner[F](connectionConfig),
+                                    DatasetsGraphProvisioner[F](connectionConfig)
+    )
 }
 
-private class SearchGraphsProvisionerImpl[F[_]](datasetsGraphProvisioner: DatasetsGraphProvisioner[F])
-    extends SearchGraphsProvisioner[F] {
+private class SearchGraphsProvisionerImpl[F[_]: MonadThrow: Logger](
+    projectsGraphProvisioner: ProjectsGraphProvisioner[F],
+    datasetsGraphProvisioner: DatasetsGraphProvisioner[F]
+) extends SearchGraphsProvisioner[F] {
 
   override def provisionSearchGraphs(project: Project): F[Unit] =
-    datasetsGraphProvisioner.provisionDatasetsGraph(project)
+    provisionProjectsGraph(project).attemptT.foldF(
+      err => provisionDatasetsGraph(project).attemptT.foldF(_ => err.raiseError[F, Unit], _ => err.raiseError[F, Unit]),
+      _ => provisionDatasetsGraph(project)
+    )
+
+  private def provisionProjectsGraph(project: Project) =
+    projectsGraphProvisioner
+      .provisionProjectsGraph(project)
+      .onError(logError(graph = "Projects"))
+
+  private def provisionDatasetsGraph(project: Project) =
+    datasetsGraphProvisioner
+      .provisionDatasetsGraph(project)
+      .onError(logError(graph = "Datasets"))
+
+  private def logError(graph: String): PartialFunction[Throwable, F[Unit]] =
+    Logger[F].error(_)(s"Provisioning $graph graph failed")
 }
