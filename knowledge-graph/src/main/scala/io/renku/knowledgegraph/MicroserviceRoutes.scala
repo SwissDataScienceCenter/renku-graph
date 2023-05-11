@@ -42,7 +42,7 @@ import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
-import io.renku.knowledgegraph.entities.QueryParamDecoders._
+import QueryParamDecoders._
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
@@ -125,7 +125,6 @@ private class MicroserviceRoutes[F[_]: Async](
   private lazy val `GET /entities/*`: AuthedRoutes[MaybeAuthUser, F] = {
     import io.renku.entities.search.Criteria._
     import Sort.sort
-    import entities.QueryParamDecoders._
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"

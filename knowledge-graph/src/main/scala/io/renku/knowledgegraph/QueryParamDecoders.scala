@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
+package io.renku.knowledgegraph
 
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
-import io.renku.entities.search.Criteria
+import io.renku.entities.search.Criteria.Filters._
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.model._
 import io.renku.http.rest.paging.model.PerPage
@@ -30,7 +30,6 @@ import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue}
 import java.time.LocalDate
 
 object QueryParamDecoders {
-  import Criteria.Filters._
 
   private implicit val queryParameterDecoder: QueryParamDecoder[Query] =
     (value: QueryParameterValue) =>
@@ -75,7 +74,6 @@ object QueryParamDecoders {
                 case n => Validated.validNel(n)
               })
           }
-
       }
   }
 
