@@ -31,8 +31,9 @@ import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UrlOps, UUID, Url => UrlConstraint}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, UUID, UrlOps, Url => UrlConstraint}
 
+import java.time.temporal.ChronoUnit
 import java.time.{Instant, LocalDate, ZoneOffset}
 
 object datasets {
@@ -304,7 +305,13 @@ object datasets {
   implicit object DateViewed
       extends TinyTypeFactory[DateViewed](new DateViewed(_))
       with InstantNotInTheFuture[DateViewed]
-      with TinyTypeJsonLDOps[DateViewed]
+      with TinyTypeJsonLDOps[DateViewed] {
+    override val transform: Instant => Either[Throwable, Instant] = {
+      val secondsPrecision: Instant => Instant = _.truncatedTo(ChronoUnit.SECONDS)
+      // cannot use super on a val
+      secondsPrecision.andThen(Right(_))
+    }
+  }
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]

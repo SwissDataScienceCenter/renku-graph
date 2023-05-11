@@ -21,11 +21,11 @@ package io.renku.entities.viewings.collector.projects.activated
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.{consumers, CategoryName, EventRequestContent}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.events.consumers.EventDecodingTools.JsonOps
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.triplesgenerator.api.events.ProjectActivated
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
@@ -54,7 +54,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[consumers.EventHandler[F]] =
-    (EventPersister[F], ProcessExecutor.concurrent(processesCount = 100))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connConfig: ProjectsConnectionConfig
+  ): F[consumers.EventHandler[F]] =
+    (EventPersister[F](connConfig), ProcessExecutor.concurrent(processesCount = 100))
       .mapN(new EventHandler[F](_, _))
 }

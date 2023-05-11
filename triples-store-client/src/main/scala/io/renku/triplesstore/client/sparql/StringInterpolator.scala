@@ -40,6 +40,7 @@ class StringInterpolator(private val sc: StringContext) {
     case (a: String, _)           => a.asTripleObject.asSparql.sparql
     case (a: Char, _)             => a.toString.asTripleObject.asSparql.sparql
     case (a: Float, _)            => a.asTripleObject.asSparql.sparql
+    case (a: Int, _)              => a.asTripleObject.asSparql.sparql
     case (a: Long, _)             => a.asTripleObject.asSparql.sparql
     case (a: Double, _)           => a.asTripleObject.asSparql.sparql
     case (a: Boolean, _)          => a.asTripleObject.asSparql.sparql
@@ -66,6 +67,12 @@ class StringInterpolator(private val sc: StringContext) {
         case ClauseType.VALUES_NOT_BRACKETED => it.map(makeValue(_, idx)).mkString(" ")
         case ClauseType.IN                   => it.map(makeValue(_, idx)).mkString(", ")
       }
+      .orElse(
+        it.headOption match {
+          case Some(_: VarName) => Some(it.map(_.asInstanceOf[VarName].name).mkString(" "))
+          case _                => None
+        }
+      )
       .getOrElse(sys.error("Iterable cannot be resolved in this context"))
   }
 }

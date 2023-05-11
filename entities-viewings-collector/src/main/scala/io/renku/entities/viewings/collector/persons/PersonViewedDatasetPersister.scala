@@ -31,10 +31,10 @@ private[viewings] trait PersonViewedDatasetPersister[F[_]] {
 
 private[viewings] object PersonViewedDatasetPersister {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PersonViewedDatasetPersister[F]] =
-    ProjectsConnectionConfig[F]()
-      .map(TSClient[F](_))
-      .map(apply[F](_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      projectsConnectionConfig: ProjectsConnectionConfig
+  ): F[PersonViewedDatasetPersister[F]] =
+    apply[F](TSClient(projectsConnectionConfig)).pure[F]
 
   def apply[F[_]: MonadThrow](tsClient: TSClient[F]): PersonViewedDatasetPersister[F] =
     new PersonViewedDatasetPersisterImpl[F](tsClient,

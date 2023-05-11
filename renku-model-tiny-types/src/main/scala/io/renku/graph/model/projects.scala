@@ -27,6 +27,7 @@ import io.renku.tinytypes.constraints._
 import io.renku.tinytypes._
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 object projects {
 
@@ -102,7 +103,13 @@ object projects {
   implicit object DateViewed
       extends TinyTypeFactory[DateViewed](new DateViewed(_))
       with InstantNotInTheFuture[DateViewed]
-      with TinyTypeJsonLDOps[DateViewed]
+      with TinyTypeJsonLDOps[DateViewed] {
+    override val transform: Instant => Either[Throwable, Instant] = {
+      val secondsPrecision: Instant => Instant = _.truncatedTo(ChronoUnit.SECONDS)
+      // cannot use super on a val
+      secondsPrecision.andThen(Right(_))
+    }
+  }
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath
