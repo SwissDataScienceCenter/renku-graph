@@ -35,7 +35,7 @@ import org.http4s.{MediaType, Uri}
 import org.http4s.MediaRange._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration._
 
 trait TSClient[F[_]] {
   def updateWithNoResult(updateQuery:         SparqlQuery): F[Unit]
@@ -53,8 +53,8 @@ object TSClient {
       triplesStoreConfig:     DatasetConnectionConfig,
       retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-      idleTimeoutOverride:    Option[Duration] = None,
-      requestTimeoutOverride: Option[Duration] = None
+      idleTimeoutOverride:    Option[Duration] = Some(20.minutes),
+      requestTimeoutOverride: Option[Duration] = Some(20.minutes)
   ): TSClient[F] =
     new TSClientImpl[F](triplesStoreConfig, retryInterval, maxRetries, idleTimeoutOverride, requestTimeoutOverride)
 }
@@ -63,8 +63,8 @@ class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     triplesStoreConfig:     DatasetConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeoutOverride:    Option[Duration] = None,
-    requestTimeoutOverride: Option[Duration] = None,
+    idleTimeoutOverride:    Option[Duration] = Some(20.minutes),
+    requestTimeoutOverride: Option[Duration] = Some(20.minutes),
     printQueries:           Boolean = false
 ) extends RestClient(Throttler.noThrottling,
                      Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
