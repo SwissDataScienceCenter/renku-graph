@@ -39,7 +39,7 @@ import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
@@ -64,6 +64,7 @@ object Microservice extends IOMicroservice {
     implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
     config                                       <- parseConfigArgs(args)
+    projectConnConfig                            <- ProjectsConnectionConfig[IO](config)
     certificateLoader                            <- CertificateLoader[IO]
     gitCertificateInstaller                      <- GitCertificateInstaller[IO]
     sentryInitializer                            <- SentryInitializer[IO]
@@ -74,10 +75,10 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
-    projectActivationsSubscription               <- viewings.collector.projects.activated.SubscriptionFactory[IO]
-    projectViewingsSubscription                  <- viewings.collector.projects.viewed.SubscriptionFactory[IO]
-    datasetViewingsSubscription                  <- viewings.collector.datasets.SubscriptionFactory[IO]
-    viewingDeletionSubscription                  <- viewings.deletion.projects.SubscriptionFactory[IO]
+    projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
+    projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
+    datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
+    viewingDeletionSubscription    <- viewings.deletion.projects.SubscriptionFactory[IO](projectConnConfig)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,

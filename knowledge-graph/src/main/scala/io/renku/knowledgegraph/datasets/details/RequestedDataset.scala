@@ -20,9 +20,9 @@ package io.renku.knowledgegraph.datasets.details
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.{datasets, RenkuUrl}
+import io.renku.graph.model.{RenkuUrl, datasets}
 import org.http4s.Uri.Path.{Segment, SegmentEncoder}
-import scodec.bits.{Bases, ByteVector}
+import scodec.bits.ByteVector
 
 trait RequestedDataset {
   def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A
@@ -31,7 +31,6 @@ trait RequestedDataset {
 object RequestedDataset {
 
   private val sameAsPathEncodingPrefix: String = "sa"
-  private val base64Alphabet = Bases.Alphabets.Base64Url
 
   def apply(identifier: datasets.Identifier): RequestedDataset = Identifier(identifier)
   def apply(sameAs:     datasets.SameAs):     RequestedDataset = SameAs(sameAs)
@@ -40,7 +39,7 @@ object RequestedDataset {
     if (value startsWith sameAsPathEncodingPrefix) {
       val encSameAs = value.replaceFirst(sameAsPathEncodingPrefix, "")
       ByteVector
-        .fromBase64(encSameAs, base64Alphabet)
+        .fromBase58(encSameAs)
         .flatMap(_.decodeUtf8.toOption)
         .flatMap(datasets.SameAs.of(_).toOption)
         .map(RequestedDataset(_))
@@ -63,7 +62,7 @@ object RequestedDataset {
         ByteVector
           .encodeUtf8(v.value)
           .fold(throw _, identity)
-          .toBase64(base64Alphabet)
+          .toBase58
       Segment(s"$sameAsPathEncodingPrefix$base64")
   }
 

@@ -28,7 +28,7 @@ import io.renku.knowledgegraph.metrics.KGMetrics
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
@@ -39,10 +39,11 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
     implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
+    projectConnConfig                            <- ProjectsConnectionConfig[IO]()
     certificateLoader                            <- CertificateLoader[IO]
     sentryInitializer                            <- SentryInitializer[IO]
     kgMetrics                                    <- KGMetrics[IO]
-    microserviceRoutes                           <- MicroserviceRoutes[IO]
+    microserviceRoutes                           <- MicroserviceRoutes[IO](projectConnConfig)
     termSignal                                   <- SignallingRef.of[IO, Boolean](false)
     exitCode <- microserviceRoutes.routes.use { routes =>
                   val httpServer = HttpServer[IO](serverPort = port"9004", routes)

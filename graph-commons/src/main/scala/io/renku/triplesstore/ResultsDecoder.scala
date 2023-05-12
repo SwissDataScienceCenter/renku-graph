@@ -23,6 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.{Decoder, HCursor}
+import io.renku.triplesstore.client.sparql.VarName
 
 object ResultsDecoder extends ResultsDecoder {
 
@@ -73,4 +74,7 @@ trait ResultsDecoder {
 
   def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
     cursor.downField(property).downField("value").as[T]
+
+  def read[T](property: VarName)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
+    extract(property.name.drop(1))
 }

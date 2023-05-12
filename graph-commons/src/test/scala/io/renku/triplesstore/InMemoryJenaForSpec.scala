@@ -30,7 +30,11 @@ trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with Bef
     createDatasets().unsafeRunSync()
   }
 
+  def clearDatasetsBefore: Boolean = true
+
   before {
-    clearAllDatasets()
+    if (clearDatasetsBefore) {
+      clearAllDatasets()
+    }
   }
 }

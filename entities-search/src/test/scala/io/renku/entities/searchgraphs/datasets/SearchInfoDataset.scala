@@ -38,7 +38,7 @@ trait SearchInfoDataset {
       renkuUrl:        RenkuUrl,
       entityFunctions: EntityFunctions[entities.Project],
       graphsProducer:  GraphsProducer[entities.Project]
-  ) = projects.map(provisionTestProject).sequence
+  ) = projects.traverse_(provisionTestProject)
 
   def provisionTestProject(
       p: testentities.Project

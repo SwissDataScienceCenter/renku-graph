@@ -18,10 +18,10 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters.EntityType
 import io.circe.Decoder
+import io.renku.entities.search.Criteria.Filters.EntityType
+import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model.{GraphClass, persons}
-import model.{Entity, MatchingScore}
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
