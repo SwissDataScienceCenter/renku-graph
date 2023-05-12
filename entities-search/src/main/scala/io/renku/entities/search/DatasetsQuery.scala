@@ -276,7 +276,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   def textQueryPart(mq: Option[Filters.Query]): Fragment =
     mq match {
       case Some(q) =>
-        val luceneQuery = LuceneQuery(q.value)
+        val luceneQuery = LuceneQuery.fuzzy(q.value)
         fr"""|{
              |  SELECT $sameAsVar ?id (MAX(?score) AS $matchingScoreVar)
              |  WHERE {

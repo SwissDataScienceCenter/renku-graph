@@ -254,7 +254,7 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
     import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
 
     lazy val query: LuceneQuery =
-      filters.maybeQuery.map(q => LuceneQuery.escape(q.value)).getOrElse(LuceneQuery.queryAll)
+      filters.maybeQuery.map(q => LuceneQuery.fuzzy(q.value)).getOrElse(LuceneQuery.queryAll)
 
     def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
       val typeMatching = filters.entityTypes match {

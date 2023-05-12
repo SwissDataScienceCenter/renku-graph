@@ -82,7 +82,7 @@ package object search {
     import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
 
     lazy val query: LuceneQuery =
-      filters.maybeQuery.map(q => LuceneQuery.escape(q.value)).getOrElse(LuceneQuery.queryAll)
+      filters.maybeQuery.map(q => LuceneQuery.fuzzy(q.value)).getOrElse(LuceneQuery.queryAll)
 
     def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
       val typeMatching = filters.entityTypes match {
@@ -95,9 +95,9 @@ package object search {
     def onQuery(snippet: String, matchingScoreVariableName: String = "?matchingScore"): String =
       foldQuery(_ => snippet, s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)")
 
-    def foldQuery[A](ifPresent: String => A, ifMissing: => A): A =
-      if (query != LuceneQuery.queryAll) ifPresent(query.query)
-      else ifMissing
+    def foldQuery[A](ifPresent: LuceneQuery => A, ifMissing: => A): A =
+      if (query.isQueryAll) ifMissing
+      else ifPresent(query)
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true
