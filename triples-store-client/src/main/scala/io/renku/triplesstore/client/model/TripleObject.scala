@@ -33,6 +33,10 @@ object TripleObject {
     override type T = scala.Boolean
   }
 
+  final case class Char(value: scala.Char) extends AnyVal with TripleObject {
+    override type T = scala.Char
+  }
+
   final case class Int(value: scala.Int) extends AnyVal with TripleObject {
     override type T = scala.Int
   }
@@ -67,6 +71,7 @@ object TripleObject {
 
   implicit def show[T <: TripleObject]: Show[T] = Show.show {
     case v: TripleObject.Boolean   => v.value.show
+    case v: TripleObject.Char      => v.value.show
     case v: TripleObject.Int       => v.value.show
     case v: TripleObject.Long      => v.value.show
     case v: TripleObject.Float     => v.value.show

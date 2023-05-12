@@ -42,6 +42,7 @@ object TripleObjectEncoder {
 
     implicit val booleanObjEncoder: TripleObjectEncoder[scala.Boolean] =
       TripleObjectEncoder.instance(TripleObject.Boolean)
+    implicit val charObjEncoder:   TripleObjectEncoder[scala.Char]   = TripleObjectEncoder.instance(TripleObject.Char)
     implicit val intObjEncoder:    TripleObjectEncoder[scala.Int]    = TripleObjectEncoder.instance(TripleObject.Int)
     implicit val longObjEncoder:   TripleObjectEncoder[scala.Long]   = TripleObjectEncoder.instance(TripleObject.Long)
     implicit val floatObjEncoder:  TripleObjectEncoder[scala.Float]  = TripleObjectEncoder.instance(TripleObject.Float)
