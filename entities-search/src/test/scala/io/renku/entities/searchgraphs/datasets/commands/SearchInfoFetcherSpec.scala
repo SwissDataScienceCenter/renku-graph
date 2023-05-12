@@ -20,8 +20,9 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import cats.effect.IO
-import io.renku.entities.searchgraphs.datasets.Generators._
+import io.renku.entities.searchgraphs.Generators.personInfos
 import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
+import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.commands.Encoders._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
@@ -44,7 +45,7 @@ class SearchInfoFetcherSpec
 
     "find info about all Datasets that are linked to the Project" in new TestCase {
 
-      val infos = searchInfoObjectsGen(withLinkTo = projectId).generateList(min = 1)
+      val infos = datasetSearchInfoObjects(withLinkTo = projectId).generateList(min = 1)
 
       insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 
@@ -56,7 +57,7 @@ class SearchInfoFetcherSpec
 
     "work if there are ',' in names" in new TestCase {
 
-      val infos = searchInfoObjectsGen(withLinkTo = projectId)
+      val infos = datasetSearchInfoObjects(withLinkTo = projectId)
         .map(_.copy(creators = personInfos.map(_.copy(name = "name, surname")).generateNonEmptyList(max = 1)))
         .generateFixedSizeList(ofSize = 1)
 

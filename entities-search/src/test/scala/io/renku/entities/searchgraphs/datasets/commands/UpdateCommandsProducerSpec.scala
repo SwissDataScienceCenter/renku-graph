@@ -20,8 +20,8 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.Generators.{datasetSearchInfoObjects, updateCommands}
 import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
+import io.renku.entities.searchgraphs.datasets.Generators.{datasetSearchInfoObjects, updateCommands}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
 import io.renku.graph.model.testentities._
@@ -41,7 +41,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
       "- case when all the model infos have counterparts in the TS " +
       "and there is the same and sole project only on the infos in TS" in new TestCase {
 
-        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList(min = 1)
+        val modelInfos = datasetSearchInfoObjects(withLinkTo = project).generateList(min = 1)
         val tsInfos    = modelInfos
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
@@ -62,17 +62,17 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
       "zip them with the datasets found on the Project and generate update commands for them " +
       "- case when infos in the TS has more or different projects" in new TestCase {
 
-        val modelInfo1 = searchInfoObjectsGen(withLinkTo = project).generateOne
-        val modelInfo2 = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo1 = datasetSearchInfoObjects(withLinkTo = project).generateOne
+        val modelInfo2 = datasetSearchInfoObjects(withLinkTo = project).generateOne
         val modelInfos = List(modelInfo1, modelInfo2)
 
         val tsInfo1Project = projectResourceIds.generateOne -> projectVisibilities.generateOne
         val tsInfo1 =
-          searchInfoObjectsGen(withLinkTo = tsInfo1Project._1).generateOne
+          datasetSearchInfoObjects(withLinkTo = tsInfo1Project._1).generateOne
             .copy(topmostSameAs = modelInfo1.topmostSameAs)
         val tsInfo2Project = projectResourceIds.generateOne -> projectVisibilities.generateOne
         val tsInfo2 =
-          searchInfoObjectsGen(withLinkTo = project.resourceId, and = tsInfo2Project._1).generateOne
+          datasetSearchInfoObjects(withLinkTo = project.resourceId, and = tsInfo2Project._1).generateOne
             .copy(topmostSameAs = modelInfo2.topmostSameAs)
         val tsInfos = List(tsInfo1, tsInfo2)
 
@@ -98,7 +98,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     "produce commands - " +
       "case when not all model infos have counterparts in the TS" in new TestCase {
 
-        val modelInfos = searchInfoObjectsGen(withLinkTo = project).generateList(min = 2)
+        val modelInfos = datasetSearchInfoObjects(withLinkTo = project).generateList(min = 2)
         val tsInfos    = modelInfos.tail
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])
@@ -118,7 +118,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
     "produce commands - " +
       "case when not all TS infos have counterparts in the model" in new TestCase {
 
-        val tsInfos    = searchInfoObjectsGen(withLinkTo = project).generateList(min = 1)
+        val tsInfos    = datasetSearchInfoObjects(withLinkTo = project).generateList(min = 1)
         val modelInfos = tsInfos.tail
 
         givenSearchInfoFetcher(project, returning = Random.shuffle(tsInfos).pure[Try])

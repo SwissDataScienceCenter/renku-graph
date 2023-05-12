@@ -19,8 +19,9 @@
 package io.renku.entities.searchgraphs.datasets
 package commands
 
+import io.renku.entities.searchgraphs.Generators.personInfos
 import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.entities.searchgraphs.datasets.{LinkOntology, DatasetSearchInfo, SearchInfoOntology}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, LinkOntology, SearchInfoOntology}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds

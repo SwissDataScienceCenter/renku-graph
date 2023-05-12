@@ -16,18 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
+package io.renku.entities.searchgraphs
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.SearchGraphsProvisioner
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.{RenkuUrl, entities, testentities}
 import io.renku.logging.{ExecutionTimeRecorder, TestExecutionTimeRecorder}
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-trait SearchInfoDataset {
+trait SearchInfoDatasets {
   self: ProjectsDataset with InMemoryJena =>
 
   implicit def ioLogger: Logger[IO]

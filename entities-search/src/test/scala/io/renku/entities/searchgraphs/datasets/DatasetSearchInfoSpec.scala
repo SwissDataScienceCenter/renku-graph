@@ -158,15 +158,3 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     }
   }
 }
-
-class PersonLinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
-
-  "show" should {
-
-    "returns String representation" in {
-      forAll(personInfos) { case info @ PersonInfo(id, name) =>
-        info.show shouldBe show"id = $id, name = $name"
-      }
-    }
-  }
-}

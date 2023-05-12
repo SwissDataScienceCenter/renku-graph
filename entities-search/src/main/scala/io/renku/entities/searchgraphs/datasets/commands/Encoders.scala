@@ -18,9 +18,10 @@
 
 package io.renku.entities.searchgraphs.datasets.commands
 
-import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset}
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.{Link, LinkOntology, PersonInfo, DatasetSearchInfo, SearchInfoOntology}
+import io.renku.entities.searchgraphs.PersonInfo
+import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, Link, LinkOntology, SearchInfoOntology}
 import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Person

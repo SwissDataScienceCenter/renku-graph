@@ -20,7 +20,7 @@ package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.PersonInfo._
+import io.renku.entities.searchgraphs.PersonInfo._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._

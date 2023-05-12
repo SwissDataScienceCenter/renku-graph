@@ -20,7 +20,7 @@ package io.renku.entities.searchgraphs.datasets
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.PersonInfo._
+import io.renku.entities.searchgraphs
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand
 import io.renku.generators.Generators.Implicits._
@@ -39,7 +39,7 @@ private object Generators {
     createdOrPublished <- datasetCreatedOrPublished
     visibility         <- projectVisibilities
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
-    creators           <- personInfos.toGeneratorOfNonEmptyList(max = 2)
+    creators           <- searchgraphs.Generators.personInfos.toGeneratorOfNonEmptyList(max = 2)
     keywords           <- datasetKeywords.toGeneratorOfList(max = 2)
     maybeDesc          <- datasetDescriptions.toGeneratorOfOptions
     images             <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
@@ -56,10 +56,10 @@ private object Generators {
                             links
   )
 
-  def searchInfoObjectsGen(withLinkTo: entities.Project): Gen[DatasetSearchInfo] =
-    searchInfoObjectsGen(withLinkTo.resourceId).map(_.copy(visibility = withLinkTo.visibility))
+  def datasetSearchInfoObjects(withLinkTo: entities.Project): Gen[DatasetSearchInfo] =
+    datasetSearchInfoObjects(withLinkTo.resourceId).map(_.copy(visibility = withLinkTo.visibility))
 
-  def searchInfoObjectsGen(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[DatasetSearchInfo] =
+  def datasetSearchInfoObjects(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[DatasetSearchInfo] =
     datasetSearchInfoObjects.map { i =>
       searchInfoLinks
         .modify { _ =>
@@ -67,9 +67,6 @@ private object Generators {
           linkedProjects.map(linkProjectId.set(_)(linkObjectsGen(i.topmostSameAs).generateOne))
         }(i)
     }
-
-  lazy val personInfos: Gen[PersonInfo] =
-    personEntities.map(_.to[entities.Person]).map(toPersonInfo)
 
   def linkObjectsGen(topmostSameAs: TopmostSameAs,
                      projectIdGen:  Gen[projects.ResourceId] = projectResourceIds

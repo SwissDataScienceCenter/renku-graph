@@ -21,7 +21,7 @@ package details
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.SearchInfoDataset
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
@@ -47,7 +47,7 @@ class DatasetFinderSpec
     with OptionValues
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with SearchInfoDataset
+    with SearchInfoDatasets
     with ScalaCheckPropertyChecks
     with IOSpec {
 

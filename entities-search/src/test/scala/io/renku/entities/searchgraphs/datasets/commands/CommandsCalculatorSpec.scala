@@ -50,7 +50,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject()
 
-        val info = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val info = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val infoSet = CalculatorInfoSet.AllInfos(project.identification,
                                                  info,
@@ -66,7 +66,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val infoSet = CalculatorInfoSet.ModelInfoOnly(project.identification, modelInfo)
 
@@ -78,7 +78,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject()
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfo =
           modelInfo.copy(links = modelInfo.links ::: linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList())
@@ -98,7 +98,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(visibilities(minus = projects.Visibility.Private).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val otherTsLinks = linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList()
         val tsInfo       = modelInfo.copy(links = modelInfo.links ::: otherTsLinks)
@@ -120,7 +120,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(visibilities(minus = projects.Visibility.Public).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val otherTsLinks = linkObjectsGen(modelInfo.topmostSameAs).generateNonEmptyList()
         val tsInfo       = modelInfo.copy(links = modelInfo.links ::: otherTsLinks)
@@ -142,7 +142,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(visibilities(minus = projects.Visibility.Private).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfoVisibility = visibilitiesNarrower(modelInfo.visibility).generateOne
         val tsInfoLink       = linkObjectsGen(modelInfo.topmostSameAs).generateOne
@@ -166,7 +166,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(visibilities(minus = projects.Visibility.Public).generateOne)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
         val tsInfoLink1      = linkObjectsGen(modelInfo.topmostSameAs).generateOne
@@ -191,7 +191,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(projects.Visibility.Private)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
         val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
@@ -213,7 +213,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(projects.Visibility.Private)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfoVisibility = visibilitiesBroader(modelInfo.visibility).generateOne
         val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
@@ -238,7 +238,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject(projects.Visibility.Public)
 
-        val modelInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val modelInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val tsInfoVisibility = visibilitiesNarrower(modelInfo.visibility).generateOne
         val otherTsInfoLink  = linkObjectsGen(modelInfo.topmostSameAs).generateOne
@@ -263,7 +263,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
         val project = newProject()
 
-        val tsInfo = searchInfoObjectsGen(withLinkTo = project).generateOne
+        val tsInfo = datasetSearchInfoObjects(withLinkTo = project).generateOne
 
         val infoSet =
           CalculatorInfoSet.TSInfoOnly(project.identification, tsInfo, Map(project.resourceId -> tsInfo.visibility))
@@ -280,7 +280,10 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
         val otherTsProject2Id = projectResourceIds.generateOne
         val tsInfoVisibility  = visibilitiesBroader(projects.Visibility.Private).generateOne
         val tsInfo =
-          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProject1Id, otherTsProject2Id).generateOne
+          datasetSearchInfoObjects(withLinkTo = project.resourceId,
+                                   and = otherTsProject1Id,
+                                   otherTsProject2Id
+          ).generateOne
             .copy(visibility = tsInfoVisibility)
 
         val infoSet = CalculatorInfoSet.TSInfoOnly(
@@ -309,7 +312,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
         val otherTsProjectId         = projectResourceIds.generateOne
         val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
         val tsInfo =
-          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
+          datasetSearchInfoObjects(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
             .copy(visibility = projects.Visibility.Public)
 
         val infoSet = CalculatorInfoSet.TSInfoOnly(
@@ -337,7 +340,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
         val otherTsProjectId         = projectResourceIds.generateOne
         val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
         val tsInfo =
-          searchInfoObjectsGen(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
+          datasetSearchInfoObjects(withLinkTo = project.resourceId, and = otherTsProjectId).generateOne
             .copy(visibility = projects.Visibility.Public)
 
         val infoSet = CalculatorInfoSet.TSInfoOnly(
@@ -367,7 +370,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
       val otherTsProjectId         = projectResourceIds.generateOne
       val otherTsProjectVisibility = visibilitiesNarrower(projects.Visibility.Public).generateOne
-      val tsInfo = searchInfoObjectsGen(withLinkTo = otherTsProjectId).generateOne
+      val tsInfo = datasetSearchInfoObjects(withLinkTo = otherTsProjectId).generateOne
         .copy(visibility = otherTsProjectVisibility)
 
       val infoSet = CalculatorInfoSet.TSInfoOnly(

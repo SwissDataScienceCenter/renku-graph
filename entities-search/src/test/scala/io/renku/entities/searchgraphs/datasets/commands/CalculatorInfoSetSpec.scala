@@ -37,7 +37,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     "create CalculatorInfoSet if there's no TS Search Info" in {
 
       val project        = projectIdentifications.generateOne
-      val modelInfo      = searchInfoObjectsGen(project.resourceId).generateOne
+      val modelInfo      = datasetSearchInfoObjects(project.resourceId).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
       val Right(infoSet) = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
@@ -48,7 +48,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     "create CalculatorInfoSet if there's no model Search Info" in {
 
       val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
-      val tsInfo         = searchInfoObjectsGen(project.resourceId).generateOne
+      val tsInfo         = datasetSearchInfoObjects(project.resourceId).generateOne
       val tsVisibilities = Map(project.resourceId -> project.visibility)
 
       val Right(infoSet) = CalculatorInfoSet.from(project.identification, None, tsInfo.some, tsVisibilities)
@@ -59,8 +59,8 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     "create CalculatorInfoSet if there are both Search Infos" in {
 
       val project        = anyRenkuProjectEntities(anyVisibility).map(_.to[entities.Project]).generateOne
-      val modelInfo      = searchInfoObjectsGen(project.resourceId).generateOne
-      val tsInfo         = searchInfoObjectsGen(project.resourceId).generateOne
+      val modelInfo      = datasetSearchInfoObjects(project.resourceId).generateOne
+      val tsInfo         = datasetSearchInfoObjects(project.resourceId).generateOne
       val tsVisibilities = Map(project.resourceId -> project.visibility)
 
       val Right(infoSet) = CalculatorInfoSet.from(project.identification, modelInfo.some, tsInfo.some, tsVisibilities)
@@ -71,7 +71,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     "fail if there's model Search Info with multiple Links" in {
 
       val project        = projectIdentifications.generateOne
-      val modelInfo      = searchInfoObjectsGen(project.resourceId, projectResourceIds.generateOne).generateOne
+      val modelInfo      = datasetSearchInfoObjects(project.resourceId, projectResourceIds.generateOne).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
       val result = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
@@ -84,7 +84,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     "fail if there's model Search Info pointing to some other Project" in {
 
       val project        = projectIdentifications.generateOne
-      val modelInfo      = searchInfoObjectsGen(projectResourceIds.generateOne).generateOne
+      val modelInfo      = datasetSearchInfoObjects(projectResourceIds.generateOne).generateOne
       val tsVisibilities = Map.empty[projects.ResourceId, projects.Visibility]
 
       val result = CalculatorInfoSet.from(project, modelInfo.some, None, tsVisibilities)
@@ -109,9 +109,9 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
 
     "return String containing project id and path along with model and TS search info" in {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-        val maybeModelInfo = searchInfoObjectsGen(withLinkTo = project.resourceId).generateSome
+        val maybeModelInfo = datasetSearchInfoObjects(withLinkTo = project.resourceId).generateSome
 
-        val maybeTSInfo = searchInfoObjectsGen(
+        val maybeTSInfo = datasetSearchInfoObjects(
           withLinkTo = project.resourceId,
           and = projectResourceIds.generateList(): _*
         ).generateSome

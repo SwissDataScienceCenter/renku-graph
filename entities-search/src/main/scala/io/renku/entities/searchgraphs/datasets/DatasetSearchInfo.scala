@@ -21,9 +21,9 @@ package io.renku.entities.searchgraphs.datasets
 import cats.Show
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.graph.model.entities.Person
+import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.graph.model.{datasets, projects}
 
 private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                            name:               datasets.Name,
@@ -128,14 +128,5 @@ private object links {
     def from(topmostSameAs: datasets.TopmostSameAs, projectPath: projects.Path): ResourceId = ResourceId(
       (topmostSameAs / projectPath).value
     )
-  }
-}
-
-private final case class PersonInfo(resourceId: persons.ResourceId, name: persons.Name)
-
-private object PersonInfo {
-  lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
-  implicit lazy val show: Show[PersonInfo] = Show.show { case PersonInfo(resourceId, name) =>
-    show"id = $resourceId, name = $name"
   }
 }

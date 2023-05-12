@@ -21,7 +21,7 @@ package io.renku.entities.searchgraphs.datasets
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.PersonInfo._
+import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.{Dataset, Project}
 
