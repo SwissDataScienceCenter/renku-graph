@@ -20,7 +20,7 @@ package io.renku.entities.searchgraphs.datasets.commands
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.SearchInfo
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.projects
 
@@ -30,22 +30,22 @@ private sealed trait CalculatorInfoSet {
 
 private object CalculatorInfoSet {
 
-  final case class ModelInfoOnly(project: ProjectIdentification, modelInfo: SearchInfo) extends CalculatorInfoSet
+  final case class ModelInfoOnly(project: ProjectIdentification, modelInfo: DatasetSearchInfo) extends CalculatorInfoSet
 
   final case class TSInfoOnly(project:        ProjectIdentification,
-                              tsInfo:         SearchInfo,
+                              tsInfo:         DatasetSearchInfo,
                               tsVisibilities: Map[projects.ResourceId, projects.Visibility]
   ) extends CalculatorInfoSet
 
   final case class AllInfos(project:        ProjectIdentification,
-                            modelInfo:      SearchInfo,
-                            tsInfo:         SearchInfo,
+                            modelInfo:      DatasetSearchInfo,
+                            tsInfo:         DatasetSearchInfo,
                             tsVisibilities: Map[projects.ResourceId, projects.Visibility]
   ) extends CalculatorInfoSet
 
   def from(project:        ProjectIdentification,
-           maybeModelInfo: Option[SearchInfo],
-           maybeTSInfo:    Option[SearchInfo],
+           maybeModelInfo: Option[DatasetSearchInfo],
+           maybeTSInfo:    Option[DatasetSearchInfo],
            tsVisibilities: Map[projects.ResourceId, projects.Visibility]
   ): Either[Exception, CalculatorInfoSet] =
     validate(project, maybeModelInfo, maybeTSInfo) >>= { _ =>
@@ -53,8 +53,8 @@ private object CalculatorInfoSet {
     }
 
   private def validate(project:        ProjectIdentification,
-                       maybeModelInfo: Option[SearchInfo],
-                       maybeTSInfo:    Option[SearchInfo]
+                       maybeModelInfo: Option[DatasetSearchInfo],
+                       maybeTSInfo:    Option[DatasetSearchInfo]
   ): Either[Exception, Unit] =
     (maybeModelInfo, maybeTSInfo) match {
       case (Some(modelInfo), _) if modelInfo.links.size > 1 =>
@@ -67,8 +67,8 @@ private object CalculatorInfoSet {
     }
 
   private lazy val instantiate: (ProjectIdentification,
-                                 Option[SearchInfo],
-                                 Option[SearchInfo],
+                                 Option[DatasetSearchInfo],
+                                 Option[DatasetSearchInfo],
                                  Map[projects.ResourceId, projects.Visibility]
   ) => Either[Exception, CalculatorInfoSet] = {
     case (project, Some(modelInfo), None, _)             => ModelInfoOnly(project, modelInfo).asRight
@@ -87,7 +87,7 @@ private object CalculatorInfoSet {
       show"$project, modelInfo = [${toString(modelInfo)}], tsInfo = [${toString(tsInfo)}]"
   }
 
-  private def toString(info: SearchInfo) = List(
+  private def toString(info: DatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
     show"name = ${info.name}",
     show"visibility = ${info.visibility}",

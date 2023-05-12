@@ -24,9 +24,10 @@ import monocle.Lens
 
 private object SearchInfoLens {
 
-  val searchInfoLinks: Lens[SearchInfo, NonEmptyList[Link]] = Lens[SearchInfo, NonEmptyList[Link]](_.links) {
-    links => info => info.copy(links = links)
-  }
+  val searchInfoLinks: Lens[DatasetSearchInfo, NonEmptyList[Link]] =
+    Lens[DatasetSearchInfo, NonEmptyList[Link]](_.links) { links => info =>
+      info.copy(links = links)
+    }
 
   val linkProjectId: Lens[Link, projects.ResourceId] =
     Lens[Link, projects.ResourceId](_.projectId) { projectId =>

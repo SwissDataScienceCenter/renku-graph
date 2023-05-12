@@ -29,7 +29,7 @@ private object SearchInfoExtractor {
 
   def extractSearchInfo[F[_]: MonadThrow](
       project: Project
-  )(datasets: List[Dataset[Dataset.Provenance]]): F[List[SearchInfo]] =
+  )(datasets: List[Dataset[Dataset.Provenance]]): F[List[DatasetSearchInfo]] =
     datasets
       .map(toSearchInfo[F](project))
       .sequence
@@ -59,7 +59,7 @@ private object SearchInfoExtractor {
                                createdOrPublished: datasets.CreatedOrPublished,
                                maybeDateModified:  Option[datasets.DateModified],
                                project:            Project
-  ) = SearchInfo(
+  ) = DatasetSearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
     project.visibility,

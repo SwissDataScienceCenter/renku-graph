@@ -20,8 +20,8 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.Generators.{searchInfoObjectsGen, updateCommands}
-import io.renku.entities.searchgraphs.datasets.SearchInfo
+import io.renku.entities.searchgraphs.datasets.Generators.{datasetSearchInfoObjects, updateCommands}
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
 import io.renku.graph.model.testentities._
@@ -151,7 +151,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
       }
     )
 
-    def givenSearchInfoFetcher(project: entities.Project, returning: Try[List[SearchInfo]]) =
+    def givenSearchInfoFetcher(project: entities.Project, returning: Try[List[DatasetSearchInfo]]) =
       (searchInfoFetcher.fetchTSSearchInfos _)
         .expects(project.resourceId)
         .returning(returning)
@@ -166,8 +166,8 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with M
       returning
     }
 
-    def toInfoSets(modelInfos:     List[Option[SearchInfo]],
-                   tsInfos:        List[Option[SearchInfo]],
+    def toInfoSets(modelInfos:     List[Option[DatasetSearchInfo]],
+                   tsInfos:        List[Option[DatasetSearchInfo]],
                    tsVisibilities: Map[projects.ResourceId, projects.Visibility]
     ): Seq[CalculatorInfoSet] =
       (modelInfos zip tsInfos)

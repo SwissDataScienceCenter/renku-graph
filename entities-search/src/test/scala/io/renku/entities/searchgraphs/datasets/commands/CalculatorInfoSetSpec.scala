@@ -21,7 +21,7 @@ package commands
 
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.entities.searchgraphs.datasets.SearchInfo
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
 import io.renku.graph.model.testentities._
@@ -132,7 +132,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
     }
   }
 
-  private def searchIntoToString(info: SearchInfo) = List(
+  private def searchIntoToString(info: DatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
     show"name = ${info.name}",
     show"visibility = ${info.visibility}",

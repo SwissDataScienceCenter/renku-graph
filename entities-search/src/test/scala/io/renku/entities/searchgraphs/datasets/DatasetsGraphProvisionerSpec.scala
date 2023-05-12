@@ -92,14 +92,14 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
     private val commandsUploader = mock[UpdateCommandsUploader[Try]]
     val provisioner              = new DatasetsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
 
-    def givenSearchInfoExtraction(project: entities.Project): Try[List[SearchInfo]] =
+    def givenSearchInfoExtraction(project: entities.Project): Try[List[DatasetSearchInfo]] =
       (collectLastVersions >>> extractSearchInfo[Try](project))(project)
 
     def givenUpdatesProducing(project:     entities.ProjectIdentification,
-                              searchInfos: List[SearchInfo],
+                              searchInfos: List[DatasetSearchInfo],
                               returning:   Try[List[UpdateCommand]]
     ) = (commandsProducer
-      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[SearchInfo]))
+      .toUpdateCommands(_: entities.ProjectIdentification)(_: List[DatasetSearchInfo]))
       .expects(project, searchInfos)
       .returning(returning)
 

@@ -33,7 +33,7 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit lazy val searchInfoObjectsGen: Gen[SearchInfo] = for {
+  implicit lazy val datasetSearchInfoObjects: Gen[DatasetSearchInfo] = for {
     topmostSameAs      <- datasetTopmostSameAs
     name               <- datasetNames
     createdOrPublished <- datasetCreatedOrPublished
@@ -44,23 +44,23 @@ private object Generators {
     maybeDesc          <- datasetDescriptions.toGeneratorOfOptions
     images             <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
     links              <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
-  } yield SearchInfo(topmostSameAs,
-                     name,
-                     visibility,
-                     createdOrPublished,
-                     maybeDateModified,
-                     creators,
-                     keywords,
-                     maybeDesc,
-                     images.toList,
-                     links
+  } yield DatasetSearchInfo(topmostSameAs,
+                            name,
+                            visibility,
+                            createdOrPublished,
+                            maybeDateModified,
+                            creators,
+                            keywords,
+                            maybeDesc,
+                            images.toList,
+                            links
   )
 
-  def searchInfoObjectsGen(withLinkTo: entities.Project): Gen[SearchInfo] =
+  def searchInfoObjectsGen(withLinkTo: entities.Project): Gen[DatasetSearchInfo] =
     searchInfoObjectsGen(withLinkTo.resourceId).map(_.copy(visibility = withLinkTo.visibility))
 
-  def searchInfoObjectsGen(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[SearchInfo] =
-    searchInfoObjectsGen.map { i =>
+  def searchInfoObjectsGen(withLinkTo: projects.ResourceId, and: projects.ResourceId*): Gen[DatasetSearchInfo] =
+    datasetSearchInfoObjects.map { i =>
       searchInfoLinks
         .modify { _ =>
           val linkedProjects = NonEmptyList.of(withLinkTo, and: _*)

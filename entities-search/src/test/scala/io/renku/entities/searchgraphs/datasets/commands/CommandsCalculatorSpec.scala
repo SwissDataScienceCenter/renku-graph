@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.commands.Encoders._
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand._
-import io.renku.entities.searchgraphs.datasets.{Link, SearchInfo, SearchInfoOntology}
+import io.renku.entities.searchgraphs.datasets.{Link, DatasetSearchInfo, SearchInfoOntology}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
@@ -394,10 +394,10 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
   private def visibilitiesBroader(than: projects.Visibility): Gen[projects.Visibility] =
     Gen.oneOf(projects.Visibility.allOrdered.takeWhile(_ != than))
 
-  private def linkEdge(info: SearchInfo, link: Link): Quad =
+  private def linkEdge(info: DatasetSearchInfo, link: Link): Quad =
     DatasetsQuad(info.topmostSameAs, SearchInfoOntology.linkProperty, link.resourceId.asEntityId)
 
-  private def visibilityQuad(info: SearchInfo, visibility: projects.Visibility): Quad =
+  private def visibilityQuad(info: DatasetSearchInfo, visibility: projects.Visibility): Quad =
     DatasetsQuad(info.topmostSameAs, SearchInfoOntology.visibilityProperty.id, visibility.asObject)
 
   private def produce(expected: List[UpdateCommand]) = new Matcher[Try[List[UpdateCommand]]] {

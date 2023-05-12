@@ -23,7 +23,7 @@ import io.renku.entities.searchgraphs.datasets.SearchInfoOntology.{linkProperty,
 import UpdateCommand._
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.{Link, SearchInfo, links}
+import io.renku.entities.searchgraphs.datasets.{Link, DatasetSearchInfo, links}
 import io.renku.graph.model.{datasets, projects}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._
@@ -72,7 +72,7 @@ private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculato
   }
 
   private object `DS exists on Project only` {
-    def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
+    def unapply(infoSet: CalculatorInfoSet): Option[DatasetSearchInfo] = infoSet match {
       case CalculatorInfoSet.ModelInfoOnly(_, modelInfo) => modelInfo.some
       case _                                             => None
     }
@@ -123,7 +123,7 @@ private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculato
   }
 
   private object `DS exists on TS only on the single project` {
-    def unapply(infoSet: CalculatorInfoSet): Option[SearchInfo] = infoSet match {
+    def unapply(infoSet: CalculatorInfoSet): Option[DatasetSearchInfo] = infoSet match {
       case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, _)
           if tsInfo.findLink(proj.resourceId).nonEmpty && tsInfo.links.size == 1 =>
         tsInfo.some
@@ -160,7 +160,9 @@ private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculato
   private def maxVisibilityNow(tsVisibilities: Map[projects.ResourceId, projects.Visibility]) =
     findMax(tsVisibilities)
 
-  private def maxVisibilityAfter(tsVisibilities: Map[projects.ResourceId, projects.Visibility], modelInfo: SearchInfo) =
+  private def maxVisibilityAfter(tsVisibilities: Map[projects.ResourceId, projects.Visibility],
+                                 modelInfo:      DatasetSearchInfo
+  ) =
     findMax(tsVisibilities + (modelInfo.links.head.projectId -> modelInfo.visibility))
 
   private def findMax(visibilities: Map[projects.ResourceId, projects.Visibility]): projects.Visibility =

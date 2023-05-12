@@ -31,13 +31,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "findLink" should {
 
     "return the relevant link if there's a link for the given projectId" in {
 
-      val info         = searchInfoObjectsGen.generateOne
+      val info         = datasetSearchInfoObjects.generateOne
       val project1Link = linkObjectsGen(info.topmostSameAs).generateOne
       val project2Link = linkObjectsGen(info.topmostSameAs).generateOne
       val someLink     = Gen.oneOf(project1Link, project2Link).generateOne
@@ -47,24 +47,24 @@ class SearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
     }
 
     "return None if there's no link for the given projectId" in {
-      searchInfoObjectsGen.generateOne.findLink(projectResourceIds.generateOne) shouldBe None
+      datasetSearchInfoObjects.generateOne.findLink(projectResourceIds.generateOne) shouldBe None
     }
   }
 
   "show" should {
 
     "return String representation of the Info" in {
-      forAll(searchInfoObjectsGen) {
-        case info @ SearchInfo(topSameAs,
-                               name,
-                               visibility,
-                               createdOrPublished,
-                               maybeDateModified,
-                               creators,
-                               keywords,
-                               maybeDescription,
-                               images,
-                               links
+      forAll(datasetSearchInfoObjects) {
+        case info @ DatasetSearchInfo(topSameAs,
+                                      name,
+                                      visibility,
+                                      createdOrPublished,
+                                      maybeDateModified,
+                                      creators,
+                                      keywords,
+                                      maybeDescription,
+                                      images,
+                                      links
             ) =>
           info.show shouldBe List(
             show"topmostSameAs = $topSameAs".some,

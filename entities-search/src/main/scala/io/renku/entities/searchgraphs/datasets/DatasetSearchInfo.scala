@@ -25,34 +25,34 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.{datasets, persons, projects}
 
-private final case class SearchInfo(topmostSameAs:      datasets.TopmostSameAs,
-                                    name:               datasets.Name,
-                                    visibility:         projects.Visibility,
-                                    createdOrPublished: datasets.CreatedOrPublished,
-                                    maybeDateModified:  Option[datasets.DateModified],
-                                    creators:           NonEmptyList[PersonInfo],
-                                    keywords:           List[datasets.Keyword],
-                                    maybeDescription:   Option[datasets.Description],
-                                    images:             List[Image],
-                                    links:              NonEmptyList[Link]
+private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
+                                           name:               datasets.Name,
+                                           visibility:         projects.Visibility,
+                                           createdOrPublished: datasets.CreatedOrPublished,
+                                           maybeDateModified:  Option[datasets.DateModified],
+                                           creators:           NonEmptyList[PersonInfo],
+                                           keywords:           List[datasets.Keyword],
+                                           maybeDescription:   Option[datasets.Description],
+                                           images:             List[Image],
+                                           links:              NonEmptyList[Link]
 ) {
   def findLink(projectId: projects.ResourceId): Option[Link] =
     links.find(_.projectId == projectId)
 }
 
-private object SearchInfo {
+private object DatasetSearchInfo {
 
-  implicit val show: Show[SearchInfo] = Show.show {
-    case SearchInfo(topSameAs,
-                    name,
-                    visibility,
-                    createdOrPublished,
-                    maybeDateModified,
-                    creators,
-                    keywords,
-                    maybeDescription,
-                    images,
-                    links
+  implicit val show: Show[DatasetSearchInfo] = Show.show {
+    case DatasetSearchInfo(topSameAs,
+                           name,
+                           visibility,
+                           createdOrPublished,
+                           maybeDateModified,
+                           creators,
+                           keywords,
+                           maybeDescription,
+                           images,
+                           links
         ) =>
       List(
         show"topmostSameAs = $topSameAs".some,

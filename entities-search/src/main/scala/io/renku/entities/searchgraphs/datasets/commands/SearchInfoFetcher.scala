@@ -22,14 +22,14 @@ import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.entities.searchgraphs
-import io.renku.entities.searchgraphs.datasets.{Link, PersonInfo, SearchInfo, links}
+import io.renku.entities.searchgraphs.datasets.{Link, PersonInfo, DatasetSearchInfo, links}
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait SearchInfoFetcher[F[_]] {
-  def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[SearchInfo]]
+  def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[DatasetSearchInfo]]
 }
 
 private object SearchInfoFetcher {
@@ -56,8 +56,8 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore.client.syntax._
 
-  override def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[SearchInfo]] =
-    queryExpecting[List[SearchInfo]](query(projectId))
+  override def fetchTSSearchInfos(projectId: projects.ResourceId): F[List[DatasetSearchInfo]] =
+    queryExpecting[List[DatasetSearchInfo]](query(projectId))
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "ds search infos",
@@ -115,7 +115,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   private lazy val rowsSeparator = '\u0000'
 
-  private implicit lazy val recordsDecoder: Decoder[List[SearchInfo]] = ResultsDecoder[List, SearchInfo] {
+  private implicit lazy val recordsDecoder: Decoder[List[DatasetSearchInfo]] = ResultsDecoder[List, DatasetSearchInfo] {
     implicit cur =>
       import Decoder._
       import io.circe.DecodingFailure
@@ -225,16 +225,16 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         keywords                                     <- extract[Option[String]]("keywords") >>= toListOfKeywords
         images                                       <- extract[Option[String]]("images") >>= toListOfImages
         links                                        <- extract[String]("links") >>= toListOfLinks
-      } yield searchgraphs.datasets.SearchInfo(topSameAs,
-                                               name,
-                                               visibility,
-                                               createdOrPublished,
-                                               maybeDateModified,
-                                               creators,
-                                               keywords,
-                                               maybeDescription,
-                                               images,
-                                               links
+      } yield searchgraphs.datasets.DatasetSearchInfo(topSameAs,
+                                                      name,
+                                                      visibility,
+                                                      createdOrPublished,
+                                                      maybeDateModified,
+                                                      creators,
+                                                      keywords,
+                                                      maybeDescription,
+                                                      images,
+                                                      links
       )
   }
 }

@@ -21,7 +21,7 @@ package commands
 
 import cats.effect.IO
 import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.entities.searchgraphs.datasets.SearchInfo
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
 import io.renku.entities.searchgraphs.datasets.commands.Encoders._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
@@ -49,7 +49,7 @@ class SearchInfoFetcherSpec
       insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 
       // other project DS
-      insert(projectsDataset, searchInfoObjectsGen.generateOne.asQuads)
+      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
 
       fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
     }
@@ -67,7 +67,7 @@ class SearchInfoFetcherSpec
 
     "return nothing if no Datasets for the Project" in new TestCase {
 
-      insert(projectsDataset, searchInfoObjectsGen.generateOne.asQuads)
+      insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
 
       fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe Nil
     }
@@ -82,9 +82,9 @@ class SearchInfoFetcherSpec
     val fetcher = new SearchInfoFetcherImpl[IO](projectsDSConnectionInfo)
   }
 
-  private def orderValues(info: SearchInfo) = info.copy(creators = info.creators.sortBy(_.name),
-                                                        keywords = info.keywords.sorted,
-                                                        images = info.images.sortBy(_.position),
-                                                        links = info.links.sortBy(_.projectId)
+  private def orderValues(info: DatasetSearchInfo) = info.copy(creators = info.creators.sortBy(_.name),
+                                                               keywords = info.keywords.sorted,
+                                                               images = info.images.sortBy(_.position),
+                                                               links = info.links.sortBy(_.projectId)
   )
 }

@@ -45,7 +45,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
 
       SearchInfoExtractor.extractSearchInfo[Try](project)(datasets) shouldBe datasets
         .map { ds =>
-          SearchInfo(
+          DatasetSearchInfo(
             ds.provenance.topmostSameAs,
             ds.identification.name,
             project.visibility,
@@ -74,7 +74,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
       val lastModification = project.datasets.last
 
       SearchInfoExtractor.extractSearchInfo[Try](project)(List(lastModification)) shouldBe List(
-        SearchInfo(
+        DatasetSearchInfo(
           lastModification.provenance.topmostSameAs,
           lastModification.identification.name,
           project.visibility,
