@@ -16,38 +16,34 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs
-package projects
+package io.renku.entities.searchgraphs.projects
+package commands
 
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import commands.UpdateCommandsProducer
-import io.renku.graph.model.entities.Project
+import io.renku.entities.searchgraphs.UpdateCommand
+import io.renku.entities.searchgraphs.projects.ProjectSearchInfo
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-trait ProjectsGraphProvisioner[F[_]] {
-  def provisionProjectsGraph(project: Project): F[Unit]
+private[projects] trait UpdateCommandsProducer[F[_]] {
+  def toUpdateCommands(modelInfo: ProjectSearchInfo): F[List[UpdateCommand]]
 }
 
-object ProjectsGraphProvisioner {
+private[projects] object UpdateCommandsProducer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
-  ): ProjectsGraphProvisioner[F] =
-    new ProjectsGraphProvisionerImpl[F](UpdateCommandsProducer[F](connectionConfig),
-                                        UpdateCommandsUploader[F](connectionConfig)
-    )
+  ): UpdateCommandsProducer[F] =
+    new UpdateCommandsProducerImpl[F](SearchInfoFetcher[F](connectionConfig), CommandsCalculator[F])
 }
 
-private class ProjectsGraphProvisionerImpl[F[_]: MonadThrow](commandsProducer: UpdateCommandsProducer[F],
-                                                             commandsUploader: UpdateCommandsUploader[F]
-) extends ProjectsGraphProvisioner[F] {
+private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],
+                                                           commandsCalculator: CommandsCalculator[F]
+) extends UpdateCommandsProducer[F] {
 
-  import SearchInfoExtractor.extractSearchInfo
-  import commandsProducer.toUpdateCommands
-  import commandsUploader.upload
-
-  override def provisionProjectsGraph(project: Project): F[Unit] =
-    toUpdateCommands(extractSearchInfo(project)) >>= upload
+  override def toUpdateCommands(modelInfo: ProjectSearchInfo): F[List[UpdateCommand]] =
+    searchInfoFetcher
+      .fetchTSSearchInfo(modelInfo.id)
+      .flatMap(commandsCalculator.calculateCommands(modelInfo, _))
 }

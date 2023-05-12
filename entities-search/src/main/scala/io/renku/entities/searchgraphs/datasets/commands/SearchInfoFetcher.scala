@@ -20,7 +20,6 @@ package io.renku.entities.searchgraphs.datasets.commands
 
 import cats.data.NonEmptyList
 import cats.effect.Async
-import cats.syntax.all._
 import io.renku.entities.searchgraphs
 import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, Link, links}
@@ -38,9 +37,6 @@ private object SearchInfoFetcher {
       connectionConfig: ProjectsConnectionConfig
   ): SearchInfoFetcher[F] =
     new SearchInfoFetcherImpl[F](connectionConfig)
-
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SearchInfoFetcher[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)

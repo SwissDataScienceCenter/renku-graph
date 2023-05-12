@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
+package io.renku.entities.searchgraphs
 
+import Generators.updateCommands
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.datasets.Generators.updateCommands
-import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.triplesstore.client.TriplesStoreGenerators.quads

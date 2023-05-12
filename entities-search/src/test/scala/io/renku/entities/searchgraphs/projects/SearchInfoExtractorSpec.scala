@@ -18,23 +18,32 @@
 
 package io.renku.entities.searchgraphs.projects
 
-import io.renku.entities.searchgraphs
+import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private object Generators {
+class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
 
-  implicit lazy val projectSearchInfoObjects: Gen[ProjectSearchInfo] = for {
-    id           <- projectResourceIds
-    name         <- projectNames
-    path         <- projectPaths
-    createdDate  <- projectCreatedDates()
-    visibility   <- projectVisibilities
-    maybeCreator <- searchgraphs.Generators.personInfos.toGeneratorOfOptions
-    keywords     <- projectKeywords.toGeneratorOfList(max = 2)
-    maybeDesc    <- projectDescriptions.toGeneratorOfOptions
-    images       <- imageUris.toGeneratorOfList(max = 2).map(convertImageUris(id.asEntityId))
-  } yield ProjectSearchInfo(id, name, path, visibility, createdDate, maybeCreator, keywords, maybeDesc, images.toList)
+  "extractSearchInfo" should {
+
+    "convert the given non-modified Datasets to SearchInfo objects" in {
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
+        project.resourceId,
+        project.name,
+        project.path,
+        project.visibility,
+        project.dateCreated,
+        project.maybeCreator.map(PersonInfo.toPersonInfo),
+        project.keywords.toList,
+        project.maybeDescription,
+        project.images
+      )
+    }
+  }
 }

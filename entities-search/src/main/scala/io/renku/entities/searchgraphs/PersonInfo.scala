@@ -26,6 +26,7 @@ import io.renku.graph.model.persons
 private final case class PersonInfo(resourceId: persons.ResourceId, name: persons.Name)
 
 private object PersonInfo {
+
   lazy val toPersonInfo: Person => PersonInfo = p => PersonInfo(p.resourceId, p.name)
   implicit lazy val show: Show[PersonInfo] = Show.show { case PersonInfo(resourceId, name) =>
     show"id = $resourceId, name = $name"

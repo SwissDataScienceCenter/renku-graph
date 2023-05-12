@@ -22,13 +22,11 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.entities.searchgraphs
 import io.renku.entities.searchgraphs.datasets.SearchInfoLens._
-import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities.Dataset.DatasetImagesOps
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{datasets, entities, projects}
-import io.renku.triplesstore.client.TriplesStoreGenerators.quads
 import org.scalacheck.Gen
 
 private object Generators {
@@ -83,7 +81,4 @@ private object Generators {
                                     projectIdGen:  Gen[projects.ResourceId] = projectResourceIds
   ): Gen[Link] = (datasetResourceIds, projectIdGen, projectPaths)
     .mapN(Link(topmostSameAs, _, _, _))
-
-  val updateCommands: Gen[UpdateCommand] =
-    quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))
 }

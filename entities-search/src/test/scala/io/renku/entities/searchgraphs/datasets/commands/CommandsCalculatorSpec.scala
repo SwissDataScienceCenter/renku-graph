@@ -21,10 +21,11 @@ package commands
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.UpdateCommand
+import io.renku.entities.searchgraphs.UpdateCommand._
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.commands.Encoders._
-import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand._
-import io.renku.entities.searchgraphs.datasets.{Link, DatasetSearchInfo, SearchInfoOntology}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, Link}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
@@ -356,7 +357,7 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
         calculateCommands(infoSet) should produce(
           (expectedLinkToDelete.asQuads +
             DatasetsQuad(tsInfo.topmostSameAs,
-                         SearchInfoOntology.linkProperty,
+                         DatasetSearchInfoOntology.linkProperty,
                          expectedLinkToDelete.resourceId.asEntityId
             )).map(Delete).toList :::
             Insert(visibilityQuad(tsInfo, otherTsProjectVisibility)) ::
@@ -398,10 +399,10 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
     Gen.oneOf(projects.Visibility.allOrdered.takeWhile(_ != than))
 
   private def linkEdge(info: DatasetSearchInfo, link: Link): Quad =
-    DatasetsQuad(info.topmostSameAs, SearchInfoOntology.linkProperty, link.resourceId.asEntityId)
+    DatasetsQuad(info.topmostSameAs, DatasetSearchInfoOntology.linkProperty, link.resourceId.asEntityId)
 
   private def visibilityQuad(info: DatasetSearchInfo, visibility: projects.Visibility): Quad =
-    DatasetsQuad(info.topmostSameAs, SearchInfoOntology.visibilityProperty.id, visibility.asObject)
+    DatasetsQuad(info.topmostSameAs, DatasetSearchInfoOntology.visibilityProperty.id, visibility.asObject)
 
   private def produce(expected: List[UpdateCommand]) = new Matcher[Try[List[UpdateCommand]]] {
     def apply(actual: Try[List[UpdateCommand]]): MatchResult = {

@@ -20,8 +20,10 @@ package io.renku.entities.searchgraphs.datasets
 package commands
 
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.Generators.updateCommands
+import io.renku.entities.searchgraphs.UpdateCommand
 import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
-import io.renku.entities.searchgraphs.datasets.Generators.{datasetSearchInfoObjects, updateCommands}
+import io.renku.entities.searchgraphs.datasets.Generators.datasetSearchInfoObjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectResourceIds, projectVisibilities}
 import io.renku.graph.model.testentities._

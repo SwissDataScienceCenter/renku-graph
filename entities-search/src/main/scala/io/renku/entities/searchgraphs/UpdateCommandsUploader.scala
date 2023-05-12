@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
+package io.renku.entities.searchgraphs
 
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.commands.UpdateCommand
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
@@ -34,9 +33,6 @@ private object UpdateCommandsUploader {
       connectionConfig: ProjectsConnectionConfig
   ): UpdateCommandsUploader[F] =
     new UpdateCommandsUploaderImpl[F](TSClient[F](connectionConfig))
-
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsUploader[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class UpdateCommandsUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends UpdateCommandsUploader[F] {

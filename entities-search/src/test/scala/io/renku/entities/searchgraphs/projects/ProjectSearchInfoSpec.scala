@@ -30,7 +30,8 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
 
     "return a String representation of the Info" in {
       forAll(projectSearchInfoObjects) {
-        case info @ ProjectSearchInfo(name,
+        case info @ ProjectSearchInfo(id,
+                                      name,
                                       path,
                                       visibility,
                                       dateCreated,
@@ -40,6 +41,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
                                       images
             ) =>
           info.show shouldBe List(
+            show"id = $id".some,
             show"name = $name".some,
             show"path = $path".some,
             show"visibility = $visibility".some,

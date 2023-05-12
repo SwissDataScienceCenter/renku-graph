@@ -18,17 +18,14 @@
 
 package io.renku.entities.searchgraphs
 
-import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
-import io.renku.triplesstore.client.TriplesStoreGenerators.quads
-import org.scalacheck.Gen
+import io.renku.triplesstore.client.model.Quad
 
-private object Generators {
+private trait UpdateCommand extends Product with Serializable {
+  val quad: Quad
+}
 
-  lazy val personInfos: Gen[PersonInfo] =
-    personEntities.map(_.to[entities.Person]).map(toPersonInfo)
+private object UpdateCommand {
 
-  val updateCommands: Gen[UpdateCommand] =
-    quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))
+  final case class Insert(quad: Quad) extends UpdateCommand
+  final case class Delete(quad: Quad) extends UpdateCommand
 }

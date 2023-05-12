@@ -24,7 +24,8 @@ import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 
-private final case class ProjectSearchInfo(name:             projects.Name,
+private final case class ProjectSearchInfo(id:               projects.ResourceId,
+                                           name:             projects.Name,
                                            path:             projects.Path,
                                            visibility:       projects.Visibility,
                                            dateCreated:      projects.DateCreated,
@@ -37,8 +38,9 @@ private final case class ProjectSearchInfo(name:             projects.Name,
 private object ProjectSearchInfo {
 
   implicit val show: Show[ProjectSearchInfo] = Show.show {
-    case ProjectSearchInfo(name, path, visibility, dateCreated, maybeCreator, keywords, maybeDescription, images) =>
+    case ProjectSearchInfo(id, name, path, visibility, dateCreated, maybeCreator, keywords, maybeDescription, images) =>
       List(
+        show"id = $id".some,
         show"name = $name".some,
         show"path = $path".some,
         show"visibility = $visibility".some,

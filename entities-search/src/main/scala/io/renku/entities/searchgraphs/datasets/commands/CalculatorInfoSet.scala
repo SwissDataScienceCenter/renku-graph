@@ -93,5 +93,4 @@ private object CalculatorInfoSet {
     show"visibility = ${info.visibility}",
     show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
   ).mkString(", ")
-
 }

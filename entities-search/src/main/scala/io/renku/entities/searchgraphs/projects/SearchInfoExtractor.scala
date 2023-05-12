@@ -16,19 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs
+package io.renku.entities.searchgraphs.projects
 
 import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
-import io.renku.triplesstore.client.TriplesStoreGenerators.quads
-import org.scalacheck.Gen
+import io.renku.graph.model.entities.Project
 
-private object Generators {
+private object SearchInfoExtractor {
 
-  lazy val personInfos: Gen[PersonInfo] =
-    personEntities.map(_.to[entities.Person]).map(toPersonInfo)
-
-  val updateCommands: Gen[UpdateCommand] =
-    quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))
+  def extractSearchInfo(project: Project): ProjectSearchInfo =
+    ProjectSearchInfo(
+      project.resourceId,
+      project.name,
+      project.path,
+      project.visibility,
+      project.dateCreated,
+      project.maybeCreator.map(toPersonInfo),
+      project.keywords.toList,
+      project.maybeDescription,
+      project.images
+    )
 }

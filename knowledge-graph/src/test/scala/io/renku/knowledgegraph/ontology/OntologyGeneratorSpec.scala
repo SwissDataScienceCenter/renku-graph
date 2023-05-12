@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.ontology
 
 import cats.data.NonEmptyList
-import io.renku.entities.searchgraphs.datasets.SearchInfoOntology
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfoOntology
 import io.renku.graph.model.Schemas
 import io.renku.graph.model.entities.{CompositePlan, Project}
 import io.renku.jsonld.ontology._
@@ -31,7 +31,7 @@ class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
   "getOntology" should {
 
     "return generated Renku ontology" in {
-      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, SearchInfoOntology.typeDef)
+      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, DatasetSearchInfoOntology.typeDef)
       val ontology = generateOntology(types, Schemas.renku)
 
       new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology

@@ -21,7 +21,7 @@ package commands
 
 import io.renku.entities.searchgraphs.Generators.personInfos
 import io.renku.entities.searchgraphs.datasets.Generators._
-import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, LinkOntology, SearchInfoOntology}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, LinkOntology}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.generators.jsonld.JsonLDGenerators.entityIds
@@ -107,9 +107,9 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
       searchInfo.asQuads shouldBe Set(
         DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
-        DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.slugProperty.id, searchInfo.name.asObject),
+        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.slugProperty.id, searchInfo.name.asObject),
         DatasetsQuad(searchInfo.topmostSameAs,
-                     SearchInfoOntology.visibilityProperty.id,
+                     DatasetSearchInfoOntology.visibilityProperty.id,
                      searchInfo.visibility.asObject
         ),
         createdOrPublishedToQuad(searchInfo.topmostSameAs)(searchInfo.createdOrPublished)
@@ -125,15 +125,15 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   private def createdOrPublishedToQuad(topmostSameAs: datasets.TopmostSameAs): datasets.CreatedOrPublished => Quad = {
     case d: datasets.DateCreated =>
-      DatasetsQuad(topmostSameAs, SearchInfoOntology.dateCreatedProperty.id, d.asObject)
+      DatasetsQuad(topmostSameAs, DatasetSearchInfoOntology.dateCreatedProperty.id, d.asObject)
     case d: datasets.DatePublished =>
-      DatasetsQuad(topmostSameAs, SearchInfoOntology.datePublishedProperty.id, d.asObject)
+      DatasetsQuad(topmostSameAs, DatasetSearchInfoOntology.datePublishedProperty.id, d.asObject)
   }
 
   private def maybeDateModifiedToQuad(
       topmostSameAs: datasets.TopmostSameAs
   ): Option[datasets.DateModified] => Set[Quad] = {
-    case Some(d) => Set(DatasetsQuad(topmostSameAs, SearchInfoOntology.dateModifiedProperty.id, d.asObject))
+    case Some(d) => Set(DatasetsQuad(topmostSameAs, DatasetSearchInfoOntology.dateModifiedProperty.id, d.asObject))
     case None    => Set.empty
   }
 
@@ -141,7 +141,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
     searchInfo.creators
       .map(pi =>
         pi.asQuads + DatasetsQuad(searchInfo.topmostSameAs,
-                                  SearchInfoOntology.creatorProperty,
+                                  DatasetSearchInfoOntology.creatorProperty,
                                   pi.resourceId.asEntityId
         )
       )
@@ -151,12 +151,12 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
   private def keywordsToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.keywords
-      .map(k => DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.keywordsProperty.id, k.asObject))
+      .map(k => DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.keywordsProperty.id, k.asObject))
       .toSet
 
   private def maybeDescToQuad(topmostSameAs: datasets.TopmostSameAs): Option[datasets.Description] => Set[Quad] = {
     case Some(d) =>
-      Set(DatasetsQuad(topmostSameAs, SearchInfoOntology.descriptionProperty.id, d.asObject))
+      Set(DatasetsQuad(topmostSameAs, DatasetSearchInfoOntology.descriptionProperty.id, d.asObject))
     case None =>
       Set.empty
   }
@@ -164,7 +164,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def imagesToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.images
       .map(i =>
-        i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+        i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
       )
       .toSet
       .flatten
@@ -172,7 +172,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def linksToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.links
       .map(l =>
-        l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, SearchInfoOntology.linkProperty, l.resourceId.asEntityId)
+        l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.linkProperty, l.resourceId.asEntityId)
       )
       .toList
       .toSet

@@ -16,60 +16,68 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
+package io.renku.entities.searchgraphs
+package projects
 
 import cats.syntax.all._
+import commands.UpdateCommandsProducer
 import io.renku.entities.searchgraphs.Generators.updateCommands
-import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
-import io.renku.entities.searchgraphs.{UpdateCommand, UpdateCommandsUploader}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.entities
-import io.renku.graph.model.testentities.projectIdentifications
+import io.renku.graph.model.testentities._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class DatasetsGraphCleanerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class ProjectsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with TryValues with MockFactory {
 
-  "cleanDatasetsGraph" should {
+  "provisionProjectsGraph" should {
 
-    "produce TS update commands and " +
+    "extract the Project graph relevant data" +
+      "produce TS update commands and " +
       "push the commands into the TS" in new TestCase {
 
-        val project = projectIdentifications.generateOne
+        val project = anyProjectEntities.generateOne.to[entities.Project]
+
+        val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
 
         val updates = updateCommands.generateList()
-        givenUpdatesProducing(project, returning = updates.pure[Try])
+        givenUpdatesProducing(searchInfo, returning = updates.pure[Try])
 
         givenUploading(updates, returning = ().pure[Try])
 
-        cleaner.cleanDatasetsGraph(project) shouldBe ().pure[Try]
+        provisioner.provisionProjectsGraph(project).success.value shouldBe ()
       }
 
     "fail if updates producing step fails" in new TestCase {
 
-      val project = projectIdentifications.generateOne
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
 
       val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
-      givenUpdatesProducing(project, returning = failure)
+      givenUpdatesProducing(searchInfo, returning = failure)
 
-      cleaner.cleanDatasetsGraph(project) shouldBe failure
+      provisioner.provisionProjectsGraph(project) shouldBe failure
     }
 
     "fail if updates uploading fails" in new TestCase {
 
-      val project = projectIdentifications.generateOne
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
 
       val updates = updateCommands.generateList()
-      givenUpdatesProducing(project, returning = updates.pure[Try])
+      givenUpdatesProducing(searchInfo, returning = updates.pure[Try])
 
       val failure = exceptions.generateOne.raiseError[Try, Unit]
       givenUploading(updates, returning = failure)
 
-      cleaner.cleanDatasetsGraph(project) shouldBe failure
+      provisioner.provisionProjectsGraph(project) shouldBe failure
     }
   }
 
@@ -77,12 +85,11 @@ class DatasetsGraphCleanerSpec extends AnyWordSpec with should.Matchers with Moc
 
     private val commandsProducer = mock[UpdateCommandsProducer[Try]]
     private val commandsUploader = mock[UpdateCommandsUploader[Try]]
-    val cleaner                  = new DatasetsGraphCleanerImpl[Try](commandsProducer, commandsUploader)
+    val provisioner              = new ProjectsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
 
-    def givenUpdatesProducing(project: entities.ProjectIdentification, returning: Try[List[UpdateCommand]]) =
-      (commandsProducer
-        .toUpdateCommands(_: entities.ProjectIdentification)(_: List[DatasetSearchInfo]))
-        .expects(project, Nil)
+    def givenUpdatesProducing(searchInfo: ProjectSearchInfo, returning: Try[List[UpdateCommand]]) =
+      (commandsProducer.toUpdateCommands _)
+        .expects(searchInfo)
         .returning(returning)
 
     def givenUploading(commands: List[UpdateCommand], returning: Try[Unit]) =

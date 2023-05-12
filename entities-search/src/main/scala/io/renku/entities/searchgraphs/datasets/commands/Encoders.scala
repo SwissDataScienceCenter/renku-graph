@@ -21,7 +21,7 @@ package io.renku.entities.searchgraphs.datasets.commands
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset}
-import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, Link, LinkOntology, SearchInfoOntology}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, DatasetSearchInfoOntology, Link, LinkOntology}
 import io.renku.graph.model.Schemas.{rdf, renku}
 import io.renku.graph.model.datasets
 import io.renku.graph.model.entities.Person
@@ -71,42 +71,42 @@ private object Encoders {
 
     val createdOrPublishedQuad = info.createdOrPublished match {
       case d: datasets.DateCreated =>
-        searchInfoQuad(SearchInfoOntology.dateCreatedProperty.id, d.asObject)
+        searchInfoQuad(DatasetSearchInfoOntology.dateCreatedProperty.id, d.asObject)
       case d: datasets.DatePublished =>
-        searchInfoQuad(SearchInfoOntology.datePublishedProperty.id, d.asObject)
+        searchInfoQuad(DatasetSearchInfoOntology.datePublishedProperty.id, d.asObject)
     }
 
     val maybeDateModifiedQuad = info.maybeDateModified.map { d =>
-      searchInfoQuad(SearchInfoOntology.dateModifiedProperty.id, d.asObject)
+      searchInfoQuad(DatasetSearchInfoOntology.dateModifiedProperty.id, d.asObject)
     }
 
     val maybeDescriptionQuad = info.maybeDescription.map { d =>
-      searchInfoQuad(SearchInfoOntology.descriptionProperty.id, d.asObject)
+      searchInfoQuad(DatasetSearchInfoOntology.descriptionProperty.id, d.asObject)
     }
 
     val creatorsQuads = info.creators.toList.toSet.flatMap { (pi: PersonInfo) =>
       pi.asQuads +
-        searchInfoQuad(SearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
+        searchInfoQuad(DatasetSearchInfoOntology.creatorProperty, pi.resourceId.asEntityId)
     }
 
     val keywordsQuads = info.keywords.toSet.map { (k: datasets.Keyword) =>
-      searchInfoQuad(SearchInfoOntology.keywordsProperty.id, k.asObject)
+      searchInfoQuad(DatasetSearchInfoOntology.keywordsProperty.id, k.asObject)
     }
 
     val imagesQuads = info.images.toSet.flatMap { (i: Image) =>
       i.asQuads +
-        searchInfoQuad(SearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+        searchInfoQuad(DatasetSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
     }
 
     val linksQuads = info.links.toList.toSet.flatMap { (l: Link) =>
       l.asQuads +
-        searchInfoQuad(SearchInfoOntology.linkProperty, l.resourceId.asEntityId)
+        searchInfoQuad(DatasetSearchInfoOntology.linkProperty, l.resourceId.asEntityId)
     }
 
     Set(
-      searchInfoQuad(rdf / "type", SearchInfoOntology.typeDef.clazz.id).some,
-      searchInfoQuad(SearchInfoOntology.slugProperty.id, info.name.asObject).some,
-      searchInfoQuad(SearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
+      searchInfoQuad(rdf / "type", DatasetSearchInfoOntology.typeDef.clazz.id).some,
+      searchInfoQuad(DatasetSearchInfoOntology.slugProperty.id, info.name.asObject).some,
+      searchInfoQuad(DatasetSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       createdOrPublishedQuad.some,
       maybeDateModifiedQuad,
       maybeDescriptionQuad

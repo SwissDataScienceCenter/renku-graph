@@ -19,11 +19,12 @@
 package io.renku.entities.searchgraphs.datasets.commands
 
 import Encoders._
-import io.renku.entities.searchgraphs.datasets.SearchInfoOntology.{linkProperty, visibilityProperty}
-import UpdateCommand._
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.{Link, DatasetSearchInfo, links}
+import io.renku.entities.searchgraphs.UpdateCommand
+import io.renku.entities.searchgraphs.UpdateCommand._
+import io.renku.entities.searchgraphs.datasets.DatasetSearchInfoOntology.{linkProperty, visibilityProperty}
+import io.renku.entities.searchgraphs.datasets.{DatasetSearchInfo, Link, links}
 import io.renku.graph.model.{datasets, projects}
 import io.renku.jsonld.Property
 import io.renku.jsonld.syntax._

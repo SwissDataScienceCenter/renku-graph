@@ -19,21 +19,23 @@
 package io.renku.entities.searchgraphs.datasets
 
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.Generators.updateCommands
 import io.renku.entities.searchgraphs.datasets.DatasetsCollector._
-import io.renku.entities.searchgraphs.datasets.Generators.updateCommands
 import io.renku.entities.searchgraphs.datasets.SearchInfoExtractor._
-import io.renku.entities.searchgraphs.datasets.commands.{UpdateCommand, UpdateCommandsProducer}
+import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
+import io.renku.entities.searchgraphs.{UpdateCommand, UpdateCommandsUploader}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, positiveInts}
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
-class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with TryValues with MockFactory {
 
   "provisionDatasetsGraph" should {
 
@@ -49,21 +51,21 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
           .generateOne
           .to[entities.Project]
 
-        val Success(searchInfos) = givenSearchInfoExtraction(project)
+        val searchInfos = givenSearchInfoExtraction(project).success.value
 
         val updates = updateCommands.generateList()
         givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])
 
         givenUploading(updates, returning = ().pure[Try])
 
-        provisioner.provisionDatasetsGraph(project) shouldBe ().pure[Try]
+        provisioner.provisionDatasetsGraph(project).success.value shouldBe ()
       }
 
     "fail if updates producing step fails" in new TestCase {
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
 
-      val Success(searchInfos) = givenSearchInfoExtraction(project)
+      val searchInfos = givenSearchInfoExtraction(project).success.value
 
       val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
       givenUpdatesProducing(project.identification, searchInfos, returning = failure)
@@ -75,7 +77,7 @@ class DatasetsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
 
       val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
 
-      val Success(searchInfos) = givenSearchInfoExtraction(project)
+      val searchInfos = givenSearchInfoExtraction(project).success.value
 
       val updates = updateCommands.generateList()
       givenUpdatesProducing(project.identification, searchInfos, returning = updates.pure[Try])

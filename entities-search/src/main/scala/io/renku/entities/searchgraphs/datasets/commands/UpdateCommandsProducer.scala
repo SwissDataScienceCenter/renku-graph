@@ -16,22 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.datasets
+package commands
 
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.entities.searchgraphs.datasets.DatasetSearchInfo
+import io.renku.entities.searchgraphs.UpdateCommand
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.projects
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-private[searchgraphs] trait UpdateCommandsProducer[F[_]] {
+private[datasets] trait UpdateCommandsProducer[F[_]] {
   def toUpdateCommands(project: ProjectIdentification)(modelInfos: List[DatasetSearchInfo]): F[List[UpdateCommand]]
 }
 
-private[searchgraphs] object UpdateCommandsProducer {
+private[datasets] object UpdateCommandsProducer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): UpdateCommandsProducer[F] = {
@@ -39,9 +40,6 @@ private[searchgraphs] object UpdateCommandsProducer {
     val visibilityFinder  = VisibilityFinder[F](connectionConfig)
     new UpdateCommandsProducerImpl[F](searchInfoFetcher, visibilityFinder, CommandsCalculator[F]())
   }
-
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsProducer[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],

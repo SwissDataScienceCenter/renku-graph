@@ -21,6 +21,7 @@ package io.renku.entities.searchgraphs.datasets
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.UpdateCommandsUploader
 import io.renku.entities.searchgraphs.datasets.commands.UpdateCommandsProducer
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}

@@ -17,18 +17,22 @@
  */
 
 package io.renku.entities.searchgraphs
+package projects
+package commands
 
-import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
-import io.renku.graph.model.entities
-import io.renku.graph.model.testentities._
-import io.renku.triplesstore.client.TriplesStoreGenerators.quads
-import org.scalacheck.Gen
+import cats.MonadThrow
 
-private object Generators {
+private trait CommandsCalculator[F[_]] {
+  def calculateCommands(modelInfo: ProjectSearchInfo, maybeTSInfo: Option[ProjectSearchInfo]): F[List[UpdateCommand]]
+}
 
-  lazy val personInfos: Gen[PersonInfo] =
-    personEntities.map(_.to[entities.Person]).map(toPersonInfo)
+private object CommandsCalculator {
+  def apply[F[_]: MonadThrow]: CommandsCalculator[F] = new CommandsCalculatorImpl[F]
+}
 
-  val updateCommands: Gen[UpdateCommand] =
-    quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))
+private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculator[F] {
+
+  override def calculateCommands(modelInfo:   ProjectSearchInfo,
+                                 maybeTSInfo: Option[ProjectSearchInfo]
+  ): F[List[UpdateCommand]] = ???
 }

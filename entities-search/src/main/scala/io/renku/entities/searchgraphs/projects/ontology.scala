@@ -16,40 +16,36 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets
+package io.renku.entities.searchgraphs.projects
 
-import io.renku.graph.model.Schemas.{xsd, _}
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entities.{Dataset, Person, Project}
 import io.renku.graph.model.images.Image
 import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
 
-object DatasetSearchInfoOntology {
+object ProjectSearchInfoOntology {
 
-  val slugProperty:          DataProperty.Def = Dataset.Ontology.slugProperty
-  val visibilityProperty:    DataProperty.Def = Project.Ontology.visibilityProperty
-  val dateCreatedProperty:   DataProperty.Def = Dataset.Ontology.dateCreatedProperty
-  val datePublishedProperty: DataProperty.Def = Dataset.Ontology.datePublishedProperty
-  val dateModifiedProperty:  DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
-  val keywordsProperty:      DataProperty.Def = Dataset.Ontology.keywordsProperty
-  val descriptionProperty:   DataProperty.Def = Dataset.Ontology.descriptionProperty
-  val creatorProperty:       Property         = Dataset.Ontology.creator
-  val imageProperty:         Property         = Dataset.Ontology.image
-  val linkProperty:          Property         = renku / "datasetProjectLink"
+  val nameProperty:        DataProperty.Def = Project.Ontology.nameProperty
+  val pathProperty:        DataProperty.Def = Project.Ontology.pathProperty
+  val visibilityProperty:  DataProperty.Def = Project.Ontology.visibilityProperty
+  val dateCreatedProperty: DataProperty.Def = Project.Ontology.dateCreatedProperty
+  val keywordsProperty:    DataProperty.Def = Project.Ontology.keywordsProperty
+  val descriptionProperty: DataProperty.Def = Project.Ontology.descriptionProperty
+  val creatorProperty:     Property         = Project.Ontology.creator
+  val imageProperty:       Property         = Project.Ontology.image
 
   lazy val typeDef: Type = Type.Def(
-    Class(renku / "DiscoverableDataset"),
+    Class(renku / "DiscoverableProject"),
     ObjectProperties(
       ObjectProperty(creatorProperty, PersonInfoOntology.typeDef),
-      ObjectProperty(imageProperty, Image.Ontology.typeDef),
-      ObjectProperty(linkProperty, LinkOntology.typeDef)
+      ObjectProperty(imageProperty, Image.Ontology.typeDef)
     ),
     DataProperties(
-      slugProperty,
+      nameProperty,
+      pathProperty,
       visibilityProperty,
       dateCreatedProperty,
-      datePublishedProperty,
-      dateModifiedProperty,
       keywordsProperty,
       descriptionProperty
     )

@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.datasets.commands
+package io.renku.entities.searchgraphs.projects.commands
 
-import io.renku.triplesstore.client.model.Quad
+import io.renku.graph.model.GraphClass
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityIdEncoder, Property}
+import io.renku.triplesstore.client.model
+import io.renku.triplesstore.client.model.{Quad, TripleObject}
 
-private[searchgraphs] trait UpdateCommand extends Product with Serializable {
-  val quad: Quad
-}
-private[searchgraphs] object UpdateCommand {
-
-  final case class Insert(quad: Quad) extends UpdateCommand
-  final case class Delete(quad: Quad) extends UpdateCommand
+private object ProjectsQuad {
+  def apply[ID](subject: ID, predicate: Property, obj: TripleObject)(implicit subjectEnc: EntityIdEncoder[ID]): Quad =
+    model.Quad(GraphClass.Projects.id, subject.asEntityId, predicate, obj)
 }
