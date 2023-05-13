@@ -25,6 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, TSClient}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -62,7 +63,7 @@ class UpdateCommandsUploaderSpec
 
     "fail if uploading updates to the TS fails" in new TestCase {
 
-      val commands = allSortsOfCommands.generateList(min = 1, max = 3).flatten
+      val commands = allSortsOfCommands.generateOne
 
       val query1 :: query2 :: query3 :: Nil = toSparqlQueries(commands)
       givenTSUpdating(query1, returning = ().pure[Try])
@@ -114,7 +115,7 @@ class UpdateCommandsUploaderSpec
         .returning(returning)
   }
 
-  private lazy val allSortsOfCommands =
+  private lazy val allSortsOfCommands: Gen[List[UpdateCommand]] =
     (insertUpdateCommands, deleteUpdateCommands, queryUpdateCommands)
       .mapN(_ :: _ :: _ :: Nil)
 }

@@ -20,19 +20,25 @@ package io.renku.entities.searchgraphs
 package projects
 package commands
 
-import cats.MonadThrow
+import Encoders._
+import UpdateCommand.Insert
+import io.renku.triplesstore.client.syntax._
 
-private trait CommandsCalculator[F[_]] {
-  def calculateCommands(modelInfo: ProjectSearchInfo, maybeTSInfo: Option[ProjectSearchInfo]): F[List[UpdateCommand]]
+private trait CommandsCalculator {
+  def calculateCommands(modelInfo: ProjectSearchInfo, maybeTSInfo: Option[ProjectSearchInfo]): List[UpdateCommand]
 }
 
 private object CommandsCalculator {
-  def apply[F[_]: MonadThrow]: CommandsCalculator[F] = new CommandsCalculatorImpl[F]
+  def apply(): CommandsCalculator = new CommandsCalculatorImpl
 }
 
-private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculator[F] {
+private class CommandsCalculatorImpl extends CommandsCalculator {
 
   override def calculateCommands(modelInfo:   ProjectSearchInfo,
                                  maybeTSInfo: Option[ProjectSearchInfo]
-  ): F[List[UpdateCommand]] = ???
+  ): List[UpdateCommand] = maybeTSInfo match {
+    case Some(tsInfo) if tsInfo == modelInfo => List.empty[UpdateCommand]
+    case Some(_) => UpdateCommand.Query(ProjectInfoDeleteQuery(modelInfo.id)) :: modelInfo.asQuads.map(Insert).toList
+    case None    => modelInfo.asQuads.map(Insert).toList
+  }
 }

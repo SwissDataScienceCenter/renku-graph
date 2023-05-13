@@ -45,10 +45,9 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with T
 
         givenSearchInfoFetcher(modelInfo.id, returning = tsInfo.pure[Try])
 
-        val expectedCommands =
-          givenCommandsCalculation(modelInfo, tsInfo, returning = updateCommands.generateList().pure[Try])
+        val expectedCommands = givenCommandsCalculation(modelInfo, tsInfo, returning = updateCommands.generateList())
 
-        commandsProducer.toUpdateCommands(modelInfo).map(_.toSet) shouldBe expectedCommands.map(_.toSet)
+        commandsProducer.toUpdateCommands(modelInfo).map(_.toSet).success.value shouldBe expectedCommands.toSet
       }
 
     "fail if Info fetching fails" in new TestCase {
@@ -59,25 +58,12 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with T
 
       commandsProducer.toUpdateCommands(modelInfo).failure.exception shouldBe exception
     }
-
-    "fail if commands calculation fails" in new TestCase {
-
-      val modelInfo = projectSearchInfoObjects.generateOne
-      val tsInfo    = projectSearchInfoObjects.generateOption.map(_.copy(id = modelInfo.id))
-
-      givenSearchInfoFetcher(modelInfo.id, returning = tsInfo.pure[Try])
-
-      val exception = exceptions.generateOne
-      givenCommandsCalculation(modelInfo, tsInfo, returning = exception.raiseError[Try, Nothing])
-
-      commandsProducer.toUpdateCommands(modelInfo).failure.exception shouldBe exception
-    }
   }
 
   private trait TestCase {
 
     private val searchInfoFetcher  = mock[SearchInfoFetcher[Try]]
-    private val commandsCalculator = mock[CommandsCalculator[Try]]
+    private val commandsCalculator = mock[CommandsCalculator]
     val commandsProducer           = new UpdateCommandsProducerImpl[Try](searchInfoFetcher, commandsCalculator)
 
     def givenSearchInfoFetcher(id: model.projects.ResourceId, returning: Try[Option[ProjectSearchInfo]]) =
@@ -87,7 +73,7 @@ class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with T
 
     def givenCommandsCalculation(modelInfo:   ProjectSearchInfo,
                                  maybeTSInfo: Option[ProjectSearchInfo],
-                                 returning:   Try[List[UpdateCommand]]
+                                 returning:   List[UpdateCommand]
     ) = {
       (commandsCalculator.calculateCommands _).expects(modelInfo, maybeTSInfo).returning(returning)
       returning

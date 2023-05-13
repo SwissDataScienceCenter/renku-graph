@@ -35,15 +35,15 @@ private[projects] object UpdateCommandsProducer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): UpdateCommandsProducer[F] =
-    new UpdateCommandsProducerImpl[F](SearchInfoFetcher[F](connectionConfig), CommandsCalculator[F])
+    new UpdateCommandsProducerImpl[F](SearchInfoFetcher[F](connectionConfig), CommandsCalculator())
 }
 
 private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],
-                                                           commandsCalculator: CommandsCalculator[F]
+                                                           commandsCalculator: CommandsCalculator
 ) extends UpdateCommandsProducer[F] {
 
   override def toUpdateCommands(modelInfo: ProjectSearchInfo): F[List[UpdateCommand]] =
     searchInfoFetcher
       .fetchTSSearchInfo(modelInfo.id)
-      .flatMap(commandsCalculator.calculateCommands(modelInfo, _))
+      .map(commandsCalculator.calculateCommands(modelInfo, _))
 }
