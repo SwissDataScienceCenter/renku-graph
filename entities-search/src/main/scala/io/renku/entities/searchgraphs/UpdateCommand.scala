@@ -18,14 +18,13 @@
 
 package io.renku.entities.searchgraphs
 
+import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.client.model.Quad
 
-private trait UpdateCommand extends Product with Serializable {
-  val quad: Quad
-}
+private trait UpdateCommand extends Product with Serializable
 
 private object UpdateCommand {
-
-  final case class Insert(quad: Quad) extends UpdateCommand
-  final case class Delete(quad: Quad) extends UpdateCommand
+  final case class Insert(quad: Quad)        extends UpdateCommand
+  final case class Delete(quad: Quad)        extends UpdateCommand
+  final case class Query(query: SparqlQuery) extends UpdateCommand
 }

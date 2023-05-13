@@ -40,6 +40,7 @@ object TriplesStoreGenerators {
 
   implicit val tripleObjects: Gen[TripleObject] = Gen.oneOf(
     booleanTripleObjects,
+    charTripleObjects,
     intTripleObjects,
     longTripleObjects,
     floatTripleObjects,

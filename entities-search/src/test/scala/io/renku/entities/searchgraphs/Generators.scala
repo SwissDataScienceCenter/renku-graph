@@ -21,7 +21,9 @@ package io.renku.entities.searchgraphs
 import io.renku.entities.searchgraphs.PersonInfo.toPersonInfo
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.client.TriplesStoreGenerators.quads
+import io.renku.triplesstore.client.syntax._
 import org.scalacheck.Gen
 
 private object Generators {
@@ -29,6 +31,13 @@ private object Generators {
   lazy val personInfos: Gen[PersonInfo] =
     personEntities.map(_.to[entities.Person]).map(toPersonInfo)
 
+  val insertUpdateCommands: Gen[UpdateCommand] =
+    quads.map(UpdateCommand.Insert)
+  val deleteUpdateCommands: Gen[UpdateCommand] =
+    quads.map(UpdateCommand.Delete)
+  val queryUpdateCommands: Gen[UpdateCommand] =
+    quads.map(quad => UpdateCommand.Query(SparqlQuery.ofUnsafe("generated query", sparql"INSERT DATA {$quad}")))
+
   val updateCommands: Gen[UpdateCommand] =
-    quads.flatMap(quad => Gen.oneOf(UpdateCommand.Insert(quad), UpdateCommand.Delete(quad)))
+    Gen.oneOf(insertUpdateCommands, deleteUpdateCommands, queryUpdateCommands)
 }
