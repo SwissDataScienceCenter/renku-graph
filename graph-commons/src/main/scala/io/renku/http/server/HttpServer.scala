@@ -20,10 +20,11 @@ package io.renku.http.server
 
 import cats.data.Kleisli
 import cats.effect._
-import org.http4s.ember.server._
-import org.http4s.{HttpApp, HttpRoutes, Request, Response}
 import com.comcast.ip4s._
+import fs2.io.net.Network
+import org.http4s.ember.server._
 import org.http4s.server.Server
+import org.http4s.{HttpApp, HttpRoutes, Request, Response}
 
 trait HttpServer[F[_]] {
   val httpApp: HttpApp[F]
@@ -41,13 +42,15 @@ class HttpServerImpl[F[_]: Async](serverPort: Port, serviceRoutes: HttpRoutes[F]
 
   lazy val httpApp: HttpApp[F] = serviceRoutes.orNotFound
 
-  def createServer: Resource[F, Server] =
+  def createServer: Resource[F, Server] = {
+    implicit val network: Network[F] = Network.forAsync(Async[F])
     EmberServerBuilder
       .default[F]
       .withHost(ipv4"0.0.0.0")
       .withPort(serverPort)
       .withHttpApp(httpApp)
       .build
+  }
 
   private implicit class RoutesOps(routes: HttpRoutes[F]) {
     def orNotFound: Kleisli[F, Request[F], Response[F]] = Kleisli {
