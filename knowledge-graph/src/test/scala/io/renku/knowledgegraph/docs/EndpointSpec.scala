@@ -50,7 +50,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       .expects()
       .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
 
-    val otherEndpointDocs = 1 to ints(min = 1, max = 10).generateOne map { _ =>
+    val otherEndpointDocs = (1 to ints(min = 1, max = 10).generateOne).map { _ =>
       val docs = mock[EndpointDocs]
 
       (() => docs.path)
@@ -58,8 +58,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
 
       docs
-    }
+    }.toList
 
-    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1, otherEndpointDocs: _*)
+    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1 :: otherEndpointDocs)
   }
 }

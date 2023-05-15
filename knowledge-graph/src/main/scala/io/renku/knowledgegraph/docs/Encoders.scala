@@ -34,7 +34,7 @@ private object Encoders {
       "openapi":  ${doc.openApiVersion},
       "info":     ${doc.info},
       "servers":  ${doc.servers},
-      "paths":    ${doc.paths},
+      "paths":    ${doc.paths.sortBy(_._1)},
       "security": ${doc.security}
     }""" deepMerge components
   }

@@ -6,7 +6,7 @@ object Dependencies {
   object V {
     val ammonite               = "2.4.1"
     val catsCore               = "2.9.0"
-    val catsEffect             = "3.4.11"
+    val catsEffect             = "3.5.0"
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
@@ -28,7 +28,7 @@ object Dependencies {
     val refinedPureconfig      = "0.10.3"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
-    val scalatest              = "3.2.15"
+    val scalatest              = "3.2.16"
     val scalatestScalacheck    = "3.2.2.0"
     val sentryLogback          = "6.18.1"
     val skunk                  = "0.5.1"
