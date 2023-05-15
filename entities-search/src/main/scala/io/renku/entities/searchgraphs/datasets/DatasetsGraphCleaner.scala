@@ -27,11 +27,11 @@ import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-trait DatasetsGraphCleaner[F[_]] {
+private[searchgraphs] trait DatasetsGraphCleaner[F[_]] {
   def cleanDatasetsGraph(project: ProjectIdentification): F[Unit]
 }
 
-object DatasetsGraphCleaner {
+private[searchgraphs] object DatasetsGraphCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): DatasetsGraphCleaner[F] = {
@@ -39,9 +39,6 @@ object DatasetsGraphCleaner {
     val searchInfoUploader = UpdateCommandsUploader[F](connectionConfig)
     new DatasetsGraphCleanerImpl[F](updatesProducer, searchInfoUploader)
   }
-
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsGraphCleaner[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class DatasetsGraphCleanerImpl[F[_]: MonadThrow](updatesProducer: UpdateCommandsProducer[F],

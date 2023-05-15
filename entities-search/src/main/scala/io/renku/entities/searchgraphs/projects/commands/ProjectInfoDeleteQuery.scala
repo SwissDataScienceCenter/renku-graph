@@ -23,7 +23,7 @@ import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.client.syntax._
 
-private object ProjectInfoDeleteQuery {
+private[projects] object ProjectInfoDeleteQuery {
   def apply(projectId: projects.ResourceId): SparqlQuery =
     SparqlQuery.ofUnsafe(
       "delete project info",
