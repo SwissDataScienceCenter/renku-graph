@@ -32,44 +32,47 @@ object model {
     def openApiVersion: String
     def info:           Info
     def servers:        List[Server]
-    def paths:          Map[String, Path]
+    def paths:          List[(String, Path)]
     def components:     Option[Components]
     def security:       List[SecurityRequirement]
   }
 
   object OpenApiDocument {
     def apply(openApiVersion: String, info: Info): DocWithInfo =
-      DocWithInfo(openApiVersion, info, Nil, Map.empty)
+      DocWithInfo(openApiVersion, info, servers = Nil, paths = List.empty)
   }
 
   private[model] case class DocWithInfo(openApiVersion: String,
                                         info:           Info,
                                         servers:        List[Server],
-                                        paths:          Map[String, Path]
+                                        paths:          List[(String, Path)]
   ) {
 
     def addPath(path: Path): CompleteDoc =
-      CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None, Nil)
+      CompleteDoc(openApiVersion, info, servers, (path.template -> path) :: paths, None, Nil)
 
-    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, server :: servers, paths)
+    def addServer(server: Server): CompleteDoc =
+      CompleteDoc(openApiVersion, info, server :: servers, paths, None, Nil)
   }
 
   private case class CompleteDoc(openApiVersion: String,
                                  info:           Info,
                                  servers:        List[Server],
-                                 paths:          Map[String, Path],
+                                 paths:          List[(String, Path)],
                                  components:     Option[Components],
                                  security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
 
-    def addPath(path: Path): CompleteDoc = copy(paths = paths + (path.template -> path))
+    def addPath(path: Path): CompleteDoc =
+      copy(paths = path.template -> path :: paths)
 
-    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, server :: servers, paths)
+    def addServer(server: Server): CompleteDoc =
+      copy(openApiVersion, info, server :: servers, paths)
 
     def addNoAuthSecurity(): CompleteDoc =
       copy(security = SecurityRequirementNoAuth :: security)
 
-    def addSecurity(securityScheme: SecurityScheme) = copy(
+    def addSecurity(securityScheme: SecurityScheme): CompleteDoc = copy(
       security = SecurityRequirementAuth(securityScheme.id, Nil) :: security,
       components = {
         val c = components.getOrElse(Components.empty)

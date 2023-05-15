@@ -32,16 +32,36 @@ trait Endpoint[F[_]] {
   def `get /spec.json`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
-                                        endpoint:  EndpointDocs,
-                                        endpoints: EndpointDocs*
-) extends Http4sDsl[F]
+object Endpoint {
+
+  def apply[F[_]: Async]: F[Endpoint[F]] = for {
+    serviceVersion <- ServiceVersion.readFromConfig[F]()
+    endpointsDocs <- List(
+                       datasets.EndpointDocs[F],
+                       datasets.details.EndpointDocs[F],
+                       entities.EndpointDocs[F],
+                       ontology.EndpointDocs[F],
+                       projects.delete.EndpointDocs.pure[F].widen[docs.EndpointDocs],
+                       projects.details.EndpointDocs[F],
+                       projects.files.lineage.EndpointDocs.pure[F].widen[docs.EndpointDocs],
+                       projects.datasets.EndpointDocs[F],
+                       projects.datasets.tags.EndpointDocs[F],
+                       users.projects.EndpointDocs[F],
+                       entities.currentuser.recentlyviewed.EndpointDocs[F],
+                       EndpointDocs[F]
+                     ).sequence
+  } yield new EndpointImpl[F](serviceVersion, endpointsDocs)
+}
+
+private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion, endpointsDocs: List[EndpointDocs])
+    extends Http4sDsl[F]
     with Endpoint[F] {
   import Encoders._
 
   override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
 
   lazy val doc: OpenApiDocument = {
+
     val document = OpenApiDocument(
       openApiVersion = "3.0.3",
       Info("Knowledge Graph API",
@@ -50,9 +70,9 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
       )
     ).addServer(server)
 
-    endpoints
-      .foldLeft(document addPath endpoint.path) { (d, endpoint) =>
-        d.addPath(endpoint.path)
+    endpointsDocs
+      .foldLeft(document) { (doc, endpoint) =>
+        doc.addPath(endpoint.path)
       }
       .addSecurity(privateToken)
       .addSecurity(openIdConnect)
@@ -74,35 +94,5 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
     id = "oauth_auth",
     name = "oauth_auth",
     openIdConnectUrl = "/auth/realms/Renku/.well-known/openid-configuration"
-  )
-}
-
-object Endpoint {
-  def apply[F[_]: Async]: F[Endpoint[F]] = for {
-    datasetsEndpoint           <- datasets.EndpointDocs[F]
-    datasetDetailsEndpoint     <- datasets.details.EndpointDocs[F]
-    entitiesEndpoint           <- entities.EndpointDocs[F]
-    ontologyEndpoint           <- ontology.EndpointDocs[F]
-    projectDetailsEndpoint     <- projects.details.EndpointDocs[F]
-    projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
-    projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
-    userProjectsEndpoint       <- users.projects.EndpointDocs[F]
-    userRecentEntitiesEndpoint <- entities.currentuser.recentlyviewed.EndpointDocs[F]
-    docsEndpointEndpoint       <- EndpointDocs[F]
-    serviceVersion             <- ServiceVersion.readFromConfig[F]()
-  } yield new EndpointImpl[F](
-    serviceVersion,
-    datasetsEndpoint,
-    datasetDetailsEndpoint,
-    entitiesEndpoint,
-    ontologyEndpoint,
-    projects.delete.EndpointDocs,
-    projectDetailsEndpoint,
-    projects.files.lineage.EndpointDocs,
-    projectDatasetsEndpoint,
-    projectDatasetTagsEndpoint,
-    docsEndpointEndpoint,
-    userProjectsEndpoint,
-    userRecentEntitiesEndpoint
   )
 }
