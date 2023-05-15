@@ -62,12 +62,12 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
   private lazy val limit = Parameter.Query(
     "limit",
     Schema.Integer,
-    "Limit the results by this amount. Must be > 0 and <= 200".some,
+    "Limit the results by this amount. Must be > 0 and <= 200. Defaults to 10".some,
     required = false
   )
 
   private lazy val entityType = Parameter.Query(
-    "entityType",
+    "type",
     Schema.String,
     "One of 'project' or 'dataset'. Can be given multiple times. If non-existent, all types are returned.".some,
     required = false
