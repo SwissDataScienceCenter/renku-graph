@@ -22,6 +22,7 @@ import cats.data.{EitherT, NonEmptyList, OptionT}
 import cats.effect._
 import cats.syntax.all._
 import com.comcast.ip4s.{Host, Port}
+import fs2.io.net.Network
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
@@ -202,7 +203,8 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
   def client: Client[F] =
     Client.fromHttpApp(allRoutes.orNotFound)
 
-  def resource(bindAddress: Host, port: Port): Resource[F, Server] =
+  def resource(bindAddress: Host, port: Port): Resource[F, Server] = {
+    implicit val network: Network[F] = Network.forAsync(Async[F])
     Resource.eval(logger.trace(s"Starting GitLab stub on $bindAddress:$port")) *>
       EmberServerBuilder
         .default[F]
@@ -210,6 +212,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
         .withPort(port)
         .withHttpApp(enableLogging[F](allRoutes.orNotFound))
         .build
+  }
 
   def resource(bindAddress: String, port: Int): Resource[F, Server] =
     (Host.fromString(bindAddress), Port.fromInt(port))
