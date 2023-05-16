@@ -59,55 +59,55 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "ds search infos",
     Prefixes of (renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?topSameAs ?name ?visibility ?maybeDescription
-        |                ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
-        |                (GROUP_CONCAT(?creator; separator='$rowsSeparator') AS ?creators)
-        |                (GROUP_CONCAT(?keyword; separator='$rowsSeparator') AS ?keywords)
-        |                (GROUP_CONCAT(?image; separator='$rowsSeparator') AS ?images)
-        |                (GROUP_CONCAT(?link; separator='$rowsSeparator') AS ?links)
-        |WHERE {
-        |  {
-        |    SELECT DISTINCT ?topSameAs
-        |    WHERE {
-        |      GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
-        |        ?linkId a renku:DatasetProjectLink;
-        |                renku:project ${resourceId.asEntityId.asSparql.sparql}.
-        |        ?topSameAs renku:datasetProjectLink ?linkId
-        |      }
-        |    }
-        |  } {
-        |    GRAPH ${GraphClass.Datasets.id.asSparql.sparql} {
-        |      ?topSameAs renku:slug ?name;
-        |                 renku:projectVisibility ?visibility.
-        |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
-        |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
-        |      OPTIONAL { ?topSameAs schema:datePublished ?maybeDatePublished }
-        |      OPTIONAL { ?topSameAs schema:dateModified ?maybeDateModified }
-        |      {
-        |        ?topSameAs schema:creator ?creatorId.
-        |        ?creatorId schema:name ?creatorName.
-        |        BIND (CONCAT(STR(?creatorId), STR(';;'), STR(?creatorName)) AS ?creator)
-        |      }
-        |      OPTIONAL { ?topSameAs schema:keywords ?keyword }
-        |      OPTIONAL {
-        |        ?topSameAs schema:image ?imageId.
-        |        ?imageId schema:position ?imagePosition;
-        |                 schema:contentUrl ?imageUrl.
-        |        BIND (CONCAT(STR(?imageId), STR(';;'), STR(?imagePosition), STR(';;'), STR(?imageUrl)) AS ?image)
-        |      }
-        |      {
-        |        ?topSameAs renku:datasetProjectLink ?linkId.
-        |        ?linkId renku:project ?linkProjectId;
-        |                renku:dataset ?linkDatasetId.
-        |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId)) AS ?link)
-        |      }
-        |    }
-        |  }
-        |}
-        |GROUP BY ?topSameAs ?name ?visibility ?maybeDescription
-        |         ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
-        |ORDER BY ?name
-        |""".stripMargin
+    sparql"""|SELECT DISTINCT ?topSameAs ?name ?visibility ?maybeDescription
+             |                ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |                (GROUP_CONCAT(?creator; separator=${rowsSeparator.asTripleObject}) AS ?creators)
+             |                (GROUP_CONCAT(?keyword; separator=${rowsSeparator.asTripleObject}) AS ?keywords)
+             |                (GROUP_CONCAT(?image; separator=${rowsSeparator.asTripleObject}) AS ?images)
+             |                (GROUP_CONCAT(?link; separator=${rowsSeparator.asTripleObject}) AS ?links)
+             |WHERE {
+             |  {
+             |    SELECT DISTINCT ?topSameAs
+             |    WHERE {
+             |      GRAPH ${GraphClass.Datasets.id} {
+             |        ?linkId a renku:DatasetProjectLink;
+             |                renku:project ${resourceId.asEntityId}.
+             |        ?topSameAs renku:datasetProjectLink ?linkId
+             |      }
+             |    }
+             |  } {
+             |    GRAPH ${GraphClass.Datasets.id} {
+             |      ?topSameAs renku:slug ?name;
+             |                 renku:projectVisibility ?visibility.
+             |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
+             |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
+             |      OPTIONAL { ?topSameAs schema:datePublished ?maybeDatePublished }
+             |      OPTIONAL { ?topSameAs schema:dateModified ?maybeDateModified }
+             |      {
+             |        ?topSameAs schema:creator ?creatorId.
+             |        ?creatorId schema:name ?creatorName.
+             |        BIND (CONCAT(STR(?creatorId), STR(';;'), STR(?creatorName)) AS ?creator)
+             |      }
+             |      OPTIONAL { ?topSameAs schema:keywords ?keyword }
+             |      OPTIONAL {
+             |        ?topSameAs schema:image ?imageId.
+             |        ?imageId schema:position ?imagePosition;
+             |                 schema:contentUrl ?imageUrl.
+             |        BIND (CONCAT(STR(?imageId), STR(';;'), STR(?imagePosition), STR(';;'), STR(?imageUrl)) AS ?image)
+             |      }
+             |      {
+             |        ?topSameAs renku:datasetProjectLink ?linkId.
+             |        ?linkId renku:project ?linkProjectId;
+             |                renku:dataset ?linkDatasetId.
+             |        BIND (CONCAT(STR(?linkId), STR(';;'), STR(?linkProjectId), STR(';;'), STR(?linkDatasetId)) AS ?link)
+             |      }
+             |    }
+             |  }
+             |}
+             |GROUP BY ?topSameAs ?name ?visibility ?maybeDescription
+             |         ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |ORDER BY ?name
+             |""".stripMargin
   )
 
   private lazy val rowsSeparator = '\u0000'
@@ -122,7 +122,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       val splitRows: String => List[String] = _.split(rowsSeparator).toList.distinct
 
       def decode[O](map: String => Decoder.Result[O], sort: List[O] => List[O]): String => Decoder.Result[List[O]] =
-        splitRows(_).map(map).sequence.map(sort)
+        splitRows(_).map(map).sequence.map(_.distinct).map(sort)
 
       def toNonEmptyList[O](noElemMessage: String): List[O] => Decoder.Result[NonEmptyList[O]] = {
         case Nil => DecodingFailure(DecodingFailure.Reason.CustomReason(noElemMessage), cur).asLeft[NonEmptyList[O]]
