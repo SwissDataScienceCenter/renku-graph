@@ -23,18 +23,13 @@ import cats.syntax.all._
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-
 private[migrations] trait UpdateQueryRunner[F[_]] {
   def run(query: SparqlQuery): F[Unit]
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig: ProjectsConnectionConfig
-) extends TSClientImpl[F](storeConfig,
-                          idleTimeoutOverride = (16 minutes).some,
-                          requestTimeoutOverride = (15 minutes).some
-    )
+) extends TSClientImpl[F](storeConfig)
     with UpdateQueryRunner[F] {
 
   def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)

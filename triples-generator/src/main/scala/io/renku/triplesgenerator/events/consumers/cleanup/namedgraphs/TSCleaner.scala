@@ -40,17 +40,13 @@ private[cleanup] object TSCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig,
       retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
-      maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-      idleTimeout:      Duration = 16 minutes,
-      requestTimeout:   Duration = 15 minutes
+      maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
   ): TSCleaner[F] =
     new TSCleanerImpl[F](ProjectIdFinder[F](connectionConfig),
                          SearchGraphsCleaner(connectionConfig),
                          connectionConfig,
                          retryInterval,
-                         maxRetries,
-                         idleTimeout,
-                         requestTimeout
+                         maxRetries
     )
 
   def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSCleaner[F]] =
@@ -62,15 +58,8 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     searchGraphsCleaner: SearchGraphsCleaner[F],
     connectionConfig:    ProjectsConnectionConfig,
     retryInterval:       FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:          Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:         Duration = 16 minutes,
-    requestTimeout:      Duration = 15 minutes
-) extends TSClientImpl(connectionConfig,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       idleTimeoutOverride = idleTimeout.some,
-                       requestTimeoutOverride = requestTimeout.some
-    )
+    maxRetries:          Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+) extends TSClientImpl(connectionConfig, retryInterval = retryInterval, maxRetries = maxRetries)
     with TSCleaner[F] {
 
   import ProjectHierarchyFixer._

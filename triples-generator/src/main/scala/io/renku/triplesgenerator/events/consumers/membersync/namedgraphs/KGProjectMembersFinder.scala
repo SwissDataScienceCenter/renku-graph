@@ -22,31 +22,25 @@ package namedgraphs
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model._
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-import scala.concurrent.duration._
 
 private trait KGProjectMembersFinder[F[_]] {
   def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]]
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    connectionConfig: ProjectsConnectionConfig,
-    idleTimeout:      Duration = 21 minutes,
-    requestTimeout:   Duration = 20 minutes
+    connectionConfig: ProjectsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClientImpl(connectionConfig,
-                         idleTimeoutOverride = idleTimeout.some,
-                         requestTimeoutOverride = requestTimeout.some
-    )
+    extends TSClientImpl(connectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
