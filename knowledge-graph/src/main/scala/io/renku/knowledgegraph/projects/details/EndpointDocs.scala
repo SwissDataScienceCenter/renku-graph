@@ -50,9 +50,9 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
 ) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Project details",
-    "Finds Project details".some,
     GET(
+      "Project details",
+      "Finds Project details",
       Uri / "projects" / namespace / projectName,
       Status.Ok -> Response(
         "Details found",

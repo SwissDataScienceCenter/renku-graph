@@ -28,9 +28,9 @@ import io.renku.knowledgegraph.docs.model.Operation.DELETE
 object EndpointDocs extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Project Delete",
-    "Deletes Project".some,
     DELETE(
+      "Project Delete",
+      "Deletes a Project with the given path",
       Uri / "projects" / namespace / projectName,
       Status.Accepted -> Response(
         "Project deleted",

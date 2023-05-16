@@ -40,9 +40,9 @@ import java.time.Instant
 final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "User recent entities search",
-    "Finds recent projects and datasets of the user with the given userId".some,
     GET(
+      "User recent entities search",
+      "Finds recent projects and datasets of the user with the given userId",
       Uri / "entities" / "current-user" / "recently-viewed" :? limit :? entityType,
       Status.Ok -> Response("Found entities", Contents(MediaType.`application/json`("Sample response", example))),
       Status.BadRequest -> Response(

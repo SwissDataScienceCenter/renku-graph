@@ -43,9 +43,9 @@ object EndpointDocs {
 private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "User Projects search",
-    "Finds Projects of the user with the given userId".some,
     GET(
+      "User Projects search",
+      "Finds Projects of the user with the given userId",
       Uri / "users" / userId / "projects" :? state,
       Status.Ok -> Response("Found projects",
                             Contents(MediaType.`application/json`("Sample response", example)),

@@ -36,9 +36,9 @@ private object EndpointDocs {
 private class EndpointDocsImpl() extends EndpointDocs {
 
   override lazy val path: Path = Path(
-    "OpenAPI specification of the service's resources",
-    description = None,
     GET(
+      "OpenAPI specification",
+      "OpenAPI specification of the service's resources",
       Uri / "spec.json",
       Status.Ok -> Response("Specification in JSON", Contents(MediaType.`application/json`)),
       Status.InternalServerError ->

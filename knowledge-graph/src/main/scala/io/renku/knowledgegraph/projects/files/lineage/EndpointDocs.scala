@@ -31,9 +31,9 @@ import model.{Edge, Lineage, Node}
 object EndpointDocs extends docs.EndpointDocs {
 
   override val path: Path = Path(
-    "Lineage",
-    "Finds lineage of the given file".some,
     GET(
+      "Lineage",
+      "Finds lineage of the given file",
       Uri / "projects" / namespace / projectName / "files" / location / "lineage",
       Status.Ok -> Response("Lineage found", Contents(MediaType.`application/json`("Sample Lineage", example))),
       Status.Unauthorized -> Response(

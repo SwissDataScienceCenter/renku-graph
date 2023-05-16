@@ -32,39 +32,51 @@ object model {
     def openApiVersion: String
     def info:           Info
     def servers:        List[Server]
-    def paths:          List[(String, Path)]
+    def paths:          Paths
     def components:     Option[Components]
     def security:       List[SecurityRequirement]
   }
 
-  object OpenApiDocument {
-    def apply(openApiVersion: String, info: Info): DocWithInfo =
-      DocWithInfo(openApiVersion, info, servers = Nil, paths = List.empty)
+  final case class Paths(value: Map[String, List[Path]]) {
+
+    def add(path: Path): Paths =
+      Paths {
+        value.get(path.template) match {
+          case None        => value + (path.template -> List(path))
+          case Some(paths) => value + (path.template -> (path :: paths))
+        }
+      }
   }
 
-  private[model] case class DocWithInfo(openApiVersion: String,
-                                        info:           Info,
-                                        servers:        List[Server],
-                                        paths:          List[(String, Path)]
-  ) {
+  object Paths {
+    lazy val empty: Paths = new Paths(Map.empty)
+    def apply(path: Path): Paths = Paths.empty.add(path)
+  }
+
+  object OpenApiDocument {
+    def apply(openApiVersion: String, info: Info): DocWithInfo =
+      DocWithInfo(openApiVersion, info, servers = Nil, paths = Paths.empty)
+  }
+
+  private[model] case class DocWithInfo(openApiVersion: String, info: Info, servers: List[Server], paths: Paths) {
 
     def addPath(path: Path): CompleteDoc =
-      CompleteDoc(openApiVersion, info, servers, (path.template -> path) :: paths, None, Nil)
+      CompleteDoc(openApiVersion, info, servers, Paths(path), components = None, security = Nil)
 
     def addServer(server: Server): CompleteDoc =
-      CompleteDoc(openApiVersion, info, server :: servers, paths, None, Nil)
+      CompleteDoc(openApiVersion, info, server :: servers, paths, components = None, security = Nil)
   }
 
   private case class CompleteDoc(openApiVersion: String,
                                  info:           Info,
                                  servers:        List[Server],
-                                 paths:          List[(String, Path)],
+                                 paths:          Paths,
                                  components:     Option[Components],
                                  security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
 
     def addPath(path: Path): CompleteDoc =
-      copy(paths = path.template -> path :: paths)
+      copy(paths = paths.add(path))
 
     def addServer(server: Server): CompleteDoc =
       copy(openApiVersion, info, server :: servers, paths)
@@ -72,13 +84,14 @@ object model {
     def addNoAuthSecurity(): CompleteDoc =
       copy(security = SecurityRequirementNoAuth :: security)
 
-    def addSecurity(securityScheme: SecurityScheme): CompleteDoc = copy(
-      security = SecurityRequirementAuth(securityScheme.id, Nil) :: security,
-      components = {
-        val c = components.getOrElse(Components.empty)
-        c.copy(securitySchemes = c.securitySchemes + (securityScheme.id -> securityScheme))
-      }.some
-    )
+    def addSecurity(securityScheme: SecurityScheme): CompleteDoc =
+      copy(
+        security = SecurityRequirementAuth(securityScheme.id, Nil) :: security,
+        components = {
+          val c = components.getOrElse(Components.empty)
+          c.copy(securitySchemes = c.securitySchemes + (securityScheme.id -> securityScheme))
+        }.some
+      )
   }
 
   case class Info(title: String, description: Option[String], version: String)
@@ -125,7 +138,7 @@ object model {
   }
 
   trait Path {
-    def summary:     String
+    def summary:     Option[String]
     def description: Option[String]
     def operations:  List[Operation]
     def parameters:  List[Parameter]
@@ -134,13 +147,13 @@ object model {
 
   object Path {
 
-    def apply(summary: String, description: Option[String] = None, opMapping: OpMapping): Path =
+    def apply(opMapping: OpMapping, summary: Option[String] = None, description: Option[String] = None): Path =
       PathImpl(summary, description, List(opMapping.operation), opMapping.operation.parameters, opMapping.template)
 
     case class OpMapping(template: String, operation: Operation)
   }
 
-  private case class PathImpl(summary:     String,
+  private case class PathImpl(summary:     Option[String],
                               description: Option[String],
                               operations:  List[Operation],
                               parameters:  List[Parameter],
@@ -149,6 +162,7 @@ object model {
 
   sealed trait Operation extends Product with Serializable {
     def summary:     Option[String]
+    def description: Option[String]
     def parameters:  List[Parameter]
     def requestBody: Option[RequestBody]
     def responses:   Map[Status, Response]
@@ -157,25 +171,30 @@ object model {
 
   object Operation {
 
-    def GET(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
+    def GET(summary: String, description: String, uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      OpMapping(Uri.getTemplate(uri.parts), Get("".some, parameters, None, statusAndResponse.toMap, Nil))
+      OpMapping(Uri.getTemplate(uri.parts),
+                Get(summary.some, description.some, parameters, None, statusAndResponse.toMap, Nil)
+      )
     }
 
-    def DELETE(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
+    def DELETE(summary: String, description: String, uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      OpMapping(Uri.getTemplate(uri.parts), Delete("".some, parameters, None, statusAndResponse.toMap, Nil))
+      OpMapping(Uri.getTemplate(uri.parts),
+                Delete(summary.some, description.some, parameters, None, statusAndResponse.toMap, Nil)
+      )
     }
 
     case class Get(summary:     Option[String],
+                   description: Option[String],
                    parameters:  List[Parameter],
                    requestBody: Option[RequestBody],
                    responses:   Map[Status, Response],
@@ -183,6 +202,7 @@ object model {
     ) extends Operation
 
     case class Delete(summary:     Option[String],
+                      description: Option[String],
                       parameters:  List[Parameter],
                       requestBody: Option[RequestBody],
                       responses:   Map[Status, Response],
