@@ -56,6 +56,8 @@ object SparqlEncoder {
 
     private val booleanObjectEncoder: SparqlEncoder[TripleObject.Boolean] =
       nonStringLiteralEncoder.contramap(_.value.toString)
+    private val charObjectEncoder: SparqlEncoder[TripleObject.Char] =
+      stringLiteralEncoder.contramap(_.value.toString)
     private val intObjectEncoder: SparqlEncoder[TripleObject.Int] =
       nonStringLiteralEncoder.contramap(_.value.toString)
     private val longObjectEncoder: SparqlEncoder[TripleObject.Long] =
@@ -76,6 +78,7 @@ object SparqlEncoder {
     private val iriObjectEncoder: SparqlEncoder[TripleObject.Iri] = entityIdSparqlEncoder.contramap(_.value)
     implicit def tripleObjectSparqlEncoder[T <: TripleObject]: SparqlEncoder[T] = SparqlEncoder.instance {
       case o: TripleObject.Boolean   => booleanObjectEncoder(o)
+      case o: TripleObject.Char      => charObjectEncoder(o)
       case o: TripleObject.Int       => intObjectEncoder(o)
       case o: TripleObject.Long      => longObjectEncoder(o)
       case o: TripleObject.Float     => floatObjectEncoder(o)

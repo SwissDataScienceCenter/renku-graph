@@ -25,7 +25,7 @@ import io.circe.Decoder
 import io.renku.entities.search.FinderSpecOps
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.{Entity => SearchEntity}
-import io.renku.entities.searchgraphs.SearchInfoDataset
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.entities.viewings.EntityViewings
 import io.renku.entities.viewings.search.RecentEntitiesFinder.EntityType
 import io.renku.graph.model.persons.GitLabId
@@ -53,7 +53,7 @@ abstract class SearchTestBase
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with SearchInfoDataset
+    with SearchInfoDatasets
     with AdditionalMatchers
     with SearchDiffInstances
     with EntityViewings

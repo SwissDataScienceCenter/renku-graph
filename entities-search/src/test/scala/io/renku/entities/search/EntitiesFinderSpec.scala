@@ -27,7 +27,7 @@ import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
-import io.renku.entities.searchgraphs.SearchInfoDataset
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -59,7 +59,7 @@ class EntitiesFinderSpec
     with AdditionalMatchers
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with SearchInfoDataset
+    with SearchInfoDatasets
     with IOSpec {
 
   implicit val ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]

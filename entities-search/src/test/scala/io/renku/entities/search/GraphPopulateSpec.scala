@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.entities.searchgraphs.SearchInfoDataset
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
@@ -41,7 +41,7 @@ class GraphPopulateSpec
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with SearchInfoDataset
+    with SearchInfoDatasets
     with IOSpec {
 
   implicit val ioLogger: Logger[IO] = TestLogger[IO]()

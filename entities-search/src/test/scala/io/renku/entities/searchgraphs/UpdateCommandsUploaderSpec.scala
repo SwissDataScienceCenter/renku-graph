@@ -18,44 +18,58 @@
 
 package io.renku.entities.searchgraphs
 
-import Generators.updateCommands
+import Generators.{deleteUpdateCommands, insertUpdateCommands, queryUpdateCommands}
 import cats.syntax.all._
-import commands.UpdateCommand
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.triplesstore.client.TriplesStoreGenerators.quads
 import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{SparqlQuery, TSClient}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class UpdateCommandsUploaderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with MockFactory
+    with TableDrivenPropertyChecks {
 
   "upload" should {
 
-    "succeeds if uploading updates to the TS succeeds" in new TestCase {
+    forAll {
+      Table(
+        "type"   -> "generator",
+        "insert" -> insertUpdateCommands,
+        "delete" -> deleteUpdateCommands,
+        "query"  -> queryUpdateCommands
+      )
+    } { (typ, commandsGen) =>
+      s"succeeds if uploading updates of type $typ to the TS succeeds" in new TestCase {
 
-      val commands = updateCommands.generateList(min = 1)
+        val commands = commandsGen.generateList(min = 1)
 
-      toSparqlQueries(commands) foreach { query =>
-        givenTSUpdating(query, returning = ().pure[Try])
+        toSparqlQueries(commands) foreach { query =>
+          givenTSUpdating(query, returning = ().pure[Try])
+        }
+
+        uploader.upload(commands) shouldBe ().pure[Try]
       }
-
-      uploader.upload(commands) shouldBe ().pure[Try]
     }
 
     "fail if uploading updates to the TS fails" in new TestCase {
 
-      val commands = allSortsOfCommands.generateList(min = 1, max = 2).flatten
+      val commands = allSortsOfCommands.generateOne
 
-      val query1 :: query2 :: Nil = toSparqlQueries(commands)
+      val query1 :: query2 :: query3 :: Nil = toSparqlQueries(commands)
       givenTSUpdating(query1, returning = ().pure[Try])
+      givenTSUpdating(query2, returning = ().pure[Try])
       val failure = exceptions.generateOne.raiseError[Try, Unit]
-      givenTSUpdating(query2, returning = failure)
+      givenTSUpdating(query3, returning = failure)
 
       uploader.upload(commands) shouldBe failure
     }
@@ -64,14 +78,29 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
   private def toSparqlQueries(commands: List[UpdateCommand]): List[SparqlQuery] =
     commands
       .groupBy {
-        case _: UpdateCommand.Insert => true
-        case _: UpdateCommand.Delete => false
+        case _: UpdateCommand.Insert => "insert"
+        case _: UpdateCommand.Delete => "delete"
+        case _: UpdateCommand.Query  => "query"
       }
-      .map {
-        case (true, cmds) =>
-          SparqlQuery.of("search info inserts", s"INSERT DATA {\n${cmds.map(_.quad.asSparql).combineAll.sparql}\n}")
-        case (false, cmds) =>
-          SparqlQuery.of("search info deletes", s"DELETE DATA {\n${cmds.map(_.quad.asSparql).combineAll.sparql}\n}")
+      .flatMap {
+        case ("insert", cmds) =>
+          List(
+            SparqlQuery.of(
+              "search info inserts",
+              sparql"INSERT DATA {\n${cmds.map { case UpdateCommand.Insert(quad) => quad.asSparql }.combineAll}\n}"
+            )
+          )
+        case ("delete", cmds) =>
+          List(
+            SparqlQuery.of(
+              "search info deletes",
+              sparql"DELETE DATA {\n${cmds.map { case UpdateCommand.Delete(quad) => quad.asSparql }.combineAll}\n}"
+            )
+          )
+        case ("query", cmds) =>
+          cmds.map { case UpdateCommand.Query(query) => query }
+        case (other, _) =>
+          throw new Exception(s"UpdateCommand of type '$other' not supported by the test")
       }
       .toList
 
@@ -86,7 +115,7 @@ class UpdateCommandsUploaderSpec extends AnyWordSpec with should.Matchers with M
         .returning(returning)
   }
 
-  private lazy val allSortsOfCommands =
-    (quads.map(UpdateCommand.Insert) -> quads.map(UpdateCommand.Delete))
-      .mapN(_ :: _ :: Nil)
+  private lazy val allSortsOfCommands: Gen[List[UpdateCommand]] =
+    (insertUpdateCommands, deleteUpdateCommands, queryUpdateCommands)
+      .mapN(_ :: _ :: _ :: Nil)
 }

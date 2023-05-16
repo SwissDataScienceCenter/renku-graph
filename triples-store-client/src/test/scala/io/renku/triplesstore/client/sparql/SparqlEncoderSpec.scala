@@ -40,6 +40,11 @@ class SparqlEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
       obj.asSparql.sparql shouldBe s"${obj.value}"
     }
 
+    "be able to encode TripleObject.Char as sparql" in {
+      val obj = charTripleObjects.generateOne
+      obj.asSparql.sparql shouldBe s"'${obj.value}'"
+    }
+
     "be able to encode TripleObject.Int as sparql" in {
       val obj = intTripleObjects.generateOne
       obj.asSparql.sparql shouldBe s"${obj.value}"
