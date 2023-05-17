@@ -35,7 +35,7 @@ import org.http4s.{MediaType, Uri}
 import org.http4s.MediaRange._
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration._
 
 trait TSClient[F[_]] {
   def updateWithNoResult(updateQuery:         SparqlQuery): F[Unit]
@@ -50,28 +50,26 @@ trait TSClient[F[_]] {
 
 object TSClient {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      triplesStoreConfig:     DatasetConnectionConfig,
-      retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
-      maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-      idleTimeoutOverride:    Option[Duration] = None,
-      requestTimeoutOverride: Option[Duration] = None
+      triplesStoreConfig: DatasetConnectionConfig,
+      retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
+      maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+      timeout:            Duration = 20.minutes
   ): TSClient[F] =
-    new TSClientImpl[F](triplesStoreConfig, retryInterval, maxRetries, idleTimeoutOverride, requestTimeoutOverride)
+    new TSClientImpl[F](triplesStoreConfig, retryInterval, maxRetries, timeout)
 }
 
 class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    triplesStoreConfig:     DatasetConnectionConfig,
-    retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeoutOverride:    Option[Duration] = None,
-    requestTimeoutOverride: Option[Duration] = None,
-    printQueries:           Boolean = false
+    triplesStoreConfig: DatasetConnectionConfig,
+    retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    timeout:            Duration = 20.minutes,
+    printQueries:       Boolean = false
 ) extends RestClient(Throttler.noThrottling,
                      Option(implicitly[SparqlQueryTimeRecorder[F]].instance),
                      retryInterval,
                      maxRetries,
-                     idleTimeoutOverride,
-                     requestTimeoutOverride
+                     timeout.some,
+                     timeout.some
     )
     with TSClient[F]
     with RdfMediaTypes {

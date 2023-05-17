@@ -24,17 +24,15 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.model.{datasets, projects, GraphClass}
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.jsonld.{EntityId, NamedGraph}
-import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration._
 
 private object SameAsHierarchyFixer {
   def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
@@ -44,10 +42,7 @@ private object SameAsHierarchyFixer {
 
 private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
     connectionConfig: ProjectsConnectionConfig
-) extends TSClientImpl(connectionConfig,
-                       idleTimeoutOverride = (11 minutes).some,
-                       requestTimeoutOverride = (10 minutes).some
-    ) {
+) extends TSClientImpl(connectionConfig) {
 
   import io.renku.jsonld.syntax._
   import io.renku.tinytypes.json.TinyTypeDecoders._
