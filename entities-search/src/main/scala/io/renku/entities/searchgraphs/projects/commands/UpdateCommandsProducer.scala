@@ -19,31 +19,20 @@
 package io.renku.entities.searchgraphs.projects
 package commands
 
-import cats.MonadThrow
-import cats.effect.Async
-import cats.syntax.all._
 import io.renku.entities.searchgraphs.UpdateCommand
 import io.renku.entities.searchgraphs.projects.ProjectSearchInfo
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
-import org.typelevel.log4cats.Logger
 
-private[projects] trait UpdateCommandsProducer[F[_]] {
-  def toUpdateCommands(modelInfo: ProjectSearchInfo): F[List[UpdateCommand]]
+private[projects] trait UpdateCommandsProducer {
+  def toUpdateCommands(modelInfo: ProjectSearchInfo): List[UpdateCommand]
 }
 
 private[projects] object UpdateCommandsProducer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      connectionConfig: ProjectsConnectionConfig
-  ): UpdateCommandsProducer[F] =
-    new UpdateCommandsProducerImpl[F](SearchInfoFetcher[F](connectionConfig), CommandsCalculator())
+  def apply(): UpdateCommandsProducer =
+    new UpdateCommandsProducerImpl(CommandsCalculator())
 }
 
-private class UpdateCommandsProducerImpl[F[_]: MonadThrow](searchInfoFetcher: SearchInfoFetcher[F],
-                                                           commandsCalculator: CommandsCalculator
-) extends UpdateCommandsProducer[F] {
+private class UpdateCommandsProducerImpl(commandsCalculator: CommandsCalculator) extends UpdateCommandsProducer {
 
-  override def toUpdateCommands(modelInfo: ProjectSearchInfo): F[List[UpdateCommand]] =
-    searchInfoFetcher
-      .fetchTSSearchInfo(modelInfo.id)
-      .map(commandsCalculator.calculateCommands(modelInfo, _))
+  override def toUpdateCommands(modelInfo: ProjectSearchInfo): List[UpdateCommand] =
+    commandsCalculator.calculateCommands(modelInfo)
 }

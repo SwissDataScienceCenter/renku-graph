@@ -18,20 +18,41 @@
 
 package io.renku.entities.searchgraphs.projects.commands
 
+import eu.timepit.refined.auto._
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.syntax._
 
 private[projects] object ProjectInfoDeleteQuery {
   def apply(projectId: projects.ResourceId): SparqlQuery =
     SparqlQuery.ofUnsafe(
       "delete project info",
-      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id ?p ?o } }
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE {
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    ?imageId ?imagePred ?imageObj.
+               |    ?creatorId ?creatorPred ?creatorObj.
+               |    ?projId ?projPred ?projObj.
+               |  }
+               |}
                |WHERE {
                |  GRAPH ${GraphClass.Projects.id} {
-               |    BIND (${projectId.asEntityId} AS ?id)
-               |    ?id ?p ?o
+               |    BIND (${projectId.asEntityId} AS ?projId)
+               |
+               |    OPTIONAL {
+               |      ?projId schema:image ?imageId.
+               |      ?imageId ?imagePred ?imageObj.
+               |    }
+               |
+               |    OPTIONAL {
+               |      ?projId schema:creator ?creatorId.
+               |      ?creatorId ?creatorPred ?creatorObj.
+               |    }
+               |
+               |    ?projId ?projPred ?projObj.
                |  }
                |}
                |""".stripMargin

@@ -53,19 +53,19 @@ class TriplesRemoverSpec
       upload(to = projectsDataset, someProject, anyRenkuProjectEntities.generateOne.to[entities.RenkuProject])
       insertViewTime(someProject, someProject.maybeCreator.value.resourceId)
 
-      triplesCount(on = projectsDataset) should be > 0L
+      triplesCount(on = projectsDataset).unsafeRunSync() should be > 0L
 
-      val projectViewedGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id)
+      val projectViewedGraphTriples = triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id).unsafeRunSync()
       projectViewedGraphTriples should be > 0L
-      val personViewingsGraphTriples = triplesCount(projectsDataset, GraphClass.PersonViewings.id)
+      val personViewingsGraphTriples = triplesCount(projectsDataset, GraphClass.PersonViewings.id).unsafeRunSync()
       personViewingsGraphTriples should be > 0L
 
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      triplesCount(on = projectsDataset) shouldBe projectViewedGraphTriples + personViewingsGraphTriples
+      triplesCount(on = projectsDataset).unsafeRunSync() shouldBe projectViewedGraphTriples + personViewingsGraphTriples
 
-      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id) shouldBe projectViewedGraphTriples
-      triplesCount(projectsDataset, GraphClass.PersonViewings.id)     shouldBe personViewingsGraphTriples
+      triplesCount(projectsDataset, GraphClass.ProjectViewedTimes.id).unsafeRunSync() shouldBe projectViewedGraphTriples
+      triplesCount(projectsDataset, GraphClass.PersonViewings.id).unsafeRunSync() shouldBe personViewingsGraphTriples
     }
   }
 
