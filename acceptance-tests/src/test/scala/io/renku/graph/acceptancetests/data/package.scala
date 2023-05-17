@@ -54,6 +54,8 @@ package object data extends TSData with ProjectFunctions {
     statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
     _ = if (project.members.nonEmpty)
           throw new Exception(show"Test project should not have members")
+    _ = if (project.maybeCreator.flatMap(_.maybeGitLabId).nonEmpty)
+          throw new Exception(show"Test project creator with GitLab id")
   } yield Project(project,
                   id,
                   maybeCreator = project.maybeCreator.map(_.to[ProjectMember]),
@@ -66,10 +68,7 @@ package object data extends TSData with ProjectFunctions {
   )
 
   private implicit lazy val testPersonToProjectMember: testentities.Person => ProjectMember = { p =>
-    val m = ProjectMember(p.name,
-                          persons.Username(p.name.value),
-                          p.maybeGitLabId.getOrElse(throw new Exception(show"Test project creator with GitLab id"))
-    )
+    val m = ProjectMember(p.name, persons.Username(p.name.value), personGitLabIds.generateOne)
     p.maybeEmail.map(m.add).getOrElse(m)
   }
 

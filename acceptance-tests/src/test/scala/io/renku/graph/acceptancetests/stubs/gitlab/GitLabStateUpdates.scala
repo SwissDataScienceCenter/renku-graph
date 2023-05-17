@@ -92,8 +92,9 @@ trait GitLabStateUpdates {
     addPersons(person.toSet)
 
   def addPersons(persons: Iterable[Person]): StateUpdate = state => {
-    val ids = persons.flatMap(_.maybeGitLabId).toSet
-    state.copy(persons = persons.toList ::: state.persons.filterNot(p => p.maybeGitLabId.exists(ids.contains)))
+    val glIdPersons = persons.filter(_.maybeGitLabId.nonEmpty)
+    val ids         = glIdPersons.flatMap(_.maybeGitLabId).toSet
+    state.copy(persons = glIdPersons.toList ::: state.persons.filterNot(p => p.maybeGitLabId.exists(ids.contains)))
   }
 
   def addProject(project: Project): StateUpdate =
