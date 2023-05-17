@@ -46,24 +46,12 @@ class ProjectsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
         val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
 
         val updates = updateCommands.generateList()
-        givenUpdatesProducing(searchInfo, returning = updates.pure[Try])
+        givenUpdatesProducing(searchInfo, returning = updates)
 
         givenUploading(updates, returning = ().pure[Try])
 
         provisioner.provisionProjectsGraph(project).success.value shouldBe ()
       }
-
-    "fail if updates producing step fails" in new TestCase {
-
-      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
-
-      val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
-
-      val failure = exceptions.generateOne.raiseError[Try, List[UpdateCommand]]
-      givenUpdatesProducing(searchInfo, returning = failure)
-
-      provisioner.provisionProjectsGraph(project) shouldBe failure
-    }
 
     "fail if updates uploading fails" in new TestCase {
 
@@ -72,7 +60,7 @@ class ProjectsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
       val searchInfo = SearchInfoExtractor.extractSearchInfo(project)
 
       val updates = updateCommands.generateList()
-      givenUpdatesProducing(searchInfo, returning = updates.pure[Try])
+      givenUpdatesProducing(searchInfo, returning = updates)
 
       val failure = exceptions.generateOne.raiseError[Try, Unit]
       givenUploading(updates, returning = failure)
@@ -83,11 +71,11 @@ class ProjectsGraphProvisionerSpec extends AnyWordSpec with should.Matchers with
 
   private trait TestCase {
 
-    private val commandsProducer = mock[UpdateCommandsProducer[Try]]
+    private val commandsProducer = mock[UpdateCommandsProducer]
     private val commandsUploader = mock[UpdateCommandsUploader[Try]]
     val provisioner              = new ProjectsGraphProvisionerImpl[Try](commandsProducer, commandsUploader)
 
-    def givenUpdatesProducing(searchInfo: ProjectSearchInfo, returning: Try[List[UpdateCommand]]) =
+    def givenUpdatesProducing(searchInfo: ProjectSearchInfo, returning: List[UpdateCommand]) =
       (commandsProducer.toUpdateCommands _)
         .expects(searchInfo)
         .returning(returning)

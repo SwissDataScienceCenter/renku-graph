@@ -36,7 +36,7 @@ private class EndpointDocsImpl() extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     GET(
-      "Knowledge Graph ontology",
+      "Knowledge Graph Ontology",
       "Returns details information about ontology used in the Knowledge Graph",
       Uri / "ontology",
       Status.Ok -> Response("Ontology",

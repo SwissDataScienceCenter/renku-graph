@@ -51,7 +51,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
 
   override lazy val path: Path = Path(
     GET(
-      "Project details",
+      "Project Details",
       "Finds Project details",
       Uri / "projects" / namespace / projectName,
       Status.Ok -> Response(

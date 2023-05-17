@@ -21,7 +21,6 @@ package projects
 
 import cats.MonadThrow
 import cats.effect.Async
-import cats.syntax.all._
 import commands.UpdateCommandsProducer
 import io.renku.graph.model.entities.Project
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -35,12 +34,10 @@ object ProjectsGraphProvisioner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       connectionConfig: ProjectsConnectionConfig
   ): ProjectsGraphProvisioner[F] =
-    new ProjectsGraphProvisionerImpl[F](UpdateCommandsProducer[F](connectionConfig),
-                                        UpdateCommandsUploader[F](connectionConfig)
-    )
+    new ProjectsGraphProvisionerImpl[F](UpdateCommandsProducer(), UpdateCommandsUploader[F](connectionConfig))
 }
 
-private class ProjectsGraphProvisionerImpl[F[_]: MonadThrow](commandsProducer: UpdateCommandsProducer[F],
+private class ProjectsGraphProvisionerImpl[F[_]: MonadThrow](commandsProducer: UpdateCommandsProducer,
                                                              commandsUploader: UpdateCommandsUploader[F]
 ) extends ProjectsGraphProvisioner[F] {
 
@@ -49,5 +46,5 @@ private class ProjectsGraphProvisionerImpl[F[_]: MonadThrow](commandsProducer: U
   import commandsUploader.upload
 
   override def provisionProjectsGraph(project: Project): F[Unit] =
-    toUpdateCommands(extractSearchInfo(project)) >>= upload
+    upload(toUpdateCommands(extractSearchInfo(project)))
 }

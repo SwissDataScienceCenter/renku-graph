@@ -30,29 +30,44 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
 class ProjectInfoDeleteQuerySpec
-    extends AnyFlatSpec
+    extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
     with SearchInfoDatasets
     with IOSpec {
 
-  it should "generate query that removes data of a single project info" in {
+  "the delete query" should {
 
-    val project1 = anyProjectEntities.generateOne.to[entities.Project]
-    val project2 = anyProjectEntities.generateOne.to[entities.Project]
+    "generate query that removes data of a single project info" in {
 
-    IOBody {
-      insertSearchInfo(project1) >>
-        insertSearchInfo(project2) >>
-        findProjects.map(_ should contain only (project1.resourceId, project2.resourceId)) >>
-        runUpdate(on = projectsDataset, ProjectInfoDeleteQuery(project1.resourceId)) >>
-        findProjects.map(_ shouldBe List(project2.resourceId))
+      val project1 = anyProjectEntities.generateOne.to[entities.Project]
+      val project2 = anyProjectEntities.generateOne.to[entities.Project]
+
+      IOBody {
+        insertSearchInfo(project1) >>
+          insertSearchInfo(project2) >>
+          findProjects.map(_ should contain only (project1.resourceId, project2.resourceId)) >>
+          runUpdate(on = projectsDataset, ProjectInfoDeleteQuery(project1.resourceId)) >>
+          findProjects.map(_ shouldBe List(project2.resourceId))
+      }
+    }
+
+    "generate query that removes all the data of the project" in {
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      IOBody {
+        insertSearchInfo(project) >>
+          findProjects.map(_ shouldBe List(project.resourceId)) >>
+          runUpdate(on = projectsDataset, ProjectInfoDeleteQuery(project.resourceId)) >>
+          triplesCount(on = projectsDataset, graphId = GraphClass.Projects.id).map(_ shouldBe 0L)
+      }
     }
   }
 

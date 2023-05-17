@@ -37,7 +37,7 @@ private class EndpointDocsImpl() extends EndpointDocs {
 
   override lazy val path: Path = Path(
     GET(
-      "OpenAPI specification",
+      "OpenAPI Specification",
       "OpenAPI specification of the service's resources",
       Uri / "spec.json",
       Status.Ok -> Response("Specification in JSON", Contents(MediaType.`application/json`)),

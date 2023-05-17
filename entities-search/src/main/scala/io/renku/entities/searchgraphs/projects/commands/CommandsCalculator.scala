@@ -25,7 +25,7 @@ import UpdateCommand.Insert
 import io.renku.triplesstore.client.syntax._
 
 private trait CommandsCalculator {
-  def calculateCommands(modelInfo: ProjectSearchInfo, maybeTSInfo: Option[ProjectSearchInfo]): List[UpdateCommand]
+  def calculateCommands(modelInfo: ProjectSearchInfo): List[UpdateCommand]
 }
 
 private object CommandsCalculator {
@@ -34,11 +34,9 @@ private object CommandsCalculator {
 
 private class CommandsCalculatorImpl extends CommandsCalculator {
 
-  override def calculateCommands(modelInfo:   ProjectSearchInfo,
-                                 maybeTSInfo: Option[ProjectSearchInfo]
-  ): List[UpdateCommand] = maybeTSInfo match {
-    case Some(tsInfo) if tsInfo == modelInfo => List.empty[UpdateCommand]
-    case Some(_) => UpdateCommand.Query(ProjectInfoDeleteQuery(modelInfo.id)) :: modelInfo.asQuads.map(Insert).toList
-    case None    => modelInfo.asQuads.map(Insert).toList
-  }
+  // Until there's no service ensuring serial writes to the TS
+  // it's safer to not take a decision based on the current state of TS
+  // and simply always re-create the data for the Project in the Projects graph
+  override def calculateCommands(modelInfo: ProjectSearchInfo): List[UpdateCommand] =
+    UpdateCommand.Query(ProjectInfoDeleteQuery(modelInfo.id)) :: modelInfo.asQuads.map(Insert).toList
 }

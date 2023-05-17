@@ -41,8 +41,8 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
 
   override lazy val path: Path = Path(
     GET(
-      "User recent entities search",
-      "Finds recent projects and datasets of the user with the given userId",
+      "User Recently Viewed Entities",
+      "Finds entities the user recently viewed",
       Uri / "entities" / "current-user" / "recently-viewed" :? limit :? entityType,
       Status.Ok -> Response("Found entities", Contents(MediaType.`application/json`("Sample response", example))),
       Status.BadRequest -> Response(

@@ -130,16 +130,15 @@ trait InMemoryJena {
   def runUpdate(on: DatasetName, query: SparqlQuery): IO[Unit] =
     queryRunnerFor(on).flatMap(_.runUpdate(query))
 
-  def triplesCount(on: DatasetName)(implicit ioRuntime: IORuntime): Long =
+  def triplesCount(on: DatasetName): IO[Long] =
     queryRunnerFor(on)
       .flatMap(
         _.runQuery(
           SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
         ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       )
-      .unsafeRunSync()
 
-  def triplesCount(on: DatasetName, graphId: EntityId)(implicit ioRuntime: IORuntime): Long =
+  def triplesCount(on: DatasetName, graphId: EntityId): IO[Long] =
     queryRunnerFor(on)
       .flatMap(
         _.runQuery(
@@ -148,7 +147,6 @@ trait InMemoryJena {
           )
         ).map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       )
-      .unsafeRunSync()
 
   implicit class QueriesOps(queries: List[SparqlQuery]) {
     def runAll(on: DatasetName): IO[Unit] =

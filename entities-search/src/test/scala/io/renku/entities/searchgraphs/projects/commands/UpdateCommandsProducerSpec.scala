@@ -21,61 +21,34 @@ package projects
 package commands
 
 import Generators._
-import cats.syntax.all._
 import io.renku.entities.searchgraphs.Generators.updateCommands
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.exceptions
-import io.renku.graph.model
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
 class UpdateCommandsProducerSpec extends AnyWordSpec with should.Matchers with TryValues with MockFactory {
 
   "toUpdateCommands" should {
 
-    "fetch Search Info for the Project from TS and " +
-      "generate update commands for the model data and fetched data" in new TestCase {
-
-        val modelInfo = projectSearchInfoObjects.generateOne
-        val tsInfo    = projectSearchInfoObjects.generateOption.map(_.copy(id = modelInfo.id))
-
-        givenSearchInfoFetcher(modelInfo.id, returning = tsInfo.pure[Try])
-
-        val expectedCommands = givenCommandsCalculation(modelInfo, tsInfo, returning = updateCommands.generateList())
-
-        commandsProducer.toUpdateCommands(modelInfo).map(_.toSet).success.value shouldBe expectedCommands.toSet
-      }
-
-    "fail if Info fetching fails" in new TestCase {
+    "generate update commands from the model data" in new TestCase {
 
       val modelInfo = projectSearchInfoObjects.generateOne
-      val exception = exceptions.generateOne
-      givenSearchInfoFetcher(modelInfo.id, returning = exception.raiseError[Try, Nothing])
 
-      commandsProducer.toUpdateCommands(modelInfo).failure.exception shouldBe exception
+      val expectedCommands = givenCommandsCalculation(modelInfo, returning = updateCommands.generateList())
+
+      commandsProducer.toUpdateCommands(modelInfo).toSet shouldBe expectedCommands.toSet
     }
   }
 
   private trait TestCase {
 
-    private val searchInfoFetcher  = mock[SearchInfoFetcher[Try]]
     private val commandsCalculator = mock[CommandsCalculator]
-    val commandsProducer           = new UpdateCommandsProducerImpl[Try](searchInfoFetcher, commandsCalculator)
+    val commandsProducer           = new UpdateCommandsProducerImpl(commandsCalculator)
 
-    def givenSearchInfoFetcher(id: model.projects.ResourceId, returning: Try[Option[ProjectSearchInfo]]) =
-      (searchInfoFetcher.fetchTSSearchInfo _)
-        .expects(id)
-        .returning(returning)
-
-    def givenCommandsCalculation(modelInfo:   ProjectSearchInfo,
-                                 maybeTSInfo: Option[ProjectSearchInfo],
-                                 returning:   List[UpdateCommand]
-    ) = {
-      (commandsCalculator.calculateCommands _).expects(modelInfo, maybeTSInfo).returning(returning)
+    def givenCommandsCalculation(modelInfo: ProjectSearchInfo, returning: List[UpdateCommand]) = {
+      (commandsCalculator.calculateCommands _).expects(modelInfo).returning(returning)
       returning
     }
   }

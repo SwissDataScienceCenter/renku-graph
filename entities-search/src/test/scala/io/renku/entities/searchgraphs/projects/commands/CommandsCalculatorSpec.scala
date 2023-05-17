@@ -22,13 +22,10 @@ package commands
 
 import Encoders._
 import Generators.projectSearchInfoObjects
-import cats.syntax.all._
 import io.renku.entities.searchgraphs.UpdateCommand
 import io.renku.entities.searchgraphs.UpdateCommand.Insert
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model
 import io.renku.triplesstore.client.syntax._
-import org.scalacheck.Gen
 import org.scalatest.matchers.{MatchResult, Matcher, should}
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -36,40 +33,17 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
 
   "calculateCommands" should {
 
-    "return no commands " +
-      "when both the model and TS projects are the same" in {
+    "return project info delete query and inserts commands" in {
 
-        val modelInfo = projectSearchInfoObjects.generateOne
-        val tsInfo    = modelInfo.some
+      val modelInfo = projectSearchInfoObjects.generateOne
 
-        CommandsCalculator().calculateCommands(modelInfo, tsInfo) shouldBe Nil
-      }
+      val commands = CommandsCalculator().calculateCommands(modelInfo)
 
-    "return project info delete query and inserts commands " +
-      "when the model and TS projects are different" in {
-
-        val modelInfo = projectSearchInfoObjects.generateOne
-        val tsInfo = modelInfo
-          .copy(visibility = Gen.oneOf(model.projects.Visibility.all - modelInfo.visibility).generateOne)
-          .some
-
-        val commands = CommandsCalculator().calculateCommands(modelInfo, tsInfo)
-
-        commands.head shouldBe UpdateCommand.Query(ProjectInfoDeleteQuery(modelInfo.id))
-        commands.tail should produce(
-          modelInfo.asQuads(searchInfoEncoder).map(Insert).toList
-        )
-      }
-
-    "return inserts commands " +
-      "when there's no TS projects found" in {
-
-        val modelInfo = projectSearchInfoObjects.generateOne
-
-        CommandsCalculator().calculateCommands(modelInfo, maybeTSInfo = None) should produce(
-          modelInfo.asQuads(searchInfoEncoder).map(Insert).toList
-        )
-      }
+      commands.head shouldBe UpdateCommand.Query(ProjectInfoDeleteQuery(modelInfo.id))
+      commands.tail should produce(
+        modelInfo.asQuads(searchInfoEncoder).map(Insert).toList
+      )
+    }
   }
 
   private def produce(expected: List[UpdateCommand]) = new Matcher[List[UpdateCommand]] {
