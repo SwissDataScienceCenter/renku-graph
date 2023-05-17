@@ -47,7 +47,7 @@ class FragmentSpec extends AnyWordSpec with should.Matchers {
       val quad1 = quads.generateOne.asSparql
       val quad2 = quads.generateOne.asSparql
 
-      List(quad1, quad2).combineAll shouldBe Fragment(s"${quad1.sparql}\n${quad2.sparql}")
+      List(quad1, quad2).combineAll shouldBe Fragment(s"${quad1.sparql} ${quad2.sparql}")
     }
   }
 

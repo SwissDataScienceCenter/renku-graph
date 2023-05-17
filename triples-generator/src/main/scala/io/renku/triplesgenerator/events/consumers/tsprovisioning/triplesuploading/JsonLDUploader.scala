@@ -41,15 +41,8 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     dsConnectionConfig: DatasetConnectionConfig,
     recoveryStrategy:   RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:        Duration = 21 minutes,
-    requestTimeout:     Duration = 20 minutes
-) extends TSClientImpl(dsConnectionConfig,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       idleTimeoutOverride = idleTimeout.some,
-                       requestTimeoutOverride = requestTimeout.some
-    )
+    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+) extends TSClientImpl(dsConnectionConfig, retryInterval = retryInterval, maxRetries = maxRetries)
     with JsonLDUploader[F] {
 
   import org.http4s.{Request, Response, Status}
@@ -68,19 +61,11 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object JsonLDUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig:   ProjectsConnectionConfig,
-                                                          retryInterval: FiniteDuration = SleepAfterConnectionIssue,
-                                                          maxRetries: Int Refined NonNegative =
-                                                            MaxRetriesAfterConnectionTimeout,
-                                                          idleTimeout:    Duration = 6 minutes,
-                                                          requestTimeout: Duration = 5 minutes
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      storeConfig:   ProjectsConnectionConfig,
+      retryInterval: FiniteDuration = SleepAfterConnectionIssue,
+      maxRetries:    Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
   ): F[JsonLDUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new JsonLDUploaderImpl[F](storeConfig,
-                              RecoverableErrorsRecovery,
-                              retryInterval,
-                              maxRetries,
-                              idleTimeout,
-                              requestTimeout
-    )
+    new JsonLDUploaderImpl[F](storeConfig, RecoverableErrorsRecovery, retryInterval, maxRetries)
   )
 }

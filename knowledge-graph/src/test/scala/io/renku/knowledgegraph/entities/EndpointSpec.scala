@@ -20,25 +20,20 @@ package io.renku.knowledgegraph.entities
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Decoder._
-import io.circe.{Decoder, DecodingFailure}
+import io.circe.Json
+import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
-import io.renku.entities.search.model.Entity.Workflow.WorkflowType
-import io.renku.entities.search.model.MatchingScore
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
-import io.renku.graph.model.images.ImageUri
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
-import io.renku.http.rest.Links
-import io.renku.http.rest.Links.Rel
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -47,49 +42,79 @@ import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
 import org.http4s.Status._
-import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
-import org.http4s.{EntityDecoder, Request, Uri}
+import org.http4s.{Request, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
+class EndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with IOSpec
+    with ModelEncoders {
+  implicit val renkuUrl    = renkuUrls.generateOne
+  implicit val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   "GET /entities" should {
 
     "respond with OK and the found entities" in new TestCase {
       forAll(pagingResponses(modelEntities)) { results =>
-        (finder.findEntities _).expects(criteria).returning(results.pure[IO])
+        (finder.findEntities(_: Criteria)).expects(criteria).returning(results.pure[IO])
 
         val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
         response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-        implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
-        response.as[List[model.Entity]].unsafeRunSync() shouldBe results.results
+
+        response.as[Json].unsafeRunSync() shouldBe results.results.asJson
+      }
+    }
+
+    "respond with OK using new search when secret header is present" in new TestCase {
+      override val finder: EntitiesFinder[IO] = new EntitiesFinder[IO] {
+        override def findEntities(criteria: Criteria): IO[PagingResponse[model.Entity]] = ???
+      }
+      override val finderNew: EntitiesFinder[IO] = mock[EntitiesFinder[IO]]
+
+      forAll(pagingResponses(modelEntities)) { results =>
+        (finderNew.findEntities(_: Criteria)).expects(criteria).returning(results.pure[IO])
+
+        val response =
+          endpoint.`GET /entities`(criteria, request.putHeaders("Renku-Kg-QueryNew" -> "true")).unsafeRunSync()
+
+        response.status        shouldBe Ok
+        response.contentType   shouldBe Some(`Content-Type`(application.json))
+        response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
+
+        response.as[Json].unsafeRunSync() shouldBe results.results.asJson
       }
     }
 
     "respond with OK with an empty list if no entities found" in new TestCase {
       val results = PagingResponse.empty[model.Entity](pagingRequests.generateOne)
-      (finder.findEntities _).expects(criteria).returning(results.pure[IO])
+      (finder.findEntities(_: Criteria)).expects(criteria).returning(results.pure[IO])
 
       val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
       response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-      implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
-      response.as[List[model.Entity]].unsafeRunSync() shouldBe Nil
+
+      response.as[Json].unsafeRunSync() shouldBe List.empty[model.Entity].asJson
     }
 
     "respond with INTERNAL_SERVER_ERROR when finding entities fails" in new TestCase {
       val exception = exceptions.generateOne
-      (finder.findEntities _).expects(criteria).returning(exception.raiseError[IO, PagingResponse[model.Entity]])
+      (finder
+        .findEntities(_: Criteria))
+        .expects(criteria)
+        .returning(exception.raiseError[IO, PagingResponse[model.Entity]])
 
       val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
@@ -103,18 +128,19 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  private lazy val renkuUrl    = renkuUrls.generateOne
-  private lazy val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
-
-  private trait TestCase {
+  private class TestCase {
     val criteria = criterias.generateOne
     val request  = Request[IO](GET, Uri.fromString(s"/${relativePaths().generateOne}").fold(throw _, identity))
 
     implicit val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
     implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
-    val finder   = mock[EntitiesFinder[IO]]
-    val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuApiUrl, gitLabUrl)
+    val finder = mock[EntitiesFinder[IO]]
+    def finderNew = new EntitiesFinder[IO] {
+      override def findEntities(criteria: Criteria): IO[PagingResponse[model.Entity]] = ???
+    }
+    // the endpoint should by default not use the new search graph
+    lazy val endpoint = new EndpointImpl[IO](finderNew, finder, renkuUrl, renkuApiUrl, gitLabUrl)
   }
 
   private lazy val criterias: Gen[Criteria] = for {
@@ -123,138 +149,4 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     paging        <- pagingRequests
     maybeAuthUser <- authUsers.toGeneratorOfOptions
   } yield Criteria(Filters(maybeQuery), sortingBy, paging, maybeAuthUser)
-
-  private implicit def httpEntityDecoder(implicit
-      decoder: Decoder[model.Entity]
-  ): EntityDecoder[IO, List[model.Entity]] = jsonOf[IO, List[model.Entity]]
-
-  private def entitiesDecoder(
-      possibleEntities: List[model.Entity]
-  )(implicit gitLabUrl: GitLabUrl): Decoder[model.Entity] = cursor => {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    def imagesDecoder(projectPath: projects.Path): Decoder[ImageUri] = Decoder.instance { cursor =>
-      cursor.downField("location").as[ImageUri] >>= {
-        case uri: ImageUri.Relative =>
-          cursor._links >>= {
-            _.get(Rel("view")) match {
-              case Some(link) if link.href.value == s"$gitLabUrl/$projectPath/raw/master/$uri" => uri.asRight
-              case maybeLink => DecodingFailure(s"'$maybeLink' is not expected absolute DS image view link", Nil).asLeft
-            }
-          }
-        case uri: ImageUri.Absolute =>
-          cursor._links >>= {
-            _.get(Rel("view")) match {
-              case Some(link) if link.href.value == uri.show => uri.asRight
-              case maybeLink => DecodingFailure(s"'$maybeLink' is not expected relative DS image view link", Nil).asLeft
-            }
-          }
-      }
-    }
-
-    implicit val namespacesListDecoder: Decoder[(Rel, projects.Namespace)] = Decoder.instance { cursor =>
-      (cursor.downField("rel").as[Rel] -> cursor.downField("namespace").as[projects.Namespace]).mapN(_ -> _)
-    }
-
-    implicit val workflowTypeDecoder: Decoder[WorkflowType] =
-      Decoder.decodeString.emap(WorkflowType.fromName)
-
-    def expectedNamespaces(path: projects.Path) = path.toNamespaces
-      .foldLeft(List.empty[(Rel, List[projects.Namespace])]) {
-        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
-        case (all @ (_, prevNamespaces) :: _, namespace) =>
-          all ::: (Rel(namespace.show), prevNamespaces ::: namespace :: Nil) :: Nil
-      }
-      .map { case (rel, namespaces) => rel -> projects.Namespace(namespaces.map(_.show).mkString("/")) }
-
-    cursor.downField("type").as[Criteria.Filters.EntityType] >>= {
-      case Criteria.Filters.EntityType.Project =>
-        for {
-          score        <- cursor.downField("matchingScore").as[MatchingScore]
-          name         <- cursor.downField("name").as[projects.Name]
-          path         <- cursor.downField("path").as[projects.Path]
-          namespace    <- cursor.downField("namespace").as[projects.Namespace]
-          namespaces   <- cursor.downField("namespaces").as[List[(Rel, projects.Namespace)]]
-          visibility   <- cursor.downField("visibility").as[projects.Visibility]
-          date         <- cursor.downField("date").as[projects.DateCreated]
-          maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
-          keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
-          maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
-          images       <- cursor.downField("images").as(decodeList(imagesDecoder(path)))
-          _ <- Either.cond(path.show startsWith namespace.show,
-                           (),
-                           DecodingFailure(show"'$path' does not start with '$namespace'", Nil)
-               )
-          _ <- Either.cond(namespaces == expectedNamespaces(path),
-                           (),
-                           DecodingFailure(show"'$namespaces' do not match '${expectedNamespaces(path)}'", Nil)
-               )
-          _ <- cursor._links
-                 .flatMap(_.get(Links.Rel("details")).toRight(DecodingFailure("No project details link", Nil)))
-                 .flatMap { link =>
-                   val expected = renkuApiUrl / "projects" / path
-                   Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
-                 }
-        } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc, images)
-      case Criteria.Filters.EntityType.Dataset =>
-        for {
-          score      <- cursor.downField("matchingScore").as[MatchingScore]
-          name       <- cursor.downField("name").as[datasets.Name]
-          visibility <- cursor.downField("visibility").as[projects.Visibility]
-          date <- cursor
-                    .downField("date")
-                    .as[datasets.DateCreated]
-                    .orElse(cursor.downField("date").as[datasets.DatePublished])
-          creators  <- cursor.downField("creators").as[List[persons.Name]]
-          keywords  <- cursor.downField("keywords").as[List[datasets.Keyword]]
-          maybeDesc <- cursor.downField("description").as[Option[datasets.Description]]
-          dsDetailsLink <-
-            cursor._links.flatMap(_.get(Links.Rel("details")).toRight(DecodingFailure("No dataset details link", Nil)))
-          identifier <- dsDetailsLink.href.value
-                          .split("/")
-                          .lastOption
-                          .toRight(DecodingFailure("Invalid dataset-details link", Nil))
-                          .map(datasets.Identifier)
-          projectPath <- possibleEntities.collect {
-                           case ds: model.Entity.Dataset if ds.identifier == identifier => ds.exemplarProjectPath
-                         } match {
-                           case path :: Nil => path.asRight
-                           case _ => DecodingFailure(s"DS $identifier doesn't exist in possible results", Nil).asLeft
-                         }
-          images <- cursor.downField("images").as(decodeList(imagesDecoder(projectPath)))
-          _ <- {
-            val expected = renkuApiUrl / "datasets" / identifier
-            Either.cond(dsDetailsLink.href.value == expected.show,
-                        (),
-                        DecodingFailure(s"$dsDetailsLink not equal $expected", Nil)
-            )
-          }
-        } yield model.Entity.Dataset(score,
-                                     identifier,
-                                     name,
-                                     visibility,
-                                     date,
-                                     creators,
-                                     keywords,
-                                     maybeDesc,
-                                     images,
-                                     projectPath
-        )
-      case Criteria.Filters.EntityType.Workflow =>
-        for {
-          score        <- cursor.downField("matchingScore").as[MatchingScore]
-          name         <- cursor.downField("name").as[plans.Name]
-          visibility   <- cursor.downField("visibility").as[projects.Visibility]
-          date         <- cursor.downField("date").as[plans.DateCreated]
-          keywords     <- cursor.downField("keywords").as[List[plans.Keyword]]
-          maybeDesc    <- cursor.downField("description").as[Option[plans.Description]]
-          workflowType <- cursor.downField("workflowType").as[WorkflowType]
-        } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc, workflowType)
-      case Criteria.Filters.EntityType.Person =>
-        for {
-          score <- cursor.downField("matchingScore").as[MatchingScore]
-          name  <- cursor.downField("name").as[persons.Name]
-        } yield model.Entity.Person(score, name)
-    }
-  }
 }

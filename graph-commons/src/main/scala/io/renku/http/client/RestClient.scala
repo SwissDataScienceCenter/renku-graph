@@ -25,6 +25,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import fs2.Stream
+import fs2.io.net.Network
 import io.circe.Json
 import io.renku.control.Throttler
 import io.renku.http.client.AccessToken._
@@ -33,14 +34,14 @@ import io.renku.http.client.RestClientError._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
+import org.http4s._
 import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.core.EmberException
-import org.http4s.headers.{`Content-Disposition`, `Content-Type`, Authorization}
+import org.http4s.headers.{Authorization, `Content-Disposition`, `Content-Type`}
 import org.http4s.multipart.{Multiparts, Part}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -115,6 +116,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     }
 
   private def httpClientBuilder: EmberClientBuilder[F] = {
+    implicit val network: Network[F] = Network.forAsync(Async[F])
     val clientBuilder      = EmberClientBuilder.default[F]
     val updatedIdleTimeout = idleTimeoutOverride map clientBuilder.withIdleConnectionTime getOrElse clientBuilder
     requestTimeoutOverride map updatedIdleTimeout.withTimeout getOrElse updatedIdleTimeout

@@ -45,7 +45,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
 
       handler
         .createHandlingDefinition()
-        .decode(EventRequestContent.NoPayload(event.asJson)).value shouldBe event
+        .decode(EventRequestContent.NoPayload(event.asJson))
+        .value shouldBe event
     }
   }
 

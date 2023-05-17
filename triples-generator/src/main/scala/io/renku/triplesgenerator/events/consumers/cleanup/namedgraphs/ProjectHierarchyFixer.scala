@@ -25,8 +25,6 @@ import io.renku.graph.model.projects
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-
 private object ProjectHierarchyFixer {
   def relinkProjectHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
       connectionConfig: ProjectsConnectionConfig
@@ -35,10 +33,7 @@ private object ProjectHierarchyFixer {
 
 private class ProjectHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](projectPath: projects.Path)(
     connectionConfig: ProjectsConnectionConfig
-) extends TSClientImpl(connectionConfig,
-                       idleTimeoutOverride = (11 minutes).some,
-                       requestTimeoutOverride = (10 minutes).some
-    ) {
+) extends TSClientImpl(connectionConfig) {
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._

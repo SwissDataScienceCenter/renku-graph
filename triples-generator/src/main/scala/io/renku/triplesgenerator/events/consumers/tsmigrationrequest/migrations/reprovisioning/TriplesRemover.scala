@@ -22,32 +22,25 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.jsonld.EntityId
-import io.renku.triplesstore._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration._
 
 private trait TriplesRemover[F[_]] {
   def removeAllTriples(): F[Unit]
 }
 
 private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:    ProjectsConnectionConfig,
-    idleTimeout:    Duration = 11 minutes,
-    requestTimeout: Duration = 10 minutes
-) extends TSClientImpl(storeConfig,
-                       idleTimeoutOverride = idleTimeout.some,
-                       requestTimeoutOverride = requestTimeout.some
-    )
+    storeConfig: ProjectsConnectionConfig
+) extends TSClientImpl(storeConfig)
     with TriplesRemover[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.GraphClass.{ProjectViewedTimes, PersonViewings}
+  import io.renku.graph.model.GraphClass.{PersonViewings, ProjectViewedTimes}
   import io.renku.graph.model.Schemas._
-  import io.renku.triplesstore.client.syntax._
   import io.renku.triplesstore.ResultsDecoder._
+  import io.renku.triplesstore.client.syntax._
 
   override def removeAllTriples(): F[Unit] =
     queryExpecting[Option[EntityId]](findGraph) >>= {

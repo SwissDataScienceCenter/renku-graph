@@ -21,7 +21,6 @@ package io.renku.entities.searchgraphs
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import commands.UpdateCommand
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
@@ -34,9 +33,6 @@ private object UpdateCommandsUploader {
       connectionConfig: ProjectsConnectionConfig
   ): UpdateCommandsUploader[F] =
     new UpdateCommandsUploaderImpl[F](TSClient[F](connectionConfig))
-
-  def default[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateCommandsUploader[F]] =
-    ProjectsConnectionConfig[F]().map(apply(_))
 }
 
 private class UpdateCommandsUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends UpdateCommandsUploader[F] {
@@ -49,7 +45,7 @@ private class UpdateCommandsUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]
   override def upload(commands: List[UpdateCommand]): F[Unit] =
     commands
       .groupBy(commandType)
-      .map(toSparqlQueries)
+      .flatMap(toSparqlQueries)
       .toList
       .map(updateWithNoResult)
       .sequence
@@ -59,17 +55,31 @@ private class UpdateCommandsUploaderImpl[F[_]: MonadThrow](tsClient: TSClient[F]
   private object CommandType {
     final case object Insert extends CommandType
     final case object Delete extends CommandType
+    final case object Query  extends CommandType
   }
 
   private lazy val commandType: UpdateCommand => CommandType = {
     case _: UpdateCommand.Insert => CommandType.Insert
     case _: UpdateCommand.Delete => CommandType.Delete
+    case _: UpdateCommand.Query  => CommandType.Query
   }
 
-  private lazy val toSparqlQueries: ((CommandType, List[UpdateCommand])) => SparqlQuery = {
+  private lazy val toSparqlQueries: ((CommandType, List[UpdateCommand])) => List[SparqlQuery] = {
     case (CommandType.Insert, cmds) =>
-      SparqlQuery.of("search info inserts", s"INSERT DATA {\n${cmds.map(_.quad.asSparql).combineAll.sparql}\n}")
+      List(
+        SparqlQuery.of(
+          "search info inserts",
+          sparql"INSERT DATA {\n${cmds.map { case UpdateCommand.Insert(quad) => quad.asSparql }.combineAll}\n}"
+        )
+      )
     case (CommandType.Delete, cmds) =>
-      SparqlQuery.of("search info deletes", s"DELETE DATA {\n${cmds.map(_.quad.asSparql).combineAll.sparql}\n}")
+      List(
+        SparqlQuery.of(
+          "search info deletes",
+          sparql"DELETE DATA {\n${cmds.map { case UpdateCommand.Delete(quad) => quad.asSparql }.combineAll}\n}"
+        )
+      )
+    case (CommandType.Query, cmds) =>
+      cmds.map { case UpdateCommand.Query(query) => query }
   }
 }

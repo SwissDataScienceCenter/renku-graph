@@ -23,7 +23,7 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.images.ImageUri
 import io.renku.tinytypes._
 
-private object DecodingTools {
+object DecodingTools {
 
   def toListOf[TT <: StringTinyType, TTF <: TinyTypeFactory[TT]](implicit
       ttFactory: TTF

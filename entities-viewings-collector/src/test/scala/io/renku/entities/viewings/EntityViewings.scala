@@ -34,11 +34,11 @@ trait EntityViewings {
   def provision(event: DatasetViewedEvent): IO[Unit] =
     datasetViewedEventUploader >>= { _.upload(event) }
 
-  private def tsClient = {
+  val tsClientIO: IO[TSClient[IO]] = {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     TestSparqlQueryTimeRecorder[IO].map(implicit sqrt => TSClient[IO](projectsDSConnectionInfo))
   }
 
-  private def projectViewedEventPersister = tsClient.map(collector.projects.viewed.EventPersister[IO](_))
-  private def datasetViewedEventUploader  = tsClient.map(collector.datasets.EventUploader[IO](_))
+  private def projectViewedEventPersister = tsClientIO.map(collector.projects.viewed.EventPersister[IO](_))
+  private def datasetViewedEventUploader  = tsClientIO.map(collector.datasets.EventUploader[IO](_))
 }

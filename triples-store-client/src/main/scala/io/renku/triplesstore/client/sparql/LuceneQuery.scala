@@ -18,6 +18,8 @@
 
 package io.renku.triplesstore.client.sparql
 
+import org.apache.lucene.queryparser.flexible.standard.QueryParserUtil
+
 final class LuceneQuery(val query: String) extends AnyVal {
   def isQueryAll: Boolean = query == LuceneQuery.queryAll.query
 }
@@ -28,6 +30,16 @@ object LuceneQuery {
   def apply(str: String): LuceneQuery = new LuceneQuery(str)
 
   def escape(str: String): LuceneQuery = LuceneQuery(LuceneQueryEncoder.queryAsString(str))
+
+  def fuzzy(str: String): LuceneQuery =
+    new LuceneQuery(
+      QueryTokenizer.luceneStandard
+        .split(str)
+        .map(_.trim)
+        .map(QueryParserUtil.escape)
+        .map(word => s"$word~")
+        .mkString(" ")
+    )
 
   implicit val sparqlEncoder: SparqlEncoder[LuceneQuery] =
     SparqlEncoder.instance(q => Fragment(s"'${q.query}'"))

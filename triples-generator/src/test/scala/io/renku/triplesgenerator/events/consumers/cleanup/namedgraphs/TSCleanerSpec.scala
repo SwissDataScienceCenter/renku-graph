@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup.namedgraphs
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.entities.searchgraphs.DatasetsGraphCleaner
+import io.renku.entities.searchgraphs.SearchGraphsCleaner
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.TopmostSameAs
@@ -56,7 +56,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, project)
 
         givenProjectIdFindingSucceeds(project)
-        givenDatasetsGraphCleaningSucceeds(project)
+        givenSearchGraphsCleaningSucceeds(project)
 
         (cleaner removeTriples project.path).unsafeRunSync()
 
@@ -74,7 +74,7 @@ class TSCleanerSpec
         findProjectParent(child.resourceId).unsafeRunSync() shouldBe parent.resourceId.some
 
         givenProjectIdFindingSucceeds(parent)
-        givenDatasetsGraphCleaningSucceeds(parent)
+        givenSearchGraphsCleaningSucceeds(parent)
 
         (cleaner removeTriples parent.path).unsafeRunSync()
 
@@ -96,7 +96,7 @@ class TSCleanerSpec
         findProjectParent(child.resourceId).unsafeRunSync()  shouldBe parent.resourceId.some
 
         givenProjectIdFindingSucceeds(parent)
-        givenDatasetsGraphCleaningSucceeds(parent)
+        givenSearchGraphsCleaningSucceeds(parent)
 
         (cleaner removeTriples parent.path).unsafeRunSync()
 
@@ -122,7 +122,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, topProject, middleProject, bottomProject)
 
         givenProjectIdFindingSucceeds(topProject)
-        givenDatasetsGraphCleaningSucceeds(topProject)
+        givenSearchGraphsCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -155,7 +155,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
 
         givenProjectIdFindingSucceeds(topProject)
-        givenDatasetsGraphCleaningSucceeds(topProject)
+        givenSearchGraphsCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -187,7 +187,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
 
         givenProjectIdFindingSucceeds(middleProject)
-        givenDatasetsGraphCleaningSucceeds(middleProject)
+        givenSearchGraphsCleaningSucceeds(middleProject)
 
         (cleaner removeTriples middleProject.path).unsafeRunSync()
 
@@ -220,7 +220,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, middleProject, bottomProject, topProject)
 
         givenProjectIdFindingSucceeds(bottomProject)
-        givenDatasetsGraphCleaningSucceeds(bottomProject)
+        givenSearchGraphsCleaningSucceeds(bottomProject)
 
         (cleaner removeTriples bottomProject.path).unsafeRunSync()
 
@@ -256,7 +256,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, middleProject1, middleProject2, bottomProject, topProject)
 
         givenProjectIdFindingSucceeds(topProject)
-        givenDatasetsGraphCleaningSucceeds(topProject)
+        givenSearchGraphsCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -316,7 +316,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, topProject, middleProject1, middleProject2, bottomProject)
 
         givenProjectIdFindingSucceeds(topProject)
-        givenDatasetsGraphCleaningSucceeds(topProject)
+        givenSearchGraphsCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -359,7 +359,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, bottomProject, topProject, topProjectFork)
 
         givenProjectIdFindingSucceeds(topProject)
-        givenDatasetsGraphCleaningSucceeds(topProject)
+        givenSearchGraphsCleaningSucceeds(topProject)
 
         (cleaner removeTriples topProject.path).unsafeRunSync()
 
@@ -393,7 +393,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
         givenProjectIdFindingSucceeds(middleProject)
-        givenDatasetsGraphCleaningSucceeds(middleProject)
+        givenSearchGraphsCleaningSucceeds(middleProject)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -432,8 +432,8 @@ class TSCleanerSpec
 
         givenProjectIdFindingSucceeds(middleProject)
         givenProjectIdFindingSucceeds(middleProjectFork)
-        givenDatasetsGraphCleaningSucceeds(middleProject)
-        givenDatasetsGraphCleaningSucceeds(middleProjectFork)
+        givenSearchGraphsCleaningSucceeds(middleProject)
+        givenSearchGraphsCleaningSucceeds(middleProjectFork)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
         cleaner.removeTriples(middleProjectFork.path).unsafeRunSync()
@@ -472,7 +472,7 @@ class TSCleanerSpec
         upload(to = projectsDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
 
         givenProjectIdFindingSucceeds(middleProject)
-        givenDatasetsGraphCleaningSucceeds(middleProject)
+        givenSearchGraphsCleaningSucceeds(middleProject)
 
         cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -501,9 +501,9 @@ class TSCleanerSpec
     on = projectsDataset,
     SparqlQuery.of(
       "find all data",
-      s"""|SELECT ?s ?p ?o 
-          |WHERE { 
-          |  GRAPH <${GraphClass.Project.id(projectId)}> { ?s ?p ?o } 
+      s"""|SELECT ?s ?p ?o
+          |WHERE {
+          |  GRAPH <${GraphClass.Project.id(projectId)}> { ?s ?p ?o }
           |}""".stripMargin
     )
   ).map(_.map(_.values.toList))
@@ -513,9 +513,9 @@ class TSCleanerSpec
     SparqlQuery.of(
       "find project triples",
       s"""SELECT ?p ?o
-          WHERE { 
-            GRAPH <${GraphClass.Project.id(projectId)}> { 
-              ${projectId.showAs[RdfResource]} ?p ?o 
+          WHERE {
+            GRAPH <${GraphClass.Project.id(projectId)}> {
+              ${projectId.showAs[RdfResource]} ?p ?o
             }
           }"""
     )
@@ -527,9 +527,9 @@ class TSCleanerSpec
       "find project parent",
       Prefixes of prov -> "prov",
       s"""SELECT ?parentId
-          WHERE { 
-            GRAPH <${GraphClass.Project.id(projectId)}> { 
-              ${projectId.showAs[RdfResource]} prov:wasDerivedFrom ?parentId 
+          WHERE {
+            GRAPH <${GraphClass.Project.id(projectId)}> {
+              ${projectId.showAs[RdfResource]} prov:wasDerivedFrom ?parentId
             }
           }"""
     )
@@ -543,9 +543,9 @@ class TSCleanerSpec
     on = projectsDataset,
     SparqlQuery.of(
       "find DS triples",
-      s"""SELECT ?p ?o 
-          WHERE { 
-            GRAPH ?g { <$datasetId> ?p ?o } 
+      s"""SELECT ?p ?o
+          WHERE {
+            GRAPH ?g { <$datasetId> ?p ?o }
           }"""
     )
   ).map(_.map(_.values.toList))
@@ -555,10 +555,10 @@ class TSCleanerSpec
     SparqlQuery.of(
       "find DS sameAs",
       Prefixes.of(renku -> "renku", schema -> "schema"),
-      s"""SELECT ?sameAs ?topmostSameAs 
+      s"""SELECT ?sameAs ?topmostSameAs
           WHERE {
-            GRAPH ?g { 
-              <$datasetId> renku:topmostSameAs ?topmostSameAs . 
+            GRAPH ?g {
+              <$datasetId> renku:topmostSameAs ?topmostSameAs .
               OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs }
             }
           }"""
@@ -573,17 +573,17 @@ class TSCleanerSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val projectIdFinder      = mock[ProjectIdFinder[IO]]
-    private val datasetsGraphCleaner = mock[DatasetsGraphCleaner[IO]]
-    val cleaner = new TSCleanerImpl[IO](projectIdFinder, datasetsGraphCleaner, projectsDSConnectionInfo)
+    private val projectIdFinder     = mock[ProjectIdFinder[IO]]
+    private val searchGraphsCleaner = mock[SearchGraphsCleaner[IO]]
+    val cleaner = new TSCleanerImpl[IO](projectIdFinder, searchGraphsCleaner, projectsDSConnectionInfo)
 
     def givenProjectIdFindingSucceeds(project: Project) =
       (projectIdFinder.findProjectId _)
         .expects(project.path)
         .returning(project.identification.some.pure[IO])
 
-    def givenDatasetsGraphCleaningSucceeds(project: Project) =
-      (datasetsGraphCleaner.cleanDatasetsGraph _)
+    def givenSearchGraphsCleaningSucceeds(project: Project) =
+      (searchGraphsCleaner.cleanSearchGraphs _)
         .expects(project.identification)
         .returning(().pure[IO])
   }
