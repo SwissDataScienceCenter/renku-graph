@@ -48,7 +48,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
 
   override lazy val path: Path = Path(
     GET(
-      "Cross-Entity search",
+      "Cross-Entity Search",
       "Finds entities by the given criteria",
       Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",

@@ -41,8 +41,8 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
 
   override lazy val path: Path = Path(
     GET(
-      "Project Dataset tags search",
-      "Finds tags of the Dataset with the given name on the project with given path",
+      "Project Dataset Tags",
+      "Returns tags of the Dataset with the given name on the project with given path",
       Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags",
       Status.Ok -> Response("Found tags",
                             Contents(MediaType.`application/json`("Sample response", example)),

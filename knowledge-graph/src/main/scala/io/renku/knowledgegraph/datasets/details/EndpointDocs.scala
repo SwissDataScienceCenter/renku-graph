@@ -47,7 +47,7 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
 
   override lazy val path: Path = Path(
     GET(
-      "Dataset details",
+      "Dataset Details",
       "Finds Datasets details",
       Uri / "datasets" / identifier,
       Status.Ok -> Response("Dataset details", Contents(MediaType.`application/json`("Sample response", example))),
