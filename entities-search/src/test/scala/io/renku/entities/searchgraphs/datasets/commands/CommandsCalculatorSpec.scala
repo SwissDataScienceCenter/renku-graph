@@ -272,6 +272,24 @@ class CommandsCalculatorSpec extends AnyWordSpec with should.Matchers {
         calculateCommands(infoSet) should produce(tsInfo.asQuads.map(Delete).toList)
       }
 
+    "create Deletes for the info and the links " +
+      "when it does not exist on this Project but there were multiple DS on the same project with the same sameAs" in {
+
+        val project = newProject()
+
+        val tsInfo = {
+          val info = datasetSearchInfoObjects(withLinkTo = project).generateOne
+          info.copy(links =
+            info.links.append(linkObjectsGen(info.topmostSameAs, projectIdGen = project.resourceId).generateOne)
+          )
+        }
+
+        val infoSet =
+          CalculatorInfoSet.TSInfoOnly(project.identification, tsInfo, Map(project.resourceId -> tsInfo.visibility))
+
+        calculateCommands(infoSet) should produce(tsInfo.asQuads.map(Delete).toList)
+      }
+
     "create Deletes for the link only " +
       "when the info found in the TS is associated also with other projects - the other projects' visibilities are broader or same" in {
 

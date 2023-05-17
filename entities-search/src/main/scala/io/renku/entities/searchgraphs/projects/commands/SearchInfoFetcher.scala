@@ -57,8 +57,8 @@ private class SearchInfoFetcherImpl[F[_]](tsClient: TSClient[F]) extends SearchI
     Prefixes of (renku -> "renku", schema -> "schema"),
     sparql"""|SELECT DISTINCT ?id ?name ?path ?visibility ?dateCreated ?maybeDescription
              |                ?maybeCreatorId ?maybeCreatorName
-             |                (GROUP_CONCAT(?keyword; separator=${rowsSeparator.asTripleObject}) AS ?keywords)
-             |                (GROUP_CONCAT(?image; separator=${rowsSeparator.asTripleObject}) AS ?images)
+             |                (GROUP_CONCAT(?keyword; separator=$rowsSeparator) AS ?keywords)
+             |                (GROUP_CONCAT(?image; separator=$rowsSeparator) AS ?images)
              |WHERE {
              |  BIND (${resourceId.asEntityId} AS ?id)
              |  GRAPH ${GraphClass.Projects.id} {

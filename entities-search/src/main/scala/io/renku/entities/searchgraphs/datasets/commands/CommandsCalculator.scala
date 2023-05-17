@@ -125,8 +125,10 @@ private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculato
 
   private object `DS exists on TS only on the single project` {
     def unapply(infoSet: CalculatorInfoSet): Option[DatasetSearchInfo] = infoSet match {
-      case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, _)
-          if tsInfo.findLink(proj.resourceId).nonEmpty && tsInfo.links.size == 1 =>
+      case CalculatorInfoSet.TSInfoOnly(proj, tsInfo, tsVisibilities)
+          if tsInfo
+            .findLink(proj.resourceId)
+            .nonEmpty && (tsInfo.links.size == 1 || (tsVisibilities - proj.resourceId).isEmpty) =>
         tsInfo.some
       case _ => None
     }
@@ -163,8 +165,7 @@ private class CommandsCalculatorImpl[F[_]: MonadThrow] extends CommandsCalculato
 
   private def maxVisibilityAfter(tsVisibilities: Map[projects.ResourceId, projects.Visibility],
                                  modelInfo:      DatasetSearchInfo
-  ) =
-    findMax(tsVisibilities + (modelInfo.links.head.projectId -> modelInfo.visibility))
+  ) = findMax(tsVisibilities + (modelInfo.links.head.projectId -> modelInfo.visibility))
 
   private def findMax(visibilities: Map[projects.ResourceId, projects.Visibility]): projects.Visibility =
     visibilities.maxBy(_._2)._2
