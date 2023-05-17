@@ -382,7 +382,7 @@ object Generators {
 
       def toGeneratorOf[TT](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
 
-      private def generateExample[O](generator: Gen[O]): O = {
+      protected def generateExample[O](generator: Gen[O]): O = {
         @annotation.tailrec
         def loop(tries: Int): O =
           generator.sample match {

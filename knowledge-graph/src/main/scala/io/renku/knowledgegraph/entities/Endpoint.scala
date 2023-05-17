@@ -21,14 +21,20 @@ package io.renku.knowledgegraph.entities
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.config.renku.ResourceUrl
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
+import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityEncoder, Header, Request, Response, Status}
+import org.http4s.{Header, Request, Response, Status}
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -41,49 +47,42 @@ object Endpoint {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     entitiesFinder <- EntitiesFinder[F]
+    oldFinder      <- EntitiesFinder.createOld[F]
     renkuUrl       <- RenkuUrlLoader()
     renkuApiUrl    <- renku.ApiUrl()
     gitLabUrl      <- GitLabUrlLoader[F]()
-  } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuApiUrl, gitLabUrl)
+  } yield new EndpointImpl(entitiesFinder, oldFinder, renkuUrl, renkuApiUrl, gitLabUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
-                                                renkuUrl:    RenkuUrl,
-                                                renkuApiUrl: renku.ApiUrl,
-                                                gitLabUrl:   GitLabUrl
+                                                oldFinder:                EntitiesFinder[F],
+                                                implicit val renkuUrl:    RenkuUrl,
+                                                implicit val renkuApiUrl: renku.ApiUrl,
+                                                implicit val gitLabUrl:   GitLabUrl
 ) extends Http4sDsl[F]
-    with Endpoint[F] {
+    with Endpoint[F]
+    with ModelEncoders {
 
-  import io.circe.syntax._
-  import io.circe.{Encoder, Json}
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
-  import org.http4s.circe.jsonEncoderOf
+  private val newQueryHeader = ci"Renku-Kg-QueryNew"
 
-  override def `GET /entities`(criteria: Criteria, request: Request[F]): F[Response[F]] =
-    finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
+  override def `GET /entities`(criteria: Criteria, request: Request[F]): F[Response[F]] = {
+    lazy val newQuery = finder.findEntities(criteria)
+    lazy val oldQuery = oldFinder.findEntities(criteria)
+
+    request.headers
+      .get(newQueryHeader)
+      .filter(_.head.value.equalsIgnoreCase("true"))
+      .fold(oldQuery)(_ => newQuery)
+      .map(toHttpResponse(request))
+      .recoverWith(httpResult)
+  }
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+    val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
-      .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
+      .putHeaders(PagingHeaders.from(response)(resourceUrl, ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
   }
-
-  private implicit def modelEncoder: Encoder[model.Entity] = {
-    import ModelEncoders._
-    implicit val apiUrl: renku.ApiUrl = renkuApiUrl
-    implicit val glUrl:  GitLabUrl    = gitLabUrl
-
-    Encoder.instance {
-      case project:  model.Entity.Project  => project.asJson
-      case ds:       model.Entity.Dataset  => ds.asJson
-      case workflow: model.Entity.Workflow => workflow.asJson
-      case person:   model.Entity.Person   => person.asJson
-    }
-  }
-
-  private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage("Cross-entity search failed")

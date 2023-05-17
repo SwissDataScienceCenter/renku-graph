@@ -28,7 +28,7 @@ final case class Fragment(sparql: String) {
     (sparql, next.sparql) match {
       case ("", r) => Fragment(r)
       case (l, "") => Fragment(l)
-      case (l, r)  => Fragment(s"$l\n$r")
+      case (l, r)  => Fragment(s"$l $r")
     }
 
   def stripMargin: Fragment =

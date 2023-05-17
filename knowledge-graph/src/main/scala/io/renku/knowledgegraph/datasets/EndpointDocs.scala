@@ -45,9 +45,9 @@ object EndpointDocs {
 private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Free-Text Dataset search",
-    "Finds Datasets by the given criteria".some,
     GET(
+      "Free-Text Dataset search",
+      "Finds Datasets by the given criteria",
       Uri / "datasets" :? query & sort & page & perPage,
       Status.Ok -> Response("Found datasets",
                             Contents(MediaType.`application/json`("Sample response", example)),

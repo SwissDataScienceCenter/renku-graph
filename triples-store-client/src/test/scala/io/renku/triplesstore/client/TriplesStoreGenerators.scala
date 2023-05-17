@@ -28,6 +28,7 @@ import org.scalacheck.{Arbitrary, Gen}
 object TriplesStoreGenerators {
 
   implicit val booleanTripleObjects: Gen[TripleObject.Boolean] = Arbitrary.arbBool.arbitrary map TripleObject.Boolean
+  implicit val charTripleObjects:    Gen[TripleObject.Char]    = Arbitrary.arbChar.arbitrary map TripleObject.Char
   implicit val intTripleObjects:     Gen[TripleObject.Int]     = Arbitrary.arbInt.arbitrary map TripleObject.Int
   implicit val longTripleObjects:    Gen[TripleObject.Long]    = Arbitrary.arbLong.arbitrary map TripleObject.Long
   implicit val floatTripleObjects:   Gen[TripleObject.Float]   = Arbitrary.arbFloat.arbitrary map TripleObject.Float
@@ -39,6 +40,7 @@ object TriplesStoreGenerators {
 
   implicit val tripleObjects: Gen[TripleObject] = Gen.oneOf(
     booleanTripleObjects,
+    charTripleObjects,
     intTripleObjects,
     longTripleObjects,
     floatTripleObjects,

@@ -18,14 +18,15 @@
 
 package io.renku.entities.search
 
-import Criteria.Filters.EntityType
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.entities.search.Criteria.Filters.EntityType
+import io.renku.entities.search.model.Entity.Workflow.WorkflowType
+import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model.entities.{CompositePlan, StepPlan}
 import io.renku.graph.model.{plans, projects}
-import model.Entity.Workflow.WorkflowType
-import model.{Entity, MatchingScore}
+import io.renku.triplesstore.client.sparql.LuceneQuery
 
 private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
@@ -112,12 +113,12 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
       |}
       |""".stripMargin
 
-  def withQuerySnippet(query: String) =
+  def withQuerySnippet(query: LuceneQuery) =
     s"""
        |{
        |  SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
        |  WHERE {
-       |    (?wkId ?score) text:query (schema:name schema:keywords schema:description '$query').
+       |    (?wkId ?score) text:query (schema:name schema:keywords schema:description '${query.query}').
        |    GRAPH ?g {
        |      ?wkId a prov:Plan;
        |            ^renku:hasPlan ?projId

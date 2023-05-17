@@ -40,6 +40,11 @@ class TripleObjectEncoderSpec extends AnyWordSpec with should.Matchers {
       implicitly[TripleObjectEncoder[Boolean]].apply(value) shouldBe TripleObject.Boolean(value)
     }
 
+    "define implicit encoder turning Char value to TripleObject.Char" in {
+      val value = Arbitrary.arbChar.arbitrary.generateOne
+      implicitly[TripleObjectEncoder[Char]].apply(value) shouldBe TripleObject.Char(value)
+    }
+
     "define implicit encoder turning Int value to TripleObject.Int" in {
       val value = Arbitrary.arbInt.arbitrary.generateOne
       implicitly[TripleObjectEncoder[Int]].apply(value) shouldBe TripleObject.Int(value)

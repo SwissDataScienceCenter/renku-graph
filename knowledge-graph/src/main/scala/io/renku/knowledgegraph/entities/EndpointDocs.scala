@@ -47,9 +47,9 @@ object EndpointDocs {
 private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Cross-Entity search",
-    "Finds entities by the given criteria".some,
     GET(
+      "Cross-Entity search",
+      "Finds entities by the given criteria",
       Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
@@ -154,7 +154,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     ).asJson,
     Dataset(
       MatchingScore(1),
-      datasets.Identifier("123444"),
+      Left(datasets.Identifier("123444")),
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),

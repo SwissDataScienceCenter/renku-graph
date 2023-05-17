@@ -22,11 +22,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.graph.model.projects
-import io.renku.triplesstore._
 import io.renku.triplesstore.ResultsDecoder._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration._
 
 private trait ProjectsFinder[F[_]] {
   def findProjects: F[List[projects.Path]]
@@ -40,10 +38,7 @@ private object ProjectsFinder {
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     query:       SparqlQuery,
     storeConfig: ProjectsConnectionConfig
-) extends TSClientImpl[F](storeConfig,
-                          idleTimeoutOverride = (16 minutes).some,
-                          requestTimeoutOverride = (15 minutes).some
-    )
+) extends TSClientImpl[F](storeConfig)
     with ProjectsFinder[F] {
 
   override def findProjects: F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)

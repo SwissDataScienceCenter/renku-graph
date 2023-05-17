@@ -11,6 +11,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                                   |
 | GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
 | GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
+| GET    | ```/knowledge-graph/entities/current-user/recently-viewed```             | Returns entities recently viewed by the user introducing himself with the token.     |
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
@@ -421,6 +422,112 @@ Response body example:
     "matchingScore": 4.364836,
     "name":          "name",
     "_links":        []
+  }
+]
+```
+
+#### GET /knowledge-graph/entities/current-user/recently-viewed
+
+Returns entities recently viewed by the user introducing himself with the token.
+
+**Filtering:**
+* `type`  - to filter by entity type(s); allowed values: `project` and/or `dataset`; multiple `type` parameters allowed
+* `limit` - limit the results by this amount; must be > 0 and <= 200; defaults to 10
+
+**NOTE:** all query parameters have to be url-encoded.
+
+**Sorting:**
+The results are sorted by the viewing time desc.
+
+**Security**
+The endpoint requires an authorization token passed in the request header as:
+- `Authorization: Bearer <token>` with oauth token obtained from gitlab
+- `PRIVATE-TOKEN: <token>` with user's personal access token in gitlab
+
+**Response**
+
+| Status                       | Description                                      |
+|------------------------------|--------------------------------------------------|
+| OK (200)                     | If results are found; `[]` if nothing is found   |
+| BAD_REQUEST (400)            | If illegal values for query parameters are given |
+| UNAUTHORIZED (401)           | If given auth header is not valid                |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                        |
+
+Response body example:
+
+```json
+[
+  {
+    "_links": [
+      {
+        "rel":  "details",
+        "href": "https://renku-kg-dev.dev.renku.ch/knowledge-graph/projects/group/subgroup/name"
+      }
+    ],
+    "type":          "project",
+    "description":   "Some project",
+    "creator":       "Jan Kowalski",
+    "matchingScore": 1,
+    "name":          "name",
+    "path":          "group/subgroup/name",
+    "namespace":     "group/subgroup",
+    "namespaces": [
+      {
+        "rel":       "group",
+        "namespace": "group"
+      },
+      {
+        "rel":       "subgroup",
+        "namespace": "group/subgroup"
+      }
+    ],
+    "visibility": "public",
+    "date":       "2012-11-15T10:00:00Z",
+    "keywords": [ 
+      "key" 
+    ],
+    "images": [
+      {
+        "_links": [
+          {
+            "rel":  "view",
+            "href": "https://gitlab.dev.renku.ch/group/subgroup/name/raw/master/image.png"
+          }
+        ],
+        "location": "image.png"
+      }
+    ]
+  },
+  {
+    "_links": [
+      {
+        "rel":  "details",
+        "href": "https://renku-kg-dev.dev.renku.ch/knowledge-graph/datasets/sa3A8evQPNEfcTsXtDcKcEvhryXBu9agJw"
+      }
+    ],
+    "type":          "dataset",
+    "description":   "Some project",
+    "matchingScore": 1,
+    "name":          "name",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00Z",
+    "creators": [
+      "Jan Kowalski"
+    ],
+    "keywords": [
+      "key"
+    ],
+    "images": [
+      {
+        "_links": [
+          {
+            "rel":  "view",
+            "href": "https://gitlab.dev.renku.ch/group/subgroup/name/raw/master/image.png"
+          }
+        ],
+        "location": "image.png"
+      }
+    ]
   }
 ]
 ```

@@ -903,6 +903,7 @@ class MicroserviceRoutesSpec
     val datasetsSearchEndpoint          = mock[datasets.Endpoint[IO]]
     val datasetDetailsEndpoint          = mock[datasets.details.Endpoint[IO]]
     val entitiesEndpoint                = mock[entities.Endpoint[IO]]
+    val recentEntitiesEndpoint          = mock[entities.currentuser.recentlyviewed.Endpoint[IO]]
     val lineageEndpoint                 = mock[projects.files.lineage.Endpoint[IO]]
     val ontologyEndpoint                = mock[ontology.Endpoint[IO]]
     val projectDeleteEndpoint           = mock[projects.delete.Endpoint[IO]]
@@ -933,6 +934,7 @@ class MicroserviceRoutesSpec
         projectDetailsEndpoint,
         projectDatasetsEndpoint,
         projectDatasetTagsEndpoint,
+        recentEntitiesEndpoint,
         lineageEndpoint,
         docsEndpoint,
         usersProjectsEndpoint,

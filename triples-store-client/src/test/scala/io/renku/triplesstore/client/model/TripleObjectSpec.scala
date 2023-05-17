@@ -34,6 +34,7 @@ class TripleObjectSpec extends AnyWordSpec with should.Matchers with TableDriven
       Table(
         "type"      -> "value generator",
         "Boolean"   -> booleanTripleObjects,
+        "Char"      -> charTripleObjects,
         "Int"       -> intTripleObjects,
         "Long"      -> longTripleObjects,
         "Float"     -> floatTripleObjects,

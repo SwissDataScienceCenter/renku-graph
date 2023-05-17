@@ -35,6 +35,14 @@ private object EventPersister {
     ProjectsConnectionConfig[F]()
       .map(TSClient[F](_))
       .map(tsClient => new EventPersisterImpl[F](tsClient, EventDeduplicator(tsClient, categoryName)))
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      connectionConfig: ProjectsConnectionConfig
+  ): F[EventPersister[F]] = {
+    val tsClient = TSClient[F](connectionConfig)
+    val persister: EventPersister[F] = new EventPersisterImpl[F](tsClient, EventDeduplicator(tsClient, categoryName))
+    persister.pure[F]
+  }
 }
 
 private class EventPersisterImpl[F[_]: MonadThrow](tsClient: TSClient[F], deduplicator: EventDeduplicator[F])

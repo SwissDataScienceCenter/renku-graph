@@ -41,15 +41,8 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     dsConnectionConfig: DatasetConnectionConfig,
     recoveryStrategy:   RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:        Duration = 21 minutes,
-    requestTimeout:     Duration = 20 minutes
-) extends TSClientImpl[F](dsConnectionConfig,
-                          retryInterval,
-                          maxRetries,
-                          idleTimeoutOverride = idleTimeout.some,
-                          requestTimeoutOverride = requestTimeout.some
-    )
+    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+) extends TSClientImpl[F](dsConnectionConfig, retryInterval, maxRetries)
     with UpdateQueryRunner[F] {
 
   import org.http4s.{Request, Response, Status}

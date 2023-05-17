@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.ontology
 
 import cats.effect.Async
 import cats.syntax.all._
+import fs2.io.file.Files
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{Accept, Location}
 import org.http4s.{Headers, Request, Response, StaticFile, Uri}
@@ -56,9 +57,11 @@ private class EndpointImpl[F[_]: Async: Logger](ontologyGenerator: OntologyGener
   private def pageResponse(path: Uri.Path)(implicit request: Request[F]) = htmlGenerator.generateHtml >> {
     if (path.isEmpty)
       Response[F](SeeOther, headers = Headers(Location(request.uri / "index-en.html"), Accept(text.html))).pure[F]
-    else
+    else {
+      implicit val files: Files[F] = Files.forAsync
       StaticFile
         .fromPath(fromNioPath(htmlGenerator.generationPath resolve path.toString()), Some(request))
         .getOrElseF(NotFound(s"Ontology '$path' resource cannot be found"))
+    }
   }
 }

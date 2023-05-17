@@ -23,11 +23,12 @@ import cats.Show
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
+import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
-import io.renku.graph.model._
+import io.renku.jsonld.Property
 import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
@@ -590,33 +591,41 @@ object Project {
 
     val projectClass: Class = Class(schema / "Project")
 
-    val visibilityProperty = DataProperty.top(
+    val creator: Property = schema / "creator"
+    val image:   Property = schema / "image"
+
+    val nameProperty:        DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val pathProperty:        DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
+    val descriptionProperty: DataProperty.Def = DataProperty(schema / "description", xsd / "string")
+    val dateCreatedProperty: DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
+    val visibilityProperty: DataProperty.Def = DataProperty.top(
       renku / "projectVisibility",
       DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
     )
+    val keywordsProperty: DataProperty.Def = DataProperty(schema / "keywords", xsd / "string")
 
     lazy val typeDef: Type =
       Type.Def(
         projectClass,
         ObjectProperties(
           ObjectProperty(schema / "agent", Agent.ontology),
-          ObjectProperty(schema / "creator", Person.Ontology.typeDef),
+          ObjectProperty(creator, Person.Ontology.typeDef),
           ObjectProperty(schema / "member", Person.Ontology.typeDef),
           ObjectProperty(renku / "hasActivity", Activity.ontology),
           ObjectProperty(renku / "hasPlan", Plan.ontology),
           ObjectProperty(renku / "hasDataset", Dataset.Ontology.typeDef),
           ObjectProperty(prov / "wasDerivedFrom", projectClass),
-          ObjectProperty(schema / "image", Image.Ontology.typeDef)
+          ObjectProperty(image, Image.Ontology.typeDef)
         ),
         DataProperties(
-          DataProperty(schema / "name", xsd / "string"),
-          DataProperty(renku / "projectPath", xsd / "string"),
+          nameProperty,
+          pathProperty,
           DataProperty(renku / "projectNamespace", xsd / "string"),
           DataProperty(renku / "projectNamespaces", xsd / "string"),
-          DataProperty(schema / "description", xsd / "string"),
-          DataProperty(schema / "dateCreated", xsd / "dateTime"),
+          descriptionProperty,
+          dateCreatedProperty,
           visibilityProperty,
-          DataProperty(schema / "keywords", xsd / "string"),
+          keywordsProperty,
           DataProperty(schema / "schemaVersion", xsd / "string")
         )
       )

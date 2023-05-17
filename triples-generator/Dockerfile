@@ -45,7 +45,7 @@ USER tguser
 ENV PATH=$PATH:/home/tguser/.local/bin
 
 # Installing Renku
-RUN python3 -m pip install 'renku==2.3.2' 'sentry-sdk==1.5.11'
+RUN python3 -m pip install 'renku==2.4.1rc3' 'sentry-sdk==1.5.11'
 
 RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \

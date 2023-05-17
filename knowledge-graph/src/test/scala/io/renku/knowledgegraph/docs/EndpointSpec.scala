@@ -25,9 +25,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester._
 import io.renku.knowledgegraph.docs.OpenApiTester._
-import io.renku.knowledgegraph.docs.model.Operation.GET
+import io.renku.knowledgegraph.docs.model.Operation.{DELETE, GET}
+import io.renku.knowledgegraph.docs.model.Path.OpMapping
 import io.renku.knowledgegraph.docs.model.{Path, Uri}
 import io.renku.testtools.IOSpec
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,18 +50,35 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     private val endpointDocs1 = mock[EndpointDocs]
     (() => endpointDocs1.path)
       .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
+      .returns(pathsGen.generateOne)
 
-    val otherEndpointDocs = 1 to ints(min = 1, max = 10).generateOne map { _ =>
+    private val otherEndpointDocs = (1 to ints(min = 1, max = 10).generateOne).map { _ =>
       val docs = mock[EndpointDocs]
 
       (() => docs.path)
         .expects()
-        .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
+        .returns(pathsGen.generateOne)
 
       docs
-    }
+    }.toList
 
-    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1, otherEndpointDocs: _*)
+    private lazy val pathsGen: Gen[Path] = Path(
+      mappingGen.generateOne,
+      summary = nonEmptyStrings().generateOption,
+      description = nonEmptyStrings().generateOption
+    )
+
+    private lazy val mappingGen: Gen[OpMapping] = Gen.oneOf(
+      GET(summary = nonEmptyStrings().generateOne,
+          description = nonEmptyStrings().generateOne,
+          Uri / nonEmptyStrings().generateOne
+      ),
+      DELETE(summary = nonEmptyStrings().generateOne,
+             description = nonEmptyStrings().generateOne,
+             Uri / nonEmptyStrings().generateOne
+      )
+    )
+
+    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1 :: otherEndpointDocs)
   }
 }

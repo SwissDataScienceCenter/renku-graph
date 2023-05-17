@@ -27,7 +27,6 @@ import io.renku.knowledgegraph.docs.model._
 
 private object Encoders {
 
-  private val empty = Json.obj()
   implicit val docEncoder: Encoder[OpenApiDocument] = Encoder.instance { doc =>
     val components: Json = doc.components.map(c => json"""{"components": $c}""").getOrElse(JsonObject.empty.asJson)
     json"""{
@@ -38,12 +37,20 @@ private object Encoders {
       "security": ${doc.security}
     }""" deepMerge components
   }
+
   implicit val infoEncoder:     Encoder[Info]           = deriveEncoder
   implicit val serverEncoder:   Encoder[Server]         = deriveEncoder
   implicit val variableEncoder: Encoder[model.Variable] = deriveEncoder
-  implicit val pathEncoder: Encoder[model.Path] = Encoder.instance { path =>
-    val description = path.description.map(s => json"""{"description": $s }""").getOrElse(empty)
 
+  implicit val pathsEncoder: Encoder[model.Paths] = Encoder.instance { case Paths(paths) =>
+    Json.obj(
+      paths.toList.sortBy(_._1).map { case path -> paths =>
+        path -> paths.map(_.asJson).reduce(_ deepMerge _)
+      }: _*
+    )
+  }
+
+  implicit val pathEncoder: Encoder[model.Path] = Encoder.instance { path =>
     val operations: Json = path.operations
       .map { operation: Operation =>
         operation match {
@@ -51,16 +58,16 @@ private object Encoders {
           case _: Operation.Delete => json"""{"delete": $operation}"""
         }
       }
-      .foldLeft(json"""{}""")((acc, opJson) => acc deepMerge opJson)
+      .foldLeft(Json.obj())((acc, opJson) => acc deepMerge opJson)
 
     json"""{
-      "parameters": ${path.parameters},
-      "summary":    ${path.summary}
-    }""" deepMerge description deepMerge operations
+      "summary":     ${path.summary},
+      "description": ${path.description},
+      "parameters":  ${path.parameters}
+    }""".deepDropNullValues deepMerge operations
   }
+
   implicit val operationEncoder: Encoder[model.Operation] = Encoder.instance { operation =>
-    val summary     = operation.summary.map(s => json"""{"summary": $s }""").getOrElse(empty)
-    val requestBody = operation.requestBody.map(r => json"""{"requestBody": $r }""").getOrElse(empty)
     val responses = operation.responses
       .map { case (status, response) =>
         json"""{
@@ -72,13 +79,17 @@ private object Encoders {
           } 
         }"""
       }
-      .foldLeft(empty)((acc, opJson) => acc deepMerge opJson)
+      .foldLeft(Json.obj())((acc, opJson) => acc deepMerge opJson)
     json"""{
-      "security":   ${operation.security},
-      "parameters": ${operation.parameters},
-      "responses":  $responses
-    }""" deepMerge summary deepMerge requestBody
+      "summary":     ${operation.summary},
+      "description": ${operation.description},
+      "requestBody": ${operation.requestBody},
+      "security":    ${operation.security},
+      "parameters":  ${operation.parameters},
+      "responses":   $responses
+    }""" deepDropNullValues
   }
+
   implicit val parameterEncoder: Encoder[model.Parameter] = Encoder.instance { param =>
     json"""{
       "name":        ${param.name},
@@ -88,11 +99,13 @@ private object Encoders {
       "schema":      ${param.schema}
     }"""
   }
+
   implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance { schema =>
     json"""{"type": ${schema.`type`}}"""
   }
+
   implicit val requestBodyEncoder: Encoder[model.RequestBody] = Encoder.instance { requestBody =>
-    val content = requestBody.content.foldLeft(empty) { case (acc, (key, mediaType)) =>
+    val content = requestBody.content.foldLeft(Json.obj()) { case (acc, (key, mediaType)) =>
       json"""{$key: $mediaType}""" deepMerge acc
     }
     json"""{
@@ -100,46 +113,54 @@ private object Encoders {
       "content":     $content
     }""" deepMerge content
   }
+
   implicit val mediaTypeEncoder: Encoder[model.MediaType] = Encoder.instance { mediaType =>
     json"""{
       "examples": ${mediaType.examples}
     }"""
   }
+
   implicit val responseEncoder: Encoder[model.Response] = Encoder.instance { response =>
     json"""{
       "description": ${response.description}, 
       "content":     ${response.content}
     }"""
   }
+
   implicit val statusEncoder: Encoder[model.Status] = deriveEncoder
   implicit val headerEncoder: Encoder[model.Header] = deriveEncoder
   implicit val linkEncoder:   Encoder[model.Link]   = deriveEncoder
+
   implicit lazy val securityRequirementEncoder: Encoder[model.SecurityRequirement] = Encoder.instance {
     case SecurityRequirementAuth(name, scopes) =>
       json"""{$name: $scopes}"""
     case SecurityRequirementNoAuth =>
       json"""{}"""
   }
+
   implicit val inEncoder: Encoder[model.In] = Encoder.instance { inType =>
     Json.fromString(inType.value)
   }
+
   implicit val oAuthFlowsEncoder: Encoder[model.OAuthFlows] = Encoder.instance { oAuthFlows =>
-    val implicitFlow = oAuthFlows.`implicit`.map(i => json"""{"implicit": $i}""").getOrElse(empty)
-    val passwordFlow = oAuthFlows.password.map(p => json"""{"password": $p}""").getOrElse(empty)
+    val implicitFlow = oAuthFlows.`implicit`.map(i => json"""{"implicit": $i}""").getOrElse(Json.obj())
+    val passwordFlow = oAuthFlows.password.map(p => json"""{"password": $p}""").getOrElse(Json.obj())
     val clientCredentialsFlow =
-      oAuthFlows.clientCredentials.map(c => json"""{"clientCredentials": $c}""").getOrElse(empty)
+      oAuthFlows.clientCredentials.map(c => json"""{"clientCredentials": $c}""").getOrElse(Json.obj())
     val authorizationCodeFlow =
-      oAuthFlows.authorizationCode.map(a => json"""{"authorizationCode": $a}""").getOrElse(empty)
-    empty deepMerge implicitFlow deepMerge passwordFlow deepMerge clientCredentialsFlow deepMerge authorizationCodeFlow
+      oAuthFlows.authorizationCode.map(a => json"""{"authorizationCode": $a}""").getOrElse(Json.obj())
+    Json.obj() deepMerge implicitFlow deepMerge passwordFlow deepMerge clientCredentialsFlow deepMerge authorizationCodeFlow
   }
+
   implicit val oAuthFlowEncoder: Encoder[model.OAuthFlows.OAuthFlow] = Encoder.instance { flow =>
-    val refreshUrl = flow.refreshUrl.map(s => json"""{"refreshUrl": $s }""").getOrElse(empty)
+    val refreshUrl = flow.refreshUrl.map(s => json"""{"refreshUrl": $s }""").getOrElse(Json.obj())
     json"""{
       "authorizationUrl": ${flow.authorizationUrl},
       "tokenUrl":         ${flow.tokenUrl},
       "scopes":           ${flow.scopes}
     }""" deepMerge refreshUrl
   }
+
   implicit val componentsEncoder: Encoder[model.Components] = Encoder.instance { components =>
     json"""{
       "schemas":         ${components.schemas},
@@ -147,21 +168,23 @@ private object Encoders {
       "securitySchemes": ${components.securitySchemes}
     }"""
   }
+
   implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance {
     case sch: SecurityScheme.ApiKey =>
-      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(Json.obj())
       json"""{
         "name": ${sch.name},
         "type": ${sch.`type`.value},
         "in":   ${sch.in}
       }""" deepMerge description
     case sch: SecurityScheme.OpenIdConnect =>
-      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(Json.obj())
       json"""{
         "openIdConnectUrl": ${sch.openIdConnectUrl},
         "type":             ${sch.`type`.value}
       }""" deepMerge description
   }
+
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
     val value = example match {
       case JsonExample(value, _)   => json"""{"value": $value}"""
@@ -169,7 +192,7 @@ private object Encoders {
       case StringExample(value, _) => json"""{"value": $value}"""
     }
 
-    val summary = example.summary.map(s => json"""{"summary": $s}""").getOrElse(empty)
+    val summary = example.summary.map(s => json"""{"summary": $s}""").getOrElse(Json.obj())
 
     value deepMerge summary
   }
