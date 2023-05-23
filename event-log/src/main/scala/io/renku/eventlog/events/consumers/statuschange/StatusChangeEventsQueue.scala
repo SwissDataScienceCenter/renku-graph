@@ -26,6 +26,7 @@ import cats.{MonadThrow, Show}
 import io.circe.{Decoder, Encoder}
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
@@ -38,8 +39,9 @@ import scala.util.control.NonFatal
 trait StatusChangeEventsQueue[F[_]] {
 
   def register[E <: StatusChangeEvent](
-      handler: E => F[Unit]
-  )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit]
+      eventType: EventType[E],
+      handler:   E => F[Unit]
+  )(implicit decoder: Decoder[E]): F[Unit]
 
   def offer[E <: StatusChangeEvent](event: E)(implicit
       encoder:   Encoder[E],
@@ -81,8 +83,9 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
   private val handlers: Ref[F, List[HandlerDef[_ <: StatusChangeEvent]]] = Ref.unsafe(List.empty)
 
   override def register[E <: StatusChangeEvent](
-      handler: E => F[Unit]
-  )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit] =
+      eventType: EventType[E],
+      handler:   E => F[Unit]
+  )(implicit decoder: Decoder[E]): F[Unit] =
     handlers.update(HandlerDef(eventType, decoder, handler) :: _)
 
   override def offer[E <: StatusChangeEvent](event: E)(implicit

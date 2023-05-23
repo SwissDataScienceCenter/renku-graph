@@ -21,7 +21,7 @@ package io.renku.eventlog.events.consumers.statuschange.totriplesgenerated
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesGenerated
+import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesGenerated
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}

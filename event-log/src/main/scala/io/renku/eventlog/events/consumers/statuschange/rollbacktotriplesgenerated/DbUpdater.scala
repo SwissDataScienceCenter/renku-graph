@@ -26,7 +26,7 @@ import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{TransformingTriples, TriplesGenerated}
 import io.renku.graph.model.events.{EventId, ExecutionDate}

@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange.rollbacktotriplesgenerat
 
 import cats.effect.IO
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.Project

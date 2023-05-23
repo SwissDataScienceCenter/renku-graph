@@ -21,10 +21,11 @@ package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
 import cats.MonadThrow
 import cats.data.Kleisli
 import io.circe.Encoder
+import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEvent, StatusChangeEventsQueue}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue}
 import skunk.Session
 
 private[statuschange] class DbUpdater[F[_]: MonadThrow](eventsQueue: StatusChangeEventsQueue[F])

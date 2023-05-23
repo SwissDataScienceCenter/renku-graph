@@ -26,7 +26,7 @@ import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{EventStatus, ExecutionDate}

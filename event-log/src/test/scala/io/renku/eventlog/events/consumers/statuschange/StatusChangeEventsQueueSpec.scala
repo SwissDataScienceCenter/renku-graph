@@ -22,11 +22,12 @@ import cats.effect.{Async, IO, Ref}
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.generators.Generators.Implicits._
-import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.api.events.StatusChangeGenerators
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import io.renku.generators.Generators
+import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -34,6 +35,7 @@ import natchez.Trace.Implicits.noop
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import projecteventstonew.eventType
 import skunk.Session
 
 class StatusChangeEventsQueueSpec
@@ -54,7 +56,7 @@ class StatusChangeEventsQueueSpec
 
       queue.run.unsafeRunAndForget()
 
-      queue.register(eventHandler).unsafeRunSync()
+      queue.register(projecteventstonew.eventType, eventHandler).unsafeRunSync()
 
       eventually {
         dequeuedEvents.get.unsafeRunSync() shouldBe List(event)
@@ -75,7 +77,7 @@ class StatusChangeEventsQueueSpec
       val nextEvent = StatusChangeGenerators.projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
-      queue.register(eventHandler).unsafeRunSync()
+      queue.register(projecteventstonew.eventType, eventHandler).unsafeRunSync()
 
       queue.run.unsafeRunAndForget()
 
@@ -96,14 +98,14 @@ class StatusChangeEventsQueueSpec
         case other   => dequeuedEvents.update(_ ::: other :: Nil)
       }
 
-      queue.register(failingHandler).unsafeRunSync()
+      queue.register(projecteventstonew.eventType, failingHandler).unsafeRunSync()
 
       queue.run.unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
           TestLogger.Level.Error(
-            show"$categoryName processing event ${event.asJson.noSpaces} of type ${ProjectEventsToNew.eventType} failed",
+            show"$categoryName processing event ${event.asJson.noSpaces} of type ${projecteventstonew.eventType} failed",
             exception
           )
         )
@@ -128,7 +130,7 @@ class StatusChangeEventsQueueSpec
         new StatusChangeEventsQueueImpl[IO]()(implicitly[Async[IO]], logger, failingSessionResource, queriesExecTimes)
 
       val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
-      queue.register(handler).unsafeRunSync()
+      queue.register(projecteventstonew.eventType, handler).unsafeRunSync()
 
       queue.run.unsafeRunAndForget()
 

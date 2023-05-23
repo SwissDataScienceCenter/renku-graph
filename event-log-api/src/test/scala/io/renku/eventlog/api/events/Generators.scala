@@ -21,7 +21,7 @@ package io.renku.eventlog.api.events
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import org.scalacheck.Gen
 
-object Generators {
+object Generators extends StatusChangeGenerators {
 
   val commitSyncRequests: Gen[CommitSyncRequest] =
     consumerProjects.map(CommitSyncRequest.apply)

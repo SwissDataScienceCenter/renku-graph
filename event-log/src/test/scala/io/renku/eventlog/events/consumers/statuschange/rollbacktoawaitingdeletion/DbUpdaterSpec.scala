@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange.rollbacktoawaitingdeleti
 
 import cats.effect.IO
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.Project

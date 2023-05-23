@@ -18,3 +18,7 @@
 
 organization := "io.renku"
 name := "event-log-api"
+
+libraryDependencies ++=
+  Dependencies.circeGeneric ++
+    Dependencies.circeGenericExtras

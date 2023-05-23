@@ -47,6 +47,18 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     }
   }
 
+  "send StatusChangeEvent.RedoProjectTransformation" should {
+
+    "send the given event through the EventSender" in new TestCase {
+
+      val event = redoProjectTransformationEvents.generateOne
+
+      givenSending(event, StatusChangeEvent.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
   private trait TestCase {
 
     private val eventSender = mock[EventSender[Try]]
