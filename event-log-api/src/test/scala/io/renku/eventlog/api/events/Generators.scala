@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import org.scalacheck.Gen

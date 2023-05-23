@@ -16,12 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import Generators._
 import io.circe.literal._
 import io.circe.syntax._
@@ -30,6 +26,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.projects
+import org.scalatest.EitherValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CommitSyncRequestSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 

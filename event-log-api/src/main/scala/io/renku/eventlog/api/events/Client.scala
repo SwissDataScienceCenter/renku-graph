@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.producers.EventSender
 import io.renku.events.EventRequestContent
+import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
@@ -38,9 +38,9 @@ object Client {
 
 private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
 
+  import EventSender.EventContext
   import cats.syntax.all._
   import io.circe.syntax._
-  import EventSender.EventContext
 
   override def send(event: CommitSyncRequest): F[Unit] =
     eventSender.sendEvent(

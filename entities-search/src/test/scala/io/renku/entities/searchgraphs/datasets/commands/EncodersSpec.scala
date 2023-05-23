@@ -164,7 +164,10 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def imagesToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.images
       .map(i =>
-        i.asQuads + DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.imageProperty, i.resourceId.asEntityId)
+        i.asQuads + DatasetsQuad(searchInfo.topmostSameAs,
+                                 DatasetSearchInfoOntology.imageProperty,
+                                 i.resourceId.asEntityId
+        )
       )
       .toSet
       .flatten
@@ -172,7 +175,10 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
   private def linksToQuads(searchInfo: DatasetSearchInfo): Set[Quad] =
     searchInfo.links
       .map(l =>
-        l.asQuads + DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.linkProperty, l.resourceId.asEntityId)
+        l.asQuads + DatasetsQuad(searchInfo.topmostSameAs,
+                                 DatasetSearchInfoOntology.linkProperty,
+                                 l.resourceId.asEntityId
+        )
       )
       .toList
       .toSet

@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.TryValues
 import Generators._
-import cats.syntax.all._
 import cats.Show
-import io.circe.syntax.EncoderOps
+import cats.syntax.all._
 import io.circe.Encoder
+import io.circe.syntax.EncoderOps
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 

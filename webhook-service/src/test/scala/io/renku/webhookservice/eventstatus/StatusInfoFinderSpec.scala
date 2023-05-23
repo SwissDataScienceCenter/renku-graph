@@ -19,9 +19,9 @@
 package io.renku.webhookservice.eventstatus
 
 import cats.syntax.all._
+import io.renku.eventlog.api.EventLogClient
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonEmptyStrings}
-import io.renku.graph.eventlog.EventLogClient
 import io.renku.graph.model.EventContentGenerators.eventInfos
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.EventInfo

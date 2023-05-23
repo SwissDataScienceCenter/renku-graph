@@ -20,17 +20,16 @@ package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.{Async, Spawn, Temporal}
 import cats.syntax.all._
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.http.InfoMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.CleanUpEvent
+import io.renku.{eventlog, triplesgenerator}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

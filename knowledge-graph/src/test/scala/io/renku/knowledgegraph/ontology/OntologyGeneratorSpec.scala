@@ -31,7 +31,8 @@ class OntologyGeneratorSpec extends AnyWordSpec with should.Matchers {
   "getOntology" should {
 
     "return generated Renku ontology" in {
-      val types = NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, DatasetSearchInfoOntology.typeDef)
+      val types =
+        NonEmptyList.of(Project.Ontology.typeDef, CompositePlan.Ontology.typeDef, DatasetSearchInfoOntology.typeDef)
       val ontology = generateOntology(types, Schemas.renku)
 
       new OntologyGeneratorImpl(ontology).getOntology shouldBe ontology
