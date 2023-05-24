@@ -65,6 +65,7 @@ object CommonGraphGenerators {
           .listOfN(length * 2, Gen.hexChar)
           .map(_.mkString.toLowerCase)
           .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
+          .retryUntil(_.takeWhile(_ != 10.toByte).length == length) // this is to prevent LF chars to be generated
           .map(Secret.unsafe)
       }
 

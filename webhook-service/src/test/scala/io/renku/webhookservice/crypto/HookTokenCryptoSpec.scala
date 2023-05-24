@@ -27,6 +27,7 @@ import io.renku.generators.Generators._
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.model.HookToken
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.ByteVector
@@ -34,26 +35,26 @@ import scodec.bits.ByteVector
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
+class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers with TryValues {
 
   "encrypt/decrypt" should {
 
     "encrypt and decrypt a given HookToken" in new TestCase {
       val token: HookToken = hookTokens.generateOne
 
-      val Success(crypted) = hookTokenCrypto.encrypt(token)
+      val crypted = hookTokenCrypto.encrypt(token).success.value
       crypted.value should not be token
 
-      val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
+      val decrypted = hookTokenCrypto.decrypt(crypted).success.value
       decrypted shouldBe token
     }
 
     "fail if cannot be decrypted" in new TestCase {
       val token: SerializedHookToken = SerializedHookToken.from("abcd").fold(e => throw e, identity)
 
-      val Failure(decryptException) = hookTokenCrypto.decrypt(token)
+      val decryptException = hookTokenCrypto.decrypt(token).failure.exception
 
       decryptException            shouldBe an[Exception]
       decryptException.getMessage shouldBe "HookToken decryption failed"
@@ -68,7 +69,7 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
           SerializedHookToken.from("4TV8A81+1+U3dfa8sVO9TUuMvGHLaerySYpxEIkVT/U=").fold(throw _, identity)
         )
 
-      plain shouldBe Success(HookToken(123456))
+      plain.success.value shouldBe HookToken(123456)
     }
   }
 
@@ -85,10 +86,10 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      val Success(crypto) = HookTokenCrypto[Try](config)
+      val crypto = HookTokenCrypto[Try](config).success.value
 
       val token = hookTokens.generateOne
-      crypto.encrypt(token) flatMap crypto.decrypt shouldBe Success(token)
+      (crypto.encrypt(token) flatMap crypto.decrypt).success.value shouldBe token
     }
 
     "fail if there's wrong key in the 'services.gitlab.hook-token-secret' key in the config" in {
@@ -103,10 +104,10 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
         ).asJava
       )
 
-      val Failure(exception) = HookTokenCrypto[Try](config)
+      val exception = HookTokenCrypto[Try](config).failure.exception
 
       exception          shouldBe a[ConfigLoadingException]
-      exception.getMessage should include("Expected 16 bytes, but got 15")
+      exception.getMessage should include("Expected 16 or 24 or 32 bytes, but got 15")
     }
   }
 
