@@ -20,14 +20,12 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package projectsgraph
 
 import cats.effect.IO
-import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.versions.SchemaVersion
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -39,9 +37,8 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 import tooling._
-
-import java.time.Instant
 
 class BacklogCreatorSpec
     extends AnyWordSpec
@@ -50,21 +47,17 @@ class BacklogCreatorSpec
     with InMemoryJenaForSpec
     with ProjectsDataset
     with MigrationsDataset
+    with SearchInfoDatasets
     with MockFactory {
 
   private val pageSize = 50
-  private val v9       = SchemaVersion("9")
-  private val v10      = SchemaVersion("10")
 
   "createBacklog" should {
 
-    "find all projects that are either in schema v9 or have no schema but date created before migration start date " +
+    "find all projects that have relevant Project graphs but no DiscoverableProject entity in the Projects graph " +
       "and copy their paths into the migrations DS" in new TestCase {
 
-        givenMigrationDateFinding(returning = Instant.now().pure[IO])
-
-        val projects = anyRenkuProjectEntities
-          .map(setSchema(v9))
+        val projects = anyProjectEntities
           .generateList(min = pageSize + 1, max = Gen.choose(pageSize + 1, (2 * pageSize) - 1).generateOne)
 
         fetchBacklogProjects shouldBe Nil
@@ -79,99 +72,48 @@ class BacklogCreatorSpec
         fetchBacklogProjects.toSet shouldBe projects.map(_.path).toSet
       }
 
-    "skip projects in schema different than v9" in new TestCase {
+    "skip projects that are already in the Projects graph" in new TestCase {
 
-      val migrationDate = timestampsNotInTheFuture.generateOne
-      givenMigrationDateFinding(returning = migrationDate.pure[IO])
+      val projectToSkip = anyProjectEntities.generateOne
+      provisionTestProject(projectToSkip)(implicitly[RenkuUrl],
+                                          implicitly[EntityFunctions[entities.Project]],
+                                          projectsDSGraphsProducer[entities.Project]
+      ).unsafeRunSync()
 
-      val v9Project1 = anyRenkuProjectEntities
-        .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
-        .map(setSchema(v9))
-        .generateOne
-      val v10Project = anyRenkuProjectEntities.map(setSchema(v10)).generateOne
-      val v9Project2 = anyRenkuProjectEntities
-        .modify(
-          replaceProjectDateCreated(
-            timestampsNotInTheFuture(butYoungerThan = migrationDate).generateAs(projects.DateCreated)
-          )
-        )
-        .map(setSchema(v9))
-        .generateOne
+      val projectNotToSkip = anyProjectEntities.generateOne
+      upload(to = projectsDataset, projectNotToSkip)(implicitly[EntityFunctions[Project]],
+                                                     projectsDSGraphsProducer[Project],
+                                                     ioRuntime
+      )
 
       fetchBacklogProjects shouldBe Nil
 
-      upload(to = projectsDataset, v9Project1, v10Project, v9Project2)(implicitly[EntityFunctions[Project]],
-                                                                       projectsDSGraphsProducer[Project],
-                                                                       ioRuntime
-      )
-
       backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
 
-      fetchBacklogProjects.toSet shouldBe Set(v9Project1.path, v9Project2.path)
-    }
-
-    "skip projects without schema but dateCreated before the migration start time" in new TestCase {
-
-      val migrationDate = timestampsNotInTheFuture.generateOne
-      givenMigrationDateFinding(returning = migrationDate.pure[IO])
-
-      val oldProject1 = anyNonRenkuProjectEntities
-        .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
-        .generateOne
-      val newProject = anyNonRenkuProjectEntities
-        .modify(
-          replaceProjectDateCreated(
-            timestampsNotInTheFuture(butYoungerThan = migrationDate).generateAs(projects.DateCreated)
-          )
-        )
-        .generateOne
-      val oldProject2 = anyNonRenkuProjectEntities
-        .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
-        .generateOne
-
-      fetchBacklogProjects shouldBe Nil
-
-      upload(to = projectsDataset, oldProject1, newProject, oldProject2)(implicitly[EntityFunctions[NonRenkuProject]],
-                                                                         projectsDSGraphsProducer[NonRenkuProject],
-                                                                         ioRuntime
-      )
-
-      backlogCreator.createBacklog().unsafeRunSync() shouldBe ()
-
-      fetchBacklogProjects.toSet shouldBe Set(oldProject1.path, oldProject2.path)
+      fetchBacklogProjects.toSet shouldBe Set(projectNotToSkip.path)
     }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    private val migrationDateFinder = mock[MigrationStartTimeFinder[IO]]
-    val backlogCreator = new BacklogCreatorImpl[IO](migrationDateFinder,
-                                                    RecordsFinder[IO](projectsDSConnectionInfo),
-                                                    TSClient[IO](migrationsDSConnectionInfo)
-    )
+  private implicit val logger:    TestLogger[IO] = TestLogger[IO]()
+  implicit override val ioLogger: Logger[IO]     = logger
 
-    def givenMigrationDateFinding(returning: IO[Instant]) =
-      (() => migrationDateFinder.findMigrationStartDate)
-        .expects()
-        .returning(returning)
-        .atLeastOnce()
+  private trait TestCase {
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+    val backlogCreator =
+      new BacklogCreatorImpl[IO](RecordsFinder[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
 
     def fetchBacklogProjects =
       runSelect(
         on = migrationsDataset,
         SparqlQuery.ofUnsafe(
-          "test V10 backlog",
+          "test Projects Graph provisioning backlog",
           Prefixes of renku -> "renku",
-          s"""|SELECT ?path
-              |WHERE {
-              |  ${ProvisionProjectsGraph.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?path
-              |}
-              |""".stripMargin
+          sparql"""|SELECT ?path
+                   |WHERE {
+                   |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?path
+                   |}
+                   |""".stripMargin
         )
       ).unsafeRunSync().flatMap(_.get("path").map(projects.Path))
   }
-
-  private def setSchema(version: SchemaVersion): Project => Project =
-    _.fold(_.copy(version = version), _.copy(version = version), identity, identity)
 }

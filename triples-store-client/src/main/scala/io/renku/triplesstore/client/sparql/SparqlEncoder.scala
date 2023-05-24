@@ -92,7 +92,7 @@ object SparqlEncoder {
     implicit val tripleSparqlEncoder: SparqlEncoder[Triple] = SparqlEncoder.instance {
       case Triple(subject, predicate, obj) =>
         Fragment(
-          s"${entityIdSparqlEncoder(subject).sparql} ${propertySparqlEncoder(predicate).sparql} ${tripleObjectSparqlEncoder(obj).sparql}."
+          s"${entityIdSparqlEncoder(subject).sparql} ${propertySparqlEncoder(predicate).sparql} ${tripleObjectSparqlEncoder(obj).sparql}.\n"
         )
     }
 
