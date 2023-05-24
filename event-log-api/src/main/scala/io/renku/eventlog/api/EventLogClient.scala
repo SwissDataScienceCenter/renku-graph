@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog
+package io.renku.eventlog.api
 
+import EventLogClient._
 import cats.data.Ior
 import cats.effect.Async
 import cats.syntax.all._
 import fs2.{RaiseThrowable, Stream}
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.eventlog.EventLogClient._
 import io.renku.graph.model.eventlogapi._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects

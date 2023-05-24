@@ -21,15 +21,15 @@ package commitsyncrequest
 
 import cats.effect.IO
 import io.circe.syntax._
+import io.renku.eventlog.api.events.Generators
 import io.renku.events.EventRequestContent
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.eventlog.api.events.Generators
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with EitherValues {
 

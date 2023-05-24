@@ -24,8 +24,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
+import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls

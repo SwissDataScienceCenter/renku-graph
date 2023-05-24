@@ -42,6 +42,7 @@ lazy val root = project
     renkuCliModel,
     renkuModel,
     graphCommons,
+    eventLogApi,
     eventLog,
     tokenRepository,
     webhookService,
@@ -108,11 +109,19 @@ lazy val graphCommons = project
   .dependsOn(renkuModel % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val eventLogApi = project
+  .in(file("event-log-api"))
+  .withId("event-log-api")
+  .settings(commonSettings)
+  .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val eventLog = project
   .in(file("event-log"))
   .withId("event-log")
   .settings(commonSettings)
   .dependsOn(
+    eventLogApi         % "compile->compile; test->test",
     triplesGeneratorApi % "compile->compile; test->test"
   )
   .enablePlugins(
@@ -124,7 +133,7 @@ lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(eventLogApi  % "compile->compile; test->test")
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -151,7 +160,7 @@ lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
   .settings(commonSettings)
-  .dependsOn(graphCommons % "compile->compile; test->test")
+  .dependsOn(eventLogApi  % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val entitiesViewingsCollector = project

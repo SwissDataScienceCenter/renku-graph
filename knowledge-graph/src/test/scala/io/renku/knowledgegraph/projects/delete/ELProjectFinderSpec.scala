@@ -19,12 +19,12 @@
 package io.renku.knowledgegraph.projects.delete
 
 import cats.syntax.all._
+import io.renku.eventlog.api.EventLogClient
+import io.renku.eventlog.api.EventLogClient.Result.{Failure, Success}
+import io.renku.eventlog.api.EventLogClient.{Result, SearchCriteria}
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.graph.eventlog.EventLogClient
-import io.renku.graph.eventlog.EventLogClient.Result.{Failure, Success}
-import io.renku.graph.eventlog.EventLogClient.{Result, SearchCriteria}
 import io.renku.graph.model.EventContentGenerators.eventInfos
 import io.renku.graph.model.events.EventInfo
 import io.renku.http.rest.paging.model.PerPage

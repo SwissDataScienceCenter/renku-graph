@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformatio
 
 import cats.effect.IO
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{ProjectPath, RedoProjectTransformation}
+import io.renku.eventlog.api.events.StatusChangeEvent.{ProjectPath, RedoProjectTransformation}
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.eventlog.metrics.QueriesExecutionTimes

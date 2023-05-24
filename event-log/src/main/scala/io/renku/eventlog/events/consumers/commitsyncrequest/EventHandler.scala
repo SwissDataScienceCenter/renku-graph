@@ -21,10 +21,10 @@ package io.renku.eventlog.events.consumers.commitsyncrequest
 import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.{consumers, CategoryName}
 import io.renku.events.consumers._
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](

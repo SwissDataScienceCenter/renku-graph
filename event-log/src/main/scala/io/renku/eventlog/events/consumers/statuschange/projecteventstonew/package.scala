@@ -16,13 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.events.consumers.statuschange
 
-import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import org.scalacheck.Gen
+import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 
-object Generators {
-
-  val commitSyncRequests: Gen[CommitSyncRequest] =
-    consumerProjects.map(CommitSyncRequest.apply)
+package object projecteventstonew {
+  private[statuschange] implicit val eventType: StatusChangeEventsQueue.EventType[ProjectEventsToNew] =
+    StatusChangeEventsQueue.EventType("PROJECT_EVENTS_TO_NEW")
 }

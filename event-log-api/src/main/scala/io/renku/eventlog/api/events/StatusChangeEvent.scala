@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange
+package io.renku.eventlog.api.events
 
 import cats.Show
 import cats.syntax.all._
@@ -25,6 +25,7 @@ import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto.{deriveConfiguredDecoder, deriveConfiguredEncoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax._
+import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus._
@@ -40,6 +41,8 @@ sealed trait StatusChangeEvent extends Product {
 }
 
 object StatusChangeEvent {
+
+  val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
 
   final case class ProjectPath(path: projects.Path)
   object ProjectPath {
@@ -59,9 +62,6 @@ object StatusChangeEvent {
 
   final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent
   object ProjectEventsToNew {
-    implicit lazy val eventType: StatusChangeEventsQueue.EventType[ProjectEventsToNew] =
-      StatusChangeEventsQueue.EventType("PROJECT_EVENTS_TO_NEW")
-
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { event =>
       show"${event.subCategoryName} ${event.project}"
     }
@@ -72,11 +72,9 @@ object StatusChangeEvent {
 
   final case class RedoProjectTransformation(project: ProjectPath) extends StatusChangeEvent
   object RedoProjectTransformation {
+
     def apply(path: projects.Path): RedoProjectTransformation =
       RedoProjectTransformation(ProjectPath(path))
-
-    implicit lazy val eventType: StatusChangeEventsQueue.EventType[RedoProjectTransformation] =
-      StatusChangeEventsQueue.EventType("REDO_PROJECT_TRANSFORMATION")
 
     implicit lazy val show: Show[RedoProjectTransformation] = Show.show { event =>
       show"${event.subCategoryName} projectPath = ${event.project.path}, status = ${EventStatus.TriplesGenerated}"

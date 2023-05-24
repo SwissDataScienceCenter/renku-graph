@@ -22,7 +22,8 @@ package statuschange
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
+import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}

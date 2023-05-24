@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToNew
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New}

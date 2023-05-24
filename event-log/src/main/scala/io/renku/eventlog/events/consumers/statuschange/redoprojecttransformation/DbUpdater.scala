@@ -21,9 +21,10 @@ package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformatio
 import cats.MonadThrow
 import cats.data.Kleisli
 import io.circe.Encoder
+import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange._
 import skunk.Session
 
