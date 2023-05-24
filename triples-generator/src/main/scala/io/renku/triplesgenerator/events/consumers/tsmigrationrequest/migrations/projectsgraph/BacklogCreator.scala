@@ -86,7 +86,7 @@ private class BacklogCreatorImpl[F[_]: Async](recordsFinder: RecordsFinder[F], m
 
   private def query(page: Int) = SparqlQuery.ofUnsafe(
     show"${ProvisionProjectsGraph.name} - projects to migrate",
-    Prefixes of schema -> "schema",
+    Prefixes of (schema -> "schema", renku -> "renku"),
     sparql"""|SELECT DISTINCT ?path
              |WHERE {
              |  GRAPH ?id {

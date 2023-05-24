@@ -61,13 +61,13 @@ private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F
   private lazy val query = SparqlQuery.ofUnsafe(
     show"${ProvisionProjectsGraph.name} - find projects",
     Prefixes of renku -> "renku",
-    s"""|SELECT DISTINCT ?path
-        |WHERE {
-        |  ${ProvisionProjectsGraph.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?path
-        |}
-        |ORDER BY ?path
-        |LIMIT $pageSize
-        |""".stripMargin
+    sparql"""|SELECT DISTINCT ?path
+             |WHERE {
+             |  ${ProvisionProjectsGraph.name.asEntityId} renku:toBeMigrated ?path
+             |}
+             |ORDER BY ?path
+             |LIMIT $pageSize
+             |""".stripMargin
   )
 
   private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {

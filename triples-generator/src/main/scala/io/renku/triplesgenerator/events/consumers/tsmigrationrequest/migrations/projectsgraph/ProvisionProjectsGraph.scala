@@ -24,11 +24,9 @@ package projectsgraph
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.literal._
-import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.projects
+import io.renku.eventlog
+import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.events.CategoryName
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -39,13 +37,12 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
     backlogCreator:       BacklogCreator[F],
     projectsFinder:       ProjectsPageFinder[F],
     progressFinder:       ProgressFinder[F],
-    eventsSender:         EventSender[F],
+    elClient:             eventlog.api.events.Client[F],
     projectDonePersister: ProjectDonePersister[F],
     executionRegister:    MigrationExecutionRegister[F],
     recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
-  import eventsSender._
   import executionRegister._
   import fs2._
   import progressFinder._
@@ -74,7 +71,7 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
         .flatMap(Stream.emits(_))
         .evalMap(path => findProgressInfo.map(path -> _))
         .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
-        .evalTap(sendCleanUpEvent)
+        .evalTap { case (path, _) => elClient.send(StatusChangeEvent.RedoProjectTransformation(path)) }
         .evalTap { case (path, _) => noteDone(path) }
         .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
         .compile
@@ -82,21 +79,6 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError[F, Unit])
   }
-
-  private lazy val sendCleanUpEvent: ((projects.Path, String)) => F[Unit] = { case (path, _) =>
-    val (payload, ctx) = toCleanUpEvent(path)
-    sendEvent(payload, ctx)
-  }
-
-  private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) =
-    EventRequestContent.NoPayload {
-      json"""{
-        "categoryName": $cleanUpEventCategory,
-        "project": {
-          "path": $path
-        }
-      }"""
-    } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $path")
 
   private def logInfo(message: String, progressInfo: String): F[Unit] =
     Logger[F].info(show"${ProvisionProjectsGraph.name} - $progressInfo - $message")
@@ -116,14 +98,14 @@ private[migrations] object ProvisionProjectsGraph {
     backlogCreator       <- BacklogCreator[F]
     projectsFinder       <- ProjectsPageFinder[F]
     progressFinder       <- ProgressFinder[F]
-    eventsSender         <- EventSender[F](EventLogUrl)
+    elClient             <- eventlog.api.events.Client[F]
     projectDonePersister <- ProjectDonePersister[F]
     executionRegister    <- MigrationExecutionRegister[F]
   } yield new ProvisionProjectsGraph(checkMigrationNeeded,
                                      backlogCreator,
                                      projectsFinder,
                                      progressFinder,
-                                     eventsSender,
+                                     elClient,
                                      projectDonePersister,
                                      executionRegister
   )

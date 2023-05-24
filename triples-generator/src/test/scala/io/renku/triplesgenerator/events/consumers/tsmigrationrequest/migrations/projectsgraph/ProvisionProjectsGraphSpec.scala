@@ -22,13 +22,12 @@ package projectsgraph
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.literal._
-import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.eventlog
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
 import cats.MonadThrow
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
@@ -89,7 +88,7 @@ class ProvisionProjectsGraphSpec
 
         givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjects.size)
 
-        allProjects map toRedoProjectTransformation foreach verifyEventWasSent
+        allProjects foreach verifyEventWasSent
 
         allProjects foreach verifyProjectNotedDone
 
@@ -122,13 +121,12 @@ class ProvisionProjectsGraphSpec
   private trait TestCase {
     val pageSize = positiveInts(max = 100).generateOne.value
 
-    private val eventCategoryName = CategoryName("EVENTS_STATUS_CHANGE")
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val migrationNeedChecker         = mock[MigrationNeedChecker[IO]]
     private val backlogCreator       = mock[BacklogCreator[IO]]
     val projectsFinder               = mock[ProjectsPageFinder[IO]]
     private val progressFinder       = mock[ProgressFinder[IO]]
-    private val eventSender          = mock[EventSender[IO]]
+    private val elClient             = mock[eventlog.api.events.Client[IO]]
     private val projectDonePersister = mock[ProjectDonePersister[IO]]
     private val executionRegister    = mock[MigrationExecutionRegister[IO]]
     val recoverableError             = processingRecoverableErrors.generateOne
@@ -142,7 +140,7 @@ class ProvisionProjectsGraphSpec
       backlogCreator,
       projectsFinder,
       progressFinder,
-      eventSender,
+      elClient,
       projectDonePersister,
       executionRegister,
       recoveryStrategy
@@ -166,23 +164,10 @@ class ProvisionProjectsGraphSpec
         .returning(returning)
         .repeat(times)
 
-    def toRedoProjectTransformation(projectPath: projects.Path) = projectPath -> EventRequestContent.NoPayload {
-      json"""{
-        "categoryName": $eventCategoryName,
-        "project": {
-          "path": $projectPath
-        }
-      }"""
-    }
-
-    lazy val verifyEventWasSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
-      (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-        .expects(event,
-                 EventSender.EventContext(eventCategoryName,
-                                          show"$categoryName: ${migration.name} cannot send event for $path"
-                 )
-        )
+    lazy val verifyEventWasSent: projects.Path => Unit = { path =>
+      (elClient
+        .send(_: StatusChangeEvent.RedoProjectTransformation))
+        .expects(StatusChangeEvent.RedoProjectTransformation(path))
         .returning(().pure[IO])
       ()
     }
