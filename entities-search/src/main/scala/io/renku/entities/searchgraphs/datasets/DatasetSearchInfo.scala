@@ -27,6 +27,7 @@ import io.renku.graph.model.{datasets, projects}
 
 private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
                                            name:               datasets.Name,
+                                           title:              datasets.Title,
                                            visibility:         projects.Visibility,
                                            createdOrPublished: datasets.CreatedOrPublished,
                                            maybeDateModified:  Option[datasets.DateModified],
@@ -45,6 +46,7 @@ private object DatasetSearchInfo {
   implicit val show: Show[DatasetSearchInfo] = Show.show {
     case DatasetSearchInfo(topSameAs,
                            name,
+                           title,
                            visibility,
                            createdOrPublished,
                            maybeDateModified,
@@ -57,6 +59,7 @@ private object DatasetSearchInfo {
       List(
         show"topmostSameAs = $topSameAs".some,
         show"name = $name".some,
+        show"title = $title".some,
         show"visibility = $visibility".some,
         createdOrPublished match {
           case d: datasets.DateCreated   => show"dateCreated = $d".some
