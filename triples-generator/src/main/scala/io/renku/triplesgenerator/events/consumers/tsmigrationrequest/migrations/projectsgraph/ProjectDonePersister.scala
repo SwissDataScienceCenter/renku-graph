@@ -51,8 +51,8 @@ private class ProjectDonePersisterImpl[F[_]](tsClient: TSClient[F])(implicit ru:
   private def v10MigratedTriple(path: projects.Path) = {
     val triple = Triple(ProvisionProjectsGraph.name.asEntityId, renku / "toBeMigrated", path.asObject)
     SparqlQuery.ofUnsafe(
-      show"${ProvisionProjectsGraph.name} - store migrated",
-      s"DELETE DATA {${triple.asSparql.sparql}}"
+      show"${ProvisionProjectsGraph.name} - remove migrated",
+      sparql"DELETE DATA {$triple}"
     )
   }
 }

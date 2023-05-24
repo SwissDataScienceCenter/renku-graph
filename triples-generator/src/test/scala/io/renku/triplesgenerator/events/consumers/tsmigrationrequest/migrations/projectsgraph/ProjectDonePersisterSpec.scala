@@ -43,10 +43,11 @@ class ProjectDonePersisterSpec
 
   "noteDone" should {
 
-    "persist the (MigrationToV10, renku:migrated, path) triple" in new TestCase {
+    "remove the (ProvisionProjectsGraph, renku:toBeMigrated, path) triple" in new TestCase {
 
       val paths       = projectPaths.generateList(min = 2)
       val insertQuery = BacklogCreator.asToBeMigratedInserts.apply(paths).value
+
       runUpdate(on = migrationsDataset, insertQuery).unsafeRunSync()
 
       progressFinder.findProgressInfo.unsafeRunSync() shouldBe s"${paths.size} left from ${paths.size}"
