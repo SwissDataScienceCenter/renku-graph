@@ -18,29 +18,30 @@
 
 package io.renku.eventlog
 
+import MicroserviceRunnerSpec._
 import cats.Show
 import cats.data.Kleisli
 import cats.effect._
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.eventlog.events.consumers.statuschange.{StatusChangeEvent, StatusChangeEventsQueue}
+import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
 import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.http.server.HttpServer
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.GaugeResetScheduler
 import io.renku.microservices.{AbstractMicroserviceRunnerTest, CallCounter, ServiceReadinessChecker, ServiceRunCounter}
 import io.renku.testtools.IOSpec
-
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.Session
-import MicroserviceRunnerSpec._
-import io.renku.http.server.HttpServer
+
 import scala.concurrent.duration._
 
 class MicroserviceRunnerSpec extends AnyWordSpec with IOSpec with should.Matchers {
@@ -180,8 +181,9 @@ object MicroserviceRunnerSpec {
     override def getStatus: IO[Set[EventProducerStatus]] = ???
 
     override def register[E <: StatusChangeEvent](
-        handler: E => IO[Unit]
-    )(implicit decoder: Decoder[E], eventType: StatusChangeEventsQueue.EventType[E]): IO[Unit] = ???
+        eventType: StatusChangeEventsQueue.EventType[E],
+        handler:   E => IO[Unit]
+    )(implicit decoder: Decoder[E]): IO[Unit] = ???
 
     override def offer[E <: StatusChangeEvent](event: E)(implicit
         encoder:   Encoder[E],

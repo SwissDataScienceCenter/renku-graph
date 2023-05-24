@@ -22,9 +22,9 @@ import cats.data.NonEmptyList
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Decoder
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.ErrorMessage._

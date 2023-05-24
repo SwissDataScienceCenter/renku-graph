@@ -21,7 +21,7 @@ package io.renku.webhookservice.eventstatus
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.eventlog.EventLogClient
+import io.renku.eventlog.api.EventLogClient
 import io.renku.graph.model.events.EventInfo
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage

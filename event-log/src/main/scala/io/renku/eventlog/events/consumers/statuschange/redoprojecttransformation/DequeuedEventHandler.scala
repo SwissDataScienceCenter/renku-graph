@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.redoprojecttransformation
+package io.renku.eventlog.events.consumers.statuschange
+package redoprojecttransformation
 
 import cats.data.Kleisli
 import cats.effect.Async
@@ -24,7 +25,7 @@ import cats.syntax.all._
 import io.renku.db.DbClient
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
+import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 

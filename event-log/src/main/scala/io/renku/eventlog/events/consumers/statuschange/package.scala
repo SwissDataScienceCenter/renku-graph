@@ -22,5 +22,4 @@ import io.renku.events.CategoryName
 
 package object statuschange {
   val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
-
 }

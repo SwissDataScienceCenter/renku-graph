@@ -23,8 +23,8 @@ import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
 import io.circe.syntax._
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._

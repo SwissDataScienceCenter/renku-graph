@@ -16,23 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog
+package io.renku.eventlog.api
 
+import EventLogClient.{EventPayload, Result, SearchCriteria}
+import Http4sEventLogClient.Implicits._
 import cats.effect._
 import cats.syntax.all._
 import io.renku.control.Throttler
-import io.renku.graph.eventlog.EventLogClient.{EventPayload, Result, SearchCriteria}
-import io.renku.graph.eventlog.Http4sEventLogClient.Implicits._
 import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.graph.model.events.{EventId, EventInfo}
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.client.RestClient
 import io.renku.tinytypes.TinyType
-import org.http4s.{QueryParamEncoder, Uri}
+import org.http4s.Uri.Path.SegmentEncoder
 import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
-import org.http4s.Uri.Path.SegmentEncoder
+import org.http4s.{QueryParamEncoder, Uri}
 import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
 

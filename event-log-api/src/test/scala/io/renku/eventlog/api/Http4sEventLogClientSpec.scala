@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog
+package io.renku.eventlog.api
 
+import EventLogClient.{Result, SearchCriteria}
+import Http4sEventLogClientSpec.JsonEncoders._
 import cats.effect._
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
@@ -27,19 +29,17 @@ import io.circe.literal._
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
-import io.renku.graph.eventlog.EventLogClient.{Result, SearchCriteria}
-import io.renku.graph.eventlog.Http4sEventLogClientSpec.JsonEncoders._
-import io.renku.graph.model._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model._
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.http.client.UrlEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.{Status, Uri}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 import org.typelevel.log4cats.Logger
 import scodec.bits.ByteVector
 

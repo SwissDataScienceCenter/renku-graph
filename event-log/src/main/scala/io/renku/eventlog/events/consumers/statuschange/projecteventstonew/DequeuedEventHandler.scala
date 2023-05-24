@@ -16,32 +16,33 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange.projecteventstonew
+package io.renku.eventlog.events.consumers.statuschange
+package projecteventstonew
 
 import cats.data.Kleisli
 import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
+import cleaning.ProjectCleaner
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits.PreparedQueryOps
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.consumers.statuschange.{categoryName, DBUpdater, DBUpdateResults}
+import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, categoryName}
 import io.renku.eventlog.events.producers.minprojectinfo
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
+import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
-import skunk.{~, Session, SqlState}
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{Session, SqlState, ~}
 
 import java.time.Instant
 import scala.util.control.NonFatal
@@ -49,6 +50,7 @@ import scala.util.control.NonFatal
 trait DequeuedEventHandler[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 object DequeuedEventHandler {
+
   def apply[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes: MetricsRegistry]
       : F[DBUpdater[F, ProjectEventsToNew]] =
     ProjectCleaner[F].map(new DequeuedEventHandlerImpl(_))

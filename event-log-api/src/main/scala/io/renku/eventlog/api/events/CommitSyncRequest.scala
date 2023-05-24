@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
-import cats.syntax.all._
 import cats.Show
-import io.circe.{Decoder, DecodingFailure, Encoder}
-import io.circe.literal._
+import cats.syntax.all._
 import io.circe.DecodingFailure.Reason.CustomReason
-import io.renku.events.consumers.Project
+import io.circe.literal._
+import io.circe.{Decoder, DecodingFailure, Encoder}
 import io.renku.events.CategoryName
+import io.renku.events.consumers.Project
 
 final case class CommitSyncRequest(project: Project)
 

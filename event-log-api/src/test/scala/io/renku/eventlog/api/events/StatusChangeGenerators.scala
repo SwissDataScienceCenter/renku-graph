@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange
+package io.renku.eventlog.api.events
 
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.events.consumers.{ConsumersModelGenerators, Project}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -28,7 +28,9 @@ import org.scalacheck.Gen
 
 import java.time.{Duration => JDuration}
 
-object StatusChangeGenerators {
+object StatusChangeGenerators extends StatusChangeGenerators
+
+trait StatusChangeGenerators {
 
   val projectEventsToNewEvents: Gen[ProjectEventsToNew] =
     ConsumersModelGenerators.consumerProjects.map(ProjectEventsToNew(_))

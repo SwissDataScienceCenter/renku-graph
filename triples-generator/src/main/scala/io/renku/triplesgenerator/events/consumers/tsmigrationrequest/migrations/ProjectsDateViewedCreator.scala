@@ -24,18 +24,18 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import fs2.Stream
 import io.circe.Decoder
-import io.renku.graph.eventlog.EventLogClient
+import io.renku.eventlog.api.EventLogClient
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesstore._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery, RegisteredMigration}
 

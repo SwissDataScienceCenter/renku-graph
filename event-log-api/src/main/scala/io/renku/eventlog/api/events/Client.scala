@@ -16,18 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.graph.eventlog.api.events
+package io.renku.eventlog.api.events
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.producers.EventSender
 import io.renku.events.EventRequestContent
+import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
-  def send(event: CommitSyncRequest): F[Unit]
+  def send(event: CommitSyncRequest):                           F[Unit]
+  def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit]
 }
 
 object Client {
@@ -38,13 +39,19 @@ object Client {
 
 private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
 
+  import EventSender.EventContext
   import cats.syntax.all._
   import io.circe.syntax._
-  import EventSender.EventContext
 
   override def send(event: CommitSyncRequest): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(event.asJson),
       EventContext(CommitSyncRequest.categoryName, show"${CommitSyncRequest.categoryName}: sending event $event failed")
+    )
+
+  override def send(event: StatusChangeEvent.RedoProjectTransformation): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(event.asJson),
+      EventContext(StatusChangeEvent.categoryName, show"${StatusChangeEvent.categoryName}: sending event $event failed")
     )
 }

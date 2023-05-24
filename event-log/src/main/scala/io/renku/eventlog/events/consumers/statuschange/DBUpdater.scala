@@ -20,6 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.Applicative
 import cats.data.Kleisli
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import skunk.Session
 

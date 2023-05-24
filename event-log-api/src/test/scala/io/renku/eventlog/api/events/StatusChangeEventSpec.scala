@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange
+package io.renku.eventlog.api.events
 
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
+import io.renku.eventlog.api.events.StatusChangeEvent._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.ZippedEventPayload
 import org.scalatest.matchers.should
