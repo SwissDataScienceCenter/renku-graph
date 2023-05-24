@@ -62,6 +62,7 @@ private object SearchInfoExtractor {
   ) = DatasetSearchInfo(
     ds.provenance.topmostSameAs,
     ds.identification.name,
+    ds.identification.title,
     project.visibility,
     createdOrPublished,
     maybeDateModified,

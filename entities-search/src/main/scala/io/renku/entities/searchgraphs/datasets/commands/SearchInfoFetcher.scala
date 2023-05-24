@@ -59,7 +59,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "ds search infos",
     Prefixes of (renku -> "renku", schema -> "schema"),
-    sparql"""|SELECT DISTINCT ?topSameAs ?name ?visibility ?maybeDescription
+    sparql"""|SELECT DISTINCT ?topSameAs ?name ?title ?visibility ?maybeDescription
              |                ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
              |                (GROUP_CONCAT(?creator; separator=${rowsSeparator.asTripleObject}) AS ?creators)
              |                (GROUP_CONCAT(?keyword; separator=${rowsSeparator.asTripleObject}) AS ?keywords)
@@ -78,6 +78,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |  } {
              |    GRAPH ${GraphClass.Datasets.id} {
              |      ?topSameAs renku:slug ?name;
+             |                 schema:name ?title;
              |                 renku:projectVisibility ?visibility.
              |      OPTIONAL { ?topSameAs schema:description ?maybeDescription }
              |      OPTIONAL { ?topSameAs schema:dateCreated ?maybeDateCreated }
@@ -104,7 +105,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
              |    }
              |  }
              |}
-             |GROUP BY ?topSameAs ?name ?visibility ?maybeDescription
+             |GROUP BY ?topSameAs ?name ?title ?visibility ?maybeDescription
              |         ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
              |ORDER BY ?name
              |""".stripMargin
@@ -212,6 +213,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       for {
         implicit0(topSameAs: datasets.TopmostSameAs) <- extract[datasets.TopmostSameAs]("topSameAs")
         name                                         <- extract[datasets.Name]("name")
+        title                                        <- extract[datasets.Title]("title")
         visibility                                   <- extract[projects.Visibility]("visibility")
         maybeDescription                             <- extract[Option[datasets.Description]]("maybeDescription")
         maybeDateCreated                             <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
@@ -224,6 +226,7 @@ private class SearchInfoFetcherImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         links                                        <- extract[String]("links") >>= toListOfLinks
       } yield searchgraphs.datasets.DatasetSearchInfo(topSameAs,
                                                       name,
+                                                      title,
                                                       visibility,
                                                       createdOrPublished,
                                                       maybeDateModified,

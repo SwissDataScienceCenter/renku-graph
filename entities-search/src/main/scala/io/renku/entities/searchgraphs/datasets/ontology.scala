@@ -27,6 +27,7 @@ import io.renku.jsonld.ontology._
 object DatasetSearchInfoOntology {
 
   val slugProperty:          DataProperty.Def = Dataset.Ontology.slugProperty
+  val nameProperty:          DataProperty.Def = Dataset.Ontology.nameProperty
   val visibilityProperty:    DataProperty.Def = Project.Ontology.visibilityProperty
   val dateCreatedProperty:   DataProperty.Def = Dataset.Ontology.dateCreatedProperty
   val datePublishedProperty: DataProperty.Def = Dataset.Ontology.datePublishedProperty
@@ -46,6 +47,7 @@ object DatasetSearchInfoOntology {
     ),
     DataProperties(
       slugProperty,
+      nameProperty,
       visibilityProperty,
       dateCreatedProperty,
       datePublishedProperty,
