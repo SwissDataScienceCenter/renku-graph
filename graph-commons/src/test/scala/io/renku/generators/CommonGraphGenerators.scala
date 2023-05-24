@@ -59,11 +59,14 @@ object CommonGraphGenerators {
 
   implicit val aesCryptoSecrets: Gen[Secret] =
     Gen
-      .listOfN(32, Gen.hexChar)
-      .map(_.mkString.toLowerCase)
-      .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
-      .retryUntil(_.takeWhile(_ != 10.toByte).length == 16)
-      .map(Secret.unsafe)
+      .oneOf(16, 24, 32)
+      .flatMap { length =>
+        Gen
+          .listOfN(length * 2, Gen.hexChar)
+          .map(_.mkString.toLowerCase)
+          .map(ByteVector.fromValidHex(_, Alphabets.HexLowercase))
+          .map(Secret.unsafe)
+      }
 
   implicit val personalAccessTokens: Gen[PersonalAccessToken] = for {
     length <- Gen.choose(5, 40)
