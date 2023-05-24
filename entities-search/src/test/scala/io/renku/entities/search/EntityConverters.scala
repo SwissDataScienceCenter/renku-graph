@@ -45,6 +45,7 @@ private object EntityConverters {
       MatchingScore.min,
       Right(dataset.provenance.topmostSameAs),
       dataset.identification.name,
+      dataset.identification.title,
       project.visibility,
       dataset.provenance.date,
       dataset.provenance.creators.map(_.name).toList.sorted,

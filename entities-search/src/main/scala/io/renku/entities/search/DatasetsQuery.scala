@@ -35,6 +35,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
 
   val matchingScoreVar        = VarName("matchingScore")
   val nameVar                 = VarName("name")
+  val titleVar                = VarName("title")
   val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
@@ -50,6 +51,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     entityTypeVar,
     matchingScoreVar,
     nameVar,
+    titleVar,
     idsPathsVisibilitiesVar,
     sameAsVar,
     maybeDateCreatedVar,
@@ -68,6 +70,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
           |       $nameVar
+          |       $titleVar
           |       $idsPathsVisibilitiesVar
           |       $sameAsVar
           |       $maybeDateCreatedVar
@@ -123,7 +126,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |
           |  Graph schema:Dataset {
           |    # name
-          |    $sameAsVar renku:slug $nameVar
+          |    $sameAsVar renku:slug $nameVar;
+          |               schema:name $titleVar.
           |
           |    #description
           |    $description
@@ -336,6 +340,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     for {
       matchingScore <- read[MatchingScore](matchingScoreVar)
       name          <- read[datasets.Name](nameVar)
+      title         <- read[datasets.Title](titleVar)
       sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
       pathAndVisibility <- read[Option[String]](idsPathsVisibilitiesVar)
                              .flatMap(toListOfIdsPathsAndVisibilities)
@@ -356,6 +361,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       matchingScore,
       Right(sameAs),
       name,
+      title,
       pathAndVisibility._2,
       date,
       creators,

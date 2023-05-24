@@ -61,6 +61,7 @@ object model {
         matchingScore:       MatchingScore,
         sameAs:              Either[datasets.Identifier, datasets.TopmostSameAs],
         name:                datasets.Name,
+        title:               datasets.Title,
         visibility:          projects.Visibility,
         date:                datasets.CreatedOrPublished,
         creators:            List[persons.Name],
