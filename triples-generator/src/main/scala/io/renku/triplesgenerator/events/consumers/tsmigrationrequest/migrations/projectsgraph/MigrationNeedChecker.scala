@@ -24,9 +24,12 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
+import io.renku.entities.searchgraphs.projects.ProjectSearchInfoOntology
+import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait MigrationNeedChecker[F[_]] {
@@ -42,23 +45,26 @@ private class MigrationNeedCheckerImpl[F[_]: MonadThrow](tsClient: TSClient[F]) 
 
   override def checkMigrationNeeded: F[ConditionedMigration.MigrationRequired] =
     tsClient.queryExpecting[Int](query).map {
-      case 0       => ConditionedMigration.MigrationRequired.No("all v9 projects migrated")
-      case nonZero => ConditionedMigration.MigrationRequired.Yes(s"$nonZero v9 projects for migration")
+      case 0       => ConditionedMigration.MigrationRequired.No("all projects present in the Projects graph")
+      case nonZero => ConditionedMigration.MigrationRequired.Yes(s"$nonZero projects not present in the Projects graph")
     }
 
   private lazy val query = SparqlQuery.ofUnsafe(
     show"${ProvisionProjectsGraph.name} - check migration needed",
-    Prefixes of (schema -> "schema", renku -> "renku", xsd -> "xsd"),
-    s"""|SELECT (COUNT(DISTINCT ?path) AS ?cnt)
-        |WHERE {
-        |  GRAPH ?id {
-        |    ?id a schema:Project;
-        |        schema:schemaVersion '9';
-        |        renku:projectPath ?path.
-        |  }
-        |}
-        |LIMIT 1
-        |""".stripMargin
+    Prefixes of schema -> "schema",
+    sparql"""|SELECT (COUNT(DISTINCT ?id) AS ?cnt)
+             |WHERE {
+             |  GRAPH ?id {
+             |    ?id a schema:Project
+             |  }
+             |  FILTER NOT EXISTS {
+             |    GRAPH ${GraphClass.Projects.id} {
+             |      ?id a ${ProjectSearchInfoOntology.typeDef.clazz.id}
+             |    }
+             |  }
+             |}
+             |LIMIT 1
+             |""".stripMargin
   )
 
   import io.renku.triplesstore.ResultsDecoder._

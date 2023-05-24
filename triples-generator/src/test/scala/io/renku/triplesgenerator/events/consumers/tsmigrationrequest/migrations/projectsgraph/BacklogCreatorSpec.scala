@@ -98,6 +98,7 @@ class BacklogCreatorSpec
   implicit override val ioLogger: Logger[IO]     = logger
 
   private trait TestCase {
+
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val backlogCreator =
       new BacklogCreatorImpl[IO](RecordsFinder[IO](projectsDSConnectionInfo), TSClient[IO](migrationsDSConnectionInfo))
