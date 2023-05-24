@@ -26,23 +26,23 @@ import org.scalacheck.Gen
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import pureconfig.ConfigSource
 import scodec.bits.Bases.Alphabets
 import scodec.bits.ByteVector
 
-class SecretSpec extends AnyWordSpec with should.Matchers with EitherValues {
+class SecretSpec extends AnyWordSpec with should.Matchers with EitherValues with ScalaCheckPropertyChecks {
 
   "secretReader" should {
 
     val keyName = "secret"
 
     "decode Base64 encoded secret" in {
+      forAll(aesCryptoSecrets) { secret =>
+        val config = ConfigFactory.parseString(s"""$keyName = "${secret.toBase64}"""")
 
-      val secret = aesCryptoSecrets.generateOne
-
-      val config = ConfigFactory.parseString(s"""$keyName = "${secret.toBase64}"""")
-
-      ConfigSource.fromConfig(config).at(keyName).load[Secret].value.toBase64 shouldBe secret.toBase64
+        ConfigSource.fromConfig(config).at(keyName).load[Secret].value.toBase64 shouldBe secret.toBase64
+      }
     }
 
     "decode Base64 encoded secret ending with LF char" in {

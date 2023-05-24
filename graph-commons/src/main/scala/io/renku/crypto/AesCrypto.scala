@@ -70,9 +70,9 @@ object AesCrypto {
   object Secret {
 
     def apply(value: ByteVector): Either[String, Secret] = {
-      val expectedLength = 16
-      if (value.length == expectedLength) Right(new Secret(value))
-      else Left(s"Expected $expectedLength bytes, but got ${value.length}")
+      val expectedLengths = List(16L, 24L, 32L)
+      if (expectedLengths.contains(value.length)) Right(new Secret(value))
+      else Left(s"Expected ${expectedLengths.mkString(" or ")} bytes, but got ${value.length}")
     }
 
     def unsafe(value: ByteVector): Secret = apply(value).fold(sys.error, identity)
