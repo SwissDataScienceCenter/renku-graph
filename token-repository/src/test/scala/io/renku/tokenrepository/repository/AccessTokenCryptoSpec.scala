@@ -110,7 +110,7 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
       val Failure(exception) = AccessTokenCrypto[Try](config)
 
       exception          shouldBe a[ConfigLoadingException]
-      exception.getMessage should include("Expected 16 bytes, but got 15")
+      exception.getMessage should include("Expected 16 or 24 or 32 bytes, but got 15")
     }
   }
 
