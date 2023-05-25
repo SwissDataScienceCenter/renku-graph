@@ -5,10 +5,10 @@
   # Alternatively, run `nix develop` to drop into a bash shell.
   #
   # Look for packages here:
-  # https://search.nixos.org/packages?channel=22.05
+  # https://search.nixos.org/packages?channel=22.11
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-22.05";
+    nixpkgs.url = "nixpkgs/nixos-22.11";
     utils.url = "github:numtide/flake-utils";
   };
 
