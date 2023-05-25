@@ -70,7 +70,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
              |    (GROUP_CONCAT($encodedImageUrlVar; separator=',') AS $imagesVar)
              |  WHERE {
-             |    BIND ('project' AS $entityTypeVar)
+             |    BIND (${entityType.value.asTripleObject} AS $entityTypeVar)
              |
              |    # textQuery
              |    ${textQueryPart(criteria.filters.maybeQuery)}
