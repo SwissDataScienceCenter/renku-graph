@@ -32,14 +32,17 @@ import io.renku.testtools.IOSpec
 import io.renku.tinytypes.StringTinyType
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.TestSuite
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 
 trait FinderSpecOps {
   self: TestSuite with InMemoryJenaForSpec with ProjectsDataset with IOSpec =>
 
+  protected implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  implicit val ioLogger:         Logger[IO]     = logger
+
   protected[search] trait TestCase {
-    implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
     val finder: EntitiesFinder[IO] = new EntitiesFinderImpl[IO](projectsDSConnectionInfo, EntitiesFinder.newFinders)
   }

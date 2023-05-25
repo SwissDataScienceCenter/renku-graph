@@ -21,8 +21,9 @@ package io.renku.entities.search
 import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.triplesstore.ResultsDecoder
+import io.renku.triplesstore.client.sparql.VarName
 
-private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder {
+private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with EntityQueryVars {
   val entityType:      EntityType
   val selectVariables: Set[String]
   def query(criteria: Criteria): Option[String]
@@ -30,4 +31,9 @@ private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder {
 
   def getDecoder[EE >: E](entityType: EntityType): Option[Decoder[EE]] =
     Option.when(entityType == this.entityType)(decoder[EE])
+}
+
+private[entities] object EntityQueryVars extends EntityQueryVars
+private[entities] trait EntityQueryVars {
+  val entityTypeVar = VarName("entityType")
 }

@@ -33,7 +33,6 @@ import io.renku.triplesstore.client.syntax._
 object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
 
-  val entityTypeVar           = VarName("entityType")
   val matchingScoreVar        = VarName("matchingScore")
   val nameVar                 = VarName("name")
   val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
@@ -97,7 +96,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |          $sameAsVar schema:creator / schema:name ?creatorName.
           |        }
           |
-          |        #keywords, description
+          |        #keywords
           |        $keywords
           |
           |        # resolve project
