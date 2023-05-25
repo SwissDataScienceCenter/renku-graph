@@ -43,6 +43,8 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   // local vars
   private val projectIdVar       = VarName("projectId")
+  private val someDateVar        = VarName("someDate")
+  private val someCreatorNameVar = VarName("someCreatorName")
   private val keywordVar         = VarName("keyword")
   private val encodedImageUrlVar = VarName("encodedImageUrl")
 
@@ -61,8 +63,11 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
-             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar $dateVar $maybeCreatorNameVar
-             |    $maybeDescriptionVar (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
+             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar
+             |    (MIN($someDateVar) AS $dateVar)
+             |    (SAMPLE($someCreatorNameVar) AS $maybeCreatorNameVar)
+             |    $maybeDescriptionVar
+             |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
              |    (GROUP_CONCAT($encodedImageUrlVar; separator=',') AS $imagesVar)
              |  WHERE {
              |    BIND ('project' AS $entityTypeVar)
@@ -74,24 +79,24 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
              |                    renku:projectPath $pathVar;
-             |                    schema:dateCreated $dateVar.
+             |                    schema:dateCreated $someDateVar.
+             |
+             |      ${filters.maybeOnDateCreated(someDateVar)}
              |
              |      GRAPH $projectIdVar {
              |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
              |        ${namespacesPart(criteria.filters.namespaces)}
              |      }
-             |      
-             |      ${filters.maybeOnDateCreated(dateVar)}
-             |      ${filters.maybeOnCreatorName(maybeCreatorNameVar)}
              |
-             |      OPTIONAL { $projectIdVar schema:creator/schema:name $maybeCreatorNameVar }
+             |      OPTIONAL { $projectIdVar schema:creator/schema:name $someCreatorNameVar }
+             |      ${filters.maybeOnCreatorName(someCreatorNameVar)}
+             |
              |      OPTIONAL { $projectIdVar schema:description $maybeDescriptionVar }
              |      OPTIONAL { $projectIdVar schema:keywords $keywordVar }
              |      $imagesPart
              |    }
              |  }
-             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $pathVar
-             |    $visibilityVar $dateVar $maybeCreatorNameVar $maybeDescriptionVar
+             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar $maybeDescriptionVar
              |}
              |""".stripMargin.sparql
   }
