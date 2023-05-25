@@ -94,7 +94,8 @@ object DatasetQuery extends (Criteria => Option[SparqlQuery]) {
                |    }
                |
                |    Graph ${GraphClass.Datasets.id} {
-               |      ${v.datasetSameAs} renku:slug ${v.datasetName}.
+               |      ${v.datasetSameAs} renku:slug ${v.datasetName};
+               |                         schema:name ${v.datasetTitle}.
                |
                |      Optional {
                |        ${v.datasetSameAs} schema:description ${v.description}.
