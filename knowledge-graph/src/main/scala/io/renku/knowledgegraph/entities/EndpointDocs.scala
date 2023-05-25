@@ -156,6 +156,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       MatchingScore(1),
       Left(datasets.Identifier("123444")),
       datasets.Name("name"),
+      datasets.Title("title"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       List(persons.Name("Jan Kowalski")),
