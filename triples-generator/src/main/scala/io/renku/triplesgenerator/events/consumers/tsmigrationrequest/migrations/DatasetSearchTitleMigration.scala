@@ -1,59 +1,44 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
-import cats.data.EitherT
-import cats.effect.Async
+import cats.effect._
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import fs2.Stream
-import io.circe.Decoder
-import io.renku.graph.model.{GraphClass, Schemas, datasets}
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery, RegisteredMigration}
+import io.renku.graph.model.{GraphClass, Schemas}
+import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.client.syntax.FragmentStringContext
-import io.renku.triplesstore.{SparqlQuery, TSClient}
+import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
-private class DatasetSearchTitleMigration[F[_]: Async: Logger](
-    tsClient:          TSClient[F],
-    executionRegister: MigrationExecutionRegister[F],
-    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends RegisteredMigration[F](ProjectsDateViewedCreator.name, executionRegister, recoveryStrategy) {
-  val chunkSize = 100
-  protected override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = ???
+private object DatasetSearchTitleMigration {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
+    UpdateQueryMigration[F](name, query).widen
 
+  private lazy val name = Migration.Name("Insert dataset title into the dataset search graph")
 
-  def queryAll: Stream[F, DatasetSearchTitleMigration.DsTitle] =
-    Stream
-      .iterate(0)(_ + chunkSize)
-      .covary[F]
-      .evalMap(sz => tsClient.queryExpecting[List[DatasetSearchTitleMigration.DsTitle]](query(chunkSize, sz)))
-      .flatMap(el => fs2.Stream.emits(el))
-
-  def query(limit: Int, offset: Int) = SparqlQuery.of(
-    "dataset title query",
-    Prefixes.of(Schemas.renku -> "renku"),
-    sparql"""
-            |SELECT DISTINCT ?sameAs ?title
-            |WHERE {
-            |  Graph ?id {
-            |    ?id a schema:Project.
-            |    ?dsId a schema:Dataset;
-            |          renku:topmostSameAs ?sameAs;
-            |          schema:identifier ?identifier;
-            |          schema:name ?title.
-            |  }
-            |}
-            |ORDER BY ?sameAs ?title
-            |LIMIT $limit
-            |OFFSET $offset
-            |""".stripMargin
+  private[migrations] lazy val query = SparqlQuery.of(
+    name.asRefined,
+    Prefixes.of(Schemas.schema -> "schema", Schemas.renku -> "renku"),
+    sparql"""|INSERT {
+             |  Graph ${GraphClass.Datasets.id} {
+             |    ?sameAs schema:name ?title
+             |  }
+             |}
+             |WHERE {
+             |  Graph ${GraphClass.Datasets.id} {
+             |    ?sameAs a renku:DiscoverableDataset;
+             |       renku:datasetProjectLink ?link.
+             |
+             |    ?link renku:project ?projectId;
+             |          renku:dataset ?dsId
+             |  }
+             |
+             |  Graph ?projectId {
+             |    ?dsId schema:name ?title
+             |  }
+             |}
+             |""".stripMargin
   )
-}
-
-object DatasetSearchTitleMigration {
-  final case class DsTitle(sameAs: datasets.TopmostSameAs, title: datasets.Title)
-
-  object DsTitle {
-    implicit def decoder: Decoder[DsTitle] = ???
-  }
 }
