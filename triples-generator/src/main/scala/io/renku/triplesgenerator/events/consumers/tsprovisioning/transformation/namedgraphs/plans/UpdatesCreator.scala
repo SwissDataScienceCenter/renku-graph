@@ -19,35 +19,37 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.plans
 
 import eu.timepit.refined.auto._
-import io.renku.graph.model.{GraphClass, plans, projects}
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.entities.StepPlan
-import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{GraphClass, plans, projects}
+import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.syntax._
 
 private object UpdatesCreator extends UpdatesCreator
 
 private trait UpdatesCreator {
 
-  def queriesDeletingDate(projectId:        projects.ResourceId,
-                          stepPlan:         StepPlan,
-                          maybeDateCreated: Option[plans.DateCreated]
-  ): List[SparqlQuery] = Option
-    .when(!maybeDateCreated.forall(_ == stepPlan.dateCreated)) {
-      SparqlQuery.of(
-        name = "transformation - delete activity author link",
-        Prefixes of (schema -> "schema", prov -> "prov"),
-        s"""|DELETE { GRAPH <${GraphClass.Project.id(projectId)}> { ?planId schema:dateCreated ?dateCreated } }
-            |WHERE {
-            |  BIND (${stepPlan.resourceId.showAs[RdfResource]} AS ?planId)
-            |  GRAPH <${GraphClass.Project.id(projectId)}> {
-            |    ?planId a prov:Plan;
-            |            schema:dateCreated ?dateCreated
-            |  }
-            |}
-            |""".stripMargin
-      )
-    }
-    .toList
+  def queriesDeletingDate(projectId:      projects.ResourceId,
+                          stepPlan:       StepPlan,
+                          tsCreatedDates: List[plans.DateCreated]
+  ): List[SparqlQuery] =
+    Option
+      .when(tsCreatedDates.size > 1 || !tsCreatedDates.forall(_ == stepPlan.dateCreated)) {
+        SparqlQuery.of(
+          name = "transformation - delete activity author link",
+          Prefixes of (schema -> "schema", prov -> "prov"),
+          sparql"""|DELETE { GRAPH ${GraphClass.Project.id(projectId)} { ?planId schema:dateCreated ?dateCreated } }
+                   |WHERE {
+                   |  BIND (${stepPlan.resourceId.asEntityId} AS ?planId)
+                   |  GRAPH ${GraphClass.Project.id(projectId)} {
+                   |    ?planId a prov:Plan;
+                   |            schema:dateCreated ?dateCreated
+                   |  }
+                   |}
+                   |""".stripMargin
+        )
+      }
+      .toList
 }

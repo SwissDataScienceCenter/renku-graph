@@ -19,14 +19,18 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.plans
 
 import cats.effect.IO
-import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.GraphModelGenerators.projectResourceIds
-import io.renku.graph.model.entities
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities, plans}
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.client.model.Quad
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,9 +42,9 @@ class KGInfoFinderSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
-  "findDateCreated" should {
+  "findCreatedDates" should {
 
-    "return plan's dateCreated" in new TestCase {
+    "return the sole plan's dateCreated" in new TestCase {
 
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
@@ -51,13 +55,37 @@ class KGInfoFinderSpec
 
       upload(to = projectsDataset, project)
 
-      kgInfoFinder.findDateCreated(project.resourceId, plan.resourceId).unsafeRunSync() shouldBe plan.dateCreated.some
+      kgInfoFinder.findCreatedDates(project.resourceId, plan.resourceId).unsafeRunSync() shouldBe List(plan.dateCreated)
+    }
+
+    "return all plan's dateCreated" in new TestCase {
+
+      val project = anyRenkuProjectEntities
+        .withActivities(activityEntities(stepPlanEntities()))
+        .generateOne
+        .to[entities.RenkuProject]
+
+      val plan = project.plans.headOption.getOrElse(fail("Plan expected"))
+
+      upload(to = projectsDataset, project)
+
+      val otherDate = timestampsNotInTheFuture(butYoungerThan = plan.dateCreated.value).generateOne
+      insert(to = projectsDataset,
+             Quad(GraphClass.Project.id(project.resourceId),
+                  plan.resourceId.asEntityId,
+                  schema / "dateCreated",
+                  otherDate.asTripleObject
+             )
+      )
+
+      kgInfoFinder.findCreatedDates(project.resourceId, plan.resourceId).unsafeRunSync() shouldBe
+        List(plans.DateCreated(otherDate), plan.dateCreated).sorted
     }
 
     "return no dateCreated if there's no Plan with the given id" in new TestCase {
       kgInfoFinder
-        .findDateCreated(projectResourceIds.generateOne, planResourceIds.generateOne)
-        .unsafeRunSync() shouldBe Option.empty
+        .findCreatedDates(projectResourceIds.generateOne, planResourceIds.generateOne)
+        .unsafeRunSync() shouldBe Nil
     }
   }
 
