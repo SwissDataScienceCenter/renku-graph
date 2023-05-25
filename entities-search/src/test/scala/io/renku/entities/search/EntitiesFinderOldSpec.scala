@@ -142,7 +142,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which name matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val person = personEntities
         .map(replacePersonName(to = sentenceContaining(query).generateAs(persons.Name)))
@@ -189,7 +189,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which keywords matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -235,7 +235,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which description matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -273,7 +273,7 @@ class EntitiesFinderOldSpec
     }
 
     "return project entities which namespace matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
@@ -290,7 +290,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which creator name matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val projectCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -991,7 +991,7 @@ class EntitiesFinderOldSpec
 
     "be sorting by Matching Score if requested" in new OldTestCase {
 
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
