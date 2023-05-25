@@ -26,7 +26,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog
 import io.renku.eventlog.api.events.StatusChangeEvent
-import io.renku.events.CategoryName
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -59,8 +58,6 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
       .recoverWith(maybeRecoverableError[F, ConditionedMigration.MigrationRequired])
   }
 
-  private val cleanUpEventCategory = CategoryName("CLEAN_UP_REQUEST")
-
   protected[projectsgraph] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     backlogCreator.createBacklog() >>
       Logger[F].info(show"$categoryName: $name backlog created") >>
@@ -70,7 +67,7 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
         .takeThrough(_.nonEmpty)
         .flatMap(Stream.emits(_))
         .evalMap(path => findProgressInfo.map(path -> _))
-        .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
+        .evalTap { case (path, info) => logInfo(show"sending RedoProjectTransformation event for '$path'", info) }
         .evalTap { case (path, _) => elClient.send(StatusChangeEvent.RedoProjectTransformation(path)) }
         .evalTap { case (path, _) => noteDone(path) }
         .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
