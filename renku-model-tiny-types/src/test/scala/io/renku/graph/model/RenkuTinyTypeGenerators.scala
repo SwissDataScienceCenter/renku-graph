@@ -64,7 +64,7 @@ trait RenkuTinyTypeGenerators {
     val nonFirstCharGen = Gen.frequency(13 -> Gen.alphaChar, 6 -> Gen.numChar, 1 -> Gen.oneOf("!#$&*+-/=?_~.".toList))
     val beforeAts = for {
       firstChar  <- firstCharGen
-      otherChars <- Generators.nonEmptyList(nonFirstCharGen, min = 5, max = 10)
+      otherChars <- Generators.nonEmptyList(nonFirstCharGen, min = 5, max = 10).suchThat(_.count(_ == '#') <= 1)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
 
     for {
