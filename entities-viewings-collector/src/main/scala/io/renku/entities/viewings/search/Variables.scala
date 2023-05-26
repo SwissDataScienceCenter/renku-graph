@@ -36,8 +36,8 @@ object Variables {
 
     val matchingScore     = VarName("matchingScore")
     val entityType        = VarName("entityType")
+    val datasetSlug       = VarName("datasetSlug")
     val datasetName       = VarName("datasetName")
-    val datasetTitle      = VarName("datasetTitle")
     val datasetSameAs     = VarName("datasetSameAs")
     val dateCreated       = VarName("dateCreated")
     val datePublished     = VarName("datePublished")
@@ -54,8 +54,8 @@ object Variables {
     lazy val all: List[VarName] = List(
       matchingScore,
       entityType,
+      datasetSlug,
       datasetName,
-      datasetTitle,
       datasetSameAs,
       dateCreated,
       datePublished,
@@ -73,8 +73,8 @@ object Variables {
     def decoder: Decoder[SearchEntity.Dataset] = { implicit cursor =>
       for {
         matchingScore      <- read[MatchingScore](matchingScore)
+        slug               <- read[datasets.Slug](datasetSlug)
         name               <- read[datasets.Name](datasetName)
-        title              <- read[datasets.Title](datasetTitle)
         sameAs             <- read[datasets.TopmostSameAs](datasetSameAs)
         path               <- read[projects.Path](projectPath)
         visibility         <- read[projects.Visibility](projectVisibility)
@@ -93,8 +93,8 @@ object Variables {
       } yield SearchEntity.Dataset(
         matchingScore,
         Right(sameAs),
+        slug,
         name,
-        title,
         visibility,
         date,
         creators,

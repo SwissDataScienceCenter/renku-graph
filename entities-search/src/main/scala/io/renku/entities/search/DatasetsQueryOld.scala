@@ -56,7 +56,7 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
     "?entityType",
     "?matchingScore",
     "?name",
-    "?title",
+    "?slug",
     "?idsPathsVisibilities",
     "?sameAs",
     "?maybeDateCreated",
@@ -74,12 +74,12 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
     import criteria._
     // format: off
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?name ?title ?idsPathsVisibilities ?sameAs
+        |  SELECT ?entityType ?matchingScore ?name ?slug ?idsPathsVisibilities ?sameAs
         |    ?maybeDateCreated ?maybeDatePublished ?date
         |    ?creatorsNames ?maybeDescription ?keywords ?images
         |  WHERE {
         |    {
-        |      SELECT ?sameAs ?name ?title ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
+        |      SELECT ?sameAs ?name ?slug ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
         |        (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS ?idsPathsVisibilities)
         |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
@@ -140,8 +140,8 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
         |          ?projectId renku:projectNamespace ?namespace;
         |                     renku:projectPath ?projectPath.
         |          ?dsId schema:identifier ?identifier;
-        |                schema:name ?title;
-        |                renku:slug ?name.
+        |                schema:name ?name;
+        |                renku:slug ?slug.
         |          ${criteria.maybeOnAccessRightsAndVisibility("?projectId", "?visibility")}
         |          BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
         |          ${filters.maybeOnNamespace("?namespace")}
@@ -170,7 +170,7 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
         |          }
         |        }
         |      }
-        |      GROUP BY ?sameAs ?name ?title ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
+        |      GROUP BY ?sameAs ?name ?slug ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |    BIND ('dataset' AS ?entityType)
@@ -225,7 +225,7 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
     for {
       matchingScore <- extract[MatchingScore]("matchingScore")
       name          <- extract[datasets.Name]("name")
-      title         <- extract[datasets.Title]("title")
+      slug          <- extract[datasets.Slug]("slug")
       sameAs        <- extract[datasets.SameAs]("sameAs")
       idPathAndVisibility <- extract[Option[String]]("idsPathsVisibilities")
                                .flatMap(toListOfIdsPathsAndVisibilities)
@@ -241,8 +241,8 @@ private case object DatasetsQueryOld extends EntityQuery[model.Entity.Dataset] {
       images    <- extract[Option[String]]("images") >>= toListOfImageUris
     } yield Entity.Dataset(matchingScore,
                            Left(idPathAndVisibility._1),
+                           slug,
                            name,
-                           title,
                            idPathAndVisibility._3,
                            date,
                            creators,

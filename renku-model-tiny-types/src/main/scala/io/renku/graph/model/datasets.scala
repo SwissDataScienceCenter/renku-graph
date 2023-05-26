@@ -74,6 +74,9 @@ object datasets {
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
+  final class Slug private (val value: String) extends AnyVal with StringTinyType
+  implicit object Slug extends TinyTypeFactory[Slug](new Slug(_)) with NonBlank[Slug] with TinyTypeJsonLDOps[Slug]
+
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))

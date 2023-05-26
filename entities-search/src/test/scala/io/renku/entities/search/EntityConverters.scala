@@ -18,6 +18,7 @@
 
 package io.renku.entities.search
 
+import io.renku.graph.model.datasets
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model._
 import io.renku.graph.model.testentities.{Entity => _, _}
@@ -44,8 +45,8 @@ private object EntityConverters {
     Entity.Dataset(
       MatchingScore.min,
       Right(dataset.provenance.topmostSameAs),
-      dataset.identification.name,
-      dataset.identification.title,
+      datasets.Slug(dataset.identification.name.value),
+      datasets.Name(dataset.identification.title.value),
       project.visibility,
       dataset.provenance.date,
       dataset.provenance.creators.map(_.name).toList.sorted,

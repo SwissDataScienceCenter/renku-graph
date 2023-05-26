@@ -34,8 +34,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val entityType: Filters.EntityType = Filters.EntityType.Dataset
 
   val matchingScoreVar        = VarName("matchingScore")
+  val slugVar                 = VarName("slug")
   val nameVar                 = VarName("name")
-  val titleVar                = VarName("title")
   val idsPathsVisibilitiesVar = VarName("idsPathsVisibilities")
   val sameAsVar               = VarName("sameAs")
   val maybeDateCreatedVar     = VarName("maybeDateCreated")
@@ -50,8 +50,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
   override val selectVariables = Set(
     entityTypeVar,
     matchingScoreVar,
+    slugVar,
     nameVar,
-    titleVar,
     idsPathsVisibilitiesVar,
     sameAsVar,
     maybeDateCreatedVar,
@@ -69,8 +69,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       fr"""{
           |SELECT DISTINCT $entityTypeVar
           |       $matchingScoreVar
+          |       $slugVar
           |       $nameVar
-          |       $titleVar
           |       $idsPathsVisibilitiesVar
           |       $sameAsVar
           |       $maybeDateCreatedVar
@@ -126,8 +126,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |
           |  Graph schema:Dataset {
           |    # name
-          |    $sameAsVar renku:slug $nameVar;
-          |               schema:name $titleVar.
+          |    $sameAsVar renku:slug $slugVar;
+          |               schema:name $nameVar.
           |
           |    #description
           |    $description
@@ -339,8 +339,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
 
     for {
       matchingScore <- read[MatchingScore](matchingScoreVar)
+      slug          <- read[datasets.Slug](slugVar)
       name          <- read[datasets.Name](nameVar)
-      title         <- read[datasets.Title](titleVar)
       sameAs        <- read[datasets.TopmostSameAs](sameAsVar)
       pathAndVisibility <- read[Option[String]](idsPathsVisibilitiesVar)
                              .flatMap(toListOfIdsPathsAndVisibilities)
@@ -360,8 +360,8 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
     } yield Entity.Dataset(
       matchingScore,
       Right(sameAs),
+      slug,
       name,
-      title,
       pathAndVisibility._2,
       date,
       creators,
