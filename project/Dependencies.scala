@@ -7,6 +7,7 @@ object Dependencies {
     val ammonite               = "2.4.1"
     val catsCore               = "2.9.0"
     val catsEffect             = "3.4.11"
+    val catsEffectScalaTest    = "1.5.0"
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
@@ -120,6 +121,10 @@ object Dependencies {
 
   val catsEffect = Seq(
     "org.typelevel" %% "cats-effect" % V.catsEffect
+  )
+
+  val catsEffectScalaTest = Seq(
+    "org.typelevel" %% "cats-effect-testing-scalatest" % V.catsEffectScalaTest
   )
 
   val log4Cats = Seq(

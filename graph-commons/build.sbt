@@ -36,6 +36,7 @@ libraryDependencies ++=
 
 // Test dependencies
 libraryDependencies ++=
-  (Dependencies.testContainersPostgres ++
+  (Dependencies.catsEffectScalaTest ++
+    Dependencies.testContainersPostgres ++
     Dependencies.wiremock ++
     Dependencies.scalamock).map(_ % Test)
