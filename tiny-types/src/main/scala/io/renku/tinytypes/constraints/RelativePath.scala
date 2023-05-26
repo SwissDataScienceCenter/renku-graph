@@ -25,7 +25,7 @@ trait RelativePath[TT <: TinyType { type V = String }] extends Constraints[TT] w
   self: TinyTypeFactory[TT] =>
 
   addConstraint(
-    check = value => !value.startsWith("/") && !value.endsWith("/") && !value.matches("^\\w+://.*"),
+    check = value => !value.startsWith("/") && !value.matches("^\\w+://.*"),
     message = value => s"'$value' is not a valid $typeName"
   )
 }
