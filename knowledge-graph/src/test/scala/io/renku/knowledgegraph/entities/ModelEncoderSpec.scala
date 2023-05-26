@@ -217,8 +217,8 @@ object ModelEncoderSpec {
   case class JsonDataset(
       _links:        List[Href],
       matchingScore: MatchingScore,
-      name:          datasets.Name,
-      title:         datasets.Title,
+      slug:          datasets.Name,
+      name:          datasets.Title,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
       creators:      List[persons.Name],
