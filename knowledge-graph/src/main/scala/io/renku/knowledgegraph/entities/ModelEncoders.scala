@@ -98,8 +98,8 @@ trait ModelEncoders {
       json"""{
         "type":          ${Criteria.Filters.EntityType.Dataset.value},
         "matchingScore": ${ds.matchingScore},
-        "name":          ${ds.name},
-        "title":         ${ds.title},
+        "name":          ${ds.title},
+        "slug":          ${ds.name},
         "visibility":    ${ds.visibility},
         "date":          ${ds.date},
         "creators":      ${ds.creators},

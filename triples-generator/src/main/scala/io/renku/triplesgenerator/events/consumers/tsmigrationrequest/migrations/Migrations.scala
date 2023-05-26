@@ -45,6 +45,7 @@ private[tsmigrationrequest] object Migrations {
     projectDateViewedDeduplicator  <- ProjectDateViewedDeduplicator[F]
     personViewedEntityDeduplicator <- PersonViewedEntityDeduplicator[F]
     provisionProjectsGraph         <- projectsgraph.ProvisionProjectsGraph[F]
+    datasetTitleMigration          <- DatasetSearchTitleMigration[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -57,7 +58,8 @@ private[tsmigrationrequest] object Migrations {
                     projectsDateViewedCreator,
                     projectDateViewedDeduplicator,
                     personViewedEntityDeduplicator,
-                    provisionProjectsGraph
+                    provisionProjectsGraph,
+                    datasetTitleMigration
                   )
   } yield migrations
 
