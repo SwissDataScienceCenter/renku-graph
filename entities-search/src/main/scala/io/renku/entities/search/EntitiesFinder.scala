@@ -91,7 +91,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQu
     import io.circe.DecodingFailure
     import io.renku.triplesstore.ResultsDecoder._
 
-    extract[EntityType]("entityType") >>= { entityType =>
+    read[EntityType](EntityQueryVars.entityTypeVar) >>= { entityType =>
       entityQueries.flatMap(_.getDecoder(entityType)) match {
         case Nil            => DecodingFailure(s"No decoder for $entityType", Nil).asLeft
         case decoder :: Nil => cursor.as(decoder)

@@ -18,21 +18,18 @@
 
 package io.renku.entities.search
 
-import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.interpreters.TestLogger
+import io.renku.graph.model.{GraphClass, Schemas}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.typelevel.log4cats.Logger
 
 class GraphPopulateSpec
     extends AnyFlatSpec
@@ -43,8 +40,6 @@ class GraphPopulateSpec
     with ProjectsDataset
     with SearchInfoDatasets
     with IOSpec {
-
-  implicit val ioLogger: Logger[IO] = TestLogger[IO]()
 
   it should "populate the schema:Datasets graph" in {
     val project = renkuProjectEntities(visibilityPublic)

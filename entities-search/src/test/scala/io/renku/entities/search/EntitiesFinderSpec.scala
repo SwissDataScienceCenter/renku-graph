@@ -19,7 +19,6 @@
 package io.renku.entities.search
 
 import cats.data.NonEmptyList
-import cats.effect.IO
 import cats.syntax.all._
 import io.renku.entities.search
 import io.renku.entities.search.Criteria.Filters._
@@ -43,8 +42,6 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.temporal.ChronoUnit.DAYS
 import java.time.{Instant, LocalDate, ZoneOffset}
@@ -61,8 +58,6 @@ class EntitiesFinderSpec
     with ProjectsDataset
     with SearchInfoDatasets
     with IOSpec {
-
-  implicit val ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "findEntities - no filters" should {
 
