@@ -123,12 +123,6 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val endpoint = new CreateTokenEndpointImpl[IO](tokensCreator)
 
-    def givenTokenValidation(projectId: projects.GitLabId, accessToken: AccessToken, returning: IO[Boolean]) =
-      (tokenValidator
-        .checkValid(_: GitLabId, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(returning)
-
     def givenTokenCreation(projectId: projects.GitLabId, accessToken: AccessToken, returning: IO[Unit]) =
       (tokensCreator
         .create(_: GitLabId, _: AccessToken))

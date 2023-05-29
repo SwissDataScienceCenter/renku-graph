@@ -18,54 +18,42 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.effect.MonadCancelThrow
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.GitLabId
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
-import skunk.data.Completion
-import skunk.implicits._
+
+import scala.util.control.NonFatal
 
 private[repository] trait TokenRemover[F[_]] {
-  def delete(projectId: GitLabId): F[Unit]
+  def delete(projectId: GitLabId, accessToken: AccessToken): F[Unit]
 }
 
 private[repository] object TokenRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]: TokenRemover[F] =
-    new TokenRemoverImpl[F]
+  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes]: F[TokenRemover[F]] =
+    RevokeCandidatesFinder[F].map(new TokenRemoverImpl[F](PersistedTokenRemover[F], _, TokenRevoker[F]))
 }
 
-private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
-    extends DbClient[F](Some(QueriesExecutionTimes[F]))
-    with TokenRemover[F]
-    with TokenRepositoryTypeSerializers {
+private class TokenRemoverImpl[F[_]: MonadThrow: Logger](dbTokenRemover: PersistedTokenRemover[F],
+                                                         revokeCandidatesFinder: RevokeCandidatesFinder[F],
+                                                         tokenRevoker:           TokenRevoker[F]
+) extends TokenRemover[F] {
 
-  override def delete(projectId: GitLabId): F[Unit] =
-    SessionResource[F].useK {
-      query(projectId)
-    }
+  import revokeCandidatesFinder._
+  import tokenRevoker._
 
-  private def query(projectId: GitLabId) = measureExecutionTime {
-    SqlStatement
-      .named("remove token")
-      .command[GitLabId](sql"""DELETE FROM projects_tokens
-                         WHERE project_id = $projectIdEncoder""".command)
-      .arguments(projectId)
-      .build
-      .flatMapResult(failIfMultiUpdate(projectId))
-  }
+  override def delete(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
+    dbTokenRemover.delete(projectId) >> tryRevokingOldTokens(projectId, accessToken)
 
-  private def failIfMultiUpdate(projectId: GitLabId): Completion => F[Unit] = {
-    case Completion.Delete(0) => ().pure[F]
-    case Completion.Delete(1) => Logger[F].info(show"token removed for $projectId")
-    case Completion.Delete(n) =>
-      new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
-        .raiseError[F, Unit]
-    case completion =>
-      new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
-        .raiseError[F, Unit]
-  }
+  private def tryRevokingOldTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
+    findTokensToRemove(projectId, accessToken)
+      .flatMap(_.map(revokeToken(projectId, _, accessToken)).sequence)
+      .void
+      .recoverWith { case NonFatal(ex) =>
+        Logger[F].warn(ex)(show"removing old token in GitLab for project $projectId failed")
+      }
 }

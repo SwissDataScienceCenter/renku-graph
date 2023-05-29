@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory

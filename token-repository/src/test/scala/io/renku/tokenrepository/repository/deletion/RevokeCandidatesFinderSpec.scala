@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package deletion
 
-import Generators._
-import TokenDates.ExpiryDate
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -38,6 +37,8 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import org.http4s._
 import org.http4s.implicits._
 import org.scalacheck.Gen

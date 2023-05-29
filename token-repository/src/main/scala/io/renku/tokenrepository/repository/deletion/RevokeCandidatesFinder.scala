@@ -16,23 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package deletion
 
-import TokenDates.ExpiryDate
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 
 import java.time.LocalDate.now
 import java.time.Period
 
-private trait RevokeCandidatesFinder[F[_]] {
+private[repository] trait RevokeCandidatesFinder[F[_]] {
   def findTokensToRemove(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]]
 }
 
-private object RevokeCandidatesFinder {
+private[repository] object RevokeCandidatesFinder {
   def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
     (ProjectTokenDuePeriod[F](), RenkuAccessTokenName[F]())
       .mapN(new RevokeCandidatesFinderImpl[F](PerPage(50), _, _))

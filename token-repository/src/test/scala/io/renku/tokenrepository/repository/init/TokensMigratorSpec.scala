@@ -26,7 +26,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import creation.TokenDates.{CreatedAt, ExpiryDate}
 import creation._
-import deletion.TokenRemover
+import deletion.PersistedTokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
@@ -228,7 +228,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val tokenCrypto     = mock[AccessTokenCrypto[IO]]
     private val tokenValidator  = mock[TokenValidator[IO]]
-    private val tokenRemover    = TokenRemover[IO]
+    private val tokenRemover    = PersistedTokenRemover[IO]
     private val tokensCreator   = mock[NewTokensCreator[IO]]
     private val tokensPersister = TokensPersister[IO]
     val migration = new TokensMigrator[IO](tokenCrypto,

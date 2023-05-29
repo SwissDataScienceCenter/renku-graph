@@ -21,14 +21,8 @@ package io.renku.http.server.security
 import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
-import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.model._
-import org.http4s.AuthScheme.Bearer
-import org.http4s.Credentials.Token
-import org.http4s.headers.Authorization
 import org.http4s.{AuthedRoutes, Request}
-import org.typelevel.ci._
 
 private trait Authentication[F[_]] {
   def authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, MaybeAuthUser]]
@@ -37,11 +31,12 @@ private trait Authentication[F[_]] {
 
 private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[F]) extends Authentication[F] {
 
-  import org.http4s.{Header, Request}
+  import RequestTokenFinder._
+  import org.http4s.Request
 
   override val authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, MaybeAuthUser]] =
     Kleisli { request =>
-      request.getBearerToken orElse request.getPrivateAccessToken match {
+      getBearerToken(request) orElse getPrivateAccessToken(request) match {
         case Some(token) => authenticator.authenticate(token).map(_.map(MaybeAuthUser.apply))
         case None        => MaybeAuthUser.noUser.asRight[EndpointSecurityException].pure[F]
       }
@@ -49,23 +44,6 @@ private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[
 
   override val authenticate: Kleisli[F, Request[F], Either[EndpointSecurityException, AuthUser]] =
     authenticateIfNeeded.map(_.flatMap(_.required))
-
-  private implicit class RequestOps(request: Request[F]) {
-
-    import Header.Select._
-
-    lazy val getBearerToken: Option[UserAccessToken] =
-      request.headers.get(singleHeaders(Authorization.headerInstance)) >>= {
-        case Authorization(Token(Bearer, token)) => UserOAuthAccessToken(token).some
-        case _                                   => None
-      }
-
-    lazy val getPrivateAccessToken: Option[UserAccessToken] =
-      request.headers.get(ci"PRIVATE-TOKEN").map(_.toList) >>= {
-        case Header.Raw(_, token) :: _ => PersonalAccessToken(token).some
-        case _                         => None
-      }
-  }
 }
 
 object Authentication {

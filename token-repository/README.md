@@ -91,10 +91,11 @@ Deletes the association of a token and a project id. The deletion is successful 
 
 **Response**
 
-| Status                     | Description                                            |
-|----------------------------|--------------------------------------------------------|
-| NO_CONTENT (204)           | When deletion was successful                           |
-| INTERNAL SERVER ERROR (500)| When there were problems with deleting the association |
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| NO_CONTENT (204)            | When deletion was successful                           |
+| UNAUTHORIZED (401)          | When no access token given                             |
+| INTERNAL SERVER ERROR (500) | When there were problems with deleting the association |
 
 #### GET /version
 
