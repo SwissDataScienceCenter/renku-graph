@@ -30,7 +30,7 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.tinytypes._
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt}
+import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.json.TinyTypeDecoders
 import pureconfig.ConfigReader
 
@@ -45,7 +45,6 @@ private[repository] object TokenDates {
 
   implicit object CreatedAt
       extends TinyTypeFactory[CreatedAt](new CreatedAt(_))
-      with InstantNotInTheFuture[CreatedAt]
       with TinyTypeJsonLDOps[CreatedAt]
 
   final class ExpiryDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
