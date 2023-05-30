@@ -99,6 +99,7 @@ trait ModelEncoders {
         "type":          ${Criteria.Filters.EntityType.Dataset.value},
         "matchingScore": ${ds.matchingScore},
         "name":          ${ds.name},
+        "slug":          ${ds.name},
         "visibility":    ${ds.visibility},
         "date":          ${ds.date},
         "creators":      ${ds.creators},

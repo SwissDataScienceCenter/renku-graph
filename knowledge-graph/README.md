@@ -384,6 +384,7 @@ Response body example:
     "type":          "dataset",
     "matchingScore": 3.364836,
     "name":          "name",
+    "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
     "creators":      [ "Jan Kowalski", "Zoe" ],
@@ -509,6 +510,7 @@ Response body example:
     "description":   "Some project",
     "matchingScore": 1,
     "name":          "name",
+    "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00Z",
     "creators": [
