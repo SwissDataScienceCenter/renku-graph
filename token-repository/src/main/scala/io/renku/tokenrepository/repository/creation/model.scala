@@ -36,9 +36,7 @@ private[repository] final case class TokenDates(createdAt: CreatedAt, expiryDate
 private[repository] object TokenDates {
   final class CreatedAt private (val value: Instant) extends AnyVal with InstantTinyType
 
-  implicit object CreatedAt
-      extends TinyTypeFactory[CreatedAt](new CreatedAt(_))
-      with TinyTypeJsonLDOps[CreatedAt]
+  implicit object CreatedAt extends TinyTypeFactory[CreatedAt](new CreatedAt(_)) with TinyTypeJsonLDOps[CreatedAt]
 
   final class ExpiryDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object ExpiryDate extends TinyTypeFactory[ExpiryDate](new ExpiryDate(_)) with TinyTypeJsonLDOps[ExpiryDate]
