@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators.{httpStatuses, userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security._
 import io.renku.http.server.version
@@ -149,21 +149,26 @@ class MicroserviceRoutesSpec
       val accessToken = userAccessTokens.generateOne
 
       (deleteEndpoint
-        .deleteToken(_: projects.GitLabId, _: AccessToken))
-        .expects(projectId, accessToken)
+        .deleteToken(_: projects.GitLabId, _: Option[AccessToken]))
+        .expects(projectId, accessToken.some)
         .returning(IO.pure(Response[IO](NoContent)))
 
       (routes call Request[IO](DELETE, uri"/projects" / projectId / "tokens")
         .withHeaders(accessToken.toHeader)).status shouldBe NoContent
     }
 
-    s"return $Unauthorized for a valid projectId when no access token in the header" in new TestCase {
+    s"return $Ok for a valid projectId when no access token in the header" in new TestCase {
 
       givenDBReady()
 
-      routes
-        .call(Request[IO](DELETE, uri"/projects" / projectIds.generateOne / "tokens"))
-        .status shouldBe Unauthorized
+      val projectId = projectIds.generateOne
+
+      (deleteEndpoint
+        .deleteToken(_: projects.GitLabId, _: Option[AccessToken]))
+        .expects(projectId, Option.empty[UserAccessToken])
+        .returning(IO.pure(Response[IO](NoContent)))
+
+      (routes call Request[IO](DELETE, uri"/projects" / projectId / "tokens")).status shouldBe NoContent
     }
 
     s"return $ServiceUnavailable for a valid projectId when DB migration is ongoing" in new TestCase {
@@ -181,11 +186,11 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val fetchEndpoint  = mock[fetching.FetchTokenEndpoint[IO]]
-    val createEndpoint = mock[CreateTokenEndpoint[IO]]
-    val deleteEndpoint = mock[deletion.DeleteTokenEndpoint[IO]]
-    val routesMetrics  = TestRoutesMetrics()
-    val versionRoutes  = mock[version.Routes[IO]]
+    val fetchEndpoint         = mock[fetching.FetchTokenEndpoint[IO]]
+    val createEndpoint        = mock[CreateTokenEndpoint[IO]]
+    val deleteEndpoint        = mock[deletion.DeleteTokenEndpoint[IO]]
+    private val routesMetrics = TestRoutesMetrics()
+    private val versionRoutes = mock[version.Routes[IO]]
     private val microserviceRoutes = new MicroserviceRoutesImpl[IO](
       fetchEndpoint,
       createEndpoint,

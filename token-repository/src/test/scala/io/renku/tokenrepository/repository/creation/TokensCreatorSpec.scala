@@ -384,7 +384,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     def givenTokenRemoval(projectId: projects.GitLabId, userAccessToken: UserAccessToken, returning: Try[Unit]) =
       (tokenRemover.delete _)
-        .expects(projectId, userAccessToken)
+        .expects(projectId, userAccessToken.some)
         .returning(returning)
 
     def givenIntegrityCheckPasses(projectId:            projects.GitLabId,

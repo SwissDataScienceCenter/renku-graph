@@ -36,7 +36,7 @@ private class AuthenticationImpl[F[_]: MonadThrow](authenticator: Authenticator[
 
   override val authenticateIfNeeded: Kleisli[F, Request[F], Either[EndpointSecurityException, MaybeAuthUser]] =
     Kleisli { request =>
-      getBearerToken(request) orElse getPrivateAccessToken(request) match {
+      getAccessToken(request) match {
         case Some(token) => authenticator.authenticate(token).map(_.map(MaybeAuthUser.apply))
         case None        => MaybeAuthUser.noUser.asRight[EndpointSecurityException].pure[F]
       }

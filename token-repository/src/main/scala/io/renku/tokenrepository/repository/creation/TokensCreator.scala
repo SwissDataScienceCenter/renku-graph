@@ -84,7 +84,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case Some(token) =>
       checkValid(projectId, token) >>= {
         case true  => token.some.pure[F]
-        case false => tokenRemover.delete(projectId, userToken).as(Option.empty)
+        case false => tokenRemover.delete(projectId, userToken.some).as(Option.empty)
       }
   }
 
@@ -103,7 +103,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
           }
         )
         .cataF(
-          default = tokenRemover.delete(projectId, userToken).as(Option.empty),
+          default = tokenRemover.delete(projectId, userToken.some).as(Option.empty),
           _ => token.some.pure[F]
         )
   }

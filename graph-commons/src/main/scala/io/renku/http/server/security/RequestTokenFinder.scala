@@ -30,13 +30,16 @@ import org.typelevel.ci._
 
 object RequestTokenFinder {
 
-  def getBearerToken[F[_]](request: Request[F]): Option[UserAccessToken] =
+  def getAccessToken[F[_]](request: Request[F]): Option[UserAccessToken] =
+    getBearerToken(request) orElse getPrivateAccessToken(request)
+
+  private def getBearerToken[F[_]](request: Request[F]): Option[UserAccessToken] =
     request.headers.get(singleHeaders(Authorization.headerInstance)) >>= {
       case Authorization(Token(Bearer, token)) => UserOAuthAccessToken(token).some
       case _                                   => None
     }
 
-  def getPrivateAccessToken[F[_]](request: Request[F]): Option[UserAccessToken] =
+  private def getPrivateAccessToken[F[_]](request: Request[F]): Option[UserAccessToken] =
     request.headers.get(ci"PRIVATE-TOKEN").map(_.toList) >>= {
       case Header.Raw(_, token) :: _ => PersonalAccessToken(token).some
       case _                         => None

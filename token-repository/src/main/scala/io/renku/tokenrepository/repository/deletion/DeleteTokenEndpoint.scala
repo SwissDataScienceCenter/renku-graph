@@ -33,17 +33,15 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait DeleteTokenEndpoint[F[_]] {
-  def deleteToken(projectId: GitLabId, accessToken: AccessToken): F[Response[F]]
+  def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]]
 }
 
 class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F])
     extends Http4sDsl[F]
     with DeleteTokenEndpoint[F] {
 
-  override def deleteToken(projectId: GitLabId, accessToken: AccessToken): F[Response[F]] =
-    tokenRemover
-      .delete(projectId, accessToken)
-      .flatMap(_ => NoContent())
+  override def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]] =
+    (tokenRemover.delete(projectId, maybeAccessToken) >> NoContent())
       .recoverWith(httpResult(projectId))
 
   private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {

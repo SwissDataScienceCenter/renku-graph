@@ -35,7 +35,7 @@ import scala.util.Try
 
 class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
 
-  it should "remove the token from DB" in new TestCase {
+  it should "remove the token from DB and revoke project tokens from GL if user access token is given" in new TestCase {
 
     val projectId = projectIds.generateOne
     givenDBRemoval(projectId, returning = ().pure[Try])
@@ -43,7 +43,15 @@ class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues w
     val accessToken = accessTokens.generateOne
     givenSuccessfulTokensRevoking(projectId, accessToken)
 
-    tokenRemover.delete(projectId, accessToken).success.value shouldBe ()
+    tokenRemover.delete(projectId, accessToken.some).success.value shouldBe ()
+  }
+
+  it should "just remove the token from DB if no user access token is given" in new TestCase {
+
+    val projectId = projectIds.generateOne
+    givenDBRemoval(projectId, returning = ().pure[Try])
+
+    tokenRemover.delete(projectId, maybeAccessToken = None).success.value shouldBe ()
   }
 
   private trait TestCase {
