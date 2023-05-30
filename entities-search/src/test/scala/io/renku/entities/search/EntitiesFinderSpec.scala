@@ -26,6 +26,7 @@ import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
+import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
@@ -58,6 +59,12 @@ class EntitiesFinderSpec
     with ProjectsDataset
     with SearchInfoDatasets
     with IOSpec {
+
+  private def nameOrSlugContains(word: String)(entity: Entity): Boolean =
+    entity.name.value.contains(word) || (entity match {
+      case e: Entity.Dataset => e.slug.value.contains(word)
+      case _ => false
+    })
 
   "findEntities - no filters" should {
 
@@ -134,9 +141,12 @@ class EntitiesFinderSpec
       }
 
       implicit val entityOrdering: Ordering[model.Entity] =
-        Ordering.by(e => s"${e.date}, ${e.name}".toLowerCase)
+        Ordering.by {
+          case e: Entity.Dataset => s"${e.date.value}, ${e.slug.value}".toLowerCase
+          case e => s"${e.date.value}, ${e.name.value}".toLowerCase
+        }
 
-      val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
+      val expected = allEntitiesFrom(project).filter(nameOrSlugContains("hello")).sorted
 
       results shouldMatchTo expected
     }
