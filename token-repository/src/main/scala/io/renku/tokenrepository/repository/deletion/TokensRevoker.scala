@@ -23,25 +23,31 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
 
-private[repository] trait TokenRemover[F[_]] {
-  def delete(projectId: GitLabId, accessToken: AccessToken): F[Unit]
+import scala.util.control.NonFatal
+
+private[repository] trait TokensRevoker[F[_]] {
+  def revokeAllTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit]
 }
 
-private[repository] object TokenRemover {
-  def apply[F[_]: Async: GitLabClient: SessionResource: Logger: QueriesExecutionTimes]: F[TokenRemover[F]] =
-    TokensRevoker[F].map(new TokenRemoverImpl[F](PersistedTokenRemover[F], _))
+private[repository] object TokensRevoker {
+  def apply[F[_]: Async: GitLabClient: Logger]: F[TokensRevoker[F]] =
+    RevokeCandidatesFinder[F].map(new TokensRevokerImpl[F](_, TokenRevoker[F]))
 }
 
-private class TokenRemoverImpl[F[_]: MonadThrow: Logger](dbTokenRemover: PersistedTokenRemover[F],
-                                                         tokensRevoker: TokensRevoker[F]
-) extends TokenRemover[F] {
+private class TokensRevokerImpl[F[_]: MonadThrow: Logger](revokeCandidatesFinder: RevokeCandidatesFinder[F],
+                                                          tokenRevoker: TokenRevoker[F]
+) extends TokensRevoker[F] {
 
-  import tokensRevoker._
+  import revokeCandidatesFinder._
+  import tokenRevoker._
 
-  override def delete(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
-    dbTokenRemover.delete(projectId) >> revokeAllTokens(projectId, accessToken)
+  override def revokeAllTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
+    findProjectAccessTokens(projectId, accessToken)
+      .flatMap(_.map(revokeToken(projectId, _, accessToken)).sequence)
+      .void
+      .recoverWith { case NonFatal(ex) =>
+        Logger[F].warn(ex)(show"removing old token in GitLab for project $projectId failed")
+      }
 }

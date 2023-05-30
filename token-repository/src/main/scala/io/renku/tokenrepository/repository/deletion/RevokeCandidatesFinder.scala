@@ -29,11 +29,11 @@ import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import java.time.LocalDate.now
 import java.time.Period
 
-private[repository] trait RevokeCandidatesFinder[F[_]] {
-  def findTokensToRemove(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]]
+private trait RevokeCandidatesFinder[F[_]] {
+  def findProjectAccessTokens(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]]
 }
 
-private[repository] object RevokeCandidatesFinder {
+private object RevokeCandidatesFinder {
   def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
     (ProjectTokenDuePeriod[F](), RenkuAccessTokenName[F]())
       .mapN(new RevokeCandidatesFinderImpl[F](PerPage(50), _, _))
@@ -59,7 +59,7 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
 
   private val endpointName: String Refined NonEmpty = "project-access-tokens"
 
-  override def findTokensToRemove(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]] =
+  override def findProjectAccessTokens(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]] =
     Stream
       .iterate(1)(_ + 1)
       .evalMap(fetch(_, projectId, accessToken))

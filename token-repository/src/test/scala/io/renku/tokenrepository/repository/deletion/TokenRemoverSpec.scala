@@ -22,13 +22,10 @@ package deletion
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Warn
-import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -44,56 +41,26 @@ class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues w
     givenDBRemoval(projectId, returning = ().pure[Try])
 
     val accessToken = accessTokens.generateOne
-    givenSuccessfulOldTokenRevoking(projectId, accessToken)
+    givenSuccessfulTokensRevoking(projectId, accessToken)
 
     tokenRemover.delete(projectId, accessToken).success.value shouldBe ()
-  }
-
-  it should "log a warning and succeed when token revoking fails" in new TestCase {
-
-    val projectId = projectIds.generateOne
-    givenDBRemoval(projectId, returning = ().pure[Try])
-
-    val accessToken = accessTokens.generateOne
-    val exception   = exceptions.generateOne
-    givenTokensToRevokeFinding(projectId, accessToken, exception.raiseError[Try, List[AccessTokenId]])
-
-    tokenRemover.delete(projectId, accessToken).success.value shouldBe ()
-
-    logger.logged(
-      Warn(show"removing old token in GitLab for project $projectId failed", exception)
-    )
   }
 
   private trait TestCase {
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    private val dbTokenRemover         = mock[PersistedTokenRemover[Try]]
-    private val revokeCandidatesFinder = mock[RevokeCandidatesFinder[Try]]
-    private val tokenRevoker           = mock[TokenRevoker[Try]]
-    val tokenRemover                   = new TokenRemoverImpl[Try](dbTokenRemover, revokeCandidatesFinder, tokenRevoker)
+    private val dbTokenRemover = mock[PersistedTokenRemover[Try]]
+    private val tokensRevoker  = mock[TokensRevoker[Try]]
+    val tokenRemover           = new TokenRemoverImpl[Try](dbTokenRemover, tokensRevoker)
 
     def givenDBRemoval(projectId: projects.GitLabId, returning: Try[Unit]) =
       (dbTokenRemover.delete _)
         .expects(projectId)
         .returning(returning)
 
-    def givenSuccessfulOldTokenRevoking(projectId: projects.GitLabId, accessToken: AccessToken) = {
-      val tokensToRevoke = accessTokenIds.generateList()
-      givenTokensToRevokeFinding(projectId, accessToken, returning = tokensToRevoke.pure[Try])
-
-      tokensToRevoke foreach { tokenId =>
-        (tokenRevoker.revokeToken _)
-          .expects(projectId, tokenId, accessToken)
-          .returning(().pure[Try])
-      }
-    }
-
-    def givenTokensToRevokeFinding(projectId:   projects.GitLabId,
-                                   accessToken: AccessToken,
-                                   returning:   Try[List[AccessTokenId]]
-    ) = (revokeCandidatesFinder.findTokensToRemove _)
-      .expects(projectId, accessToken)
-      .returning(returning)
+    def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
+      (tokensRevoker.revokeAllTokens _)
+        .expects(projectId, accessToken)
+        .returning(().pure[Try])
   }
 }

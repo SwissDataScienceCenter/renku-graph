@@ -58,7 +58,7 @@ class RevokeCandidatesFinderSpec
     with IOSpec
     with should.Matchers {
 
-  "checkTokenDue" should {
+  "findProjectAccessTokens" should {
 
     "call GET projects/:id/access_tokens to find expired tokens with RenkuAccessTokenName" in new TestCase {
 
@@ -73,7 +73,7 @@ class RevokeCandidatesFinderSpec
 
       fetchProjectTokens(Page(1), returning = (allTokens -> Option.empty[Page]).pure[IO])
 
-      finder.findTokensToRemove(projectId, accessToken).unsafeRunSync() shouldBe allTokens.take(3).map(_._1)
+      finder.findProjectAccessTokens(projectId, accessToken).unsafeRunSync() shouldBe allTokens.take(3).map(_._1)
     }
 
     "go through all the pages of project tokens" in new TestCase {
@@ -91,7 +91,7 @@ class RevokeCandidatesFinderSpec
       fetchProjectTokens(Page(1), returning = (otherTokensPage1 -> Page(2).some).pure[IO])
       fetchProjectTokens(Page(2), returning = (otherTokensPage2 -> Option.empty[Page]).pure[IO])
 
-      finder.findTokensToRemove(projectId, accessToken).unsafeRunSync() shouldBe
+      finder.findProjectAccessTokens(projectId, accessToken).unsafeRunSync() shouldBe
         List(tokensToFind1, tokensToFind2).map(_._1)
     }
 
@@ -135,7 +135,7 @@ class RevokeCandidatesFinderSpec
     val finder         = new RevokeCandidatesFinderImpl[IO](pageSize, tokenDuePeriod, renkuTokenName)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = finder.findTokensToRemove(projectIds.generateOne, accessTokens.generateOne).unsafeRunSync(),
+      findingMethod = finder.findProjectAccessTokens(projectIds.generateOne, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = tokenInfosWithoutExpiry().generateList() -> Option.empty[Page]
     )
 

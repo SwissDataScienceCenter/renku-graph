@@ -31,7 +31,7 @@ import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.deletion.{RevokeCandidatesFinder, TokenRemover, TokenRevoker}
+import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokensRevoker}
 import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
@@ -43,28 +43,25 @@ private trait TokensCreator[F[_]] {
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
-                                                           projectPathFinder:      ProjectPathFinder[F],
-                                                           accessTokenCrypto:      AccessTokenCrypto[F],
-                                                           tokenValidator:         TokenValidator[F],
-                                                           tokenDueChecker:        TokenDueChecker[F],
-                                                           newTokensCreator:       NewTokensCreator[F],
-                                                           tokensPersister:        TokensPersister[F],
-                                                           persistedPathFinder:    PersistedPathFinder[F],
-                                                           tokenRemover:           TokenRemover[F],
-                                                           tokenFinder:            PersistedTokensFinder[F],
-                                                           revokeCandidatesFinder: RevokeCandidatesFinder[F],
-                                                           tokensRevoker:          TokenRevoker[F],
-                                                           maxRetries:             Int Refined NonNegative
+    projectPathFinder:   ProjectPathFinder[F],
+    accessTokenCrypto:   AccessTokenCrypto[F],
+    tokenValidator:      TokenValidator[F],
+    tokenDueChecker:     TokenDueChecker[F],
+    newTokensCreator:    NewTokensCreator[F],
+    tokensPersister:     TokensPersister[F],
+    persistedPathFinder: PersistedPathFinder[F],
+    tokenRemover:        TokenRemover[F],
+    tokenFinder:         PersistedTokensFinder[F],
+    tokensRevoker:       TokensRevoker[F],
+    maxRetries:          Int Refined NonNegative
 ) extends TokensCreator[F] {
 
   import newTokensCreator._
   import persistedPathFinder._
-  import revokeCandidatesFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
   import tokensPersister._
-  import tokensRevoker._
 
   override def create(projectId: projects.GitLabId, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
@@ -145,10 +142,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     Logger[F].info(show"token created for $project").map(_ => project)
 
   private def tryRevokingOldTokens(userToken: AccessToken)(project: Project) =
-    findTokensToRemove(project.id, userToken)
-      .flatMap(_.map(revokeToken(project.id, _, userToken)).sequence)
-      .void
-      .recoverWith { case ex => Logger[F].warn(ex)(show"removing old token in GitLab for project $project failed") }
+    tokensRevoker.revokeAllTokens(project.id, userToken)
 
   private def persistWithRetry(storingInfo:     TokenStoringInfo,
                                newToken:        ProjectAccessToken,
@@ -191,7 +185,7 @@ private object TokensCreator {
     tokenDueChecker           <- TokenDueChecker[F]
     projectAccessTokenCreator <- NewTokensCreator[F]()
     tokenRemover              <- TokenRemover[F]
-    revokeCandidatesFinder    <- RevokeCandidatesFinder[F]
+    tokensRevoker             <- TokensRevoker[F]
   } yield new TokensCreatorImpl[F](
     pathFinder,
     accessTokenCrypto,
@@ -202,8 +196,7 @@ private object TokensCreator {
     PersistedPathFinder[F],
     tokenRemover,
     PersistedTokensFinder[F],
-    revokeCandidatesFinder,
-    TokenRevoker[F],
+    tokensRevoker,
     maxRetries
   )
 }

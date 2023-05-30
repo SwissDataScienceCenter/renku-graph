@@ -24,11 +24,11 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
-private[repository] trait TokenRevoker[F[_]] {
+private trait TokenRevoker[F[_]] {
   def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
 }
 
-private[repository] object TokenRevoker {
+private object TokenRevoker {
   def apply[F[_]: Async: GitLabClient]: TokenRevoker[F] = new TokenRevokerImpl[F]
 }
 
