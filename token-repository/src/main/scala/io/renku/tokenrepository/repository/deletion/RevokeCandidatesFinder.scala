@@ -25,10 +25,6 @@ import fs2.Stream
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.model.{Page, PerPage}
-import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
-
-import java.time.LocalDate.now
-import java.time.Period
 
 private trait RevokeCandidatesFinder[F[_]] {
   def projectAccessTokensStream(projectId: projects.GitLabId, accessToken: AccessToken): Stream[F, AccessTokenId]
@@ -36,12 +32,10 @@ private trait RevokeCandidatesFinder[F[_]] {
 
 private object RevokeCandidatesFinder {
   def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
-    (ProjectTokenDuePeriod[F](), RenkuAccessTokenName[F]())
-      .mapN(new RevokeCandidatesFinderImpl[F](PerPage(50), _, _))
+    RenkuAccessTokenName[F]().map(new RevokeCandidatesFinderImpl[F](PerPage(50), _))
 }
 
 private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: PerPage,
-                                                                    tokenDuePeriod: Period,
                                                                     renkuTokenName: RenkuAccessTokenName
 ) extends RevokeCandidatesFinder[F] {
 
@@ -65,11 +59,10 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
     Stream
       .iterate(1)(_ + 1)
       .evalMap(fetch(_, projectId, accessToken))
-      .map { case (tokens, maybeNextPage) =>
-        tokens.filter(renkuTokens).filter(dueToRefresh).map(_._1) -> maybeNextPage
-      }
       .takeThrough { case (_, maybeNextPage) => maybeNextPage.nonEmpty }
       .flatMap { case (tokens, _) => Stream.emits(tokens) }
+      .filter { case (_, tokenName) => tokenName == renkuTokenName.value }
+      .map { case (tokenId, _) => tokenId }
 
   private def fetch(page: Int, projectId: projects.GitLabId, accessToken: AccessToken) =
     GitLabClient[F]
@@ -77,7 +70,7 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
         mapResponse
       )(accessToken.some)
 
-  private type TokenInfo = (AccessTokenId, String, Option[ExpiryDate])
+  private type TokenInfo = (AccessTokenId, String)
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[F], Response[F]), F[(List[TokenInfo], Option[Page])]] = {
@@ -89,23 +82,11 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
     response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption.map(Page))
 
   private implicit lazy val decoder: EntityDecoder[F, List[TokenInfo]] = {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
 
     implicit val itemDecoder: Decoder[TokenInfo] = cursor =>
-      (cursor.downField("id").as[AccessTokenId],
-       cursor.downField("name").as[String],
-       cursor.downField("expires_at").as[Option[ExpiryDate]]
-      ).mapN((t, n, e) => (t, n, e))
+      (cursor.downField("id").as[AccessTokenId], cursor.downField("name").as[String])
+        .mapN((t, n) => (t, n))
 
     jsonOf[F, List[TokenInfo]]
-  }
-
-  private lazy val renkuTokens: TokenInfo => Boolean = { case (_, name, _) =>
-    name == renkuTokenName.value
-  }
-
-  private lazy val dueToRefresh: TokenInfo => Boolean = {
-    case (_, _, None)         => true
-    case (_, _, Some(expiry)) => (now().plus(tokenDuePeriod) compareTo expiry.value) >= 0
   }
 }
