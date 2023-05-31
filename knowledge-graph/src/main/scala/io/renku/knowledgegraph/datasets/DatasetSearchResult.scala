@@ -53,8 +53,8 @@ object DatasetSearchResult {
   implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: config.renku.ApiUrl): Encoder[DatasetSearchResult] =
     Encoder.instance[DatasetSearchResult] {
       case DatasetSearchResult(id,
-                               title,
                                name,
+                               slug,
                                maybeDescription,
                                creators,
                                date,
@@ -65,7 +65,7 @@ object DatasetSearchResult {
           ) =>
         json"""{
         "identifier":    $id,
-        "title":         $title,
+        "slug":          $slug,
         "name":          $name,
         "slug":          $name,
         "published":     ${creators -> date},

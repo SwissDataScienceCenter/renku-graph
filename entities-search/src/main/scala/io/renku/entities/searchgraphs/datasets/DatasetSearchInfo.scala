@@ -45,8 +45,8 @@ private object DatasetSearchInfo {
 
   implicit val show: Show[DatasetSearchInfo] = Show.show {
     case DatasetSearchInfo(topSameAs,
+                           slug,
                            name,
-                           title,
                            visibility,
                            createdOrPublished,
                            maybeDateModified,
@@ -58,8 +58,8 @@ private object DatasetSearchInfo {
         ) =>
       List(
         show"topmostSameAs = $topSameAs".some,
+        show"slug = $slug".some,
         show"name = $name".some,
-        show"title = $title".some,
         show"visibility = $visibility".some,
         createdOrPublished match {
           case d: datasets.DateCreated   => show"dateCreated = $d".some

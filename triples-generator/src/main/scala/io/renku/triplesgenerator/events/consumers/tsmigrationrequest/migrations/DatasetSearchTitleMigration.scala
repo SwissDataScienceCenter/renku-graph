@@ -34,14 +34,14 @@ private object DatasetSearchTitleMigration {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Insert dataset title into the dataset search graph")
+  private lazy val name = Migration.Name("Insert dataset name into the dataset search graph")
 
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
     Prefixes.of(Schemas.schema -> "schema", Schemas.renku -> "renku"),
     sparql"""|INSERT {
              |  Graph ${GraphClass.Datasets.id} {
-             |    ?sameAs schema:name ?title
+             |    ?sameAs schema:name ?name
              |  }
              |}
              |WHERE {
@@ -54,7 +54,7 @@ private object DatasetSearchTitleMigration {
              |  }
              |
              |  Graph ?projectId {
-             |    ?dsId schema:name ?title
+             |    ?dsId schema:name ?name
              |  }
              |}
              |""".stripMargin

@@ -143,11 +143,11 @@ object Dataset {
 
   object Identification {
     private[Dataset] implicit lazy val encoder: Identification => Map[Property, JsonLD] = {
-      case Identification(_, identifier, title, name) =>
+      case Identification(_, identifier, name, slug) =>
         Map(
           schema / "identifier" -> identifier.asJsonLD,
-          schema / "name"       -> title.asJsonLD,
-          renku / "slug"        -> name.asJsonLD
+          schema / "name"       -> name.asJsonLD,
+          renku / "slug"        -> slug.asJsonLD
         )
     }
 

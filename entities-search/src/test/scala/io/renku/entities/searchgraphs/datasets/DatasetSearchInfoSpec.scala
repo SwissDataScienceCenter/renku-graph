@@ -56,8 +56,8 @@ class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
     "return String representation of the Info" in {
       forAll(datasetSearchInfoObjects) {
         case info @ DatasetSearchInfo(topSameAs,
+                                      slug,
                                       name,
-                                      title,
                                       visibility,
                                       createdOrPublished,
                                       maybeDateModified,
@@ -69,8 +69,8 @@ class DatasetSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
             ) =>
           info.show shouldBe List(
             show"topmostSameAs = $topSameAs".some,
+            show"slug = $slug".some,
             show"name = $name".some,
-            show"title = $title".some,
             show"visibility = $visibility".some,
             createdOrPublished match {
               case d: datasets.DateCreated   => show"dateCreated = $d".some

@@ -44,7 +44,7 @@ class DatasetSearchTitleMigrationSpec
   implicit val ioLogger: Logger[IO] = TestLogger()
 
   "run" should {
-    "Add datasets title into the search graph" in {
+    "Add datasets name into the search graph" in {
       val data = anyRenkuProjectEntities
         .modify(replaceProjectCreator(personEntities.generateSome))
         .addDataset(datasetEntities(provenanceInternal))
@@ -53,8 +53,8 @@ class DatasetSearchTitleMigrationSpec
       provisionTestProjects(data.map(_._2): _*).unsafeRunSync()
 
       // initially, names are provisioned
-      val titles = findDatasetNames.unsafeRunSync()
-      titles should not be empty
+      val names = findDatasetNames.unsafeRunSync()
+      names should not be empty
 
       // remove names
       removeDatasetNames.unsafeRunSync()
@@ -64,8 +64,8 @@ class DatasetSearchTitleMigrationSpec
       runUpdate(projectsDataset, DatasetSearchTitleMigration.query).unsafeRunSync()
 
       // names should be back
-      val nextTitles = findDatasetNames.unsafeRunSync()
-      nextTitles shouldBe titles
+      val nextNames = findDatasetNames.unsafeRunSync()
+      nextNames shouldBe names
     }
   }
 

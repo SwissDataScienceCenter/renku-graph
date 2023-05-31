@@ -122,9 +122,9 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   implicit class JsonsOps(jsons: List[Json]) {
 
-    def findId(title: Name): Option[Identifier] =
+    def findId(name: Name): Option[Identifier] =
       jsons
-        .find(_.hcursor.downField("name").as[String].fold(throw _, _ == title.toString))
+        .find(_.hcursor.downField("name").as[String].fold(throw _, _ == name.toString))
         .map(_.hcursor.downField("identifier").as[Identifier].fold(throw _, identity))
   }
 

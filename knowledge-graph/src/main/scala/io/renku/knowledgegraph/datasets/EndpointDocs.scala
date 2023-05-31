@@ -70,13 +70,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val query = Parameter.Query(
     "query",
     Schema.String,
-    "to filter by matching field (e.g., title, keyword, description, or creator name)".some,
+    "to filter by matching field (e.g., name, keyword, description, or creator name)".some,
     required = false
   )
   private lazy val sort = Parameter.Query(
     "sort",
     Schema.String,
-    "the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`, `datePublished`, `date` and `projectsCount`".some,
+    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`, `datePublished`, `date` and `projectsCount`".some,
     required = false
   )
   private lazy val page = Parameter.Query(
