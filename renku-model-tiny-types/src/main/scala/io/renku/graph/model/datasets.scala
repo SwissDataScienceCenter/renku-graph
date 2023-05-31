@@ -68,9 +68,6 @@ object datasets {
       with NonBlankTTJsonLDOps[OriginalIdentifier]
       with NonBlank[OriginalIdentifier]
 
-  final class Title private (val value: String) extends AnyVal with StringTinyType
-  implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank[Title] with TinyTypeJsonLDOps[Title]
-
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 

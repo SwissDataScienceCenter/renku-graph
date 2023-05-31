@@ -52,59 +52,59 @@ class DatasetSearchTitleMigrationSpec
 
       provisionTestProjects(data.map(_._2): _*).unsafeRunSync()
 
-      // initially, titles are provisioned
-      val titles = findDatasetTitles.unsafeRunSync()
+      // initially, names are provisioned
+      val titles = findDatasetNames.unsafeRunSync()
       titles should not be empty
 
-      // remove titles
-      removeDatasetTitles.unsafeRunSync()
-      findDatasetTitles.unsafeRunSync() should be(empty)
+      // remove names
+      removeDatasetNames.unsafeRunSync()
+      findDatasetNames.unsafeRunSync() should be(empty)
 
       // run the migration
       runUpdate(projectsDataset, DatasetSearchTitleMigration.query).unsafeRunSync()
 
-      // titles should be back
-      val nextTitles = findDatasetTitles.unsafeRunSync()
+      // names should be back
+      val nextTitles = findDatasetNames.unsafeRunSync()
       nextTitles shouldBe titles
     }
   }
 
-  def findDatasetTitles: IO[Map[datasets.TopmostSameAs, List[datasets.Title]]] =
+  def findDatasetNames: IO[Map[datasets.TopmostSameAs, List[datasets.Name]]] =
     runSelect(
       on = projectsDataset,
       SparqlQuery.of(
         "find dates",
         prefixes,
         """
-          |SELECT ?sameAs ?title
+          |SELECT ?sameAs ?name
           |  WHERE {
           |    Graph schema:Dataset {
           |      ?sameAs a renku:DiscoverableDataset;
-          |              schema:name ?title
+          |              schema:name ?name
           |    }
           |  }
           |""".stripMargin
       )
     ).map(
-      _.map(row => datasets.TopmostSameAs(row("sameAs")) -> datasets.Title(row("title")))
+      _.map(row => datasets.TopmostSameAs(row("sameAs")) -> datasets.Name(row("name")))
         .groupMap(_._1)(_._2)
     )
 
-  def removeDatasetTitles =
+  def removeDatasetNames =
     runUpdate(
       projectsDataset,
       SparqlQuery.of(
-        "delete titles",
+        "delete names",
         prefixes,
         """|DELETE {
            |  Graph schema:Dataset {
-           |    ?sameAs schema:name ?title
+           |    ?sameAs schema:name ?name
            |  }
            |}
            |WHERE {
            |  Graph schema:Dataset {
            |    ?sameAs a renku:DiscoverableDataset;
-           |            schema:name ?title.
+           |            schema:name ?name.
            |  }
            |}
            |""".stripMargin

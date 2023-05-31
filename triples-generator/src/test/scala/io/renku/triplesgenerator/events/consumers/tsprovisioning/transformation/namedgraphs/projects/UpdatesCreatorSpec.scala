@@ -141,7 +141,7 @@ class UpdatesCreatorSpec
 
       val datasets = findDatasets
       datasets.size      shouldBe 1
-      datasets.head.name shouldBe dataset.identification.title.value.some
+      datasets.head.name shouldBe dataset.identification.namee.value.some
     }
   }
 
