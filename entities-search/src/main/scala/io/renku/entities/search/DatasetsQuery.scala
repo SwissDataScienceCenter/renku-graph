@@ -23,9 +23,9 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
@@ -80,21 +80,20 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |       $imagesVar
           |WHERE {
           |  BIND ('dataset' AS $entityTypeVar)
-          |  # textQuery
-          |  ${textQueryPart(criteria.filters.maybeQuery)}
           |
           |  { # start sub select
-          |    SELECT $sameAsVar (SAMPLE(?projId) as ?projectId)
+          |    SELECT $sameAsVar $matchingScoreVar
           |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS $creatorsNamesVar)
           |      (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS $idsPathsVisibilitiesVar)
           |      (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS $keywordsVar)
           |      (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS $imagesVar)
           |    WHERE {
+          |      # textQuery
+          |      ${textQueryPart(criteria.filters.maybeQuery)}
+          |
           |      Graph schema:Dataset {
           |        #creator
-          |        Optional {
-          |          $sameAsVar schema:creator / schema:name ?creatorName.
-          |        }
+          |        $sameAsVar schema:creator / schema:name ?creatorName.
           |
           |        #keywords
           |        $keywords
@@ -117,8 +116,9 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |        $pathVisibility
           |      }
           |    }
-          |    GROUP BY $sameAsVar
+          |    GROUP BY $sameAsVar $matchingScoreVar
           |  }# end sub select
+          |
           |  ${creatorsPart(criteria.filters.creators)}
           |
           |  Graph schema:Dataset {
@@ -136,13 +136,13 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
           |""".stripMargin.sparql
     }
 
-  def pathVisibility: Fragment =
+  private def pathVisibility: Fragment =
     fr"""|  # Return all visibilities and select the broadest in decoding
          |  BIND (CONCAT(STR(?projectPath), STR(':'),
          |               STR(?visibility)) AS ?idPathVisibility)
          |""".stripMargin
 
-  def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
+  private def accessRightsAndVisibility(maybeUser: Option[AuthUser], visibilities: Set[Visibility]): Fragment =
     maybeUser match {
       case Some(user) =>
         val nonPrivateVisibilities =
@@ -184,7 +184,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
         }
     }
 
-  def images: Fragment =
+  private def images: Fragment =
     fr"""|       OPTIONAL {
          |          ?sameAs schema:image ?imageId .
          |          ?imageId schema:position ?imagePosition ;
@@ -193,12 +193,12 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |       }
          |""".stripMargin
 
-  def resolveProject: Fragment =
+  private def resolveProject: Fragment =
     fr"""|    $sameAsVar a renku:DiscoverableDataset;
-         |            renku:datasetProjectLink / renku:project ?projId.
+         |               renku:datasetProjectLink / renku:project ?projId.
          |""".stripMargin
 
-  def datesPart(maybeSince: Option[Filters.Since], maybeUntil: Option[Filters.Until]): Fragment = {
+  private def datesPart(maybeSince: Option[Filters.Since], maybeUntil: Option[Filters.Until]): Fragment = {
     val sinceLocal =
       maybeSince.map(_.value).map(d => fr"$d")
     val untilLocal =
@@ -237,18 +237,18 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
          |""".stripMargin
   }
 
-  def keywords: Fragment =
+  private def keywords: Fragment =
     fr"""|OPTIONAL {
          |  $sameAsVar schema:keywords ?keyword
          |}
          |""".stripMargin
 
-  def description: Fragment =
+  private def description: Fragment =
     fr"""| OPTIONAL {
          |   $sameAsVar schema:description $maybeDescriptionVar
          | }""".stripMargin
 
-  def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
+  private def namespacesPart(ns: Set[projects.Namespace]): Fragment = {
     val matchFrag =
       if (ns.isEmpty) Fragment.empty
       else fr"Values (?namespace) { ${ns.map(_.value)}  }"
@@ -259,7 +259,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       """.stripMargin
   }
 
-  def creatorsPart(creators: Set[persons.Name]): Fragment = {
+  private def creatorsPart(creators: Set[persons.Name]): Fragment = {
     val matchFrag =
       creators
         .map(c => fr"CONTAINS(LCASE($creatorsNamesVar), ${c.value.toLowerCase})")
@@ -272,29 +272,25 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       fr"""FILTER (IF (BOUND($creatorsNamesVar), $matchFrag, false))""".stripMargin
   }
 
-  def textQueryPart(mq: Option[Filters.Query]): Fragment =
+  private def textQueryPart(mq: Option[Filters.Query]): Fragment =
     mq match {
       case Some(q) =>
         val luceneQuery = LuceneQuery.fuzzy(q.value)
         fr"""|{
-             |  SELECT $sameAsVar ?id (MAX(?score) AS $matchingScoreVar)
+             |  SELECT $sameAsVar (MAX(?score) AS $matchingScoreVar)
              |  WHERE {
              |    Graph schema:Dataset {
              |      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name $luceneQuery).
              |     {
-             |       ?id a schema:Person.
-             |       $sameAsVar schema:creator ?id
-             |     } UNION
-             |     {
-             |       ?id a renku:DiscoverableDatasetPerson.
-             |       $sameAsVar schema:creator ?id
+             |       $sameAsVar a renku:DiscoverableDataset;
+             |                  schema:creator ?id
              |     } UNION {
              |       ?id a renku:DiscoverableDataset
              |       BIND (?id AS $sameAsVar)
              |     }
              |    }
              |  }
-             | group by $sameAsVar ?id
+             | group by $sameAsVar
              |}""".stripMargin
 
       case None =>
@@ -315,10 +311,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
         _.split(",")
           .map(_.trim)
           .map { case s"$projectPath:$visibility" =>
-            (
-              projects.Path.from(projectPath),
-              projects.Visibility.from(visibility)
-            ).mapN((_, _))
+            (projects.Path.from(projectPath), projects.Visibility.from(visibility)).mapN((_, _))
           }
           .toList
           .sequence
