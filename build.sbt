@@ -133,7 +133,7 @@ lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
-  .dependsOn(eventLogApi  % "compile->compile; test->test")
+  .dependsOn(eventLogApi % "compile->compile; test->test")
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin
@@ -160,7 +160,7 @@ lazy val triplesGeneratorApi = project
   .in(file("triples-generator-api"))
   .withId("triples-generator-api")
   .settings(commonSettings)
-  .dependsOn(eventLogApi  % "compile->compile; test->test")
+  .dependsOn(eventLogApi % "compile->compile; test->test")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val entitiesViewingsCollector = project
