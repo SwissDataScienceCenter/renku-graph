@@ -302,21 +302,21 @@ class DatasetsResourcesSpec
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
       val datasetsSortedByNameProj4ForkPath = List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsSortedByName)
-      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
 
       foundDatasetsSortedByName should {
         be(datasetsSortedByNameProj4Path) or be(datasetsSortedByNameProj4ForkPath)
       }
 
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
       val searchForPage =
-        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1"
+        knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
 
       Then("he should get OK response with the dataset from the requested page")
       val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
@@ -326,7 +326,7 @@ class DatasetsResourcesSpec
       }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
-      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
+      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
 
       Then("he should get OK response with all the datasets")
       val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
@@ -337,14 +337,14 @@ class DatasetsResourcesSpec
           searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
-        ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
+        ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'title' property found"))) or
           contain allElementsOf List(
             searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
-          ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+          ).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'title' property found")))
       }
 
       When("user uses the response header link with the rel='first'")
@@ -419,7 +419,7 @@ class DatasetsResourcesSpec
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse =
-        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc", user.accessToken)
+        knowledgeGraphClient GET (s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc", user.accessToken)
 
       Then("he should get OK response with some matching datasets")
       datasetsSearchResponse.status shouldBe Ok

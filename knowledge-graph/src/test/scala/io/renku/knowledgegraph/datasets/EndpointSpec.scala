@@ -146,8 +146,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
     lazy val toJson: DatasetSearchResult => Json = {
       case DatasetSearchResult(id,
-                               title,
                                name,
+                               slug,
                                maybeDescription,
                                creators,
                                date,
@@ -158,7 +158,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           ) =>
         json"""{
           "identifier":    $id,
-          "title":         $title,
+          "slug":          $slug,
           "name":          $name,
           "slug":          $name,
           "published":     ${creators -> date},
