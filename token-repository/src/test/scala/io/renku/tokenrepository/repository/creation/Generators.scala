@@ -24,7 +24,7 @@ import TokenDates._
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.projectAccessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{localDates, positiveInts, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{localDates, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
@@ -44,7 +44,4 @@ object Generators {
 
   val tokenStoringInfos: Gen[TokenStoringInfo] =
     (projectObjects, encryptedAccessTokens, tokenDates).mapN(TokenStoringInfo.apply)
-
-  private[creation] val accessTokenIds: Gen[AccessTokenId] =
-    positiveInts().toGeneratorOf(v => AccessTokenId(v.value))
 }

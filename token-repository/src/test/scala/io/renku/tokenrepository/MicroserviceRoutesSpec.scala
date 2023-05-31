@@ -21,13 +21,15 @@ package io.renku.tokenrepository
 import cats.data.OptionT
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.httpStatuses
+import io.renku.generators.CommonGraphGenerators.{httpStatuses, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.security._
 import io.renku.http.server.version
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.creation.CreateTokenEndpoint
@@ -143,18 +145,35 @@ class MicroserviceRoutesSpec
 
       givenDBReady()
 
-      val projectId = projectIds.generateOne
+      val projectId   = projectIds.generateOne
+      val accessToken = userAccessTokens.generateOne
+
       (deleteEndpoint
-        .deleteToken(_: projects.GitLabId))
-        .expects(projectId)
+        .deleteToken(_: projects.GitLabId, _: Option[AccessToken]))
+        .expects(projectId, accessToken.some)
         .returning(IO.pure(Response[IO](NoContent)))
 
-      (routes call Request[IO](DELETE, uri"/projects" / projectId.toString / "tokens")).status shouldBe NoContent
+      (routes call Request[IO](DELETE, uri"/projects" / projectId / "tokens")
+        .withHeaders(accessToken.toHeader)).status shouldBe NoContent
+    }
+
+    s"return $Ok for a valid projectId when no access token in the header" in new TestCase {
+
+      givenDBReady()
+
+      val projectId = projectIds.generateOne
+
+      (deleteEndpoint
+        .deleteToken(_: projects.GitLabId, _: Option[AccessToken]))
+        .expects(projectId, Option.empty[UserAccessToken])
+        .returning(IO.pure(Response[IO](NoContent)))
+
+      (routes call Request[IO](DELETE, uri"/projects" / projectId / "tokens")).status shouldBe NoContent
     }
 
     s"return $ServiceUnavailable for a valid projectId when DB migration is ongoing" in new TestCase {
       routes
-        .call(Request(DELETE, uri"/projects" / projectIds.generateOne.toString / "tokens"))
+        .call(Request[IO](DELETE, uri"/projects" / projectIds.generateOne / "tokens"))
         .status shouldBe ServiceUnavailable
     }
   }
@@ -167,11 +186,11 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val fetchEndpoint  = mock[fetching.FetchTokenEndpoint[IO]]
-    val createEndpoint = mock[CreateTokenEndpoint[IO]]
-    val deleteEndpoint = mock[deletion.DeleteTokenEndpoint[IO]]
-    val routesMetrics  = TestRoutesMetrics()
-    val versionRoutes  = mock[version.Routes[IO]]
+    val fetchEndpoint         = mock[fetching.FetchTokenEndpoint[IO]]
+    val createEndpoint        = mock[CreateTokenEndpoint[IO]]
+    val deleteEndpoint        = mock[deletion.DeleteTokenEndpoint[IO]]
+    private val routesMetrics = TestRoutesMetrics()
+    private val versionRoutes = mock[version.Routes[IO]]
     private val microserviceRoutes = new MicroserviceRoutesImpl[IO](
       fetchEndpoint,
       createEndpoint,

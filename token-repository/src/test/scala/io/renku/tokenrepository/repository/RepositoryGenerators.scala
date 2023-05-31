@@ -20,6 +20,7 @@ package io.renku.tokenrepository.repository
 
 import AccessTokenCrypto.EncryptedAccessToken
 import eu.timepit.refined.api.RefType
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import org.scalacheck.Gen
 
@@ -34,4 +35,7 @@ private object RepositoryGenerators {
             throw new IllegalArgumentException("Invalid value generated for EncryptedAccessToken")
           }
       }
+
+  val accessTokenIds: Gen[AccessTokenId] =
+    positiveInts().toGeneratorOf(v => AccessTokenId(v.value))
 }

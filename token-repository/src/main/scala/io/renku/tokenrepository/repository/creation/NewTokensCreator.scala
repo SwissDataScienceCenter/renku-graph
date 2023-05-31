@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package creation
 
 import cats.data.OptionT
 import cats.effect.Async

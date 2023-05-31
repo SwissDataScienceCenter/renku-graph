@@ -16,22 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package deletion
 
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
-private trait TokensRevoker[F[_]] {
-  def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
+private trait TokenRevoker[F[_]] {
+  def revokeToken(tokenId: AccessTokenId, projectId: projects.GitLabId, accessToken: AccessToken): F[Unit]
 }
 
-private object TokensRevoker {
-  def apply[F[_]: Async: GitLabClient] = new TokensRevokerImpl[F]
+private object TokenRevoker {
+  def apply[F[_]: Async: GitLabClient]: TokenRevoker[F] = new TokenRevokerImpl[F]
 }
 
-private class TokensRevokerImpl[F[_]: Async: GitLabClient] extends TokensRevoker[F] {
+private class TokenRevokerImpl[F[_]: Async: GitLabClient] extends TokenRevoker[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -39,7 +40,7 @@ private class TokensRevokerImpl[F[_]: Async: GitLabClient] extends TokensRevoker
   import org.http4s.implicits._
   import org.http4s.{Request, Response, Status}
 
-  override def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit] =
+  override def revokeToken(tokenId: AccessTokenId, projectId: projects.GitLabId, accessToken: AccessToken): F[Unit] =
     GitLabClient[F]
       .delete(uri"projects" / projectId / "access_tokens" / tokenId, "revoke-project-access-token")(mapResponse)(
         accessToken.some

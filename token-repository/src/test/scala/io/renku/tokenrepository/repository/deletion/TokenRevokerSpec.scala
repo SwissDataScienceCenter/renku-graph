@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository.deletion
 
-import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -32,6 +31,7 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
 import org.http4s.Method.DELETE
 import org.http4s._
 import org.http4s.implicits._
@@ -39,7 +39,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TokensRevokerSpec
+class TokenRevokerSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -57,7 +57,7 @@ class TokensRevokerSpec
         .expects(uri"projects" / projectId / "access_tokens" / tokenId, endpointName, *, Option(accessToken))
         .returning(().pure[IO])
 
-      tokensRevoker.revokeToken(projectId, tokenId, accessToken).unsafeRunSync() shouldBe ()
+      tokensRevoker.revokeToken(tokenId, projectId, accessToken).unsafeRunSync() shouldBe ()
     }
 
     Status.Ok :: Status.NoContent :: Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach {
@@ -75,10 +75,10 @@ class TokensRevokerSpec
     val accessToken = accessTokens.generateOne
 
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-    val tokensRevoker = new TokensRevokerImpl[IO]
+    val tokensRevoker = new TokenRevokerImpl[IO]
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = tokensRevoker.revokeToken(projectId, tokenId, accessTokens.generateOne).unsafeRunSync(),
+      findingMethod = tokensRevoker.revokeToken(tokenId, projectId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = fixed(()),
       method = DELETE
     )

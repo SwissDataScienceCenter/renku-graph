@@ -31,7 +31,7 @@ import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.deletion.TokenRemover
+import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokensRevoker}
 import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
@@ -43,33 +43,33 @@ private trait TokensCreator[F[_]] {
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:      ProjectPathFinder[F],
-    accessTokenCrypto:      AccessTokenCrypto[F],
-    tokenValidator:         TokenValidator[F],
-    tokenDueChecker:        TokenDueChecker[F],
-    newTokensCreator:       NewTokensCreator[F],
-    tokensPersister:        TokensPersister[F],
-    persistedPathFinder:    PersistedPathFinder[F],
-    tokenRemover:           TokenRemover[F],
-    tokenFinder:            PersistedTokensFinder[F],
-    revokeCandidatesFinder: RevokeCandidatesFinder[F],
-    tokensRevoker:          TokensRevoker[F],
-    maxRetries:             Int Refined NonNegative
+    projectPathFinder:   ProjectPathFinder[F],
+    accessTokenCrypto:   AccessTokenCrypto[F],
+    tokenValidator:      TokenValidator[F],
+    tokenDueChecker:     TokenDueChecker[F],
+    newTokensCreator:    NewTokensCreator[F],
+    tokensPersister:     TokensPersister[F],
+    persistedPathFinder: PersistedPathFinder[F],
+    tokenRemover:        TokenRemover[F],
+    tokenFinder:         PersistedTokensFinder[F],
+    tokensRevoker:       TokensRevoker[F],
+    maxRetries:          Int Refined NonNegative
 ) extends TokensCreator[F] {
 
   import newTokensCreator._
   import persistedPathFinder._
-  import revokeCandidatesFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
   import tokensPersister._
-  import tokensRevoker._
 
   override def create(projectId: projects.GitLabId, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
       .flatMapF(
-        decrypt >=> removeWhenInvalid(projectId) >=> replacePathIfChangedOrRemove(projectId) >=> checkIfDue(projectId)
+        decrypt >=>
+          removeWhenInvalid(projectId, userToken) >=>
+          replacePathIfChangedOrRemove(projectId, userToken) >=>
+          checkIfDue(projectId)
       )
       .void
       .getOrElseF(createNew(projectId, userToken))
@@ -77,17 +77,20 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   private lazy val decrypt: EncryptedAccessToken => F[Option[AccessToken]] = encryptedToken =>
     accessTokenCrypto.decrypt(encryptedToken).map(_.some)
 
-  private def removeWhenInvalid(projectId: projects.GitLabId): Option[AccessToken] => F[Option[AccessToken]] = {
+  private def removeWhenInvalid(projectId: projects.GitLabId,
+                                userToken: AccessToken
+  ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
     case Some(token) =>
       checkValid(projectId, token) >>= {
         case true  => token.some.pure[F]
-        case false => tokenRemover.delete(projectId).as(Option.empty)
+        case false => tokenRemover.delete(projectId, userToken.some).as(Option.empty)
       }
   }
 
   private def replacePathIfChangedOrRemove(
-      projectId: projects.GitLabId
+      projectId: projects.GitLabId,
+      userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
     case Some(token) =>
@@ -100,7 +103,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
           }
         )
         .cataF(
-          default = tokenRemover.delete(projectId).as(Option.empty),
+          default = tokenRemover.delete(projectId, userToken.some).as(Option.empty),
           _ => token.some.pure[F]
         )
   }
@@ -139,12 +142,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     Logger[F].info(show"token created for $project").map(_ => project)
 
   private def tryRevokingOldTokens(userToken: AccessToken)(project: Project) =
-    findTokensToRemove(project.id, userToken)
-      .flatMap(_.map(revokeToken(project.id, _, userToken)).sequence)
-      .void
-      .recoverWith { case NonFatal(ex) =>
-        Logger[F].warn(ex)(show"removing old token in GitLab for project $project failed")
-      }
+    tokensRevoker.revokeAllTokens(project.id, userToken)
 
   private def persistWithRetry(storingInfo:     TokenStoringInfo,
                                newToken:        ProjectAccessToken,
@@ -186,7 +184,8 @@ private object TokensCreator {
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F]
     projectAccessTokenCreator <- NewTokensCreator[F]()
-    revokeCandidatesFinder    <- RevokeCandidatesFinder[F]
+    tokenRemover              <- TokenRemover[F]
+    tokensRevoker             <- TokensRevoker[F]
   } yield new TokensCreatorImpl[F](
     pathFinder,
     accessTokenCrypto,
@@ -195,10 +194,9 @@ private object TokensCreator {
     projectAccessTokenCreator,
     TokensPersister[F],
     PersistedPathFinder[F],
-    TokenRemover[F],
+    tokenRemover,
     PersistedTokensFinder[F],
-    revokeCandidatesFinder,
-    TokensRevoker[F],
+    tokensRevoker,
     maxRetries
   )
 }

@@ -21,6 +21,7 @@ package io.renku.webhookservice.tokenrepository
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
@@ -34,7 +35,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AccessTokenRemoverImplSpec
+class AccessTokenRemoverSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
@@ -47,10 +48,11 @@ class AccessTokenRemoverImplSpec
 
       stubFor {
         delete(s"/projects/$projectId/tokens")
+          .withAccessToken(maybeAccessToken)
           .willReturn(noContent())
       }
 
-      tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
+      tokenRemover.removeAccessToken(projectId, maybeAccessToken).unsafeRunSync() shouldBe ()
     }
 
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
@@ -58,20 +60,23 @@ class AccessTokenRemoverImplSpec
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
         delete(s"/projects/$projectId/tokens")
+          .withAccessToken(maybeAccessToken)
           .willReturn(status(Status.BadGateway.code).withBody(responseBody))
       }
 
       intercept[Exception] {
-        tokenRemover.removeAccessToken(projectId).unsafeRunSync()
+        tokenRemover.removeAccessToken(projectId, maybeAccessToken).unsafeRunSync()
       }.getMessage shouldBe s"DELETE $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadGateway}; body: $responseBody"
     }
   }
 
   private trait TestCase {
+
+    val projectId        = projectIds.generateOne
+    val maybeAccessToken = accessTokens.generateOption
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
-    val projectId          = projectIds.generateOne
-
-    val tokenRemover = new AccessTokenRemoverImpl[IO](tokenRepositoryUrl)
+    val tokenRemover       = new AccessTokenRemoverImpl[IO](tokenRepositoryUrl)
   }
 }

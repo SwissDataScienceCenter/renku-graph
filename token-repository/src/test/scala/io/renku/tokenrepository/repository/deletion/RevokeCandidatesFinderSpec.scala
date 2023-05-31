@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package deletion
 
-import Generators._
-import TokenDates.ExpiryDate
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -34,17 +33,23 @@ import io.renku.generators.Generators.{emptyOptionOf, fixed, localDates, nonEmpt
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
+import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import org.http4s._
 import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.ci._
 
 import java.time.LocalDate.now
 import java.time.{LocalDate, Period}
+import scala.util.Random
 
 class RevokeCandidatesFinderSpec
     extends AnyWordSpec
@@ -53,11 +58,9 @@ class RevokeCandidatesFinderSpec
     with IOSpec
     with should.Matchers {
 
-  "checkTokenDue" should {
+  "projectAccessTokensStream" should {
 
-    "do GET projects/:id/access_tokens to find expired tokens with RenkuAccessTokenName" in new TestCase {
-
-      val endpointName: String Refined NonEmpty = "project-access-tokens"
+    "call GET projects/:id/access_tokens to find expired tokens with RenkuAccessTokenName" in new TestCase {
 
       val allTokens = List(
         tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(max = now() plus tokenDuePeriod)),
@@ -68,27 +71,51 @@ class RevokeCandidatesFinderSpec
         tokenInfosWithExpiry()
       ).map(_.generateOne)
 
-      (gitLabClient
-        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, List[TokenInfo]])(_: Option[AccessToken]))
-        .expects(uri"projects" / projectId.value / "access_tokens", endpointName, *, Option(accessToken))
-        .returning(allTokens.pure[IO])
+      fetchProjectTokens(Page(1), returning = (allTokens -> Option.empty[Page]).pure[IO])
 
-      finder.findTokensToRemove(projectId, accessToken).unsafeRunSync() shouldBe allTokens.take(3).map(_._1)
+      finder.projectAccessTokensStream(projectId, accessToken).compile.toList.unsafeRunSync() shouldBe
+        allTokens.take(3).map(_._1)
+    }
+
+    "go through all the pages of project tokens" in new TestCase {
+
+      val tokensToFind1 =
+        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(max = now() plus tokenDuePeriod)).generateOne
+      val tokensToFind2 =
+        tokenInfosWithExpiry(fixed(renkuTokenName.value), fixed(now() plus tokenDuePeriod)).generateOne
+
+      val otherTokensPage1 =
+        Random.shuffle(tokensToFind1 :: tokenInfosWithExpiry().generateFixedSizeList(ofSize = pageSize.value - 1))
+      val otherTokensPage2 =
+        Random.shuffle(tokensToFind2 :: tokenInfosWithExpiry().generateFixedSizeList(ofSize = pageSize.value - 1))
+
+      fetchProjectTokens(Page(1), returning = (otherTokensPage1 -> Page(2).some).pure[IO])
+      fetchProjectTokens(Page(2), returning = (otherTokensPage2 -> Option.empty[Page]).pure[IO])
+
+      finder.projectAccessTokensStream(projectId, accessToken).compile.toList.unsafeRunSync() shouldBe
+        List(tokensToFind1, tokensToFind2).map(_._1)
     }
 
     "map OK response body to TokenInfo tuples" in new TestCase {
 
       val tokens = Gen
         .oneOf(tokenInfosWithExpiry(), tokenInfosWithoutExpiry(fixed(renkuTokenName.value)))
-        .generateList()
+        .generateList(max = pageSize.value)
+      val nextPage = Page(2)
 
-      mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(tokens.asJson))
-        .unsafeRunSync() shouldBe tokens
+      mapResponse(
+        Status.Ok,
+        Request[IO](),
+        Response[IO](Status.Ok)
+          .withEntity(tokens.asJson)
+          .withHeaders(Header.Raw(ci"X-Next-Page", nextPage.value.toString))
+      ).unsafeRunSync() shouldBe (tokens -> nextPage.some)
     }
 
     Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
       s"map $status response to None" in new TestCase {
-        mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe Nil
+        mapResponse(status, Request[IO](), Response[IO](status))
+          .unsafeRunSync() shouldBe (List.empty[TokenInfo] -> Option.empty[Page])
       }
     }
   }
@@ -100,15 +127,33 @@ class RevokeCandidatesFinderSpec
     val projectId   = projectIds.generateOne
     val accessToken = accessTokens.generateOne
 
-    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    private implicit val gitLabClient: GitLabClient[IO]        = mock[GitLabClient[IO]]
+    private val endpointName:          String Refined NonEmpty = "project-access-tokens"
+
     val tokenDuePeriod = Period.ofDays(5)
+    val pageSize       = PerPage(50)
     val renkuTokenName = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
-    val finder         = new RevokeCandidatesFinderImpl[IO](tokenDuePeriod, renkuTokenName)
+    val finder         = new RevokeCandidatesFinderImpl[IO](pageSize, tokenDuePeriod, renkuTokenName)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = finder.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),
-      resultGenerator = tokenInfosWithoutExpiry().generateList()
+      findingMethod =
+        finder.projectAccessTokensStream(projectIds.generateOne, accessTokens.generateOne).compile.toList.unsafeRunSync(),
+      resultGenerator = tokenInfosWithoutExpiry().generateList() -> Option.empty[Page]
     )
+
+    def fetchProjectTokens(page: Page, returning: IO[(List[TokenInfo], Option[Page])]) =
+      (gitLabClient
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, (List[TokenInfo], Option[Page])])(
+          _: Option[AccessToken]
+        ))
+        .expects((uri"projects" / projectId / "access_tokens")
+                   .withQueryParam("per_page", pageSize)
+                   .withQueryParam("page", page),
+                 endpointName,
+                 *,
+                 accessToken.some
+        )
+        .returning(returning)
   }
 
   private def tokenInfosWithoutExpiry(names: Gen[String] = nonEmptyStrings()): Gen[TokenInfo] =

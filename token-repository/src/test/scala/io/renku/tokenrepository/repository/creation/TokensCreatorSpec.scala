@@ -33,11 +33,10 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators._
 import io.renku.tokenrepository.repository.creation.Generators._
-import io.renku.tokenrepository.repository.deletion.TokenRemover
+import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokensRevoker}
 import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
@@ -77,13 +76,13 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenTokenDecryption(of = encryptedToken, returning = projectAccessToken.pure[Try])
 
       givenTokenValidation(of = projectAccessToken, returning = false.pure[Try])
-      givenTokenRemoval(projectId, returning = ().pure[Try])
+      givenTokenRemoval(projectId, userAccessToken, returning = ().pure[Try])
 
       givenTokenValidation(userAccessToken, returning = true.pure[Try])
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
       givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -129,7 +128,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
       givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -142,7 +141,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
       givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -155,7 +154,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       val storedToken = userAccessTokens.generateOne
       givenTokenDecryption(of = encryptedToken, returning = storedToken.pure[Try])
       givenTokenValidation(storedToken, returning = false.pure[Try])
-      givenTokenRemoval(projectId, returning = ().pure[Try])
+      givenTokenRemoval(projectId, userAccessToken, returning = ().pure[Try])
 
       givenTokenValidation(userAccessToken, returning = false.pure[Try])
 
@@ -213,7 +212,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
-      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -243,7 +242,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
-      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -285,32 +284,6 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .exception
         .getMessage shouldBe show"Token associator - just saved token cannot be found for project: $projectId"
     }
-
-    "log a warning and succeed when token revoking fails" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-      givenStoredTokenFinder(projectId, returning = OptionT.some(encryptedToken))
-
-      val storedToken = accessTokens.generateOne
-      givenTokenDecryption(of = encryptedToken, returning = storedToken.pure[Try])
-
-      givenTokenValidation(storedToken, returning = false.pure[Try])
-      givenTokenRemoval(projectId, returning = ().pure[Try])
-
-      givenTokenValidation(userAccessToken, returning = true.pure[Try])
-      val projectPath = projectPaths.generateOne
-      givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      givenSuccessfulTokenCreation(projectPath)
-
-      val exception = exceptions.generateOne
-      givenTokensToRevokeFinding(projectId, userAccessToken, exception.raiseError[Try, List[AccessTokenId]])
-
-      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
-
-      logger.logged(
-        Warn(show"removing old token in GitLab for project ${Project(projectId, projectPath)} failed", exception)
-      )
-    }
   }
 
   private trait TestCase {
@@ -319,17 +292,16 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     implicit val logger:    TestLogger[Try]         = TestLogger[Try]()
     private val maxRetries: Int Refined NonNegative = 2
-    val projectPathFinder      = mock[ProjectPathFinder[Try]]
-    val accessTokenCrypto      = mock[AccessTokenCrypto[Try]]
-    val tokenValidator         = mock[TokenValidator[Try]]
-    val tokenDueChecker        = mock[TokenDueChecker[Try]]
-    val newTokensCreator       = mock[NewTokensCreator[Try]]
-    val tokensPersister        = mock[TokensPersister[Try]]
-    val persistedPathFinder    = mock[PersistedPathFinder[Try]]
-    val tokenRemover           = mock[TokenRemover[Try]]
-    val tokensFinder           = mock[PersistedTokensFinder[Try]]
-    val revokeCandidatesFinder = mock[RevokeCandidatesFinder[Try]]
-    val tokensRevoker          = mock[TokensRevoker[Try]]
+    private val projectPathFinder   = mock[ProjectPathFinder[Try]]
+    private val accessTokenCrypto   = mock[AccessTokenCrypto[Try]]
+    private val tokenValidator      = mock[TokenValidator[Try]]
+    private val tokenDueChecker     = mock[TokenDueChecker[Try]]
+    private val newTokensCreator    = mock[NewTokensCreator[Try]]
+    private val tokensPersister     = mock[TokensPersister[Try]]
+    private val persistedPathFinder = mock[PersistedPathFinder[Try]]
+    private val tokenRemover        = mock[TokenRemover[Try]]
+    private val tokensFinder        = mock[PersistedTokensFinder[Try]]
+    private val tokensRevoker       = mock[TokensRevoker[Try]]
     val tokensCreator = new TokensCreatorImpl[Try](
       projectPathFinder,
       accessTokenCrypto,
@@ -340,7 +312,6 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       persistedPathFinder,
       tokenRemover,
       tokensFinder,
-      revokeCandidatesFinder,
       tokensRevoker,
       maxRetries
     )
@@ -381,10 +352,9 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     def givenPathFinder(projectId:   projects.GitLabId,
                         accessToken: AccessToken,
                         returning:   OptionT[Try, projects.Path]
-    ) =
-      (projectPathFinder.findProjectPath _)
-        .expects(projectId, accessToken)
-        .returning(returning)
+    ) = (projectPathFinder.findProjectPath _)
+      .expects(projectId, accessToken)
+      .returning(returning)
 
     def givenPathHasNotChanged(projectId: projects.GitLabId, accessToken: AccessToken) = {
       val projectPath = projectPaths.generateOne
@@ -412,9 +382,9 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(project)
         .returning(returning)
 
-    def givenTokenRemoval(projectId: projects.GitLabId, returning: Try[Unit]) =
+    def givenTokenRemoval(projectId: projects.GitLabId, userAccessToken: UserAccessToken, returning: Try[Unit]) =
       (tokenRemover.delete _)
-        .expects(projectId)
+        .expects(projectId, userAccessToken.some)
         .returning(returning)
 
     def givenIntegrityCheckPasses(projectId:            projects.GitLabId,
@@ -442,22 +412,9 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
     }
 
-    def givenSuccessfulOldTokenRevoking(projectId: projects.GitLabId, accessToken: AccessToken) = {
-      val tokensToRevoke = accessTokenIds.generateList()
-      givenTokensToRevokeFinding(projectId, accessToken, returning = tokensToRevoke.pure[Try])
-
-      tokensToRevoke foreach { tokenId =>
-        (tokensRevoker.revokeToken _)
-          .expects(projectId, tokenId, accessToken)
-          .returning(().pure[Try])
-      }
-    }
-
-    def givenTokensToRevokeFinding(projectId:   projects.GitLabId,
-                                   accessToken: AccessToken,
-                                   returning:   Try[List[AccessTokenId]]
-    ) = (revokeCandidatesFinder.findTokensToRemove _)
-      .expects(projectId, accessToken)
-      .returning(returning)
+    def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
+      (tokensRevoker.revokeAllTokens _)
+        .expects(projectId, accessToken)
+        .returning(().pure[Try])
   }
 }
