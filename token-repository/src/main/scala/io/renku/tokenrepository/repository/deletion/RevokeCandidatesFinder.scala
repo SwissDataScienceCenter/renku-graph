@@ -21,6 +21,7 @@ package deletion
 
 import cats.effect.Async
 import cats.syntax.all._
+import fs2.Stream
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -30,7 +31,7 @@ import java.time.LocalDate.now
 import java.time.Period
 
 private trait RevokeCandidatesFinder[F[_]] {
-  def findProjectAccessTokens(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]]
+  def projectAccessTokensStream(projectId: projects.GitLabId, accessToken: AccessToken): Stream[F, AccessTokenId]
 }
 
 private object RevokeCandidatesFinder {
@@ -47,7 +48,6 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
   import eu.timepit.refined.api.Refined
   import eu.timepit.refined.auto._
   import eu.timepit.refined.collection.NonEmpty
-  import fs2.Stream
   import io.circe.Decoder
   import io.circe.Decoder._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -59,7 +59,9 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
 
   private val endpointName: String Refined NonEmpty = "project-access-tokens"
 
-  override def findProjectAccessTokens(projectId: projects.GitLabId, accessToken: AccessToken): F[List[AccessTokenId]] =
+  override def projectAccessTokensStream(projectId:   projects.GitLabId,
+                                         accessToken: AccessToken
+  ): Stream[F, AccessTokenId] =
     Stream
       .iterate(1)(_ + 1)
       .evalMap(fetch(_, projectId, accessToken))
@@ -67,10 +69,7 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](pageSize: Pe
         tokens.filter(renkuTokens).filter(dueToRefresh).map(_._1) -> maybeNextPage
       }
       .takeThrough { case (_, maybeNextPage) => maybeNextPage.nonEmpty }
-      .map(_._1)
-      .compile
-      .toList
-      .map(_.flatten)
+      .flatMap { case (tokens, _) => Stream.emits(tokens) }
 
   private def fetch(page: Int, projectId: projects.GitLabId, accessToken: AccessToken) =
     GitLabClient[F]

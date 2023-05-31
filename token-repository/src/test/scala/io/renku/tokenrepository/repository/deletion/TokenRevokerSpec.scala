@@ -57,7 +57,7 @@ class TokenRevokerSpec
         .expects(uri"projects" / projectId / "access_tokens" / tokenId, endpointName, *, Option(accessToken))
         .returning(().pure[IO])
 
-      tokensRevoker.revokeToken(projectId, tokenId, accessToken).unsafeRunSync() shouldBe ()
+      tokensRevoker.revokeToken(tokenId, projectId, accessToken).unsafeRunSync() shouldBe ()
     }
 
     Status.Ok :: Status.NoContent :: Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach {
@@ -78,7 +78,7 @@ class TokenRevokerSpec
     val tokensRevoker = new TokenRevokerImpl[IO]
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod = tokensRevoker.revokeToken(projectId, tokenId, accessTokens.generateOne).unsafeRunSync(),
+      findingMethod = tokensRevoker.revokeToken(tokenId, projectId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = fixed(()),
       method = DELETE
     )

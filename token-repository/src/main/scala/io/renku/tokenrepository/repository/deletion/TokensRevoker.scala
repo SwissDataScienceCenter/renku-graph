@@ -18,7 +18,6 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects.GitLabId
@@ -36,17 +35,18 @@ private[repository] object TokensRevoker {
     RevokeCandidatesFinder[F].map(new TokensRevokerImpl[F](_, TokenRevoker[F]))
 }
 
-private class TokensRevokerImpl[F[_]: MonadThrow: Logger](revokeCandidatesFinder: RevokeCandidatesFinder[F],
-                                                          tokenRevoker: TokenRevoker[F]
+private class TokensRevokerImpl[F[_]: Async: Logger](revokeCandidatesFinder: RevokeCandidatesFinder[F],
+                                                     tokenRevoker: TokenRevoker[F]
 ) extends TokensRevoker[F] {
 
   import revokeCandidatesFinder._
   import tokenRevoker._
 
   override def revokeAllTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
-    findProjectAccessTokens(projectId, accessToken)
-      .flatMap(_.map(revokeToken(projectId, _, accessToken)).sequence)
-      .void
+    projectAccessTokensStream(projectId, accessToken)
+      .evalMap(revokeToken(_, projectId, accessToken))
+      .compile
+      .drain
       .recoverWith { case NonFatal(ex) =>
         Logger[F].warn(ex)(show"removing old token in GitLab for project $projectId failed")
       }

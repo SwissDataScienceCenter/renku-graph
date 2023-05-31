@@ -25,7 +25,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait TokenRevoker[F[_]] {
-  def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
+  def revokeToken(tokenId: AccessTokenId, projectId: projects.GitLabId, accessToken: AccessToken): F[Unit]
 }
 
 private object TokenRevoker {
@@ -40,7 +40,7 @@ private class TokenRevokerImpl[F[_]: Async: GitLabClient] extends TokenRevoker[F
   import org.http4s.implicits._
   import org.http4s.{Request, Response, Status}
 
-  override def revokeToken(projectId: projects.GitLabId, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit] =
+  override def revokeToken(tokenId: AccessTokenId, projectId: projects.GitLabId, accessToken: AccessToken): F[Unit] =
     GitLabClient[F]
       .delete(uri"projects" / projectId / "access_tokens" / tokenId, "revoke-project-access-token")(mapResponse)(
         accessToken.some

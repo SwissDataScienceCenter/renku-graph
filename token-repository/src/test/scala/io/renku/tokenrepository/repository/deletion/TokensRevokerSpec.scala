@@ -18,7 +18,9 @@
 
 package io.renku.tokenrepository.repository.deletion
 
+import cats.effect.IO
 import cats.syntax.all._
+import fs2.Stream
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -27,16 +29,14 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
+import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenId
 import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
-import scala.util.Try
-
-class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
+class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec with MockFactory {
 
   it should "succeed and revoke all found project tokens" in new TestCase {
 
@@ -44,11 +44,14 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with TryValues 
     val accessToken   = accessTokens.generateOne
     val projectTokens = accessTokenIds.generateList()
 
-    givenTokensToRevokeFinding(projectId, accessToken, returning = projectTokens.pure[Try])
+    givenStreamOfTokensToRevoke(projectId,
+                                accessToken,
+                                returning = Stream.fromIterator[IO](projectTokens.iterator, chunkSize = 20)
+    )
 
-    projectTokens foreach (givenTokenRevoking(projectId, _: AccessTokenId, accessToken, returning = ().pure[Try]))
+    projectTokens foreach (givenTokenRevoking(projectId, _: AccessTokenId, accessToken, returning = ().pure[IO]))
 
-    tokensRevoker.revokeAllTokens(projectId, accessToken).success.value shouldBe ()
+    tokensRevoker.revokeAllTokens(projectId, accessToken).unsafeRunSync() shouldBe ()
   }
 
   it should "log a warning and succeed when token revoking process fails" in new TestCase {
@@ -57,9 +60,9 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with TryValues 
     val accessToken = accessTokens.generateOne
 
     val exception = exceptions.generateOne
-    givenTokensToRevokeFinding(projectId, accessToken, returning = exception.raiseError[Try, Nothing])
+    givenStreamOfTokensToRevoke(projectId, accessToken, returning = Stream.raiseError[IO](exception))
 
-    tokensRevoker.revokeAllTokens(projectId, accessToken).success.value shouldBe ()
+    tokensRevoker.revokeAllTokens(projectId, accessToken).unsafeRunSync() shouldBe ()
 
     logger.logged(
       Warn(show"removing old token in GitLab for project $projectId failed", exception)
@@ -68,23 +71,23 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with TryValues 
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    private val revokeCandidatesFinder = mock[RevokeCandidatesFinder[Try]]
-    private val tokenRevoker           = mock[TokenRevoker[Try]]
-    val tokensRevoker                  = new TokensRevokerImpl[Try](revokeCandidatesFinder, tokenRevoker)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val revokeCandidatesFinder = mock[RevokeCandidatesFinder[IO]]
+    private val tokenRevoker           = mock[TokenRevoker[IO]]
+    val tokensRevoker                  = new TokensRevokerImpl[IO](revokeCandidatesFinder, tokenRevoker)
 
     def givenTokenRevoking(projectId:   projects.GitLabId,
                            tokenId:     AccessTokenId,
                            accessToken: AccessToken,
-                           returning:   Try[Unit]
+                           returning:   IO[Unit]
     ) = (tokenRevoker.revokeToken _)
-      .expects(projectId, tokenId, accessToken)
+      .expects(tokenId, projectId, accessToken)
       .returning(returning)
 
-    def givenTokensToRevokeFinding(projectId:   projects.GitLabId,
-                                   accessToken: AccessToken,
-                                   returning:   Try[List[AccessTokenId]]
-    ) = (revokeCandidatesFinder.findProjectAccessTokens _)
+    def givenStreamOfTokensToRevoke(projectId:   projects.GitLabId,
+                                    accessToken: AccessToken,
+                                    returning:   Stream[IO, AccessTokenId]
+    ) = (revokeCandidatesFinder.projectAccessTokensStream _)
       .expects(projectId, accessToken)
       .returning(returning)
   }
