@@ -67,7 +67,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project3)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           val expectedResults = List(
@@ -76,7 +76,7 @@ class DatasetsFinderSpec
               dataset1ImportedToProject2 -> project2
             ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 2),
             List((dataset3 -> project3).toDatasetSearchResult(projectsCount = 1))
-          ).flatten.sortBy(_.title)
+          ).flatten.sortBy(_.namee)
 
           result.results          shouldBe expectedResults
           result.pagingInfo.total shouldBe Total(expectedResults.size)
@@ -93,13 +93,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projects: _*)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe projects
             .map(project => project.datasets.head -> project)
             .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
+            .sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(projects.size)
         }
 
@@ -114,7 +114,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project3)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -136,13 +136,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project2Updated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
             (dataset1, project1),
             (dataset2Modified, project2Updated)
-          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -157,7 +157,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2, project2Fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -181,12 +181,12 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(dataset1Modified -> project1, dataset2Modified -> project2)
             .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title)
+            .sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -200,7 +200,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectWithAllDatasets)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((modification2, projectWithAllDatasets).toDatasetSearchResult(projectsCount = 1))
@@ -218,13 +218,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
             dataset1Modification -> project1,
             dataset2             -> project2
-          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -239,13 +239,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2Updated)
 
           val result = datasetsFinder
-            .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(None, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
             dataset1         -> project1,
             dataset2Modified -> project2Updated
-          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+          ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -260,7 +260,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
@@ -279,13 +279,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectUpdated, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
             (dataset, fork).toDatasetSearchResult(projectsCount = 1),
             (datasetModified, projectUpdated).toDatasetSearchResult(projectsCount = 1)
-          ).sortBy(_.title)
+          ).sortBy(_.namee)
 
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -304,13 +304,13 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, forkUpdated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List(
             (datasetModification, project).toDatasetSearchResult(projectsCount = 1),
             (modificationOfModificationOnFork, forkUpdated).toDatasetSearchResult(projectsCount = 1)
-          ).sortBy(_.title)
+          ).sortBy(_.namee)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -324,7 +324,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project1, project2)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
@@ -340,7 +340,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, project, forkUpdated)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
@@ -356,7 +356,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, afterForkingUpdated, fork)
 
           val result = datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
 
           result.results shouldBe List((dataset, fork).toDatasetSearchResult(projectsCount = 1))
@@ -372,7 +372,7 @@ class DatasetsFinderSpec
           upload(to = projectsDataset, projectUpdated)
 
           datasetsFinder
-            .findDatasets(maybePhrase, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+            .findDatasets(maybePhrase, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
             .unsafeRunSync()
             .results shouldBe Nil
         }
@@ -386,7 +386,7 @@ class DatasetsFinderSpec
 
         val phrase = phrases.generateOne.value
         val (dataset1, project1) = publicProjectEntities
-          .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase)))
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeSlugContaining(phrase)))
           .generateOne
         val (dataset2, project2) = publicProjectEntities
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase)))
@@ -395,7 +395,7 @@ class DatasetsFinderSpec
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(phrase)))
           .generateOne
         val (dataset4, project4) = publicProjectEntities
-          .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase)))
+          .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase)))
           .generateOne
         val (dataset5, project5) = publicProjectEntities
           .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase)))
@@ -406,7 +406,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, project1, project2, project3, project4, project5, projectWithoutPhrase)
 
         val result = datasetsFinder
-          .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+          .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
 
         result.results shouldBe List((dataset1, project1),
@@ -414,7 +414,7 @@ class DatasetsFinderSpec
                                      (dataset3, project3),
                                      (dataset4, project4),
                                      (dataset5, project5)
-        ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.title)
+        ).map(_.toDatasetSearchResult(projectsCount = 1)).sortBy(_.namee)
         result.pagingInfo.total shouldBe Total(5)
       }
 
@@ -426,7 +426,7 @@ class DatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(Some(phrases.generateOne),
-                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                      Sorting(Sort.By(NameProperty, Direction.Asc)),
                       PagingRequest.default,
                       None
         )
@@ -444,7 +444,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -464,7 +464,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset1, project1).toDatasetSearchResult(projectsCount = 1))
     }
@@ -482,7 +482,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2Updated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset2Modified, project2Updated).toDatasetSearchResult(projectsCount = 1))
     }
@@ -498,7 +498,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, projectUpdate2)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -515,7 +515,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project, forkUpdated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((dataset, project).toDatasetSearchResult(projectsCount = 1))
     }
@@ -531,7 +531,7 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project, forkUpdated)
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results shouldBe List((datasetModified, forkUpdated).toDatasetSearchResult(projectsCount = 1))
     }
@@ -547,7 +547,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, project)
 
         datasetsFinder
-          .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+          .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
           .results shouldBe Nil
       }
@@ -555,10 +555,10 @@ class DatasetsFinderSpec
 
   "findDatasets when explicit sorting given" should {
 
-    s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
 
       val (dataset2, project2) = publicProjectEntities
@@ -574,20 +574,20 @@ class DatasetsFinderSpec
       upload(to = projectsDataset, project1, project2, project3, projectNonPhrased)
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
         .unsafeRunSync()
         .results
 
       results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(1))
-        .sortBy(_.title)
+        .sortBy(_.namee)
 
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $DatePublishedProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeDescContaining(phrase.value)))
@@ -621,7 +621,7 @@ class DatasetsFinderSpec
     s"return datasets with name, description or creator matching the given phrase sorted by $DateProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
@@ -652,7 +652,7 @@ class DatasetsFinderSpec
       val phrase = phrases.generateOne
 
       val (dataset1, project1 -> project1Fork) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .forkOnce()
         .generateOne
       val (dataset2, project2 -> project2Forks) = publicProjectEntities
@@ -691,7 +691,7 @@ class DatasetsFinderSpec
     "return the requested page of datasets matching the given phrase" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (dataset2, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
@@ -710,12 +710,12 @@ class DatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), pagingRequest, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), pagingRequest, None)
         .unsafeRunSync()
 
       result.results shouldBe List((dataset1, project1), (dataset2, project2), (dataset3, project3))
         .map(_.toDatasetSearchResult(projectsCount = 1))
-        .sortBy(_.title)
+        .sortBy(_.namee)
         .get(1)
         .toList
 
@@ -726,7 +726,7 @@ class DatasetsFinderSpec
     "return no results if the requested page does not exist" in new TestCase {
       val phrase = phrases.generateOne
       val (_, project1) = publicProjectEntities
-        .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(phrase.value)))
+        .addDataset(datasetEntities(provenanceInternal).modify(_.makeNameContaining(phrase.value)))
         .generateOne
       val (_, project2) = publicProjectEntities
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
@@ -740,7 +740,7 @@ class DatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sorting(Sort.By(TitleProperty, Direction.Asc)), pagingRequest, None)
+        .findDatasets(Some(phrase), Sorting(Sort.By(NameProperty, Direction.Asc)), pagingRequest, None)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -761,7 +761,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, publicProject, privateProject)
 
         val result = datasetsFinder
-          .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, maybeUser = None)
+          .findDatasets(None, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, maybeUser = None)
           .unsafeRunSync()
 
         result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
@@ -778,7 +778,7 @@ class DatasetsFinderSpec
         upload(to = projectsDataset, publicProject, privateProjectWithPublicDataset)
 
         val result = datasetsFinder
-          .findDatasets(None, Sorting(Sort.By(TitleProperty, Direction.Asc)), PagingRequest.default, None)
+          .findDatasets(None, Sorting(Sort.By(NameProperty, Direction.Asc)), PagingRequest.default, None)
           .unsafeRunSync()
 
         result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
@@ -811,7 +811,7 @@ class DatasetsFinderSpec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                      Sorting(Sort.By(NameProperty, Direction.Asc)),
                       PagingRequest.default,
                       userWithGitlabId.toAuthUser.some
         )
@@ -821,7 +821,7 @@ class DatasetsFinderSpec
         (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
         (internalDatasetWithAccess, internalProjectWithAccess).toDatasetSearchResult(projectsCount = 1),
         (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
-      ).sortBy(_.title)
+      ).sortBy(_.namee)
 
       result.results          shouldBe datasetsList
       result.pagingInfo.total shouldBe Total(3)
@@ -836,7 +836,7 @@ class DatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                      Sorting(Sort.By(NameProperty, Direction.Asc)),
                       PagingRequest.default,
                       authUsers.generateSome
         )
@@ -855,7 +855,7 @@ class DatasetsFinderSpec
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
-                      Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                      Sorting(Sort.By(NameProperty, Direction.Asc)),
                       PagingRequest.default,
                       authUsers.generateSome
         )
@@ -893,7 +893,7 @@ class DatasetsFinderSpec
 
         val result = datasetsFinder
           .findDatasets(maybePhrase = None,
-                        Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                        Sorting(Sort.By(NameProperty, Direction.Asc)),
                         PagingRequest.default,
                         userWithGitlabId.toAuthUser.some
           )
@@ -907,7 +907,7 @@ class DatasetsFinderSpec
             (internalDatasetWithoutAccess, internalProjectWithoutAccess),
             (internalDatasetWithAccess, internalProjectWithAccess)
           ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 2).toList
-        }.sortBy(_.title)
+        }.sortBy(_.namee)
 
         result.pagingInfo.total shouldBe Total(3)
       }
@@ -932,8 +932,8 @@ class DatasetsFinderSpec
 
     def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult = DatasetSearchResult(
       dataset.identification.identifier,
-      dataset.identification.title,
-      dataset.identification.name,
+      dataset.identification.namee,
+      dataset.identification.slug,
       dataset.additionalInfo.maybeDescription,
       dataset.provenance.creators.map(_.to[DatasetCreator]).toList.sortBy(_.name),
       dataset.provenance.date,
@@ -957,8 +957,8 @@ class DatasetsFinderSpec
 
       DatasetSearchResult(
         dataset.identification.identifier,
-        dataset.identification.title,
-        dataset.identification.name,
+        dataset.identification.namee,
+        dataset.identification.slug,
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(_.to[DatasetCreator]).toList,
         dataset.provenance.date,

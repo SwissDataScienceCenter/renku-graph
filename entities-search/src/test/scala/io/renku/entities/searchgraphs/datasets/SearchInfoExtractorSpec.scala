@@ -47,8 +47,8 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         .map { ds =>
           DatasetSearchInfo(
             ds.provenance.topmostSameAs,
-            ds.identification.name,
-            ds.identification.title,
+            ds.identification.slug,
+            ds.identification.namee,
             project.visibility,
             ds.provenance.date,
             maybeDateModified = None,
@@ -77,8 +77,8 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
       SearchInfoExtractor.extractSearchInfo[Try](project)(List(lastModification)) shouldBe List(
         DatasetSearchInfo(
           lastModification.provenance.topmostSameAs,
-          lastModification.identification.name,
-          lastModification.identification.title,
+          lastModification.identification.slug,
+          lastModification.identification.namee,
           project.visibility,
           originalDataset.provenance.date,
           datasets.DateModified(lastModification.provenance.date).some,

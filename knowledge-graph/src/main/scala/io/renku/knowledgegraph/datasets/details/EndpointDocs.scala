@@ -75,7 +75,7 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     Dataset
       .NonModifiedDataset(
         datasets.ResourceId((renkuUrl / "datasets" / "123444").show),
-        datasets.Title("title"),
+        datasets.Slug("slug"),
         datasets.Name("name"),
         sameAs,
         DatasetVersions(datasets.OriginalIdentifier("12333")),

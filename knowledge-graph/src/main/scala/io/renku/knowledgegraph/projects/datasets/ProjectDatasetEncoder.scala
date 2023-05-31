@@ -41,15 +41,14 @@ private object ProjectDatasetEncoder extends ImagesEncoder {
   def encoder(
       projectPath: projects.Path
   )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
+    Encoder.instance[ProjectDataset] { case ProjectDataset(id, originalId, name, slug, sameAsOrDerived, images) =>
       json"""{
         "identifier": ${id.toString},
         "versions": {
           "initial": ${originalId.toString}
         },
-        "title":  ${title},
-        "name":   ${name},
-        "slug":   ${name},
+        "name":  $name,
+        "slug":   $slug,
         "images": ${images -> projectPath}
       }"""
         .deepMerge(sameAsOrDerived.asJson)
@@ -58,7 +57,7 @@ private object ProjectDatasetEncoder extends ImagesEncoder {
             Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)),
             Rel("initial-version") ->
               knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(originalId.asIdentifier)),
-            Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, name)
+            Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, slug)
           )
         )
     }

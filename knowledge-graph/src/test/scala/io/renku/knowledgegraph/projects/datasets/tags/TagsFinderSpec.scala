@@ -18,13 +18,13 @@
 
 package io.renku.knowledgegraph.projects.datasets.tags
 
-import Endpoint._
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.paging.model.Total
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph.projects.datasets.tags.Endpoint._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
@@ -61,11 +61,11 @@ class TagsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      original.identification.name shouldBe modified.identification.name
+      original.identification.slug shouldBe modified.identification.slug
 
       project.datasets.flatMap(_.publicationEvents).size shouldBe 3
 
-      val response = finder.findTags(Criteria(project.path, original.identification.name)).unsafeRunSync()
+      val response = finder.findTags(Criteria(project.path, original.identification.slug)).unsafeRunSync()
 
       response.results shouldBe List(original, modified)
         .flatMap(_.publicationEvents)
@@ -94,7 +94,7 @@ class TagsFinderSpec
       project.datasets.flatMap(_.publicationEvents).size               shouldBe 1
       projectWithImportedDs.datasets.flatMap(_.publicationEvents).size shouldBe 1
 
-      val response = finder.findTags(Criteria(project.path, ds.identification.name)).unsafeRunSync()
+      val response = finder.findTags(Criteria(project.path, ds.identification.slug)).unsafeRunSync()
 
       response.results shouldBe List(ds)
         .flatMap(_.publicationEvents)
@@ -104,7 +104,7 @@ class TagsFinderSpec
       response.pagingInfo.total shouldBe Total(1)
 
       finder
-        .findTags(Criteria(projectWithImportedDs.path, ds.identification.name))
+        .findTags(Criteria(projectWithImportedDs.path, ds.identification.slug))
         .unsafeRunSync()
         .results shouldBe List(importedDs)
         .flatMap(_.publicationEvents)
@@ -122,7 +122,7 @@ class TagsFinderSpec
 
     upload(to = projectsDataset, project)
 
-    val response = finder.findTags(Criteria(project.path, original.identification.name)).unsafeRunSync()
+    val response = finder.findTags(Criteria(project.path, original.identification.slug)).unsafeRunSync()
 
     response.results          shouldBe Nil
     response.pagingInfo.total shouldBe Total(0)
@@ -130,7 +130,7 @@ class TagsFinderSpec
 
   "return no PublicationEvent for non-existing Project" in new TestCase {
 
-    val response = finder.findTags(Criteria(projectPaths.generateOne, datasetNames.generateOne)).unsafeRunSync()
+    val response = finder.findTags(Criteria(projectPaths.generateOne, datasetSlugs.generateOne)).unsafeRunSync()
 
     response.results          shouldBe Nil
     response.pagingInfo.total shouldBe Total(0)
@@ -144,7 +144,7 @@ class TagsFinderSpec
 
     upload(to = projectsDataset, project)
 
-    val response = finder.findTags(Criteria(projectPaths.generateOne, original.identification.name)).unsafeRunSync()
+    val response = finder.findTags(Criteria(projectPaths.generateOne, original.identification.slug)).unsafeRunSync()
 
     response.results          shouldBe Nil
     response.pagingInfo.total shouldBe Total(0)

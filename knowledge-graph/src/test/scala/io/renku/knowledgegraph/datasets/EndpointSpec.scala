@@ -120,7 +120,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     import io.renku.knowledgegraph.datasets.Endpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      Endpoint.Sort.properties shouldBe Set(TitleProperty, DateProperty, DatePublishedProperty, ProjectsCountProperty)
+      Endpoint.Sort.properties shouldBe Set(NameProperty, DateProperty, DatePublishedProperty, ProjectsCountProperty)
     }
   }
 
@@ -220,7 +220,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private implicit lazy val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id                <- datasetIdentifiers
-    title             <- datasetTitles
+    slug              <- datasetSlugs
     name              <- datasetNames
     maybeDescription  <- datasetDescriptions.toGeneratorOfOptions
     creators          <- personEntities.toGeneratorOfNonEmptyList(max = 4)
@@ -231,8 +231,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     images            <- imageUris.toGeneratorOfList()
   } yield DatasetSearchResult(
     id,
-    title,
     name,
+    slug,
     maybeDescription,
     creators.map(_.to[DatasetCreator]).toList,
     dates,

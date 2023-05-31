@@ -107,8 +107,8 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
 
       searchInfo.asQuads shouldBe Set(
         DatasetsQuad(searchInfo.topmostSameAs, rdf / "type", renku / "DiscoverableDataset"),
-        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.slugProperty.id, searchInfo.name.asObject),
-        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.nameProperty.id, searchInfo.title.asObject),
+        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.slugProperty.id, searchInfo.slug.asObject),
+        DatasetsQuad(searchInfo.topmostSameAs, DatasetSearchInfoOntology.nameProperty.id, searchInfo.namee.asObject),
         DatasetsQuad(searchInfo.topmostSameAs,
                      DatasetSearchInfoOntology.visibilityProperty.id,
                      searchInfo.visibility.asObject

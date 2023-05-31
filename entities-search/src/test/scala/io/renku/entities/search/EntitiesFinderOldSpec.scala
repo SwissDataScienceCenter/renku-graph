@@ -119,7 +119,7 @@ class EntitiesFinderOldSpec
         .withActivities(activityEntities(stepPlanEntities(fixed(plans.DateCreated(projectDate)))))
         .withDatasets(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSName(datasets.Name("hello 2")))
+            .modify(replaceDsName(datasets.Name("hello 2")))
             .modify(replaceDSDateCreatedOrPublished(otherDate))
         )
         .generateOne
@@ -144,9 +144,8 @@ class EntitiesFinderOldSpec
           .resultsWithSkippedMatchingScore
 
       implicit val entityOrdering: Ordering[model.Entity] =
-        Ordering.by {
-          case e: Entity.Dataset => s"${e.date.value}, ${e.slug.value}".toLowerCase
-          case e => s"${e.date.value}, ${e.name.value}".toLowerCase
+        Ordering.by { e =>
+          s"${e.date.value}, ${e.name.value}".toLowerCase
         }
 
       val expected = allEntitiesFrom(project).filter(nameOrSlugContains("hello")).sorted
@@ -169,7 +168,7 @@ class EntitiesFinderOldSpec
       val dsAndProject @ _ -> dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
-            replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name))
+            replaceDsName(to = sentenceContaining(query).generateAs(datasets.Name))
           )
         )
         .generateOne
@@ -958,7 +957,7 @@ class EntitiesFinderOldSpec
       val project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(projects.Name(s"a$commonPart")))
         .withActivities(activityEntities(stepPlanEntities()))
-        .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSName(datasets.Name(s"B$commonPart"))))
+        .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDsName(datasets.Name(s"B$commonPart"))))
         .generateOne
 
       provisionTestProject(project).unsafeRunSync()
@@ -1013,7 +1012,7 @@ class EntitiesFinderOldSpec
         .withActivities(activityEntities(stepPlanEntities().map(_.replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(
           datasetEntities(provenanceNonModified)
-            .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
+            .modify(replaceDsName(to = sentenceContaining(query).generateAs(datasets.Name)))
         )
         .generateOne
       val plan :: Nil = project.plans

@@ -85,7 +85,7 @@ class MicroserviceRoutesSpec
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Phrase(phrase).some,
-                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                 Sorting(Sort.By(NameProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser.option
         )
@@ -103,7 +103,7 @@ class MicroserviceRoutesSpec
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
         .expects(Option.empty[Phrase],
-                 Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                 Sorting(Sort.By(NameProperty, Direction.Asc)),
                  PagingRequest(Page.first, PerPage.default),
                  maybeAuthUser.option
         )
@@ -158,7 +158,7 @@ class MicroserviceRoutesSpec
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sorting[Sort.type], _: PagingRequest, _: Option[AuthUser]))
           .expects(phrase.some,
-                   Sorting(Sort.By(TitleProperty, Direction.Asc)),
+                   Sorting(Sort.By(NameProperty, Direction.Asc)),
                    PagingRequest(page, perPage),
                    maybeAuthUser.option
           )
@@ -616,19 +616,19 @@ class MicroserviceRoutesSpec
     import projects.datasets.tags.Endpoint._
 
     val projectPath = projectPaths.generateOne
-    val datasetName = datasetNames.generateOne
+    val datasetSlug = datasetSlugs.generateOne
     val projectDsTagsUri = projectPath.toNamespaces
       .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) /
-      projectPath.toName.show / "datasets" / datasetName.show / "tags"
+      projectPath.toName.show / "datasets" / datasetSlug.show / "tags"
 
     forAll {
       Table(
         "uri"            -> "criteria",
-        projectDsTagsUri -> Criteria(projectPath, datasetName),
+        projectDsTagsUri -> Criteria(projectPath, datasetSlug),
         pages
           .map(page =>
             projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectPath,
-                                                                  datasetName,
+                                                                  datasetSlug,
                                                                   PagingRequest.default.copy(page = page)
             )
           )
@@ -636,7 +636,7 @@ class MicroserviceRoutesSpec
         perPages
           .map(perPage =>
             projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
-                                                                         datasetName,
+                                                                         datasetSlug,
                                                                          PagingRequest.default.copy(perPage = perPage)
             )
           )
@@ -689,7 +689,7 @@ class MicroserviceRoutesSpec
       val responseBody = jsons.generateOne
       (projectDatasetTagsEndpoint
         .`GET /projects/:path/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
-        .expects(Criteria(projectPath, datasetName, maybeUser = maybeAuthUser.option), request)
+        .expects(Criteria(projectPath, datasetSlug, maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok

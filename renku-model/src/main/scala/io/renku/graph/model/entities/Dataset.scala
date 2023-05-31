@@ -137,8 +137,8 @@ object Dataset {
   final case class Identification(
       resourceId: ResourceId,
       identifier: Identifier,
-      title:      Title,
-      name:       Name
+      namee:      Name,
+      slug:       Slug
   )
 
   object Identification {
@@ -152,7 +152,7 @@ object Dataset {
     }
 
     def fromCli(dataset: CliDataset): Identification =
-      Identification(dataset.resourceId, dataset.identifier, dataset.title, dataset.name)
+      Identification(dataset.resourceId, dataset.identifier, dataset.namee, dataset.slug)
   }
 
   sealed trait Provenance extends Product with Serializable {

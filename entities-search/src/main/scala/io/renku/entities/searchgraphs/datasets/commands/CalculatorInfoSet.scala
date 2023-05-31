@@ -89,7 +89,7 @@ private object CalculatorInfoSet {
 
   private def toString(info: DatasetSearchInfo) = List(
     show"topmostSameAs = ${info.topmostSameAs}",
-    show"name = ${info.name}",
+    show"slug = ${info.slug}",
     show"visibility = ${info.visibility}",
     show"links = [${info.links.map(link => show"projectId = ${link.projectId}, datasetId = ${link.datasetId}").intercalate("; ")}}]"
   ).mkString(", ")

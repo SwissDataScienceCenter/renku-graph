@@ -82,8 +82,8 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
       SearchEntity.Dataset(
         sameAs = Right(dataset.provenance.topmostSameAs),
         matchingScore = MatchingScore(1f),
-        name = datasets.Name(dataset.identification.title.value),
-        slug = datasets.Slug(dataset.identification.name.value),
+        name = datasets.Name(dataset.identification.namee.value),
+        slug = datasets.Slug(dataset.identification.slug.value),
         visibility = project.visibility,
         date = dataset.provenance.date,
         keywords = dataset.additionalInfo.keywords.sorted,
@@ -122,8 +122,8 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
       SearchEntity.Dataset(
         sameAs = Right(dataset1.provenance.topmostSameAs),
         matchingScore = MatchingScore(1f),
-        name = datasets.Name(dataset1.identification.title.value),
-        slug = datasets.Slug(dataset1.identification.name.value),
+        name = datasets.Name(dataset1.identification.namee.value),
+        slug = datasets.Slug(dataset1.identification.slug.value),
         visibility = project1.visibility,
         date = dataset1.provenance.date,
         keywords = dataset1.additionalInfo.keywords.sorted,

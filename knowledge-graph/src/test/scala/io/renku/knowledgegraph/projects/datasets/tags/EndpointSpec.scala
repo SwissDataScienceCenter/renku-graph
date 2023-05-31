@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.datasets.tags
 
-import Endpoint.Criteria
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
@@ -27,7 +26,8 @@ import io.renku.config.renku.ResourceUrl
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.{projectPaths, renkuUrls}
+import io.renku.graph.model.RenkuTinyTypeGenerators.datasetSlugs
 import io.renku.graph.model.publicationEvents
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -35,6 +35,7 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.knowledgegraph.projects.datasets.tags.Endpoint.Criteria
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -42,6 +43,7 @@ import org.http4s.Status.{InternalServerError, Ok}
 import org.http4s.circe._
 import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityDecoder, Request, Uri}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -110,11 +112,11 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
     val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuApiUrl)
   }
 
-  private lazy val criterias = for {
+  private lazy val criterias: Gen[Criteria] = for {
     projectPath <- projectPaths
-    datasetName <- datasetNames
+    datasetSlug <- datasetSlugs
     maybeUser   <- authUsers.toGeneratorOfOptions
-  } yield Criteria(projectPath, datasetName, PagingRequest.default, maybeUser)
+  } yield Criteria(projectPath, datasetSlug, PagingRequest.default, maybeUser)
 
   private def tagsDecoder(possibleTags: List[model.Tag]): Decoder[model.Tag] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._

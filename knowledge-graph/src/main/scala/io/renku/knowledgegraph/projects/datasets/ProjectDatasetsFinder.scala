@@ -22,7 +22,7 @@ import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.MonadThrow
 import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Slug}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
@@ -36,7 +36,14 @@ private trait ProjectDatasetsFinder[F[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
+  final case class ProjectDataset(
+      ident:           Identifier,
+      originalIdent:   OriginalIdentifier,
+      namee:           Name,
+      slug:            Slug,
+      sameAsOrDerived: SameAsOrDerived,
+      images:          List[ImageUri]
+  )
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connectionConfig: ProjectsConnectionConfig)(implicit
       renkuUrl: RenkuUrl
@@ -120,12 +127,19 @@ private object ProjectDatasetsFinderImpl {
 
       for {
         id               <- extract[Identifier]("identifier")
-        title            <- extract[Title]("name")
-        name             <- extract[Name]("slug")
+        name             <- extract[Name]("name")
+        slug             <- extract[Slug]("slug")
         sameAs           <- extract[SameAs]("topmostSameAs")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         originalId       <- extract[OriginalIdentifier]("originalId")
         images           <- extract[Option[String]]("images").map(toListOfImageUrls)
-      } yield (id, originalId, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
+      } yield ProjectDataset(
+        id,
+        originalId,
+        name,
+        slug,
+        sameAsOrDerived(from = sameAs, and = maybeDerivedFrom),
+        images
+      )
   }
 }

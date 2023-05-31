@@ -30,8 +30,8 @@ trait DatasetGenerators {
     for {
       identifier         <- RenkuTinyTypeGenerators.datasetIdentifiers
       resourceId         <- RenkuTinyTypeGenerators.datasetResourceIds(identifier)
-      title              <- RenkuTinyTypeGenerators.datasetTitles
       name               <- RenkuTinyTypeGenerators.datasetNames
+      slug               <- RenkuTinyTypeGenerators.datasetSlugs
       createdOrPublished <- RenkuTinyTypeGenerators.datasetCreatedOrPublished
       creators           <- PersonGenerators.cliPersonGen.toGeneratorOfNonEmptyList(max = 3)
       descr              <- RenkuTinyTypeGenerators.datasetDescriptions.toGeneratorOfOptions
@@ -53,8 +53,8 @@ trait DatasetGenerators {
     } yield CliDataset(
       resourceId = resourceId,
       identifier = identifier,
-      title = title,
-      name = name,
+      namee = name,
+      slug = slug,
       createdOrPublished = createdOrPublished,
       creators = creators,
       description = descr,

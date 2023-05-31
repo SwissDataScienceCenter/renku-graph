@@ -99,8 +99,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   )(implicit renkuUrl: RenkuUrl) = {
     val binding = json"""{
       "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
-      "name":              {"value": ${dataset.identification.title}},
-      "slug":              {"value": ${dataset.identification.name}},
+      "name":              {"value": ${dataset.identification.namee}},
+      "slug":              {"value": ${dataset.identification.slug}},
       "description":       {"value": $description},
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
@@ -130,8 +130,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     val binding = json"""{
       "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":        {"value": ${dataset.identifier}},
-      "name":              {"value": ${dataset.identification.title}},
-      "slug":              {"value": ${dataset.identification.name}},
+      "name":              {"value": ${dataset.identification.namee}},
+      "slug":              {"value": ${dataset.identification.slug}},
       "description":       {"value": $description},
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "maybeDerivedFrom":  {"value": ${dataset.provenance.derivedFrom}},

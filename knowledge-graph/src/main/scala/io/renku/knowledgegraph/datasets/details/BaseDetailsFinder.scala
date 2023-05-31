@@ -269,7 +269,7 @@ private object BaseDetailsFinderImpl {
 
   private lazy val createDataset: (RequestedDataset,
                                    ResourceId,
-                                   Title,
+                                   Slug,
                                    Name,
                                    Option[DerivedFrom],
                                    SameAs,
@@ -278,10 +278,10 @@ private object BaseDetailsFinderImpl {
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (_, resourceId, title, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
+    case (_, resourceId, slug, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
       ModifiedDataset(
         resourceId,
-        title,
+        slug,
         name,
         derived,
         DatasetVersions(initialVersion),
@@ -295,10 +295,10 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (_, resourceId, title, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
+    case (_, resourceId, slug, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
       NonModifiedDataset(
         resourceId,
-        title,
+        slug,
         name,
         sameAs,
         DatasetVersions(initialVersion),
@@ -323,8 +323,8 @@ private object BaseDetailsFinderImpl {
     ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId       <- extract[ResourceId]("datasetId")
-        title            <- extract[Title]("name")
-        name             <- extract[Name]("slug")
+        name             <- extract[Name]("name")
+        slug             <- extract[Slug]("slug")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs           <- extract[SameAs]("topmostSameAs")
         initialVersion   <- extract[OriginalIdentifier]("initialVersion")
@@ -349,7 +349,7 @@ private object BaseDetailsFinderImpl {
 
         dataset <- createDataset(requestedDataset,
                                  resourceId,
-                                 title,
+                                 slug,
                                  name,
                                  maybeDerivedFrom,
                                  sameAs,

@@ -31,8 +31,9 @@ package object details {
                                              project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
-    dataset.identification.name,
+    dataset.identification.identifier,
+    dataset.identification.slug,
+    dataset.identification.namee,
     SameAs(dataset.entityId),
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -50,8 +51,9 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
-    dataset.identification.name,
+    dataset.identification.identifier,
+    dataset.identification.slug,
+    dataset.identification.namee,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -69,8 +71,9 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
-    dataset.identification.name,
+    dataset.identification.identifier,
+    dataset.identification.slug,
+    dataset.identification.namee,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,
@@ -88,8 +91,9 @@ package object details {
                                           project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.title,
-    dataset.identification.name,
+    dataset.identification.identifier,
+    dataset.identification.slug,
+    dataset.identification.namee,
     dataset.provenance.derivedFrom,
     DatasetVersions(dataset.provenance.originalIdentifier),
     maybeInitialTag = None,

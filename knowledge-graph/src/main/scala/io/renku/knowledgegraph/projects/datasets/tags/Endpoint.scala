@@ -41,7 +41,7 @@ trait Endpoint[F[_]] {
 object Endpoint {
 
   final case class Criteria(projectPath: graph.model.projects.Path,
-                            datasetName: graph.model.datasets.Name,
+                            datasetSlug: graph.model.datasets.Slug,
                             paging:      PagingRequest = PagingRequest.default,
                             maybeUser:   Option[AuthUser] = None
   )
@@ -54,8 +54,8 @@ object Endpoint {
     renkuApiUrl                   <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Path, name: datasets.Name): Href =
-    Href(renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags")
+  def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Path, slug: datasets.Slug): Href =
+    Href(renkuApiUrl / "projects" / projectPath / "datasets" / slug / "tags")
 }
 
 private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],

@@ -24,10 +24,10 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.config
-import io.renku.graph.model.datasets.{CreatedOrPublished, DatePublished, Description, Identifier, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{CreatedOrPublished, DatePublished, Description, Identifier, Keyword, Name, Slug}
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{projects, GitLabUrl}
-import io.renku.http.rest.Links.{_links, Href, Link, Rel}
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.tinytypes.constraints.NonNegativeInt
@@ -35,8 +35,8 @@ import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
 final case class DatasetSearchResult(
     id:                 Identifier,
-    title:              Title,
-    name:               Name,
+    namee:              Name,
+    slug:               Slug,
     maybeDescription:   Option[Description],
     creators:           List[DatasetCreator],
     createdOrPublished: CreatedOrPublished,

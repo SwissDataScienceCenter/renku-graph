@@ -24,6 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsFinder.ProjectDataset
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -57,12 +58,13 @@ class ProjectDatasetsFinderSpec
       datasetsFinder
         .findProjectDatasets(projectComplete.path)
         .unsafeRunSync() shouldBe List(
-        (modification2.identification.identifier,
-         OriginalIdentifier(original.identification.identifier),
-         modification2.identification.title,
-         modification2.identification.name,
-         modification2.provenance.derivedFrom.asRight,
-         modification2.additionalInfo.images
+        ProjectDataset(
+          modification2.identification.identifier,
+          OriginalIdentifier(original.identification.identifier),
+          modification2.identification.namee,
+          modification2.identification.slug,
+          modification2.provenance.derivedFrom.asRight,
+          modification2.additionalInfo.images
         )
       )
     }
@@ -76,21 +78,23 @@ class ProjectDatasetsFinderSpec
       upload(to = projectsDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
-        (dataset1.identification.identifier,
-         OriginalIdentifier(dataset1.identification.identifier),
-         dataset1.identification.title,
-         dataset1.identification.name,
-         dataset1.provenance.sameAs.asLeft,
-         dataset1.additionalInfo.images
+        ProjectDataset(
+          dataset1.identification.identifier,
+          OriginalIdentifier(dataset1.identification.identifier),
+          dataset1.identification.namee,
+          dataset1.identification.slug,
+          dataset1.provenance.sameAs.asLeft,
+          dataset1.additionalInfo.images
         ),
-        (modified2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         modified2.identification.title,
-         modified2.identification.name,
-         modified2.provenance.derivedFrom.asRight,
-         modified2.additionalInfo.images
+        ProjectDataset(
+          modified2.identification.identifier,
+          OriginalIdentifier(dataset2.identification.identifier),
+          modified2.identification.namee,
+          modified2.identification.slug,
+          modified2.provenance.derivedFrom.asRight,
+          modified2.additionalInfo.images
         )
-      ).sortBy(_._3)
+      ).sortBy(_.namee)
     }
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
@@ -105,19 +109,21 @@ class ProjectDatasetsFinderSpec
       upload(to = projectsDataset, originalProject, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-        (dataset1.identification.identifier,
-         OriginalIdentifier(dataset1.identification.identifier),
-         dataset1.identification.title,
-         original.identification.name,
-         dataset1.provenance.sameAs.asLeft,
-         original.additionalInfo.images
+        ProjectDataset(
+          dataset1.identification.identifier,
+          OriginalIdentifier(dataset1.identification.identifier),
+          dataset1.identification.namee,
+          original.identification.slug,
+          dataset1.provenance.sameAs.asLeft,
+          original.additionalInfo.images
         ),
-        (dataset2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         dataset2.identification.title,
-         original.identification.name,
-         dataset2.provenance.sameAs.asLeft,
-         original.additionalInfo.images
+        ProjectDataset(
+          dataset2.identification.identifier,
+          OriginalIdentifier(dataset2.identification.identifier),
+          dataset2.identification.namee,
+          original.identification.slug,
+          dataset2.provenance.sameAs.asLeft,
+          original.additionalInfo.images
         )
       )
     }
@@ -135,12 +141,13 @@ class ProjectDatasetsFinderSpec
       upload(to = projectsDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
-        (dataset2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         dataset2.identification.title,
-         dataset2.identification.name,
-         SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
-         dataset2.additionalInfo.images
+        ProjectDataset(
+          dataset2.identification.identifier,
+          OriginalIdentifier(dataset2.identification.identifier),
+          dataset2.identification.namee,
+          dataset2.identification.slug,
+          SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
+          dataset2.additionalInfo.images
         )
       )
     }

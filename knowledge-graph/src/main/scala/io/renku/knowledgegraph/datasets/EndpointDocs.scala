@@ -109,8 +109,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     Json.arr(
       DatasetSearchResult(
         datasets.Identifier("123444"),
-        datasets.Title("title"),
         datasets.Name("name"),
+        datasets.Slug("slug"),
         datasets.Description("Some project").some,
         List(
           DatasetCreator(persons.Email("jan@mail.com").some,

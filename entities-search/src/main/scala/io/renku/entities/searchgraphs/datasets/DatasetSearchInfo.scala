@@ -26,8 +26,8 @@ import io.renku.graph.model.images.Image
 import io.renku.graph.model.{datasets, projects}
 
 private final case class DatasetSearchInfo(topmostSameAs:      datasets.TopmostSameAs,
-                                           name:               datasets.Name,
-                                           title:              datasets.Title,
+                                           slug:               datasets.Slug,
+                                           namee:              datasets.Name,
                                            visibility:         projects.Visibility,
                                            createdOrPublished: datasets.CreatedOrPublished,
                                            maybeDateModified:  Option[datasets.DateModified],

@@ -52,7 +52,7 @@ class SearchInfoFetcherSpec
       // other project DS
       insert(projectsDataset, datasetSearchInfoObjects.generateOne.asQuads)
 
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.namee).map(orderValues)
     }
 
     "work if there are ',' in names" in new TestCase {
@@ -63,7 +63,7 @@ class SearchInfoFetcherSpec
 
       insert(projectsDataset, infos.map(_.asQuads).toSet.flatten)
 
-      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.name).map(orderValues)
+      fetcher.fetchTSSearchInfos(projectId).unsafeRunSync() shouldBe infos.sortBy(_.namee).map(orderValues)
     }
 
     "return nothing if no Datasets for the Project" in new TestCase {

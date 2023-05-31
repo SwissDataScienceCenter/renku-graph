@@ -48,8 +48,8 @@ object Dataset {
 
   final case class Identification(
       identifier: Identifier,
-      title:      Title,
-      name:       Name
+      namee:      Name,
+      slug:       Slug
   )
 
   sealed trait Provenance extends Product with Serializable {
@@ -335,8 +335,8 @@ object Dataset {
   ): Dataset[TP] => entities.Dataset[EP] = { dataset: Dataset[TP] =>
     val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
                                                          dataset.identification.identifier,
-                                                         dataset.identification.title,
-                                                         dataset.identification.name
+                                                         dataset.identification.namee,
+                                                         dataset.identification.slug
     )
     entities.Dataset(
       identification,

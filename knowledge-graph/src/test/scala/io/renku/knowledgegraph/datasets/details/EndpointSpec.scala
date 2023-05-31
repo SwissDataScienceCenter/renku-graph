@@ -234,7 +234,7 @@ class EndpointSpec
         .of(
           Self                   -> Href(Uri.unsafeFromString(renkuApiUrl.show) / "datasets" / requestedDataset),
           Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
-          Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
+          Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.slug / "tags")
         )
 
     def verifyProject(cursor: HCursor) = {
@@ -283,7 +283,7 @@ class EndpointSpec
 
   private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
-      title            <- cursor.downField("title").as[Title]
+      slug             <- cursor.downField("slug").as[Slug]
       name             <- cursor.downField("name").as[Name]
       resourceId       <- cursor.downField("url").as[ResourceId]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
@@ -307,7 +307,7 @@ class EndpointSpec
     } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
       case (Some(sameAs), _, None) =>
         NonModifiedDataset(resourceId,
-                           title,
+                           slug,
                            name,
                            sameAs,
                            versions,
@@ -323,7 +323,7 @@ class EndpointSpec
         )
       case (None, Some(dateCreated), Some(derivedFrom)) =>
         ModifiedDataset(resourceId,
-                        title,
+                        slug,
                         name,
                         derivedFrom,
                         versions,

@@ -83,7 +83,7 @@ trait DatasetEntitiesGenerators {
       creatorEntityGen:   Gen[Person] = personEntities
   )(implicit renkuUrl: RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
     identifier <- datasetIdentifiers
-    title      <- datasetTitles
+    name       <- datasetNames
     date <- datasetCreatedDates(
               List(original.provenance.date.instant, projectDateCreated.value).max
             )
@@ -98,7 +98,7 @@ trait DatasetEntitiesGenerators {
                                  }.toGeneratorOfList()
   } yield Dataset
     .from(
-      original.identification.copy(identifier = identifier, title = title),
+      original.identification.copy(identifier = identifier, namee = name),
       Provenance.Modified(
         Dataset.entityId(identifier),
         DerivedFrom(original.entityId),
@@ -117,9 +117,9 @@ trait DatasetEntitiesGenerators {
 
   val datasetIdentifications: Gen[Dataset.Identification] = for {
     identifier <- datasetIdentifiers
-    title      <- datasetTitles
     name       <- datasetNames
-  } yield Dataset.Identification(identifier, title, name)
+    slug       <- datasetSlugs
+  } yield Dataset.Identification(identifier, name, slug)
 
   val provenanceInternal: ProvenanceGen[Dataset.Provenance.Internal] = provenanceInternal()
   def provenanceInternal(creatorsGen: Gen[Person] = personEntities): ProvenanceGen[Dataset.Provenance.Internal] =
@@ -319,8 +319,11 @@ trait DatasetEntitiesGenerators {
       }
     }
 
-  def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
-    identificationLens[P].modify(_.copy(name = to))
+  def replaceDsSlug[P <: Dataset.Provenance](to: datasets.Slug): Dataset[P] => Dataset[P] =
+    identificationLens[P].modify(_.copy(slug = to))
+
+  def replaceDsName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
+    identificationLens[P].modify(_.copy(namee = to))
 
   def replaceDSDateCreatedOrPublished[P <: Dataset.Provenance](to: Instant): Dataset[P] => Dataset[P] = {
     val datePublished = datasets.DatePublished(to.atOffset(ZoneOffset.UTC).toLocalDate)

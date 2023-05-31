@@ -27,7 +27,6 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{Identifier, Name, OriginalIdentifier, Title}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Path
 import io.renku.http.ErrorMessage
@@ -121,16 +120,15 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val endpoint = new EndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
-    lazy val toJson: ((Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
-      case (id, originalId, title, name, Left(sameAs), images) =>
+    lazy val toJson: ProjectDataset => Json = {
+      case ProjectDataset(id, originalId, name, slug, Left(sameAs), images) =>
         json"""{
           "identifier": $id,
           "versions": {
             "initial": $originalId
           },
-          "title": $title,
           "name": $name,
-          "slug": $name,
+          "slug": $slug,
           "sameAs": $sameAs,
           "images": $images,
           "_links": [{
@@ -141,18 +139,17 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
             "href": ${renkuApiUrl / "datasets" / originalId}
           }, {
             "rel":  "tags",
-            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
+            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / slug / "tags"}
           }]
         }"""
-      case (id, originalId, title, name, Right(derivedFrom), images) =>
+      case ProjectDataset(id, originalId, name, slug, Right(derivedFrom), images) =>
         json"""{
           "identifier": $id,
           "versions" : {
             "initial": $originalId
           },
-          "title": $title,
           "name": $name,
-          "slug": $name,
+          "slug": $slug,
           "derivedFrom": $derivedFrom,
           "images": $images,
           "_links": [{
@@ -163,7 +160,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
             "href": ${renkuApiUrl / "datasets" / originalId}
           }, {
             "rel":  "tags",
-            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
+            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / slug / "tags"}
           }]
         }"""
     }
@@ -191,9 +188,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   private implicit lazy val datasetBasicDetails: Gen[ProjectDataset] = for {
     id                      <- datasetIdentifiers
     originalIdentifier      <- datasetOriginalIdentifiers
-    title                   <- datasetTitles
+    slug                    <- datasetSlugs
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
     images                  <- listOf(imageUris)
-  } yield (id, originalIdentifier, title, name, sameAsEitherDerivedFrom, images)
+  } yield ProjectDataset(id, originalIdentifier, name, slug, sameAsEitherDerivedFrom, images)
 }

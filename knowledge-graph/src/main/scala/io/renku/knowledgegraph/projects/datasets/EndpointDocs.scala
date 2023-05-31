@@ -77,19 +77,21 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private val example = {
     implicit val dsEncoder: Encoder[ProjectDataset] = encoder(projects.Path("namespace/name"))
     Json.arr(
-      (datasets.Identifier("123"),
-       datasets.OriginalIdentifier("123"),
-       datasets.Title("dataset"),
-       datasets.Name("dataset"),
-       datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
-       List(ImageUri("image.png"))
+      ProjectDataset(
+        datasets.Identifier("123"),
+        datasets.OriginalIdentifier("123"),
+        datasets.Name("dataset"),
+        datasets.Slug("dataset"),
+        datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
+        List(ImageUri("image.png"))
       ).asJson,
-      (datasets.Identifier("123"),
-       datasets.OriginalIdentifier("123"),
-       datasets.Title("dataset"),
-       datasets.Name("dataset"),
-       datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
-       List(ImageUri("image.png"))
+      ProjectDataset(
+        datasets.Identifier("123"),
+        datasets.OriginalIdentifier("123"),
+        datasets.Name("dataset"),
+        datasets.Slug("dataset"),
+        datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
+        List(ImageUri("image.png"))
       ).asJson
     )
   }

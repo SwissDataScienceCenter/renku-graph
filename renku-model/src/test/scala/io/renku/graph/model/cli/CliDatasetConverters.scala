@@ -32,8 +32,8 @@ trait CliDatasetConverters extends CliCommonConverters {
     CliDataset(
       resourceId = id,
       identifier = dataset.identification.identifier,
-      title = dataset.identification.title,
-      name = dataset.identification.name,
+      namee = dataset.identification.namee,
+      slug = dataset.identification.slug,
       createdOrPublished = dataset.provenance.date,
       dateModified = datasets.DateModified(dataset.provenance.date),
       creators = dataset.provenance.creators.map(from),

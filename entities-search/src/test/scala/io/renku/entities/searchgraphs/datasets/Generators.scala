@@ -34,7 +34,7 @@ private object Generators {
   implicit lazy val datasetSearchInfoObjects: Gen[DatasetSearchInfo] = for {
     topmostSameAs      <- datasetTopmostSameAs
     name               <- datasetNames
-    title              <- datasetTitles
+    slug               <- datasetSlugs
     createdOrPublished <- datasetCreatedOrPublished
     visibility         <- projectVisibilities
     maybeDateModified  <- datasetModifiedDates(notYoungerThan = createdOrPublished).toGeneratorOfOptions
@@ -44,8 +44,8 @@ private object Generators {
     images             <- imageUris.toGeneratorOfList(max = 2).map(_.toEntitiesImages(datasetResourceIds.generateOne))
     links              <- linkObjectsGen(topmostSameAs).toGeneratorOfNonEmptyList(max = 2)
   } yield DatasetSearchInfo(topmostSameAs,
+                            slug,
                             name,
-                            title,
                             visibility,
                             createdOrPublished,
                             maybeDateModified,
