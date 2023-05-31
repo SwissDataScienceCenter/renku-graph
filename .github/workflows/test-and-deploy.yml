@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: deploy-to-graph
     steps:
-      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.4.5
+      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.4.6
         with:
           kubeconfig: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
           renku-release: renku-kg-dev
