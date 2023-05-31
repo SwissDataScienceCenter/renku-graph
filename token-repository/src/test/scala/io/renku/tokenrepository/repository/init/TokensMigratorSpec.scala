@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository
 package init
 
 import AccessTokenCrypto.EncryptedAccessToken
-import RepositoryGenerators.encryptedAccessTokens
+import RepositoryGenerators.{accessTokenIds, encryptedAccessTokens}
 import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
@@ -162,7 +162,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
-        TokenCreationInfo(projectToken,
+        TokenCreationInfo(accessTokenIds.generateOne,
+                          projectToken,
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
@@ -197,7 +198,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       )
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
-        TokenCreationInfo(projectToken,
+        TokenCreationInfo(accessTokenIds.generateOne,
+                          projectToken,
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
@@ -275,6 +277,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo = TokenCreationInfo(
+        accessTokenIds.generateOne,
         projectToken,
         TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
       )
