@@ -62,7 +62,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
         )
         .withDatasets(
           datasetEntities(provenanceInternal(cliShapedPersons))
-            .modify(replaceDSName(sentenceContaining(commonPhrase).generateAs[datasets.Name]))
+            .modify(replaceDsName(sentenceContaining(commonPhrase).generateAs[datasets.Name]))
         )
         .generateOne
     val project = dataProjects(testProject).map(addMemberWithId(user.id)).generateOne

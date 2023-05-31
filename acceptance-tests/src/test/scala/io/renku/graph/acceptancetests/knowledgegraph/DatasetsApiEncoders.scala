@@ -23,7 +23,7 @@ import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
-import io.renku.graph.model.datasets.{DatePublished, Identifier, Title}
+import io.renku.graph.model.datasets.{DatePublished, Identifier, Name}
 import io.renku.graph.model.testentities.{Dataset, Person}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Rel, _links}
@@ -49,9 +49,8 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "versions": {
         "initial": ${dataset.provenance.originalIdentifier.value}
       },
-      "title":  ${dataset.identification.title.value},
-      "name":   ${dataset.identification.name.value},
-      "slug":   ${dataset.identification.name.value},
+      "name":  ${dataset.identification.namee.value},
+      "slug":   ${dataset.identification.slug.value},
       "images": ${dataset.additionalInfo.images -> projectPath}
     }"""
       .deepMerge(
@@ -59,7 +58,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
           Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
           Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
           Rel("tags") -> Href(
-            renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
+            renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.slug / "tags"
           )
         )
       )
@@ -81,16 +80,15 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
                                                 actualResults: List[Json]
   ): Json = {
     val actualIdentifier = actualResults
-      .findId(dataset.identification.title)
-      .getOrElse(fail(s"No ${dataset.identification.title} dataset found among the results"))
+      .findId(dataset.identification.namee)
+      .getOrElse(fail(s"No ${dataset.identification.namee} dataset found among the results"))
 
     dataset.identification.identifier shouldBe actualIdentifier
 
     json"""{
       "identifier":    ${actualIdentifier.value},
-      "title":         ${dataset.identification.title.value},
-      "name":          ${dataset.identification.name.value},
-      "slug":          ${dataset.identification.name.value},
+      "name":          ${dataset.identification.namee.value},
+      "slug":         ${dataset.identification.slug.value},
       "published":     ${dataset.provenance.creators -> dataset.provenance.date},
       "date":          ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
@@ -124,9 +122,9 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   implicit class JsonsOps(jsons: List[Json]) {
 
-    def findId(title: Title): Option[Identifier] =
+    def findId(title: Name): Option[Identifier] =
       jsons
-        .find(_.hcursor.downField("title").as[String].fold(throw _, _ == title.toString))
+        .find(_.hcursor.downField("name").as[String].fold(throw _, _ == title.toString))
         .map(_.hcursor.downField("identifier").as[Identifier].fold(throw _, identity))
   }
 
