@@ -71,7 +71,7 @@ object WebhookServiceClient {
       POST((uri"projects" / projectId / "webhooks").renderString, accessToken)
 
     def `GET projects/:id/events/status`(projectId: projects.GitLabId, accessToken: AccessToken)(implicit
-                                                                                                 ior: IORuntime
+        ior: IORuntime
     ): ClientResponse =
       GET((uri"projects" / projectId / "events" / "status").renderString, accessToken)
   }

@@ -67,7 +67,9 @@ class ProjectStatusResourceSpec
 
       When("the user who is not a member of the project is calling the Status API")
       Then("the Status API should return NOT_FOUND")
-      webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken).status shouldBe NotFound
+      webhookServiceClient
+        .`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
+        .status shouldBe NotFound
 
       When("a member of the project activates it")
       gitLabStub.addAuthenticated(memberUser)
@@ -80,7 +82,8 @@ class ProjectStatusResourceSpec
 
       Then("the non-member user should get OK with 'activated' = true")
       eventually {
-        val authUserResponse = webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
+        val authUserResponse =
+          webhookServiceClient.`GET projects/:id/events/status`(project.id, someAuthUser.accessToken)
         authUserResponse.status                                                    shouldBe Ok
         authUserResponse.jsonBody.hcursor.downField("activated").as[Boolean].value shouldBe true
       }
