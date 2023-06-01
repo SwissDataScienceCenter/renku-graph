@@ -25,7 +25,7 @@ import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder,
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
-  def findDateCreated(projectId: projects.ResourceId, planId: plans.ResourceId): F[Option[plans.DateCreated]]
+  def findCreatedDates(projectId: projects.ResourceId, planId: plans.ResourceId): F[List[plans.DateCreated]]
 }
 
 private object KGInfoFinder {
@@ -39,32 +39,33 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](sto
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model._
   import io.renku.graph.model.Schemas.{prov, schema}
-  import io.renku.graph.model.views.RdfResource
+  import io.renku.graph.model._
+  import io.renku.jsonld.syntax._
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import io.renku.triplesstore._
   import io.renku.triplesstore.ResultsDecoder._
   import io.renku.triplesstore.SparqlQuery.Prefixes
+  import io.renku.triplesstore._
+  import io.renku.triplesstore.client.syntax._
 
-  override def findDateCreated(projectId: projects.ResourceId,
-                               planId:    plans.ResourceId
-  ): F[Option[plans.DateCreated]] = {
-    implicit val decoder: Decoder[Option[plans.DateCreated]] = ResultsDecoder[Option, plans.DateCreated] {
-      implicit cur => extract[plans.DateCreated]("dateCreated")
+  override def findCreatedDates(projectId: projects.ResourceId,
+                                planId:    plans.ResourceId
+  ): F[List[plans.DateCreated]] = {
+    implicit val decoder: Decoder[List[plans.DateCreated]] = ResultsDecoder[List, plans.DateCreated] { implicit cur =>
+      extract[plans.DateCreated]("dateCreated")
     }
 
-    queryExpecting[Option[plans.DateCreated]](
+    queryExpecting[List[plans.DateCreated]](
       SparqlQuery.of(
         name = "transformation - find plan dateCreated",
         Prefixes of (schema -> "schema", prov -> "prov"),
-        s"""|SELECT DISTINCT ?dateCreated
-            |FROM <${GraphClass.Project.id(projectId)}> {
-            |  ${planId.showAs[RdfResource]} a prov:Plan;
-            |                                schema:dateCreated ?dateCreated.
-            |}
-            |""".stripMargin
+        sparql"""|SELECT DISTINCT ?dateCreated
+                 |FROM ${GraphClass.Project.id(projectId)} {
+                 |  ${planId.asEntityId} a prov:Plan;
+                 |                       schema:dateCreated ?dateCreated.
+                 |}
+                 |""".stripMargin
       )
-    )
+    ).map(_.sorted)
   }
 }

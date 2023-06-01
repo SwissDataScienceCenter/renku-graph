@@ -32,16 +32,16 @@ trait EventDataFetching {
   ): List[(CompoundEventId, ExecutionDate, BatchDate)] =
     execute {
       Kleisli { session =>
-        val query: Query[(EventStatus, Void), (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
+        val query: Query[EventStatus *: Void *: EmptyTuple, (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
             SELECT event_id, project_id, execution_date, batch_date
             FROM event
             WHERE status = $eventStatusEncoder
-            ORDER BY """ ~ orderBy)
+            ORDER BY """ *: orderBy)
           .query(eventIdDecoder ~ projectIdDecoder ~ executionDateDecoder ~ batchDateDecoder)
           .map { case eventId ~ projectId ~ executionDate ~ batchDate =>
             (CompoundEventId(eventId, projectId), executionDate, batchDate)
           }
-        session.prepare(query).flatMap(_.stream((status, Void), 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(status *: Void *: EmptyTuple, 32).compile.toList)
       }
     }
 
@@ -60,7 +60,7 @@ trait EventDataFetching {
 
   protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, ZippedEventPayload)] = execute {
     Kleisli { session =>
-      val query: Query[EventId ~ projects.GitLabId, (CompoundEventId, ZippedEventPayload)] =
+      val query: Query[EventId *: projects.GitLabId *: EmptyTuple, (CompoundEventId, ZippedEventPayload)] =
         sql"""SELECT event_id, project_id, payload
               FROM event_payload
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
@@ -68,7 +68,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ eventPayload =>
             (CompoundEventId(eventId, projectId), eventPayload)
           }
-      session.prepare(query).flatMap(_.option(eventId.id ~ eventId.projectId))
+      session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
     }
   }
 
@@ -108,21 +108,23 @@ trait EventDataFetching {
   protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
     execute {
       Kleisli { session =>
-        val query: Query[EventId ~ projects.GitLabId, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
+        val query
+            : Query[EventId *: projects.GitLabId *: EmptyTuple, (ExecutionDate, EventStatus, Option[EventMessage])] =
+          sql"""
           SELECT execution_date, status, message
           FROM event
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
         """.query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt).map {
-          case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
-        }
-        session.prepare(query).flatMap(_.option(eventId.id ~ eventId.projectId))
+            case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
+          }
+        session.prepare(query).flatMap(_.option(eventId.id *: eventId.projectId *: EmptyTuple))
       }
     }
 
   protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
     execute {
       Kleisli { session =>
-        val query: Query[EventId ~ projects.GitLabId, (CompoundEventId, EventProcessingTime)] = sql"""
+        val query: Query[EventId *: projects.GitLabId *: EmptyTuple, (CompoundEventId, EventProcessingTime)] = sql"""
           SELECT event_id, project_id, processing_time
           FROM status_processing_time
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;
@@ -131,7 +133,7 @@ trait EventDataFetching {
           .map { case eventId ~ projectId ~ eventProcessingTime =>
             (CompoundEventId(eventId, projectId), eventProcessingTime)
           }
-        session.prepare(query).flatMap(_.stream(eventId.id ~ eventId.projectId, 32).compile.toList)
+        session.prepare(query).flatMap(_.stream(eventId.id *: eventId.projectId *: EmptyTuple, 32).compile.toList)
       }
     }
 

@@ -93,7 +93,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 
   private def findNewerEventStatus(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - find newer event status")
-      .select[projects.GitLabId ~ EventStatus ~ EventDate, EventStatus](
+      .select[projects.GitLabId *: EventStatus *: EventDate *: EmptyTuple, EventStatus](
         sql"""SELECT status
               FROM event
               WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
@@ -101,19 +101,19 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
               LIMIT 1
           """.query(eventStatusDecoder)
       )
-      .arguments(event.project.id ~ TriplesStore ~ event.date)
+      .arguments(event.project.id *: TriplesStore *: event.date *: EmptyTuple)
       .build(_.option)
   )
 
   private def checkIfPersisted(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - check existence")
-      .select[EventId ~ projects.GitLabId, EventId](
+      .select[EventId *: projects.GitLabId *: EmptyTuple, EventId](
         sql"""SELECT event_id
               FROM event
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
           """.query(eventIdDecoder)
       )
-      .arguments(event.id ~ event.project.id)
+      .arguments(event.id *: event.project.id *: EmptyTuple)
       .build(_.option)
       .mapResult(_.isDefined)
   )
@@ -139,7 +139,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
       measureExecutionTime(
         SqlStatement(name = "new - create (NEW)")
           .command[
-            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+            EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EmptyTuple
           ](
             sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
                   VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
@@ -147,7 +147,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
                   DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
-          .arguments(id ~ project.id ~ status ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
+          .arguments(
+            id *: project.id *: status *: createdDate *: executionDate *: date *: batchDate *: body *: EmptyTuple
+          )
           .build
           .void
       )
@@ -156,7 +158,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
       measureExecutionTime(
         SqlStatement(name = "new - create (SKIPPED)")
           .command[
-            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
+            EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EventMessage *: EmptyTuple
           ](
             sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
                   VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder, $eventMessageEncoder)
@@ -164,7 +166,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
                   DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
-          .arguments(id ~ project.id ~ Skipped ~ createdDate ~ executionDate ~ date ~ batchDate ~ body ~ message)
+          .arguments(
+            id *: project.id *: Skipped *: createdDate *: executionDate *: date *: batchDate *: body *: message *: EmptyTuple
+          )
           .build
           .void
       )
@@ -172,7 +176,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 
   private def upsertProject(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - upsert project")
-      .command[projects.GitLabId ~ projects.Path ~ EventDate](
+      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](
         sql"""
             INSERT INTO project (project_id, project_path, latest_event_date)
             VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
@@ -182,7 +186,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
               WHERE EXCLUDED.latest_event_date > project.latest_event_date
           """.command
       )
-      .arguments(event.project.id ~ event.project.path ~ event.date)
+      .arguments(event.project.id *: event.project.path *: event.date *: EmptyTuple)
       .build
       .void
   )

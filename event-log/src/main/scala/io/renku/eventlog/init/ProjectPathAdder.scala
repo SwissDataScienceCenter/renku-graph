@@ -21,8 +21,8 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import io.circe.Decoder
 import io.circe.parser._
-import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.projects
@@ -78,30 +78,27 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
 
   private def parseToProjectIdAndPath(body: String): F[(GitLabId, Path)] =
     MonadCancelThrow[F].fromEither {
-      for {
-        json  <- parse(body)
-        tuple <- json.as[(GitLabId, Path)]
-      } yield tuple
+      parse(body) flatMap (_.as[(GitLabId, Path)])
     }
 
-  private implicit lazy val projectIdAndPathDecoder: Decoder[(GitLabId, Path)] = (cursor: HCursor) =>
+  private implicit lazy val projectIdAndPathDecoder: Decoder[(GitLabId, Path)] = cursor =>
     for {
       id   <- cursor.downField("project").downField("id").as[GitLabId]
       path <- cursor.downField("project").downField("path").as[Path]
     } yield id -> path
 
-  private def updatePaths(
-      projectIdsAndPaths: List[(GitLabId, Path)]
-  ): Kleisli[F, Session[F], Unit] =
+  private def updatePaths(projectIdsAndPaths: List[(GitLabId, Path)]): Kleisli[F, Session[F], Unit] =
     projectIdsAndPaths
       .map(toSqlUpdate)
       .sequence
       .map(_ => ())
 
   private lazy val toSqlUpdate: ((GitLabId, Path)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectPath) =>
-    val query: Command[projects.Path ~ projects.GitLabId] =
-      sql"update event_log set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
-    Kleisli(_.prepare(query).flatMap(_.execute(projectPath ~ projectId)).void)
+    val query: Command[projects.Path *: projects.GitLabId *: EmptyTuple] =
+      sql"""UPDATE event_log
+            SET project_path = $projectPathEncoder
+            WHERE project_id = $projectIdEncoder""".command
+    Kleisli(_.prepare(query).flatMap(_.execute(projectPath *: projectId *: EmptyTuple)).void)
   }
 
   private lazy val logging: PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case NonFatal(exception) =>

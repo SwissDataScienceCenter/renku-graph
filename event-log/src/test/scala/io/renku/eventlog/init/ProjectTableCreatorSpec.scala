@@ -20,8 +20,8 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
@@ -148,7 +148,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
-          EventId ~ GitLabId ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+          EventId *: GitLabId *: Path *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EmptyTuple
         ] = sql"""
             insert into
             event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
@@ -158,7 +158,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
           .prepare(query)
           .flatMap(
             _.execute(
-              eventIds.generateOne ~ projectId ~ projectPath ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDate ~ batchDates.generateOne ~ eventBodies.generateOne
+              eventIds.generateOne *: projectId *: projectPath *: eventStatuses.generateOne *: createdDates.generateOne *: executionDates.generateOne *: eventDate *: batchDates.generateOne *: eventBodies.generateOne *: EmptyTuple
             )
           )
           .map(_ => ())

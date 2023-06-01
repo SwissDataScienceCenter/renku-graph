@@ -22,7 +22,7 @@ package alleventstonew
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
+import io.renku.eventlog.api.events.StatusChangeEvent.AllEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, categoryName}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
@@ -68,8 +68,8 @@ class AllEventsToNewUpdaterSpec
           .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
           .expects(
             EventRequestContent.NoPayload(toEventJson(project)),
-            EventSender.EventContext(CategoryName(ProjectEventsToNew.eventType.show),
-                                     show"$categoryName: generating ${ProjectEventsToNew.eventType} for $project failed"
+            EventSender.EventContext(CategoryName(projecteventstonew.eventType.show),
+                                     show"$categoryName: generating ${projecteventstonew.eventType} for $project failed"
             )
           )
           .returning(().pure[IO])

@@ -20,13 +20,12 @@ package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
@@ -36,7 +35,7 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator
+import io.renku.{eventlog, triplesgenerator}
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import org.http4s.MediaType.application
 import org.http4s.Status.{Accepted, InternalServerError, NotFound}

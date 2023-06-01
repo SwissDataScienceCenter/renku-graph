@@ -62,10 +62,11 @@ private class PlanTransformerImpl[F[_]: MonadThrow](kgInfoFinder: KGInfoFinder[F
 
   private lazy val updateDateCreated: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     collectStepPlans(project.plans)
-      .map(plan =>
-        findDateCreated(project.resourceId, plan.resourceId)
-          .map(queriesDeletingDate(project.resourceId, plan, _))
-      )
+      .map { plan =>
+        findCreatedDates(project.resourceId, plan.resourceId).map {
+          queriesDeletingDate(project.resourceId, plan, _)
+        }
+      }
       .sequence
       .map(_.flatten)
       .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))

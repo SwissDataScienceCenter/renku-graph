@@ -22,9 +22,9 @@ import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
 import io.renku.config.ServiceVersion
-import io.renku.eventlog._
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigtationTypeSerializers._
+import io.renku.eventlog._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.SubscriberUrl
@@ -204,14 +204,14 @@ class MigrationSubscriberTrackerSpec
 
   private def updateStatus(info: MigrationSubscriber, status: MigrationStatus): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[MigrationStatus ~ SubscriberUrl ~ ServiceVersion] =
+      val query: Command[MigrationStatus *: SubscriberUrl *: ServiceVersion *: EmptyTuple] =
         sql"""UPDATE ts_migration
               SET status = $migrationStatusEncoder
               WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder
           """.command
       session
         .prepare(query)
-        .flatMap(_.execute(status ~ info.url ~ info.version))
+        .flatMap(_.execute(status *: info.url *: info.version *: EmptyTuple))
         .void
     }
   }

@@ -88,13 +88,17 @@ The endpoint requires a token to sent in the request JSON body. Allowed payloads
 #### DELETE /projects/:id/tokens
 
 Deletes the association of a token and a project id. The deletion is successful regardless the association existed or not.
+The API also tries to revoke Project Access Tokens created for the project in GitLab. For that to happen, a valid access token needs to be passed in the header as follows:
+- `Authorization: Bearer <token>` with oauth token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's personal access token in GitLab
+
 
 **Response**
 
-| Status                     | Description                                            |
-|----------------------------|--------------------------------------------------------|
-| NO_CONTENT (204)           | When deletion was successful                           |
-| INTERNAL SERVER ERROR (500)| When there were problems with deleting the association |
+| Status                      | Description                                            |
+|-----------------------------|--------------------------------------------------------|
+| NO_CONTENT (204)            | When deletion was successful                           |
+| INTERNAL SERVER ERROR (500) | When there were problems with deleting the association |
 
 #### GET /version
 

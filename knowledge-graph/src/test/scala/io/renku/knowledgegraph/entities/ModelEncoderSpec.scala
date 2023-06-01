@@ -104,6 +104,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       List(Href("details", detailsUri.renderString)),
       dataset.matchingScore,
       dataset.name,
+      dataset.name,
       dataset.visibility,
       dataset.date,
       dataset.creators,
@@ -133,6 +134,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
     val expected = JsonDataset(
       List(Href("details", detailsUri.renderString)),
       dataset.matchingScore,
+      dataset.name,
       dataset.name,
       dataset.visibility,
       dataset.date,
@@ -214,6 +216,7 @@ object ModelEncoderSpec {
       _links:        List[Href],
       matchingScore: MatchingScore,
       name:          datasets.Name,
+      slug:          datasets.Name,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
       creators:      List[persons.Name],

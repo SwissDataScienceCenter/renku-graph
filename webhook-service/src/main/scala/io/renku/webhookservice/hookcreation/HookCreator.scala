@@ -21,8 +21,8 @@ package io.renku.webhookservice.hookcreation
 import cats.Show
 import cats.effect._
 import cats.syntax.all._
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}

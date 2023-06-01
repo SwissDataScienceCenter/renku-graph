@@ -52,12 +52,12 @@ private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow: QueriesExecutionTi
   override def deleteDelivery(eventId: CompoundEventId): Kleisli[F, Session[F], Unit] =
     measureExecutionTime {
       SqlStatement(name = "delivery info remove - status update")
-        .command[EventId ~ projects.GitLabId](
+        .command[EventId *: projects.GitLabId *: EmptyTuple](
           sql"""DELETE FROM event_delivery
                 WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
         )
-        .arguments(eventId.id ~ eventId.projectId)
+        .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
         .build
         .flatMapResult {
           case Completion.Delete(_) => ().pure[F]

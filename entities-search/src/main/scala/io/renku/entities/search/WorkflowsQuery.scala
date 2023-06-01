@@ -26,7 +26,7 @@ import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model.entities.{CompositePlan, StepPlan}
 import io.renku.graph.model.{plans, projects}
-import io.renku.triplesstore.client.sparql.LuceneQuery
+import io.renku.triplesstore.client.sparql.{LuceneQuery, VarName}
 
 private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
@@ -90,7 +90,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |          ${criteria.maybeOnAccessRightsAndVisibility("?projectId", "?visibility")}
         |          BIND (CONCAT(STR(?projectId), STR('::'), STR(?visibility)) AS ?projectIdVisibility)
         |          ${filters.maybeOnNamespace("?namespace")}
-        |          ${filters.maybeOnDateCreated("?date")}
+        |          ${filters.maybeOnDateCreated(VarName("date")).sparql}
         |          OPTIONAL { ?wkId schema:description ?maybeDescription }
         |          OPTIONAL { ?wkId schema:keywords ?keyword }
         |        }

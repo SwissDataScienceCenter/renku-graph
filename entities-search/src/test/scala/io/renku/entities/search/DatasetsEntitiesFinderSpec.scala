@@ -18,7 +18,6 @@
 
 package io.renku.entities.search
 
-import cats.effect.IO
 import cats.syntax.all._
 import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
@@ -34,8 +33,6 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 class DatasetsEntitiesFinderSpec
     extends AnyWordSpec
@@ -48,8 +45,6 @@ class DatasetsEntitiesFinderSpec
     with SearchDiffInstances
     with AdditionalMatchers
     with IOSpec {
-
-  implicit val ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "findEntities - in case of a shared datasets" should {
 

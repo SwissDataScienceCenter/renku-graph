@@ -38,8 +38,7 @@ private class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionReso
       _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
       _ <- Logger[F].info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
       _ <- renameAllStatuses(from = "RECOVERABLE_FAILURE", to = "GENERATION_RECOVERABLE_FAILURE")
-      _ <-
-        Logger[F].info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
+      _ <- Logger[F].info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
       _ <- renameAllStatuses(from = "NON_RECOVERABLE_FAILURE", to = "GENERATION_NON_RECOVERABLE_FAILURE")
       _ <- Logger[F].info(
              s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'"
@@ -48,8 +47,9 @@ private class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionReso
   } recoverWith logging
 
   private def renameAllStatuses(from: String, to: String) = SessionResource[F].useK {
-    val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
-    Kleisli(_.prepare(query).flatMap(_.execute(to ~ from)).void)
+    val query: Command[String *: String *: EmptyTuple] =
+      sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
+    Kleisli(_.prepare(query).flatMap(_.execute(to *: from *: EmptyTuple)).void)
   }
 
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>

@@ -63,7 +63,7 @@ class PlanTransformerSpec extends AnyWordSpec with should.Matchers with MockFact
       val exception = recoverableClientErrors.generateOne
       findingPlanDateCreated(project.resourceId,
                              project.plans.head.resourceId,
-                             returning = exception.raiseError[Try, Option[plans.DateCreated]]
+                             returning = exception.raiseError[Try, Nothing]
       )
 
       val step = transformer.createTransformationStep
@@ -83,7 +83,7 @@ class PlanTransformerSpec extends AnyWordSpec with should.Matchers with MockFact
       val exception = exceptions.generateOne
       findingPlanDateCreated(project.resourceId,
                              project.plans.head.resourceId,
-                             returning = exception.raiseError[Try, Option[plans.DateCreated]]
+                             returning = exception.raiseError[Try, Nothing]
       )
 
       transformer.createTransformationStep.run(project).value shouldBe
@@ -92,12 +92,12 @@ class PlanTransformerSpec extends AnyWordSpec with should.Matchers with MockFact
   }
 
   private trait TestCase {
-    val kgInfoFinder   = mock[KGInfoFinder[Try]]
-    val updatesCreator = mock[UpdatesCreator]
-    val transformer    = new PlanTransformerImpl[Try](kgInfoFinder, updatesCreator)
+    private val kgInfoFinder   = mock[KGInfoFinder[Try]]
+    private val updatesCreator = mock[UpdatesCreator]
+    val transformer            = new PlanTransformerImpl[Try](kgInfoFinder, updatesCreator)
 
     def givenDateUpdates(projectId: projects.ResourceId)(plan: entities.StepPlan): List[SparqlQuery] = {
-      val maybeDateCreatedInKG = timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateOption
+      val maybeDateCreatedInKG = timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateList(max = 2)
       findingPlanDateCreated(projectId, plan.resourceId, returning = maybeDateCreatedInKG.pure[Try])
 
       val updateQueries = sparqlQueries.generateList()
@@ -108,19 +108,19 @@ class PlanTransformerSpec extends AnyWordSpec with should.Matchers with MockFact
 
     def findingPlanDateCreated(projectId:  projects.ResourceId,
                                resourceId: plans.ResourceId,
-                               returning:  Try[Option[plans.DateCreated]]
+                               returning:  Try[List[plans.DateCreated]]
     ) = (kgInfoFinder
-      .findDateCreated(_: projects.ResourceId, _: plans.ResourceId))
+      .findCreatedDates(_: projects.ResourceId, _: plans.ResourceId))
       .expects(projectId, resourceId)
       .returning(returning)
 
-    def prepareQueriesUpdatingDates(projectId:   projects.ResourceId,
-                                    plan:        entities.StepPlan,
-                                    maybeKGDate: Option[plans.DateCreated],
-                                    returning:   List[SparqlQuery]
+    private def prepareQueriesUpdatingDates(projectId: projects.ResourceId,
+                                            plan:      entities.StepPlan,
+                                            tsDates:   List[plans.DateCreated],
+                                            returning: List[SparqlQuery]
     ) = (updatesCreator
-      .queriesDeletingDate(_: projects.ResourceId, _: entities.StepPlan, _: Option[plans.DateCreated]))
-      .expects(projectId, plan, maybeKGDate)
+      .queriesDeletingDate(_: projects.ResourceId, _: entities.StepPlan, _: List[plans.DateCreated]))
+      .expects(projectId, plan, tsDates)
       .returning(returning)
   }
 }

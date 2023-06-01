@@ -23,32 +23,30 @@ import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
-import io.renku.http.client.RestClient
+import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.Status
 import org.typelevel.log4cats.Logger
 
 trait AccessTokenRemover[F[_]] {
-  def removeAccessToken(projectId: GitLabId): F[Unit]
+  def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit]
 }
 
 object AccessTokenRemover {
-  def apply[F[_]: Async: Logger]: F[AccessTokenRemover[F]] = for {
-    tokenRepositoryUrl <- TokenRepositoryUrl[F]()
-  } yield new AccessTokenRemoverImpl[F](tokenRepositoryUrl)
+  def apply[F[_]: Async: Logger]: F[AccessTokenRemover[F]] =
+    TokenRepositoryUrl[F]().map(new AccessTokenRemoverImpl[F](_))
 }
 
-class AccessTokenRemoverImpl[F[_]: Async: Logger](
-    tokenRepositoryUrl: TokenRepositoryUrl
-) extends RestClient[F, AccessTokenRemover[F]](Throttler.noThrottling)
+class AccessTokenRemoverImpl[F[_]: Async: Logger](tokenRepositoryUrl: TokenRepositoryUrl)
+    extends RestClient[F, AccessTokenRemover[F]](Throttler.noThrottling)
     with AccessTokenRemover[F] {
 
   import org.http4s.Method.DELETE
   import org.http4s.Status.NoContent
   import org.http4s.{Request, Response}
 
-  override def removeAccessToken(projectId: GitLabId): F[Unit] = for {
+  override def removeAccessToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] = for {
     uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-    _   <- send(request(DELETE, uri))(mapResponse)
+    _   <- send(secureRequest(DELETE, uri)(maybeAccessToken))(mapResponse)
   } yield ()
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {

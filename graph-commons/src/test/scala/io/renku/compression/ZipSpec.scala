@@ -19,18 +19,18 @@
 package io.renku.compression
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.testtools.IOSpec
 import org.scalacheck.Arbitrary
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.EitherValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AsyncWordSpec
 
 import java.io.EOFException
 import java.util.zip.ZipException
 
-class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers with EitherValues {
+class ZipSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with EitherValues {
 
   "zip and unzip" should {
 
@@ -39,19 +39,17 @@ class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers with EitherVa
       Zip
         .zip[IO](content)
         .flatMap(byteArray => IO.fromEither(Zip.unzip(byteArray)))
-        .unsafeRunSync() shouldBe content
+        .asserting(_ shouldBe content)
     }
   }
 
   "zip" should {
 
     "fail with a meaningful error if zipping fails" in {
-      val actual = intercept[Exception] {
-        Zip.zip[IO](null).unsafeRunSync()
+      Zip.zip[IO](null).assertThrowsError[Exception] { exception =>
+        exception.getMessage       shouldBe "Zipping content failed"
+        Option(exception.getCause) shouldBe a[Some[_]]
       }
-
-      actual.getMessage       shouldBe "Zipping content failed"
-      Option(actual.getCause) shouldBe a[Some[_]]
     }
   }
 

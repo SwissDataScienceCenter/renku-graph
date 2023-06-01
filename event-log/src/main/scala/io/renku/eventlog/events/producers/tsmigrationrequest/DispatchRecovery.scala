@@ -63,14 +63,14 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: Queries
   private def updateStatus(event: MigrationRequestEvent, newStatus: MigrationStatus) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - back to queue")
-      .command[MigrationStatus ~ ChangeDate ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[MigrationStatus *: ChangeDate *: SubscriberUrl *: ServiceVersion *: EmptyTuple](sql"""
           UPDATE ts_migration
           SET status = $migrationStatusEncoder, change_date = $changeDateEncoder
           WHERE subscriber_url = $subscriberUrlEncoder 
             AND subscriber_version = $serviceVersionEncoder
             AND status = '#${Sent.value}'
         """.command)
-      .arguments(newStatus ~ ChangeDate(now()) ~ event.subscriberUrl ~ event.subscriberVersion)
+      .arguments(newStatus *: ChangeDate(now()) *: event.subscriberUrl *: event.subscriberVersion *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(0 | 1) => ().pure[F]
@@ -83,14 +83,14 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: Queries
   private def updateDate(event: MigrationRequestEvent, newDate: ChangeDate) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - bump date")
-      .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[ChangeDate *: SubscriberUrl *: ServiceVersion *: EmptyTuple](sql"""
           UPDATE ts_migration
           SET change_date = $changeDateEncoder
           WHERE subscriber_url = $subscriberUrlEncoder 
             AND subscriber_version = $serviceVersionEncoder
             AND status = '#${Sent.value}'
         """.command)
-      .arguments(newDate ~ event.subscriberUrl ~ event.subscriberVersion)
+      .arguments(newDate *: event.subscriberUrl *: event.subscriberVersion *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(0 | 1) => ().pure[F]
@@ -109,14 +109,16 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger: Queries
   private def setFailureStatus(event: MigrationRequestEvent, exception: Throwable) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - set failure")
-      .command[ChangeDate ~ MigrationMessage ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[ChangeDate *: MigrationMessage *: SubscriberUrl *: ServiceVersion *: EmptyTuple](sql"""
           UPDATE ts_migration
           SET status = '#${NonRecoverableFailure.value}', change_date = $changeDateEncoder, message = $migrationMessageEncoder
           WHERE subscriber_url = $subscriberUrlEncoder 
             AND subscriber_version = $serviceVersionEncoder
             AND status = '#${Sent.value}'
         """.command)
-      .arguments(ChangeDate(now()) ~ MigrationMessage(exception) ~ event.subscriberUrl ~ event.subscriberVersion)
+      .arguments(
+        ChangeDate(now()) *: MigrationMessage(exception) *: event.subscriberUrl *: event.subscriberVersion *: EmptyTuple
+      )
       .build
       .flatMapResult {
         case Completion.Update(0 | 1) => ().pure[F]

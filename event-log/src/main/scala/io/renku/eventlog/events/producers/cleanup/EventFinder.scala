@@ -119,13 +119,13 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
       measureExecutionTime {
         SqlStatement
           .named(s"${categoryName.show.toLowerCase} - update status")
-          .command[ExecutionDate ~ projects.GitLabId](sql"""
+          .command[ExecutionDate *: projects.GitLabId *: EmptyTuple](sql"""
             UPDATE event
             SET status = '#${Deleting.value}', execution_date = $executionDateEncoder
             WHERE status = '#${AwaitingDeletion.value}'
               AND project_id = $projectIdEncoder
             """.command)
-          .arguments(ExecutionDate(now()) ~ projectId)
+          .arguments(ExecutionDate(now()) *: projectId *: EmptyTuple)
           .build
           .mapResult {
             case Completion.Update(count) => (CleanUpEvent(project) -> count).some

@@ -58,24 +58,24 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource: Q
 
   private def cleanEventualDeliveries(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement(name = "zombie_chasing - clean deliveries")
-      .command[EventId ~ projects.GitLabId](
+      .command[EventId *: projects.GitLabId *: EmptyTuple](
         sql"""DELETE FROM event_delivery
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
       )
-      .arguments(eventId.id ~ eventId.projectId)
+      .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
       .build
   }
 
   private def runUpdate(eventId: CompoundEventId, oldStatus: EventStatus, newStatus: EventStatus) =
     measureExecutionTime {
       SqlStatement(name = "zombie_chasing - update status")
-        .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](sql"""
+        .command[EventStatus *: ExecutionDate *: EventId *: projects.GitLabId *: EventStatus *: EmptyTuple](sql"""
           UPDATE event
           SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
           """.command)
-        .arguments(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
+        .arguments(newStatus *: ExecutionDate(now()) *: eventId.id *: eventId.projectId *: oldStatus *: EmptyTuple)
         .build
         .flatMapResult {
           case Completion.Update(1) => (Updated: UpdateResult).pure[F]

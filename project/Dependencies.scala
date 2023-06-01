@@ -7,6 +7,7 @@ object Dependencies {
     val ammonite               = "2.4.1"
     val catsCore               = "2.9.0"
     val catsEffect             = "3.4.11"
+    val catsEffectScalaTest    = "1.5.0"
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
@@ -23,17 +24,17 @@ object Dependencies {
     val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
-    val rdf4jQueryParserSparql = "4.2.4"
+    val rdf4jQueryParserSparql = "4.3.1"
     val refined                = "0.10.3"
     val refinedPureconfig      = "0.10.3"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.16"
     val scalatestScalacheck    = "3.2.2.0"
-    val sentryLogback          = "6.19.0"
-    val skunk                  = "0.5.1"
-    val swaggerParser          = "2.1.14"
-    val testContainersScala    = "0.40.15"
+    val sentryLogback          = "6.21.0"
+    val skunk                  = "0.6.0"
+    val swaggerParser          = "2.1.15"
+    val testContainersScala    = "0.40.16"
     val widoco                 = "1.4.18"
     val wiremock               = "2.35.0"
   }
@@ -120,6 +121,10 @@ object Dependencies {
 
   val catsEffect = Seq(
     "org.typelevel" %% "cats-effect" % V.catsEffect
+  )
+
+  val catsEffectScalaTest = Seq(
+    "org.typelevel" %% "cats-effect-testing-scalatest" % V.catsEffectScalaTest
   )
 
   val log4Cats = Seq(

@@ -21,17 +21,17 @@ package io.renku.eventlog
 import cats.data.Kleisli
 import io.circe.Json
 import io.renku.eventlog.events.producers.eventdelivery._
-import io.renku.events.consumers
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.events.consumers
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl
@@ -113,7 +113,7 @@ trait EventLogDataProvisioning {
       maybeMessage match {
         case None =>
           val query: Command[
-            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+            EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EmptyTuple
           ] =
             sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
@@ -123,13 +123,13 @@ trait EventLogDataProvisioning {
             .prepare(query)
             .flatMap(
               _.execute(
-                compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ batchDate ~ eventBody
+                compoundEventId.id *: compoundEventId.projectId *: eventStatus *: createdDate *: executionDate *: eventDate *: batchDate *: eventBody *: EmptyTuple
               )
             )
             .void
         case Some(message) =>
           val query: Command[
-            EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
+            EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: BatchDate *: EventBody *: EventMessage *: EmptyTuple
           ] =
             sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
@@ -139,7 +139,7 @@ trait EventLogDataProvisioning {
             .prepare(query)
             .flatMap(
               _.execute(
-                compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ batchDate ~ eventBody ~ message
+                compoundEventId.id *: compoundEventId.projectId *: eventStatus *: createdDate *: executionDate *: eventDate *: batchDate *: eventBody *: message *: EmptyTuple
               )
             )
             .void
@@ -155,13 +155,13 @@ trait EventLogDataProvisioning {
 
   protected def upsertProject(projectId: projects.GitLabId, projectPath: Path, eventDate: EventDate): Unit = execute {
     Kleisli { session =>
-      val query: Command[projects.GitLabId ~ projects.Path ~ EventDate] =
+      val query: Command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple] =
         sql"""INSERT INTO project (project_id, project_path, latest_event_date)
               VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
               ON CONFLICT (project_id)
               DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-      session.prepare(query).flatMap(_.execute(projectId ~ projectPath ~ eventDate)).void
+      session.prepare(query).flatMap(_.execute(projectId *: projectPath *: eventDate *: EmptyTuple)).void
     }
   }
 
@@ -174,7 +174,7 @@ trait EventLogDataProvisioning {
         .map { payload =>
           execute[Unit] {
             Kleisli { session =>
-              val query: Command[EventId ~ projects.GitLabId ~ ZippedEventPayload] = sql"""
+              val query: Command[EventId *: projects.GitLabId *: ZippedEventPayload *: EmptyTuple] = sql"""
                 INSERT INTO event_payload (event_id, project_id, payload)
                 VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
                 ON CONFLICT (event_id, project_id)
@@ -182,7 +182,7 @@ trait EventLogDataProvisioning {
               """.command
               session
                 .prepare(query)
-                .flatMap(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload))
+                .flatMap(_.execute(compoundEventId.id *: compoundEventId.projectId *: payload *: EmptyTuple))
                 .void
             }
           }
@@ -196,7 +196,7 @@ trait EventLogDataProvisioning {
                                      processingTime:  EventProcessingTime
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[EventId ~ projects.GitLabId ~ EventStatus ~ EventProcessingTime] =
+      val query: Command[EventId *: projects.GitLabId *: EventStatus *: EventProcessingTime *: EmptyTuple] =
         sql"""INSERT INTO
               status_processing_time (event_id, project_id, status, processing_time)
               VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
@@ -205,7 +205,9 @@ trait EventLogDataProvisioning {
         """.command
       session
         .prepare(query)
-        .flatMap(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ processingTime))
+        .flatMap(
+          _.execute(compoundEventId.id *: compoundEventId.projectId *: eventStatus *: processingTime *: EmptyTuple)
+        )
         .void
     }
   }
@@ -225,7 +227,7 @@ trait EventLogDataProvisioning {
                                  sourceUrl:   MicroserviceBaseUrl
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
+      val query: Command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: SubscriberId *: EmptyTuple] =
         sql"""INSERT INTO
               subscriber (delivery_id, delivery_url, source_url)
               VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
@@ -233,7 +235,7 @@ trait EventLogDataProvisioning {
               DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
         """.command
 
-      session.prepare(query).flatMap(_.execute(deliveryId ~ deliveryUrl ~ sourceUrl ~ deliveryId)).void
+      session.prepare(query).flatMap(_.execute(deliveryId *: deliveryUrl *: sourceUrl *: deliveryId *: EmptyTuple)).void
     }
   }
 
@@ -241,13 +243,13 @@ trait EventLogDataProvisioning {
                                     deliveryId: SubscriberId = subscriberIds.generateOne
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[EventId ~ projects.GitLabId ~ SubscriberId] =
+      val query: Command[EventId *: projects.GitLabId *: SubscriberId *: EmptyTuple] =
         sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
               VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
               ON CONFLICT (event_id, project_id)
               DO NOTHING
         """.command
-      session.prepare(query).flatMap(_.execute(eventId.id ~ eventId.projectId ~ deliveryId)).void
+      session.prepare(query).flatMap(_.execute(eventId.id *: eventId.projectId *: deliveryId *: EmptyTuple)).void
     }
   }
 
@@ -282,12 +284,12 @@ trait EventLogDataProvisioning {
 
   def insertEventIntoEventsQueue(eventType: String, payload: Json): Unit = execute {
     Kleisli { session =>
-      val query: Command[OffsetDateTime ~ String ~ String] =
+      val query: Command[OffsetDateTime *: String *: String *: EmptyTuple] =
         sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
               VALUES ($timestamptz, $varchar, $text)""".command
       session
         .prepare(query)
-        .flatMap(_.execute(OffsetDateTime.now() ~ eventType ~ payload.noSpaces))
+        .flatMap(_.execute(OffsetDateTime.now() *: eventType *: payload.noSpaces *: EmptyTuple))
         .void
     }
   }

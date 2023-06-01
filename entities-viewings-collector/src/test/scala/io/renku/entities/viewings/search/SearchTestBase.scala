@@ -41,8 +41,6 @@ import io.renku.triplesstore._
 import org.scalacheck.Gen
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.Instant
 
@@ -58,8 +56,6 @@ abstract class SearchTestBase
     with SearchDiffInstances
     with EntityViewings
     with IOSpec {
-
-  implicit override def ioLogger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   implicit val queryTimeRecorder: SparqlQueryTimeRecorder[IO] =
     TestSparqlQueryTimeRecorder[IO].unsafeRunSync()

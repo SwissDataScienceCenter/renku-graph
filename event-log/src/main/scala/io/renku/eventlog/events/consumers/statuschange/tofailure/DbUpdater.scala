@@ -24,9 +24,9 @@ import cats.syntax.all._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
@@ -34,9 +34,9 @@ import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, Executio
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 import skunk.SqlState.DeadlockDetected
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Session, ~}
 
 import java.time.{Duration, Instant}
 import scala.concurrent.duration._
@@ -49,7 +49,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToFailure) = deleteDelivery(event.eventId)
+  override def onRollback(event: ToFailure): RollbackOp[F] = deleteDelivery(event.eventId)
 
   override def updateDB(event: ToFailure): UpdateOp[F] = for {
     _                     <- deleteDelivery(event.eventId)
@@ -62,7 +62,9 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
   ): Kleisli[F, Session[F], DBUpdateResults.ForProjects] = measureExecutionTime {
     SqlStatement
       .named(s"to_${event.newStatus.value.toLowerCase} - status update")
-      .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.GitLabId ~ ProcessingStatus](
+      .command[
+        FailureStatus *: ExecutionDate *: EventMessage *: EventId *: projects.GitLabId *: ProcessingStatus *: EmptyTuple
+      ](
         sql"""UPDATE event
               SET status = $eventFailureStatusEncoder,
                 execution_date = $executionDateEncoder,
@@ -73,12 +75,13 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
                """.command
       )
       .arguments(
-        event.newStatus ~
-          ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) ~
-          event.message ~
-          event.eventId.id ~
-          event.eventId.projectId ~
-          event.currentStatus
+        event.newStatus *:
+          ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) *:
+          event.message *:
+          event.eventId.id *:
+          event.eventId.projectId *:
+          event.currentStatus *:
+          EmptyTuple
       )
       .build
       .flatMapResult {
@@ -114,7 +117,10 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
     measureExecutionTime {
       SqlStatement
         .named(s"to_${event.newStatus.value.toLowerCase} - ancestors update")
-        .select[EventStatus ~ ExecutionDate ~ projects.GitLabId ~ projects.GitLabId ~ EventId ~ EventId, EventId](
+        .select[
+          EventStatus *: ExecutionDate *: projects.GitLabId *: projects.GitLabId *: EventId *: EventId *: EmptyTuple,
+          EventId
+        ](
           sql"""UPDATE event evt
                 SET status = $eventStatusEncoder, 
                     execution_date = $executionDateEncoder, 
@@ -138,10 +144,13 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
            """.query(eventIdDecoder)
         )
         .arguments(
-          newStatus ~
-            ExecutionDate(
-              now().plusMillis(event.executionDelay.getOrElse(Duration ofMillis 0).toMillis)
-            ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+          newStatus *:
+            ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration ofMillis 0).toMillis)) *:
+            event.eventId.projectId *:
+            event.eventId.projectId *:
+            event.eventId.id *:
+            event.eventId.id *:
+            EmptyTuple
         )
         .build(_.toList)
         .mapResult { ids =>

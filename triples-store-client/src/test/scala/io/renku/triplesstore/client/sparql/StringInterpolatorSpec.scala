@@ -126,6 +126,20 @@ class StringInterpolatorSpec extends AnyWordSpec with should.Matchers {
       )
     }
 
+    "encode an Iterable if used in a context of VALUES clause where the variable is in a placeholder too" in {
+
+      val variable = nonEmptyStrings().map(VarName(_)).generateOne
+      val col      = nonEmptyStrings().generateNonEmptyList().toList
+
+      fr"VALUES ($variable) { $col }" shouldBe Fragment(
+        s"VALUES (${variable.name}) { ${col.map(v => fr"$v".sparql).map(s => s"($s)").mkString(" ")} }"
+      )
+
+      fr"VALUES $variable { $col }" shouldBe Fragment(
+        s"VALUES ${variable.name} { ${col.map(v => fr"$v".sparql).mkString(" ")} }"
+      )
+    }
+
     "encode an Iterable if used in a context of IN clause" in {
       val col = nonEmptyStrings().generateNonEmptyList().toList
       fr"IN ($col)" shouldBe Fragment(

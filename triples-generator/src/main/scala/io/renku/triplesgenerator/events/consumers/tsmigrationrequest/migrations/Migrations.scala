@@ -44,6 +44,7 @@ private[tsmigrationrequest] object Migrations {
     projectsDateViewedCreator      <- ProjectsDateViewedCreator[F]
     projectDateViewedDeduplicator  <- ProjectDateViewedDeduplicator[F]
     personViewedEntityDeduplicator <- PersonViewedEntityDeduplicator[F]
+    provisionProjectsGraph         <- projectsgraph.ProvisionProjectsGraph[F]
     migrations <- validateNames(
                     datasetsCreator,
                     datasetsRemover,
@@ -55,7 +56,8 @@ private[tsmigrationrequest] object Migrations {
                     v10VersionSetter,
                     projectsDateViewedCreator,
                     projectDateViewedDeduplicator,
-                    personViewedEntityDeduplicator
+                    personViewedEntityDeduplicator,
+                    provisionProjectsGraph
                   )
   } yield migrations
 

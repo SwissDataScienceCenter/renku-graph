@@ -28,9 +28,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.api.events.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -52,7 +52,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     createEventsResource(sendEventIfFound(_))
       .map(_ => DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: AllEventsToNew.type) = RollbackOp.none[F]
+  override def onRollback(event: AllEventsToNew.type): RollbackOp[F] = RollbackOp.none[F]
 
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]
@@ -78,8 +78,8 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
           eventSender.sendEvent(
             EventRequestContent.NoPayload(event.asJson),
             EventSender.EventContext(
-              CategoryName(ProjectEventsToNew.eventType.show),
-              show"$categoryName: generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+              CategoryName(projecteventstonew.eventType.show),
+              show"$categoryName: generating ${projecteventstonew.eventType} for ${event.project} failed"
             )
           ) >> sendEventIfFound(cursor, areMore)
       }

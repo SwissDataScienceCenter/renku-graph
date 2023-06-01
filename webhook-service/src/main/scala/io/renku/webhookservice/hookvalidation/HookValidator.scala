@@ -74,7 +74,7 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
   import projectHookVerifier._
 
   def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
-    persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId)
+    persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId, maybeAccessToken)
   }.onError(logError(projectId))
 
   private def persistGivenToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Unit] =
@@ -82,12 +82,15 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
       .map(associate(projectId, _))
       .getOrElse(().pure[F])
 
-  private def validateHookExistence(projectId: GitLabId): F[Option[HookValidationResult]] =
+  private def validateHookExistence(projectId:        GitLabId,
+                                    maybeAccessToken: Option[AccessToken]
+  ): F[Option[HookValidationResult]] =
     fetchToken(projectId)
       .flatMapF(at => checkHookPresence(HookIdentifier(projectId, projectHookUrl), at))
       .cataF(
         default = Option.empty[HookValidationResult].pure[F],
-        hookPresent => whenA(!hookPresent)(removeAccessToken(projectId)).as(validationResultFrom(hookPresent).some)
+        hookPresent =>
+          whenA(!hookPresent)(removeAccessToken(projectId, maybeAccessToken)).as(toValidationResult(hookPresent).some)
       )
 
   private def fetchToken(projectId: GitLabId): OptionT[F, AccessToken] = OptionT {
@@ -98,7 +101,7 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
   private def storedAccessTokenError(projectId: GitLabId): PartialFunction[Throwable, Throwable] = exception =>
     new Exception(s"Finding stored access token for $projectId failed", exception)
 
-  private def validationResultFrom(projectHookPresent: Boolean): HookValidationResult =
+  private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
     if (projectHookPresent) HookExists else HookMissing
 
   private def logError(projectId: GitLabId): PartialFunction[Throwable, F[Unit]] = { case exception =>

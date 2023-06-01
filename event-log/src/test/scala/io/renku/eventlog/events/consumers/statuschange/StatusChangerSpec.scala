@@ -24,8 +24,9 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog._
+import io.renku.eventlog.api.events.StatusChangeEvent._
+import io.renku.eventlog.api.events.{StatusChangeEvent, StatusChangeGenerators}
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.Generators.{subscriberIds, subscriberUrls}
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -42,8 +43,8 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
 import skunk.implicits._
-import skunk.~
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -156,12 +157,12 @@ class StatusChangerSpec
 
       override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = Kleisli {
         SqlStatement[IO](name = "onRollback dbUpdater query")
-          .command[EventId ~ projects.GitLabId](
+          .command[EventId *: projects.GitLabId *: EmptyTuple](
             sql"""DELETE FROM event_delivery
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
           )
-          .arguments(eventId.id ~ eventId.projectId)
+          .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
           .build
           .void
           .queryExecution
