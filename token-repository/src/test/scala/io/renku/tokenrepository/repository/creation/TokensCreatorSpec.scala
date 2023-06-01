@@ -81,8 +81,8 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenTokenValidation(userAccessToken, returning = true.pure[Try])
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulTokensRevoking(projectId, userAccessToken)
+      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -127,8 +127,8 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenTokenValidation(userAccessToken, returning = true.pure[Try])
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulTokensRevoking(projectId, userAccessToken)
+      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -140,8 +140,8 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenTokenValidation(userAccessToken, returning = true.pure[Try])
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      givenSuccessfulTokenCreation(projectPath)
-      givenSuccessfulTokensRevoking(projectId, userAccessToken)
+      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -212,7 +212,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
-      givenSuccessfulTokensRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, tokenCreationInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -242,7 +242,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
-      givenSuccessfulTokensRevoking(projectId, userAccessToken)
+      givenSuccessfulTokensRevoking(projectId, tokenCreationInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -395,7 +395,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenTokenDecryption(of = encryptedAccessToken, returning = token.pure[Try])
     }
 
-    def givenSuccessfulTokenCreation(projectPath: projects.Path) = {
+    def givenSuccessfulTokenCreation(projectPath: projects.Path): TokenCreationInfo = {
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
       givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
@@ -410,11 +410,15 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       )
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
+
+      tokenCreationInfo
     }
 
-    def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
-      (tokensRevoker.revokeAllTokens _)
-        .expects(projectId, accessToken)
-        .returning(().pure[Try])
+    def givenSuccessfulTokensRevoking(projectId:   projects.GitLabId,
+                                      tokenInfo:   TokenCreationInfo,
+                                      accessToken: AccessToken
+    ) = (tokensRevoker.revokeAllTokens _)
+      .expects(projectId, tokenInfo.tokenId.some, accessToken)
+      .returning(().pure[Try])
   }
 }

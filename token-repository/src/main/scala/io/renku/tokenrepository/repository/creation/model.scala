@@ -29,7 +29,10 @@ import io.renku.tinytypes._
 
 import java.time.{Instant, LocalDate}
 
-private[repository] final case class TokenCreationInfo(token: ProjectAccessToken, dates: TokenDates)
+private[repository] final case class TokenCreationInfo(tokenId: AccessTokenId,
+                                                       token:   ProjectAccessToken,
+                                                       dates:   TokenDates
+)
 
 private[repository] final case class TokenDates(createdAt: CreatedAt, expiryDate: ExpiryDate)
 

@@ -29,7 +29,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{emptyOptionOf, fixed, localDates, nonEmptyStrings}
+import io.renku.generators.Generators.{fixed, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -38,7 +38,6 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
-import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import org.http4s._
 import org.http4s.implicits._
 import org.scalacheck.Gen
@@ -47,8 +46,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.ci._
 
-import java.time.LocalDate.now
-import java.time.{LocalDate, Period}
 import scala.util.Random
 
 class RevokeCandidatesFinderSpec
@@ -60,34 +57,27 @@ class RevokeCandidatesFinderSpec
 
   "projectAccessTokensStream" should {
 
-    "call GET projects/:id/access_tokens to find expired tokens with RenkuAccessTokenName" in new TestCase {
+    "call GET projects/:id/access_tokens to find environment related tokens" in new TestCase {
 
-      val allTokens = List(
-        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(max = now() plus tokenDuePeriod)),
-        tokenInfosWithExpiry(fixed(renkuTokenName.value), fixed(now() plus tokenDuePeriod)),
-        tokenInfosWithoutExpiry(fixed(renkuTokenName.value)),
-        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(min = now() plus tokenDuePeriod plusDays 1)),
-        tokenInfosWithExpiry(expiryDates = localDates(max = now() plus tokenDuePeriod)),
-        tokenInfosWithExpiry()
-      ).map(_.generateOne)
+      val envTokens    = tokenInfos(names = fixed(renkuTokenName.value)).generateList(min = 1, max = pageSize.value - 1)
+      val nonEnvTokens = tokenInfos().generateList(min = 1, max = pageSize.value - envTokens.size)
+      val allTokens    = envTokens ::: nonEnvTokens
 
       fetchProjectTokens(Page(1), returning = (allTokens -> Option.empty[Page]).pure[IO])
 
       finder.projectAccessTokensStream(projectId, accessToken).compile.toList.unsafeRunSync() shouldBe
-        allTokens.take(3).map(_._1)
+        envTokens.map(_._1)
     }
 
     "go through all the pages of project tokens" in new TestCase {
 
-      val tokensToFind1 =
-        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(max = now() plus tokenDuePeriod)).generateOne
-      val tokensToFind2 =
-        tokenInfosWithExpiry(fixed(renkuTokenName.value), fixed(now() plus tokenDuePeriod)).generateOne
+      val tokensToFind1 = tokenInfos(names = fixed(renkuTokenName.value)).generateOne
+      val tokensToFind2 = tokenInfos(names = fixed(renkuTokenName.value)).generateOne
 
       val otherTokensPage1 =
-        Random.shuffle(tokensToFind1 :: tokenInfosWithExpiry().generateFixedSizeList(ofSize = pageSize.value - 1))
+        Random.shuffle(tokensToFind1 :: tokenInfos().generateFixedSizeList(ofSize = pageSize.value - 1))
       val otherTokensPage2 =
-        Random.shuffle(tokensToFind2 :: tokenInfosWithExpiry().generateFixedSizeList(ofSize = pageSize.value - 1))
+        Random.shuffle(tokensToFind2 :: tokenInfos().generateFixedSizeList(ofSize = pageSize.value - 1))
 
       fetchProjectTokens(Page(1), returning = (otherTokensPage1 -> Page(2).some).pure[IO])
       fetchProjectTokens(Page(2), returning = (otherTokensPage2 -> Option.empty[Page]).pure[IO])
@@ -99,7 +89,7 @@ class RevokeCandidatesFinderSpec
     "map OK response body to TokenInfo tuples" in new TestCase {
 
       val tokens = Gen
-        .oneOf(tokenInfosWithExpiry(), tokenInfosWithoutExpiry(fixed(renkuTokenName.value)))
+        .oneOf(tokenInfos(), tokenInfos(names = fixed(renkuTokenName.value)))
         .generateList(max = pageSize.value)
       val nextPage = Page(2)
 
@@ -120,7 +110,7 @@ class RevokeCandidatesFinderSpec
     }
   }
 
-  private type TokenInfo = (AccessTokenId, String, Option[ExpiryDate])
+  private type TokenInfo = (AccessTokenId, String)
 
   private trait TestCase {
 
@@ -130,15 +120,17 @@ class RevokeCandidatesFinderSpec
     private implicit val gitLabClient: GitLabClient[IO]        = mock[GitLabClient[IO]]
     private val endpointName:          String Refined NonEmpty = "project-access-tokens"
 
-    val tokenDuePeriod = Period.ofDays(5)
     val pageSize       = PerPage(50)
     val renkuTokenName = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
-    val finder         = new RevokeCandidatesFinderImpl[IO](pageSize, tokenDuePeriod, renkuTokenName)
+    val finder         = new RevokeCandidatesFinderImpl[IO](pageSize, renkuTokenName)
 
     lazy val mapResponse = captureMapping(gitLabClient)(
-      findingMethod =
-        finder.projectAccessTokensStream(projectIds.generateOne, accessTokens.generateOne).compile.toList.unsafeRunSync(),
-      resultGenerator = tokenInfosWithoutExpiry().generateList() -> Option.empty[Page]
+      findingMethod = finder
+        .projectAccessTokensStream(projectIds.generateOne, accessTokens.generateOne)
+        .compile
+        .toList
+        .unsafeRunSync(),
+      resultGenerator = tokenInfos().generateList() -> Option.empty[Page]
     )
 
     def fetchProjectTokens(page: Page, returning: IO[(List[TokenInfo], Option[Page])]) =
@@ -156,22 +148,13 @@ class RevokeCandidatesFinderSpec
         .returning(returning)
   }
 
-  private def tokenInfosWithoutExpiry(names: Gen[String] = nonEmptyStrings()): Gen[TokenInfo] =
-    tokenInfos(names, maybeExpiryDates = emptyOptionOf[ExpiryDate])
+  private def tokenInfos(names: Gen[String] = nonEmptyStrings()): Gen[TokenInfo] =
+    (accessTokenIds, names).mapN(_ -> _)
 
-  private def tokenInfosWithExpiry(names:       Gen[String] = nonEmptyStrings(),
-                                   expiryDates: Gen[LocalDate] = localDates
-  ): Gen[TokenInfo] = tokenInfos(names, expiryDates.toGeneratorOf(ExpiryDate).map(Option.apply))
-
-  private def tokenInfos(names: Gen[String], maybeExpiryDates: Gen[Option[ExpiryDate]]): Gen[TokenInfo] =
-    (accessTokenIds, names, maybeExpiryDates)
-      .mapN { case (id, name, maybeExpiry) => (id, name, maybeExpiry) }
-
-  private implicit lazy val tokenInfoEncoder: Encoder[TokenInfo] = Encoder.instance { case (id, name, expiry) =>
+  private implicit lazy val tokenInfoEncoder: Encoder[TokenInfo] = Encoder.instance { case (id, name) =>
     json"""{
-      "id":         $id,
-      "name":       $name,
-      "expires_at": $expiry
+      "id":   $id,
+      "name": $name
     }"""
   }
 }

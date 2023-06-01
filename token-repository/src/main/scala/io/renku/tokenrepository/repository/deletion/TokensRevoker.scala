@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.deletion
+package io.renku.tokenrepository.repository
+package deletion
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -24,10 +25,8 @@ import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 private[repository] trait TokensRevoker[F[_]] {
-  def revokeAllTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit]
+  def revokeAllTokens(projectId: GitLabId, except: Option[AccessTokenId], accessToken: AccessToken): F[Unit]
 }
 
 private[repository] object TokensRevoker {
@@ -42,12 +41,11 @@ private class TokensRevokerImpl[F[_]: Async: Logger](revokeCandidatesFinder: Rev
   import revokeCandidatesFinder._
   import tokenRevoker._
 
-  override def revokeAllTokens(projectId: GitLabId, accessToken: AccessToken): F[Unit] =
+  override def revokeAllTokens(projectId: GitLabId, except: Option[AccessTokenId], accessToken: AccessToken): F[Unit] =
     projectAccessTokensStream(projectId, accessToken)
+      .filterNot(except contains _)
       .evalMap(revokeToken(_, projectId, accessToken))
       .compile
       .drain
-      .recoverWith { case NonFatal(ex) =>
-        Logger[F].warn(ex)(show"removing old token in GitLab for project $projectId failed")
-      }
+      .recoverWith { case ex => Logger[F].warn(ex)(show"removing old token in GitLab for project $projectId failed") }
 }

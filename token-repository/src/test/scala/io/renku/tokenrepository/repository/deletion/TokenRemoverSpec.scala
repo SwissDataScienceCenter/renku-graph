@@ -68,7 +68,7 @@ class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues w
 
     def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
       (tokensRevoker.revokeAllTokens _)
-        .expects(projectId, accessToken)
+        .expects(projectId, Option.empty[AccessTokenId], accessToken)
         .returning(().pure[Try])
   }
 }
