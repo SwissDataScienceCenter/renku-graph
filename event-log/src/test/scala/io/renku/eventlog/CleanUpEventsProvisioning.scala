@@ -39,12 +39,12 @@ trait CleanUpEventsProvisioning {
   ): Unit =
     execute {
       Kleisli { session =>
-        val query: Command[OffsetDateTime ~ projects.GitLabId ~ projects.Path] = sql"""
+        val query: Command[OffsetDateTime *: projects.GitLabId *: projects.Path *: EmptyTuple] = sql"""
           INSERT INTO clean_up_events_queue (date, project_id, project_path)
           VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
         session
           .prepare(query)
-          .flatMap(_.execute(date ~ projectId ~ projectPath))
+          .flatMap(_.execute(date *: projectId *: projectPath *: EmptyTuple))
           .void
       }
     }

@@ -325,7 +325,7 @@ class EventPersisterSpec
       execute {
         Kleisli { session =>
           val query: Query[
-            EventId ~ projects.GitLabId,
+            EventId *: projects.GitLabId *: EmptyTuple,
             (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
           ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
                   FROM event  
@@ -346,7 +346,7 @@ class EventPersisterSpec
                   maybeEventMessage
                 )
             }
-          session.prepare(query).flatMap(_.unique(compoundEventId.id ~ compoundEventId.projectId))
+          session.prepare(query).flatMap(_.unique(compoundEventId.id *: compoundEventId.projectId *: EmptyTuple))
         }
       }
   }

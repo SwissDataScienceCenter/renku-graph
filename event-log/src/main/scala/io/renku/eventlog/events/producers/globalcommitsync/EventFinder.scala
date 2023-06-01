@@ -25,7 +25,6 @@ import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -34,9 +33,9 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{CommitId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
-import skunk._
 import skunk.data.Completion
 import skunk.implicits._
+import skunk.{*:, _}
 
 import java.time.{Duration, Instant}
 
@@ -67,10 +66,10 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
   }
 
   private def findProject = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find project"))
-      .select[CategoryName ~ LastSyncedDate, (Project, Option[LastSyncedDate])](
-        sql"""
-              SELECT
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - find project")
+      .select[CategoryName *: LastSyncedDate *: EmptyTuple, (Project, Option[LastSyncedDate])](
+        sql"""SELECT
                 proj.project_id,
                 proj.project_path,
                 sync_time.last_synced
@@ -83,9 +82,9 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(projectDecoder ~ lastSyncedDateDecoder.opt)
-          .map { case project ~ lastSyncedDate => (project, lastSyncedDate) }
+          .map { case (project, lastSyncedDate) => (project, lastSyncedDate) }
       )
-      .arguments(categoryName ~ LastSyncedDate(now()))
+      .arguments((categoryName, LastSyncedDate(now())))
       .build(_.option)
   }
 
@@ -95,17 +94,17 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
       : Option[(Project, Option[LastSyncedDate])] => Kleisli[F, Session[F], Option[GlobalCommitSyncEvent]] = {
     case Some((project, maybeLastSyncedDate)) =>
       measureExecutionTime {
-        SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-          .select[projects.GitLabId ~ projects.GitLabId, (Long, Option[CommitId])](sql"""
+        SqlStatement
+          .named(s"${categoryName.value.toLowerCase} - find commits")
+          .select[projects.GitLabId *: projects.GitLabId *: EmptyTuple, (Long, Option[CommitId])](sql"""
             SELECT
               (SELECT COUNT(event_id) FROM event 
                 WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
               (SELECT event_id FROM event 
-                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(
-              deletionStatus
-            )} ORDER BY event_date DESC LIMIT 1) AS latest
+                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}
+                ORDER BY event_date DESC LIMIT 1) AS latest
             """.query(int8 ~ commitIdDecoder.opt))
-          .arguments(project.id ~ project.id)
+          .arguments((project.id, project.id))
           .build[Id](_.unique)
           .mapResult(toEvent(project, maybeLastSyncedDate))
       }

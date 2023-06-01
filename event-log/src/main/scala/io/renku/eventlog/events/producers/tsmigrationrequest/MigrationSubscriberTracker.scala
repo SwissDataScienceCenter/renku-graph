@@ -24,12 +24,12 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Done
+import io.renku.eventlog._
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.Subscription.SubscriberUrl
-import skunk.{Session, SqlState, ~}
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -66,13 +66,13 @@ private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource
   private def insert(info: MigrationSubscriber): Kleisli[F, Session[F], Boolean] = measureExecutionTime {
     SqlStatement
       .named("migrator - add")
-      .command[ServiceVersion ~ SubscriberUrl ~ MigrationStatus ~ ChangeDate](sql"""
+      .command[ServiceVersion *: SubscriberUrl *: MigrationStatus *: ChangeDate *: EmptyTuple](sql"""
         INSERT INTO ts_migration (subscriber_version, subscriber_url, status, change_date)
         VALUES ($serviceVersionEncoder, $subscriberUrlEncoder, $migrationStatusEncoder, $changeDateEncoder)
         ON CONFLICT (subscriber_version, subscriber_url)
         DO NOTHING
         """.command)
-      .arguments(info.version ~ info.url ~ MigrationStatus.New ~ ChangeDate(now()))
+      .arguments(info.version *: info.url *: MigrationStatus.New *: ChangeDate(now()) *: EmptyTuple)
       .build
   } map insertToTableResult
 
@@ -106,9 +106,6 @@ private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource
 }
 
 private object MigrationSubscriberTracker {
-
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[MigrationSubscriberTracker[F]] =
-    MonadCancelThrow[F].catchNonFatal {
-      new MigrationSubscriberTracker[F]()
-    }
+    MonadCancelThrow[F].catchNonFatal(new MigrationSubscriberTracker[F]())
 }

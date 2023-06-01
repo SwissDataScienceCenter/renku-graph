@@ -23,10 +23,10 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.model.Event
 import io.renku.eventlog.{events => _, _}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
@@ -117,7 +117,7 @@ class EventStatusRenamerSpec
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
-          EventId ~ projects.GitLabId ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate
+          EventId *: projects.GitLabId *: String *: CreatedDate *: ExecutionDate *: EventDate *: String *: BatchDate *: EmptyTuple
         ] =
           sql"""INSERT INTO 
               event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
@@ -135,9 +135,15 @@ class EventStatusRenamerSpec
           .prepare(query)
           .flatMap(
             _.execute(
-              event.id ~ event.project.id ~ withStatus ~ createdDates.generateOne ~ executionDates.generateOne ~ event.date ~ toJsonBody(
-                event
-              ) ~ event.batchDate
+              event.id *:
+                event.project.id *:
+                withStatus *:
+                createdDates.generateOne *:
+                executionDates.generateOne *:
+                event.date *:
+                toJsonBody(event) *:
+                event.batchDate *:
+                EmptyTuple
             )
           )
           .void

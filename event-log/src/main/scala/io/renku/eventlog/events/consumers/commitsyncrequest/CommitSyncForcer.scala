@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.producers.{commitsync, SubscriptionTypeSerializers}
+import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, commitsync}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventDate
@@ -57,11 +57,11 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
 
   private def deleteLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-      .command[projects.GitLabId ~ CategoryName](sql"""
+      .command[projects.GitLabId *: CategoryName *: EmptyTuple](sql"""
         DELETE FROM subscription_category_sync_time
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
       """.command)
-      .arguments(projectId ~ commitsync.categoryName)
+      .arguments(projectId *: commitsync.categoryName *: EmptyTuple)
       .build
       .mapResult {
         case Completion.Delete(0) => true
@@ -72,13 +72,13 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: Quer
   private def upsertProject(projectId: projects.GitLabId, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert project")
-      .command[projects.GitLabId ~ projects.Path ~ EventDate](sql"""
+      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](sql"""
         INSERT INTO project (project_id, project_path, latest_event_date)
         VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
         ON CONFLICT (project_id)
         DO NOTHING
         """.command)
-      .arguments(projectId ~ projectPath ~ EventDate(Instant.EPOCH))
+      .arguments(projectId *: projectPath *: EventDate(Instant.EPOCH) *: EmptyTuple)
       .build
   }
 }

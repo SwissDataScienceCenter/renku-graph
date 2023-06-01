@@ -24,8 +24,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 
@@ -49,9 +49,9 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
   import io.renku.graph.model.events.EventStatus.{TriplesGenerated, TriplesStore}
   import io.renku.graph.model.events.{CompoundEventId, EventId, ExecutionDate}
   import io.renku.graph.model.projects
+  import skunk._
   import skunk.data.Completion
   import skunk.implicits._
-  import skunk.{Session, ~}
 
   override def updateDB(event: RedoProjectTransformation): UpdateOp[F] =
     findLatestSuccessfulEvent(event.project.path) >>= {
@@ -87,7 +87,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
   private def toTriplesGenerated(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named[F]("redo_transformation - to TriplesGenerated")
-      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
+      .command[ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 
@@ -95,7 +95,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
                 AND status = '#${TriplesStore.value}'
                """.command
       )
-      .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId)
+      .arguments(ExecutionDate(now()) *: eventId.id *: eventId.projectId *: EmptyTuple)
       .build
   }
 

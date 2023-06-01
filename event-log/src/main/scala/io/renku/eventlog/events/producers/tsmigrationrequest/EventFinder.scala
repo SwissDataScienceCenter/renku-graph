@@ -117,7 +117,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
   private def markTaken(event: MigrationRequestEvent) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - mark taken")
-      .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion ~ ChangeDate](sql"""
+      .command[ChangeDate *: SubscriberUrl *: ServiceVersion *: ChangeDate *: EmptyTuple](sql"""
         UPDATE ts_migration
         SET status = '#${Sent.value}', change_date = $changeDateEncoder, message = NULL
         WHERE subscriber_url = $subscriberUrlEncoder 
@@ -125,8 +125,8 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
           AND (status <> '#${Sent.value}' OR change_date < $changeDateEncoder)
         """.command)
       .arguments(
-        ChangeDate(now()) ~ event.subscriberUrl ~ event.subscriberVersion ~
-          ChangeDate(now() minus SentStatusTimeout)
+        ChangeDate(now()) *: event.subscriberUrl *: event.subscriberVersion *:
+          ChangeDate(now() minus SentStatusTimeout) *: EmptyTuple
       )
       .build
       .flatMapResult {

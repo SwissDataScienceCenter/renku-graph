@@ -23,17 +23,17 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{TransformingTriples, TriplesGenerated}
 import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.~
 
 import java.time.Instant
 
@@ -44,7 +44,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
 
   override def updateDB(event: RollbackToTriplesGenerated): UpdateOp[F] = measureExecutionTime {
     SqlStatement[F](name = "to_triples_generated rollback - status update")
-      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
+      .command[ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](
         sql"""UPDATE event
               SET status = '#${TriplesGenerated.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 
@@ -52,7 +52,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
                 AND status = '#${TransformingTriples.value}'
                """.command
       )
-      .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
+      .arguments(ExecutionDate(now()) *: event.eventId.id *: event.eventId.projectId *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(1) =>
@@ -67,5 +67,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToTriplesGenerated) = RollbackOp.none
+  override def onRollback(event: RollbackToTriplesGenerated): RollbackOp[F] = RollbackOp.none
 }

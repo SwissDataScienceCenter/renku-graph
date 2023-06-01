@@ -79,7 +79,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
-      .select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
+      .select[ExecutionDate *: ExecutionDate *: Int *: EmptyTuple, ProjectInfo](
         sql"""
         SELECT p.project_id, p.project_path, p.latest_event_date,
           (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
@@ -118,7 +118,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
               ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
-      .arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+      .arguments(ExecutionDate(now()) *: ExecutionDate(now()) *: projectsFetchingLimit.value *: EmptyTuple)
       .build(_.toList)
   }
 
@@ -136,7 +136,10 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
     val executionDate = ExecutionDate(now())
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find oldest")
-      .select[projects.Path ~ projects.GitLabId ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent](sql"""
+      .select[projects.Path *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
+              TriplesGeneratedEvent
+      ](
+        sql"""
          SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload
          FROM (
            SELECT evt_int.project_id, max(event_date) AS max_event_date
@@ -153,11 +156,13 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
            AND execution_date < $executionDateEncoder
          JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
          LIMIT 1
-         """.query(compoundEventIdDecoder ~ projectPathDecoder ~ zippedPayloadDecoder).map {
-        case eventId ~ projectPath ~ eventPayload =>
-          TriplesGeneratedEvent(eventId, projectPath, eventPayload)
-      })
-      .arguments(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate)
+         """
+          .query(compoundEventIdDecoder ~ projectPathDecoder ~ zippedPayloadDecoder)
+          .map { case eventId ~ projectPath ~ eventPayload =>
+            TriplesGeneratedEvent(eventId, projectPath, eventPayload)
+          }
+      )
+      .arguments(idAndPath.path *: idAndPath.id *: executionDate *: executionDate *: EmptyTuple)
       .build(_.option)
   }
 
@@ -186,7 +191,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
   private def updateStatus(commitEventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
-      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](
+      .command[EventStatus *: ExecutionDate *: EventId *: projects.GitLabId *: EventStatus *: EmptyTuple](
         sql"""UPDATE event
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder
@@ -195,11 +200,12 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
         """.command
       )
       .arguments(
-        TransformingTriples ~
-          ExecutionDate(now()) ~
-          commitEventId.id ~
-          commitEventId.projectId ~
-          TransformingTriples
+        TransformingTriples *:
+          ExecutionDate(now()) *:
+          commitEventId.id *:
+          commitEventId.projectId *:
+          TransformingTriples *:
+          EmptyTuple
       )
       .build
   }

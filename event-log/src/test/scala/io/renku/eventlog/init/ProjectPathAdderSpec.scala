@@ -21,10 +21,10 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.IO
 import io.circe.literal._
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.Generators.events
 import io.renku.eventlog.init.model.Event
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
@@ -108,7 +108,9 @@ class ProjectPathAdderSpec
 
   private def storeEvent(event: Event): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[EventId ~ projects.GitLabId ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String] =
+      val query: Command[
+        EventId *: projects.GitLabId *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
+      ] =
         sql"""insert into
             event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
             values (
@@ -125,9 +127,14 @@ class ProjectPathAdderSpec
         .prepare(query)
         .flatMap(
           _.execute(
-            event.id ~ event.project.id ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDates.generateOne ~ toJson(
-              event
-            )
+            event.id *:
+              event.project.id *:
+              eventStatuses.generateOne *:
+              createdDates.generateOne *:
+              executionDates.generateOne *:
+              eventDates.generateOne *:
+              toJson(event) *:
+              EmptyTuple
           )
         )
         .void

@@ -24,9 +24,9 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
@@ -48,18 +48,14 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
 
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = SessionResource[F].useK {
     val eventDeliveryId = eventDeliveryIdExtractor(event)
-    for {
-      _      <- deleteDelivery(eventDeliveryId)
-      result <- insert(eventDeliveryId, subscriberUrl)
-    } yield result
+    deleteDelivery(eventDeliveryId) >> insert(eventDeliveryId, subscriberUrl)
   } flatMap toResult
 
-  private def insert(eventDeliveryId: EventDeliveryId, subscriberUrl: SubscriberUrl) =
-    measureExecutionTime {
-      eventDeliveryId match {
-        case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
-          SqlStatement(name = "event delivery info - insert")
-            .command[EventId ~ projects.GitLabId ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
+  private def insert(eventDeliveryId: EventDeliveryId, subscriberUrl: SubscriberUrl) = measureExecutionTime {
+    eventDeliveryId match {
+      case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
+        SqlStatement(name = "event delivery info - insert")
+          .command[EventId *: projects.GitLabId *: SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple](sql"""
               INSERT INTO event_delivery (event_id, project_id, delivery_id)
               SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
               FROM subscriber
@@ -67,11 +63,11 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
               ON CONFLICT (event_id, project_id)
               DO NOTHING
               """.command)
-            .arguments(eventId ~ projectId ~ subscriberUrl ~ sourceUrl)
-            .build
-        case eventId @ DeletingProjectDeliverId(projectId) =>
-          SqlStatement(name = "event delivery info - insert")
-            .command[projects.GitLabId ~ EventTypeId ~ SubscriberUrl ~ MicroserviceBaseUrl](sql"""
+          .arguments(eventId *: projectId *: subscriberUrl *: sourceUrl *: EmptyTuple)
+          .build
+      case eventId @ DeletingProjectDeliverId(projectId) =>
+        SqlStatement(name = "event delivery info - insert")
+          .command[projects.GitLabId *: EventTypeId *: SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple](sql"""
               INSERT INTO event_delivery (project_id, delivery_id, event_type_id)
               SELECT  $projectIdEncoder, delivery_id, $eventTypeIdEncoder
               FROM subscriber
@@ -79,29 +75,29 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource: Queries
               ON CONFLICT (project_id, event_type_id)
               DO NOTHING
               """.command)
-            .arguments(projectId ~ eventId.eventTypeId ~ subscriberUrl ~ sourceUrl)
-            .build
-      }
+          .arguments(projectId *: eventId.eventTypeId *: subscriberUrl *: sourceUrl *: EmptyTuple)
+          .build
     }
+  }
 
   private def deleteDelivery(eventDeliveryId: EventDeliveryId) = measureExecutionTime {
     eventDeliveryId match {
       case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
         SqlStatement(name = "event delivery info - remove")
-          .command[EventId ~ projects.GitLabId](sql"""
+          .command[EventId *: projects.GitLabId *: EmptyTuple](sql"""
             DELETE FROM event_delivery
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command)
-          .arguments(eventId ~ projectId)
+          .arguments(eventId *: projectId *: EmptyTuple)
           .build
           .void
       case eventId @ DeletingProjectDeliverId(projectId) =>
         SqlStatement(name = "event delivery info - remove")
-          .command[projects.GitLabId ~ EventTypeId](sql"""
+          .command[projects.GitLabId *: EventTypeId *: EmptyTuple](sql"""
             DELETE FROM event_delivery
             WHERE event_id = NULL AND project_id = $projectIdEncoder AND event_type_id = $eventTypeIdEncoder
             """.command)
-          .arguments(projectId ~ eventId.eventTypeId)
+          .arguments(projectId *: eventId.eventTypeId *: EmptyTuple)
           .build
           .void
     }

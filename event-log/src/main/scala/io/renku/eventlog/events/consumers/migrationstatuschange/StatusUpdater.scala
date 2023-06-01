@@ -22,9 +22,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Sent
+import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.Subscription.SubscriberUrl
@@ -51,7 +51,14 @@ private class StatusUpdaterImpl[F[_]: Async: SessionResource: QueriesExecutionTi
   private def update(event: Event) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - update")
-      .command[MigrationStatus ~ ChangeDate ~ Option[MigrationMessage] ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[
+        MigrationStatus *:
+          ChangeDate *:
+          Option[MigrationMessage] *:
+          SubscriberUrl *:
+          ServiceVersion *:
+          EmptyTuple
+      ](sql"""
         UPDATE ts_migration
         SET status = $migrationStatusEncoder, change_date = $changeDateEncoder, message = ${migrationMessageEncoder.opt}
         WHERE subscriber_url = $subscriberUrlEncoder 
@@ -59,7 +66,12 @@ private class StatusUpdaterImpl[F[_]: Async: SessionResource: QueriesExecutionTi
           AND status = '#${Sent.value}'
         """.command)
       .arguments(
-        event.newStatus ~ ChangeDate(now()) ~ getMessage(event) ~ event.subscriberUrl ~ event.subscriberVersion
+        event.newStatus *:
+          ChangeDate(now()) *:
+          getMessage(event) *:
+          event.subscriberUrl *:
+          event.subscriberVersion *:
+          EmptyTuple
       )
       .build
       .flatMapResult {

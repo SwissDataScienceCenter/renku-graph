@@ -63,7 +63,6 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
               WHERE evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
           """
           .query(projectIdDecoder ~ eventStatusDecoder)
-          .map { case id ~ status => (id, status) }
       )
       .arguments(Void)
       .build(_.toList)
@@ -88,7 +87,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find")
       .select[
-        projects.GitLabId ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime ~ ExecutionDate ~ EventProcessingTime,
+        projects.GitLabId *: EventStatus *: String *: ExecutionDate *: EventProcessingTime *: ExecutionDate *: EventProcessingTime *: EmptyTuple,
         ZombieEvent
       ](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
@@ -108,9 +107,9 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
           .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
       )
       .arguments(
-        projectId ~ status ~ zombieMessage ~
-          ExecutionDate(now()) ~ EventProcessingTime(Duration ofMinutes 10) ~
-          ExecutionDate(now()) ~ findGracePeriod(status)
+        projectId *: status *: zombieMessage *:
+          ExecutionDate(now()) *: EventProcessingTime(Duration ofMinutes 10) *:
+          ExecutionDate(now()) *: findGracePeriod(status) *: EmptyTuple
       )
       .build(_.option)
   }
@@ -129,13 +128,13 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - update message")
-      .command[String ~ ExecutionDate ~ EventId ~ projects.GitLabId](
+      .command[String *: ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](
         sql"""UPDATE event
               SET message = $text, execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
       )
-      .arguments(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId)
+      .arguments(zombieMessage *: ExecutionDate(now()) *: eventId.id *: eventId.projectId *: EmptyTuple)
       .build
   }
 
@@ -147,7 +146,5 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
 
 private object LongProcessingEventFinder {
   def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new LongProcessingEventFinder()
-    }
+    MonadThrow[F].catchNonFatal(new LongProcessingEventFinder())
 }

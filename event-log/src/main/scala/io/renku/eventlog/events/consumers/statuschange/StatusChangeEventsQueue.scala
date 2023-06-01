@@ -29,8 +29,8 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
+import skunk._
 import skunk.data.Completion
-import skunk.{Session, ~}
 
 import java.time.OffsetDateTime
 import scala.concurrent.duration._
@@ -60,9 +60,7 @@ object StatusChangeEventsQueue {
   }
 
   def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[StatusChangeEventsQueue[F]] =
-    MonadThrow[F].catchNonFatal {
-      new StatusChangeEventsQueueImpl[F]
-    }
+    MonadThrow[F].catchNonFatal(new StatusChangeEventsQueueImpl[F])
 }
 
 private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]
@@ -94,12 +92,12 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
       show:      Show[E]
   ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
     SqlStatement[F](name = "status change event queue - offer")
-      .command[OffsetDateTime ~ String ~ String](
+      .command[OffsetDateTime *: String *: String *: EmptyTuple](
         sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
               VALUES ($timestamptz, $varchar, $text)
            """.command
       )
-      .arguments(OffsetDateTime.now() ~ eventType.value ~ event.asJson(encoder).noSpaces)
+      .arguments(OffsetDateTime.now() *: eventType.value *: event.asJson(encoder).noSpaces *: EmptyTuple)
       .build
   } flatMapF {
     case Completion.Insert(1) => ().pure[F]

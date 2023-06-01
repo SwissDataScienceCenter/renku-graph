@@ -66,14 +66,14 @@ private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionReso
   }
 
   private def findCurrentType(table: String, column: String): Kleisli[F, Session[F], String] = {
-    val query: Query[(String, String), String] = sql"""
+    val query: Query[String *: String *: EmptyTuple, String] = sql"""
        SELECT data_type
        FROM information_schema.columns
        WHERE table_name = $varchar AND column_name = $varchar"""
       .query(varchar)
     Kleisli {
       _.prepare(query)
-        .flatMap(_.unique(table -> column))
+        .flatMap(_.unique(table *: column *: EmptyTuple))
     }
   }
 
