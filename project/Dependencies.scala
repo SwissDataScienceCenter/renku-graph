@@ -32,7 +32,7 @@ object Dependencies {
     val scalatest              = "3.2.16"
     val scalatestScalacheck    = "3.2.2.0"
     val sentryLogback          = "6.20.0"
-    val skunk                  = "0.5.1"
+    val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.15"
     val testContainersScala    = "0.40.16"
     val widoco                 = "1.4.18"
