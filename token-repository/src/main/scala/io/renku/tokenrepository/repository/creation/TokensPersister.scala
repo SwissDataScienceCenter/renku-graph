@@ -28,6 +28,7 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
+import org.typelevel.twiddles.syntax._
 import skunk._
 import skunk.data.Completion
 import skunk.data.Completion.Delete
@@ -61,7 +62,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def deleteAssociation(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - delete")
-      .command[GitLabId ~ Path](sql"""
+      .command[GitLabId *: Path *: EmptyTuple](sql"""
         DELETE FROM projects_tokens 
         WHERE project_id = $projectIdEncoder OR project_path = $projectPathEncoder
       """.command)
@@ -79,12 +80,17 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def insert(storingInfo: TokenStoringInfo) = measureExecutionTime {
     SqlStatement
       .named("associate token - insert")
-      .command[GitLabId ~ Path ~ EncryptedAccessToken ~ CreatedAt ~ ExpiryDate](sql"""
+      .command[GitLabId *: Path *: EncryptedAccessToken *: CreatedAt *: ExpiryDate *: EmptyTuple](sql"""
         INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
         VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
       """.command)
       .arguments(
-        storingInfo.project.id ~ storingInfo.project.path ~ storingInfo.encryptedToken ~ storingInfo.dates.createdAt ~ storingInfo.dates.expiryDate
+        (storingInfo.project.id,
+         storingInfo.project.path,
+         storingInfo.encryptedToken,
+         storingInfo.dates.createdAt,
+         storingInfo.dates.expiryDate
+        )
       )
       .build
       .void
@@ -93,12 +99,12 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
   private def updatePathQuery(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - update path")
-      .command[Path ~ GitLabId](sql"""
+      .command[Path *: GitLabId *: EmptyTuple](sql"""
         UPDATE projects_tokens
         SET project_path = $projectPathEncoder
         WHERE project_id = $projectIdEncoder
     """.command)
-      .arguments(project.path ~ project.id)
+      .arguments(project.path -> project.id)
       .build
       .flatMapResult(failIfMultiUpdate(project.id))
   }
