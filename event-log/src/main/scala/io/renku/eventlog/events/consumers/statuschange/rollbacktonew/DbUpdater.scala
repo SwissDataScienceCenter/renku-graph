@@ -23,16 +23,16 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToNew
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New}
 import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.~
 
 import java.time.Instant
 
@@ -43,7 +43,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
 
   override def updateDB(event: RollbackToNew): UpdateOp[F] = measureExecutionTime {
     SqlStatement[F](name = "to_new rollback - status update")
-      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
+      .command[ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](
         sql"""UPDATE event
               SET status = '#${New.value}', execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder 
@@ -51,7 +51,7 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
                 AND status = '#${GeneratingTriples.value}'
                """.command
       )
-      .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
+      .arguments(ExecutionDate(now()) *: event.eventId.id *: event.eventId.projectId *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(1) =>
@@ -66,5 +66,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToNew) = RollbackOp.none
+  override def onRollback(event: RollbackToNew): RollbackOp[F] = RollbackOp.none
 }

@@ -62,9 +62,10 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
     SqlStatement(name = "category name events count")
       .select[
-        EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ // MEMBER_SYNC
-          EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ LastSyncedDate ~ // COMMIT_SYNC
-          LastSyncedDate, // PROJECT_SYNC
+        EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: // MEMBER_SYNC
+          EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: LastSyncedDate *: // COMMIT_SYNC
+          LastSyncedDate *: // PROJECT_SYNC
+          EmptyTuple,
         (CategoryName, Long)
       ](
         sql"""
@@ -169,9 +170,10 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
         }
       )
       .arguments(
-        eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ // MEMBER_SYNC
-          eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ lastSyncedDate ~ // COMMIT_SYNC
-          lastSyncedDate // PROJECT_SYNC
+        eventDate *: lastSyncedDate *: eventDate *: lastSyncedDate *: eventDate *: lastSyncedDate *: // MEMBER_SYNC
+          eventDate *: lastSyncedDate *: eventDate *: lastSyncedDate *: lastSyncedDate *: // COMMIT_SYNC
+          lastSyncedDate *: // PROJECT_SYNC
+          EmptyTuple
       )
       .build(_.toList)
   }

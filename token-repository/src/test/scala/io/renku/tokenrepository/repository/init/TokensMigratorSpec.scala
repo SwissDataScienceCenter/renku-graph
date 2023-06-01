@@ -20,13 +20,13 @@ package io.renku.tokenrepository.repository
 package init
 
 import AccessTokenCrypto.EncryptedAccessToken
-import RepositoryGenerators.encryptedAccessTokens
+import RepositoryGenerators.{accessTokenIds, encryptedAccessTokens}
 import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
 import creation.TokenDates.{CreatedAt, ExpiryDate}
 import creation._
-import deletion.TokenRemover
+import deletion.PersistedTokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
@@ -162,7 +162,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
-        TokenCreationInfo(projectToken,
+        TokenCreationInfo(accessTokenIds.generateOne,
+                          projectToken,
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
@@ -197,7 +198,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       )
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
-        TokenCreationInfo(projectToken,
+        TokenCreationInfo(accessTokenIds.generateOne,
+                          projectToken,
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
@@ -228,7 +230,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val tokenCrypto     = mock[AccessTokenCrypto[IO]]
     private val tokenValidator  = mock[TokenValidator[IO]]
-    private val tokenRemover    = TokenRemover[IO]
+    private val tokenRemover    = PersistedTokenRemover[IO]
     private val tokensCreator   = mock[NewTokensCreator[IO]]
     private val tokensPersister = TokensPersister[IO]
     val migration = new TokensMigrator[IO](tokenCrypto,
@@ -253,13 +255,13 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def insertNonMigrated(project: Project, encryptedToken: EncryptedAccessToken) = execute[Unit] {
       Kleisli[IO, Session[IO], Unit] { session =>
-        val command: Command[projects.GitLabId ~ projects.Path ~ EncryptedAccessToken] =
+        val command: Command[projects.GitLabId *: projects.Path *: EncryptedAccessToken *: EmptyTuple] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
           VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)""".command
         session
           .prepare(command)
-          .flatMap(_.execute(project.id ~ project.path ~ encryptedToken))
+          .flatMap(_.execute(project.id *: project.path *: encryptedToken *: EmptyTuple))
           .void
       }
     }
@@ -275,6 +277,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       val projectToken = projectAccessTokens.generateOne
       val creationInfo = TokenCreationInfo(
+        accessTokenIds.generateOne,
         projectToken,
         TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
       )

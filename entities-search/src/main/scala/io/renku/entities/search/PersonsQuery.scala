@@ -22,6 +22,7 @@ import io.circe.Decoder
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.{Entity, MatchingScore}
 import io.renku.graph.model.{GraphClass, persons}
+import io.renku.triplesstore.client.sparql.VarName
 
 private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
 
@@ -46,7 +47,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |          ?id a schema:Person;
           |              schema:name ?name
           |        }
-          |        ${filters.maybeOnCreatorName("?name")}
+          |        ${filters.maybeOnCreatorName(VarName("name")).sparql}
           |      }
           |      GROUP BY ?name
           |    }

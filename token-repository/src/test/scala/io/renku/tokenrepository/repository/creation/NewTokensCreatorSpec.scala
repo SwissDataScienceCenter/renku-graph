@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.creation
+package io.renku.tokenrepository.repository
+package creation
 
 import Generators._
 import cats.effect.IO
@@ -98,7 +99,7 @@ class NewTokensCreatorSpec
     val projectId   = projectIds.generateOne
     val accessToken = accessTokens.generateOne
 
-    val currentDate = mockFunction[LocalDate]
+    private val currentDate = mockFunction[LocalDate]
     currentDate.expects().returning(now)
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectTokenTTL = Period.ofDays(durations(1 day, 730 days).generateOne.toDays.toInt)
@@ -113,8 +114,9 @@ class NewTokensCreatorSpec
   }
 
   private def glResponsePayload(creationInfo: TokenCreationInfo) = json"""{
+    "id":         ${creationInfo.tokenId},
     "token":      ${creationInfo.token.value},
-    "created_at": ${creationInfo.dates.createdAt.value},
-    "expires_at": ${creationInfo.dates.expiryDate.value}
+    "created_at": ${creationInfo.dates.createdAt},
+    "expires_at": ${creationInfo.dates.expiryDate}
   }"""
 }

@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.tinytypes._
-import io.renku.triplesstore.client.sparql.LuceneQuery
+import io.renku.triplesstore.client.sparql.{Fragment, LuceneQuery, VarName}
 import io.renku.triplesstore.client.syntax._
 import search.Criteria.Filters
 
@@ -79,8 +79,6 @@ package object search {
 
   private[search] implicit class FiltersOps(filters: Filters) {
 
-    import io.renku.graph.model.views.SparqlLiteralEncoder.sparqlEncode
-
     lazy val query: LuceneQuery =
       filters.maybeQuery.map(q => LuceneQuery.fuzzy(q.value)).getOrElse(LuceneQuery.queryAll)
 
@@ -104,11 +102,11 @@ package object search {
       case v              => v contains projects.Visibility.Public
     }
 
-    def maybeOnCreatorName(variableName: String): String =
+    def maybeOnCreatorName(variableName: VarName): Fragment =
       filters.creators match {
-        case creators if creators.isEmpty => ""
+        case creators if creators.isEmpty => Fragment.empty
         case creators =>
-          s"FILTER (IF (BOUND($variableName), LCASE($variableName) IN ${creators.map(_.toLowerCase.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
+          fr"FILTER (IF (BOUND($variableName), LCASE($variableName) IN (${creators.map(_.toLowerCase).map(_.asObject)}), false))"
       }
 
     def maybeOnNamespace(variableName: String): String =
@@ -117,32 +115,27 @@ package object search {
         case set => s"VALUES ($variableName) { ${set.map(v => s"(${v.asObject.asSparql.sparql})").mkString(" ")} }"
       }
 
-    def maybeOnDateCreated(variableName: String): String =
+    def maybeOnDateCreated(variableName: VarName): Fragment =
       List(
         filters.maybeSince map { since =>
-          s"|BIND (${since.encodeAsXsdZonedDate} AS ?sinceZoned)" -> s"xsd:date($variableName) >= ?sinceZoned"
+          fr"|BIND (${since.encodeAsXsdZonedDate} AS ?sinceZoned)" -> sparql"xsd:date($variableName) >= ?sinceZoned"
         },
         filters.maybeUntil map { until =>
-          s"|BIND (${until.encodeAsXsdZonedDate} AS ?untilZoned)" -> s"xsd:date($variableName) <= ?untilZoned"
+          fr"|BIND (${until.encodeAsXsdZonedDate} AS ?untilZoned)" -> sparql"xsd:date($variableName) <= ?untilZoned"
         }
-      ).flatten.foldLeft(List.empty[String] -> List.empty[String]) { case ((binds, conditions), (bind, condition)) =>
-        (bind :: binds) -> (condition :: conditions)
+      ).flatten.foldLeft(List.empty[Fragment] -> List.empty[Fragment]) {
+        case ((binds, conditions), (bind, condition)) =>
+          (bind :: binds) -> (condition :: conditions)
       } match {
-        case (Nil, Nil) => ""
+        case (Nil, Nil) => Fragment.empty
         case (binds, conditions) =>
-          s"""${binds.mkString("\n")}
-             |FILTER (${conditions.mkString(" && ")})""".stripMargin
+          fr"""|${binds.intercalate(fr"\n")}
+               |FILTER (${conditions.intercalate(fr" && ")})""".stripMargin
       }
 
     private implicit class DateOps(date: LocalDateTinyType) {
-
-      lazy val encodeAsXsdZonedDate: String =
-        s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"
-
-    }
-
-    private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
-      lazy val asSparqlEncodedLiteral: String = s"'${sparqlEncode(v.show)}'"
+      lazy val encodeAsXsdZonedDate: Fragment =
+        fr"xsd:date(xsd:dateTime(${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}))"
     }
 
     private implicit class StringValueOps[TT <: StringTinyType](v: TT)(implicit s: Show[TT]) {

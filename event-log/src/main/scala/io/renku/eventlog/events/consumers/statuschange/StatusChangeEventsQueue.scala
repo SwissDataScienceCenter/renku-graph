@@ -26,10 +26,11 @@ import cats.{MonadThrow, Show}
 import io.circe.{Decoder, Encoder}
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import org.typelevel.log4cats.Logger
+import skunk._
 import skunk.data.Completion
-import skunk.{Session, ~}
 
 import java.time.OffsetDateTime
 import scala.concurrent.duration._
@@ -38,8 +39,9 @@ import scala.util.control.NonFatal
 trait StatusChangeEventsQueue[F[_]] {
 
   def register[E <: StatusChangeEvent](
-      handler: E => F[Unit]
-  )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit]
+      eventType: EventType[E],
+      handler:   E => F[Unit]
+  )(implicit decoder: Decoder[E]): F[Unit]
 
   def offer[E <: StatusChangeEvent](event: E)(implicit
       encoder:   Encoder[E],
@@ -58,9 +60,7 @@ object StatusChangeEventsQueue {
   }
 
   def apply[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]: F[StatusChangeEventsQueue[F]] =
-    MonadThrow[F].catchNonFatal {
-      new StatusChangeEventsQueueImpl[F]
-    }
+    MonadThrow[F].catchNonFatal(new StatusChangeEventsQueueImpl[F])
 }
 
 private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: QueriesExecutionTimes]
@@ -81,8 +81,9 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
   private val handlers: Ref[F, List[HandlerDef[_ <: StatusChangeEvent]]] = Ref.unsafe(List.empty)
 
   override def register[E <: StatusChangeEvent](
-      handler: E => F[Unit]
-  )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit] =
+      eventType: EventType[E],
+      handler:   E => F[Unit]
+  )(implicit decoder: Decoder[E]): F[Unit] =
     handlers.update(HandlerDef(eventType, decoder, handler) :: _)
 
   override def offer[E <: StatusChangeEvent](event: E)(implicit
@@ -91,12 +92,12 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
       show:      Show[E]
   ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
     SqlStatement[F](name = "status change event queue - offer")
-      .command[OffsetDateTime ~ String ~ String](
+      .command[OffsetDateTime *: String *: String *: EmptyTuple](
         sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
               VALUES ($timestamptz, $varchar, $text)
            """.command
       )
-      .arguments(OffsetDateTime.now() ~ eventType.value ~ event.asJson(encoder).noSpaces)
+      .arguments(OffsetDateTime.now() *: eventType.value *: event.asJson(encoder).noSpaces *: EmptyTuple)
       .build
   } flatMapF {
     case Completion.Insert(1) => ().pure[F]

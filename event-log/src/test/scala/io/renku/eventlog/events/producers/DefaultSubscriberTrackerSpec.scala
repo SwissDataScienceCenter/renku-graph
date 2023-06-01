@@ -31,9 +31,9 @@ import io.renku.metrics.TestMetricsRegistry
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
 import skunk._
 import skunk.implicits._
 
@@ -144,28 +144,29 @@ class DefaultSubscriberTrackerSpec
                              sourceUrl:     MicroserviceBaseUrl
   ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
     Kleisli { session =>
-      val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
-        sql"""SELECT delivery_id, delivery_url, source_url
-              FROM subscriber
-              WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
-          .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
-          .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
-            (subscriberId, subscriberUrl, microserviceBaseUrl)
-          }
-      session.prepare(query).flatMap(_.option(subscriberUrl ~ sourceUrl))
+      val query: Query[SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple,
+                       (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)
+      ] = sql"""SELECT delivery_id, delivery_url, source_url
+                FROM subscriber
+                WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
+        .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
+        .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+          (subscriberId, subscriberUrl, microserviceBaseUrl)
+        }
+      session.prepare(query).flatMap(_.option(subscriberUrl *: sourceUrl *: EmptyTuple))
     }
   }
 
   private def storeSubscriptionInfo(subscriber: Subscription.Subscriber, sourceUrl: MicroserviceBaseUrl): Unit =
     execute[Unit] {
       Kleisli { session =>
-        val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] =
+        val query: Command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple] =
           sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
                 VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
           """.command
         session
           .prepare(query)
-          .flatMap(_.execute(subscriber.id ~ subscriber.url ~ sourceUrl))
+          .flatMap(_.execute(subscriber.id *: subscriber.url *: sourceUrl *: EmptyTuple))
           .void
       }
     }

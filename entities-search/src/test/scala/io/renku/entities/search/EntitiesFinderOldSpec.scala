@@ -26,6 +26,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.entities.search
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -52,6 +53,7 @@ class EntitiesFinderOldSpec
     with FinderSpecOps
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with IOSpec {
 
   protected[search] override def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
@@ -74,7 +76,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe allEntitiesFrom(project).sortBy(_.name)(
         nameOrdering
@@ -90,9 +92,10 @@ class EntitiesFinderOldSpec
       val newPlan = projectBase.plans.head.createModification()
       val project = projectBase.copy(unlinkedPlans = newPlan.asInstanceOf[StepPlan] :: projectBase.unlinkedPlans)
 
-      upload(to = projectsDataset, project)
-      val results =
-        finder.findEntities(Criteria()).unsafeRunSync().results
+      provisionTestProject(project).unsafeRunSync()
+
+      val results = finder.findEntities(Criteria()).unsafeRunSync().results
+
       results shouldBe allEntitiesFrom(project).sortBy(_.name)(nameOrdering)
     }
   }
@@ -121,7 +124,7 @@ class EntitiesFinderOldSpec
         .replacePlanName(plans.Name("hello 3"))
       val project = projectBase.copy(unlinkedPlans = newPlan :: projectBase.unlinkedPlans)
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
       val results =
         finder
           .findEntities(
@@ -142,7 +145,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which name matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val person = personEntities
         .map(replacePersonName(to = sentenceContaining(query).generateAs(persons.Name)))
@@ -175,7 +178,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, loneProject, dsProject, planProject, notMatchingProject)
+      provisionTestProjects(loneProject, dsProject, planProject, notMatchingProject).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -189,7 +192,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which keywords matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -222,7 +225,8 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: Nil = planProject.plans
 
-      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+        .unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -235,7 +239,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which description matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -260,7 +264,8 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: Nil = planProject.plans
 
-      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+        .unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -273,13 +278,13 @@ class EntitiesFinderOldSpec
     }
 
     "return project entities which namespace matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
-      upload(to = projectsDataset, soleProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -290,7 +295,7 @@ class EntitiesFinderOldSpec
     }
 
     "return entities which creator name matches the given query, sorted by name" in new OldTestCase {
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val projectCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
       val soleProject = renkuProjectEntities(visibilityPublic)
@@ -306,7 +311,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, dsProject, projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -328,7 +333,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
@@ -342,7 +347,7 @@ class EntitiesFinderOldSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
@@ -358,7 +363,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
@@ -373,7 +378,7 @@ class EntitiesFinderOldSpec
         .modify(removeMembers())
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
@@ -391,7 +396,7 @@ class EntitiesFinderOldSpec
         .modify(removeMembers())
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
@@ -419,7 +424,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, dsProject, projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(creators = Set(creator.name))))
@@ -448,7 +453,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, soleProject, dsProject)
+      provisionTestProjects(soleProject, dsProject).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
@@ -478,7 +483,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      provisionTestProjects(soleProject, dsProject, projectEntities(visibilityPublic).generateOne).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
@@ -496,7 +501,7 @@ class EntitiesFinderOldSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
@@ -526,7 +531,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, publicProject, internalProject, privateProject)
+      provisionTestProjects(publicProject, internalProject, privateProject).unsafeRunSync()
 
       finder
         .findEntities(
@@ -549,7 +554,7 @@ class EntitiesFinderOldSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
@@ -572,7 +577,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, matchingProject, nonMatchingProject)
+      provisionTestProjects(matchingProject, nonMatchingProject).unsafeRunSync()
 
       finder
         .findEntities(
@@ -593,7 +598,7 @@ class EntitiesFinderOldSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(namespaces = projectNamespaces.generateFixedSizeSet(1))))
@@ -633,7 +638,7 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: _ = project.plans
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -687,7 +692,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -720,7 +725,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, dsProject)
+      provisionTestProject(dsProject).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -762,7 +767,7 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: _ = project.plans
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -815,7 +820,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -848,7 +853,7 @@ class EntitiesFinderOldSpec
         )
         .generateOne
 
-      upload(to = projectsDataset, dsProject)
+      provisionTestProject(dsProject).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -922,7 +927,7 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: _ = project.plans
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some, maybeUntil = until.some)))
@@ -946,7 +951,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceNonModified).modify(replaceDSName(datasets.Name(s"B$commonPart"))))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val direction = sortingDirections.generateOne
 
@@ -963,7 +968,7 @@ class EntitiesFinderOldSpec
         .withDatasets(datasetEntities(provenanceInternal))
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val direction = sortingDirections.generateOne
 
@@ -991,7 +996,7 @@ class EntitiesFinderOldSpec
 
     "be sorting by Matching Score if requested" in new OldTestCase {
 
-      val query = nonBlankStrings(minLength = 3).generateOne
+      val query = nonBlankStrings(minLength = 6).generateOne
 
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
@@ -1003,7 +1008,7 @@ class EntitiesFinderOldSpec
         .generateOne
       val plan :: Nil = project.plans
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val direction = sortingDirections.generateOne
 
@@ -1033,7 +1038,7 @@ class EntitiesFinderOldSpec
 
     "return the only page" in new OldTestCase {
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val paging = PagingRequest(Page(1), PerPage(3))
 
@@ -1052,7 +1057,7 @@ class EntitiesFinderOldSpec
 
     "return the requested page with info if there are more" in new OldTestCase {
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val paging = PagingRequest(Page(Random.nextInt(3) + 1), PerPage(1))
 
@@ -1073,7 +1078,7 @@ class EntitiesFinderOldSpec
 
     "return no results if non-existing page requested" in new OldTestCase {
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val paging = PagingRequest(Page(4), PerPage(1))
 
@@ -1096,7 +1101,7 @@ class EntitiesFinderOldSpec
         .suchThat(_.images.nonEmpty)
         .generateOne
 
-      upload(to = projectsDataset, project)
+      provisionTestProject(project).unsafeRunSync()
 
       val results = finder.findEntities(Criteria()).unsafeRunSync()
       val images  = results.results.collect { case e: search.model.Entity.Project => e.images }.flatten
@@ -1128,7 +1133,7 @@ class EntitiesFinderOldSpec
 
     "return public entities only if no auth user is given" in new OldTestCase {
 
-      upload(to = projectsDataset, privateProject, internalProject, publicProject)
+      provisionTestProjects(privateProject, internalProject, publicProject).unsafeRunSync()
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List
         .empty[model.Entity]
@@ -1140,7 +1145,7 @@ class EntitiesFinderOldSpec
 
     "return public and internal entities only if auth user is given" in new OldTestCase {
 
-      upload(to = projectsDataset, privateProject, internalProject, publicProject)
+      provisionTestProjects(privateProject, internalProject, publicProject).unsafeRunSync()
 
       finder
         .findEntities(
@@ -1159,7 +1164,7 @@ class EntitiesFinderOldSpec
 
     "return any visibility entities if the given auth user has access to them" in new OldTestCase {
 
-      upload(to = projectsDataset, privateProject, internalProject, publicProject)
+      provisionTestProjects(privateProject, internalProject, publicProject).unsafeRunSync()
 
       finder
         .findEntities(

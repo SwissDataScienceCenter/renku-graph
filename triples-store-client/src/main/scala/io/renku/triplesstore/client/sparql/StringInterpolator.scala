@@ -61,7 +61,7 @@ class StringInterpolator(private val sc: StringContext) {
   private def resolveIterable(it: Iterable[Any], idx: Int) = {
     import ClauseDetector.ClauseType
     ClauseDetector
-      .detectClauseContext(sc.parts(idx))
+      .detectClauseContext(findSnippet(idx))
       .map {
         case ClauseType.VALUES_BRACKETED     => it.map(makeValue(_, idx)).map(s => s"($s)").mkString(" ")
         case ClauseType.VALUES_NOT_BRACKETED => it.map(makeValue(_, idx)).mkString(" ")
@@ -75,13 +75,17 @@ class StringInterpolator(private val sc: StringContext) {
       )
       .getOrElse(sys.error("Iterable cannot be resolved in this context"))
   }
+
+  private def findSnippet(idx: Int) =
+    if (idx > 0) s"${sc.parts(idx - 1)}${sc.parts(idx)}"
+    else sc.parts(idx)
 }
 
 private object StringInterpolator {
 
   private object ClauseDetector {
-    private val valuesBracketedClause    = ".*VALUES\\s*\\(\\s*\\?\\w+\\s*\\)\\s*\\{\\s*$".r
-    private val valuesNotBracketedClause = ".*VALUES\\s*\\?\\w+\\s*\\{\\s*$".r
+    private val valuesBracketedClause    = ".*VALUES\\s*\\(\\s*(\\?\\w+)?\\s*\\)\\s*\\{\\s*$".r
+    private val valuesNotBracketedClause = ".*VALUES\\s*(\\?\\w+)?\\s*\\{\\s*$".r
     private val inClause                 = ".*IN\\s*\\(\\s*$".r
 
     sealed trait ClauseType

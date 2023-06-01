@@ -21,7 +21,7 @@ package io.renku.eventlog.events.consumers.statuschange.tofailure
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
+import io.renku.eventlog.api.events.StatusChangeEvent.ToFailure
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}

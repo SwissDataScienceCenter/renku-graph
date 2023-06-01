@@ -18,12 +18,12 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import cats.MonadThrow
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
@@ -33,31 +33,26 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait DeleteTokenEndpoint[F[_]] {
-  def deleteToken(projectId: GitLabId): F[Response[F]]
+  def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]]
 }
 
-class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
-    tokenRemover: TokenRemover[F]
-) extends Http4sDsl[F]
+class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F])
+    extends Http4sDsl[F]
     with DeleteTokenEndpoint[F] {
 
-  override def deleteToken(projectId: GitLabId): F[Response[F]] =
-    tokenRemover
-      .delete(projectId)
-      .flatMap(_ => NoContent())
+  override def deleteToken(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Response[F]] =
+    (tokenRemover.delete(projectId, maybeAccessToken) >> NoContent())
       .recoverWith(httpResult(projectId))
 
   private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-      Logger[F].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.value) >>
+        InternalServerError(errorMessage)
   }
 }
 
 object DeleteTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[DeleteTokenEndpoint[F]] =
-    MonadThrow[F].catchNonFatal {
-      new DeleteTokenEndpointImpl[F](TokenRemover[F])
-    }
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[DeleteTokenEndpoint[F]] =
+    TokenRemover[F].map(new DeleteTokenEndpointImpl[F](_))
 }

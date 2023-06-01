@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import org.typelevel.twiddles.syntax._
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -33,7 +34,7 @@ private object MigrationTools {
 
   def checkColumnExists[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Boolean] =
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] = sql"""
+      val query = sql"""
         SELECT EXISTS (
           SELECT *
           FROM information_schema.columns
@@ -41,13 +42,13 @@ private object MigrationTools {
         )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique((table, column)))
         .recover { case _ => false }
     }
 
   def checkColumnNullable[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Boolean] =
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] = sql"""
+      val query = sql"""
         SELECT is_nullable
         FROM information_schema.columns
         WHERE table_name = $varchar AND column_name = $varchar"""
@@ -59,7 +60,7 @@ private object MigrationTools {
         }
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique((table, column)))
         .recover { case _ => false }
     }
 

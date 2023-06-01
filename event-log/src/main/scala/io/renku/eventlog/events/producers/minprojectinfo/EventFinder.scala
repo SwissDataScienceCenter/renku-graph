@@ -78,13 +78,13 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
   private def markTaken(projectId: projects.GitLabId): Kleisli[F, Session[F], Boolean] = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert last_synced")
-      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](sql"""
+      .command[projects.GitLabId *: CategoryName *: LastSyncedDate *: EmptyTuple](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET last_synced = EXCLUDED.last_synced
         """.command)
-      .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
+      .arguments(projectId *: categoryName *: LastSyncedDate(now()) *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Insert(1) => true.pure[F]
@@ -103,7 +103,5 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
 private object EventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, MinProjectInfoEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new EventFinderImpl[F]()
-    }
+    MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

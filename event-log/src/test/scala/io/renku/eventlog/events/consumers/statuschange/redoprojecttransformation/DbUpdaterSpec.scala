@@ -22,9 +22,10 @@ import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Encoder
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
+import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEvent, StatusChangeEventsQueue}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators
 import org.scalamock.scalatest.MockFactory

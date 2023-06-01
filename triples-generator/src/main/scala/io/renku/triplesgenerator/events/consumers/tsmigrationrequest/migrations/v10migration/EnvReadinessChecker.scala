@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import io.renku.graph.eventlog.EventLogClient
+import io.renku.eventlog.api.EventLogClient
 import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration
 import org.typelevel.log4cats.Logger

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
@@ -140,6 +141,7 @@ final class EventHandler[F[_]: Async: Logger: MetricsRegistry: QueriesExecutionT
 }
 
 object EventHandler {
+
   def apply[F[
       _
   ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
@@ -150,9 +152,11 @@ object EventHandler {
     redoDequeuedEventHandler  <- redoprojecttransformation.DequeuedEventHandler[F]
     toNewDequeuedEventHandler <- projecteventstonew.DequeuedEventHandler[F]
     _ <- eventsQueue.register(
+           redoprojecttransformation.eventType,
            statusChanger.updateStatuses(redoDequeuedEventHandler)(_: StatusChangeEvent.RedoProjectTransformation)
          )
     _ <- eventsQueue.register(
+           projecteventstonew.eventType,
            statusChanger.updateStatuses(toNewDequeuedEventHandler)(_: StatusChangeEvent.ProjectEventsToNew)
          )
     eventSender     <- EventSender[F](EventLogUrl)

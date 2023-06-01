@@ -23,17 +23,17 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
+import io.renku.eventlog.api.events.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.~
 
 import java.time.Instant
 
@@ -44,13 +44,13 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
 
   override def updateDB(event: RollbackToAwaitingDeletion): UpdateOp[F] = measureExecutionTime {
     SqlStatement[F](name = "rollback_to_awaiting_deletion - status update")
-      .command[EventStatus ~ ExecutionDate ~ projects.GitLabId ~ EventStatus](
+      .command[EventStatus *: ExecutionDate *: projects.GitLabId *: EventStatus *: EmptyTuple](
         sql"""UPDATE event evt
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
               WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
               """.command
       )
-      .arguments(AwaitingDeletion ~ ExecutionDate(now()) ~ event.project.id ~ Deleting)
+      .arguments(AwaitingDeletion *: ExecutionDate(now()) *: event.project.id *: Deleting *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(count) =>
@@ -65,5 +65,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToAwaitingDeletion) = RollbackOp.none
+  override def onRollback(event: RollbackToAwaitingDeletion): RollbackOp[F] = RollbackOp.none
 }

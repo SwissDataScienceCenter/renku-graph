@@ -21,10 +21,10 @@ package tsmigrationrequest.migrations.v10migration
 
 import cats.effect.{Deferred, IO, Temporal}
 import cats.syntax.all._
-import io.renku.generators.Generators.{ints, positiveInts}
+import io.renku.eventlog.api.EventLogClient
+import io.renku.eventlog.api.EventLogClient.Result
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.eventlog.EventLogClient
-import io.renku.graph.eventlog.EventLogClient.Result
+import io.renku.generators.Generators.{ints, positiveInts}
 import io.renku.graph.model.eventlogapi.ServiceStatus
 import io.renku.graph.model.eventlogapi.ServiceStatus.{Capacity, SubscriptionStatus}
 import io.renku.testtools.IOSpec

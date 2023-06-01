@@ -22,10 +22,10 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.GitLabId
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -42,12 +42,11 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "respond with NO_CONTENT if the token removal was successful" in new TestCase {
 
-      (tokenRemover
-        .delete(_: GitLabId))
-        .expects(projectId)
+      (tokenRemover.delete _)
+        .expects(projectId, maybeAccessToken)
         .returning(IO.unit)
 
-      val response = deleteToken(projectId).unsafeRunSync()
+      val response = endpoint.deleteToken(projectId, maybeAccessToken).unsafeRunSync()
 
       response.status                                shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync() shouldBe empty
@@ -58,12 +57,11 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
     "respond with INTERNAL_SERVER_ERROR if token removal fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (tokenRemover
-        .delete(_: GitLabId))
-        .expects(projectId)
+      (tokenRemover.delete _)
+        .expects(projectId, maybeAccessToken)
         .returning(exception.raiseError[IO, Unit])
 
-      val response = deleteToken(projectId).unsafeRunSync()
+      val response = endpoint.deleteToken(projectId, maybeAccessToken).unsafeRunSync()
 
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -76,10 +74,11 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
   private trait TestCase {
 
-    val projectId = projectIds.generateOne
+    val projectId        = projectIds.generateOne
+    val maybeAccessToken = accessTokens.generateOption
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tokenRemover = mock[TokenRemover[IO]]
-    val deleteToken  = new DeleteTokenEndpointImpl[IO](tokenRemover).deleteToken _
+    val endpoint     = new DeleteTokenEndpointImpl[IO](tokenRemover)
   }
 }

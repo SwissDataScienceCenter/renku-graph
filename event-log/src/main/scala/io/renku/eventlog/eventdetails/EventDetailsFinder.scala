@@ -20,6 +20,7 @@ package io.renku.eventlog.eventdetails
 
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
+import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
@@ -38,27 +39,23 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: Qu
     with EventDetailsFinder[F]
     with TypeSerializers {
 
-  import eu.timepit.refined.auto._
-
   override def findDetails(eventId: CompoundEventId): F[Option[EventDetails]] =
     SessionResource[F].useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlStatement[F](name = "find event details")
-      .select[EventId ~ projects.GitLabId, EventDetails](
+      .select[EventId *: projects.GitLabId *: EmptyTuple, EventDetails](
         sql"""SELECT evt.event_id, evt.project_id, evt.event_body
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
           """.query(compoundEventIdDecoder ~ eventBodyDecoder).map {
           case (eventId: CompoundEventId, eventBody: EventBody) => EventDetails(eventId, eventBody)
         }
       )
-      .arguments(eventId.id ~ eventId.projectId)
+      .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
       .build(_.option)
 }
 
 private object EventDetailsFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
-    MonadThrow[F].catchNonFatal {
-      new EventDetailsFinderImpl[F]
-    }
+    MonadThrow[F].catchNonFatal(new EventDetailsFinderImpl[F])
 }

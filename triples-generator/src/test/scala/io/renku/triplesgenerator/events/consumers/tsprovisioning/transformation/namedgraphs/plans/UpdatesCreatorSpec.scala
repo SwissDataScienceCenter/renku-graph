@@ -18,16 +18,16 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.plans
 
-import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model._
 import io.renku.graph.model.entities.ProjectLens._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
+import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -43,7 +43,7 @@ class UpdatesCreatorSpec
 
   "queriesDeletingDate" should {
 
-    "prepare delete query if new Plan has different dateCreated that it's set in the TS" in {
+    "prepare delete query if the new Plan has different dateCreated that found in the TS" in {
       val project = anyRenkuProjectEntities
         .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
@@ -58,7 +58,30 @@ class UpdatesCreatorSpec
       UpdatesCreator
         .queriesDeletingDate(project.resourceId,
                              plan,
-                             timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateSome
+                             timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateFixedSizeList(ofSize = 1)
+        )
+        .runAll(on = projectsDataset)
+        .unsafeRunSync()
+
+      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List.empty
+    }
+
+    "prepare delete query if there are multiple dates found in the TS" in {
+      val project = anyRenkuProjectEntities
+        .withActivities(activityEntities(stepPlanEntities()))
+        .map(_.to[entities.RenkuProject])
+        .generateOne
+
+      upload(to = projectsDataset, project)
+
+      val plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
+
+      findPlanDateCreated(project.resourceId, plan.resourceId) shouldBe List(plan.dateCreated)
+
+      UpdatesCreator
+        .queriesDeletingDate(project.resourceId,
+                             plan,
+                             timestampsNotInTheFuture.toGeneratorOf(plans.DateCreated).generateList(min = 2)
         )
         .runAll(on = projectsDataset)
         .unsafeRunSync()
@@ -74,8 +97,7 @@ class UpdatesCreatorSpec
 
       val plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
 
-      UpdatesCreator
-        .queriesDeletingDate(project.resourceId, plan, plan.dateCreated.some) shouldBe Nil
+      UpdatesCreator.queriesDeletingDate(project.resourceId, plan, tsCreatedDates = Nil) shouldBe Nil
     }
 
     "prepare no queries if there's no change in Plan dateCreated" in {
@@ -86,8 +108,7 @@ class UpdatesCreatorSpec
 
       val plan = collectStepPlans(project.plans).headOption.getOrElse(fail("Expected plan"))
 
-      UpdatesCreator
-        .queriesDeletingDate(project.resourceId, plan, plan.dateCreated.some) shouldBe Nil
+      UpdatesCreator.queriesDeletingDate(project.resourceId, plan, List(plan.dateCreated)) shouldBe Nil
     }
   }
 
@@ -96,13 +117,13 @@ class UpdatesCreatorSpec
       on = projectsDataset,
       SparqlQuery.of(
         "fetch agent",
-        Prefixes.of(prov -> "prov", schema -> "schema"),
-        s"""|SELECT ?dateCreated
-            |FROM <${GraphClass.Project.id(projectId)}> {
-            |  ${planId.showAs[RdfResource]} a prov:Plan;
-            |                                schema:dateCreated ?dateCreated.
-            |}
-            |""".stripMargin
+        Prefixes of (prov -> "prov", schema -> "schema"),
+        sparql"""|SELECT ?dateCreated
+                 |FROM ${GraphClass.Project.id(projectId)} {
+                 |  ${planId.asEntityId} a prov:Plan;
+                 |                       schema:dateCreated ?dateCreated.
+                 |}
+                 |""".stripMargin
       )
     ).unsafeRunSync()
       .flatMap(row =>

@@ -86,14 +86,12 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lse - update message")
-      .command[String ~ ExecutionDate ~ EventId ~ projects.GitLabId](sql"""
+      .command[String *: ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](sql"""
         UPDATE event
         SET message = $text, execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
         """.command)
-      .arguments(
-        zombieMessage ~ ExecutionDate(now) ~ eventId.id ~ eventId.projectId
-      )
+      .arguments(zombieMessage *: ExecutionDate(now) *: eventId.id *: eventId.projectId *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(0) => false.pure[F]
@@ -113,7 +111,5 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
 
 private object LostSubscriberEventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new LostSubscriberEventFinder[F]
-    }
+    MonadThrow[F].catchNonFatal(new LostSubscriberEventFinder[F])
 }

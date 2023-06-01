@@ -32,9 +32,9 @@ import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessT
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
 import skunk.codec.all.{int4, varchar}
 import skunk.implicits._
-import skunk.{Command, Session, ~}
 
 class DuplicateProjectsRemoverSpec
     extends AnyWordSpec
@@ -85,14 +85,14 @@ class DuplicateProjectsRemoverSpec
   protected def insert(projectId: GitLabId, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
     execute {
       Kleisli[IO, Session[IO], Unit] { session =>
-        val query: Command[Int ~ String ~ String] =
+        val query: Command[Int *: String *: String *: EmptyTuple] =
           sql"""insert into 
                 projects_tokens (project_id, project_path, token) 
                 values ($int4, $varchar, $varchar)
          """.command
         session
           .prepare(query)
-          .flatMap(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
+          .flatMap(_.execute(projectId.value *: projectPath.value *: encryptedToken.value *: EmptyTuple))
           .map(assureInserted)
       }
     }

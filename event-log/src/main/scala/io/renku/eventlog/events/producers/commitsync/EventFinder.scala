@@ -23,7 +23,6 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -56,8 +55,9 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def findEvent = measureExecutionTime {
     val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event"))
-      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - find event")
+      .select[CategoryName *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EmptyTuple,
               (CommitSyncEvent, Option[LastSyncedDate], Option[EventStatus])
       ](
         sql"""
@@ -110,7 +110,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               (MinimalCommitSyncEvent(project), maybeLastSyncDate, None)
           }
       )
-      .arguments(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate)
+      .arguments(categoryName *: eventDate *: lastSyncDate *: eventDate *: lastSyncDate *: EmptyTuple)
       .build(_.option)
       .mapResult {
         case Some((event: FullCommitSyncEvent, maybeSyncDate, maybeEventStatus)) =>
@@ -126,25 +126,27 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     else insertLastSyncedDate(event)
 
   private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[LastSyncedDate ~ projects.GitLabId ~ CategoryName](sql"""
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - update last_synced")
+      .command[LastSyncedDate *: projects.GitLabId *: CategoryName *: EmptyTuple](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
         """.command)
-      .arguments(LastSyncedDate(now()) ~ event.projectId ~ categoryName)
+      .arguments(LastSyncedDate(now()) *: event.projectId *: categoryName *: EmptyTuple)
       .build
   }
 
   private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-      .command[projects.GitLabId ~ CategoryName ~ LastSyncedDate](sql"""
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - insert last_synced")
+      .command[projects.GitLabId *: CategoryName *: LastSyncedDate *: EmptyTuple](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET last_synced = EXCLUDED.last_synced
         """.command)
-      .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
+      .arguments(event.projectId *: categoryName *: LastSyncedDate(now()) *: EmptyTuple)
       .build
   }
 
@@ -163,7 +165,5 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
 private object EventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, CommitSyncEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new EventFinderImpl[F]()
-    }
+    MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

@@ -23,11 +23,11 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog
+import io.renku.eventlog.api.events.CommitSyncRequest
+import io.renku.eventlog.api.events.Generators.commitSyncRequests
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.eventlog
-import io.renku.graph.eventlog.api.events.CommitSyncRequest
-import io.renku.graph.eventlog.api.events.Generators.commitSyncRequests
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId

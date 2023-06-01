@@ -23,7 +23,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
 import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
 import io.renku.eventlog.metrics.QueriesExecutionTimes

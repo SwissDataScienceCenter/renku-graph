@@ -22,11 +22,11 @@ import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
-import io.renku.eventlog.{Microservice, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -95,12 +95,12 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource: Que
   private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - check source & delivery exists")
-      .select[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl](sql"""
+      .select[MicroserviceBaseUrl *: SubscriberUrl *: EmptyTuple, MicroserviceBaseUrl](sql"""
         SELECT source_url
         FROM subscriber
         WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
         """.query(microserviceBaseUrlDecoder))
-      .arguments(sourceUrl ~ subscriberUrl)
+      .arguments(sourceUrl *: subscriberUrl *: EmptyTuple)
       .build(_.option)
       .mapResult(_.isDefined)
   }
@@ -108,24 +108,24 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource: Que
   private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - delete zombie source")
-      .command[MicroserviceBaseUrl ~ SubscriberUrl](sql"""
+      .command[MicroserviceBaseUrl *: SubscriberUrl *: EmptyTuple](sql"""
         DELETE
         FROM subscriber
         WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
         """.command)
-      .arguments(sourceUrl ~ subscriberUrl)
+      .arguments(sourceUrl *: subscriberUrl *: EmptyTuple)
       .build
   }
 
   private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - move subscriber")
-      .command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl](sql"""
+      .command[MicroserviceBaseUrl *: MicroserviceBaseUrl *: SubscriberUrl *: EmptyTuple](sql"""
          UPDATE subscriber
          SET source_url = $microserviceBaseUrlEncoder
          WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
         """.command)
-      .arguments(microserviceBaseUrl ~ sourceUrl ~ subscriberUrl)
+      .arguments(microserviceBaseUrl *: sourceUrl *: subscriberUrl *: EmptyTuple)
       .build
   }
 

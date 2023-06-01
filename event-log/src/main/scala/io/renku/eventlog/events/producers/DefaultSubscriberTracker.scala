@@ -21,9 +21,9 @@ package io.renku.eventlog.events.producers
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.DefaultSubscription.DefaultSubscriber
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -56,14 +56,14 @@ private class DefaultSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResour
     measureExecutionTime(
       SqlStatement
         .named("subscriber - add")
-        .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
+        .command[SubscriberId *: SubscriberUrl *: MicroserviceBaseUrl *: SubscriberId *: EmptyTuple](
           sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
                 VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
                 ON CONFLICT (delivery_url, source_url)
                 DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
                """.command
         )
-        .arguments(subscriber.id ~ subscriber.url ~ sourceUrl ~ subscriber.id)
+        .arguments(subscriber.id *: subscriber.url *: sourceUrl *: subscriber.id *: EmptyTuple)
         .build
     ) map insertToTableResult
   }
@@ -72,12 +72,12 @@ private class DefaultSubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResour
     measureExecutionTime(
       SqlStatement
         .named("subscriber - delete")
-        .command[SubscriberUrl ~ MicroserviceBaseUrl](
+        .command[SubscriberUrl *: MicroserviceBaseUrl *: EmptyTuple](
           sql"""DELETE FROM subscriber
                 WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
             """.command
         )
-        .arguments(subscriberUrl ~ sourceUrl)
+        .arguments(subscriberUrl *: sourceUrl *: EmptyTuple)
         .build
     ) map deleteToTableResult
   }

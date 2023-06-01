@@ -22,7 +22,8 @@ import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.security.RequestTokenFinder.getAccessToken
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -31,7 +32,7 @@ import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpRoutes, Response}
+import org.http4s.{HttpRoutes, Request, Response}
 import org.typelevel.log4cats.Logger
 
 private trait MicroserviceRoutes[F[_]] {
@@ -46,8 +47,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     routesMetrics:          RoutesMetrics[F],
     versionRoutes:          version.Routes[F],
     dbReady:                Ref[F, Boolean]
-)(implicit clock: Clock[F])
-    extends Http4sDsl[F]
+) extends Http4sDsl[F]
     with MicroserviceRoutes[F] {
 
   import associateTokenEndpoint._
@@ -66,7 +66,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     case       GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(fetchToken(projectId))
     case       GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => whenDBReady(fetchToken(projectPath))
     case req @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(createToken(projectId, req))
-    case       DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(deleteToken(projectId))
+    case req @ DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(withAccessToken(req)(deleteToken(projectId, _)))
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
 
@@ -74,6 +74,9 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     case true  => thunk
     case false => ServiceUnavailable(InfoMessage("DB migration running"))
   }
+
+  private def withAccessToken(request: Request[F])(f: Option[AccessToken] => F[Response[F]]): F[Response[F]] =
+    f(getAccessToken(request))
 }
 
 private object MicroserviceRoutes {

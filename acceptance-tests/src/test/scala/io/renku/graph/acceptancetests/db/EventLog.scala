@@ -77,11 +77,11 @@ object EventLog extends TypeSerializers {
   def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.GitLabId)(implicit
       ioRuntime: IORuntime
   ): Unit = execute { session =>
-    val query: Command[projects.GitLabId ~ String] = sql"""
+    val query: Command[projects.GitLabId *: String *: EmptyTuple] = sql"""
       DELETE FROM subscription_category_sync_time 
       WHERE project_id = $projectIdEncoder AND category_name = $varchar
       """.command
-    session.prepare(query).flatMap(_.execute(projectId, categoryName.show)).void
+    session.prepare(query).flatMap(_.execute(projectId *: categoryName.show *: EmptyTuple)).void
   }
 
   private def `status IN`(status: List[EventStatus]) =

@@ -98,7 +98,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
                             returning = false.some.pure[Try]
       )
 
-      givenTokenRemoving(returning = ().pure[Try])
+      givenTokenRemoving(givenAccessToken.some, returning = ().pure[Try])
 
       validator.validateHook(projectId, givenAccessToken.some) shouldBe HookMissing.some.pure[Try]
 
@@ -160,7 +160,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val exception = exceptions.generateOne
       val error     = exception.raiseError[Try, Nothing]
-      givenTokenRemoving(returning = error)
+      givenTokenRemoving(givenAccessToken.some, returning = error)
 
       validator.validateHook(projectId, givenAccessToken.some) shouldBe error
 
@@ -195,7 +195,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
                             returning = false.some.pure[Try]
       )
 
-      givenTokenRemoving(returning = ().pure[Try])
+      givenTokenRemoving(accessToken = None, returning = ().pure[Try])
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe HookMissing.some.pure[Try]
 
@@ -240,7 +240,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val exception = exceptions.generateOne
       val error     = exception.raiseError[Try, Nothing]
-      givenTokenRemoving(returning = error)
+      givenTokenRemoving(accessToken = None, returning = error)
 
       validator.validateHook(projectId, maybeAccessToken = None) shouldBe error
 
@@ -284,10 +284,9 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(projectId, accessToken)
         .returning(returning)
 
-    def givenTokenRemoving(returning: Try[Unit]) =
-      (accessTokenRemover
-        .removeAccessToken(_: GitLabId))
-        .expects(projectId)
+    def givenTokenRemoving(accessToken: Option[AccessToken], returning: Try[Unit]) =
+      (accessTokenRemover.removeAccessToken _)
+        .expects(projectId, accessToken)
         .returning(returning)
   }
 }
