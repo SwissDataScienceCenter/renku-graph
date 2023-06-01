@@ -255,13 +255,13 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def insertNonMigrated(project: Project, encryptedToken: EncryptedAccessToken) = execute[Unit] {
       Kleisli[IO, Session[IO], Unit] { session =>
-        val command: Command[projects.GitLabId ~ projects.Path ~ EncryptedAccessToken] =
+        val command: Command[projects.GitLabId *: projects.Path *: EncryptedAccessToken *: EmptyTuple] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
           VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)""".command
         session
           .prepare(command)
-          .flatMap(_.execute(project.id ~ project.path ~ encryptedToken))
+          .flatMap(_.execute(project.id *: project.path *: encryptedToken *: EmptyTuple))
           .void
       }
     }

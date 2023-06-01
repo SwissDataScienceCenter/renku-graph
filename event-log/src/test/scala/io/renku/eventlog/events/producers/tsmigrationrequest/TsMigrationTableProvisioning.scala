@@ -20,10 +20,10 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 
 import cats.data.Kleisli
 import io.renku.config.ServiceVersion
-import io.renku.eventlog._
 import io.renku.eventlog.TSMigtationTypeSerializers._
+import io.renku.eventlog._
 import io.renku.events.Subscription.SubscriberUrl
-import skunk.{Command, Query, ~}
+import skunk._
 import skunk.implicits._
 
 trait TsMigrationTableProvisioning {
@@ -35,13 +35,13 @@ trait TsMigrationTableProvisioning {
                                          changeDate: ChangeDate
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[ServiceVersion ~ SubscriberUrl ~ MigrationStatus ~ ChangeDate] = sql"""
+      val query: Command[ServiceVersion *: SubscriberUrl *: MigrationStatus *: ChangeDate *: EmptyTuple] = sql"""
         INSERT INTO ts_migration (subscriber_version, subscriber_url, status, change_date)
         VALUES ($serviceVersionEncoder, $subscriberUrlEncoder, $migrationStatusEncoder, $changeDateEncoder)
         """.command
       session
         .prepare(query)
-        .flatMap(_.execute(version ~ url ~ status ~ changeDate))
+        .flatMap(_.execute(version *: url *: status *: changeDate *: EmptyTuple))
         .void
     }
   }
@@ -49,13 +49,13 @@ trait TsMigrationTableProvisioning {
   protected def findRow(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
     execute {
       Kleisli { session =>
-        val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] = sql"""
+        val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, (MigrationStatus, ChangeDate)] = sql"""
             SELECT status, change_date
             FROM ts_migration
             WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
           .query(migrationStatusDecoder ~ changeDateDecoder)
           .map { case status ~ changeDate => status -> changeDate }
-        session.prepare(query).flatMap(_.unique(url ~ version))
+        session.prepare(query).flatMap(_.unique(url *: version *: EmptyTuple))
       }
     }
 
@@ -73,12 +73,12 @@ trait TsMigrationTableProvisioning {
 
   protected def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] = execute {
     Kleisli { session =>
-      val query: Query[SubscriberUrl ~ ServiceVersion, Option[MigrationMessage]] = sql"""
+      val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, Option[MigrationMessage]] = sql"""
         SELECT message
         FROM ts_migration
         WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
         .query(migrationMessageDecoder.opt)
-      session.prepare(query).flatMap(_.unique(url ~ version))
+      session.prepare(query).flatMap(_.unique(url *: version *: EmptyTuple))
     }
   }
 }

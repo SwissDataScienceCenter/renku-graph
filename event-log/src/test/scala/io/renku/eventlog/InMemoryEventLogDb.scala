@@ -42,12 +42,12 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
 
   def verify(table: String, column: String, hasType: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, String] =
+      val query: Query[String *: String *: EmptyTuple, String] =
         sql"""SELECT data_type FROM information_schema.columns WHERE
          table_name = $varchar AND column_name = $varchar;""".query(varchar)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique(table *: column *: EmptyTuple))
         .map(dataType => dataType == hasType)
         .recover { case _ => false }
     }
@@ -55,7 +55,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
 
   def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
         sql"""SELECT EXISTS (
                 SELECT *
                 FROM information_schema.columns 
@@ -63,14 +63,14 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
               )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique(table *: column *: EmptyTuple))
         .recover { case _ => false }
     }
   }
 
   def verifyConstraintExists(table: String, constraintName: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
         sql"""SELECT EXISTS (
                  SELECT * 
                  FROM information_schema.constraint_column_usage 
@@ -78,14 +78,14 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
                )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ constraintName))
+        .flatMap(_.unique(table *: constraintName *: EmptyTuple))
         .recover { case _ => false }
     }
   }
 
   def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
         sql"""SELECT EXISTS (
                  SELECT * 
                  FROM pg_indexes 
@@ -93,7 +93,7 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
                )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ indexName))
+        .flatMap(_.unique(table *: indexName *: EmptyTuple))
         .recover { case _ => false }
     }
   }

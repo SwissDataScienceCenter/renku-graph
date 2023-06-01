@@ -21,10 +21,10 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.IO
 import io.circe.literal._
-import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.Generators._
 import io.renku.eventlog.init.model.Event
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
@@ -120,7 +120,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[
-        EventId ~ projects.GitLabId ~ projects.Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
+        EventId *: projects.GitLabId *: projects.Path *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
       ] =
         sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
@@ -139,9 +139,15 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         .prepare(query)
         .flatMap(
           _.execute(
-            event.id ~ event.project.id ~ event.project.path ~ eventStatuses.generateOne ~ createdDate ~ executionDates.generateOne ~ event.date ~ toJsonBody(
-              event
-            )
+            event.id *:
+              event.project.id *:
+              event.project.path *:
+              eventStatuses.generateOne *:
+              createdDate *:
+              executionDates.generateOne *:
+              event.date *:
+              toJsonBody(event) *:
+              EmptyTuple
           )
         )
         .map(_ => ())
@@ -151,7 +157,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
   private def toJsonBody(event: Event): String =
     json"""{
     "project": {
-      "id": ${event.project.id.value},
+      "id":   ${event.project.id.value},
       "path": ${event.project.path.value}
      }
   }""".noSpaces

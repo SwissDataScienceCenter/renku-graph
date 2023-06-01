@@ -50,7 +50,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def findEvent = measureExecutionTime {
     SqlStatement
-      .named(name = s"${categoryName.value.toLowerCase} - find event")
+      .named(s"${categoryName.value.toLowerCase} - find event")
       .select[LastSyncedDate, (projects.GitLabId, Option[LastSyncedDate], ProjectSyncEvent)](
         sql"""SELECT candidate.project_id, candidate.real_sync, candidate.project_path
               FROM (
@@ -90,13 +90,13 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def updateLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
-      .named(name = s"${categoryName.value.toLowerCase} - update last_synced")
-      .command[LastSyncedDate ~ projects.GitLabId](sql"""
+      .named(s"${categoryName.value.toLowerCase} - update last_synced")
+      .command[LastSyncedDate *: projects.GitLabId *: EmptyTuple](sql"""
         UPDATE subscription_category_sync_time
         SET last_synced = $lastSyncedDateEncoder
         WHERE project_id = $projectIdEncoder AND category_name = '#${categoryName.show}'
         """.command)
-      .arguments(LastSyncedDate(now()) ~ projectId)
+      .arguments(LastSyncedDate(now()) *: projectId *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(1) => true.pure[F]
@@ -109,14 +109,14 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def insertLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
-      .named(name = s"${categoryName.value.toLowerCase} - insert last_synced")
-      .command[projects.GitLabId ~ LastSyncedDate](sql"""
+      .named(s"${categoryName.value.toLowerCase} - insert last_synced")
+      .command[projects.GitLabId *: LastSyncedDate *: EmptyTuple](sql"""
         INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, '#${categoryName.show}', $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET last_synced = EXCLUDED.last_synced
         """.command)
-      .arguments(projectId ~ LastSyncedDate(now()))
+      .arguments(projectId *: LastSyncedDate(now()) *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Insert(1) => true.pure[F]
@@ -139,7 +139,5 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
 private object EventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventFinder[F, ProjectSyncEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new EventFinderImpl[F]()
-    }
+    MonadThrow[F].catchNonFatal(new EventFinderImpl[F]())
 }

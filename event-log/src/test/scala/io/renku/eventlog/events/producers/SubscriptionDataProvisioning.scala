@@ -35,25 +35,25 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
                                        lastSynced:   LastSyncedDate
   ): Unit = execute[Unit] {
     Kleisli { session =>
-      val query: Command[projects.GitLabId ~ CategoryName ~ LastSyncedDate] = sql"""
+      val query: Command[projects.GitLabId *: CategoryName *: LastSyncedDate *: EmptyTuple] = sql"""
         INSERT INTO subscription_category_sync_time (project_id, category_name, last_synced)
         VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET  last_synced = excluded.last_synced
       """.command
-      session.prepare(query).flatMap(_.execute(projectId ~ categoryName ~ lastSynced)).void
+      session.prepare(query).flatMap(_.execute(projectId *: categoryName *: lastSynced *: EmptyTuple)).void
     }
   }
 
   protected def findSyncTime(projectId: projects.GitLabId, categoryName: CategoryName): Option[LastSyncedDate] =
     execute {
       Kleisli { session =>
-        val query: Query[projects.GitLabId ~ CategoryName, LastSyncedDate] = sql"""
+        val query: Query[projects.GitLabId *: CategoryName *: EmptyTuple, LastSyncedDate] = sql"""
         SELECT last_synced
         FROM subscription_category_sync_time
         WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
       """.query(lastSyncedDateDecoder)
-        session.prepare(query).flatMap(_.option(projectId ~ categoryName))
+        session.prepare(query).flatMap(_.option(projectId *: categoryName *: EmptyTuple))
       }
     }
 

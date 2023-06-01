@@ -53,13 +53,13 @@ private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource: QueriesExecut
   override def offer(projectId: projects.GitLabId, projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement[F](name = "clean_up_events_queue - offer")
-        .command[OffsetDateTime ~ projects.GitLabId ~ projects.Path](
+        .command[OffsetDateTime *: projects.GitLabId *: projects.Path *: EmptyTuple](
           sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
                 VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)
                 ON CONFLICT DO NOTHING
           """.command
         )
-        .arguments(now() ~ projectId ~ projectPath)
+        .arguments(now() *: projectId *: projectPath *: EmptyTuple)
         .build
     } flatMapF {
       case Completion.Insert(0 | 1) => ().pure[F]

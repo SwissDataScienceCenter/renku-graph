@@ -57,7 +57,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
                        expiryDate:     ExpiryDate = localDates(min = LocalDate.now().plusDays(1)).generateAs(ExpiryDate)
   ): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Int ~ String ~ String ~ OffsetDateTime ~ LocalDate] =
+      val query: Command[Int *: String *: String *: OffsetDateTime *: LocalDate *: EmptyTuple] =
         sql"""insert into projects_tokens (project_id, project_path, token, created_at, expiry_date)
               values ($int4, $varchar, $varchar, $timestamptz, $date)
          """.command
@@ -65,7 +65,12 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
         .prepare(query)
         .flatMap(
           _.execute(
-            projectId.value ~ projectPath.value ~ encryptedToken.value ~ OffsetDateTime.now() ~ expiryDate.value
+            projectId.value *:
+              projectPath.value *:
+              encryptedToken.value *:
+              OffsetDateTime.now() *:
+              expiryDate.value *:
+              EmptyTuple
           )
         )
         .map(assureInserted)

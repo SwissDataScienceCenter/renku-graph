@@ -26,17 +26,17 @@ import eu.timepit.refined.auto._
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.consumers.statuschange
-import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesGenerated
+import io.renku.eventlog.events.consumers.statuschange
+import io.renku.eventlog.events.consumers.statuschange.DBUpdater.{RollbackOp, UpdateOp}
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Session, ~}
 
 import java.time.Instant
 
@@ -50,7 +50,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
+  override def onRollback(event: ToTriplesGenerated): RollbackOp[F] = deleteDelivery(event.eventId)
 
   override def updateDB(event: ToTriplesGenerated): UpdateOp[F] =
     deleteDelivery(event.eventId) >> updateStatus(event) >>= {
@@ -67,7 +67,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - status update")
-      .command[ExecutionDate ~ EventId ~ projects.GitLabId](
+      .command[ExecutionDate *: EventId *: projects.GitLabId *: EmptyTuple](
         sql"""UPDATE event evt
               SET status = '#${TriplesGenerated.value}', 
                 execution_date = $executionDateEncoder, 
@@ -76,7 +76,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
                 AND evt.project_id = $projectIdEncoder 
                 AND evt.status = '#${GeneratingTriples.value}'""".command
       )
-      .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
+      .arguments(ExecutionDate(now()) *: event.eventId.id *: event.eventId.projectId *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(1) =>
@@ -99,28 +99,30 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
               ON CONFLICT (event_id, project_id)
               DO UPDATE SET payload = EXCLUDED.payload;""".command
       )
-      .arguments(event.eventId.id ~ event.eventId.projectId ~ event.payload)
+      .arguments(event.eventId.id *: event.eventId.projectId *: event.payload *: EmptyTuple)
       .build
       .void
   }
 
   private def updateProcessingTime(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - processing_time add")
-      .command[EventId ~ projects.GitLabId ~ EventStatus ~ EventProcessingTime](
+      .command[EventId *: projects.GitLabId *: EventStatus *: EventProcessingTime *: EmptyTuple](
         sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
               VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
               ON CONFLICT (event_id, project_id, status)
               DO UPDATE SET processing_time = EXCLUDED.processing_time;
               """.command
       )
-      .arguments(event.eventId.id ~ event.eventId.projectId ~ TriplesGenerated ~ event.processingTime)
+      .arguments(event.eventId.id *: event.eventId.projectId *: TriplesGenerated *: event.processingTime *: EmptyTuple)
       .build
       .void
   }
 
   private def updateAncestorsStatus(event: ToTriplesGenerated) = measureExecutionTime {
     SqlStatement(name = "to_triples_generated - ancestors update")
-      .select[ExecutionDate ~ projects.GitLabId ~ projects.GitLabId ~ EventId ~ EventId, EventId ~ EventStatus](
+      .select[ExecutionDate *: projects.GitLabId *: projects.GitLabId *: EventId *: EventId *: EmptyTuple,
+              (EventId, EventStatus)
+      ](
         sql"""UPDATE event evt
               SET status = '#${TriplesGenerated.value}', 
                   execution_date = $executionDateEncoder, 
@@ -144,7 +146,12 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
            """.query(eventIdDecoder ~ eventStatusDecoder)
       )
       .arguments(
-        ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+        ExecutionDate(now()) *:
+          event.eventId.projectId *:
+          event.eventId.projectId *:
+          event.eventId.id *:
+          event.eventId.id *:
+          EmptyTuple
       )
       .build(_.toList)
       .mapResult { idsAndStatuses =>

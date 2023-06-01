@@ -39,9 +39,9 @@ import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
 import skunk.data.Completion
-import skunk.implicits.{toIdOps, toStringOps}
-import skunk.{Query, ~}
+import skunk.implicits.toStringOps
 
 class LastSyncedDateUpdaterSpec
     extends AnyWordSpec
@@ -108,14 +108,14 @@ class LastSyncedDateUpdaterSpec
 
   private def getLastSyncedDate(project: Project): Option[LastSyncedDate] = execute {
     Kleisli { session =>
-      val query: Query[projects.GitLabId ~ CategoryName, LastSyncedDate] =
+      val query: Query[projects.GitLabId *: CategoryName *: EmptyTuple, LastSyncedDate] =
         sql"""SELECT sync_time.last_synced FROM subscription_category_sync_time sync_time
                 WHERE sync_time.project_id = $projectIdEncoder 
                 AND sync_time.category_name = $categoryNameEncoder
                 """
           .query(lastSyncedDateDecoder)
 
-      session.prepare(query).flatMap(p => p.option(project.id ~ categoryName))
+      session.prepare(query).flatMap(p => p.option(project.id *: categoryName *: EmptyTuple))
     }
   }
 }

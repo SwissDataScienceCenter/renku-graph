@@ -54,7 +54,7 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
   private def findEvent = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lze - find event")
-      .select[ExecutionDate ~ EventProcessingTime, ZombieEvent](
+      .select[ExecutionDate *: EventProcessingTime *: EmptyTuple, ZombieEvent](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               FROM event evt
               JOIN project proj ON evt.project_id = proj.project_id
@@ -69,7 +69,7 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
             ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
           }
       )
-      .arguments(ExecutionDate(now()) ~ maxDurationForEvent)
+      .arguments(ExecutionDate(now()) *: maxDurationForEvent *: EmptyTuple)
       .build(_.option)
   }
 
@@ -86,12 +86,12 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
   private def updateExecutionDate(eventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lze - update execution date")
-      .command[ExecutionDate ~ EventId ~ projects.GitLabId ~ String](sql"""
+      .command[ExecutionDate *: EventId *: projects.GitLabId *: String *: EmptyTuple](sql"""
         UPDATE event
         SET execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
         """.command)
-      .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
+      .arguments(ExecutionDate(now()) *: eventId.id *: eventId.projectId *: zombieMessage *: EmptyTuple)
       .build
       .flatMapResult {
         case Completion.Update(1) => true.pure[F]
@@ -106,7 +106,5 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
 
 private object LostZombieEventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, ZombieEvent]] =
-    MonadThrow[F].catchNonFatal {
-      new LostZombieEventFinder[F]
-    }
+    MonadThrow[F].catchNonFatal(new LostZombieEventFinder[F])
 }

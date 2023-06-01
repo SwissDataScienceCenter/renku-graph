@@ -52,10 +52,10 @@ object EventPayloadFinder {
       def findStatement(eventId: EventId, projectPath: ProjectPath): SqlStatement[F, Option[PayloadData]] =
         SqlStatement("find event payload")
           .select(selectPayload)
-          .arguments(eventId ~ projectPath)
+          .arguments(eventId *: projectPath *: EmptyTuple)
           .build(_.option)
 
-      def selectPayload: Query[EventId ~ ProjectPath, PayloadData] =
+      def selectPayload: Query[EventId *: ProjectPath *: EmptyTuple, PayloadData] =
         sql"""
               SELECT ep.payload
               FROM event_payload ep

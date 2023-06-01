@@ -67,7 +67,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
 
   protected def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
         sql"""SELECT EXISTS (
                 SELECT *
                 FROM information_schema.columns
@@ -75,14 +75,14 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
               )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique(table *: column *: EmptyTuple))
         .recover { case _ => false }
     }
   }
 
   protected def verifyColumnNullable(table: String, column: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] = sql"""
+      val query: Query[String *: String *: EmptyTuple, Boolean] = sql"""
         SELECT DISTINCT is_nullable
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE table_name = $varchar AND column_name = $varchar"""
@@ -94,13 +94,13 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
         }
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ column))
+        .flatMap(_.unique(table *: column *: EmptyTuple))
     }
   }
 
   def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
+      val query: Query[String *: String *: EmptyTuple, Boolean] =
         sql"""SELECT EXISTS (
                SELECT *
                FROM pg_indexes
@@ -108,7 +108,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
              )""".query(bool)
       session
         .prepare(query)
-        .flatMap(_.unique(table ~ indexName))
+        .flatMap(_.unique(table *: indexName *: EmptyTuple))
         .recover { case _ => false }
     }
   }

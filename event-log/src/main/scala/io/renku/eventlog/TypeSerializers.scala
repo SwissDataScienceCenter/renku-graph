@@ -20,15 +20,15 @@ package io.renku.eventlog
 
 import cats.syntax.all._
 import io.renku.eventlog.events.producers.eventdelivery._
-import io.renku.events.consumers.Project
 import io.renku.events.Subscription.{SubscriberId, SubscriberUrl}
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import scodec.bits.ByteVector
-import skunk.{Decoder, Encoder}
 import skunk.codec.all._
+import skunk.{Decoder, Encoder}
 
 import java.time.{OffsetDateTime, ZoneOffset}
 
@@ -105,9 +105,9 @@ trait TypeSerializers {
   }
   val eventTypeIdEncoder: Encoder[EventTypeId] = varchar.values.contramap(_.value)
 
-  val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder ~ projectIdDecoder).gmap[CompoundEventId]
+  val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder *: projectIdDecoder).to[CompoundEventId]
 
-  val projectDecoder: Decoder[Project] = (projectIdDecoder ~ projectPathDecoder).gmap[Project]
+  val projectDecoder: Decoder[Project] = (projectIdDecoder *: projectPathDecoder).to[Project]
 
   val subscriberUrlDecoder: Decoder[SubscriberUrl] = varchar.map(SubscriberUrl.apply)
   val subscriberUrlEncoder: Encoder[SubscriberUrl] = varchar.values.contramap(_.value)
@@ -126,6 +126,5 @@ trait TypeSerializers {
 
   val perPageEncoder: Encoder[PerPage] = int4.values.contramap(_.value)
 
-  val byteVectorDecoder: Decoder[ByteVector] =
-    bytea.map(ByteVector.view)
+  val byteVectorDecoder: Decoder[ByteVector] = bytea.map(ByteVector.view)
 }

@@ -54,11 +54,11 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.value.toLowerCase} - dispatch recovery")
-        .command[projects.GitLabId ~ CategoryName](sql"""
+        .command[projects.GitLabId *: CategoryName *: EmptyTuple](sql"""
           DELETE FROM subscription_category_sync_time
           WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command)
-        .arguments(event.projectId ~ categoryName)
+        .arguments(event.projectId *: categoryName *: EmptyTuple)
         .build
         .flatMapResult {
           case Completion.Delete(0 | 1) => ().pure[F]
@@ -71,7 +71,6 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
 }
 
 private object DispatchRecovery {
-
   def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
       : F[DispatchRecovery[F, MinProjectInfoEvent]] = MonadCancelThrow[F].catchNonFatal {
     new DispatchRecoveryImpl[F]

@@ -35,7 +35,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewingDeletion
 import org.typelevel.log4cats.Logger
-import skunk.{~, Session, SqlState}
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -86,17 +86,17 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
 
   private def removeCleanUpEvents(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - clean_up_events_queue removal")
-      .command[projects.GitLabId ~ projects.Path](sql"""
+      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
         DELETE FROM clean_up_events_queue 
         WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
-      .arguments(project.id ~ project.path)
+      .arguments(project.id *: project.path *: EmptyTuple)
       .build
       .void
   }
 
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.GitLabId ~ projects.Path](sql"""
+      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
         DELETE FROM subscription_category_sync_time 
         WHERE project_id IN (
           SELECT st.project_id
@@ -105,17 +105,17 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
             AND p.project_id = $projectIdEncoder
             AND p.project_path = $projectPathEncoder
         )""".command)
-      .arguments(project.id ~ project.path)
+      .arguments(project.id *: project.path *: EmptyTuple)
       .build
       .void
   }
 
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
-      .command[projects.GitLabId ~ projects.Path](sql"""
+      .command[projects.GitLabId *: projects.Path *: EmptyTuple](sql"""
         DELETE FROM project 
         WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
-      .arguments(project.id ~ project.path)
+      .arguments(project.id *: project.path *: EmptyTuple)
       .build
       .mapResult {
         case Completion.Delete(1) => true

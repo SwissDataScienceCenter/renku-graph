@@ -18,24 +18,24 @@
 
 package io.renku.eventlog.events.producers.awaitinggeneration
 
-import cats.{Id, Parallel}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{Id, Parallel}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.db.{DbClient, SqlStatement}
 import io.renku.db.implicits._
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.producers
-import io.renku.eventlog.events.producers.{EventFinder, ProjectPrioritisation}
-import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.events.producers.DefaultSubscribers.DefaultSubscribers
+import io.renku.eventlog.events.producers.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.events.producers.{EventFinder, ProjectPrioritisation}
 import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
-import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import skunk._
 import skunk.codec.all._
@@ -81,7 +81,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
-      .select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
+      .select[ExecutionDate *: ExecutionDate *: Int *: EmptyTuple, ProjectInfo](
         sql"""
           SELECT p.project_id, p.project_path, p.latest_event_date,
 	        (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
@@ -119,7 +119,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
               ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
-      .arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+      .arguments(ExecutionDate(now()) *: ExecutionDate(now()) *: projectsFetchingLimit.value *: EmptyTuple)
       .build(_.toList)
   }
 
@@ -137,7 +137,9 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
     val executionDate = ExecutionDate(now())
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find latest")
-      .select[projects.Path ~ projects.GitLabId ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](sql"""
+      .select[projects.Path *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
+              AwaitingGenerationEvent
+      ](sql"""
         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
         FROM (
           SELECT project_id, max(event_date) AS max_event_date
@@ -153,7 +155,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           AND execution_date < $executionDateEncoder
         LIMIT 1
         """.query(awaitingGenerationEventGet))
-      .arguments(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate)
+      .arguments(idAndPath.path *: idAndPath.id *: executionDate *: executionDate *: EmptyTuple)
       .build(_.option)
   }
 
@@ -177,7 +179,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
   private def updateStatus(commitEventId: CompoundEventId) = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
-      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.GitLabId ~ EventStatus](sql"""
+      .command[EventStatus *: ExecutionDate *: EventId *: projects.GitLabId *: EventStatus *: EmptyTuple](sql"""
         UPDATE event 
         SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
         WHERE event_id = $eventIdEncoder
@@ -185,7 +187,12 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
           AND status <> $eventStatusEncoder
         """.command)
       .arguments(
-        GeneratingTriples ~ ExecutionDate(now()) ~ commitEventId.id ~ commitEventId.projectId ~ GeneratingTriples
+        GeneratingTriples *:
+          ExecutionDate(now()) *:
+          commitEventId.id *:
+          commitEventId.projectId *:
+          GeneratingTriples *:
+          EmptyTuple
       )
       .build
   }
@@ -207,7 +214,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
   } getOrElse Kleisli.pure[F, Session[F], Unit](())
 
   private val awaitingGenerationEventGet: Decoder[AwaitingGenerationEvent] =
-    (compoundEventIdDecoder ~ projectPathDecoder ~ eventBodyDecoder).gmap[AwaitingGenerationEvent]
+    (compoundEventIdDecoder *: projectPathDecoder *: eventBodyDecoder).to[AwaitingGenerationEvent]
 }
 
 private object EventFinder {
