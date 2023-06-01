@@ -101,7 +101,7 @@ jobs:
       name: renku-kg-dev
     steps:
       - name: deploy-development
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@fix-deploy-action
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@1.4.6
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
