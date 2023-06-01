@@ -48,6 +48,6 @@ private class TokenRemoverImpl[F[_]: MonadThrow: Logger](dbTokenRemover: Persist
   private def revokeTokens(projectId: GitLabId, maybeAccessToken: Option[AccessToken]) =
     maybeAccessToken match {
       case None              => ().pure[F]
-      case Some(accessToken) => revokeAllTokens(projectId, accessToken)
+      case Some(accessToken) => revokeAllTokens(projectId, except = None, accessToken)
     }
 }

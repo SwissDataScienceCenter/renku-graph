@@ -133,16 +133,21 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       accessTokenCrypto.encrypt(creationInfo.token).map((project, creationInfo, _))
   }
 
-  private lazy val persist: ((Project, TokenCreationInfo, EncryptedAccessToken)) => F[Project] = {
+  private lazy val persist: ((Project, TokenCreationInfo, EncryptedAccessToken)) => F[(Project, TokenCreationInfo)] = {
     case (project, creationInfo, encToken) =>
-      persistWithRetry(TokenStoringInfo(project, encToken, creationInfo.dates), creationInfo.token).map(_ => project)
+      persistWithRetry(TokenStoringInfo(project, encToken, creationInfo.dates), creationInfo.token)
+        .as(project -> creationInfo)
   }
 
-  private def logSuccess(project: Project): F[Project] =
-    Logger[F].info(show"token created for $project").map(_ => project)
+  private lazy val logSuccess: ((Project, TokenCreationInfo)) => F[(Project, TokenCreationInfo)] = {
+    case (project, creationInfo) =>
+      Logger[F].info(show"token created for $project").as(project -> creationInfo)
+  }
 
-  private def tryRevokingOldTokens(userToken: AccessToken)(project: Project) =
-    tokensRevoker.revokeAllTokens(project.id, userToken)
+  private def tryRevokingOldTokens(userToken: AccessToken): ((Project, TokenCreationInfo)) => F[Unit] = {
+    case (project, creationInfo) =>
+      tokensRevoker.revokeAllTokens(project.id, creationInfo.tokenId.some, userToken)
+  }
 
   private def persistWithRetry(storingInfo:     TokenStoringInfo,
                                newToken:        ProjectAccessToken,

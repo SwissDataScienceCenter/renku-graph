@@ -36,37 +36,60 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
+import scala.util.Random
+
 class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec with MockFactory {
 
-  it should "succeed and revoke all found project tokens" in new TestCase {
+  it should "revoke all found project tokens except from the given one" in new TestCase {
 
-    val projectId     = projectIds.generateOne
-    val accessToken   = accessTokens.generateOne
-    val projectTokens = accessTokenIds.generateList()
+    val projectId       = projectIds.generateOne
+    val userAccessToken = accessTokens.generateOne
+    val tokenToLeave    = accessTokenIds.generateOne
+    val tokensToRemove  = accessTokenIds.generateFixedSizeList(1)
 
-    givenStreamOfTokensToRevoke(projectId,
-                                accessToken,
-                                returning = Stream.fromIterator[IO](projectTokens.iterator, chunkSize = 20)
+    givenStreamOfTokensToRevoke(
+      projectId,
+      userAccessToken,
+      returning = Stream.emits[IO, AccessTokenId](Random.shuffle(tokenToLeave :: tokensToRemove))
     )
 
-    projectTokens foreach (givenTokenRevoking(projectId, _: AccessTokenId, accessToken, returning = ().pure[IO]))
+    tokensToRemove foreach (givenTokenRevoking(projectId, _: AccessTokenId, userAccessToken, returning = ().pure[IO]))
 
-    tokensRevoker.revokeAllTokens(projectId, accessToken).unsafeRunSync() shouldBe ()
+    tokensRevoker.revokeAllTokens(projectId, tokenToLeave.some, userAccessToken).unsafeRunSync() shouldBe ()
+
+    logger.expectNoLogs()
+  }
+
+  it should "revoke all found project tokens when not token to leave is given one" in new TestCase {
+
+    val projectId       = projectIds.generateOne
+    val userAccessToken = accessTokens.generateOne
+    val tokensToRemove  = accessTokenIds.generateList()
+
+    givenStreamOfTokensToRevoke(
+      projectId,
+      userAccessToken,
+      returning = Stream.fromIterator[IO](tokensToRemove.iterator, chunkSize = 20)
+    )
+
+    tokensToRemove foreach (givenTokenRevoking(projectId, _: AccessTokenId, userAccessToken, returning = ().pure[IO]))
+
+    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).unsafeRunSync() shouldBe ()
+
+    logger.expectNoLogs()
   }
 
   it should "log a warning and succeed when token revoking process fails" in new TestCase {
 
-    val projectId   = projectIds.generateOne
-    val accessToken = accessTokens.generateOne
+    val projectId       = projectIds.generateOne
+    val userAccessToken = accessTokens.generateOne
 
     val exception = exceptions.generateOne
-    givenStreamOfTokensToRevoke(projectId, accessToken, returning = Stream.raiseError[IO](exception))
+    givenStreamOfTokensToRevoke(projectId, userAccessToken, returning = Stream.raiseError[IO](exception))
 
-    tokensRevoker.revokeAllTokens(projectId, accessToken).unsafeRunSync() shouldBe ()
+    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).unsafeRunSync() shouldBe ()
 
-    logger.logged(
-      Warn(show"removing old token in GitLab for project $projectId failed", exception)
-    )
+    logger.logged(Warn(show"removing old token in GitLab for project $projectId failed", exception))
   }
 
   private trait TestCase {

@@ -91,10 +91,11 @@ private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
       import TokenDates._
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
+        tokenId     <- cursor.downField("id").as[AccessTokenId]
         token       <- cursor.downField("token").as(tokenDecoder)
         createdDate <- cursor.downField("created_at").as[CreatedAt]
         expiryDate  <- cursor.downField("expires_at").as[ExpiryDate]
-      } yield TokenCreationInfo(token, TokenDates(createdDate, expiryDate))
+      } yield TokenCreationInfo(tokenId, token, TokenDates(createdDate, expiryDate))
     }
 
     jsonOf[F, TokenCreationInfo](Sync[F], infoDecoder)
