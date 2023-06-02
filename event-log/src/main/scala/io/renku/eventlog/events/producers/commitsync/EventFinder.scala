@@ -47,7 +47,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
 
   private def findEventAndMarkTaken = findEvent >>= {
     case Some((event, maybeSyncDate, Some(eventStatus))) if eventStatus == AwaitingDeletion =>
-      setSyncDate(event, maybeSyncDate) map (_ => Option.empty[CommitSyncEvent])
+      setSyncDate(event, maybeSyncDate).as(Option.empty[CommitSyncEvent])
     case Some((event, maybeSyncDate, _)) =>
       setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
     case None => Kleisli.pure(Option.empty[CommitSyncEvent])
@@ -135,7 +135,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
         """.command)
       .arguments(LastSyncedDate(now()) *: event.projectId *: categoryName *: EmptyTuple)
       .build
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(Completion.Insert(0)) }
 
   private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlStatement
@@ -148,7 +148,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
         """.command)
       .arguments(event.projectId *: categoryName *: LastSyncedDate(now()) *: EmptyTuple)
       .build
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(Completion.Insert(0)) }
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
     lazy val projectId: projects.GitLabId = commitSyncEvent match {
