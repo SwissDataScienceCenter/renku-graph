@@ -121,7 +121,7 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource: 
   private def dequeueEvent[E <: StatusChangeEvent](handler: HandlerDef[E]) = SessionResource[F].useK {
     findEvent[E](handler.eventType) >>= {
       case None                     => Kleisli.pure(Option.empty[String])
-      case Some((eventId, payload)) => deleteEvent(eventId) map (if (_) payload.some else None)
+      case Some((eventId, payload)) => deleteEvent(eventId) map (Option.when(_)(payload))
     }
   }
 
