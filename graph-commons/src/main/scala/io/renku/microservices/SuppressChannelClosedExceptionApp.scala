@@ -18,7 +18,15 @@
 
 package io.renku.microservices
 
-trait IOMicroservice extends SuppressChannelClosedExceptionApp {
+import cats.effect._
+import cats.effect.unsafe.IORuntime
 
-  lazy val Identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate
+abstract class SuppressChannelClosedExceptionApp extends IOApp { self =>
+
+  override lazy val runtime: IORuntime = SuppressChannelClosedExceptionRuntime.createRuntime(
+    computeWorkerThreadCount,
+    blockedThreadDetectionEnabled,
+    t => self.reportFailure(t).unsafeRunAndForget()(runtime),
+    runtimeConfig
+  )
 }
