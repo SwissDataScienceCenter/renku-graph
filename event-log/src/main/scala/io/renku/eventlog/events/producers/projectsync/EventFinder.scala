@@ -105,7 +105,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
           new Exception(s"${categoryName.show}: update last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false) }
 
   private def insertLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
@@ -125,7 +125,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
           new Exception(s"${categoryName.show}: insert last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false) }
 
   private def toNoneIfEventAlreadyTaken(event: ProjectSyncEvent): Boolean => Option[ProjectSyncEvent] = {
     case true  => Some(event)
