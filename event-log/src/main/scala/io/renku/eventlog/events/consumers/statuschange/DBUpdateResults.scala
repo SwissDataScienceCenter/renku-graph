@@ -24,7 +24,7 @@ import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 
 private sealed trait DBUpdateResults {
-  lazy val widen:DBUpdateResults = this
+  lazy val widen: DBUpdateResults = this
 }
 
 private object DBUpdateResults {
