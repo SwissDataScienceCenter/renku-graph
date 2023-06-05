@@ -98,7 +98,6 @@ object commandParameters {
   final class ParameterDefaultValue private (val value: String) extends AnyVal with StringTinyType
   implicit object ParameterDefaultValue
       extends TinyTypeFactory[ParameterDefaultValue](new ParameterDefaultValue(_))
-      with NonBlank[ParameterDefaultValue]
       with TinyTypeJsonLDOps[ParameterDefaultValue]
 
   sealed abstract class IOStream(val resourceId: IOStream.ResourceId, val name: String Refined NonEmpty) {
