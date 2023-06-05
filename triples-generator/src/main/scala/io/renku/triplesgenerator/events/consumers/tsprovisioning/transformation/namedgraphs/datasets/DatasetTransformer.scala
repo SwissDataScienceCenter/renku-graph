@@ -24,8 +24,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -42,6 +42,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     descriptionUpdater:             DescriptionUpdater[F],
     personLinksUpdater:             PersonLinksUpdater[F],
     hierarchyOnInvalidationUpdater: HierarchyOnInvalidationUpdater[F],
+    publicationEventsUpdater:       PublicationEventsUpdater[F],
     recoverableErrorsRecovery:      RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetTransformer[F] {
 
@@ -51,6 +52,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   import hierarchyOnInvalidationUpdater._
   import originalIdentifierUpdater._
   import personLinksUpdater._
+  import publicationEventsUpdater._
   import recoverableErrorsRecovery._
   import sameAsUpdater._
   import topmostSameAsUpdater._
@@ -67,7 +69,8 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
         updateDateCreated >>=
         updateDescriptions >>=
         updatePersonLinks >>=
-        updateHierarchyOnInvalidation)
+        updateHierarchyOnInvalidation >>=
+        updatePublicationEvents)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError("Problem finding dataset details in KG"))
     }
@@ -78,11 +81,11 @@ private[transformation] object DatasetTransformer {
     derivationHierarchyUpdater     <- DerivationHierarchyUpdater[F]
     sameAsUpdater                  <- SameAsUpdater[F]
     topmostSameAsUpdater           <- TopmostSameAsUpdater[F]
-    personLinksUpdater             <- PersonLinksUpdater[F]
-    hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
     originalIdentifierUpdater      <- OriginalIdentifierUpdater[F]
     dateCreatedUpdater             <- DateCreatedUpdater[F]
     descriptionUpdater             <- DescriptionUpdater[F]
+    personLinksUpdater             <- PersonLinksUpdater[F]
+    hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
   } yield new DatasetTransformerImpl[F](
     derivationHierarchyUpdater,
     sameAsUpdater,
@@ -91,6 +94,7 @@ private[transformation] object DatasetTransformer {
     dateCreatedUpdater,
     descriptionUpdater,
     personLinksUpdater,
-    hierarchyOnInvalidationUpdater
+    hierarchyOnInvalidationUpdater,
+    PublicationEventsUpdater[F]
   )
 }

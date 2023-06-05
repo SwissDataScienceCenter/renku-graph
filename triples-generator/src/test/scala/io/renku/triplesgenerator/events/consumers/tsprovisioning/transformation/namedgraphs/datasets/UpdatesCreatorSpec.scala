@@ -23,12 +23,12 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.testentities.{Dataset, ModelOps}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.graph.model.testentities.{Dataset, ModelOps}
 import io.renku.graph.model.views.RdfResource
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, NamedGraph}
@@ -876,6 +876,32 @@ class UpdatesCreatorSpec
     }
   }
 
+  "deletePublicationEvents" should {
+
+    "prepare deletion queries that removes publication events linked to the given DS" in {
+
+      val project = anyRenkuProjectEntities
+        .withDatasets(datasetEntities(provenanceNonModified), datasetEntities(provenanceNonModified))
+        .generateOne
+        .to[entities.Project]
+
+      upload(to = projectsDataset, project)
+
+      val dsToClean :: dsToStay :: Nil = project.datasets
+
+      findPublicationEvents(project.resourceId, dsToClean.resourceId) shouldBe dsToClean.publicationEvents.toSet
+      findPublicationEvents(project.resourceId, dsToStay.resourceId)  shouldBe dsToStay.publicationEvents.toSet
+
+      UpdatesCreator
+        .deletePublicationEvents(project.resourceId, dsToClean)
+        .runAll(on = projectsDataset)
+        .unsafeRunSync()
+
+      findPublicationEvents(project.resourceId, dsToClean.resourceId) shouldBe Set.empty
+      findPublicationEvents(project.resourceId, dsToStay.resourceId)  shouldBe dsToStay.publicationEvents.toSet
+    }
+  }
+
   private def findDatasets: Set[(String, Option[String], Option[String], Option[String], Option[String])] =
     runSelect(
       on = projectsDataset,
@@ -1053,6 +1079,40 @@ class UpdatesCreatorSpec
       )
     ).unsafeRunSync()
       .map(row => datasets.DerivedFrom(row("derivedFrom")))
+      .toSet
+
+  private def findPublicationEvents(projectId: projects.ResourceId,
+                                    dsId:      datasets.ResourceId
+  ): Set[entities.PublicationEvent] =
+    runSelect(
+      on = projectsDataset,
+      SparqlQuery.of(
+        "fetch PublicationEvents",
+        Prefixes of schema -> "schema",
+        sparql"""|SELECT ?id ?about ?dsId ?maybeDesc ?name ?date
+                 |WHERE {
+                 |  GRAPH ${GraphClass.Project.id(projectId)} {
+                 |    BIND (${dsId.asEntityId} AS ?dsId)
+                 |    ?about schema:url ?dsId.
+                 |    ?id a schema:PublicationEvent;
+                 |          schema:about ?about;
+                 |          schema:name ?name;
+                 |          schema:startDate ?date.
+                 |    OPTIONAL { ?id schema:description ?maybeDesc }
+                 |  }
+                 |}""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row =>
+        entities.PublicationEvent(
+          publicationEvents.ResourceId(row("id")),
+          publicationEvents.About(row("about")),
+          datasets.ResourceId(row("dsId")),
+          row.get("maybeDesc").map(publicationEvents.Description(_)),
+          publicationEvents.Name(row("name")),
+          publicationEvents.StartDate(Instant.parse(row("date")))
+        )
+      )
       .toSet
 
   private implicit class SameAsOps(sameAs: SameAs) {
