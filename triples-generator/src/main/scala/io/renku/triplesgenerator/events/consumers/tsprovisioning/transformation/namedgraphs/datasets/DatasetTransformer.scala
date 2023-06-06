@@ -86,6 +86,7 @@ private[transformation] object DatasetTransformer {
     descriptionUpdater             <- DescriptionUpdater[F]
     personLinksUpdater             <- PersonLinksUpdater[F]
     hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
+    publicationEventsUpdater       <- PublicationEventsUpdater[F]
   } yield new DatasetTransformerImpl[F](
     derivationHierarchyUpdater,
     sameAsUpdater,
@@ -95,6 +96,6 @@ private[transformation] object DatasetTransformer {
     descriptionUpdater,
     personLinksUpdater,
     hierarchyOnInvalidationUpdater,
-    PublicationEventsUpdater[F]
+    publicationEventsUpdater
   )
 }

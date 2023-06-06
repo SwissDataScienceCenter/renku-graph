@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait PublicationEventsUpdater[F[_]] {
@@ -31,15 +31,26 @@ private trait PublicationEventsUpdater[F[_]] {
 }
 
 private object PublicationEventsUpdater {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: PublicationEventsUpdater[F] =
-    new PublicationEventsUpdaterImpl[F](UpdatesCreator)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PublicationEventsUpdater[F]] =
+    KGDatasetInfoFinder[F].map(new PublicationEventsUpdaterImpl[F](_, UpdatesCreator))
 }
 
-private class PublicationEventsUpdaterImpl[F[_]: Monad](updatesCreator: UpdatesCreator)
-    extends PublicationEventsUpdater[F] {
+private class PublicationEventsUpdaterImpl[F[_]: Monad](kgDatasetInfoFinder: KGDatasetInfoFinder[F],
+                                                        updatesCreator: UpdatesCreator
+) extends PublicationEventsUpdater[F] {
+
+  import kgDatasetInfoFinder.checkPublicationEventsExist
 
   override def updatePublicationEvents: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
-    val preUpdateQueries = project.datasets.flatMap(updatesCreator.deletePublicationEvents(project.resourceId, _))
-    (project -> (queries ++ Queries.preDataQueriesOnly(preUpdateQueries))).pure[F]
+    project.datasets
+      .map { ds =>
+        checkPublicationEventsExist(project.resourceId, ds.resourceId).map {
+          case false if ds.publicationEvents.isEmpty => List.empty[SparqlQuery]
+          case _                                     => updatesCreator.deletePublicationEvents(project.resourceId, ds)
+        }
+      }
+      .sequence
+      .map(_.flatten)
+      .map(preUpdateQueries => project -> (queries ++ Queries.preDataQueriesOnly(preUpdateQueries)))
   }
 }

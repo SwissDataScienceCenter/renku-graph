@@ -35,23 +35,17 @@ import scala.util.Try
 
 class PublicationEventsUpdaterSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
 
-  it should "leave the project unchanged and add delete queries for all datasets' publicationEvents" in {
+  it should "leave the project unchanged and add delete queries if there are no publicationEvents on the DS but they are in TS" in {
 
-    val initialProject = {
-      val p = anyRenkuProjectEntities.generateOne
-      p.addDatasets(datasetEntities(provenanceNonModified).generateList(p.dateCreated): _*)
-      p.to[entities.Project]
-    }
+    val (ds, initialProject) = anyRenkuProjectEntities
+      .addDataset(datasetEntities(provenanceNonModified))
+      .suchThat { case (ds, _) => ds.publicationEvents.isEmpty }
+      .generateOne
+      .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
 
-    val deletionQueries = initialProject.datasets >>= { ds =>
-      val dsDeletionQueries = sparqlQueries.generateList()
+    givenCheckPublicationEventsExist(initialProject, ds, returning = true.pure[Try])
 
-      (updatesCreator.deletePublicationEvents _)
-        .expects(initialProject.resourceId, ds)
-        .returning(dsDeletionQueries)
-
-      dsDeletionQueries
-    }
+    val deletionQueries = givenDeleteQueriesPrepared(initialProject, ds)
 
     val initialQueries = queriesGen.generateOne
 
@@ -62,6 +56,87 @@ class PublicationEventsUpdaterSpec extends AnyFlatSpec with should.Matchers with
     updatedQueries shouldBe initialQueries ++ Queries.preDataQueriesOnly(deletionQueries)
   }
 
-  private lazy val updatesCreator = mock[UpdatesCreator]
-  private lazy val updater        = new PublicationEventsUpdaterImpl[Try](updatesCreator)
+  it should "leave the project unchanged and add delete queries if there are publicationEvents on the DS but not in TS" in {
+
+    val (ds, initialProject) = anyRenkuProjectEntities
+      .addDataset(datasetEntities(provenanceNonModified))
+      .suchThat { case (ds, _) => ds.publicationEvents.nonEmpty }
+      .generateOne
+      .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+    givenCheckPublicationEventsExist(initialProject, ds, returning = false.pure[Try])
+
+    val deletionQueries = givenDeleteQueriesPrepared(initialProject, ds)
+
+    val initialQueries = queriesGen.generateOne
+
+    val (updatedProject, updatedQueries) =
+      updater.updatePublicationEvents(initialProject -> initialQueries).success.value
+
+    updatedProject shouldBe initialProject
+    updatedQueries shouldBe initialQueries ++ Queries.preDataQueriesOnly(deletionQueries)
+  }
+
+  it should "leave the project unchanged and add delete queries if there are publicationEvents on the DS and in TS" in {
+
+    val (ds, initialProject) = anyRenkuProjectEntities
+      .addDataset(datasetEntities(provenanceNonModified))
+      .suchThat { case (ds, _) => ds.publicationEvents.nonEmpty }
+      .generateOne
+      .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+    givenCheckPublicationEventsExist(initialProject, ds, returning = true.pure[Try])
+
+    val deletionQueries = givenDeleteQueriesPrepared(initialProject, ds)
+
+    val initialQueries = queriesGen.generateOne
+
+    val (updatedProject, updatedQueries) =
+      updater.updatePublicationEvents(initialProject -> initialQueries).success.value
+
+    updatedProject shouldBe initialProject
+    updatedQueries shouldBe initialQueries ++ Queries.preDataQueriesOnly(deletionQueries)
+  }
+
+  it should "leave the project unchanged and not add delete queries if there are no publicationEvents on the DS and in TS" in {
+
+    val (ds, initialProject) = anyRenkuProjectEntities
+      .addDataset(datasetEntities(provenanceNonModified))
+      .suchThat { case (ds, _) => ds.publicationEvents.isEmpty }
+      .generateOne
+      .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+    givenCheckPublicationEventsExist(initialProject, ds, returning = false.pure[Try])
+
+    val initialQueries = queriesGen.generateOne
+
+    val (updatedProject, updatedQueries) =
+      updater.updatePublicationEvents(initialProject -> initialQueries).success.value
+
+    updatedProject shouldBe initialProject
+    updatedQueries shouldBe initialQueries
+  }
+
+  private lazy val updatesCreator      = mock[UpdatesCreator]
+  private lazy val kgDatasetInfoFinder = mock[KGDatasetInfoFinder[Try]]
+  private lazy val updater             = new PublicationEventsUpdaterImpl[Try](kgDatasetInfoFinder, updatesCreator)
+
+  private def givenCheckPublicationEventsExist(project:   entities.Project,
+                                               ds:        entities.Dataset[entities.Dataset.Provenance],
+                                               returning: Try[Boolean]
+  ) = (kgDatasetInfoFinder.checkPublicationEventsExist _)
+    .expects(project.resourceId, ds.resourceId)
+    .returning(returning)
+
+  private def givenDeleteQueriesPrepared(project: entities.Project,
+                                         ds:      entities.Dataset[entities.Dataset.Provenance]
+  ) = {
+    val deletionQueries = sparqlQueries.generateList()
+
+    (updatesCreator.deletePublicationEvents _)
+      .expects(project.resourceId, ds)
+      .returning(deletionQueries)
+
+    deletionQueries
+  }
 }
