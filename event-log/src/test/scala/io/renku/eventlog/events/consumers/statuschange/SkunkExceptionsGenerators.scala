@@ -18,23 +18,22 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import DBUpdater._
-import cats.ApplicativeThrow
-import cats.data.Kleisli
-import io.renku.eventlog.api.events.StatusChangeEvent
-import skunk.Session
+import io.renku.generators.Generators.nonEmptyStrings
+import org.scalacheck.Gen
+import skunk.SqlState
+import skunk.exception.PostgresErrorException
 
-private[statuschange] trait DBUpdater[F[_], E <: StatusChangeEvent] {
-  def updateDB(event:   E): UpdateOp[F]
-  def onRollback(event: E): RollbackOp[F]
-}
+object SkunkExceptionsGenerators {
 
-private[statuschange] object DBUpdater {
-
-  type UpdateOp[F[_]]   = Kleisli[F, Session[F], DBUpdateResults]
-  type RollbackOp[F[_]] = PartialFunction[Throwable, UpdateOp[F]]
-
-  object RollbackOp {
-    def empty[F[_]: ApplicativeThrow]: RollbackOp[F] = PartialFunction.empty[Throwable, UpdateOp[F]]
-  }
+  def postgresErrors(sqlState: SqlState): Gen[PostgresErrorException] =
+    nonEmptyStrings().map(postgresMessage =>
+      new PostgresErrorException(sql = "SELECT 1",
+                                 sqlOrigin = None,
+                                 info = Map(
+                                   'C' -> sqlState.code,
+                                   'M' -> postgresMessage
+                                 ),
+                                 history = Nil
+      )
+    )
 }
