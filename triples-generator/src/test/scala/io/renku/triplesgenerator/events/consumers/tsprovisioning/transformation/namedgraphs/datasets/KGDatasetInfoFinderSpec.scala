@@ -336,6 +336,52 @@ class KGDatasetInfoFinderSpec
     }
   }
 
+  "checkPublicationEventsExist" should {
+
+    "return true if there's at least one PublicationEvent for the DS" in new TestCase {
+
+      val (ds, project) =
+        anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceNonModified))
+          .suchThat { case (ds, _) => ds.publicationEvents.nonEmpty }
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+      upload(to = projectsDataset, project)
+
+      finder
+        .checkPublicationEventsExist(project.resourceId, ds.resourceId)
+        .unsafeRunSync() shouldBe true
+    }
+
+    "return false if there's no PublicationEvents for the DS" in new TestCase {
+
+      val (ds, project) =
+        anyRenkuProjectEntities
+          .addDataset(datasetEntities(provenanceNonModified).modify(_.copy(publicationEventFactories = Nil)))
+          .suchThat { case (ds, _) => ds.publicationEvents.isEmpty }
+          .generateOne
+          .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+      upload(to = projectsDataset, project)
+
+      finder
+        .checkPublicationEventsExist(project.resourceId, ds.resourceId)
+        .unsafeRunSync() shouldBe false
+    }
+
+    "return false if there's no DS with the given id" in new TestCase {
+
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      upload(to = projectsDataset, project)
+
+      finder
+        .checkPublicationEventsExist(project.resourceId, datasetResourceIds.generateOne)
+        .unsafeRunSync() shouldBe false
+    }
+  }
+
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()

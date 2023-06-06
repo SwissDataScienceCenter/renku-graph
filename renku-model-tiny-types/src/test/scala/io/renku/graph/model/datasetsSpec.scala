@@ -154,6 +154,13 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       instance       shouldBe an[InternalSameAs]
       instance.value shouldBe sameAs.value
     }
+
+    "asResourceId" should {
+      "return sameAs to ResourceId" in {
+        val sameAs = datasetInternalSameAs.generateOne
+        sameAs.asResourceId shouldBe datasets.ResourceId(sameAs.value)
+      }
+    }
   }
 
   "SameAs.from" should {
