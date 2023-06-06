@@ -18,8 +18,9 @@
 
 package io.renku.interpreters
 
+import cats.Show
+import cats.effect.kernel.Sync
 import cats.syntax.all._
-import cats.{Monad, Show}
 import io.renku.interpreters.TestLogger.LogMessage._
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
@@ -28,12 +29,13 @@ import org.typelevel.log4cats.Logger
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters._
 
-class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
+class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
 
   import TestLogger.Level._
   import TestLogger._
   import LogMessage._
 
+  private[this] val F           = Sync[F]
   private[this] val invocations = new ConcurrentLinkedQueue[LogEntry]()
 
   def getMessages(severity: Level): List[LogMessage] =
@@ -67,55 +69,40 @@ class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
 
   def reset(): Unit = invocations.clear()
 
-  override def error(t: Throwable)(message: => String): F[Unit] = {
-    invocations add LogEntry(Error, MessageAndThrowable(message, t))
-    implicitly[Monad[F]].pure(())
+  private def add(entry: LogEntry): F[Unit] = F.delay {
+    invocations.add(entry)
+    ()
   }
 
-  override def warn(t: Throwable)(message: => String): F[Unit] = {
-    invocations add LogEntry(Warn, MessageAndThrowable(message, t))
-    implicitly[Monad[F]].pure(())
-  }
+  override def error(t: Throwable)(message: => String): F[Unit] =
+    add(LogEntry(Error, MessageAndThrowable(message, t)))
 
-  override def info(t: Throwable)(message: => String): F[Unit] = {
-    invocations add LogEntry(Info, MessageAndThrowable(message, t))
-    implicitly[Monad[F]].pure(())
-  }
+  override def warn(t: Throwable)(message: => String): F[Unit] =
+    add(LogEntry(Warn, MessageAndThrowable(message, t)))
 
-  override def debug(t: Throwable)(message: => String): F[Unit] = {
-    invocations add LogEntry(Debug, MessageAndThrowable(message, t))
-    implicitly[Monad[F]].pure(())
-  }
+  override def info(t: Throwable)(message: => String): F[Unit] =
+    add(LogEntry(Info, MessageAndThrowable(message, t)))
 
-  override def trace(t: Throwable)(message: => String): F[Unit] = {
-    invocations add LogEntry(Trace, MessageAndThrowable(message, t))
-    implicitly[Monad[F]].pure(())
-  }
+  override def debug(t: Throwable)(message: => String): F[Unit] =
+    add(LogEntry(Debug, MessageAndThrowable(message, t)))
 
-  override def error(message: => String): F[Unit] = {
-    invocations add LogEntry(Error, Message(message))
-    implicitly[Monad[F]].pure(())
-  }
+  override def trace(t: Throwable)(message: => String): F[Unit] =
+    add(LogEntry(Trace, MessageAndThrowable(message, t)))
 
-  override def warn(message: => String): F[Unit] = {
-    invocations add LogEntry(Warn, Message(message))
-    implicitly[Monad[F]].pure(())
-  }
+  override def error(message: => String): F[Unit] =
+    add(LogEntry(Error, Message(message)))
 
-  override def info(message: => String): F[Unit] = {
-    invocations add LogEntry(Info, Message(message))
-    implicitly[Monad[F]].pure(())
-  }
+  override def warn(message: => String): F[Unit] =
+    add(LogEntry(Warn, Message(message)))
 
-  override def debug(message: => String): F[Unit] = {
-    invocations add LogEntry(Debug, Message(message))
-    implicitly[Monad[F]].pure(())
-  }
+  override def info(message: => String): F[Unit] =
+    add(LogEntry(Info, Message(message)))
 
-  override def trace(message: => String): F[Unit] = {
-    invocations add LogEntry(Trace, Message(message))
-    implicitly[Monad[F]].pure(())
-  }
+  override def debug(message: => String): F[Unit] =
+    add(LogEntry(Debug, Message(message)))
+
+  override def trace(message: => String): F[Unit] =
+    add(LogEntry(Trace, Message(message)))
 
   private def invocationsPrettyPrint: String = prettyPrint(invocations.asScala)
 
@@ -131,7 +118,7 @@ class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
 
 object TestLogger {
 
-  def apply[F[_]: Monad](): TestLogger[F] = new TestLogger[F]
+  def apply[F[_]: Sync](): TestLogger[F] = new TestLogger[F]
 
   private[TestLogger] case class LogEntry(level: Level, message: LogMessage) {
     override lazy val toString = show"\n\t$level: $message"

@@ -19,6 +19,7 @@
 package io.renku.tokenrepository.repository
 package deletion
 
+import cats.effect._
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
@@ -26,42 +27,40 @@ import io.renku.graph.model.RenkuTinyTypeGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
-import scala.util.Try
-
-class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
+class TokenRemoverSpec extends AnyFlatSpec with IOSpec with should.Matchers with MockFactory {
 
   it should "remove the token from DB and revoke project tokens from GL if user access token is given" in new TestCase {
 
     val projectId = projectIds.generateOne
-    givenDBRemoval(projectId, returning = ().pure[Try])
+    givenDBRemoval(projectId, returning = ().pure[IO])
 
     val accessToken = accessTokens.generateOne
     givenSuccessfulTokensRevoking(projectId, accessToken)
 
-    tokenRemover.delete(projectId, accessToken.some).success.value shouldBe ()
+    tokenRemover.delete(projectId, accessToken.some).unsafeRunSync() shouldBe ()
   }
 
   it should "just remove the token from DB if no user access token is given" in new TestCase {
 
     val projectId = projectIds.generateOne
-    givenDBRemoval(projectId, returning = ().pure[Try])
+    givenDBRemoval(projectId, returning = ().pure[IO])
 
-    tokenRemover.delete(projectId, maybeAccessToken = None).success.value shouldBe ()
+    tokenRemover.delete(projectId, maybeAccessToken = None).unsafeRunSync() shouldBe ()
   }
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    private val dbTokenRemover = mock[PersistedTokenRemover[Try]]
-    private val tokensRevoker  = mock[TokensRevoker[Try]]
-    val tokenRemover           = new TokenRemoverImpl[Try](dbTokenRemover, tokensRevoker)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    private val dbTokenRemover = mock[PersistedTokenRemover[IO]]
+    private val tokensRevoker  = mock[TokensRevoker[IO]]
+    val tokenRemover           = new TokenRemoverImpl[IO](dbTokenRemover, tokensRevoker)
 
-    def givenDBRemoval(projectId: projects.GitLabId, returning: Try[Unit]) =
+    def givenDBRemoval(projectId: projects.GitLabId, returning: IO[Unit]) =
       (dbTokenRemover.delete _)
         .expects(projectId)
         .returning(returning)
@@ -69,6 +68,6 @@ class TokenRemoverSpec extends AnyFlatSpec with should.Matchers with TryValues w
     def givenSuccessfulTokensRevoking(projectId: projects.GitLabId, accessToken: AccessToken) =
       (tokensRevoker.revokeAllTokens _)
         .expects(projectId, Option.empty[AccessTokenId], accessToken)
-        .returning(().pure[Try])
+        .returning(().pure[IO])
   }
 }

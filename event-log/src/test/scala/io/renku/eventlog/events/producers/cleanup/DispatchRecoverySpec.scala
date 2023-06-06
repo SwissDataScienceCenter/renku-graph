@@ -20,6 +20,7 @@ package io.renku.eventlog.events.producers
 package cleanup
 
 import Generators._
+import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.events.producers.Generators.sendingResults
@@ -31,13 +32,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
+class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "returnToQueue" should {
 
@@ -61,15 +61,15 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
             show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
           )
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      dispatchRecovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
+      dispatchRecovery.returnToQueue(event, sendingResults.generateOne).unsafeRunSync() shouldBe ()
     }
   }
 
   "recovery" should {
 
-    "retry changing event status if status update failed initially" in new TestCase {
+    "reIO changing event status if status update failed initially" in new TestCase {
 
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
@@ -92,9 +92,9 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
             show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
           )
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      dispatchRecovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
+      dispatchRecovery.recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Error(show"$categoryName: $event, url = $subscriber -> $AwaitingDeletion", exception))
     }
@@ -103,8 +103,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private trait TestCase {
     val event = cleanupEvents.generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val eventSender      = mock[EventSender[Try]]
-    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val eventSender      = mock[EventSender[IO]]
+    val dispatchRecovery = new DispatchRecoveryImpl[IO](eventSender)
   }
 }

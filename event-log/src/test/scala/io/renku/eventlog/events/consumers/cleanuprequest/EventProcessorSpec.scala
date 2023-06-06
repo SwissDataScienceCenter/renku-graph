@@ -18,19 +18,19 @@
 
 package io.renku.eventlog.events.consumers.cleanuprequest
 
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.TryValues
 
-import scala.util.Try
-
-class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
+class EventProcessorSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory with TryValues {
 
   "process" should {
 
@@ -38,9 +38,9 @@ class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFacto
       val projectId   = projectIds.generateOne
       val projectPath = projectPaths.generateOne
 
-      (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[Try])
+      (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectId, projectPath)).success.value shouldBe ()
+      processor.process(CleanUpRequestEvent(projectId, projectPath)).unsafeRunSync() shouldBe ()
     }
 
     "offer project id and path to the queue if a Partial event is given " +
@@ -48,26 +48,26 @@ class EventProcessorSpec extends AnyWordSpec with should.Matchers with MockFacto
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        (projectIdFinder.findProjectId _).expects(projectPath).returning(projectId.some.pure[Try])
+        (projectIdFinder.findProjectId _).expects(projectPath).returning(projectId.some.pure[IO])
 
-        (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[Try])
+        (eventsQueue.offer _).expects(projectId, projectPath).returning(().pure[IO])
 
-        processor.process(CleanUpRequestEvent(projectPath)).success.value shouldBe ()
+        processor.process(CleanUpRequestEvent(projectPath)).unsafeRunSync() shouldBe ()
       }
 
     "log a warning for a Partial event when projectId cannot be found in the project table" in new TestCase {
       val projectPath = projectPaths.generateOne
 
-      (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.GitLabId].pure[Try])
+      (projectIdFinder.findProjectId _).expects(projectPath).returning(Option.empty[projects.GitLabId].pure[IO])
 
-      processor.process(CleanUpRequestEvent(projectPath)).success.value shouldBe ()
+      processor.process(CleanUpRequestEvent(projectPath)).unsafeRunSync() shouldBe ()
     }
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[Try] = TestLogger()
-    val projectIdFinder = mock[ProjectIdFinder[Try]]
-    val eventsQueue     = mock[CleanUpEventsQueue[Try]]
+    implicit val logger: TestLogger[IO] = TestLogger()
+    val projectIdFinder = mock[ProjectIdFinder[IO]]
+    val eventsQueue     = mock[CleanUpEventsQueue[IO]]
     val processor       = new EventProcessorImpl(projectIdFinder, eventsQueue)
   }
 }
