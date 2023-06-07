@@ -58,8 +58,9 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
   private def httpResponse(request: Request[F]): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
-      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed")
-      InternalServerError(ErrorMessage(exception))
+      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed") *> InternalServerError(
+        ErrorMessage(exception)
+      )
   }
 }
 

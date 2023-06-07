@@ -128,7 +128,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       case Some(timeRecorder) =>
         timeRecorder
           .measureExecutionTime(block, request.toHistogramLabel)
-          .map(timeRecorder.logExecutionTime(withMessage = LogMessage(request, "finished")))
+          .flatMap(timeRecorder.logExecutionTime(withMessage = LogMessage(request, "finished")))
     }
 
   private def callRemote[ResultType](httpClient:  Client[F],

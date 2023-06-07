@@ -55,14 +55,15 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
   private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
   private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
-  def getProjectDatasets(projectPath: projects.Path): F[Response[F]] = measureExecutionTime {
-    implicit val encoder: Encoder[ProjectDataset] = ProjectDatasetEncoder.encoder(projectPath)
+  def getProjectDatasets(projectPath: projects.Path): F[Response[F]] =
+    measureAndLogTime(finishedSuccessfully(projectPath)) {
+      implicit val encoder: Encoder[ProjectDataset] = ProjectDatasetEncoder.encoder(projectPath)
 
-    projectDatasetsFinder
-      .findProjectDatasets(projectPath)
-      .flatMap(datasets => Ok(datasets.asJson))
-      .recoverWith(httpResult(projectPath))
-  } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
+      projectDatasetsFinder
+        .findProjectDatasets(projectPath)
+        .flatMap(datasets => Ok(datasets.asJson))
+        .recoverWith(httpResult(projectPath))
+    }
 
   private def httpResult(
       projectPath: projects.Path

@@ -40,7 +40,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 
 class ExecutionTimeRecorderSpec
     extends AnyWordSpec
@@ -151,9 +150,12 @@ class ExecutionTimeRecorderSpec
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case _ =>
-          blockExecutionMessage
-        } shouldBe blockOut.pure[Try]
+        (elapsedTime -> blockOut)
+          .pure[IO]
+          .flatMap(logExecutionTimeWhen { case _ =>
+            blockExecutionMessage
+          })
+          .unsafeRunSync() shouldBe blockOut
 
         logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
       }
@@ -166,9 +168,12 @@ class ExecutionTimeRecorderSpec
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case _ =>
-          blockExecutionMessage
-        } shouldBe blockOut.pure[Try]
+        (elapsedTime -> blockOut)
+          .pure[IO]
+          .flatMap(logExecutionTimeWhen { case _ =>
+            blockExecutionMessage
+          })
+          .unsafeRunSync() shouldBe blockOut
 
         logger.expectNoLogs()
       }
@@ -180,9 +185,12 @@ class ExecutionTimeRecorderSpec
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
-      (elapsedTime -> blockOut).pure[Try] map logExecutionTimeWhen { case "" =>
-        blockExecutionMessage
-      } shouldBe blockOut.pure[Try]
+      (elapsedTime -> blockOut)
+        .pure[IO]
+        .flatMap(logExecutionTimeWhen { case "" =>
+          blockExecutionMessage
+        })
+        .unsafeRunSync() shouldBe blockOut
 
       logger.expectNoLogs()
     }
@@ -198,8 +206,9 @@ class ExecutionTimeRecorderSpec
       val blockExecutionMessage = "block executed"
 
       (elapsedTime -> blockOut)
-        .pure[Try]
-        .map(logExecutionTime(blockExecutionMessage)) shouldBe blockOut.pure[Try]
+        .pure[IO]
+        .flatMap(logExecutionTime(blockExecutionMessage))
+        .unsafeRunSync() shouldBe blockOut
 
       logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
     }
@@ -212,8 +221,9 @@ class ExecutionTimeRecorderSpec
       val blockExecutionMessage = "block executed"
 
       (elapsedTime -> blockOut)
-        .pure[Try]
-        .map(logExecutionTime(blockExecutionMessage)) shouldBe blockOut.pure[Try]
+        .pure[IO]
+        .flatMap(logExecutionTime(blockExecutionMessage))
+        .unsafeRunSync() shouldBe blockOut
 
       logger.expectNoLogs()
     }
@@ -240,7 +250,7 @@ class ExecutionTimeRecorderSpec
 
         (elapsedTime -> blockOut)
           .pure[IO]
-          .map(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
+          .flatMap(executionTimeRecorder.logExecutionTimeWhen { case _ => blockExecutionMessage })
           .unsafeRunSync() shouldBe blockOut
 
         logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))

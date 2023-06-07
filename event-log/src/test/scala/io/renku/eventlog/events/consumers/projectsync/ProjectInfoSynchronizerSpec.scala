@@ -31,11 +31,12 @@ import io.renku.graph.model.projects
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProjectInfoSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "syncProjectInfo" should {
 
@@ -44,7 +45,7 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
 
         givenGitLabProject(by = event.projectId, returning = event.projectPath.some.asRight.pure[IO])
 
-        synchronizer.syncProjectInfo(event) shouldBe ().pure[IO]
+        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
       }
 
     "fetches relevant project info from GitLab and " +
@@ -66,7 +67,7 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
           givenSending(commitSyncRequestEvent(event.projectId, newPath), returning = ().pure[IO])
         }
 
-        synchronizer.syncProjectInfo(event) shouldBe ().pure[IO]
+        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
       }
 
     "fetches relevant project info from GitLab and " +
@@ -77,13 +78,13 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
 
         givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
 
-        synchronizer.syncProjectInfo(event) shouldBe ().pure[IO]
+        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
       }
 
     "log an error if finding project info in GitLab returns Left" in new TestCase {
       givenGitLabProject(by = event.projectId, returning = UnauthorizedException.asLeft.pure[IO])
 
-      synchronizer.syncProjectInfo(event) shouldBe ().pure[IO]
+      synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info(show"PROJECT_SYNC: $event failed: $UnauthorizedException"))
     }
@@ -94,7 +95,7 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
                          returning = exception.raiseError[IO, Either[UnauthorizedException, Option[projects.Path]]]
       )
 
-      synchronizer.syncProjectInfo(event) shouldBe exception.raiseError[IO, Unit]
+      intercept[Exception](synchronizer.syncProjectInfo(event).unsafeRunSync()) shouldBe exception
     }
   }
 

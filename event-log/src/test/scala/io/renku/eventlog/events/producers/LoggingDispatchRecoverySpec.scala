@@ -40,7 +40,7 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Ma
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
-      recovery.unsafeRunSync().recover(subscriber, event)(exception) shouldBe ().pure[IO]
+      recovery.unsafeRunSync().recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"$categoryName: $event, url = $subscriber failed", exception)
