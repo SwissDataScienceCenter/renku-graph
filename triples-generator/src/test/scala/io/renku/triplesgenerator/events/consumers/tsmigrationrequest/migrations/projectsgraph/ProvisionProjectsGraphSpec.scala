@@ -22,13 +22,13 @@ package projectsgraph
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.projectPaths
 import cats.MonadThrow
-import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
+import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
@@ -74,26 +74,63 @@ class ProvisionProjectsGraphSpec
     "prepare backlog of projects requiring provisioning " +
       "and start the process that " +
       "goes through all the prepared projects, " +
-      "send a RedoProjectTransformation event to EL for each of them " +
+      "fetch the project data from a relevant project graph," +
+      "pass the project to the ProjectGraphProvisioner " +
       "and keep a note of the project once an event for it is sent" in new TestCase {
 
         givenBacklogCreated()
 
-        val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
+        val allProjectPaths = projectPaths.generateList(min = pageSize, max = pageSize * 2)
 
-        val projectsPages = allProjects
+        val projectPathsPages = allProjectPaths
           .sliding(pageSize, pageSize)
           .toList
-        givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
+        givenProjectsPagesReturned(projectPathsPages :+ List.empty[projects.Path])
 
-        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjects.size)
+        givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjectPaths.size)
 
-        allProjects foreach verifyEventWasSent
-
-        allProjects foreach verifyProjectNotedDone
+        allProjectPaths foreach { path =>
+          val project = anyProjectEntities
+            .map(_.fold(_.copy(path = path), _.copy(path = path), _.copy(path = path), _.copy(path = path)))
+            .generateOne
+            .to[entities.Project]
+          givenProjectDataFetching(path, returning = project.some.pure[IO])
+          givenProjectsGraphProvisioning(project, returning = ().pure[IO])
+          verifyProjectNotedDone(path)
+        }
 
         migration.migrate().value.unsafeRunSync().value shouldBe ()
       }
+
+    "skip projects which cannot be found in the TS" in new TestCase {
+
+      givenBacklogCreated()
+
+      val projectPath1 = projectPaths.generateOne
+      val projectPath2 = projectPaths.generateOne
+      val projectPath3 = projectPaths.generateOne
+
+      val projectPathsPage = List(projectPath1, projectPath2, projectPath3)
+
+      givenProjectsPagesReturned(List(projectPathsPage) :+ List.empty[projects.Path])
+
+      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectPathsPage.size)
+
+      List(projectPath1, projectPath3) foreach { path =>
+        val project = anyProjectEntities
+          .map(_.fold(_.copy(path = path), _.copy(path = path), _.copy(path = path), _.copy(path = path)))
+          .generateOne
+          .to[entities.Project]
+        givenProjectDataFetching(path, returning = project.some.pure[IO])
+        givenProjectsGraphProvisioning(project, returning = ().pure[IO])
+        verifyProjectNotedDone(path)
+      }
+
+      givenProjectDataFetching(projectPath2, returning = None.pure[IO])
+      verifyProjectNotedDone(projectPath2)
+
+      migration.migrate().value.unsafeRunSync().value shouldBe ()
+    }
 
     "return a Recoverable Error in case the recovery strategy returns one while finding projects" in new TestCase {
 
@@ -122,14 +159,15 @@ class ProvisionProjectsGraphSpec
     val pageSize = positiveInts(max = 100).generateOne.value
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val migrationNeedChecker         = mock[MigrationNeedChecker[IO]]
-    private val backlogCreator       = mock[BacklogCreator[IO]]
-    val projectsFinder               = mock[ProjectsPageFinder[IO]]
-    private val progressFinder       = mock[ProgressFinder[IO]]
-    private val elClient             = mock[eventlog.api.events.Client[IO]]
-    private val projectDonePersister = mock[ProjectDonePersister[IO]]
-    private val executionRegister    = mock[MigrationExecutionRegister[IO]]
-    val recoverableError             = processingRecoverableErrors.generateOne
+    val migrationNeedChecker             = mock[MigrationNeedChecker[IO]]
+    private val backlogCreator           = mock[BacklogCreator[IO]]
+    val projectsFinder                   = mock[ProjectsPageFinder[IO]]
+    private val progressFinder           = mock[ProgressFinder[IO]]
+    private val projectFetcher           = mock[ProjectFetcher[IO]]
+    private val projectsGraphProvisioner = mock[ProjectsGraphProvisioner[IO]]
+    private val projectDonePersister     = mock[ProjectDonePersister[IO]]
+    private val executionRegister        = mock[MigrationExecutionRegister[IO]]
+    val recoverableError                 = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
@@ -140,7 +178,8 @@ class ProvisionProjectsGraphSpec
       backlogCreator,
       projectsFinder,
       progressFinder,
-      elClient,
+      projectFetcher,
+      projectsGraphProvisioner,
       projectDonePersister,
       executionRegister,
       recoveryStrategy
@@ -164,13 +203,15 @@ class ProvisionProjectsGraphSpec
         .returning(returning)
         .repeat(times)
 
-    lazy val verifyEventWasSent: projects.Path => Unit = { path =>
-      (elClient
-        .send(_: StatusChangeEvent.RedoProjectTransformation))
-        .expects(StatusChangeEvent.RedoProjectTransformation(path))
-        .returning(().pure[IO])
-      ()
-    }
+    def givenProjectDataFetching(path: projects.Path, returning: IO[Option[entities.Project]]) =
+      (projectFetcher.fetchProject _)
+        .expects(path)
+        .returning(returning)
+
+    def givenProjectsGraphProvisioning(project: entities.Project, returning: IO[Unit]) =
+      (projectsGraphProvisioner.provisionProjectsGraph _)
+        .expects(project)
+        .returning(returning)
 
     def verifyProjectNotedDone(path: projects.Path) =
       (projectDonePersister.noteDone _)

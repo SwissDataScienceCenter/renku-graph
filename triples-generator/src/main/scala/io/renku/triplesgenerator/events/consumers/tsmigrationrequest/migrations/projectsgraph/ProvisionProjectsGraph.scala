@@ -24,29 +24,31 @@ package projectsgraph
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.eventlog
-import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.entities.searchgraphs.projects.ProjectsGraphProvisioner
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 import tooling._
 
 private class ProvisionProjectsGraph[F[_]: Async: Logger](
-    migrationNeedChecker: MigrationNeedChecker[F],
-    backlogCreator:       BacklogCreator[F],
-    projectsFinder:       ProjectsPageFinder[F],
-    progressFinder:       ProgressFinder[F],
-    elClient:             eventlog.api.events.Client[F],
-    projectDonePersister: ProjectDonePersister[F],
-    executionRegister:    MigrationExecutionRegister[F],
-    recoveryStrategy:     RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    migrationNeedChecker:     MigrationNeedChecker[F],
+    backlogCreator:           BacklogCreator[F],
+    projectsFinder:           ProjectsPageFinder[F],
+    progressFinder:           ProgressFinder[F],
+    projectFetcher:           ProjectFetcher[F],
+    projectsGraphProvisioner: ProjectsGraphProvisioner[F],
+    projectDonePersister:     ProjectDonePersister[F],
+    executionRegister:        MigrationExecutionRegister[F],
+    recoveryStrategy:         RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ConditionedMigration[F] {
 
   import executionRegister._
   import fs2._
   import progressFinder._
   import projectDonePersister._
+  import projectFetcher.fetchProject
   import projectsFinder._
+  import projectsGraphProvisioner.provisionProjectsGraph
   import recoveryStrategy._
 
   override val name: Migration.Name = ProvisionProjectsGraph.name
@@ -67,10 +69,11 @@ private class ProvisionProjectsGraph[F[_]: Async: Logger](
         .takeThrough(_.nonEmpty)
         .flatMap(Stream.emits(_))
         .evalMap(path => findProgressInfo.map(path -> _))
-        .evalTap { case (path, info) => logInfo(show"sending RedoProjectTransformation event for '$path'", info) }
-        .evalTap { case (path, _) => elClient.send(StatusChangeEvent.RedoProjectTransformation(path)) }
-        .evalTap { case (path, _) => noteDone(path) }
-        .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
+        .evalTap { case (path, info) => logInfo(show"provisioning '$path'", info) }
+        .evalMap { case (path, info) => fetchProject(path).map(p => (path, p, info)) }
+        .evalTap { case (_, maybeProj, _) => maybeProj.map(provisionProjectsGraph).getOrElse(().pure[F]) }
+        .evalTap { case (path, _, _) => noteDone(path) }
+        .evalTap { case (path, _, info) => logInfo(show"'$path' provisioned", info) }
         .compile
         .drain
         .map(_.asRight[ProcessingRecoverableError])
@@ -91,18 +94,20 @@ private[migrations] object ProvisionProjectsGraph {
   val name: Migration.Name = Migration.Name("Provision Projects Graph")
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
-    checkMigrationNeeded <- MigrationNeedChecker[F]
-    backlogCreator       <- BacklogCreator[F]
-    projectsFinder       <- ProjectsPageFinder[F]
-    progressFinder       <- ProgressFinder[F]
-    elClient             <- eventlog.api.events.Client[F]
-    projectDonePersister <- ProjectDonePersister[F]
-    executionRegister    <- MigrationExecutionRegister[F]
+    checkMigrationNeeded     <- MigrationNeedChecker[F]
+    backlogCreator           <- BacklogCreator[F]
+    projectsFinder           <- ProjectsPageFinder[F]
+    progressFinder           <- ProgressFinder[F]
+    projectFetcher           <- ProjectFetcher[F]
+    projectsGraphProvisioner <- ProjectsConnectionConfig[F]().map(ProjectsGraphProvisioner[F](_))
+    projectDonePersister     <- ProjectDonePersister[F]
+    executionRegister        <- MigrationExecutionRegister[F]
   } yield new ProvisionProjectsGraph(checkMigrationNeeded,
                                      backlogCreator,
                                      projectsFinder,
                                      progressFinder,
-                                     elClient,
+                                     projectFetcher,
+                                     projectsGraphProvisioner,
                                      projectDonePersister,
                                      executionRegister
   )
