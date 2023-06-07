@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
@@ -30,14 +31,13 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MembersSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "synchronizeMembers" should {
 
@@ -49,19 +49,19 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       (accessTokenFinder
         .findAccessToken(_: projects.Path)(_: projects.Path => String))
         .expects(projectPath, projectPathToPath)
-        .returning(maybeAccessToken.pure[Try])
+        .returning(maybeAccessToken.pure[IO])
 
       (gitLabProjectMembersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
-        .returning(membersInGitLab.pure[Try])
+        .returning(membersInGitLab.pure[IO])
 
       val syncSummary = syncSummaries.generateOne
       (kgSynchronizer.syncMembers _)
         .expects(projectPath, membersInGitLab)
-        .returning(syncSummary.pure[Try])
+        .returning(syncSummary.pure[IO])
 
-      synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
+      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Info(show"$categoryName: $projectPath accepted"),
@@ -75,15 +75,15 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       (accessTokenFinder
         .findAccessToken(_: projects.Path)(_: projects.Path => String))
         .expects(projectPath, projectPathToPath)
-        .returning(maybeAccessToken.pure[Try])
+        .returning(maybeAccessToken.pure[IO])
 
       val exception = exceptions.generateOne
       (gitLabProjectMembersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
-        .returning(exception.raiseError[Try, Set[GitLabProjectMember]])
+        .returning(exception.raiseError[IO, Set[GitLabProjectMember]])
 
-      synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
+      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
 
       logger.logged(Error(s"$categoryName: Members synchronized for project $projectPath failed", exception))
     }
@@ -93,13 +93,13 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
     val projectPath = projectPaths.generateOne
 
-    implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
-    implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
-    val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
-    val kgSynchronizer             = mock[KGSynchronizer[Try]]
-    val executionTimeRecorder      = TestExecutionTimeRecorder[Try](maybeHistogram = None)
+    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
+    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+    val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[IO]]
+    val kgSynchronizer             = mock[KGSynchronizer[IO]]
+    val executionTimeRecorder      = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val synchronizer =
-      new MembersSynchronizerImpl[Try](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
+      new MembersSynchronizerImpl[IO](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
 
     def infoMessage(syncSummary: SyncSummary) = Info(
       s"$categoryName: members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +

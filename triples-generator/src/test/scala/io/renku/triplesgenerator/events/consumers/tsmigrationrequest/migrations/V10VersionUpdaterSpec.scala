@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.MonadThrow
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
@@ -26,21 +27,13 @@ import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{EitherValues, TryValues}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import reprovisioning.RenkuVersionPairUpdater
 import tooling.{MigrationExecutionRegister, RecoverableErrorsRecovery}
 
-import scala.util.Try
-
-class V10VersionUpdaterSpec
-    extends AnyWordSpec
-    with should.Matchers
-    with IOSpec
-    with MockFactory
-    with TryValues
-    with EitherValues {
+class V10VersionUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory with IOSpec with EitherValues {
 
   "migrate" should {
 
@@ -48,18 +41,18 @@ class V10VersionUpdaterSpec
 
       (renkuVersionPairUpdater.update _)
         .expects(renkuVersionPair)
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      setter.migrate().value.success.value.value shouldBe ()
+      setter.migrate().value.unsafeRunSync().value shouldBe ()
     }
   }
 
   private trait TestCase {
 
-    private implicit val logger: TestLogger[Try] = TestLogger()
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val renkuVersionPair          = renkuVersionPairs.generateOne
-    val renkuVersionPairUpdater   = mock[RenkuVersionPairUpdater[Try]]
-    private val executionRegister = mock[MigrationExecutionRegister[Try]]
+    val renkuVersionPairUpdater   = mock[RenkuVersionPairUpdater[IO]]
+    private val executionRegister = mock[MigrationExecutionRegister[IO]]
     private val recoverableError  = processingRecoverableErrors.generateOne
     private val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
@@ -67,6 +60,6 @@ class V10VersionUpdaterSpec
       }
     }
     val setter =
-      new V10VersionUpdater[Try](renkuVersionPair, renkuVersionPairUpdater, executionRegister, recoveryStrategy)
+      new V10VersionUpdater[IO](renkuVersionPair, renkuVersionPairUpdater, executionRegister, recoveryStrategy)
   }
 }

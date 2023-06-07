@@ -20,12 +20,14 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 
 import cats.MonadThrow
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.datasetConfigFiles
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore.TSAdminClient.CreationResult
@@ -35,20 +37,18 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class DatasetsCreatorSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class DatasetsCreatorSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "createDatasets" should {
 
     "create all passed datasets" in new TestCase {
       val results = datasets map { case (datasetName, datasetConfig) =>
         val result = creationResults.generateOne
-        givenDSCreation(of = datasetConfig, returning = result.pure[Try])
+        givenDSCreation(of = datasetConfig, returning = result.pure[IO])
         datasetName -> result
       }
 
-      dsCreator.run().value shouldBe ().asRight.pure[Try]
+      dsCreator.run().value.unsafeRunSync() shouldBe ().asRight
 
       val logEntries = results map { case (datasetName, result) =>
         Info(show"$categoryName: ${dsCreator.name} -> '$datasetName' $result")
@@ -62,9 +62,9 @@ class DatasetsCreatorSpec extends AnyWordSpec with should.Matchers with MockFact
       override lazy val datasets = List(datasetName -> datasetConfig)
 
       val exception = exceptions.generateOne
-      givenDSCreation(of = datasetConfig, returning = exception.raiseError[Try, CreationResult])
+      givenDSCreation(of = datasetConfig, returning = exception.raiseError[IO, CreationResult])
 
-      dsCreator.run().value shouldBe recoverableError.asLeft.pure[Try]
+      dsCreator.run().value.unsafeRunSync() shouldBe recoverableError.asLeft
     }
   }
 
@@ -83,11 +83,11 @@ class DatasetsCreatorSpec extends AnyWordSpec with should.Matchers with MockFact
       }
     }
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val tsAdminClient  = mock[TSAdminClient[Try]]
-    lazy val dsCreator = new DatasetsCreatorImpl[Try](datasets, tsAdminClient, recoveryStrategy)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tsAdminClient  = mock[TSAdminClient[IO]]
+    lazy val dsCreator = new DatasetsCreatorImpl[IO](datasets, tsAdminClient, recoveryStrategy)
 
-    def givenDSCreation(of: DatasetConfigFile, returning: Try[CreationResult]) =
+    def givenDSCreation(of: DatasetConfigFile, returning: IO[CreationResult]) =
       (tsAdminClient.createDataset _).expects(of).returning(returning)
   }
 

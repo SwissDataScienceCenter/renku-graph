@@ -18,27 +18,27 @@
 
 package io.renku.triplesgenerator.config
 
+import cats.effect.IO
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.compatibilityGen
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Try}
-
-class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
+class VersionCompatibilityConfigSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     "fail if there are not value set for the matrix" in new TestCase {
 
-      val config             = ConfigFactory.parseString("compatibility { }")
-      val Failure(exception) = readCompatibilityConfig(config)
+      val config    = ConfigFactory.parseString("compatibility { }")
+      val exception = intercept[Exception](readCompatibilityConfig(config).unsafeRunSync())
 
       exception            shouldBe a[Exception]
       exception.getMessage shouldBe "String: 1: No configuration setting found for key 'cli-version'"
@@ -58,7 +58,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
       val config = ConfigFactory.parseString(unparsedConfigElements)
 
-      readCompatibilityConfig(config) shouldBe c.pure[Try]
+      readCompatibilityConfig(config).unsafeRunSync() shouldBe c
     }
 
     "return a compatibility config with the RenkuDevVersion if it exists and log a warning" in new TestCase {
@@ -76,7 +76,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
       val config = ConfigFactory.parseString(unparsedConfigElements)
 
-      VersionCompatibilityConfig.fromConfigF[Try](config) shouldBe Try(compatConfig)
+      VersionCompatibilityConfig.fromConfigF[IO](config).unsafeRunSync() shouldBe compatConfig
 
       logger.loggedOnly(
         Warn(
@@ -88,10 +88,10 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    def readCompatibilityConfig(config: Config): Try[VersionCompatibilityConfig] =
-      VersionCompatibilityConfig.fromConfigF[Try](config)
+    def readCompatibilityConfig(config: Config): IO[VersionCompatibilityConfig] =
+      VersionCompatibilityConfig.fromConfigF[IO](config)
 
     implicit lazy val renkuPythonDevVersions: Gen[RenkuPythonDevVersion] =
       cliVersions map (v => RenkuPythonDevVersion(v.show))
