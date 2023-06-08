@@ -69,7 +69,7 @@ class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers 
 
   "recovery" should {
 
-    "reIO changing event status if status update failed initially" in new TestCase {
+    "retry changing event status if status update failed initially" in new TestCase {
 
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne

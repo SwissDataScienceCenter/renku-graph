@@ -183,7 +183,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
     }
 
-    "reIO if the token couldn't be decrypted after storing (token sanity check failed)" in new TestCase {
+    "retry if the token couldn't be decrypted after storing (token sanity check failed)" in new TestCase {
 
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
@@ -216,7 +216,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
     }
 
-    "reIO if the token after storing couldn't be found" in new TestCase {
+    "retry if the token after storing couldn't be found" in new TestCase {
 
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
@@ -259,7 +259,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       ex shouldBe exception
     }
 
-    "fail if reIO process hit the max number of attempts" in new TestCase {
+    "fail if retry process hit the max number of attempts" in new TestCase {
 
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
