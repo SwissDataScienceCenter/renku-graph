@@ -23,7 +23,6 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
-import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -42,18 +41,19 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.webhookservice.eventstatus.Generators._
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import io.renku.{eventlog, triplesgenerator}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec with ScalaCheckPropertyChecks {
+class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "fetchProcessingStatus" should {
 
@@ -77,7 +77,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       )
     }
 
-    "send COMMIT_SYNC_REQUEST message and return OK with activated = true and status 'in-progress' " +
+    "send COMMIT_SYNC_REQUEST and PROJECT_VIEWED_EVENT and return OK with activated = true and status 'in-progress' " +
       "if webhook for the project exists but no status info can be found in EL" in new TestCase {
 
         val authUser = authUsers.generateOption
@@ -88,6 +88,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         val project = consumerProjects.generateOne.copy(id = projectId)
         givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
         givenCommitSyncRequestSend(project, returning = ().pure[IO])
+        givenProjectViewedEventSend(project, authUser, returning = ().pure[IO])
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -191,9 +192,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     private val statusInfoFinder  = mock[StatusInfoFinder[IO]]
     private val projectInfoFinder = mock[ProjectInfoFinder[IO]]
     private val elClient          = mock[eventlog.api.events.Client[IO]]
+    private val tgClient          = mock[triplesgenerator.api.events.Client[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder, projectInfoFinder, elClient)
+    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder, projectInfoFinder, elClient, tgClient)
 
     lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
 
@@ -221,6 +223,12 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       (elClient
         .send(_: CommitSyncRequest))
         .expects(CommitSyncRequest(project))
+        .returning(returning)
+
+    def givenProjectViewedEventSend(project: Project, authUser: Option[AuthUser], returning: IO[Unit]) =
+      (tgClient
+        .send(_: ProjectViewedEvent))
+        .expects(ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
         .returning(returning)
   }
 }
