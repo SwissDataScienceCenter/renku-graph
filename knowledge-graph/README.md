@@ -78,6 +78,7 @@ Response body example:
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "title":"rmDaYfpehl",
       "name": "mniouUnmal",
+      "slug": "mniouUnmal",      
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "published": {
         "datePublished": "2012-10-14", // optional property
@@ -189,6 +190,7 @@ Response body example:
   },
   "title":       "dataset title",
   "name":        "dataset-name",
+  "slug":        "dataset-name",
   "url":         "http://host/url1",             // optional property
   "sameAs":      "http://host/url2",             // optional property when no "derivedFrom" exists
   "derivedFrom": "http://host/url1",             // optional property when no "sameAs" exists
@@ -378,7 +380,7 @@ Response body example:
           }
         ]
       }
-    ]    
+    ]
   },
   {
     "type":          "dataset",
@@ -690,12 +692,12 @@ Response body example for `Accept: application/json`:
     "jobArtifactsSize": 0
   },
   "version": "9",  // optional
-  "_links":[  
-    {  
+  "_links":[
+    {
       "rel": "self",
       "href":"http://t:5511/projects/namespace/project-name"
     },
-    {  
+    {
       "rel": "datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
     }
