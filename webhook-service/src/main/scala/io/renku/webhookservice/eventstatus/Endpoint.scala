@@ -79,8 +79,9 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
 
   private def sendEvents(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
     findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      (elClient send CommitSyncRequest(project)) >>
+      (elClient send CommitSyncRequest(project)).handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed")) >>
         (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
+          .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
     }
   }.void
 
