@@ -19,7 +19,7 @@
 package io.renku.webhookservice
 package eventstatus
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
@@ -41,7 +41,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.api.events.ProjectViewedEvent
+import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import io.renku.webhookservice.eventstatus.Generators._
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
@@ -50,10 +50,17 @@ import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
+class EndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with IOSpec
+    with Eventually
+    with IntegrationPatience {
 
   "fetchProcessingStatus" should {
 
@@ -87,14 +94,17 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
         val project = consumerProjects.generateOne.copy(id = projectId)
         givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
-        givenCommitSyncRequestSend(project, returning = ().pure[IO])
-        givenProjectViewedEventSend(project, authUser, returning = ().pure[IO])
+        givenCommitSyncRequestSent
+        givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
         response.status                   shouldBe Ok
         response.contentType              shouldBe Some(`Content-Type`(application.json))
         response.as[Json].unsafeRunSync() shouldBe StatusInfo.webhookReady.asJson
+
+        verifyCommitSyncRequestSent(project)
+        verifyProjectViewedEventSent(project, authUser)
 
         logger.loggedOnly(
           Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
@@ -219,16 +229,27 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(projectId, authUser.map(_.accessToken))
         .returning(returning)
 
-    def givenCommitSyncRequestSend(project: Project, returning: IO[Unit]) =
+    private val sentEvents: Ref[IO, List[AnyRef]] = Ref.unsafe(Nil)
+
+    def givenCommitSyncRequestSent =
       (elClient
         .send(_: CommitSyncRequest))
-        .expects(CommitSyncRequest(project))
-        .returning(returning)
+        .expects(*)
+        .onCall((ev: CommitSyncRequest) => sentEvents.update(ev :: _))
 
-    def givenProjectViewedEventSend(project: Project, authUser: Option[AuthUser], returning: IO[Unit]) =
+    def givenProjectViewedEventSent =
       (tgClient
         .send(_: ProjectViewedEvent))
-        .expects(ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
-        .returning(returning)
+        .expects(*)
+        .onCall((ev: ProjectViewedEvent) => sentEvents.update(ev :: _))
+
+    def verifyCommitSyncRequestSent(project: Project) = eventually {
+      sentEvents.get.unsafeRunSync() should contain(CommitSyncRequest(project))
+    }
+
+    def verifyProjectViewedEventSent(project: Project, authUser: Option[AuthUser]) = eventually {
+      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.path -> e.maybeUserId } shouldBe
+        List(project.path -> authUser.map(_.id).map(UserId(_)))
+    }
   }
 }

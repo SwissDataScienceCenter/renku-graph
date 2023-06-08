@@ -19,9 +19,9 @@
 package io.renku.webhookservice
 package eventstatus
 
+import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
-import cats.{MonadThrow, NonEmptyParallel}
 import io.circe.syntax._
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
@@ -47,7 +47,7 @@ trait Endpoint[F[_]] {
   def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]]
 }
 
-private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: ExecutionTimeRecorder](
+private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeRecorder](
     hookValidator:     HookValidator[F],
     statusInfoFinder:  StatusInfoFinder[F],
     projectInfoFinder: ProjectInfoFinder[F],
@@ -77,11 +77,12 @@ private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: Execution
         .recoverWith(internalServerError(projectId))
     }
 
-  private def sendEvents(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] =
+  private def sendEvents(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
     findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
-      elClient.send(CommitSyncRequest(project)) >>
-        tgClient.send(ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
+      (elClient send CommitSyncRequest(project)) >>
+        (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
     }
+  }.void
 
   private def internalServerError(projectId: projects.GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case exception =>

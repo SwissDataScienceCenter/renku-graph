@@ -270,7 +270,7 @@ Response body example:
          }
       ]
     }
-  ],
+  ]
 }
 ```
 
