@@ -47,8 +47,9 @@ private object ProjectDatasetEncoder extends ImagesEncoder {
         "versions": {
           "initial": ${originalId.toString}
         },
-        "title":  ${title.toString},
-        "name":   ${name.toString},
+        "title":  ${title},
+        "name":   ${name},
+        "slug":   ${name},
         "images": ${images -> projectPath}
       }"""
         .deepMerge(sameAsOrDerived.asJson)

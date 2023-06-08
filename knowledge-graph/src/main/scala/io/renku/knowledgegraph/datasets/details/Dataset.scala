@@ -103,6 +103,7 @@ private object Dataset {
       List(
         ("identifier" -> dataset.id.asJson).some,
         ("name" -> dataset.name.asJson).some,
+        ("slug" -> dataset.name.asJson).some,
         ("title" -> dataset.title.asJson).some,
         ("url" -> dataset.resourceId.asJson).some,
         dataset match {

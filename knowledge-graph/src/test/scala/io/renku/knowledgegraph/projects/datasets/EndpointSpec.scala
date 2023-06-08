@@ -130,6 +130,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           },
           "title": $title,
           "name": $name,
+          "slug": $name,
           "sameAs": $sameAs,
           "images": $images,
           "_links": [{
@@ -151,6 +152,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           },
           "title": $title,
           "name": $name,
+          "slug": $name,
           "derivedFrom": $derivedFrom,
           "images": $images,
           "_links": [{
