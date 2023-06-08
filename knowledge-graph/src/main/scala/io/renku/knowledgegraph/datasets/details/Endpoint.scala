@@ -63,13 +63,13 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
   def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
-    measureExecutionTime {
+    measureAndLogTime(finishedSuccessfully(identifier)) {
       datasetFinder
         .findDataset(identifier, authContext)
         .flatTap(sendDatasetViewedEvent(authContext))
         .flatMap(toHttpResult(identifier))
         .recoverWith(httpResult(identifier))
-    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+    }
 
   private def sendDatasetViewedEvent(authContext: AuthContext[RequestedDataset]): Option[Dataset] => F[Unit] = {
     case None => ().pure[F]

@@ -52,8 +52,7 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 
   private lazy val internalServerError: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage("Finding event details failed")
-    Logger[F].error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
   }
 
   private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>

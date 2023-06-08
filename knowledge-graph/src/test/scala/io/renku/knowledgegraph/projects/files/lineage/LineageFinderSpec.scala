@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.projects.files.lineage
 
-import LineageGenerators._
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
@@ -29,17 +29,22 @@ import io.renku.graph.model.projects.ResourceId
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.knowledgegraph.projects.files.lineage.LineageGenerators._
+import io.renku.knowledgegraph.projects.files.lineage.model._
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery
-import model._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import scala.util.{Failure, Try}
-
-class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDrivenPropertyChecks with should.Matchers {
+class LineageFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with ScalaCheckDrivenPropertyChecks
+    with should.Matchers {
 
   import NodeDetailsFinder._
 
@@ -51,25 +56,25 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         (edgesFinder
           .findEdges(_: projects.Path, _: Option[AuthUser]))
           .expects(projectPath, maybeAuthUser)
-          .returning(initialEdgesMap.pure[Try])
+          .returning(initialEdgesMap.pure[IO])
 
         val trimmedEdgesMap = lineage.toEdgesMap
         (edgesTrimmer.trim _)
           .expects(initialEdgesMap, location)
-          .returning(trimmedEdgesMap.pure[Try])
+          .returning(trimmedEdgesMap.pure[IO])
 
         (nodeDetailsFinder
           .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
           .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
-          .returning(lineage.processRunNodes.pure[Try])
+          .returning(lineage.processRunNodes.pure[IO])
 
         val nodesSet = trimmedEdgesMap.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
         (nodeDetailsFinder
           .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
           .expects(nodesSet, projectPath, locationQuery)
-          .returning(lineage.locationNodes.pure[Try])
+          .returning(lineage.locationNodes.pure[IO])
 
-        lineageFinder.find(projectPath, location, maybeAuthUser) shouldBe lineage.some.pure[Try]
+        lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe lineage.some
       }
     }
 
@@ -77,9 +82,9 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning((Map.empty: EdgeMap).pure[Try])
+        .returning((Map.empty: EdgeMap).pure[IO])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBe None.pure[Try]
+      lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
     "return None if the trimming returns None" in new TestCase {
@@ -88,13 +93,13 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(initialEdgesMap.pure[Try])
+        .returning(initialEdgesMap.pure[IO])
 
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning((Map.empty: EdgeMap).pure[Try])
+        .returning((Map.empty: EdgeMap).pure[IO])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBe None.pure[Try]
+      lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
     "return a Failure if finding edges fails" in new TestCase {
@@ -103,7 +108,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(exception.raiseError[Try, EdgeMap])
+        .returning(exception.raiseError[IO, EdgeMap])
 
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
@@ -114,12 +119,12 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(initialEdgesMap.pure[Try])
+        .returning(initialEdgesMap.pure[IO])
 
       val exception = exceptions.generateOne
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(exception.raiseError[Try, EdgeMap])
+        .returning(exception.raiseError[IO, EdgeMap])
 
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
@@ -130,19 +135,19 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(initialEdgesMap.pure[Try])
+        .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(trimmedEdgesMap.pure[Try])
+        .returning(trimmedEdgesMap.pure[IO])
 
       val exception = exceptions.generateOne
       (nodeDetailsFinder
         .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
         .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
-        .returning(exception.raiseError[Try, Set[Node]])
+        .returning(exception.raiseError[IO, Set[Node]])
 
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
@@ -153,18 +158,18 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(initialEdgesMap.pure[Try])
+        .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(trimmedEdgesMap.pure[Try])
+        .returning(trimmedEdgesMap.pure[IO])
 
       (nodeDetailsFinder
         .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
         .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
-        .returning(lineage.processRunNodes.pure[Try])
+        .returning(lineage.processRunNodes.pure[IO])
 
       val nodesSet = trimmedEdgesMap.view
         .mapValues { case (s, t) => s ++ t }
@@ -175,7 +180,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (nodeDetailsFinder
         .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
         .expects(nodesSet, projectPath, locationQuery)
-        .returning(exception.raiseError[Try, Set[Node]])
+        .returning(exception.raiseError[IO, Set[Node]])
 
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
@@ -186,18 +191,18 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (edgesFinder
         .findEdges(_: projects.Path, _: Option[AuthUser]))
         .expects(projectPath, maybeAuthUser)
-        .returning(initialEdgesMap.pure[Try])
+        .returning(initialEdgesMap.pure[IO])
 
       val lineage         = lineages.generateOne
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(trimmedEdgesMap.pure[Try])
+        .returning(trimmedEdgesMap.pure[IO])
 
       (nodeDetailsFinder
         .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
         .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
-        .returning(Set.empty[Node].pure[Try])
+        .returning(Set.empty[Node].pure[IO])
 
       val nodesSet = trimmedEdgesMap.view
         .mapValues { case (s, t) => s ++ t }
@@ -207,28 +212,26 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       (nodeDetailsFinder
         .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
         .expects(nodesSet, projectPath, locationQuery)
-        .returning(Set.empty[Node].pure[Try])
+        .returning(Set.empty[Node].pure[IO])
 
-      lineageFinder.find(projectPath, location, maybeAuthUser) shouldBe a[Failure[_]]
+      intercept[Exception](lineageFinder.find(projectPath, location, maybeAuthUser).unsafeRunSync())
     }
   }
 
   private trait TestCase {
-    val edgesFinder       = mock[EdgesFinder[Try]]
-    val edgesTrimmer      = mock[EdgesTrimmer[Try]]
-    val nodeDetailsFinder = mock[NodeDetailsFinder[Try]]
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val lineageFinder = new LineageFinderImpl[Try](edgesFinder, edgesTrimmer, nodeDetailsFinder)
+    val edgesFinder       = mock[EdgesFinder[IO]]
+    val edgesTrimmer      = mock[EdgesTrimmer[IO]]
+    val nodeDetailsFinder = mock[NodeDetailsFinder[IO]]
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val lineageFinder = new LineageFinderImpl[IO](edgesFinder, edgesTrimmer, nodeDetailsFinder)
     val maybeAuthUser = authUsers.generateOption
     val projectPath   = projectPaths.generateOne
     val location      = nodeLocations.generateOne
 
-    implicit class FailureOps(failure: Try[Option[Lineage]]) {
+    implicit class FailureOps(failure: IO[Option[Lineage]]) {
 
       def shouldBeFailure(expected: Exception): Assertion = {
-        failure shouldBe a[Failure[_]]
-
-        val Failure(actual) = failure
+        val actual = intercept[Exception](failure.unsafeRunSync())
 
         actual.getCause   shouldBe expected
         actual.getMessage shouldBe s"Finding lineage for '$projectPath' and '$location' failed"

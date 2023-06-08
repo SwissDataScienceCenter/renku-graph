@@ -65,7 +65,6 @@ class CertificateLoaderImpl[F[_]: MonadThrow: Logger] private[certificates] (
   } yield ()
 
   private lazy val loggingError: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)("Loading client certificate failed")
-    exception.raiseError[F, Unit]
+    Logger[F].error(exception)("Loading client certificate failed") *> exception.raiseError[F, Unit]
   }
 }

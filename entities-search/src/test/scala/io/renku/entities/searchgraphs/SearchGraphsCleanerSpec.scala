@@ -18,6 +18,7 @@
 
 package io.renku.entities.searchgraphs
 
+import cats.effect._
 import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.DatasetsGraphCleaner
 import io.renku.entities.searchgraphs.projects.ProjectsGraphCleaner
@@ -26,57 +27,55 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.testentities.projectIdentifications
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
-import scala.util.Try
-
-class SearchGraphsCleanerSpec extends AnyFlatSpec with should.Matchers with MockFactory with TryValues {
+class SearchGraphsCleanerSpec extends AnyFlatSpec with should.Matchers with MockFactory with IOSpec {
 
   it should "clean Projects and Datasets graphs" in new TestCase {
 
-    givenProjectsGraphProvisioning(projectIdentification, returning = ().pure[Try])
-    givenDatasetsGraphProvisioning(projectIdentification, returning = ().pure[Try])
+    givenProjectsGraphProvisioning(projectIdentification, returning = ().pure[IO])
+    givenDatasetsGraphProvisioning(projectIdentification, returning = ().pure[IO])
 
-    cleaner.cleanSearchGraphs(projectIdentification).success.value shouldBe ()
+    cleaner.cleanSearchGraphs(projectIdentification).unsafeRunSync() shouldBe ()
   }
 
   it should "fail if cleaning Datasets graph fails" in new TestCase {
 
-    givenProjectsGraphProvisioning(projectIdentification, returning = ().pure[Try])
+    givenProjectsGraphProvisioning(projectIdentification, returning = ().pure[IO])
     val exception = exceptions.generateOne
-    givenDatasetsGraphProvisioning(projectIdentification, returning = exception.raiseError[Try, Nothing])
+    givenDatasetsGraphProvisioning(projectIdentification, returning = exception.raiseError[IO, Nothing])
 
-    cleaner.cleanSearchGraphs(projectIdentification).failure.exception shouldBe exception
+    intercept[Exception](cleaner.cleanSearchGraphs(projectIdentification).unsafeRunSync()) shouldBe exception
   }
 
   it should "fail with the Projects cleaning failure if both processes fails" in new TestCase {
 
     val projectsException = exceptions.generateOne
-    givenProjectsGraphProvisioning(projectIdentification, returning = projectsException.raiseError[Try, Nothing])
+    givenProjectsGraphProvisioning(projectIdentification, returning = projectsException.raiseError[IO, Nothing])
     val datasetsException = exceptions.generateOne
-    givenDatasetsGraphProvisioning(projectIdentification, returning = datasetsException.raiseError[Try, Nothing])
+    givenDatasetsGraphProvisioning(projectIdentification, returning = datasetsException.raiseError[IO, Nothing])
 
-    cleaner.cleanSearchGraphs(projectIdentification).failure.exception shouldBe projectsException
+    intercept[Exception](cleaner.cleanSearchGraphs(projectIdentification).unsafeRunSync()) shouldBe projectsException
   }
 
   private trait TestCase {
 
     val projectIdentification = projectIdentifications.generateOne
 
-    private lazy val projectsGraphCleaner = mock[ProjectsGraphCleaner[Try]]
-    private lazy val datasetsGraphCleaner = mock[DatasetsGraphCleaner[Try]]
-    private implicit val logger: TestLogger[Try] = new TestLogger[Try]()
+    private lazy val projectsGraphCleaner = mock[ProjectsGraphCleaner[IO]]
+    private lazy val datasetsGraphCleaner = mock[DatasetsGraphCleaner[IO]]
+    private implicit val logger: TestLogger[IO] = new TestLogger[IO]()
     val cleaner = new SearchGraphsCleanerImpl(projectsGraphCleaner, datasetsGraphCleaner)
 
-    def givenProjectsGraphProvisioning(projectIdentification: ProjectIdentification, returning: Try[Unit]) =
+    def givenProjectsGraphProvisioning(projectIdentification: ProjectIdentification, returning: IO[Unit]) =
       (projectsGraphCleaner.cleanProjectsGraph _)
         .expects(projectIdentification)
         .returning(returning)
 
-    def givenDatasetsGraphProvisioning(projectIdentification: ProjectIdentification, returning: Try[Unit]) =
+    def givenDatasetsGraphProvisioning(projectIdentification: ProjectIdentification, returning: IO[Unit]) =
       (datasetsGraphCleaner.cleanDatasetsGraph _)
         .expects(projectIdentification)
         .returning(returning)

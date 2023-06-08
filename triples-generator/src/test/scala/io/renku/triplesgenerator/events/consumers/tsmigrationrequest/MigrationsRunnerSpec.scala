@@ -19,29 +19,29 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 
 import cats.data.EitherT.{leftT, liftF, rightT}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.generators.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class MigrationsRunnerSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "run" should {
 
     "succeed if all migrations run successfully" in new TestCase {
-      (migration1.run _).expects().returning(rightT[Try, ProcessingRecoverableError](()))
-      (migration2.run _).expects().returning(rightT[Try, ProcessingRecoverableError](()))
-      (migration3.run _).expects().returning(rightT[Try, ProcessingRecoverableError](()))
+      (migration1.run _).expects().returning(rightT[IO, ProcessingRecoverableError](()))
+      (migration2.run _).expects().returning(rightT[IO, ProcessingRecoverableError](()))
+      (migration3.run _).expects().returning(rightT[IO, ProcessingRecoverableError](()))
 
-      runner.run().value shouldBe ().asRight.pure[Try]
+      runner.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
         Info(s"$categoryName: migration1 starting"),
@@ -55,12 +55,12 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
 
     "log an error and stop executing next migrations " +
       "once one of the migrations returns a Recoverable Error" in new TestCase {
-        (migration1.run _).expects().returning(rightT[Try, ProcessingRecoverableError](()))
+        (migration1.run _).expects().returning(rightT[IO, ProcessingRecoverableError](()))
 
         val recoverableError = processingRecoverableErrors.generateOne
-        (migration2.run _).expects().returning(leftT[Try, Unit](recoverableError))
+        (migration2.run _).expects().returning(leftT[IO, Unit](recoverableError))
 
-        runner.run().value shouldBe recoverableError.asLeft.pure[Try]
+        runner.run().value.unsafeRunSync() shouldBe recoverableError.asLeft
 
         logger.loggedOnly(
           Info(s"$categoryName: migration1 starting"),
@@ -71,14 +71,14 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
       }
 
     "log an error and fail if once one of the migration fails" in new TestCase {
-      (migration1.run _).expects().returning(rightT[Try, ProcessingRecoverableError](()))
+      (migration1.run _).expects().returning(rightT[IO, ProcessingRecoverableError](()))
 
       val exception = exceptions.generateOne
       (migration2.run _)
         .expects()
-        .returning(liftF(exception.raiseError[Try, Unit]))
+        .returning(liftF(exception.raiseError[IO, Unit]))
 
-      runner.run().value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+      intercept[Exception](runner.run().value.unsafeRunSync()) shouldBe exception
 
       logger.loggedOnly(
         Info(s"$categoryName: migration1 starting"),
@@ -90,17 +90,17 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val migration1 = mock[Migration[Try]]
+    val migration1 = mock[Migration[IO]]
     (() => migration1.name).expects().returning(Migration.Name("migration1")).anyNumberOfTimes()
 
-    val migration2 = mock[Migration[Try]]
+    val migration2 = mock[Migration[IO]]
     (() => migration2.name).expects().returning(Migration.Name("migration2")).anyNumberOfTimes()
 
-    val migration3 = mock[Migration[Try]]
+    val migration3 = mock[Migration[IO]]
     (() => migration3.name).expects().returning(Migration.Name("migration3")).anyNumberOfTimes()
 
-    val runner = new MigrationsRunnerImpl[Try](List(migration1, migration2, migration3))
+    val runner = new MigrationsRunnerImpl[IO](List(migration1, migration2, migration3))
   }
 }

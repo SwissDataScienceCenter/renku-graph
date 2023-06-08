@@ -20,6 +20,7 @@ package io.renku.eventlog.events.producers
 package triplesgenerated
 
 import Generators.sendingResults
+import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.events.{CategoryName, EventRequestContent}
@@ -31,13 +32,12 @@ import io.renku.graph.model.events.EventMessage
 import io.renku.graph.model.events.EventStatus._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
+class DispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "returnToQueue" should {
 
@@ -61,9 +61,9 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
                                    s"${SubscriptionCategory.categoryName}: Marking event as $TriplesGenerated failed"
           )
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      dispatchRecovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
+      dispatchRecovery.returnToQueue(event, sendingResults.generateOne).unsafeRunSync() shouldBe ()
     }
   }
 
@@ -95,9 +95,9 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
             s"${SubscriptionCategory.categoryName}: $event, url = $subscriber -> $TransformationNonRecoverableFailure"
           )
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      dispatchRecovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
+      dispatchRecovery.recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(
@@ -111,8 +111,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private trait TestCase {
     val event = triplesGeneratedEvents.generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val eventSender      = mock[EventSender[Try]]
-    val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val eventSender      = mock[EventSender[IO]]
+    val dispatchRecovery = new DispatchRecoveryImpl[IO](eventSender)
   }
 }

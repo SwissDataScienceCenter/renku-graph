@@ -18,7 +18,7 @@
 
 package io.renku.logging
 
-import cats.MonadThrow
+import cats.{Monad, MonadThrow}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -36,7 +36,7 @@ object TestExecutionTimeRecorder {
     new TestExecutionTimeRecorder[F](threshold = elapsedTimes.generateOne, maybeHistogram)
 }
 
-class TestExecutionTimeRecorder[F[_]: MonadThrow: Logger](
+class TestExecutionTimeRecorder[F[_]: Monad](
     threshold:      ElapsedTime,
     maybeHistogram: Option[Histogram]
 ) extends ExecutionTimeRecorder[F](threshold) {
@@ -45,10 +45,10 @@ class TestExecutionTimeRecorder[F[_]: MonadThrow: Logger](
   lazy val executionTimeInfo: String      = s" in ${threshold}ms"
 
   override def measureExecutionTime[BlockOut](
-      block:               => F[BlockOut],
+      block:               F[BlockOut],
       maybeHistogramLabel: Option[String Refined NonEmpty] = None
   ): F[(ElapsedTime, BlockOut)] = for {
-    _ <- MonadThrow[F].unit
+    _ <- Monad[F].unit // why?
     maybeHistogramTimer = startTimer(maybeHistogramLabel)
     result <- block
     _ = maybeHistogramTimer map (_.observeDuration())

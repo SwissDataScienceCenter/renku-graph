@@ -20,6 +20,7 @@ package io.renku.logging
 
 import cats.effect.{Clock, Sync}
 import cats.syntax.all._
+import cats.{Applicative, Monad}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -31,35 +32,40 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-abstract class ExecutionTimeRecorder[F[_]: Logger](threshold: ElapsedTime) {
+abstract class ExecutionTimeRecorder[F[_]](threshold: ElapsedTime) {
 
-  def measureExecutionTime[BlockOut](block:               => F[BlockOut],
-                                     maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, BlockOut)]
+  def measureExecutionTime[A](
+      block:               F[A],
+      maybeHistogramLabel: Option[String Refined NonEmpty] = None
+  ): F[(ElapsedTime, A)]
 
-  def logExecutionTimeWhen[BlockOut](
-      condition: PartialFunction[BlockOut, String]
-  ): ((ElapsedTime, BlockOut)) => BlockOut = { case (elapsedTime, blockOut) =>
-    logWarningIfAboveThreshold(elapsedTime, blockOut, condition)
-    blockOut
+  def measureAndLogTime[A](condition: PartialFunction[A, String])(
+      block: F[A]
+  )(implicit F: Monad[F], L: Logger[F]): F[A] =
+    measureExecutionTime(block).flatMap(logExecutionTimeWhen(condition))
+
+  def logExecutionTimeWhen[A](
+      condition: PartialFunction[A, String]
+  )(implicit F: Applicative[F], L: Logger[F]): ((ElapsedTime, A)) => F[A] = { resultAndTime =>
+    logWarningIfAboveThreshold(resultAndTime, condition.lift).as(resultAndTime._2)
   }
 
-  def logExecutionTime[BlockOut](withMessage: => String): ((ElapsedTime, BlockOut)) => BlockOut = {
-    case (elapsedTime, blockOut) =>
-      logWarningIfAboveThreshold(elapsedTime, blockOut, forAnyOutReturn(withMessage))
-      blockOut
+  def logExecutionTime[A](
+      withMessage: => String
+  )(implicit F: Applicative[F], L: Logger[F]): ((ElapsedTime, A)) => F[A] = { resultAndTime =>
+    logWarningIfAboveThreshold(resultAndTime, Function.const(Some(withMessage))).as(resultAndTime._2)
   }
 
-  private def forAnyOutReturn[BlockOut](message: String): PartialFunction[BlockOut, String] = { case _ =>
-    message
+  private def logWarningIfAboveThreshold[A](
+      resultAndTime: (ElapsedTime, A),
+      condition:     A => Option[String]
+  )(implicit F: Applicative[F], L: Logger[F]): F[Unit] = {
+    val (elapsedTime, result) = resultAndTime
+    condition(result)
+      .filter(_ => elapsedTime >= threshold)
+      .map(message => L.warn(s"$message in ${elapsedTime}ms"))
+      .getOrElse(F.unit)
   }
-
-  private def logWarningIfAboveThreshold[BlockOut](
-      elapsedTime: ElapsedTime,
-      blockOut:    BlockOut,
-      condition:   PartialFunction[BlockOut, String]
-  ): Unit = if (elapsedTime.value >= threshold.value)
-    (condition lift blockOut) foreach (message => Logger[F].warn(s"$message in ${elapsedTime}ms"))
 }
 
 class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
@@ -67,9 +73,10 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
     maybeHistogram: Option[Histogram[F]]
 ) extends ExecutionTimeRecorder[F](threshold) {
 
-  override def measureExecutionTime[BlockOut](block:               => F[BlockOut],
-                                              maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, BlockOut)] = Clock[F]
+  override def measureExecutionTime[A](
+      block:               F[A],
+      maybeHistogramLabel: Option[String Refined NonEmpty] = None
+  ): F[(ElapsedTime, A)] = Clock[F]
     .timed {
       maybeHistogram match {
         case None => block

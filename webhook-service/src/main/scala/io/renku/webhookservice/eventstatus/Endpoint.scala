@@ -61,17 +61,19 @@ private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: Execution
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
-    (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
-      .parFlatMapN {
-        case (Some(HookMissing), _)       => Ok(StatusInfo.NotActivated.asJson)
-        case (Some(HookExists), Some(si)) => Ok(si.asJson)
-        case (Some(HookExists), None) => sendCommitSync(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
-        case (None, Some(si))         => Ok(si.asJson)
-        case (None, None)             => NotFound(InfoMessage("Info about project cannot be found"))
-      }
-      .recoverWith(internalServerError(projectId))
-  } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
+  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] =
+    measureAndLogTime(logMessage(projectId)) {
+      (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
+        .parFlatMapN {
+          case (Some(HookMissing), _)       => Ok(StatusInfo.NotActivated.asJson)
+          case (Some(HookExists), Some(si)) => Ok(si.asJson)
+          case (Some(HookExists), None) =>
+            sendCommitSync(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
+          case (None, Some(si)) => Ok(si.asJson)
+          case (None, None)     => NotFound(InfoMessage("Info about project cannot be found"))
+        }
+        .recoverWith(internalServerError(projectId))
+    }
 
   private def sendCommitSync(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] =
     findProjectInfo(projectId)(authUser.map(_.accessToken)).map(CommitSyncRequest(_)) >>=
@@ -82,6 +84,9 @@ private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: Execution
       val message = show"Finding status info for project '$projectId' failed"
       Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
   }
+
+  private def logMessage(projectId: GitLabId): PartialFunction[Response[F], String] =
+    PartialFunction.fromFunction(_ => show"Finding status info for project '$projectId' finished")
 }
 
 object Endpoint {
