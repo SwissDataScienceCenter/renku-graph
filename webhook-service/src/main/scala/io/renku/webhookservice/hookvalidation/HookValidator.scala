@@ -22,6 +22,7 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
+import io.renku.cache.Cache
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -47,11 +48,14 @@ object HookValidator {
     projectHookVerifier   <- ProjectHookVerifier[F]
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
-  } yield new HookValidatorImpl[F](projectHookUrl,
-                                   projectHookVerifier,
-                                   new AccessTokenFinderImpl(tokenRepositoryUrl),
-                                   accessTokenAssociator,
-                                   accessTokenRemover
+    validationCache       <- Cache.memory[F, GitLabId, HookValidationResult](100)
+  } yield new HookValidatorImpl[F](
+    projectHookUrl,
+    projectHookVerifier,
+    new AccessTokenFinderImpl(tokenRepositoryUrl),
+    accessTokenAssociator,
+    accessTokenRemover,
+    validationCache
   )
 }
 
@@ -60,7 +64,8 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
     projectHookVerifier:   ProjectHookVerifier[F],
     accessTokenFinder:     AccessTokenFinder[F],
     accessTokenAssociator: AccessTokenAssociator[F],
-    accessTokenRemover:    AccessTokenRemover[F]
+    accessTokenRemover:    AccessTokenRemover[F],
+    validationCache:       Cache[F, GitLabId, HookValidationResult]
 ) extends HookValidator[F] {
 
   private val applicative = Applicative[F]
@@ -73,7 +78,10 @@ private class HookValidatorImpl[F[_]: MonadThrow: Logger](
   import applicative._
   import projectHookVerifier._
 
-  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
+  def validateHook(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] =
+    validationCache.withCache(pId => validateHook0(pId, maybeAccessToken))(projectId)
+
+  def validateHook0(projectId: GitLabId, maybeAccessToken: Option[AccessToken]): F[Option[HookValidationResult]] = {
     persistGivenToken(projectId, maybeAccessToken) >> validateHookExistence(projectId, maybeAccessToken)
   }.onError(logError(projectId))
 
