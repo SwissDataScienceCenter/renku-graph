@@ -18,7 +18,7 @@
 
 organization := "io.renku"
 name := "renku-graph"
-ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "2.13.11"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
