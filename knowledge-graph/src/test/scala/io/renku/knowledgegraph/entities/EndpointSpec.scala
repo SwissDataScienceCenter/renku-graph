@@ -57,8 +57,9 @@ class EndpointSpec
     with should.Matchers
     with IOSpec
     with ModelEncoders {
-  implicit val renkuUrl    = renkuUrls.generateOne
-  implicit val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
+  private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
+  private implicit val renkuApiUrl: renku.ApiUrl =
+    renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   "GET /entities" should {
 

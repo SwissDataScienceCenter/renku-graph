@@ -55,7 +55,8 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
 
       s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$path.git' for Personal Access Token" in new TestCase {
 
-        implicit val token @ Some(accessToken) = personalAccessTokens.generateSome
+        val accessToken = personalAccessTokens.generateOne
+        implicit val iat: Option[AccessToken] = accessToken.some
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
