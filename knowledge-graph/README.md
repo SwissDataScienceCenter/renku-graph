@@ -272,7 +272,7 @@ Response body example:
          }
       ]
     }
-  ],
+  ]
 }
 ```
 
