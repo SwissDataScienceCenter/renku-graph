@@ -26,6 +26,7 @@ import io.circe.syntax._
 import io.renku.http.rest.Links.{Link, Rel}
 import io.renku.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
+import org.http4s.Uri
 
 final case class Links(links: NonEmptyList[Link]) extends LinkOps
 
@@ -54,6 +55,7 @@ object Links {
 
   implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url[Href] with UrlOps[Href] {
     def apply(value: UrlTinyType): Href = Href(value.value)
+    def apply(value: Uri): Href = Href(value.renderString)
   }
 
   sealed trait Method extends StringTinyType with Product with Serializable

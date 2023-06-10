@@ -99,7 +99,6 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   )(implicit renkuUrl: RenkuUrl) = {
     val binding = json"""{
       "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
-      "identifier":        {"value": ${dataset.identifier}},
       "name":              {"value": ${dataset.identification.title}},
       "slug":              {"value": ${dataset.identification.name}},
       "description":       {"value": $description},
@@ -108,7 +107,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "projectId":         {"value": ${project.resourceId}},
       "projectPath":       {"value": ${project.path}},
       "projectName":       {"value": ${project.name}},
-      "projectVisibility": {"value": ${project.visibility}}
+      "projectVisibility": {"value": ${project.visibility}},
+      "projectDSId":       {"value": ${dataset.identification.identifier}}
     }""" deepMerge {
       dataset.provenance.date match {
         case date: datasets.DatePublished => json"""{
@@ -140,7 +140,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "projectId":         {"value": ${project.resourceId}},
       "projectPath":       {"value": ${project.path}},
       "projectName":       {"value": ${project.name}},
-      "projectVisibility": {"value": ${project.visibility}}
+      "projectVisibility": {"value": ${project.visibility}},
+      "projectDSId":       {"value": ${dataset.identification.identifier}}
     }"""
 
     json"""{"results": {"bindings": [$binding]}}"""

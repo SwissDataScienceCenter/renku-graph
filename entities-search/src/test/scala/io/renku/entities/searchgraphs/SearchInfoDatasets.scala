@@ -45,8 +45,7 @@ trait SearchInfoDatasets {
       renkuUrl:        RenkuUrl,
       entityFunctions: EntityFunctions[entities.Project],
       graphsProducer:  GraphsProducer[entities.Project]
-  ) =
-    provisionProject(p.to[entities.Project])
+  ) = provisionProject(p.to[entities.Project])
 
   def provisionProject(
       project: entities.Project

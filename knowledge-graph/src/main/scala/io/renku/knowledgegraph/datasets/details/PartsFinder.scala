@@ -27,8 +27,10 @@ import io.circe.Decoder.decodeList
 import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
+import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait PartsFinder[F[_]] {
@@ -47,23 +49,22 @@ private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](stor
   private def query(ds: Dataset) = SparqlQuery.of(
     name = "ds by id - parts",
     Prefixes of (prov -> "prov", schema -> "schema"),
-    s"""|SELECT DISTINCT ?partLocation
-        |WHERE {
-        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
-        |    ?dataset a schema:Dataset ;
-        |             schema:identifier '${ds.id}' ;
-        |             schema:hasPart ?partResource.
-        |
-        |    ?partResource a schema:DigitalDocument;
-        |                  prov:entity/prov:atLocation ?partLocation.
-        |    
-        |    FILTER NOT EXISTS {
-        |      ?partResource prov:invalidatedAtTime ?invalidation           
-        |    }
-        |  }
-        |}
-        |ORDER BY ASC(?partLocation)
-        |""".stripMargin
+    sparql"""|SELECT DISTINCT ?partLocation
+             |WHERE {
+             |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
+             |    ${ds.resourceId.asEntityId} a schema:Dataset;
+             |                                schema:hasPart ?partResource.
+             |
+             |    ?partResource a schema:DigitalDocument;
+             |                  prov:entity/prov:atLocation ?partLocation.
+             |    
+             |    FILTER NOT EXISTS {
+             |      ?partResource prov:invalidatedAtTime ?invalidation           
+             |    }
+             |  }
+             |}
+             |ORDER BY ASC(?partLocation)
+             |""".stripMargin
   )
 }
 

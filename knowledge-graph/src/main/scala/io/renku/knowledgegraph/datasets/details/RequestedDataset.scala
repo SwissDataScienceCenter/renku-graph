@@ -20,6 +20,9 @@ package io.renku.knowledgegraph.datasets.details
 
 import cats.Show
 import cats.syntax.all._
+import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.syntax._
+import io.circe.{Codec, Decoder, DecodingFailure, Encoder}
 import io.renku.graph.model.{RenkuUrl, datasets}
 import org.http4s.Uri.Path.{Segment, SegmentEncoder}
 import scodec.bits.ByteVector
@@ -54,16 +57,34 @@ object RequestedDataset {
     override def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A = saf(value)
   }
 
+  implicit def encoder(implicit renkuUrl: RenkuUrl): Codec[RequestedDataset] = Codec.from(
+    Decoder.instance { cur =>
+      cur.as[String].flatMap { v =>
+        RequestedDataset
+          .unapply(v)
+          .map(_.asRight[DecodingFailure])
+          .getOrElse(
+            DecodingFailure(CustomReason(show"$v is not a valid RequestedDataset"), cur).asLeft[RequestedDataset]
+          )
+      }
+    },
+    Encoder.instance {
+      case RequestedDataset.Identifier(id) => id.asJson
+      case RequestedDataset.SameAs(sa)     => encode(sa).asJson
+    }
+  )
+
   implicit val se: SegmentEncoder[RequestedDataset] = SegmentEncoder.instance {
-    case Identifier(v) =>
-      Segment(v.value)
-    case SameAs(v) =>
-      val base64 =
-        ByteVector
-          .encodeUtf8(v.value)
-          .fold(throw _, identity)
-          .toBase58
-      Segment(s"$sameAsPathEncodingPrefix$base64")
+    case Identifier(v) => Segment(v.value)
+    case SameAs(v)     => Segment(encode(v))
+  }
+
+  private def encode(sameAs: datasets.SameAs): String = {
+    val base58 = ByteVector
+      .encodeUtf8(sameAs.value)
+      .fold(throw _, identity)
+      .toBase58
+    s"$sameAsPathEncodingPrefix$base58"
   }
 
   implicit val show: Show[RequestedDataset] = Show.show {

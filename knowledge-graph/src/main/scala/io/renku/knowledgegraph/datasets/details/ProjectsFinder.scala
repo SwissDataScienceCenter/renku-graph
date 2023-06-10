@@ -23,13 +23,16 @@ import cats.MonadThrow
 import cats.effect.kernel.Async
 import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.{projects, GraphClass}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.triplesstore._
+import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
+import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectsFinder[F[_]] {
@@ -48,52 +51,49 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
   private def query(ds: Dataset, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?projectId ?projectPath ?projectName ?projectVisibility
-        |WHERE {
-        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
-        |    ?dsId a schema:Dataset;
-        |          schema:identifier '${ds.id}';
-        |          renku:topmostSameAs ?topmostSameAs
-        |  }
-        |  
-        |  GRAPH ?projectId {
-        |    ?allDsId a schema:Dataset;
-        |             renku:topmostSameAs ?topmostSameAs;
-        |             ^renku:hasDataset ?projectId.
-        |    ${allowedProjectFilterQuery(maybeAuthUser)}
-        |    FILTER NOT EXISTS {
-        |      ?projectDatasets prov:wasDerivedFrom/schema:url ?allDsId;
-        |                       ^renku:hasDataset ?projectId. 
-        |    }
-        |    FILTER NOT EXISTS {
-        |      ?allDsId prov:invalidatedAtTime ?invalidationTime .
-        |    }  
-        |    ?projectId schema:name ?projectName;
-        |               renku:projectPath ?projectPath;
-        |               renku:projectVisibility ?projectVisibility.
-        |  }
-        |}
-        |ORDER BY ASC(?projectName)
-        |""".stripMargin
+    sparql"""|SELECT DISTINCT ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+             |WHERE {
+             |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
+             |    ${ds.resourceId.asEntityId} a schema:Dataset;
+             |                                renku:topmostSameAs ?topmostSameAs
+             |  }
+             |  
+             |  GRAPH ${GraphClass.Datasets.id} {
+             |    ?topmostSameAs a renku:DiscoverableDataset;
+             |                   renku:datasetProjectLink ?linkId.
+             |    ?linkId renku:dataset ?projectDS;
+             |            renku:project ?projectId.
+             |  }
+             |
+             |  GRAPH ?projectId {
+             |    ${allowedProjectFilterQuery(maybeAuthUser)}
+             |    ?projectId schema:name ?projectName;
+             |               renku:projectPath ?projectPath;
+             |               renku:projectVisibility ?projectVisibility.
+             |    ?projectDS schema:identifier ?projectDSId.
+             |  }
+             |}
+             |ORDER BY ASC(?projectName)
+             |""".stripMargin
   )
 
-  private lazy val allowedProjectFilterQuery: Option[AuthUser] => String = {
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => Fragment = {
     case Some(user) =>
-      s"""|?projectId renku:projectVisibility ?parentVisibility.
-          |OPTIONAL {
-          |  ?projectId schema:member ?memberId
-          |  GRAPH <${GraphClass.Persons.id}> {
-          |    ?memberId schema:sameAs ?sameAsId.
-          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-          |              schema:identifier ?userGitlabId
-          |  }
-          |}
-          |FILTER (?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value})
-          |""".stripMargin
+      fr"""|?projectId renku:projectVisibility ?parentVisibility.
+           |OPTIONAL {
+           |  ?projectId schema:member ?memberId
+           |  GRAPH ${GraphClass.Persons.id} {
+           |    ?memberId schema:sameAs ?sameAsId.
+           |    ?sameAsId schema:additionalType ${Person.gitLabSameAsAdditionalType.asTripleObject};
+           |              schema:identifier ?userGitlabId
+           |  }
+           |}
+           |FILTER (?parentVisibility = ${Visibility.Public.value.asTripleObject} || ?userGitlabId = ${user.id.asObject})
+           |""".stripMargin
     case _ =>
-      s"""|?projectId renku:projectVisibility ?parentVisibility .
-          |FILTER (?parentVisibility = '${Visibility.Public.value}')
-          |""".stripMargin
+      fr"""|?projectId renku:projectVisibility ?parentVisibility .
+           |FILTER (?parentVisibility = ${Visibility.Public.value.asTripleObject})
+           |""".stripMargin
   }
 }
 
@@ -106,16 +106,16 @@ private object ProjectsFinderImpl {
     implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
-        id         <- extract[projects.ResourceId]("projectId")
-        path       <- extract[projects.Path]("projectPath")
-        name       <- extract[projects.Name]("projectName")
-        visibility <- extract[projects.Visibility]("projectVisibility")
-      } yield DatasetProject(id, path, name, visibility)
+        id          <- extract[projects.ResourceId]("projectId")
+        path        <- extract[projects.Path]("projectPath")
+        name        <- extract[projects.Name]("projectName")
+        visibility  <- extract[projects.Visibility]("projectVisibility")
+        projectDSId <- extract[datasets.Identifier]("projectDSId")
+      } yield DatasetProject(id, path, name, visibility, projectDSId)
   }
 }
 
 private object ProjectsFinder {
-
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig): F[ProjectsFinder[F]] =
     MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](storeConfig))
 }

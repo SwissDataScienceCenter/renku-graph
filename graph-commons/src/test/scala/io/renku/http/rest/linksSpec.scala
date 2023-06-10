@@ -109,8 +109,8 @@ class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
     link.method match {
       case Links.Method.GET =>
         json"""{
-          "rel":    ${link.rel.value},
-          "href":   ${link.href.value}
+          "rel":  ${link.rel.value},
+          "href": ${link.href.value}
         }"""
       case method =>
         json"""{
