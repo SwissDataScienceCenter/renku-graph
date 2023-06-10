@@ -55,7 +55,7 @@ object Links {
 
   implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url[Href] with UrlOps[Href] {
     def apply(value: UrlTinyType): Href = Href(value.value)
-    def apply(value: Uri): Href = Href(value.renderString)
+    def apply(value: Uri):         Href = Href(value.renderString)
   }
 
   sealed trait Method extends StringTinyType with Product with Serializable
