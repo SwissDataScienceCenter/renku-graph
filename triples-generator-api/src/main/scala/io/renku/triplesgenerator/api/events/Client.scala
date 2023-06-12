@@ -18,13 +18,14 @@
 
 package io.renku.triplesgenerator.api.events
 
+import cats.Show
 import cats.effect.Async
 import cats.syntax.all._
-import cats.Show
 import io.circe.Encoder
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.TriplesGeneratorUrl
+import io.renku.http.client.RestClient
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -45,9 +46,9 @@ object Client {
 
 private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
 
+  import EventSender.EventContext
   import cats.syntax.all._
   import io.circe.syntax._
-  import EventSender.EventContext
 
   override def send(event: CleanUpEvent): F[Unit] =
     send(event, CleanUpEvent.categoryName)
@@ -61,14 +62,27 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   override def send(event: ProjectViewedEvent): F[Unit] =
     send(event, ProjectViewedEvent.categoryName)
 
-  override def send(event: SyncRepoMetadata): F[Unit] = ???
-
   override def send(event: ProjectViewingDeletion): F[Unit] =
     send(event, ProjectViewingDeletion.categoryName)
+
+  override def send(event: SyncRepoMetadata): F[Unit] = event.maybePayload match {
+    case None          => send(event, SyncRepoMetadata.categoryName)
+    case Some(payload) => send(event, payload, SyncRepoMetadata.categoryName)
+  }
 
   private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(event.asJson),
+      EventContext(category, show"$category: sending event $event failed")
+    )
+
+  private def send[E, P](event: E, payload: P, category: CategoryName)(implicit
+      eventEnc:   Encoder[E],
+      payloadEnc: RestClient.PartEncoder[P],
+      show:       Show[E]
+  ): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.WithPayload(event.asJson, payload),
       EventContext(category, show"$category: sending event $event failed")
     )
 }
