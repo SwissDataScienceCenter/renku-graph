@@ -22,10 +22,17 @@ import cats.syntax.all._
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import org.scalacheck.Gen
 
 object Generators {
+
+  val cleanUpEvents: Gen[CleanUpEvent] =
+    consumerProjects.map(CleanUpEvent.apply)
+
+  val datasetViewedEvents: Gen[DatasetViewedEvent] =
+    (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)
 
   val projectActivatedEvents: Gen[ProjectActivated] =
     (projectPaths -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
@@ -36,12 +43,9 @@ object Generators {
   val projectViewedEvents: Gen[ProjectViewedEvent] =
     (projectPaths, projectViewedDates(), userIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
 
-  val datasetViewedEvents: Gen[DatasetViewedEvent] =
-    (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)
-
   val projectViewingDeletions: Gen[ProjectViewingDeletion] =
     projectPaths.map(ProjectViewingDeletion.apply)
 
-  val cleanUpEvents: Gen[CleanUpEvent] =
-    consumerProjects.map(CleanUpEvent.apply)
+  val syncRepoMetadataEvents: Gen[SyncRepoMetadata] =
+    (projectPaths -> zippedEventPayloads.toGeneratorOfOptions).mapN(SyncRepoMetadata.apply)
 }

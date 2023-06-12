@@ -108,7 +108,6 @@ Upon arrival, triples-generator will
 {
   "categoryName": "SYNC_REPO_METADATA",
   "project": {
-    "id": 12,
     "path": "project/path"
   }
 }

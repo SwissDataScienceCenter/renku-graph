@@ -29,11 +29,12 @@ import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 trait Client[F[_]] {
+  def send(event: CleanUpEvent):           F[Unit]
+  def send(event: DatasetViewedEvent):     F[Unit]
   def send(event: ProjectActivated):       F[Unit]
   def send(event: ProjectViewedEvent):     F[Unit]
-  def send(event: DatasetViewedEvent):     F[Unit]
   def send(event: ProjectViewingDeletion): F[Unit]
-  def send(event: CleanUpEvent):           F[Unit]
+  def send(event: SyncRepoMetadata):       F[Unit]
 }
 
 object Client {
@@ -48,20 +49,22 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   import io.circe.syntax._
   import EventSender.EventContext
 
+  override def send(event: CleanUpEvent): F[Unit] =
+    send(event, CleanUpEvent.categoryName)
+
+  override def send(event: DatasetViewedEvent): F[Unit] =
+    send(event, DatasetViewedEvent.categoryName)
+
   override def send(event: ProjectActivated): F[Unit] =
     send(event, ProjectActivated.categoryName)
 
   override def send(event: ProjectViewedEvent): F[Unit] =
     send(event, ProjectViewedEvent.categoryName)
 
-  override def send(event: DatasetViewedEvent): F[Unit] =
-    send(event, DatasetViewedEvent.categoryName)
+  override def send(event: SyncRepoMetadata): F[Unit] = ???
 
   override def send(event: ProjectViewingDeletion): F[Unit] =
     send(event, ProjectViewingDeletion.categoryName)
-
-  override def send(event: CleanUpEvent): F[Unit] =
-    send(event, CleanUpEvent.categoryName)
 
   private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
     eventSender.sendEvent(
