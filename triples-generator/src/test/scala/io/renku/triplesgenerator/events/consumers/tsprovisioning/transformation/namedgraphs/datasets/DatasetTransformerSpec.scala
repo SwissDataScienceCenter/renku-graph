@@ -25,19 +25,25 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{EitherValues, TryValues}
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
-class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class DatasetTransformerSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with TryValues
+    with EitherValues {
 
   "createTransformationStep" should {
 
     "create a step that runs all defined transformations" in new TestCase {
+
       val step1Result = generateProjAndQueries
       (() => derivationHierarchyUpdater.fixDerivationHierarchies)
         .expects()
@@ -78,10 +84,15 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = step7Result, out = step8Result))
 
+      val step9Result = generateProjAndQueries
+      (() => publicationEventsUpdater.updatePublicationEvents)
+        .expects()
+        .returning(transformation(in = step8Result, out = step9Result))
+
       val step = transformer.createTransformationStep
       step.name.value shouldBe "Dataset Details Updates"
 
-      (step run initialProjectAndQueries._1).value shouldBe step8Result.asRight.pure[Try]
+      (step run initialProjectAndQueries._1).value.success.value shouldBe step9Result.asRight
     }
 
     "return the ProcessingRecoverableFailure if one of the steps fails with a recoverable failure" in new TestCase {
@@ -120,15 +131,19 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
+      (() => publicationEventsUpdater.updatePublicationEvents)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = (step run initialProjectAndQueries._1).value
+      val recoverableError = (step run initialProjectAndQueries._1).value.success.value.left.value
 
-      recoverableError          shouldBe a[ProcessingRecoverableError]
       recoverableError.getMessage should startWith("Problem finding dataset details in KG")
     }
 
     "fail with NonRecoverableFailure if one of the steps fails with an unknown exception" in new TestCase {
+
       val step1Result = generateProjAndQueries
       (() => derivationHierarchyUpdater.fixDerivationHierarchies)
         .expects()
@@ -163,6 +178,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
+      (() => publicationEventsUpdater.updatePublicationEvents)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
       val step = transformer.createTransformationStep
 
       (step run initialProjectAndQueries._1).value shouldBe exception.raiseError[Try, (entities.Project, Queries)]
@@ -192,6 +211,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val descriptionUpdater             = mock[DescriptionUpdater[Try]]
     val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
     val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
+    val publicationEventsUpdater       = mock[PublicationEventsUpdater[Try]]
     val transformer = new DatasetTransformerImpl[Try](
       derivationHierarchyUpdater,
       sameAsUpdater,
@@ -200,7 +220,8 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       dateCreatedUpdater,
       descriptionUpdater,
       personLinksUpdater,
-      hierarchyOnInvalidationUpdater
+      hierarchyOnInvalidationUpdater,
+      publicationEventsUpdater
     )
 
     def generateProjAndQueries =

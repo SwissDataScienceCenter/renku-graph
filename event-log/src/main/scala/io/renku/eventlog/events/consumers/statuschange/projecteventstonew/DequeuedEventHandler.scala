@@ -20,7 +20,6 @@ package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew
 
 import cats.data.Kleisli
-import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
 import cleaning.ProjectCleaner
@@ -61,7 +60,7 @@ object DequeuedEventHandler {
   ) extends DbClient(Some(QueriesExecutionTimes[F]))
       with DequeuedEventHandler[F] {
 
-    override def updateDB(event: ProjectEventsToNew): UpdateOp[F] = {
+    override def updateDB(event: ProjectEventsToNew): UpdateOp[F] =
       for {
         statuses                 <- updateStatuses(event.project)
         _                        <- removeProcessingTimes(event.project)
@@ -73,10 +72,9 @@ object DequeuedEventHandler {
         maybeLatestEventDate     <- findLatestEventDate(event.project)
         _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
         _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
-      } yield DBUpdateResults.ForProjects(event.project.path,
-                                          eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents)
-      ): DBUpdateResults
-    }.recoverWith(retryOnDeadlock(event))
+      } yield DBUpdateResults
+        .ForProjects(event.project.path, eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents))
+        .widen
 
     private def eventCountsByStatus(statuses:                 List[EventStatus],
                                     removedAwaitingDeletions: Int,
@@ -247,13 +245,10 @@ object DequeuedEventHandler {
         Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}"))
     }
 
-    private def retryOnDeadlock(event: ProjectEventsToNew): PartialFunction[Throwable, UpdateOp[F]] = {
-      case SqlState.DeadlockDetected(_) =>
-        liftF[F, Session[F], Unit](
-          Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
-        ) >> updateDB(event)
+    override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = { case SqlState.DeadlockDetected(_) =>
+      Kleisli.liftF[F, Session[F], Unit](
+        Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
+      ) >> updateDB(event)
     }
-
-    override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = RollbackOp.none
   }
 }

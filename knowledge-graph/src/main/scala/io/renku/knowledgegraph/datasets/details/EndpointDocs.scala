@@ -25,7 +25,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
@@ -40,10 +40,12 @@ object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
     implicit0(gitLabUrl: GitLabUrl) <- GitLabUrlLoader[F]()
     implicit0(apiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
+    implicit0(renkuUrl: RenkuUrl)   <- RenkuUrlLoader[F]()
   } yield new EndpointDocsImpl
 }
 
-private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
+private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl, renkuUrl: RenkuUrl)
+    extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     GET(
@@ -68,15 +70,14 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
   private lazy val identifier = Parameter.Path("identifier", Schema.String, "Dataset identifier".some)
 
   private lazy val example = {
-    implicit val renkuUrl: RenkuUrl = RenkuUrl("http://renku")
+    val sameAs      = datasets.SameAs("http://datasets-repo/abcd")
     val projectPath = projects.Path("group/subgroup/name")
     Dataset
       .NonModifiedDataset(
-        datasets.ResourceId((renkuUrl / "datasets/123444").show),
-        datasets.Identifier("123444"),
+        datasets.ResourceId((renkuUrl / "datasets" / "123444").show),
         datasets.Title("title"),
         datasets.Name("name"),
-        datasets.SameAs("http://datasets-repo/abcd"),
+        sameAs,
         DatasetVersions(datasets.OriginalIdentifier("12333")),
         Tag(publicationEvents.Name("2.0"), publicationEvents.Description("Tag Dataset was imported from").some).some,
         datasets.Description("Dataset description").some,
@@ -88,10 +89,24 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
         ),
         datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
         List(DatasetPart(datasets.PartLocation("data"))),
-        DatasetProject(projects.ResourceId(projectPath), projectPath, projects.Name("name"), Visibility.Public),
-        List(DatasetProject(projects.ResourceId(projectPath), projectPath, projects.Name("name"), Visibility.Public)),
+        project = DatasetProject(projects.ResourceId(projectPath),
+                                 projectPath,
+                                 projects.Name("name"),
+                                 Visibility.Public,
+                                 datasets.Identifier("123444")
+        ),
+        usedIn = List(
+          DatasetProject(projects.ResourceId(projectPath),
+                         projectPath,
+                         projects.Name("name"),
+                         Visibility.Public,
+                         datasets.Identifier("123444")
+          )
+        ),
         List(datasets.Keyword("key")),
         List(ImageUri("image.png"))
-      ): Dataset
-  }.asJson
+      )
+      .widen
+      .asJson(Dataset.encoder(RequestedDataset(sameAs)))
+  }
 }

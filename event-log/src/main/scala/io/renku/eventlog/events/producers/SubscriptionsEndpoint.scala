@@ -73,8 +73,7 @@ class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
       }
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage("Registering subscriber failed")
-      Logger[F].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
   }
 }
 

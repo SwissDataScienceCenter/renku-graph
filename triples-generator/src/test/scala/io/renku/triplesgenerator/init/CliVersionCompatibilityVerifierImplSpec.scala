@@ -18,20 +18,19 @@
 
 package io.renku.triplesgenerator.init
 
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.config.RenkuPythonDevVersion
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers with TryValues {
+class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
 
   "run" should {
 
@@ -40,9 +39,9 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
       val cliVersion   = cliVersions.generateOne
       val compatConfig = compatibilityGen.generateOne.copy(configuredCliVersion = cliVersion, renkuDevVersion = None)
 
-      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, maybeRenkuDevVersion = None)
+      val checker = new CliVersionCompatibilityVerifierImpl[IO](cliVersion, compatConfig, maybeRenkuDevVersion = None)
 
-      checker.run.success.value shouldBe ()
+      checker.run.unsafeRunSync() shouldBe ()
     }
 
     "fail if the cli version does not match the cli version from the compatibility config" in {
@@ -50,12 +49,12 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
       val cliVersion   = cliVersions.generateOne
       val compatConfig = compatibilityGen.suchThat(c => c.cliVersion != cliVersion).generateOne
 
-      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, maybeRenkuDevVersion = None)
+      val checker = new CliVersionCompatibilityVerifierImpl[IO](cliVersion, compatConfig, maybeRenkuDevVersion = None)
 
-      val failure = checker.run.failure
+      val failure = intercept[Exception](checker.run.unsafeRunSync())
 
-      failure.exception shouldBe a[IllegalStateException]
-      failure.exception.getMessage shouldBe show"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
+      failure shouldBe a[IllegalStateException]
+      failure.getMessage shouldBe show"Incompatible versions. cliVersion: $cliVersion, configured version: ${compatConfig.cliVersion}"
     }
 
     "succeed if there's CliDevVersion configured even if the versions does not match" in {
@@ -66,11 +65,11 @@ class CliVersionCompatibilityVerifierImplSpec extends AnyWordSpec with MockFacto
 
       assume(cliVersion.value != renkuDevVersion.version)
 
-      val checker = new CliVersionCompatibilityVerifierImpl[Try](cliVersion, compatConfig, renkuDevVersion.some)
+      val checker = new CliVersionCompatibilityVerifierImpl[IO](cliVersion, compatConfig, renkuDevVersion.some)
 
-      checker.run.success.value shouldBe ()
+      checker.run.unsafeRunSync() shouldBe ()
     }
   }
 
-  private implicit lazy val logger: TestLogger[Try] = TestLogger[Try]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 }

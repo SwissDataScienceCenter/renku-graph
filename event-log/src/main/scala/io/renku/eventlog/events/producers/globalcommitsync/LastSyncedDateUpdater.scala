@@ -29,9 +29,9 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
+import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{*:, _}
 
 private trait LastSyncedDateUpdater[F[_]] {
   def run(projectId: projects.GitLabId, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion]

@@ -25,18 +25,18 @@ import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.{projects, RenkuUrl}
 import io.renku.graph.model.datasets.{Identifier, SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.details.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Random
@@ -89,11 +89,11 @@ class DatasetFinderSpec
         ).unsafeRunSync()
 
         val expectedDS1 = importedExternalToNonModified(dataset1, project1)
-          .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
+          .copy(usedIn = List(toDatasetProject(project1, dataset1), toDatasetProject(project2, dataset2)).sorted)
         findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
 
         val expectedDS2 = importedExternalToNonModified(dataset2, project2)
-          .copy(usedIn = List(project1.to[DatasetProject], project2.to[DatasetProject]).sorted)
+          .copy(usedIn = List(toDatasetProject(project1, dataset1), toDatasetProject(project2, dataset2)).sorted)
         findById(dataset2.identifier, project2.path).value shouldBe expectedDS2
 
         findBySameAs(commonSameAs, project1.path, project2.path).value should (be(expectedDS1) or be(expectedDS2))
@@ -132,7 +132,12 @@ class DatasetFinderSpec
         provisionTestProjects(sourceProject, project1, project2).unsafeRunSync()
 
         val expectedSourceDS = internalToNonModified(sourceDataset, sourceProject)
-          .copy(usedIn = List(sourceProject, project1, project2).map(_.to[DatasetProject]).sorted)
+          .copy(usedIn =
+            List(toDatasetProject(sourceProject, sourceDataset),
+                 toDatasetProject(project1, dataset1),
+                 toDatasetProject(project2, dataset2)
+            ).sorted
+          )
         findById(sourceDataset.identifier, sourceProject.path).value shouldBe expectedSourceDS
 
         val expectedDS2 = importedInternalToNonModified(dataset2, project2)
@@ -237,7 +242,7 @@ class DatasetFinderSpec
 
       provisionTestProjects(project, otherProject).unsafeRunSync()
 
-      val expectedUsedIns = List(project.to[DatasetProject], otherProject.to[DatasetProject]).sorted
+      val expectedUsedIns = List(toDatasetProject(project, dataset), toDatasetProject(otherProject, otherDS)).sorted
       val expectedDS      = internalToNonModified(dataset, project).copy(usedIn = expectedUsedIns)
       val expectedOtherDS = importedInternalToNonModified(otherDS, otherProject).copy(usedIn = expectedUsedIns)
       findById(dataset.identifier, authUser, project.path, otherProject.path).value shouldBe expectedDS
@@ -263,7 +268,9 @@ class DatasetFinderSpec
         )
 
         val expectedDS = internalToNonModified(originalDataset, originalProject)
-          .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+          .copy(usedIn =
+            List(toDatasetProject(originalProject, originalDataset), toDatasetProject(fork, originalDataset)).sorted
+          )
         findById(originalDataset.identifier, originalProject.path).value                          shouldBe expectedDS
         findByTopmostSameAs(originalDataset.provenance.topmostSameAs, originalProject.path).value shouldBe expectedDS
       }
@@ -282,8 +289,10 @@ class DatasetFinderSpec
 
         provisionTestProjects(project1, project2, project2Fork).unsafeRunSync()
 
-        val expectedUsedIns =
-          List(project1.to[DatasetProject], project2.to[DatasetProject], project2Fork.to[DatasetProject])
+        val expectedUsedIns = List(toDatasetProject(project1, dataset1),
+                                   toDatasetProject(project2, dataset2),
+                                   toDatasetProject(project2Fork, dataset2)
+        ).sorted
         val expectedDS1 = importedExternalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns.sorted)
         findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
 
@@ -313,9 +322,13 @@ class DatasetFinderSpec
           "Datasets on original project and forks have to be the same"
         )
 
-        val expectedDS = internalToNonModified(dataset, grandparentForked).copy(usedIn =
-          List(grandparentForked.to[DatasetProject], parentForked.to[DatasetProject], child.to[DatasetProject]).sorted
-        )
+        val expectedDS = internalToNonModified(dataset, grandparentForked)
+          .copy(usedIn =
+            List(toDatasetProject(grandparentForked, dataset),
+                 toDatasetProject(parentForked, dataset),
+                 toDatasetProject(child, dataset)
+            ).sorted
+          )
         findById(dataset.identifier, grandparentForked.path).value                          shouldBe expectedDS
         findByTopmostSameAs(dataset.provenance.topmostSameAs, grandparentForked.path).value shouldBe expectedDS
       }
@@ -334,7 +347,7 @@ class DatasetFinderSpec
         findById(original.identifier, project.path).value shouldBe
           internalToNonModified(original, project).copy(usedIn = Nil)
 
-        val expectedUsedIns  = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted
+        val expectedUsedIns  = List(toDatasetProject(project, modified), toDatasetProject(fork, modified)).sorted
         val expectedModified = modifiedToModified(modified, project).copy(usedIn = expectedUsedIns)
         findById(modified.identifier, project.path).value shouldBe expectedModified
 
@@ -358,7 +371,8 @@ class DatasetFinderSpec
           internalToNonModified(original, projectUpdated).copy(usedIn = Nil)
         findByTopmostSameAs(original.provenance.topmostSameAs, projectUpdated.path) shouldBe None
 
-        val expectedModified = modifiedToModified(modified, projectUpdated).copy(usedIn = List(fork.to[DatasetProject]))
+        val expectedModified =
+          modifiedToModified(modified, projectUpdated).copy(usedIn = List(toDatasetProject(fork, modified)))
         findById(modified.identifier, projectUpdated.path).value                    shouldBe expectedModified
         findByTopmostSameAs(modified.provenance.topmostSameAs, projectUpdated.path) shouldBe None
 
@@ -445,7 +459,9 @@ class DatasetFinderSpec
         )
 
         val expectedDS = internalToNonModified(originalDataset, fork)
-          .copy(usedIn = List(originalProject.to[DatasetProject], fork.to[DatasetProject]).sorted)
+          .copy(usedIn =
+            List(toDatasetProject(originalProject, originalDataset), toDatasetProject(fork, originalDataset)).sorted
+          )
         findById(originalDataset.identifier, fork.path).value                          shouldBe expectedDS
         findByTopmostSameAs(originalDataset.provenance.topmostSameAs, fork.path).value shouldBe expectedDS
       }
@@ -467,8 +483,11 @@ class DatasetFinderSpec
 
         provisionTestProjects(project1, project2, project3).unsafeRunSync()
 
-        val expectedUsedIns = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
-        val expectedDS1     = importedExternalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
+        val expectedUsedIns = List(toDatasetProject(project1, dataset1),
+                                   toDatasetProject(project2, dataset2),
+                                   toDatasetProject(project3, dataset3)
+        ).sorted
+        val expectedDS1 = importedExternalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
         findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
 
         val expectedDS3 = importedInternalToNonModified(dataset3, project3).copy(
@@ -492,8 +511,11 @@ class DatasetFinderSpec
 
         provisionTestProjects(project1, project2, project3).unsafeRunSync()
 
-        val expectedUsedIns = List(project1, project2, project3).map(_.to[DatasetProject]).sorted
-        val expectedDS1     = internalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
+        val expectedUsedIns = List(toDatasetProject(project1, dataset1),
+                                   toDatasetProject(project2, dataset2),
+                                   toDatasetProject(project3, dataset3)
+        ).sorted
+        val expectedDS1 = internalToNonModified(dataset1, project1).copy(usedIn = expectedUsedIns)
         findById(dataset1.identifier, project1.path).value shouldBe expectedDS1
 
         val expectedDS3 = importedInternalToNonModified(dataset3, project3).copy(
@@ -515,7 +537,7 @@ class DatasetFinderSpec
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
-        val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
+        val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
 
         provisionTestProjects(project1, project2Updated, project3).unsafeRunSync()
 
@@ -524,7 +546,9 @@ class DatasetFinderSpec
         findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.path).value shouldBe expectedDS1
 
         val expectedDS2Modified = modifiedToModified(dataset2Modified, project2Updated)
-          .copy(usedIn = List(project2Updated, project3).map(_.to[DatasetProject]).sorted)
+          .copy(usedIn =
+            List(toDatasetProject(project2Updated, dataset2Modified), toDatasetProject(project3, dataset3)).sorted
+          )
         findById(dataset2Modified.identifier, project2Updated.path).value shouldBe expectedDS2Modified
         findByTopmostSameAs(dataset2Modified.provenance.topmostSameAs,
                             project2Updated.path
@@ -614,7 +638,8 @@ class DatasetFinderSpec
 
         provisionTestProjects(originalDSProject, importedDSProject).unsafeRunSync()
 
-        val expectedUsedIns = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+        val expectedUsedIns =
+          List(toDatasetProject(originalDSProject, originalDS), toDatasetProject(importedDSProject, importedDS)).sorted
         val expectedImportedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
           maybeInitialTag = Tag(originalDSTag.name, originalDSTag.maybeDescription).some,
           usedIn = expectedUsedIns
@@ -677,7 +702,9 @@ class DatasetFinderSpec
 
         val expectedImportedDS = importedInternalToNonModified(importedDS, importedDSProject).copy(
           maybeInitialTag = None,
-          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+          usedIn = List(toDatasetProject(originalDSProject, originalDS),
+                        toDatasetProject(importedDSProject, importedDS)
+          ).sorted
         )
         findById(importedDS.identifier,
                  originalDSProject.path,
@@ -686,7 +713,9 @@ class DatasetFinderSpec
 
         val expectedOriginalDS = internalToNonModified(originalDS, originalDSProject).copy(
           maybeInitialTag = None,
-          usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+          usedIn = List(toDatasetProject(originalDSProject, originalDS),
+                        toDatasetProject(importedDSProject, importedDS)
+          ).sorted
         )
         findByTopmostSameAs(importedDS.provenance.topmostSameAs,
                             originalDSProject.path,

@@ -19,11 +19,12 @@
 package io.renku.eventlog.events.consumers.statuschange
 package projecteventstonew
 
+import SkunkExceptionsGenerators._
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.api.events.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.DBUpdateResults
 import io.renku.eventlog.events.consumers.statuschange.projecteventstonew.cleaning.ProjectCleaner
 import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -47,6 +48,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.SqlState
 
 import java.time.Instant
 import scala.util.Random
@@ -178,6 +180,27 @@ class DequeuedEventHandlerSpec
       }
   }
 
+  "onRollback" should {
+
+    "run the updateDB on DeadlockDetected" in new TestCase {
+
+      val project = consumerProjects.generateOne
+
+      val event = addEvent(Deleting, project)
+
+      upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+
+      (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
+
+      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
+      sessionResource
+        .useK((dbUpdater onRollback ProjectEventsToNew(project))(deadlockException))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path, Map(AwaitingDeletion -> 0, Deleting -> -1))
+
+      findEvent(event) shouldBe None
+    }
+  }
+
   private def addEvent(status:    EventStatus,
                        project:   Project = consumerProjects.generateOne,
                        eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
@@ -224,7 +247,10 @@ class DequeuedEventHandlerSpec
   }
 
   private trait TestCase {
-    val currentTime = mockFunction[Instant]
+
+    private val currentTime = mockFunction[Instant]
+    private val now         = Instant.now()
+    currentTime.expects().returning(now).anyNumberOfTimes()
 
     val subscriberId  = subscriberIds.generateOne
     val sourceUrl     = microserviceBaseUrls.generateOne
@@ -236,8 +262,5 @@ class DequeuedEventHandlerSpec
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val projectCleaner = mock[ProjectCleaner[IO]]
     val dbUpdater      = new DequeuedEventHandler.DequeuedEventHandlerImpl[IO](projectCleaner, currentTime)
-    val now            = Instant.now()
-
-    currentTime.expects().returning(now)
   }
 }

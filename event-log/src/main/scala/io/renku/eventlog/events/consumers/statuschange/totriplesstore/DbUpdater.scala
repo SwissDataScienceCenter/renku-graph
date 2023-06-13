@@ -49,7 +49,9 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesStore): RollbackOp[F] = deleteDelivery(event.eventId)
+  override def onRollback(event: ToTriplesStore): RollbackOp[F] = { _ =>
+    deleteDelivery(event.eventId).as(DBUpdateResults.ForProjects.empty)
+  }
 
   override def updateDB(event: ToTriplesStore): UpdateOp[F] = for {
     _                      <- deleteDelivery(event.eventId)

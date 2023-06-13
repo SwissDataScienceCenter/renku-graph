@@ -20,12 +20,13 @@ package io.renku.testtools
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import io.renku.microservices.SuppressChannelClosedExceptionRuntime
 import org.scalatest.Suite
 
 trait IOSpec {
   self: Suite =>
 
-  implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
+  implicit val ioRuntime: IORuntime = SuppressChannelClosedExceptionRuntime.runtime
 
   object IOBody {
     def apply[A](code: IO[A]): A = code.unsafeRunSync()

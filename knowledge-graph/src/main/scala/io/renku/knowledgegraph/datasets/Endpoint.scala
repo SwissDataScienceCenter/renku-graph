@@ -70,13 +70,13 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
                         sort:        Sorting[Sort.type],
                         paging:      PagingRequest,
                         maybeUser:   Option[AuthUser]
-  ): F[Response[F]] = measureExecutionTime {
+  ): F[Response[F]] = measureAndLogTime(finishedSuccessfully(maybePhrase)) {
     implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
     datasetsFinder
       .findDatasets(maybePhrase, sort, paging, maybeUser)
       .map(_.toHttpResponse[F, renku.ResourceUrl])
       .recoverWith(httpResult(maybePhrase))
-  } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
+  }
 
   private def requestedUrl(
       maybePhrase: Option[Phrase],

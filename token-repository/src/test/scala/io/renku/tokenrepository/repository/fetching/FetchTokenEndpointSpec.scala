@@ -136,7 +136,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
         .expects(projectId)
         .returning(OptionT(IO.raiseError[Option[AccessToken]](exception)))
 
-      val response = fetchToken(projectId).unsafeRunSync()
+      val response = endpoint.fetchToken(projectId).unsafeRunSync()
 
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))

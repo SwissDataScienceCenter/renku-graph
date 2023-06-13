@@ -150,7 +150,9 @@ object datasets {
     override def hashCode(): Int = value.hashCode
   }
 
-  final class InternalSameAs private[datasets] (val value: String) extends SameAs
+  final class InternalSameAs private[datasets] (val value: String) extends SameAs {
+    lazy val asResourceId: datasets.ResourceId = datasets.ResourceId(value)
+  }
   final class ExternalSameAs private[datasets] (val value: String) extends SameAs
 
   implicit object InternalSameAs
@@ -198,7 +200,7 @@ object datasets {
       case sameAs @ ExternalSameAs(_) => externalSameAsEncoder(sameAs)
     }
 
-    implicit def jsonLDEntityEncoder[S <: SameAs]: EntityIdEncoder[S] = EntityIdEncoder.instance {
+    implicit def jsonLDEntityIdEncoder[S <: SameAs]: EntityIdEncoder[S] = EntityIdEncoder.instance {
       case sameAs @ InternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
       case sameAs @ ExternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
     }

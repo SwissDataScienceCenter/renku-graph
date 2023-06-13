@@ -32,12 +32,13 @@ import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonNegativeInts
+import io.renku.generators.Generators.{exceptions, nonNegativeInts}
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -66,20 +67,33 @@ class StatusChangerSpec
       statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync() shouldBe ()
     }
 
-    "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
+    "rollbacks, run the updater's onRollback and fail if the updater does not handle the exception" in new MockedTestCase {
+
+      val exception = exceptions.generateOne
+      (dbUpdater.updateDB _).expects(event).returning(Kleisli.liftF(exception.raiseError[IO, DBUpdateResults]))
+
+      val onRollbackF = PartialFunction.empty[Throwable, UpdateOp[IO]]
+      (dbUpdater.onRollback _).expects(event).returning(onRollbackF)
+
+      intercept[Exception](
+        statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
+      ) shouldBe exception
+    }
+
+    "rollback and run the updater's onRollback" in new NonMockedTestCase {
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
       findAllEventDeliveries       shouldBe List(eventId -> subscriberId)
 
-      val event: StatusChangeEvent = ToTriplesGenerated(eventId.id,
-                                                        Project(eventId.projectId, projectPaths.generateOne),
-                                                        eventProcessingTimes.generateOne,
-                                                        zippedEventPayloads.generateOne
-      )
+      val event = ToTriplesGenerated(eventId.id,
+                                     Project(eventId.projectId, projectPaths.generateOne),
+                                     eventProcessingTimes.generateOne,
+                                     zippedEventPayloads.generateOne
+      ).widen
 
-      intercept[Exception] {
-        statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
-      }
+      (gaugesUpdater.updateGauges _).expects(DBUpdateResults.ForProjects.empty).returning(().pure[IO])
+
+      statusChanger.updateStatuses(dbUpdater)(event).unsafeRunSync()
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
       findAllEventDeliveries       shouldBe Nil
@@ -109,6 +123,7 @@ class StatusChangerSpec
 
     implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = mock[DBUpdater[IO, StatusChangeEvent]]
 
+    private implicit val logger: TestLogger[IO] = TestLogger()
     val gaugesUpdater = mock[GaugesUpdater[IO]]
     val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }
@@ -155,22 +170,25 @@ class StatusChangerSpec
         passingQuery.run(session) >> failingQuery.run(session)
       }
 
-      override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = Kleisli {
-        SqlStatement[IO](name = "onRollback dbUpdater query")
-          .command[EventId *: projects.GitLabId *: EmptyTuple](
-            sql"""DELETE FROM event_delivery
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+      override def onRollback(event: StatusChangeEvent): RollbackOp[IO] = { _ =>
+        Kleisli {
+          SqlStatement[IO](name = "onRollback dbUpdater query")
+            .command[EventId *: projects.GitLabId *: EmptyTuple](
+              sql"""DELETE FROM event_delivery
+                    WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                """.command
-          )
-          .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
-          .build
-          .void
-          .queryExecution
-          .run
+            )
+            .arguments(eventId.id *: eventId.projectId *: EmptyTuple)
+            .build
+            .mapResult(_ => DBUpdateResults.ForProjects.empty.widen)
+            .queryExecution
+            .run
+        }
       }
     }
 
-    implicit val dbUpdater: DBUpdater[IO, StatusChangeEvent] = new TestDbUpdater
+    implicit val dbUpdater:      DBUpdater[IO, StatusChangeEvent] = new TestDbUpdater
+    private implicit val logger: TestLogger[IO]                   = TestLogger()
     val gaugesUpdater = mock[GaugesUpdater[IO]]
     val statusChanger = new StatusChangerImpl[IO](gaugesUpdater)
   }

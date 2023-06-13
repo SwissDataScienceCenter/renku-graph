@@ -153,6 +153,18 @@ object DbInitializer {
       currentStatus = GenerationNonRecoverableFailure,
       destinationStatus = New,
       discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%ParameterDefaultValue cannot be blank%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Result Path: renku:hasPlan; Message: Value does not match pattern%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
     )
   )
 

@@ -67,6 +67,7 @@ object DatasetSearchResult {
         "identifier":    $id,
         "title":         $title,
         "name":          $name,
+        "slug":          $name,
         "published":     ${creators -> date},
         "date":          ${date.instant},
         "projectsCount": $projectsCount,

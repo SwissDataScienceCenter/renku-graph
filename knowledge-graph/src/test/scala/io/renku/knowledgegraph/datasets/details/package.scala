@@ -20,22 +20,17 @@ package io.renku.knowledgegraph.datasets
 
 import cats.syntax.all._
 import io.renku.graph.model.datasets.{PartLocation, ResourceId, SameAs}
-import io.renku.graph.model.testentities.Project._
-import io.renku.graph.model.testentities.{Dataset => ModelDataset, HavingInvalidationTime, RenkuProject}
+import io.renku.graph.model.testentities.{HavingInvalidationTime, RenkuProject, Dataset => ModelDataset}
 import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
 
 package object details {
   import Dataset._
 
-  private[details] implicit def projectToDatasetProject(implicit renkuUrl: RenkuUrl): RenkuProject => DatasetProject =
-    project => DatasetProject(project.resourceId, project.path, project.name, project.visibility)
-
   private[details] def internalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.Internal],
                                              project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     SameAs(dataset.entityId),
@@ -45,8 +40,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    project.to[DatasetProject],
-    usedIn = List(project.to[DatasetProject]),
+    toDatasetProject(project, dataset),
+    usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -55,7 +50,6 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.sameAs,
@@ -65,8 +59,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    project.to[DatasetProject],
-    usedIn = List(project.to[DatasetProject]),
+    toDatasetProject(project, dataset),
+    usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -75,7 +69,6 @@ package object details {
                                                      project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.sameAs,
@@ -85,8 +78,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    project.to[DatasetProject],
-    usedIn = List(project.to[DatasetProject]),
+    toDatasetProject(project, dataset),
+    usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -95,7 +88,6 @@ package object details {
                                           project: RenkuProject
   )(implicit renkuUrl: RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
-    dataset.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.derivedFrom,
@@ -108,9 +100,19 @@ package object details {
       .filterNot { case _: testentities.DatasetPart with HavingInvalidationTime => true; case _ => false }
       .map(part => DatasetPart(PartLocation(part.entity.location.value)))
       .sortBy(_.location),
-    project.to[DatasetProject],
-    usedIn = List(project.to[DatasetProject]),
+    toDatasetProject(project, dataset),
+    usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
+
+  private[details] def toDatasetProject(project: RenkuProject,
+                                        dataset: testentities.Dataset[testentities.Dataset.Provenance]
+  )(implicit ru: RenkuUrl): DatasetProject =
+    DatasetProject(project.resourceId,
+                   project.path,
+                   project.name,
+                   project.visibility,
+                   dataset.identification.identifier
+    )
 }

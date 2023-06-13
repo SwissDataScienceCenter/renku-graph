@@ -20,11 +20,13 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 
 import cats.MonadThrow
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import io.renku.triplesstore.{DatasetName, TSAdminClient}
@@ -33,18 +35,21 @@ import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class DatasetsRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory with TableDrivenPropertyChecks {
+class DatasetsRemoverSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with MockFactory
+    with TableDrivenPropertyChecks {
 
   "run" should {
 
     TSAdminClient.RemovalResult.Removed :: TSAdminClient.RemovalResult.NotExisted :: Nil foreach { result =>
       s"succeed when 'renku' dataset removal has finished with $result" in new TestCase {
 
-        givenDSRemoval(of = renkuDataset, returning = result.pure[Try])
+        givenDSRemoval(of = renkuDataset, returning = result.pure[IO])
 
-        dsRemover.run().value shouldBe ().asRight.pure[Try]
+        dsRemover.run().value.unsafeRunSync() shouldBe ().asRight
 
         logger.loggedOnly(Info(show"$categoryName: ${dsRemover.name} -> 'renku' $result"))
       }
@@ -53,9 +58,9 @@ class DatasetsRemoverSpec extends AnyWordSpec with should.Matchers with MockFact
     "return a Recoverable Error if in case of an exception the given strategy returns one" in new TestCase {
 
       val exception = exceptions.generateOne
-      givenDSRemoval(of = renkuDataset, returning = exception.raiseError[Try, TSAdminClient.RemovalResult])
+      givenDSRemoval(of = renkuDataset, returning = exception.raiseError[IO, TSAdminClient.RemovalResult])
 
-      dsRemover.run().value shouldBe recoverableError.asLeft.pure[Try]
+      dsRemover.run().value.unsafeRunSync() shouldBe recoverableError.asLeft
     }
   }
 
@@ -69,11 +74,11 @@ class DatasetsRemoverSpec extends AnyWordSpec with should.Matchers with MockFact
       }
     }
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val tsAdminClient  = mock[TSAdminClient[Try]]
-    lazy val dsRemover = new DatasetsRemoverImpl[Try](tsAdminClient, recoveryStrategy)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tsAdminClient  = mock[TSAdminClient[IO]]
+    lazy val dsRemover = new DatasetsRemoverImpl[IO](tsAdminClient, recoveryStrategy)
 
-    def givenDSRemoval(of: DatasetName, returning: Try[TSAdminClient.RemovalResult]) =
+    def givenDSRemoval(of: DatasetName, returning: IO[TSAdminClient.RemovalResult]) =
       (tsAdminClient.removeDataset _).expects(of).returning(returning)
   }
 }

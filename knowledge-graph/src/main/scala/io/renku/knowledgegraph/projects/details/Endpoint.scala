@@ -72,13 +72,13 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
   def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
       request: Request[F]
-  ): F[Response[F]] = measureExecutionTime {
+  ): F[Response[F]] = measureAndLogTime(finishedSuccessfully(path)) {
     projectFinder
       .findProject(path, maybeAuthUser)
       .flatTap(sendProjectViewedEvent(maybeAuthUser))
       .flatMap(toHttpResult(path))
       .recoverWith(httpResult(path))
-  } map logExecutionTimeWhen(finishedSuccessfully(path))
+  }
 
   private def sendProjectViewedEvent(maybeAuthUser: Option[AuthUser]): Option[Project] => F[Unit] = {
     case None => ().pure[F]

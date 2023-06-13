@@ -210,7 +210,6 @@ class EventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe None
-
       }
   }
 

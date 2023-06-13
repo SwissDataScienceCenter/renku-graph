@@ -66,5 +66,5 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       }
   }
 
-  override def onRollback(event: RollbackToNew): RollbackOp[F] = RollbackOp.none
+  override def onRollback(event: RollbackToNew): RollbackOp[F] = RollbackOp.empty
 }

@@ -18,21 +18,22 @@
 
 package io.renku.triplesgenerator.config
 
+import cats.effect.IO
 import com.typesafe.config.ConfigFactory
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.config.TriplesGeneration._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Success, Try}
 
-class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {
+class TriplesGenerationSpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     "return RenkuLog with the defaults from application.conf" in {
-      TriplesGeneration[Try]() shouldBe Success(RenkuLog)
+      TriplesGeneration[IO]().unsafeRunSync() shouldBe RenkuLog
     }
 
     "return RenkuLog if 'triples-generation' config value is set to 'renku-log'" in {
@@ -40,7 +41,7 @@ class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {
         Map("triples-generation" -> "renku-log").asJava
       )
 
-      TriplesGeneration[Try](config) shouldBe Success(RenkuLog)
+      TriplesGeneration[IO](config).unsafeRunSync() shouldBe RenkuLog
     }
 
     "return an instance of RemoteTriplesGeneration if 'triples-generation' config value is set to 'remote-generator'" in {
@@ -49,9 +50,9 @@ class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {
         Map("triples-generation" -> "remote-generator").asJava
       )
 
-      TriplesGeneration[Try](config) shouldBe Success(RemoteTriplesGeneration)
+      TriplesGeneration[IO](config).unsafeRunSync() shouldBe RemoteTriplesGeneration
     }
   }
 
-  private implicit val logger: TestLogger[Try] = TestLogger[Try]()
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
 }

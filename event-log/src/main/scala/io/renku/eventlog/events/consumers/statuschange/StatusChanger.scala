@@ -26,6 +26,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.UpdateOp
 import io.renku.eventlog.metrics.EventStatusGauges
+import org.typelevel.log4cats.Logger
 import skunk.Transaction
 
 private trait StatusChanger[F[_]] {
@@ -33,12 +34,13 @@ private trait StatusChanger[F[_]] {
 }
 
 private object StatusChanger {
-  def apply[F[_]: MonadCancelThrow: SessionResource: EventStatusGauges]: F[StatusChanger[F]] =
+  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: EventStatusGauges]: F[StatusChanger[F]] =
     MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](GaugesUpdater[F]))
 }
 
-private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
-    extends StatusChanger[F] {
+private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource: Logger](
+    gaugesUpdater: GaugesUpdater[F]
+) extends StatusChanger[F] {
 
   import gaugesUpdater._
 
@@ -51,9 +53,10 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
             updateResults <-
               dbUpdater
                 .updateDB(event)
-                .flatMapF(res => transaction.commit.map(_ => res))
-                .recoverWith(rollback(transaction)(savepoint)(event)(dbUpdater))
-            _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case _ => Kleisli.pure(()) }
+                .flatMapF(res => transaction.commit.as(res))
+                .handleErrorWith(rollback(transaction)(savepoint)(event)(dbUpdater))
+            _ <-
+              Kleisli.liftF(updateGauges(updateResults).handleErrorWith(Logger[F].error(_)("Updating gauges failed")))
           } yield ()
         } run session
       }
@@ -61,13 +64,14 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
 
   private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
       dbUpdater: DBUpdater[F, E]
-  ): PartialFunction[Throwable, UpdateOp[F]] = { case err =>
+  ): Throwable => UpdateOp[F] = { err =>
+    val throwAll: PartialFunction[Throwable, UpdateOp[F]] = { e => Kleisli.liftF(e.raiseError[F, DBUpdateResults]) }
+
     Kleisli.liftF {
-      for {
-        _ <- transaction.rollback(savepoint)
-        _ <- SessionResource[F].useK(dbUpdater onRollback event)
-        _ <- err.raiseError[F, DBUpdateResults]
-      } yield DBUpdateResults.ForProjects.empty
+      transaction.rollback(savepoint) >>
+        SessionResource[F].useK(
+          (dbUpdater onRollback event).applyOrElse(err, throwAll)
+        )
     }
   }
 }
