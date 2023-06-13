@@ -37,6 +37,9 @@ final case class CacheConfig(
 ) {
   def isExpired(key: Key[_], currentTime: FiniteDuration) =
     evictStrategy.isExpired(key, ttl, currentTime)
+
+  def isDisabled: Boolean =
+    ttl <= Duration.Zero || clearConfig.maximumSize <= 0
 }
 
 object CacheConfig {

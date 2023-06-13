@@ -31,8 +31,8 @@ private[cache] final case class CacheState[A, B](
   def get(key: A, currentTime: FiniteDuration): (CacheState[A, B], CacheResult[Option[B]]) =
     data
       .get(key)
-      .map { case (k, r) => (k, r, config.isExpired(k, currentTime)) }
-      .map { case (curKey, result, expired) =>
+      .map { case (curKey, result) =>
+        val expired  = config.isExpired(curKey, currentTime)
         val nextKeys = keys - curKey
         val newKey   = curKey.withAccessedAt(currentTime)
 

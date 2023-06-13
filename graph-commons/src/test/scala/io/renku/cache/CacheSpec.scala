@@ -38,8 +38,6 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
 
   val cacheResource: Resource[IO, Cache[IO, String, Int]] = Cache.memoryAsync[IO, String, Int](config)
 
-  val key1 = new Key[String]("a", 0, 0)
-
   "Cache" should {
     "not run the function on a hit" in {
       val counter = Ref.unsafe[IO, Int](0)
@@ -52,6 +50,40 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
           _ = v1 shouldBe List.fill(5)(Some(1))
           c <- counter.get
           _ = c shouldBe 1
+        } yield ()
+      }
+    }
+
+    "run the function when expired" in {
+      val counter = Ref.unsafe[IO, Int](0)
+      val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
+      val cfg = config.copy(ttl = 0.1.second)
+
+      Cache.memoryAsyncF[IO, String, Int](cfg).flatMap { cache =>
+        val calcCached = cache.withCache(calc)
+        for {
+          v1 <- List.fill(5)("a").traverse(calcCached)
+          _ = v1 shouldBe List.fill(5)(Some(1))
+          c <- counter.get
+          _ = c shouldBe 1
+          _  <- IO.sleep(1.seconds) // TODO move Clock[F].currentTime to config
+          v2 <- List.fill(5)("a").traverse(calcCached)
+          _ = v2 shouldBe List.fill(5)(Some(2))
+          c2 <- counter.get
+          _ = c2 shouldBe 2
+        } yield ()
+      }
+    }
+
+    "create a noop cache when disabled via config" in {
+      val counter = Ref.unsafe[IO, Int](0)
+      val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
+      val cfg = config.copy(ttl = 0.seconds)
+      Cache.memoryAsyncF[IO, String, Int](cfg).flatMap { cache =>
+        val calcCached = cache.withCache(calc)
+        for {
+          v1 <- List.fill(5)("a").traverse(calcCached)
+          _ = v1 shouldBe List.range(1, 6).map(_.some)
         } yield ()
       }
     }

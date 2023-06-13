@@ -35,46 +35,47 @@ object Cache {
   def noop[F[_], A, B]: Cache[F, A, B] =
     (f: A => F[Option[B]]) => f
 
-  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig): Resource[F, Cache[F, A, B]] = {
-    val refState =
-      Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
+  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig): Resource[F, Cache[F, A, B]] =
+    if (cacheConfig.isDisabled) Resource.pure(noop[F, A, B])
+    else {
+      val refState =
+        Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
 
-    Resource.eval(refState).flatMap { state =>
-      val (cache, clear) = baseCacheAndClearing(cacheConfig, state)
+      Resource.eval(refState).flatMap { state =>
+        val cache = baseCache[F, A, B](state)
+        val clear = cacheClearing(cacheConfig, state)
 
-      Async[F]
-        .background(fs2.Stream.repeatEval(clear).compile.drain)
-        .as(cache)
+        Async[F]
+          .background(fs2.Stream.repeatEval(clear).compile.drain)
+          .as(cache)
+      }
     }
-  }
 
-  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig): F[Cache[F, A, B]] = {
-    val refState =
-      Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
+  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig): F[Cache[F, A, B]] =
+    if (cacheConfig.isDisabled) noop[F, A, B].pure[F]
+    else {
+      val refState =
+        Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
 
-    refState.flatMap { state =>
-      val (cache, clear) = baseCacheAndClearing(cacheConfig, state)
-      Spawn[F].start(clear).as(cache)
+      refState.flatMap { state =>
+        val cache = baseCache[F, A, B](state)
+        val clear = cacheClearing(cacheConfig, state)
+        Spawn[F].start(clear).as(cache)
+      }
     }
-  }
 
-  private[cache] def baseCacheAndClearing[F[_]: Sync: Temporal, A, B](
+  private[cache] def cacheClearing[F[_]: Sync: Temporal, A, B](
       cacheConfig: CacheConfig,
       state:       Ref[F, CacheState[A, B]]
-  ) = {
-    val cache: Cache[F, A, B] = baseCache[F, A, B](state)
-    val clear =
-      cacheConfig.clearConfig match {
-        case ClearConfig.Periodic(_, interval) =>
-          Stream
-            .awakeEvery(interval)
-            .evalMap(_ => state.update(_.shrink))
-            .compile
-            .drain
-      }
-
-    (cache, clear)
-  }
+  ) =
+    cacheConfig.clearConfig match {
+      case ClearConfig.Periodic(_, interval) =>
+        Stream
+          .awakeEvery(interval)
+          .evalMap(_ => state.update(_.shrink))
+          .compile
+          .drain
+    }
 
   private[cache] def baseCache[F[_]: Sync, A, B](
       state: Ref[F, CacheState[A, B]]
