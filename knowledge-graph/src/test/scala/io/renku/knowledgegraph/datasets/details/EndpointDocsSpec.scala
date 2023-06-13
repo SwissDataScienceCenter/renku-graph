@@ -21,8 +21,8 @@ package io.renku.knowledgegraph.datasets.details
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
+import io.renku.graph.model.{GitLabUrl, RenkuUrl}
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -35,6 +35,7 @@ class EndpointDocsSpec extends AnyWordSpec {
     }
   }
 
-  private implicit lazy val renkuUrl:  renku.ApiUrl = renkuApiUrls.generateOne
-  private implicit lazy val gitLabUrl: GitLabUrl    = gitLabUrls.generateOne
+  private implicit lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
+  private implicit lazy val renkuUrl:    RenkuUrl     = renkuUrls.generateOne
+  private implicit lazy val gitLabUrl:   GitLabUrl    = gitLabUrls.generateOne
 }

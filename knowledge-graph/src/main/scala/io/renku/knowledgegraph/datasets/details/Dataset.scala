@@ -27,16 +27,15 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.{GitLabUrl, RenkuUrl}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 
 private sealed trait Dataset extends Product with Serializable {
   val resourceId:         ResourceId
-  val id:                 Identifier
   val title:              Title
   val name:               Name
   val versions:           DatasetVersions
@@ -49,12 +48,14 @@ private sealed trait Dataset extends Product with Serializable {
   val usedIn:             List[DatasetProject]
   val keywords:           List[Keyword]
   val images:             List[ImageUri]
+
+  lazy val widen: Dataset = this
+  def fold[A](fnm: Dataset.NonModifiedDataset => A, fm: Dataset.ModifiedDataset => A): A
 }
 
 private object Dataset {
 
   final case class NonModifiedDataset(resourceId:         ResourceId,
-                                      id:                 Identifier,
                                       title:              Title,
                                       name:               Name,
                                       sameAs:             SameAs,
@@ -68,10 +69,11 @@ private object Dataset {
                                       usedIn:             List[DatasetProject],
                                       keywords:           List[Keyword],
                                       images:             List[ImageUri]
-  ) extends Dataset
+  ) extends Dataset {
+    def fold[A](fnm: Dataset.NonModifiedDataset => A, fm: Dataset.ModifiedDataset => A): A = fnm(this)
+  }
 
   final case class ModifiedDataset(resourceId:         ResourceId,
-                                   id:                 Identifier,
                                    title:              Title,
                                    name:               Name,
                                    derivedFrom:        DerivedFrom,
@@ -85,50 +87,54 @@ private object Dataset {
                                    usedIn:             List[DatasetProject],
                                    keywords:           List[Keyword],
                                    images:             List[ImageUri]
-  ) extends Dataset
+  ) extends Dataset {
+    def fold[A](fnm: Dataset.NonModifiedDataset => A, fm: Dataset.ModifiedDataset => A): A = fm(this)
+  }
 
   final case class DatasetPart(location: PartLocation)
   final case class DatasetVersions(initial: OriginalIdentifier)
   final case class Tag(name: model.publicationEvents.Name, maybeDesc: Option[model.publicationEvents.Description])
 
-  final case class DatasetProject(id:         model.projects.ResourceId,
-                                  path:       model.projects.Path,
-                                  name:       model.projects.Name,
-                                  visibility: Visibility
+  final case class DatasetProject(id:                model.projects.ResourceId,
+                                  path:              model.projects.Path,
+                                  name:              model.projects.Name,
+                                  visibility:        Visibility,
+                                  datasetIdentifier: model.datasets.Identifier
   )
 
   // format: off
-  implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
-    Json.obj(
-      List(
-        ("identifier" -> dataset.id.asJson).some,
-        ("name" -> dataset.name.asJson).some,
-        ("slug" -> dataset.name.asJson).some,
-        ("title" -> dataset.title.asJson).some,
-        ("url" -> dataset.resourceId.asJson).some,
-        dataset match {
-          case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
-          case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some
-        },
-        ("versions" -> dataset.versions.asJson).some,
-        dataset.maybeInitialTag.map(tag => "tags" -> json"""{"initial": ${tag.asJson}}"""),
-        dataset.maybeDescription.map(description => "description" -> description.asJson),
-        ("published" -> (dataset.creators -> dataset.createdOrPublished).asJson).some,
-        dataset.createdOrPublished match {
-          case DatePublished(_)  => Option.empty[(String, Json)]
-          case DateCreated(date) => ("created" -> date.asJson).some
-        },
-        ("hasPart" -> dataset.parts.asJson).some,
-        ("project" -> dataset.project.asJson).some,
-        ("usedIn" -> dataset.usedIn.asJson).some,
-        ("keywords" -> dataset.keywords.asJson).some,
-        ("images" -> (dataset.images, dataset.project).asJson).some
-      ).flatten: _*
-    ) deepMerge _links(
-      Rel.Self -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.id)),
-      Rel("initial-version") -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.versions.initial.asIdentifier)),
-      Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
-    )
+  def encoder(requestedDataset: RequestedDataset)(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl, renkuUrl: RenkuUrl): Encoder[Dataset] =
+    Encoder.instance[Dataset] { dataset =>
+      Json.obj(
+        List(
+          ("identifier" -> requestedDataset.asJson).some,
+          ("name" -> dataset.name.asJson).some,
+          ("slug" -> dataset.name.asJson).some,
+          ("title" -> dataset.title.asJson).some,
+          ("url" -> dataset.resourceId.asJson).some,
+          dataset match {
+            case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
+            case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some
+          },
+          ("versions" -> dataset.versions.asJson).some,
+          dataset.maybeInitialTag.map(tag => "tags" -> json"""{"initial": ${tag.asJson}}"""),
+          dataset.maybeDescription.map(description => "description" -> description.asJson),
+          ("published" -> (dataset.creators -> dataset.createdOrPublished).asJson).some,
+          dataset.createdOrPublished match {
+            case DatePublished(_)  => Option.empty[(String, Json)]
+            case DateCreated(date) => ("created" -> date.asJson).some
+          },
+          ("hasPart" -> dataset.parts.asJson).some,
+          ("project" -> dataset.project.asJson).some,
+          ("usedIn" -> dataset.usedIn.asJson).some,
+          ("keywords" -> dataset.keywords.asJson).some,
+          ("images" -> (dataset.images, dataset.project).asJson).some
+        ).flatten: _*
+      ) deepMerge _links(
+        Rel.Self -> Endpoint.href(renkuApiUrl, requestedDataset),
+        Rel("initial-version") -> Endpoint.href(renkuApiUrl, RequestedDataset(dataset.versions.initial.asIdentifier)),
+        Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
+      )
   }
   // format: on
 
@@ -142,15 +148,15 @@ private object Dataset {
     }"""
   }
 
-  // format: off
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
-    Json.obj(List(
-      ("name" -> creator.name.asJson).some,
-      creator.maybeEmail.map(email => "email" -> email.asJson),
-      creator.maybeAffiliation.map(affiliation => "affiliation" -> affiliation.asJson)
-    ).flatten: _*)
+    Json.obj(
+      List(
+        ("name" -> creator.name.asJson).some,
+        creator.maybeEmail.map(email => "email" -> email.asJson),
+        creator.maybeAffiliation.map(affiliation => "affiliation" -> affiliation.asJson)
+      ).flatten: _*
+    )
   }
-  // format: on
 
   private implicit lazy val partEncoder: Encoder[DatasetPart] = Encoder.instance[DatasetPart] { part =>
     json"""{
@@ -161,9 +167,12 @@ private object Dataset {
   private implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[DatasetProject] =
     Encoder.instance[DatasetProject] { project =>
       json"""{
-        "path": ${project.path},
-        "name": ${project.name},
-        "visibility": ${project.visibility}
+        "path":       ${project.path},
+        "name":       ${project.name},
+        "visibility": ${project.visibility},
+        "dataset": {
+          "identifier": ${project.datasetIdentifier}
+        }
       }""" deepMerge _links(Link(Rel("project-details") -> projects.details.Endpoint.href(renkuApiUrl, project.path)))
     }
 
