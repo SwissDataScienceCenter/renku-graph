@@ -18,32 +18,35 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata
 
+import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import io.circe.syntax._
 import io.renku.events.EventRequestContent
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventsGenerators.zippedEventPayloads
-import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
+import io.renku.triplesgenerator.api.events.Generators._
+import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
+class EventDecoderSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with EitherValues {
 
   "decode" should {
 
     "extract SyncRepoMetadata with project path only if there's no payload in the request" in {
-
-      val event = syncRepoMetadataEvents.generateOne.copy(maybePayload = None)
-
+      val event = syncRepoMetadataWithoutPayloadEvents.generateOne
       EventDecoder.decode(EventRequestContent.NoPayload(event.asJson)).value shouldBe event
     }
 
     "extract SyncRepoMetadata with payload if there are both path and payload in the request" in {
-
-      val payload = zippedEventPayloads.generateOne
-      val event   = syncRepoMetadataEvents.generateOne.copy(maybePayload = Some(payload))
-
-      EventDecoder.decode(EventRequestContent.WithPayload(event.asJson, payload)).value shouldBe event
+      syncRepoMetadataWithPayloadEvents[IO]
+        .map(_.generateOne)
+        .asserting {
+          case event @ SyncRepoMetadata(_, Some(payload)) =>
+            EventDecoder.decode(EventRequestContent.WithPayload(event.asJson, payload)).value shouldBe event
+          case _ =>
+            fail("expecting payload")
+        }
     }
   }
 }

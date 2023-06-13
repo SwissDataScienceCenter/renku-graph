@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.syncrepometadata
+package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
-import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import io.renku.graph.model.projects
 
-private trait EventProcessor[F[_]] {
-  def process(event: SyncRepoMetadata): F[Unit]
+private trait GLDataFinder[F[_]] {
+  def fetchGLData(path: projects.Path): F[Option[DataExtract]]
 }

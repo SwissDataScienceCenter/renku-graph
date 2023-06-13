@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.api.events
 
 import Generators._
 import cats.Show
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.syntax._
@@ -28,6 +29,7 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.http.client.RestClient
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
 import org.scalatest.matchers.should
@@ -35,7 +37,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
+class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues with IOSpec {
 
   "send ProjectActivated" should {
 
@@ -89,7 +91,10 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
 
     "send the given event without the payload through the EventSender" in new TestCase {
 
-      val event = syncRepoMetadataEvents.generateOne.copy(maybePayload = None)
+      val event = syncRepoMetadataEvents[IO]
+        .unsafeRunSync()
+        .generateOne
+        .copy(maybePayload = None)
 
       givenSending(event, SyncRepoMetadata.categoryName, returning = ().pure[Try])
 
@@ -99,7 +104,10 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     "send the given event with the payload through the EventSender" in new TestCase {
 
       val payload = zippedEventPayloads.generateOne
-      val event   = syncRepoMetadataEvents.generateOne.copy(maybePayload = payload.some)
+      val event = syncRepoMetadataEvents[IO]
+        .unsafeRunSync()
+        .generateOne
+        .copy(maybePayload = payload.some)
 
       givenSending(event, payload, SyncRepoMetadata.categoryName, returning = ().pure[Try])
 

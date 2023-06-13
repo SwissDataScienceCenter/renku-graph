@@ -24,6 +24,7 @@ import io.renku.events.{CategoryName, consumers}
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.typelevel.log4cats.Logger
+import processor.EventProcessor
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName = categoryName,

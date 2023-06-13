@@ -19,63 +19,75 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata
 
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
 import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
-import org.scalamock.scalatest.MockFactory
+import io.renku.triplesgenerator.events.consumers.syncrepometadata.processor.EventProcessor
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class EventHandlerSpec extends AnyWordSpec with should.Matchers with IOSpec with MockFactory {
+class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "handlingDefinition.decode" should {
 
-    "be EventDecoder.decode" in new TestCase {
+    "be EventDecoder.decode" in {
+
+      expectTSReadinessCheckerCall
+
       handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
     }
   }
 
   "handlingDefinition.process" should {
 
-    "be the EventProcessor.process" in new TestCase {
+    "be the EventProcessor.process" in {
 
-      val event = syncRepoMetadataEvents.generateOne
+      expectTSReadinessCheckerCall
 
-      (eventProcessor.process _).expects(event).returns(().pure[IO])
+      syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
+        (eventProcessor.process _).expects(event).returns(().pure[IO])
 
-      handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
+        handler.createHandlingDefinition().process(event).asserting(_ shouldBe ())
+      }
     }
   }
 
   "handlingDefinition.precondition" should {
 
-    "be the TSReadinessForEventsChecker.verifyTSReady" in new TestCase {
-      handler.createHandlingDefinition().precondition.unsafeRunSync() shouldBe readinessCheckerResult
+    "be the TSReadinessForEventsChecker.verifyTSReady" in {
+
+      expectTSReadinessCheckerCall
+
+      handler.createHandlingDefinition().precondition.asserting(_ shouldBe readinessCheckerResult)
     }
   }
 
   "handlingDefinition.onRelease" should {
 
-    "not be defined" in new TestCase {
+    "not be defined" in {
+
+      expectTSReadinessCheckerCall
+
       handler.createHandlingDefinition().onRelease shouldBe None
     }
   }
 
-  private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    private val tsReadinessChecker = mock[TSReadinessForEventsChecker[IO]]
-    val readinessCheckerResult     = eventSchedulingResults.generateSome
+  private lazy val tsReadinessChecker     = mock[TSReadinessForEventsChecker[IO]]
+  private lazy val readinessCheckerResult = eventSchedulingResults.generateSome
+
+  private def expectTSReadinessCheckerCall =
     (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
 
-    val eventProcessor = mock[EventProcessor[IO]]
+  private lazy val eventProcessor = mock[EventProcessor[IO]]
 
-    val handler =
-      new EventHandler[IO](categoryName, tsReadinessChecker, EventDecoder, eventProcessor, mock[ProcessExecutor[IO]])
-  }
+  private lazy val handler =
+    new EventHandler[IO](categoryName, tsReadinessChecker, EventDecoder, eventProcessor, mock[ProcessExecutor[IO]])
 }

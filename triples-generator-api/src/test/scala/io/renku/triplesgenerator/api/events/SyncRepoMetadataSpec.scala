@@ -18,8 +18,9 @@
 
 package io.renku.triplesgenerator.api.events
 
-import Generators.syncRepoMetadataEvents
+import Generators.{syncRepoMetadataEvents, syncRepoMetadataWithoutPayloadEvents}
 import cats.effect.IO
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -31,56 +32,59 @@ import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.projects
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{EitherValues, OptionValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class SyncRepoMetadataSpec
-    extends AnyWordSpec
+    extends AsyncWordSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with OptionValues
     with EitherValues
-    with IOSpec
-    with MockFactory {
+    with AsyncIOSpec
+    with AsyncMockFactory {
 
   "maybeJsonLDPayload" should {
 
     "return None if no payload given" in {
-      syncRepoMetadataEvents.generateOne.copy(maybePayload = None).maybeJsonLDPayload shouldBe None
+      syncRepoMetadataWithoutPayloadEvents.generateOne.maybeJsonLDPayload shouldBe None
     }
 
     "return some failure if payload cannot be unzipped or parsed to JSON-LD" in {
 
-      val result = syncRepoMetadataEvents.generateOne
-        .copy(maybePayload = zippedEventPayloads.generateSome)
-        .maybeJsonLDPayload
-        .value
+      val result = syncRepoMetadataEvents[IO].map(
+        _.generateOne
+          .copy(maybePayload = zippedEventPayloads.generateSome)
+          .maybeJsonLDPayload
+          .value
+      )
 
-      result.left.value shouldBe a[Exception]
+      result.asserting(_.left.value shouldBe a[Exception])
     }
 
     "return some JSON-LD payload for a valid payload" in {
 
       val jsonLDPayload = jsonLDEntities.generateOne
 
-      syncRepoMetadataEvents.generateOne
-        .copy(maybePayload = ZippedEventPayload(Zip.zip[IO](jsonLDPayload.toJson.noSpaces).unsafeRunSync()).some)
-        .maybeJsonLDPayload
-        .value shouldBe jsonLDPayload.asRight
+      syncRepoMetadataEvents[IO]
+        .map(
+          _.generateOne
+            .copy(maybePayload = ZippedEventPayload(Zip.zip[IO](jsonLDPayload.toJson.noSpaces).unsafeRunSync()).some)
+            .maybeJsonLDPayload
+        )
+        .asserting(_.value shouldBe jsonLDPayload.asRight)
     }
   }
 
   "json codec" should {
 
     "encode and decode the event part" in {
-
-      val event = syncRepoMetadataEvents.generateOne
-
-      event.asJson.hcursor.as[SyncRepoMetadata].value shouldBe event.copy(maybePayload = None)
+      syncRepoMetadataEvents[IO]
+        .map(_.generateOne)
+        .asserting(event => event.asJson.hcursor.as[SyncRepoMetadata].value shouldBe event.copy(maybePayload = None))
     }
 
     "be able to decode json valid from the contract point of view" in {
