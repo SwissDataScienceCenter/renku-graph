@@ -33,10 +33,10 @@ import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
-import io.renku.triplesstore._
-import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.triplesstore.client.sparql.Fragment
+import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
@@ -55,8 +55,11 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   def findBaseDetails(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Option[Dataset]] = {
     implicit val decoder: Decoder[Option[Dataset]] = maybeDatasetDecoder(identifier)
-    queryExpecting[Option[Dataset]](selectQuery =
-      identifier.fold(queryWithIdentifier(_, authContext), queryWithSameAs(_, authContext))
+    queryExpecting[Option[Dataset]](
+      identifier.fold(
+        queryWithIdentifier(_, authContext),
+        queryWithSameAs(_, authContext)
+      )
     )
   }
 
@@ -64,9 +67,9 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     SparqlQuery.of(
       name = "ds by id - details",
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-      sparql"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug
+      sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished 
-               |  ?projectId ?projectPath ?projectName ?projectVisibility
+               |  ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
                |WHERE {        
                |  {
                |    SELECT ?projectId ?projectPath ?projectName ?projectVisibility
@@ -74,7 +77,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |      GRAPH ?projectId {
                |        ?datasetId a schema:Dataset;
                |                   schema:identifier ${identifier.asObject};
-               |                   ^renku:hasDataset  ?projectId.
+               |                   ^renku:hasDataset ?projectId.
                |        ?projectId schema:dateCreated ?dateCreated ;
                |                   schema:name ?projectName;
                |                   renku:projectVisibility ?projectVisibility;
@@ -96,7 +99,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |
                |  GRAPH ?projectId {
                |    ?datasetId schema:identifier ${identifier.asObject};
-               |               schema:identifier ?identifier;
+               |               schema:identifier ?projectDSId;
                |               a schema:Dataset;
                |               ^renku:hasDataset ?projectId;
                |               schema:name ?name;
@@ -116,9 +119,9 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     SparqlQuery.of(
       name = "ds by sameAs - details",
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-      sparql"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug
+      sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished
-               |  ?projectId ?projectPath ?projectName ?projectVisibility
+               |  ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
                |WHERE {
                |  {
                |    SELECT ?datasetId ?projectId ?projectPath ?projectName ?projectVisibility
@@ -144,7 +147,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |
                |  GRAPH ?projectId {
                |    ?datasetId renku:topmostSameAs ?topmostSameAs;
-               |               schema:identifier ?identifier;
+               |               schema:identifier ?projectDSId;
                |               ^renku:hasDataset ?projectId;
                |               schema:name ?name;
                |               renku:slug ?slug;
@@ -167,7 +170,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     sparql"""|SELECT DISTINCT ?tagName ?maybeTagDesc
              |WHERE {
              |  GRAPH ${GraphClass.Project.id(ds.project.id)} {
-             |    ?datasetId schema:identifier ${ds.id.asObject};
+             |    ?datasetId schema:identifier ${ds.project.datasetIdentifier.asObject};
              |               schema:version ?version;
              |               schema:sameAs/schema:url ?originalDsId
              |  }
@@ -222,7 +225,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     Prefixes of schema -> "schema",
     sparql"""|SELECT DISTINCT ?keyword
              |FROM ${GraphClass.Project.id(ds.project.id)} {
-             |  ?datasetId schema:identifier ${ds.id.asObject};
+             |  ?datasetId schema:identifier ${ds.project.datasetIdentifier.asObject};
              |             schema:keywords ?keyword
              |}
              |ORDER BY ASC(?keyword)
@@ -237,10 +240,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     Prefixes of schema -> "schema",
     sparql"""|SELECT DISTINCT ?contentUrl
              |FROM ${GraphClass.Project.id(ds.project.id)} {
-             |  ?datasetId schema:identifier ${ds.id.asObject};
-             |             schema:image ?imageId .
+             |  ?datasetId schema:identifier ${ds.project.datasetIdentifier.asObject};
+             |             schema:image ?imageId.
              |  ?imageId a schema:ImageObject;
-             |           schema:contentUrl ?contentUrl ;
+             |           schema:contentUrl ?contentUrl;
              |           schema:position ?position
              |}
              |ORDER BY ASC(?position)
@@ -264,8 +267,8 @@ private object BaseDetailsFinderImpl {
   import io.renku.tinytypes.json.TinyTypeDecoders._
   import io.renku.triplesstore.ResultsDecoder._
 
-  private lazy val createDataset: (ResourceId,
-                                   Identifier,
+  private lazy val createDataset: (RequestedDataset,
+                                   ResourceId,
                                    Title,
                                    Name,
                                    Option[DerivedFrom],
@@ -275,10 +278,9 @@ private object BaseDetailsFinderImpl {
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (resourceId, id, title, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
+    case (_, resourceId, title, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
       ModifiedDataset(
         resourceId,
-        id,
         title,
         name,
         derived,
@@ -293,10 +295,9 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (resourceId, identifier, title, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
+    case (_, resourceId, title, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
       NonModifiedDataset(
         resourceId,
-        identifier,
         title,
         name,
         sameAs,
@@ -311,18 +312,17 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (identifier, title, _, _, _, _, _, _, _, _) =>
+    case (requestedDS, _, title, _, _, _, _, _, _, _) =>
       DecodingFailure(
-        s"'$title' dataset with id '$identifier' does not meet validation for modified nor non-modified dataset",
+        show"'$title' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
         Nil
       ).asLeft[Dataset]
   }
 
-  private[datasets] def maybeDatasetDecoder(identifier: RequestedDataset): Decoder[Option[Dataset]] =
+  private[datasets] def maybeDatasetDecoder(requestedDataset: RequestedDataset): Decoder[Option[Dataset]] =
     ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId       <- extract[ResourceId]("datasetId")
-        identifier       <- extract[Identifier]("identifier")
         title            <- extract[Title]("name")
         name             <- extract[Name]("slug")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
@@ -343,11 +343,12 @@ private object BaseDetailsFinderImpl {
         project <- (extract[projects.ResourceId]("projectId"),
                     extract[projects.Path]("projectPath"),
                     extract[projects.Name]("projectName"),
-                    extract[projects.Visibility]("projectVisibility")
+                    extract[projects.Visibility]("projectVisibility"),
+                    extract[datasets.Identifier]("projectDSId")
                    ).mapN(DatasetProject)
 
-        dataset <- createDataset(resourceId,
-                                 identifier,
+        dataset <- createDataset(requestedDataset,
+                                 resourceId,
                                  title,
                                  name,
                                  maybeDerivedFrom,
@@ -358,7 +359,7 @@ private object BaseDetailsFinderImpl {
                                  project
                    )
       } yield dataset
-    }(toOption(show"More than one dataset with $identifier id"))
+    }(toOption(show"More than one dataset with $requestedDataset id"))
 
   private implicit lazy val maybeInitialTagDecoder: Decoder[Option[Tag]] = ResultsDecoder[Option, Tag] { implicit cur =>
     (extract[publicationEvents.Name]("tagName") -> extract[Option[publicationEvents.Description]]("maybeTagDesc"))

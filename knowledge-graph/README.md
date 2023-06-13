@@ -149,7 +149,7 @@ Response body example:
 
 #### GET /knowledge-graph/datasets/:id
 
-Finds details of the dataset with the given `id`. The `id` can be either Dataset's _Identifier_ or a ResourceId of a group of the same Datasets existing on multiple projects.
+Finds details of the dataset with the given `id`. The `id` can be either Dataset's _Identifier_ or a _ResourceId_ of a group of the same Datasets existing on multiple projects.
 
 **Response**
 
@@ -167,7 +167,7 @@ Response body example:
   "_links": [
     {
       "rel":  "self",
-      "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+      "href": "https://zemdgsw:9540/datasets/sa23KQwnti57su5gsbmTB78JVrRZpPg9Rqb6y5MNAbxz7Rsav4bhw2s8TuaFpyGTGJgNZfCubX2fABZab5to5kDuuLigYbVDj"
     },
     {
       "rel":  "initial-version",
@@ -178,7 +178,7 @@ Response body example:
       "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
     }
   ],
-  "identifier": "22222222-2222-2222-2222-222222222222",
+  "identifier": "sa23KQwnti57su5gsbmTB78JVrRZpPg9Rqb6y5MNAbxz7Rsav4bhw2s8TuaFpyGTGJgNZfCubX2fABZab5to5kDuuLigYbVDj",
   "versions": {
     "initial": "11111111-1111-1111-1111-111111111111"
   },
@@ -224,8 +224,11 @@ Response body example:
         "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
       }
     ],
-    "path": "namespace1/project1-name",
-    "name": "project1 name",
+    "dataset": {
+      "identifier": "22222222-2222-2222-2222-222222222222"
+    },
+    "path":       "namespace1/project1-name",
+    "name":       "project1 name",
     "visibility": "public"
   },
   "usedIn": [
@@ -236,8 +239,11 @@ Response body example:
           "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
         }
       ],
-      "path": "namespace1/project1-name",
-      "name": "project1 name",
+      "dataset": {
+        "identifier": "33333333333"
+      },
+      "path":       "namespace1/project1-name",
+      "name":       "project1 name",
       "visibility": "public"
     },
     {
@@ -247,8 +253,11 @@ Response body example:
           "href": "https://zemdgsw:9540/projects/namespace2/project2-name"
         }
       ],
-      "path": "namespace2/project2-name",
-      "name": "project2 name",
+      "dataset": {
+        "identifier": "4444444444"
+      },
+      "path":       "namespace2/project2-name",
+      "name":       "project2 name",
       "visibility": "public"
     }
   ],

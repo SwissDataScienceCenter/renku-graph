@@ -23,26 +23,27 @@ import Dataset.{DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDat
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.circe.Decoder._
 import io.circe.syntax._
+import io.circe.{Decoder, DecodingFailure, HCursor, Json}
+import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.{datasets, projects, publicationEvents}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.graph.model._
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
-import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.rest.Links.Rel.Self
+import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -50,14 +51,14 @@ import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
-import org.http4s._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
@@ -93,13 +94,14 @@ class EndpointSpec
     ) { (dsType, dataset) =>
       s"respond with OK and sends a DATASET_VIEWED event in case a $dsType DS was found" in new TestCase {
 
-        val requestedDataset = RequestedDataset(dataset.id)
+        val requestedDataset =
+          dataset.fold(ds => RequestedDataset(ds.sameAs), ds => RequestedDataset(ds.project.datasetIdentifier))
 
         val authContext = authContexts(fixed(requestedDataset)).generateOne
 
         givenDatasetFinding(requestedDataset, authContext, returning = dataset.some.pure[IO])
 
-        givenDatasetViewedEventSent(dataset.id, authContext, returning = ().pure[IO])
+        givenDatasetViewedEventSent(dataset.project.datasetIdentifier, authContext, returning = ().pure[IO])
 
         val response = endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync()
 
@@ -107,13 +109,15 @@ class EndpointSpec
         response.contentType                 shouldBe `Content-Type`(MediaType.application.json).some
         response.as[Dataset].unsafeRunSync() shouldBe dataset
 
-        verifyLinks(response, dataset)
+        verifyLinks(response, dataset, requestedDataset)
         val responseCursor = response.as[Json].unsafeRunSync().hcursor
         verifyProject(responseCursor)
         verifyUsedIn(responseCursor, dataset)
         verifyImages(responseCursor, dataset)
 
-        logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
+        logger.loggedOnly(
+          Warn(show"Finding '$requestedDataset' dataset finished${executionTimeRecorder.executionTimeInfo}")
+        )
       }
     }
 
@@ -130,15 +134,14 @@ class EndpointSpec
 
       givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
 
-      givenDatasetViewedEventSent(ds.id, authContext, returning = ().pure[IO])
+      givenDatasetViewedEventSent(ds.project.datasetIdentifier, authContext, returning = ().pure[IO])
 
       endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
     }
 
     "respond with NOT_FOUND if there is no dataset with the given id" in new TestCase {
 
-      val identifier       = datasetIdentifiers.generateOne
-      val requestedDataset = RequestedDataset(identifier)
+      val requestedDataset = RequestedDataset(datasetIdentifiers.generateOne)
       val authContext      = authContexts(fixed(requestedDataset)).generateOne
 
       givenDatasetFinding(requestedDataset, authContext, returning = Option.empty[Dataset].pure[IO])
@@ -148,15 +151,16 @@ class EndpointSpec
       response.status      shouldBe NotFound
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No '$identifier' dataset found").asJson
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(show"No '$requestedDataset' dataset found").asJson
 
-      logger.loggedOnly(Warn(show"Finding '$identifier' dataset finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(
+        Warn(show"Finding '$requestedDataset' dataset finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "respond with INTERNAL_SERVER_ERROR if finding the dataset fails" in new TestCase {
 
-      val identifier       = datasetIdentifiers.generateOne
-      val requestedDataset = RequestedDataset(identifier)
+      val requestedDataset = RequestedDataset(datasetIdentifiers.generateOne)
       val authContext      = authContexts(fixed(requestedDataset)).generateOne
 
       val exception = exceptions.generateOne
@@ -167,9 +171,9 @@ class EndpointSpec
       response.status      shouldBe InternalServerError
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding dataset '$identifier' failed").asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(show"Finding dataset '$requestedDataset' failed").asJson
 
-      logger.loggedOnly(Error(show"Finding dataset '$identifier' failed", exception))
+      logger.loggedOnly(Error(show"Finding dataset '$requestedDataset' failed", exception))
     }
 
     "do not fail if sending PROJECT_VIEWED event fails" in new TestCase {
@@ -179,14 +183,15 @@ class EndpointSpec
         .map((importedExternalToNonModified _).tupled)
         .generateOne
 
-      val requestedDataset = RequestedDataset(ds.id)
+      val requestedDataset =
+        ds.fold(ds => RequestedDataset(ds.sameAs), ds => RequestedDataset(ds.project.datasetIdentifier))
 
       val authContext = authContexts(fixed(requestedDataset)).generateOne
 
       givenDatasetFinding(requestedDataset, authContext, returning = ds.some.pure[IO])
 
       val exception = exceptions.generateOne
-      givenDatasetViewedEventSent(ds.id, authContext, returning = exception.raiseError[IO, Unit])
+      givenDatasetViewedEventSent(ds.project.datasetIdentifier, authContext, returning = exception.raiseError[IO, Unit])
 
       endpoint.`GET /datasets/:id`(requestedDataset, authContext).unsafeRunSync().status shouldBe Ok
 
@@ -198,14 +203,15 @@ class EndpointSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val datasetsFinder = mock[DatasetFinder[IO]]
-    private val renkuApiUrl    = renkuApiUrls.generateOne
-    private val gitLabUrl      = gitLabUrls.generateOne
     private val tgClient       = mock[triplesgenerator.api.events.Client[IO]]
     val executionTimeRecorder  = TestExecutionTimeRecorder[IO]()
-    private val currentTime    = Instant.now()
-    private val now            = mockFunction[Instant]
+    private implicit val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
+    private implicit val renkuUrl:    RenkuUrl     = renkuUrls.generateOne
+    private implicit val gitLabUrl:   GitLabUrl    = gitLabUrls.generateOne
+    private val currentTime = Instant.now()
+    private val now         = mockFunction[Instant]
     now.expects().returning(currentTime).anyNumberOfTimes()
-    val endpoint = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder, now)
+    val endpoint = new EndpointImpl[IO](datasetsFinder, tgClient, executionTimeRecorder, now)
 
     def givenDatasetViewedEventSent(identifier:  datasets.Identifier,
                                     authContext: AuthContext[RequestedDataset],
@@ -223,10 +229,10 @@ class EndpointSpec
       .expects(id, authContext)
       .returning(returning)
 
-    def verifyLinks(response: Response[IO], dataset: Dataset) =
+    def verifyLinks(response: Response[IO], dataset: Dataset, requestedDataset: RequestedDataset) =
       response.as[Json].unsafeRunSync()._links.value shouldBe Links
         .of(
-          Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
+          Self                   -> Href(Uri.unsafeFromString(renkuApiUrl.show) / "datasets" / requestedDataset),
           Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
           Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
         )
@@ -277,7 +283,6 @@ class EndpointSpec
 
   private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
-      id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
       name             <- cursor.downField("name").as[Name]
       resourceId       <- cursor.downField("url").as[ResourceId]
@@ -302,7 +307,6 @@ class EndpointSpec
     } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
       case (Some(sameAs), _, None) =>
         NonModifiedDataset(resourceId,
-                           id,
                            title,
                            name,
                            sameAs,
@@ -319,7 +323,6 @@ class EndpointSpec
         )
       case (None, Some(dateCreated), Some(derivedFrom)) =>
         ModifiedDataset(resourceId,
-                        id,
                         title,
                         name,
                         derivedFrom,
@@ -364,10 +367,11 @@ class EndpointSpec
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path       <- cursor.downField("path").as[projects.Path]
-      name       <- cursor.downField("name").as[projects.Name]
-      visibility <- cursor.downField("visibility").as[projects.Visibility]
-    } yield DatasetProject(projects.ResourceId(path), path, name, visibility)
+      path         <- cursor.downField("path").as[projects.Path]
+      name         <- cursor.downField("name").as[projects.Name]
+      visibility   <- cursor.downField("visibility").as[projects.Visibility]
+      dsIdentifier <- cursor.downField("dataset").downField("identifier").as[datasets.Identifier]
+    } yield DatasetProject(projects.ResourceId(path), path, name, visibility, dsIdentifier)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {
