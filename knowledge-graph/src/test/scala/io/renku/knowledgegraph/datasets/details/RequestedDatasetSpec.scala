@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.datasets.details
 
+import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{datasetExternalSameAs, datasetIdentifiers, datasetInternalSameAs, renkuUrls}
 import io.renku.graph.model.RenkuUrl
@@ -25,23 +26,28 @@ import org.http4s.Uri.Path.SegmentEncoder
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.OptionValues
+import org.scalatest.{EitherValues, OptionValues}
 
-class RequestedDatasetSpec extends AnyWordSpec with should.Matchers with OptionValues with TableDrivenPropertyChecks {
+class RequestedDatasetSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with OptionValues
+    with EitherValues
+    with TableDrivenPropertyChecks {
 
   private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
+  private val idTypeScenarios = Table(
+    "id type"         -> "id",
+    "Identifier"      -> RequestedDataset(datasetIdentifiers.generateOne),
+    "Internal sameAs" -> RequestedDataset(datasetInternalSameAs.generateOne),
+    "External sameAs" -> RequestedDataset(datasetExternalSameAs.generateOne)
+  )
+
   "url codec" should {
 
-    forAll {
-      Table(
-        "id type"         -> "id",
-        "identifier"      -> RequestedDataset(datasetIdentifiers.generateOne),
-        "internal sameAs" -> RequestedDataset(datasetInternalSameAs.generateOne),
-        "external sameAs" -> RequestedDataset(datasetExternalSameAs.generateOne)
-      )
-    } { (idType, id) =>
-      s"url encode and decode Dataset identified by $idType" in {
+    forAll(idTypeScenarios) { (idType, id) =>
+      s"url encode and decode Dataset identifier of $idType type" in {
 
         val encoded = implicitly[SegmentEncoder[RequestedDataset]].toSegment(id)
 
@@ -50,4 +56,12 @@ class RequestedDatasetSpec extends AnyWordSpec with should.Matchers with OptionV
     }
   }
 
+  "json codec" should {
+
+    forAll(idTypeScenarios) { (idType, id) =>
+      s"json encode and decode Dataset identifier of $idType type" in {
+        id.asJson.hcursor.as[RequestedDataset].value shouldBe id
+      }
+    }
+  }
 }

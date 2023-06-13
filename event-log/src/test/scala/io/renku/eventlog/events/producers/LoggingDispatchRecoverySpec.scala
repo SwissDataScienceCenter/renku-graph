@@ -20,6 +20,7 @@ package io.renku.eventlog.events.producers
 
 import Generators._
 import TestCategoryEvent.testCategoryEvents
+import cats.effect._
 import cats.syntax.all._
 import io.renku.events.Generators.{categoryNames, subscriberUrls}
 import io.renku.generators.Generators.Implicits._
@@ -31,8 +32,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Success, Try}
-
 class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "recover" should {
@@ -41,7 +40,7 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Ma
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
-      recovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
+      recovery.unsafeRunSync().recover(subscriber, event)(exception).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"$categoryName: $event, url = $subscriber failed", exception)
@@ -51,7 +50,7 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Ma
 
   "returnToQueue" should {
     "return unit" in new TestCase {
-      recovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
+      recovery.unsafeRunSync().returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[IO]
     }
   }
 
@@ -59,7 +58,7 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Ma
     val event = testCategoryEvents.generateOne
 
     val categoryName = categoryNames.generateOne
-    protected implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val Success(recovery) = LoggingDispatchRecovery[Try, TestCategoryEvent](categoryName)
+    protected implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val recovery = LoggingDispatchRecovery[IO, TestCategoryEvent](categoryName)
   }
 }

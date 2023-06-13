@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -48,7 +49,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
-import scala.util.Try
 
 class EventProcessorSpec
     extends AnyWordSpec
@@ -67,11 +67,11 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        .returning(maybeAccessToken.pure[IO])
 
       successfulTriplesGeneration(commitEvent -> jsonLDEntities.generateOne)
 
-      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Info(s"${commonLogMessage(commitEvent)} accepted"),
@@ -84,17 +84,17 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        .returning(maybeAccessToken.pure[IO])
 
       val exception = nonRecoverableMalformedRepoErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
-        .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
+        .returning(EitherT.liftF(exception.raiseError[IO, JsonLD]))
 
       expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
     }
 
     "log an error and succeed " +
@@ -103,17 +103,17 @@ class EventProcessorSpec
         val commitEvent = commitEvents.generateOne
 
         givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
-          .returning(maybeAccessToken.pure[Try])
+          .returning(maybeAccessToken.pure[IO])
 
         val exception = exceptions.generateOne
         (triplesFinder
           .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commitEvent, maybeAccessToken)
-          .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
+          .returning(EitherT.liftF(exception.raiseError[IO, JsonLD]))
 
         expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
-        eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+        eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
 
         logError(commitEvent, exception)
       }
@@ -123,17 +123,17 @@ class EventProcessorSpec
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        .returning(maybeAccessToken.pure[IO])
 
       val exception = logWorthyRecoverableErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
-        .returning(leftT[Try, JsonLD](exception))
+        .returning(leftT[IO, JsonLD](exception))
 
       expectEventMarkedAsRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
 
       logError(commitEvent, exception, exception.getMessage)
     }
@@ -144,17 +144,17 @@ class EventProcessorSpec
         val commitEvent = commitEvents.generateOne
 
         givenFetchingAccessToken(commitEvent.project.path)
-          .returning(maybeAccessToken.pure[Try])
+          .returning(maybeAccessToken.pure[IO])
 
         val exception = silentRecoverableErrors.generateOne
         (triplesFinder
           .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commitEvent, maybeAccessToken)
-          .returning(leftT[Try, JsonLD](exception))
+          .returning(leftT[IO, JsonLD](exception))
 
         expectEventMarkedAsRecoverableFailure(commitEvent, exception)
 
-        eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+        eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
 
         logger.getMessages(Error).isEmpty shouldBe true
       }
@@ -165,11 +165,11 @@ class EventProcessorSpec
 
       val exception = exceptions.generateOne
       givenFetchingAccessToken(commitEvent.project.path)
-        .returning(exception.raiseError[Try, Option[AccessToken]])
+        .returning(exception.raiseError[IO, Option[AccessToken]])
 
       expectEventRolledBackToNew(commitEvent)
 
-      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+      eventProcessor.process(commitEvent).unsafeRunSync() shouldBe ()
 
       logger.getMessages(Error).map(_.message) shouldBe List(s"${logMessageCommon(commitEvent)} processing failure")
     }
@@ -179,12 +179,12 @@ class EventProcessorSpec
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
-    implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
-    implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
-    val triplesFinder           = mock[TriplesGenerator[Try]]
-    val eventStatusUpdater      = mock[EventStatusUpdater[Try]]
-    val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val singleEventTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
+    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
+    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+    val triplesFinder           = mock[TriplesGenerator[IO]]
+    val eventStatusUpdater      = mock[EventStatusUpdater[IO]]
+    val allEventsTimeRecorder   = TestExecutionTimeRecorder[IO](maybeHistogram = None)
+    val singleEventTimeRecorder = TestExecutionTimeRecorder[IO](maybeHistogram = None)
     val eventProcessor = new EventProcessorImpl(
       triplesFinder,
       eventStatusUpdater,
@@ -202,7 +202,7 @@ class EventProcessorSpec
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
-        .returning(rightT[Try, ProcessingRecoverableError](payload))
+        .returning(rightT[IO, ProcessingRecoverableError](payload))
 
       expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
                                           commit.project.path,
@@ -223,14 +223,14 @@ class EventProcessorSpec
                  exception,
                  executionDelay
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
     }
 
     def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater
         .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable))
         .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, projectPath: Path, payload: JsonLD) =
       (eventStatusUpdater
@@ -240,13 +240,13 @@ class EventProcessorSpec
                  payload,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
     def expectEventRolledBackToNew(commit: CommitEvent) =
       (eventStatusUpdater
         .rollback(_: CompoundEventId, _: Path, _: RollbackStatus.New.type))
         .expects(commit.compoundEventId, commit.project.path, *)
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
     def logError(commit: CommitEvent, exception: Exception, message: String = "failed") =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))

@@ -27,7 +27,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.consumers.ConsumersModelGenerators
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import io.renku.graph.model.events.EventStatus._
@@ -237,8 +237,8 @@ class DbUpdaterSpec
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
 
       sessionResource
-        .useK(dbUpdater onRollback event)
-        .unsafeRunSync() shouldBe ()
+        .useK((dbUpdater onRollback event)(exceptions.generateOne))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
     }
   }
 

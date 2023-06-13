@@ -81,8 +81,7 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
   private def loggingError(projectPath: Path, location: Location): PartialFunction[Throwable, F[Option[Lineage]]] = {
     case NonFatal(ex) =>
       val message = s"Finding lineage for '$projectPath' and '$location' failed"
-      Logger[F].error(ex)(message)
-      new Exception(message, ex).raiseError[F, Option[Lineage]]
+      Logger[F].error(ex)(message) *> new Exception(message, ex).raiseError[F, Option[Lineage]]
   }
 }
 

@@ -18,7 +18,7 @@
 
 organization := "io.renku"
 name := "renku-graph"
-ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "2.13.11"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -133,7 +133,10 @@ lazy val webhookService = project
   .in(file("webhook-service"))
   .withId("webhook-service")
   .settings(commonSettings)
-  .dependsOn(eventLogApi % "compile->compile; test->test")
+  .dependsOn(
+    eventLogApi         % "compile->compile; test->test",
+    triplesGeneratorApi % "compile->compile; test->test"
+  )
   .enablePlugins(
     JavaAppPackaging,
     AutomateHeaderPlugin

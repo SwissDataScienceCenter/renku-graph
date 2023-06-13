@@ -20,15 +20,16 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{DateCreated, Description, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.syntax._
 
 private trait UpdatesCreator {
 
@@ -85,6 +86,8 @@ private trait UpdatesCreator {
                         dataset:    Dataset[Dataset.Provenance],
                         sameAsInKG: Set[SameAs]
   ): List[SparqlQuery]
+
+  def deletePublicationEvents(projectId: projects.ResourceId, dataset: Dataset[Dataset.Provenance]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -409,15 +412,39 @@ private object UpdatesCreator extends UpdatesCreator {
             SparqlQuery.of(
               name = "transformation - sameAs clean-up",
               Prefixes of schema -> "schema",
-              s"""|DELETE { GRAPH <${GraphClass.Project.id(projectId)}> { ?dsId schema:sameAs ?sameAs } }
-                  |WHERE {
-                  |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
-                  |  GRAPH <${GraphClass.Project.id(projectId)}> { ?dsId schema:sameAs ?sameAs }
-                  |  FILTER ( ?sameAs != <${dsSameAs.show}> )
-                  |}""".stripMargin
+              sparql"""|DELETE { GRAPH ${GraphClass.Project.id(projectId)} { ?dsId schema:sameAs ?sameAs } }
+                       |WHERE {
+                       |  BIND (${ds.resourceId.asEntityId} AS ?dsId)
+                       |  GRAPH ${GraphClass.Project.id(projectId)} { ?dsId schema:sameAs ?sameAs }
+                       |  FILTER ( ?sameAs != $dsSameAs )
+                       |}""".stripMargin
             )
           }
           .toList
     }
   }
+
+  override def deletePublicationEvents(projectId: projects.ResourceId,
+                                       ds:        Dataset[Dataset.Provenance]
+  ): List[SparqlQuery] = List(
+    SparqlQuery.of(
+      name = "transformation - publication event clean-up",
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE {
+               |  GRAPH ${GraphClass.Project.id(projectId)} {
+               |    ?about ?aboutP ?aboutO.
+               |    ?peId ?peP ?peO.
+               |  }
+               |}
+               |WHERE {
+               |  GRAPH ${GraphClass.Project.id(projectId)} {
+               |    ?about schema:url ${ds.resourceId.asEntityId};
+               |           ?aboutP ?aboutO.
+               |    ?peId a schema:PublicationEvent;
+               |          schema:about ?about;
+               |          ?peP ?peO
+               |  }
+               |}""".stripMargin
+    )
+  )
 }

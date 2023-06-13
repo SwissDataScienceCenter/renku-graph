@@ -93,7 +93,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
           new Exception(s"${categoryName.show}: insert last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false) }
 
   private def toNoneIfEventAlreadyTaken(event: MinProjectInfoEvent): Boolean => Option[MinProjectInfoEvent] = {
     case true  => Some(event)

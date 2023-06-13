@@ -57,7 +57,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
           usedInFiber     <- Spawn[F].start(findUsedIn(dataset, authContext))
           keywordsFiber   <- Spawn[F].start(findKeywords(dataset))
           imagesFiber     <- Spawn[F].start(findImages(dataset))
-          creatorsFiber   <- Spawn[F].start(findCreators(dataset.id, dataset.project.id))
+          creatorsFiber   <- Spawn[F].start(findCreators(dataset.project.datasetIdentifier, dataset.project.id))
           partsFiber      <- Spawn[F].start(findParts(dataset))
           maybeInitialTag <- initialTagFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("initial tag")))
           usedIn          <- usedInFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("usedIn")))

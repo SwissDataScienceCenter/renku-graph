@@ -24,19 +24,19 @@ import cats.effect._
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GitLabUrl
-import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.graph.model.{GitLabUrl, RenkuUrl}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.Href
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.DatasetViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.{Response, Uri}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Response, Uri}
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
@@ -48,40 +48,36 @@ trait Endpoint[F[_]] {
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
     datasetFinder:         DatasetFinder[F],
-    renkuApiUrl:           renku.ApiUrl,
-    gitLabUrl:             GitLabUrl,
     tgClient:              triplesgenerator.api.events.Client[F],
     executionTimeRecorder: ExecutionTimeRecorder[F],
     now:                   () => Instant = () => Instant.now()
-) extends Http4sDsl[F]
+)(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl, renkuUrl: RenkuUrl)
+    extends Http4sDsl[F]
     with Endpoint[F] {
 
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
-  private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
-
   def `GET /datasets/:id`(identifier: RequestedDataset, authContext: AuthContext[RequestedDataset]): F[Response[F]] =
-    measureExecutionTime {
+    measureAndLogTime(finishedSuccessfully(identifier)) {
       datasetFinder
         .findDataset(identifier, authContext)
         .flatTap(sendDatasetViewedEvent(authContext))
         .flatMap(toHttpResult(identifier))
         .recoverWith(httpResult(identifier))
-    } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+    }
 
   private def sendDatasetViewedEvent(authContext: AuthContext[RequestedDataset]): Option[Dataset] => F[Unit] = {
     case None => ().pure[F]
     case Some(ds) =>
       tgClient
-        .send(DatasetViewedEvent.forDataset(ds.id, authContext.maybeAuthUser.map(_.id), now))
+        .send(DatasetViewedEvent.forDataset(ds.project.datasetIdentifier, authContext.maybeAuthUser.map(_.id), now))
         .handleErrorWith(err => Logger[F].error(err)(show"sending ${DatasetViewedEvent.categoryName} event failed"))
   }
 
-  private def toHttpResult(identifier: RequestedDataset): Option[Dataset] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(show"No '$identifier' dataset found"))
-    case Some(dataset) => Ok(dataset.asJson)
+  private def toHttpResult(requestedDataset: RequestedDataset): Option[Dataset] => F[Response[F]] = {
+    case None          => NotFound(InfoMessage(show"No '$requestedDataset' dataset found"))
+    case Some(dataset) => Ok(dataset.asJson(Dataset.encoder(requestedDataset)))
   }
 
   private def httpResult(identifier: RequestedDataset): PartialFunction[Throwable, F[Response[F]]] = {
@@ -100,12 +96,13 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 object Endpoint {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Endpoint[F]] = for {
-    datasetFinder         <- DatasetFinder[F]
-    renkuApiUrl           <- renku.ApiUrl[F]()
-    gitLabUrl             <- GitLabUrlLoader[F]()
-    tgClient              <- triplesgenerator.api.events.Client[F]
-    executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new EndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, tgClient, executionTimeRecorder)
+    datasetFinder                        <- DatasetFinder[F]
+    tgClient                             <- triplesgenerator.api.events.Client[F]
+    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
+    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader[F]()
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+  } yield new EndpointImpl[F](datasetFinder, tgClient, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, identifier: RequestedDataset): Href =
     Href((Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / identifier).toString)

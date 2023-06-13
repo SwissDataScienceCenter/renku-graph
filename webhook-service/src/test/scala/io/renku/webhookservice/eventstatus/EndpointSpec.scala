@@ -19,11 +19,10 @@
 package io.renku.webhookservice
 package eventstatus
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
-import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -42,42 +41,57 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.api.events.{ProjectViewedEvent, UserId}
 import io.renku.webhookservice.eventstatus.Generators._
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
+import io.renku.{eventlog, triplesgenerator}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec with ScalaCheckPropertyChecks {
+class EndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with IOSpec
+    with Eventually
+    with IntegrationPatience {
 
   "fetchProcessingStatus" should {
 
-    "return OK with project status info if webhook for the project exists" in new TestCase {
+    "return OK with project status info and send PROJECT_VIEWED_EVENT " +
+      "if webhook for the project exists" in new TestCase {
 
-      val authUser = authUsers.generateOption
+        val authUser = authUsers.generateOption
 
-      givenHookValidation(projectId, authUser, returning = HookExists.some.pure[IO])
+        givenHookValidation(projectId, authUser, returning = HookExists.some.pure[IO])
 
-      val statusInfo = statusInfos.generateOne
-      givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
+        val statusInfo = statusInfos.generateOne
+        givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
-      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
+        val project = consumerProjects.generateOne.copy(id = projectId)
+        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectViewedEventSent
 
-      response.status                   shouldBe Ok
-      response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
+        val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
-      logger.loggedOnly(
-        Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
-      )
-    }
+        response.status                   shouldBe Ok
+        response.contentType              shouldBe Some(`Content-Type`(application.json))
+        response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
 
-    "send COMMIT_SYNC_REQUEST message and return OK with activated = true and status 'in-progress' " +
+        verifyProjectViewedEventSent(project, authUser)
+
+        logger.loggedOnly(
+          Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
+        )
+      }
+
+    "send COMMIT_SYNC_REQUEST and return OK with activated = true and status 'in-progress' " +
       "if webhook for the project exists but no status info can be found in EL" in new TestCase {
 
         val authUser = authUsers.generateOption
@@ -87,13 +101,15 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
         val project = consumerProjects.generateOne.copy(id = projectId)
         givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
-        givenCommitSyncRequestSend(project, returning = ().pure[IO])
+        givenCommitSyncRequestSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
         response.status                   shouldBe Ok
         response.contentType              shouldBe Some(`Content-Type`(application.json))
         response.as[Json].unsafeRunSync() shouldBe StatusInfo.webhookReady.asJson
+
+        verifyCommitSyncRequestSent(project)
 
         logger.loggedOnly(
           Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
@@ -114,7 +130,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       response.as[Json].unsafeRunSync() shouldBe StatusInfo.NotActivated.asJson
     }
 
-    "return OK with project status info with activated = true " +
+    "return OK with project status info with activated = true and " +
+      "send PROJECT_VIEWED_EVENT " +
       "if determining project hook existence returns None " +
       "but status info can be found in EL" in new TestCase {
 
@@ -125,11 +142,17 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         val statusInfo = statusInfos.generateOne
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
+        val project = consumerProjects.generateOne.copy(id = projectId)
+        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectViewedEventSent
+
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
         response.status                   shouldBe Ok
         response.contentType              shouldBe Some(`Content-Type`(application.json))
         response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
+
+        verifyProjectViewedEventSent(project, authUser)
       }
 
     "return NOT_FOUND if determining project hook existence returns None " +
@@ -191,9 +214,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
     private val statusInfoFinder  = mock[StatusInfoFinder[IO]]
     private val projectInfoFinder = mock[ProjectInfoFinder[IO]]
     private val elClient          = mock[eventlog.api.events.Client[IO]]
+    private val tgClient          = mock[triplesgenerator.api.events.Client[IO]]
     implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder, projectInfoFinder, elClient)
+    val endpoint = new EndpointImpl[IO](hookValidator, statusInfoFinder, projectInfoFinder, elClient, tgClient)
 
     lazy val statusInfoFindingErrorMessage = show"Finding status info for project '$projectId' failed"
 
@@ -217,10 +241,27 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
         .expects(projectId, authUser.map(_.accessToken))
         .returning(returning)
 
-    def givenCommitSyncRequestSend(project: Project, returning: IO[Unit]) =
+    private val sentEvents: Ref[IO, List[AnyRef]] = Ref.unsafe(Nil)
+
+    def givenCommitSyncRequestSent =
       (elClient
         .send(_: CommitSyncRequest))
-        .expects(CommitSyncRequest(project))
-        .returning(returning)
+        .expects(*)
+        .onCall((ev: CommitSyncRequest) => sentEvents.update(ev :: _))
+
+    def givenProjectViewedEventSent =
+      (tgClient
+        .send(_: ProjectViewedEvent))
+        .expects(*)
+        .onCall((ev: ProjectViewedEvent) => sentEvents.update(ev :: _))
+
+    def verifyCommitSyncRequestSent(project: Project) = eventually {
+      sentEvents.get.unsafeRunSync() should contain(CommitSyncRequest(project))
+    }
+
+    def verifyProjectViewedEventSent(project: Project, authUser: Option[AuthUser]) = eventually {
+      sentEvents.get.unsafeRunSync().collect { case e: ProjectViewedEvent => e.path -> e.maybeUserId } shouldBe
+        List(project.path -> authUser.map(_.id).map(UserId(_)))
+    }
   }
 }

@@ -51,6 +51,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       },
       "title":  ${dataset.identification.title.value},
       "name":   ${dataset.identification.name.value},
+      "slug":   ${dataset.identification.name.value},
       "images": ${dataset.additionalInfo.images -> projectPath}
     }"""
       .deepMerge(
@@ -89,6 +90,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "identifier":    ${actualIdentifier.value},
       "title":         ${dataset.identification.title.value},
       "name":          ${dataset.identification.name.value},
+      "slug":          ${dataset.identification.name.value},
       "published":     ${dataset.provenance.creators -> dataset.provenance.date},
       "date":          ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,

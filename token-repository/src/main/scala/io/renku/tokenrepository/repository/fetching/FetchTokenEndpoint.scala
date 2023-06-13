@@ -67,8 +67,7 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
       projectIdentifier: ID
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-    Logger[F].error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
   }
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken] = tokenFinder.findToken

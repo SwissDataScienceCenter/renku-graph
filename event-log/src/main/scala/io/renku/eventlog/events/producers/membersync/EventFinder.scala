@@ -74,7 +74,9 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               ORDER BY proj.latest_event_date DESC
               LIMIT 1
       """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
-          .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
+          .map { case (id: projects.GitLabId) ~ (maybeDate: Option[LastSyncedDate]) ~ (path: projects.Path) =>
+            (id, maybeDate, MemberSyncEvent(path))
+          }
       )
       .arguments(
         categoryName *: eventDate *: lastSyncDate *: eventDate *: lastSyncDate *: eventDate *: lastSyncDate *: EmptyTuple
@@ -106,7 +108,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
           new Exception(s"${categoryName.show}: update last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false) }
 
   private def insertLastSyncedDate(projectId: projects.GitLabId) = measureExecutionTime {
     SqlStatement
@@ -126,7 +128,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
           new Exception(s"${categoryName.show}: insert last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
-  }
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false) }
 
   private def toNoneIfEventAlreadyTaken(event: MemberSyncEvent): Boolean => Option[MemberSyncEvent] = {
     case true  => Some(event)

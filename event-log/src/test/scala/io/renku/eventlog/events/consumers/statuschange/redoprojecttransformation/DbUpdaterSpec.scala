@@ -25,7 +25,7 @@ import io.circe.Encoder
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.eventlog.api.events.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
-import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, StatusChangeEventsQueue}
+import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DBUpdater, StatusChangeEventsQueue}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators
 import org.scalamock.scalatest.MockFactory
@@ -53,8 +53,8 @@ class DbUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
   }
 
   "onRollback" should {
-    "return unit Kleisli" in new TestCase {
-      handler.onRollback(event)(session) shouldBe ().pure[Try]
+    "return RollbackOp.empty" in new TestCase {
+      handler.onRollback(event) shouldBe DBUpdater.RollbackOp.empty[Try]
     }
   }
 

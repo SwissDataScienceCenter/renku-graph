@@ -18,19 +18,20 @@
 
 package io.renku.commiteventservice.events.consumers.commitsync.eventgeneration
 
+import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.commiteventservice.events.consumers.commitsync.{categoryName, logMessageCommon}
 import io.renku.commiteventservice.events.consumers.commitsync.Generators._
-import io.renku.commiteventservice.events.consumers.common._
+import io.renku.commiteventservice.events.consumers.commitsync.{categoryName, logMessageCommon}
 import io.renku.commiteventservice.events.consumers.common.Generators.commitInfos
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.commiteventservice.events.consumers.common._
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.CommonGraphGenerators.accessTokens
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
@@ -42,14 +43,14 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level._
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Clock, ZoneId, ZoneOffset}
-import scala.util.{Failure, Success, Try}
 
-class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class CommitsSynchronizerSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "synchronizeEvents" should {
 
@@ -62,7 +63,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenAccessTokenIsFound(event.project.id)
 
         givenLatestCommitIsFound(latestCommitInfo, event.project.id)
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $event accepted"))
       }
@@ -82,7 +83,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+      commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Info(show"$categoryName: $event accepted"),
@@ -110,7 +111,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenEventIsNotInEL(latestCommitInfo, event.project.id)
         givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logSummary(latestCommitInfo.id,
@@ -136,7 +137,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
+        .returning(IO.pure(Created))
 
       givenEventIsInEL(parentCommit.id, event.project.id)(
         CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
@@ -144,7 +145,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       givenCommitIsInGL(parentCommit, event.project.id)
       givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+      commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
       logger.logged(
         logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
@@ -172,17 +173,17 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, latestCommitInfo, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
 
         givenEventIsNotInEL(parentCommit, event.project.id)
         givenCommitIsInGL(parentCommit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parentCommit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
@@ -205,7 +206,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         (latestCommitFinder
           .findLatestCommit(_: projects.GitLabId)(_: Option[AccessToken]))
           .expects(event.project.id, maybeAccessToken)
-          .returning(Option.empty[CommitInfo].pure[Try])
+          .returning(Option.empty[CommitInfo].pure[IO])
 
         givenEventIsInEL(event.id, event.project.id)(returning =
           CommitWithParents(event.id, event.project.id, List(parentCommit.id))
@@ -214,7 +215,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitEventsRemover.removeDeletedEvent _)
           .expects(event.project, event.id)
-          .returning(UpdateResult.Deleted.pure[Try])
+          .returning(UpdateResult.Deleted.pure[IO])
 
         givenEventIsInEL(parentCommit.id, event.project.id)(returning =
           CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
@@ -223,10 +224,10 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitEventsRemover.removeDeletedEvent _)
           .expects(event.project, parentCommit.id)
-          .returning(UpdateResult.Deleted.pure[Try])
+          .returning(UpdateResult.Deleted.pure[IO])
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logEventFoundForDeletion(event.id, event.project, executionTimeRecorder.elapsedTime),
@@ -254,7 +255,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, latestCommitInfo, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
 
         givenEventIsInEL(parentCommit.id, event.project.id)(returning =
           CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
@@ -263,10 +264,10 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitEventsRemover.removeDeletedEvent _)
           .expects(event.project, parentCommit.id)
-          .returning(UpdateResult.Deleted.pure[Try])
+          .returning(UpdateResult.Deleted.pure[IO])
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
@@ -295,22 +296,22 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, latestCommitInfo, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
 
         val exception = exceptions.generateOne
         (eventDetailsFinder.getEventDetails _)
           .expects(event.project.id, parent1Commit.id)
-          .returning(Failure(exception))
+          .returning(IO.raiseError(exception))
 
         givenEventIsNotInEL(parent2Commit, event.project.id)
         givenCommitIsInGL(parent2Commit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parent2Commit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
@@ -340,7 +341,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, latestCommitInfo, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
 
         givenEventIsNotInEL(parent1Commit, event.project.id)
 
@@ -348,17 +349,17 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         (commitInfoFinder
           .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
           .expects(event.project.id, parent1Commit.id, maybeAccessToken)
-          .returning(Failure(exception))
+          .returning(IO.raiseError(exception))
 
         givenEventIsNotInEL(parent2Commit, event.project.id)
         givenCommitIsInGL(parent2Commit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parent2Commit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
@@ -389,17 +390,17 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, latestCommitInfo, batchDate)
-          .returning(Success(Failed(exception.getMessage, exception)))
+          .returning(IO.pure(Failed(exception.getMessage, exception)))
 
         givenEventIsNotInEL(parent1Commit, event.project.id)
         givenCommitIsInGL(parent1Commit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parent1Commit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logErrorSynchronization(latestCommitInfo.id,
@@ -436,17 +437,17 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         val deletionFailure = UpdateResult.Failed(nonEmptyStrings().generateOne, exception)
         (commitEventsRemover.removeDeletedEvent _)
           .expects(event.project, latestCommitInfo.id)
-          .returning(deletionFailure.pure[Try])
+          .returning(deletionFailure.pure[IO])
 
         givenEventIsNotInEL(parent1Commit, event.project.id)
         givenCommitIsInGL(parent1Commit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parent1Commit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logErrorSynchronization(latestCommitInfo.id,
@@ -482,17 +483,17 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         val exception = exceptions.generateOne
         (commitEventsRemover.removeDeletedEvent _)
           .expects(event.project, latestCommitInfo.id)
-          .returning(exception.raiseError[Try, UpdateResult])
+          .returning(exception.raiseError[IO, UpdateResult])
 
         givenEventIsNotInEL(parent1Commit, event.project.id)
         givenCommitIsInGL(parent1Commit, event.project.id)
 
         (commitToEventLog.storeCommitInEventLog _)
           .expects(event.project, parent1Commit, batchDate)
-          .returning(Success(Created))
+          .returning(IO.pure(Created))
         givenGlobalCommitSyncRequestIsSent(event.project)
 
-        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
         logger.logged(
           logErrorSynchronization(latestCommitInfo.id,
@@ -525,7 +526,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       (commitToEventLog.storeCommitInEventLog _)
         .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
+        .returning(IO.pure(Created))
 
       givenEventIsInEL(parentCommit.id, event.project.id)(
         CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
@@ -541,9 +542,9 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                    s"$categoryName: Triggering Global Commit Sync Failed"
           )
         )
-        .returning(exception.raiseError[Try, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+      commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
 
       logger.logged(
         logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
@@ -563,9 +564,9 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       (accessTokenFinder
         .findAccessToken(_: GitLabId)(_: GitLabId => String))
         .expects(event.project.id, projectIdToPath)
-        .returning(Failure(exception))
+        .returning(IO.raiseError(exception))
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe Failure(exception)
+      intercept[Exception](commitsSynchronizer.synchronizeEvents(event).unsafeRunSync()) shouldBe exception
 
       logger.logged(Error(s"${logMessageCommon(event)} -> Synchronization failed", exception))
     }
@@ -576,55 +577,55 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val batchDate = batchDates.generateOne
 
-    implicit val logger:                TestLogger[Try]                = TestLogger[Try]()
-    implicit val executionTimeRecorder: TestExecutionTimeRecorder[Try] = TestExecutionTimeRecorder[Try]()
-    implicit val accessTokenFinder:     AccessTokenFinder[Try]         = mock[AccessTokenFinder[Try]]
-    val latestCommitFinder  = mock[LatestCommitFinder[Try]]
-    val eventDetailsFinder  = mock[EventDetailsFinder[Try]]
-    val commitInfoFinder    = mock[CommitInfoFinder[Try]]
-    val commitToEventLog    = mock[CommitToEventLog[Try]]
-    val commitEventsRemover = mock[CommitEventsRemover[Try]]
-    val eventSender         = mock[EventSender[Try]]
+    implicit val logger:                TestLogger[IO]                = TestLogger[IO]()
+    implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
+    implicit val accessTokenFinder:     AccessTokenFinder[IO]         = mock[AccessTokenFinder[IO]]
+    val latestCommitFinder  = mock[LatestCommitFinder[IO]]
+    val eventDetailsFinder  = mock[EventDetailsFinder[IO]]
+    val commitInfoFinder    = mock[CommitInfoFinder[IO]]
+    val commitToEventLog    = mock[CommitToEventLog[IO]]
+    val commitEventsRemover = mock[CommitEventsRemover[IO]]
+    val eventSender         = mock[EventSender[IO]]
     private val clock       = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
-    val commitsSynchronizer = new CommitsSynchronizerImpl[Try](latestCommitFinder,
-                                                               eventDetailsFinder,
-                                                               commitInfoFinder,
-                                                               commitToEventLog,
-                                                               commitEventsRemover,
-                                                               eventSender,
-                                                               clock
+    val commitsSynchronizer = new CommitsSynchronizerImpl[IO](latestCommitFinder,
+                                                              eventDetailsFinder,
+                                                              commitInfoFinder,
+                                                              commitToEventLog,
+                                                              commitEventsRemover,
+                                                              eventSender,
+                                                              clock
     )
 
     def givenAccessTokenIsFound(projectId: GitLabId) = (accessTokenFinder
       .findAccessToken(_: GitLabId)(_: GitLabId => String))
       .expects(projectId, projectIdToPath)
-      .returning(Success(maybeAccessToken))
+      .returning(IO.pure(maybeAccessToken))
 
     def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: GitLabId) =
       (latestCommitFinder
         .findLatestCommit(_: projects.GitLabId)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(commitInfo.some.pure[Try])
+        .returning(commitInfo.some.pure[IO])
 
     def givenCommitIsInGL(commitInfo: CommitInfo, projectId: GitLabId) = (commitInfoFinder
       .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
       .expects(projectId, commitInfo.id, maybeAccessToken)
-      .returning(Success(commitInfo.some))
+      .returning(IO.pure(commitInfo.some))
 
     def givenEventIsInEL(commitId: CommitId, projectId: GitLabId)(returning: CommitWithParents) =
       (eventDetailsFinder.getEventDetails _)
         .expects(projectId, commitId)
-        .returning(Some(returning).pure[Try])
+        .returning(Some(returning).pure[IO])
 
     def givenEventIsNotInEL(commitInfo: CommitInfo, projectId: GitLabId) =
-      (eventDetailsFinder.getEventDetails _).expects(projectId, commitInfo.id).returning(Success(None))
+      (eventDetailsFinder.getEventDetails _).expects(projectId, commitInfo.id).returning(IO.pure(None))
 
     def givenCommitIsNotInGL(commitId: CommitId, projectId: GitLabId) =
       (commitInfoFinder
         .getMaybeCommitInfo(_: GitLabId, _: CommitId)(_: Option[AccessToken]))
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(Success(None))
+        .returning(IO.pure(None))
 
     def givenGlobalCommitSyncRequestIsSent(project: Project) =
       (eventSender
@@ -635,7 +636,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                    s"$categoryName: Triggering Global Commit Sync Failed"
           )
         )
-        .returning(Success(()))
+        .returning(IO.unit)
 
     def withRequestContent(project: Project) =
       EventRequestContent.NoPayload(

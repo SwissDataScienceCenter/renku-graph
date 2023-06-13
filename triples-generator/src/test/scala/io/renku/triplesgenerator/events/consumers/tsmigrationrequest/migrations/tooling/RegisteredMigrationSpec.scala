@@ -23,12 +23,14 @@ package tooling
 import Generators.migrationNames
 import cats.MonadThrow
 import cats.data.EitherT
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
@@ -36,36 +38,34 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class RegisteredMigrationSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class RegisteredMigrationSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "required" should {
 
     "return Yes if Migration Execution Register cannot find any past executions" in new TestCase {
       (executionRegister.findExecution _)
         .expects(migration.name)
-        .returning(None.pure[Try])
+        .returning(None.pure[IO])
 
-      migration.required.value shouldBe MigrationRequired.Yes("was not executed yet").asRight.pure[Try]
+      migration.required.value.unsafeRunSync() shouldBe MigrationRequired.Yes("was not executed yet").asRight
     }
 
     "return No if Migration Execution Register finds a past version" in new TestCase {
       val version = serviceVersions.generateOne
       (executionRegister.findExecution _)
         .expects(migration.name)
-        .returning(version.some.pure[Try])
+        .returning(version.some.pure[IO])
 
-      migration.required.value shouldBe MigrationRequired.No(s"was executed on $version").asRight.pure[Try]
+      migration.required.value.unsafeRunSync() shouldBe MigrationRequired.No(s"was executed on $version").asRight
     }
 
     "return a Recoverable Error if in case of an exception the given strategy returns one" in new TestCase {
       val exception = exceptions.generateOne
       (executionRegister.findExecution _)
         .expects(migration.name)
-        .returning(exception.raiseError[Try, Option[ServiceVersion]])
+        .returning(exception.raiseError[IO, Option[ServiceVersion]])
 
-      migration.required.value shouldBe recoverableError.asLeft.pure[Try]
+      migration.required.value.unsafeRunSync() shouldBe recoverableError.asLeft
     }
   }
 
@@ -75,9 +75,9 @@ class RegisteredMigrationSpec extends AnyWordSpec with should.Matchers with Mock
 
       (executionRegister.registerExecution _)
         .expects(migration.name)
-        .returning(().pure[Try])
+        .returning(().pure[IO])
 
-      migration.postMigration().value shouldBe ().asRight.pure[Try]
+      migration.postMigration().value.unsafeRunSync() shouldBe ().asRight
     }
 
     "return a Recoverable Error if in case of an exception " +
@@ -85,26 +85,26 @@ class RegisteredMigrationSpec extends AnyWordSpec with should.Matchers with Mock
         val exception = exceptions.generateOne
         (executionRegister.registerExecution _)
           .expects(migration.name)
-          .returning(exception.raiseError[Try, Unit])
+          .returning(exception.raiseError[IO, Unit])
 
-        migration.postMigration().value shouldBe recoverableError.asLeft.pure[Try]
+        migration.postMigration().value.unsafeRunSync() shouldBe recoverableError.asLeft
       }
   }
 
   private trait TestCase {
 
-    private implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val executionRegister = mock[MigrationExecutionRegister[Try]]
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val executionRegister = mock[MigrationExecutionRegister[IO]]
     val recoverableError  = processingRecoverableErrors.generateOne
     val recoveryStrategy = new RecoverableErrorsRecovery {
       override def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = { _ =>
         recoverableError.asLeft[OUT].pure[F]
       }
     }
-    val migration = new RegisteredMigration[Try](migrationNames.generateOne, executionRegister, recoveryStrategy) {
+    val migration = new RegisteredMigration[IO](migrationNames.generateOne, executionRegister, recoveryStrategy) {
 
-      protected override def migrate(): EitherT[Try, ProcessingRecoverableError, Unit] =
-        EitherT.pure[Try, ProcessingRecoverableError](())
+      protected override def migrate(): EitherT[IO, ProcessingRecoverableError, Unit] =
+        EitherT.pure[IO, ProcessingRecoverableError](())
     }
   }
 }

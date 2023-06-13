@@ -18,9 +18,7 @@
 
 package io.renku.microservices
 
-import cats.effect.IOApp
-
-trait IOMicroservice extends IOApp {
+trait IOMicroservice extends SuppressChannelClosedExceptionApp {
 
   lazy val Identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate
 }

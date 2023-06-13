@@ -50,9 +50,9 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   override def updateDB(event: AllEventsToNew.type): UpdateOp[F] =
     createEventsResource(sendEventIfFound(_))
-      .map(_ => DBUpdateResults.ForProjects.empty)
+      .as(DBUpdateResults.ForProjects.empty)
 
-  override def onRollback(event: AllEventsToNew.type): RollbackOp[F] = RollbackOp.none[F]
+  override def onRollback(event: AllEventsToNew.type): RollbackOp[F] = RollbackOp.empty[F]
 
   private def createEventsResource(
       f: Cursor[F, ProjectEventsToNew] => F[Unit]

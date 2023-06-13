@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.config.certificates
 
-import cats.Applicative
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.certificates.Certificate
 import io.renku.generators.CommonGraphGenerators.certificates
@@ -26,51 +26,51 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.nio.file.{Path, Paths}
-import scala.util.Try
 
-class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class GitCertificateInstallerSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "run" should {
 
     "save the certificate into a file and configure git to trust it" in new TestCase {
 
       val certificate = certificates.generateOne
-      findCertificate.expects().returning(Some(certificate).pure[Try])
+      findCertificate.expects().returning(Some(certificate).pure[IO])
 
       val path = Paths.get(relativePaths().generateOne)
       (certificateSaver
         .save(_: Certificate))
         .expects(certificate)
-        .returning(path.pure[Try])
+        .returning(path.pure[IO])
 
       (gitConfigModifier
         .makeGitTrust(_: Path))
         .expects(path)
-        .returning(Applicative[Try].unit)
+        .returning(IO.unit)
 
-      certInstaller.run shouldBe Applicative[Try].unit
+      certInstaller.run.unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("Certificate installed for Git"))
     }
 
     "do nothing if there's no certificate found" in new TestCase {
 
-      findCertificate.expects().returning(None.pure[Try])
+      findCertificate.expects().returning(None.pure[IO])
 
-      certInstaller.run shouldBe Applicative[Try].unit
+      certInstaller.run.unsafeRunSync() shouldBe ()
     }
 
     "fail if finding the certificate fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      findCertificate.expects().returning(exception.raiseError[Try, Option[Certificate]])
+      findCertificate.expects().returning(exception.raiseError[IO, Option[Certificate]])
 
-      certInstaller.run shouldBe exception.raiseError[Try, Unit]
+      intercept[Exception](certInstaller.run.unsafeRunSync()) shouldBe exception
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }
@@ -78,15 +78,15 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
     "fail if saving the certificate fails" in new TestCase {
 
       val certificate = certificates.generateOne
-      findCertificate.expects().returning(Some(certificate).pure[Try])
+      findCertificate.expects().returning(Some(certificate).pure[IO])
 
       val exception = exceptions.generateOne
       (certificateSaver
         .save(_: Certificate))
         .expects(certificate)
-        .returning(exception.raiseError[Try, Path])
+        .returning(exception.raiseError[IO, Path])
 
-      certInstaller.run shouldBe exception.raiseError[Try, Unit]
+      intercept[Exception](certInstaller.run.unsafeRunSync()) shouldBe exception
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }
@@ -94,21 +94,21 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
     "fail if changing Git config fails" in new TestCase {
 
       val certificate = certificates.generateOne
-      findCertificate.expects().returning(Some(certificate).pure[Try])
+      findCertificate.expects().returning(Some(certificate).pure[IO])
 
       val path = Paths.get(relativePaths().generateOne)
       (certificateSaver
         .save(_: Certificate))
         .expects(certificate)
-        .returning(path.pure[Try])
+        .returning(path.pure[IO])
 
       val exception = exceptions.generateOne
       (gitConfigModifier
         .makeGitTrust(_: Path))
         .expects(path)
-        .returning(exception.raiseError[Try, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
-      certInstaller.run shouldBe exception.raiseError[Try, Unit]
+      intercept[Exception](certInstaller.run.unsafeRunSync()) shouldBe exception
 
       logger.loggedOnly(Error("Certificate installation for Git failed", exception))
     }
@@ -116,10 +116,10 @@ class GitCertificateInstallerSpec extends AnyWordSpec with should.Matchers with 
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val findCertificate   = mockFunction[Try[Option[Certificate]]]
-    val certificateSaver  = mock[CertificateSaver[Try]]
-    val gitConfigModifier = mock[GitConfigModifier[Try]]
-    val certInstaller     = new GitCertificateInstallerImpl[Try](findCertificate, certificateSaver, gitConfigModifier)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val findCertificate   = mockFunction[IO[Option[Certificate]]]
+    val certificateSaver  = mock[CertificateSaver[IO]]
+    val gitConfigModifier = mock[GitConfigModifier[IO]]
+    val certInstaller     = new GitCertificateInstallerImpl[IO](findCertificate, certificateSaver, gitConfigModifier)
   }
 }

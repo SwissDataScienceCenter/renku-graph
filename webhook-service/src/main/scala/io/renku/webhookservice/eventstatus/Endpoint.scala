@@ -19,11 +19,10 @@
 package io.renku.webhookservice
 package eventstatus
 
+import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
-import cats.{MonadThrow, NonEmptyParallel}
 import io.circe.syntax._
-import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
@@ -33,10 +32,12 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.ProjectHookUrl
+import io.renku.{eventlog, triplesgenerator}
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -46,11 +47,12 @@ trait Endpoint[F[_]] {
   def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]]
 }
 
-private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: ExecutionTimeRecorder](
+private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeRecorder](
     hookValidator:     HookValidator[F],
     statusInfoFinder:  StatusInfoFinder[F],
     projectInfoFinder: ProjectInfoFinder[F],
-    elClient:          eventlog.api.events.Client[F]
+    elClient:          eventlog.api.events.Client[F],
+    tgClient:          triplesgenerator.api.events.Client[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -61,27 +63,45 @@ private class EndpointImpl[F[_]: MonadThrow: NonEmptyParallel: Logger: Execution
   private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
-    (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
-      .parFlatMapN {
-        case (Some(HookMissing), _)       => Ok(StatusInfo.NotActivated.asJson)
-        case (Some(HookExists), Some(si)) => Ok(si.asJson)
-        case (Some(HookExists), None) => sendCommitSync(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
-        case (None, Some(si))         => Ok(si.asJson)
-        case (None, None)             => NotFound(InfoMessage("Info about project cannot be found"))
-      }
-      .recoverWith(internalServerError(projectId))
-  } map logExecutionTime(withMessage = show"Finding status info for project '$projectId' finished")
+  def fetchProcessingStatus(projectId: GitLabId, authUser: Option[AuthUser]): F[Response[F]] =
+    measureAndLogTime(logMessage(projectId)) {
+      (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
+        .parFlatMapN {
+          case (Some(HookMissing), _) =>
+            Ok(StatusInfo.NotActivated.asJson)
+          case (Some(HookExists), Some(si)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (Some(HookExists), None) =>
+            sendCommitSyncRequest(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
+          case (None, Some(si)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (None, None) =>
+            NotFound(InfoMessage("Info about project cannot be found"))
+        }
+        .handleErrorWith(internalServerError(projectId))
+    }
 
-  private def sendCommitSync(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] =
-    findProjectInfo(projectId)(authUser.map(_.accessToken)).map(CommitSyncRequest(_)) >>=
-      elClient.send
+  private def sendCommitSyncRequest(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
+    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
+      (elClient send CommitSyncRequest(project))
+        .handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed"))
+    }
+  }.void
 
-  private def internalServerError(projectId: projects.GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
-    case exception =>
-      val message = show"Finding status info for project '$projectId' failed"
-      Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
+  private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
+    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
+      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
+        .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
+    }
+  }.void
+
+  private def internalServerError(projectId: projects.GitLabId): Throwable => F[Response[F]] = { exception =>
+    val message = show"Finding status info for project '$projectId' failed"
+    Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
   }
+
+  private def logMessage(projectId: GitLabId): PartialFunction[Response[F], String] =
+    PartialFunction.fromFunction(_ => show"Finding status info for project '$projectId' finished")
 }
 
 object Endpoint {
@@ -92,5 +112,6 @@ object Endpoint {
     statusInfoFinder  <- StatusInfoFinder[F]
     projectInfoFinder <- ProjectInfoFinder[F]
     elClient          <- eventlog.api.events.Client[F]
-  } yield new EndpointImpl[F](hookValidator, statusInfoFinder, projectInfoFinder, elClient)
+    tgClient          <- triplesgenerator.api.events.Client[F]
+  } yield new EndpointImpl[F](hookValidator, statusInfoFinder, projectInfoFinder, elClient, tgClient)
 }

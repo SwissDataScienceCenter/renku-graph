@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.consumers.statuschange
 package redoprojecttransformation
 
-import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
@@ -129,5 +128,5 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
       .void
   }
 
-  override def onRollback(event: RedoProjectTransformation): Kleisli[F, Session[F], Unit] = RollbackOp.none
+  override def onRollback(event: RedoProjectTransformation): RollbackOp[F] = RollbackOp.empty
 }

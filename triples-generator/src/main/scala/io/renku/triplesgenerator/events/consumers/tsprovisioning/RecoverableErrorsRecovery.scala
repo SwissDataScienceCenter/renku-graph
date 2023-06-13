@@ -30,10 +30,11 @@ private trait RecoverableErrorsRecovery {
 
   private type RecoveryStrategy[F[_], OUT] = PartialFunction[Throwable, F[Either[ProcessingRecoverableError, OUT]]]
 
-  def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] = maybeRecoverableError(None)
-  def maybeRecoverableError[F[_]: MonadThrow, OUT](message: String): RecoveryStrategy[F, OUT] = maybeRecoverableError(
-    Some(message)
-  )
+  def maybeRecoverableError[F[_]: MonadThrow, OUT]: RecoveryStrategy[F, OUT] =
+    maybeRecoverableError(None)
+
+  def maybeRecoverableError[F[_]: MonadThrow, OUT](message: String): RecoveryStrategy[F, OUT] =
+    maybeRecoverableError(Some(message))
 
   def maybeRecoverableError[F[_]: MonadThrow, OUT](maybeMessage: Option[String]): RecoveryStrategy[F, OUT] = {
     case exception @ (_: ConnectivityException | _: ClientException) =>

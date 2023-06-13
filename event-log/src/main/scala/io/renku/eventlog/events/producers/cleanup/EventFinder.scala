@@ -46,15 +46,17 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     with SubscriptionTypeSerializers
     with TypeSerializers {
 
+  private type EventAndUpdatedCount = (CleanUpEvent, Int)
+
   override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useWithTransactionK {
     Kleisli { case (transaction, session) =>
       liftF(transaction.savepoint)
         .flatMap { savepoint =>
           findEventAndMarkTaken
             .flatTap(commit(transaction))
-            .onError(rollback(transaction)(savepoint))
+            .handleErrorWith(rollback(transaction)(savepoint)(_).as(Option.empty[EventAndUpdatedCount]))
             .flatTap(updateMetrics)
-            .map(_.map(_._1))
+            .map(_.map { case (cleanUpEvent, _) => cleanUpEvent })
         }
         .run(session)
     }
@@ -114,7 +116,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     case None => Kleisli.pure(Option.empty[Project])
   }
 
-  private def markEventsDeleting(): Option[Project] => Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]] = {
+  private def markEventsDeleting(): Option[Project] => Kleisli[F, Session[F], Option[EventAndUpdatedCount]] = {
     case Some(project @ Project(projectId, _)) =>
       measureExecutionTime {
         SqlStatement
@@ -129,22 +131,13 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
           .build
           .mapResult {
             case Completion.Update(count) => (CleanUpEvent(project) -> count).some
-            case _                        => Option.empty[(CleanUpEvent, Int)]
+            case _                        => Option.empty[EventAndUpdatedCount]
           }
-      } recoverWith retryOnDeadlock(project)
-    case None => Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
+      }
+    case None => Kleisli.pure(Option.empty[EventAndUpdatedCount])
   }
 
-  private def retryOnDeadlock(
-      project: Project
-  ): PartialFunction[Throwable, Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]]] = {
-    case SqlState.DeadlockDetected(_) =>
-      liftF[F, Session[F], Unit](
-        Logger[F].info(show"$categoryName: deadlock happened while popping $project; retrying")
-      ) >> markEventsDeleting()(project.some)
-  }
-
-  private lazy val updateMetrics: Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = {
+  private lazy val updateMetrics: Option[EventAndUpdatedCount] => Kleisli[F, Session[F], Unit] = {
     case Some(CleanUpEvent(Project(_, projectPath)) -> updatedRows) =>
       Kleisli.liftF {
         EventStatusGauges[F].awaitingDeletion.update((projectPath, updatedRows * -1)) >>
@@ -153,15 +146,15 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     case None => Kleisli.pure[F, Session[F], Unit](())
   }
 
-  private def commit(transaction: Transaction[F]): Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = _ =>
+  private def commit(transaction: Transaction[F]): Option[EventAndUpdatedCount] => Kleisli[F, Session[F], Unit] = _ =>
     Kleisli.liftF(transaction.commit.void)
 
-  private def rollback(transaction: Transaction[F])(
-      savepoint: transaction.Savepoint
-  ): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case err =>
+  private def rollback(
+      transaction: Transaction[F]
+  )(savepoint: transaction.Savepoint): Throwable => Kleisli[F, Session[F], Unit] = { err =>
     Kleisli.liftF {
-      (transaction rollback savepoint).void >>
-        Logger[F].error(err)(show"$categoryName: problems with DB update; rollback")
+      transaction.rollback(savepoint) >>
+        Logger[F].info(err)(show"$categoryName: problems with DB update; rollback")
     }
   }
 }

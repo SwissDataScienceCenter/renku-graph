@@ -43,7 +43,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     GET(
       "User Recently Viewed Entities",
       "Finds entities the user recently viewed",
-      Uri / "entities" / "current-user" / "recently-viewed" :? limit :? entityType,
+      Uri / "current-user" / "recently-viewed" :? limit :? entityType,
       Status.Ok -> Response("Found entities", Contents(MediaType.`application/json`("Sample response", example))),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
