@@ -57,7 +57,7 @@ object RequestedDataset {
     override def fold[A](idf: datasets.Identifier => A, saf: datasets.SameAs => A): A = saf(value)
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl): Codec[RequestedDataset] = Codec.from(
+  implicit def codec(implicit renkuUrl: RenkuUrl): Codec[RequestedDataset] = Codec.from(
     Decoder.instance { cur =>
       cur.as[String].flatMap { v =>
         RequestedDataset
