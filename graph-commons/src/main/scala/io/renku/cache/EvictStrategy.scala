@@ -18,24 +18,25 @@
 
 package io.renku.cache
 
+import scala.concurrent.duration.FiniteDuration
+
 sealed trait EvictStrategy {
   private[cache] def keyOrder[A]: Ordering[Key[A]]
-
-  def evict(key: Key[_], ttl: Int): Boolean
+  private[cache] def isExpired(key: Key[_], ttl: FiniteDuration, currentTime: FiniteDuration): Boolean
 }
 
 object EvictStrategy {
   case object LeastUsed extends EvictStrategy {
-    private[cache] override def keyOrder[A]: Ordering[Key[A]] = Key.Order.leastUsed
+    private[cache] override def keyOrder[A]: Ordering[Key[A]] = Key.Order.leastRecentlyUsed
 
-    override def evict(key: Key[_], ttl: Int): Boolean =
-      key.access < ttl
+    private[cache] def isExpired(key: Key[_], ttl: FiniteDuration, currentTime: FiniteDuration): Boolean =
+      (key.accessedAt + ttl.toSeconds) < currentTime.toSeconds
   }
 
   case object Oldest extends EvictStrategy {
     private[cache] override def keyOrder[A]: Ordering[Key[A]] = Key.Order.oldest
 
-    override def evict(key: Key[_], ttl: Int): Boolean =
-      key.created < ttl
+    private[cache] def isExpired(key: Key[_], ttl: FiniteDuration, currentTime: FiniteDuration): Boolean =
+      (key.createdAt + ttl.toSeconds) < currentTime.toSeconds
   }
 }

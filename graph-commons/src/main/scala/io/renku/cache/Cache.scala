@@ -20,7 +20,8 @@ package io.renku.cache
 
 import cats.effect._
 import cats.syntax.all._
-import fs2.concurrent
+import fs2.Stream
+import io.renku.cache.CacheConfig.ClearConfig
 
 trait Cache[F[_], A, B] {
 
@@ -34,54 +35,58 @@ object Cache {
   def noop[F[_], A, B]: Cache[F, A, B] =
     (f: A => F[Option[B]]) => f
 
-  def memory[F[_]: Sync, A, B](size: Int, evictStrategy: EvictStrategy, ignoreEmptyValues: Boolean): F[Cache[F, A, B]] =
-    if (size <= 0) noop[F, A, B].pure[F]
-    else
-      Ref.of[F, CacheState[A, B]](CacheState.create(evictStrategy, ignoreEmptyValues)).map { state =>
-        Cache(f =>
-          a =>
-            Clock[F].realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
-              case CacheResult.Hit(b) => b.pure[F]
-              case CacheResult.Miss =>
-                (f(a), Key(a)).flatMapN { (r, k) =>
-                  state.update(_.shrinkTo(size - 1).put(k, r)).as(r)
-                }
-            }
-        )
-      }
+  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig): Resource[F, Cache[F, A, B]] = {
+    val refState =
+      Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
 
-  def memoryAsync[F[_]: Async, A, B](
-      size:              Int,
-      evictStrategy:     EvictStrategy,
-      ignoreEmptyValues: Boolean
-  ): Resource[F, Cache[F, A, B]] = {
-    val refState   = Ref.of[F, CacheState[A, B]](CacheState.create(evictStrategy, ignoreEmptyValues))
-    val refRefresh = concurrent.SignallingRef.of[F, Long](0L)
-
-    (Resource.eval(refState), Resource.eval(refRefresh)).flatMapN { (state, refresh) =>
-      val clear =
-        refresh.discrete
-          .filter(_ > size.toLong)
-          .evalMap(_ => state.update(_.shrinkTo(size)) *> refresh.set(size))
-          .compile
-          .drain
-
-      val cache: Cache[F, A, B] =
-        Cache(f =>
-          a =>
-            Clock[F].realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
-              case CacheResult.Hit(b) if !evictStrategy.evict(key, b) =>
-                b.pure[F]
-              case CacheResult.Miss =>
-                (f(a), Key(a)).flatMapN { (r, k) =>
-                  (refresh.update(_ + 1) *> state.update(_.put(k, r))).as(r)
-                }
-            }
-        )
+    Resource.eval(refState).flatMap { state =>
+      val (cache, clear) = baseCacheAndClearing(cacheConfig, state)
 
       Async[F]
         .background(fs2.Stream.repeatEval(clear).compile.drain)
         .as(cache)
     }
   }
+
+  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig): F[Cache[F, A, B]] = {
+    val refState =
+      Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
+
+    refState.flatMap { state =>
+      val (cache, clear) = baseCacheAndClearing(cacheConfig, state)
+      Spawn[F].start(clear).as(cache)
+    }
+  }
+
+  private[cache] def baseCacheAndClearing[F[_]: Sync: Temporal, A, B](
+      cacheConfig: CacheConfig,
+      state:       Ref[F, CacheState[A, B]]
+  ) = {
+    val cache: Cache[F, A, B] = baseCache[F, A, B](state)
+    val clear =
+      cacheConfig.clearConfig match {
+        case ClearConfig.Periodic(_, interval) =>
+          Stream
+            .awakeEvery(interval)
+            .evalMap(_ => state.update(_.shrink))
+            .compile
+            .drain
+      }
+
+    (cache, clear)
+  }
+
+  private[cache] def baseCache[F[_]: Sync, A, B](
+      state: Ref[F, CacheState[A, B]]
+  ): Cache[F, A, B] =
+    Cache(f =>
+      a =>
+        Clock[F].realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
+          case CacheResult.Hit(_, b) => b.pure[F]
+          case _ =>
+            (Key(a), f(a)).flatMapN { (k, r) =>
+              state.update(_.put(k, r)).as(r)
+            }
+        }
+    )
 }

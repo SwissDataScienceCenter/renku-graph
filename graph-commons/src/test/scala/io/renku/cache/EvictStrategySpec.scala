@@ -18,33 +18,29 @@
 
 package io.renku.cache
 
-import cats.effect._
-import cats.syntax.all._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 
-object Play extends IOApp.Simple {
+class EvictStrategySpec extends AnyWordSpec with should.Matchers {
 
-  val cacheResource =
-    Cache.memoryAsync[IO, Int, String](
-      CacheConfig.default.copy(clearConfig = CacheConfig.ClearConfig.Periodic(15, 1500.millis))
-    )
-
-  val calc: Int => IO[Option[String]] = n => IO.sleep(1.1.seconds).as(n.toString.some)
-
-  def test(cache: Cache[IO, Int, String]) = {
-    val f = cache.withCache(calc)
-    (List.range(0, 26) ++ List.range(2, 8)).traverse(f)
-  }
-
-  override def run: IO[Unit] =
-    cacheResource.use { cache =>
-      fs2.Stream
-        .repeatEval(
-          test(cache).flatTap(IO.println) *> IO.sleep(1.seconds)
-        )
-        .take(5)
-        .compile
-        .drain
+  "Oldest" should {
+    "expired based on createdAt" in {
+      val s   = EvictStrategy.Oldest
+      val ttl = 20.seconds
+      val key = new Key(0, 10, 0)
+      s.isExpired(key, ttl, 2.seconds)  shouldBe false
+      s.isExpired(key, ttl, 22.seconds) shouldBe false
+      s.isExpired(key, ttl, 32.seconds) shouldBe true
     }
 
+    "expired based on accessedAt" in {
+      val s   = EvictStrategy.LeastUsed
+      val ttl = 20.seconds
+      val key = new Key(0, 0, 10)
+      s.isExpired(key, ttl, 2.seconds)  shouldBe false
+      s.isExpired(key, ttl, 22.seconds) shouldBe false
+      s.isExpired(key, ttl, 32.seconds) shouldBe true
+    }
+  }
 }

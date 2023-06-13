@@ -20,6 +20,6 @@ package io.renku.cache
 
 sealed trait CacheResult[+A]
 object CacheResult {
-  final case class Hit[+A](value: A) extends CacheResult[A]
-  case object Miss                   extends CacheResult[Nothing]
+  final case class Hit[+A](key: Key[_], value: A) extends CacheResult[A]
+  case object Miss                                extends CacheResult[Nothing]
 }

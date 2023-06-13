@@ -21,59 +21,64 @@ package io.renku.cache
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration.FiniteDuration
 
-final class CacheState[A, B](data: Map[A, (Key[A], Option[B])], keys: TreeSet[Key[A]], ignoreEmptyValues: Boolean) {
+private[cache] final case class CacheState[A, B](
+    data:   Map[A, (Key[A], Option[B])],
+    keys:   TreeSet[Key[A]],
+    config: CacheConfig
+) {
   require(data.size == keys.size, s"sizes differ: data=${data.size} vs keys=${keys.size}")
 
   def get(key: A, currentTime: FiniteDuration): (CacheState[A, B], CacheResult[Option[B]]) =
     data
       .get(key)
-      .map { case (curKey, result) =>
-        val newKey   = curKey.withAccessedAt(currentTime)
+      .map { case (k, r) => (k, r, config.isExpired(k, currentTime)) }
+      .map { case (curKey, result, expired) =>
         val nextKeys = keys - curKey
-        val next = new CacheState[A, B](
-          data.updated(newKey.value, newKey -> result),
-          nextKeys + newKey,
-          ignoreEmptyValues
-        )
-        println(s"hit: $newKey -> $result")
+        val newKey   = curKey.withAccessedAt(currentTime)
 
-        (next, CacheResult.Hit(result))
+        if (expired) (new CacheState[A, B](data.removed(curKey.value), nextKeys, config), CacheResult.Miss)
+        else
+          (new CacheState[A, B](
+             data.updated(newKey.value, newKey -> result),
+             nextKeys + newKey,
+             config
+           ),
+           CacheResult.Hit(newKey, result)
+          )
       }
       .getOrElse(this -> CacheResult.Miss)
 
   def put(key: Key[A], entry: Option[B]): CacheState[A, B] =
-    if (ignoreEmptyValues && entry.isEmpty) this
+    if (config.ignoreEmptyValues && entry.isEmpty) this
     else
       data.get(key.value) match {
         case Some((curKey, result)) if result != entry =>
           new CacheState[A, B](
-            data.updated(key.value, key -> result),
+            data.updated(key.value, key -> entry),
             (keys - curKey) + key,
-            ignoreEmptyValues
+            config
           )
         case Some(_) => this
         case None =>
           new CacheState[A, B](
             data.updated(key.value, key -> entry),
             keys + key,
-            ignoreEmptyValues
+            config
           )
       }
 
   def put(key: Key[A], entry: B): CacheState[A, B] = put(key, Some(entry))
 
-  def shrinkTo(targetSize: Int): CacheState[A, B] = {
+  def shrink: CacheState[A, B] = {
     val currentSize = keys.size
-    val diff        = currentSize - targetSize
-    println(s"shrink $currentSize -> $targetSize by $diff")
+    val diff        = currentSize - config.clearConfig.maximumSize
     if (diff <= 0) this
     else {
       val (toDrop, rest) = keys.splitAt(diff)
-      println(s"dropping: ${toDrop.toList.map(_.value)}")
       new CacheState[A, B](
         data.removedAll(toDrop.unsorted.map(_.value)),
         rest,
-        ignoreEmptyValues
+        config
       )
     }
   }
@@ -83,9 +88,6 @@ final class CacheState[A, B](data: Map[A, (Key[A], Option[B])], keys: TreeSet[Ke
 
 object CacheState {
 
-  def create[A, B](evictStrategy: EvictStrategy, ignoreEmptyValues: Boolean): CacheState[A, B] =
-    createEmpty(evictStrategy.keyOrder, ignoreEmptyValues)
-
-  private def createEmpty[A, B](ordering: Ordering[Key[A]], ignoreEmpty: Boolean): CacheState[A, B] =
-    new CacheState[A, B](Map.empty, TreeSet.empty(ordering), ignoreEmpty)
+  def create[A, B](config: CacheConfig): CacheState[A, B] =
+    new CacheState[A, B](Map.empty, TreeSet.empty(config.evictStrategy.keyOrder), config)
 }
