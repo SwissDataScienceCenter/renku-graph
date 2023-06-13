@@ -67,29 +67,37 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
     measureAndLogTime(logMessage(projectId)) {
       (validateHook(projectId, authUser.map(_.accessToken)) -> findStatusInfo(projectId))
         .parFlatMapN {
-          case (Some(HookMissing), _)       => Ok(StatusInfo.NotActivated.asJson)
-          case (Some(HookExists), Some(si)) => Ok(si.asJson)
+          case (Some(HookMissing), _) =>
+            Ok(StatusInfo.NotActivated.asJson)
+          case (Some(HookExists), Some(si)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
           case (Some(HookExists), None) =>
-            sendEvents(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
-          case (None, Some(si)) => Ok(si.asJson)
-          case (None, None)     => NotFound(InfoMessage("Info about project cannot be found"))
+            sendCommitSyncRequest(projectId, authUser) >> Ok(StatusInfo.webhookReady.widen.asJson)
+          case (None, Some(si)) =>
+            sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
+          case (None, None) =>
+            NotFound(InfoMessage("Info about project cannot be found"))
         }
-        .recoverWith(internalServerError(projectId))
+        .handleErrorWith(internalServerError(projectId))
     }
 
-  private def sendEvents(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
+  private def sendCommitSyncRequest(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
     findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
       (elClient send CommitSyncRequest(project))
-        .handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed")) >>
-        (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
-          .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
+        .handleErrorWith(Logger[F].warn(_)("Sending CommitSyncRequest failed"))
     }
   }.void
 
-  private def internalServerError(projectId: projects.GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
-    case exception =>
-      val message = show"Finding status info for project '$projectId' failed"
-      Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
+  private def sendProjectViewed(projectId: GitLabId, authUser: Option[AuthUser]): F[Unit] = Spawn[F].start {
+    findProjectInfo(projectId)(authUser.map(_.accessToken)) >>= { project =>
+      (tgClient send ProjectViewedEvent.forProjectAndUserId(project.path, authUser.map(_.id)))
+        .handleErrorWith(Logger[F].warn(_)("Sending ProjectViewedEvent failed"))
+    }
+  }.void
+
+  private def internalServerError(projectId: projects.GitLabId): Throwable => F[Response[F]] = { exception =>
+    val message = show"Finding status info for project '$projectId' failed"
+    Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
   }
 
   private def logMessage(projectId: GitLabId): PartialFunction[Response[F], String] =

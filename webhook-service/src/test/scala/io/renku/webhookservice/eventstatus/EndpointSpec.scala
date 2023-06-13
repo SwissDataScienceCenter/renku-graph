@@ -64,27 +64,34 @@ class EndpointSpec
 
   "fetchProcessingStatus" should {
 
-    "return OK with project status info if webhook for the project exists" in new TestCase {
+    "return OK with project status info and send PROJECT_VIEWED_EVENT " +
+      "if webhook for the project exists" in new TestCase {
 
-      val authUser = authUsers.generateOption
+        val authUser = authUsers.generateOption
 
-      givenHookValidation(projectId, authUser, returning = HookExists.some.pure[IO])
+        givenHookValidation(projectId, authUser, returning = HookExists.some.pure[IO])
 
-      val statusInfo = statusInfos.generateOne
-      givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
+        val statusInfo = statusInfos.generateOne
+        givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
-      val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
+        val project = consumerProjects.generateOne.copy(id = projectId)
+        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectViewedEventSent
 
-      response.status                   shouldBe Ok
-      response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
+        val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
-      logger.loggedOnly(
-        Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
-      )
-    }
+        response.status                   shouldBe Ok
+        response.contentType              shouldBe Some(`Content-Type`(application.json))
+        response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
 
-    "send COMMIT_SYNC_REQUEST and PROJECT_VIEWED_EVENT and return OK with activated = true and status 'in-progress' " +
+        verifyProjectViewedEventSent(project, authUser)
+
+        logger.loggedOnly(
+          Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
+        )
+      }
+
+    "send COMMIT_SYNC_REQUEST and return OK with activated = true and status 'in-progress' " +
       "if webhook for the project exists but no status info can be found in EL" in new TestCase {
 
         val authUser = authUsers.generateOption
@@ -95,7 +102,6 @@ class EndpointSpec
         val project = consumerProjects.generateOne.copy(id = projectId)
         givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
         givenCommitSyncRequestSent
-        givenProjectViewedEventSent
 
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
@@ -104,7 +110,6 @@ class EndpointSpec
         response.as[Json].unsafeRunSync() shouldBe StatusInfo.webhookReady.asJson
 
         verifyCommitSyncRequestSent(project)
-        verifyProjectViewedEventSent(project, authUser)
 
         logger.loggedOnly(
           Warn(s"Finding status info for project '$projectId' finished${executionTimeRecorder.executionTimeInfo}")
@@ -125,7 +130,8 @@ class EndpointSpec
       response.as[Json].unsafeRunSync() shouldBe StatusInfo.NotActivated.asJson
     }
 
-    "return OK with project status info with activated = true " +
+    "return OK with project status info with activated = true and " +
+      "send PROJECT_VIEWED_EVENT " +
       "if determining project hook existence returns None " +
       "but status info can be found in EL" in new TestCase {
 
@@ -136,11 +142,17 @@ class EndpointSpec
         val statusInfo = statusInfos.generateOne
         givenStatusInfoFinding(projectId, returning = statusInfo.some.pure[IO])
 
+        val project = consumerProjects.generateOne.copy(id = projectId)
+        givenProjectInfoFinding(projectId, authUser, returning = project.pure[IO])
+        givenProjectViewedEventSent
+
         val response = endpoint.fetchProcessingStatus(projectId, authUser).unsafeRunSync()
 
         response.status                   shouldBe Ok
         response.contentType              shouldBe Some(`Content-Type`(application.json))
         response.as[Json].unsafeRunSync() shouldBe statusInfo.asJson
+
+        verifyProjectViewedEventSent(project, authUser)
       }
 
     "return NOT_FOUND if determining project hook existence returns None " +
