@@ -104,7 +104,8 @@ class CacheStateSpec extends AnyWordSpec with should.Matchers {
       .map { case (v, i) => new Key(v, i, 10 - i) }
       .foldLeft(CacheState.create[String, String](cfg))((c, e) => c.put(e, e.value))
 
-    val next = cache.shrink
+    val (next, removed) = cache.shrink
+    removed                         shouldBe 2
     next.data.size                  shouldBe cfg.clearConfig.maximumSize
     next.data.values.map(_._2).toList should contain theSameElementsAs (List(Some("c"), Some("d")))
   }

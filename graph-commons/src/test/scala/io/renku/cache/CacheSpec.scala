@@ -21,6 +21,7 @@ package io.renku.cache
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.MutableClock
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
@@ -28,6 +29,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import scala.concurrent.duration._
 
 class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
+  implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
   val clearInterval = 100.millis
   val config = CacheConfig(
