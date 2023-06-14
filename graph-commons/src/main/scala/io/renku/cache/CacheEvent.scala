@@ -18,15 +18,10 @@
 
 package io.renku.cache
 
-trait Cache[F[_], A, B] {
+sealed trait CacheEvent
 
-  def withCache(f: A => F[Option[B]]): A => F[Option[B]]
-}
+object CacheEvent {
 
-object Cache {
-  def apply[F[_], A, B](f: (A => F[Option[B]]) => A => F[Option[B]]): Cache[F, A, B] =
-    (n: A => F[Option[B]]) => f(n)
-
-  def noop[F[_], A, B]: Cache[F, A, B] =
-    (f: A => F[Option[B]]) => f
+  final case class CacheResponse(result: CacheResult[_], size: Int) extends CacheEvent
+  final case class CacheClear(dropped: Int, size: Int)              extends CacheEvent
 }

@@ -27,6 +27,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
   implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -39,8 +40,12 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
     clearConfig = CacheConfig.ClearConfig.Periodic(10, clearInterval)
   )
 
-  val clock:         MutableClock[IO]                     = MutableClock.zero
-  val cacheResource: Resource[IO, Cache[IO, String, Int]] = Cache.memoryAsync[IO, String, Int](config, clock)
+  val clock: MutableClock[IO] = MutableClock.zero
+  val cacheResource: Resource[IO, Cache[IO, String, Int]] = CacheBuilder
+    .default[IO, String, Int]
+    .withConfig(config)
+    .withClock(clock)
+    .resource
 
   "Cache" should {
     "not run the function on a hit" in {
@@ -63,7 +68,7 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
       val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
       val cfg = config.copy(ttl = 0.1.second)
 
-      Cache.memoryAsyncF[IO, String, Int](cfg, clock).flatMap { cache =>
+      CacheBuilder.default[IO, String, Int].withConfig(cfg).withClock(clock).build.flatMap { cache =>
         val calcCached = cache.withCache(calc)
         for {
           v1 <- List.fill(5)("a").traverse(calcCached)
@@ -85,7 +90,7 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
       val counter = Ref.unsafe[IO, Int](0)
       val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
       val cfg = config.copy(ttl = 0.seconds)
-      Cache.memoryAsyncF[IO, String, Int](cfg, clock).flatMap { cache =>
+      CacheBuilder.default[IO, String, Int].withConfig(cfg).withClock(clock).build.flatMap { cache =>
         val calcCached = cache.withCache(calc)
         for {
           v1 <- List.fill(5)("a").traverse(calcCached)
@@ -108,6 +113,49 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
           _ <- List.range(0, 100).map(_.toString).traverse(calcCached)
           c <- counter.get
           _ = c shouldBe (100 - config.clearConfig.maximumSize)
+        } yield ()
+      }
+    }
+
+    "handlers should receive respective events" in {
+      val events: Ref[IO, List[CacheEvent]] = Ref.unsafe[IO, List[CacheEvent]](Nil)
+      def eventsOf[A](implicit t: ClassTag[A]) = {
+        val cls = t.runtimeClass
+        events.get.map(_.filter(_.getClass.isAssignableFrom(cls)))
+      }
+
+      val calc: String => IO[Option[Int]] = a => a.toIntOption.pure[IO]
+      val cacheR = CacheBuilder
+        .default[IO, String, Int]
+        .withConfig(config)
+        .withEventHandler(CacheEventHandler(ev => events.update(ev :: _)))
+        .resource
+      cacheR.use { cache =>
+        val calcCached = cache.withCache(calc)
+        for {
+          _ <- List.range(0, 3).map(_.toString).traverse(calcCached)
+          _ <- eventsOf[CacheEvent.CacheResponse].asserting(
+                 _ shouldBe List
+                   .range(1, 4)
+                   .map(n => CacheEvent.CacheResponse(CacheResult.Miss, n))
+                   .reverse
+               )
+          _ <- calcCached("0")
+          _ <- eventsOf[CacheEvent.CacheResponse].asserting { list =>
+                 list should have size 4
+                 val CacheEvent.CacheResponse(r, n) = list.head
+                 r shouldBe a[CacheResult.Hit[_]]
+                 n shouldBe 3
+               }
+
+          _ <- IO.sleep(clearInterval + 50.millis)
+          _ <- eventsOf[CacheEvent.CacheClear].asserting { list =>
+                 list.size should be >= 1
+                 val CacheEvent.CacheClear(removed, n) = list.head
+                 removed shouldBe 0
+                 n       shouldBe 3
+               }
+
         } yield ()
       }
     }

@@ -28,6 +28,8 @@ private[cache] final case class CacheState[A, B](
 ) {
   require(data.size == keys.size, s"sizes differ: data=${data.size} vs keys=${keys.size}")
 
+  def size = data.size
+
   def get(key: A, currentTime: FiniteDuration): (CacheState[A, B], CacheResult[Option[B]]) =
     data
       .get(key)

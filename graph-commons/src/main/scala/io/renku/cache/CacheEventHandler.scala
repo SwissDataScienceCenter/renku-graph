@@ -18,15 +18,26 @@
 
 package io.renku.cache
 
-trait Cache[F[_], A, B] {
+import cats.{Applicative, Parallel}
+import cats.syntax.all._
 
-  def withCache(f: A => F[Option[B]]): A => F[Option[B]]
+trait CacheEventHandler[F[_]] {
+
+  def apply(event: CacheEvent): F[Unit]
 }
 
-object Cache {
-  def apply[F[_], A, B](f: (A => F[Option[B]]) => A => F[Option[B]]): Cache[F, A, B] =
-    (n: A => F[Option[B]]) => f(n)
+object CacheEventHandler {
+  def apply[F[_]](f: CacheEvent => F[Unit]): CacheEventHandler[F] =
+    (event: CacheEvent) => f(event)
 
-  def noop[F[_], A, B]: Cache[F, A, B] =
-    (f: A => F[Option[B]]) => f
+  def none[F[_]: Applicative]: CacheEventHandler[F] =
+    apply(_ => Applicative[F].unit)
+
+  def parCombine[F[_]: Parallel: Applicative](handlers: List[CacheEventHandler[F]]): CacheEventHandler[F] =
+    if (handlers.isEmpty) none[F]
+    else apply(ev => handlers.parTraverse_(h => h(ev)))
+
+  def combine[F[_]: Applicative](handlers: List[CacheEventHandler[F]]): CacheEventHandler[F] =
+    if (handlers.isEmpty) none[F]
+    else apply(ev => handlers.traverse_(h => h(ev)))
 }
