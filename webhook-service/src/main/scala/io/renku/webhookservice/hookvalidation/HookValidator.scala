@@ -48,7 +48,7 @@ object HookValidator {
     projectHookVerifier   <- ProjectHookVerifier[F]
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
-    validationCache       <- Cache.memoryAsyncF[F, GitLabId, HookValidationResult](CacheConfig.default)
+    validationCache       <- Cache.memoryAsyncF[F, GitLabId, HookValidationResult](CacheConfig.default, Async[F])
   } yield new HookValidatorImpl[F](
     projectHookUrl,
     projectHookVerifier,

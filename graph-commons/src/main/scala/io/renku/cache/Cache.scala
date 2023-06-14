@@ -18,6 +18,7 @@
 
 package io.renku.cache
 
+import cats.Monad
 import cats.effect._
 import cats.syntax.all._
 import fs2.Stream
@@ -35,14 +36,14 @@ object Cache {
   def noop[F[_], A, B]: Cache[F, A, B] =
     (f: A => F[Option[B]]) => f
 
-  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig): Resource[F, Cache[F, A, B]] =
+  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig, clock: Clock[F]): Resource[F, Cache[F, A, B]] =
     if (cacheConfig.isDisabled) Resource.pure(noop[F, A, B])
     else {
       val refState =
         Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
 
       Resource.eval(refState).flatMap { state =>
-        val cache = baseCache[F, A, B](state)
+        val cache = baseCache[F, A, B](state, clock)
         val clear = cacheClearing(cacheConfig, state)
 
         Async[F]
@@ -51,14 +52,14 @@ object Cache {
       }
     }
 
-  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig): F[Cache[F, A, B]] =
+  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig, clock: Clock[F]): F[Cache[F, A, B]] =
     if (cacheConfig.isDisabled) noop[F, A, B].pure[F]
     else {
       val refState =
         Ref.of[F, CacheState[A, B]](CacheState.create(cacheConfig))
 
       refState.flatMap { state =>
-        val cache = baseCache[F, A, B](state)
+        val cache = baseCache[F, A, B](state, clock)
         val clear = cacheClearing(cacheConfig, state)
         Spawn[F].start(clear).as(cache)
       }
@@ -77,15 +78,16 @@ object Cache {
           .drain
     }
 
-  private[cache] def baseCache[F[_]: Sync, A, B](
-      state: Ref[F, CacheState[A, B]]
+  private[cache] def baseCache[F[_]: Monad, A, B](
+      state: Ref[F, CacheState[A, B]],
+      clock: Clock[F]
   ): Cache[F, A, B] =
     Cache(f =>
       a =>
-        Clock[F].realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
+        clock.realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
           case CacheResult.Hit(_, b) => b.pure[F]
           case _ =>
-            (Key(a), f(a)).flatMapN { (k, r) =>
+            (Key(a)(clock, Monad[F]), f(a)).flatMapN { (k, r) =>
               state.update(_.put(k, r)).as(r)
             }
         }

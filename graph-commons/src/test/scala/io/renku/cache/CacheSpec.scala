@@ -21,6 +21,7 @@ package io.renku.cache
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.testtools.MutableClock
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -36,7 +37,8 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
     clearConfig = CacheConfig.ClearConfig.Periodic(10, clearInterval)
   )
 
-  val cacheResource: Resource[IO, Cache[IO, String, Int]] = Cache.memoryAsync[IO, String, Int](config)
+  val clock:         MutableClock[IO]                     = MutableClock.zero
+  val cacheResource: Resource[IO, Cache[IO, String, Int]] = Cache.memoryAsync[IO, String, Int](config, clock)
 
   "Cache" should {
     "not run the function on a hit" in {
@@ -59,14 +61,16 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
       val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
       val cfg = config.copy(ttl = 0.1.second)
 
-      Cache.memoryAsyncF[IO, String, Int](cfg).flatMap { cache =>
+      Cache.memoryAsyncF[IO, String, Int](cfg, clock).flatMap { cache =>
         val calcCached = cache.withCache(calc)
         for {
           v1 <- List.fill(5)("a").traverse(calcCached)
           _ = v1 shouldBe List.fill(5)(Some(1))
           c <- counter.get
           _ = c shouldBe 1
-          _  <- IO.sleep(1.seconds) // TODO move Clock[F].currentTime to config
+
+          _ <- clock.update(_ + 1.second)
+
           v2 <- List.fill(5)("a").traverse(calcCached)
           _ = v2 shouldBe List.fill(5)(Some(2))
           c2 <- counter.get
@@ -79,7 +83,7 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
       val counter = Ref.unsafe[IO, Int](0)
       val calc: String => IO[Option[Int]] = _ => counter.updateAndGet(_ + 1).map(_.some)
       val cfg = config.copy(ttl = 0.seconds)
-      Cache.memoryAsyncF[IO, String, Int](cfg).flatMap { cache =>
+      Cache.memoryAsyncF[IO, String, Int](cfg, clock).flatMap { cache =>
         val calcCached = cache.withCache(calc)
         for {
           v1 <- List.fill(5)("a").traverse(calcCached)
@@ -96,7 +100,9 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
         for {
           _ <- List.range(0, 100).map(_.toString).traverse(calcCached)
           _ <- counter.set(0)
+
           _ <- IO.sleep(clearInterval + 50.millis)
+
           _ <- List.range(0, 100).map(_.toString).traverse(calcCached)
           c <- counter.get
           _ = c shouldBe (100 - config.clearConfig.maximumSize)

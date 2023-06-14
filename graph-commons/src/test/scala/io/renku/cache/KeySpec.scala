@@ -18,23 +18,25 @@
 
 package io.renku.cache
 
-import cats.effect.{Clock, IO}
-import io.renku.testtools.IOSpec
+import cats.Monad
+import cats.effect.IO
+import io.renku.testtools.{IOSpec, MutableClock}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.immutable.TreeSet
+import scala.concurrent.duration._
 
 class KeySpec extends AnyWordSpec with should.Matchers with IOSpec with ScalaCheckPropertyChecks {
 
   "Key" should {
     "create based on current time" in {
-      val curTime = Clock[IO].realTime.unsafeRunSync().toSeconds.toInt
-      val key     = Key[IO, Int](15).unsafeRunSync()
+      val clock = MutableClock.apply(151.seconds)
+      val key   = Key[IO, Int](15)(clock, Monad[IO]).unsafeRunSync()
       key.value      shouldBe 15
-      key.createdAt    should be >= curTime
-      key.accessedAt   should be >= curTime
+      key.createdAt    should be >= 151
+      key.accessedAt   should be >= 151
       key.accessedAt shouldBe key.createdAt
     }
 
