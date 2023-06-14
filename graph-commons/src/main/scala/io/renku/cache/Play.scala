@@ -20,13 +20,18 @@ package io.renku.cache
 
 import cats.effect._
 import cats.syntax.all._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+
 import scala.concurrent.duration._
 
 object Play extends IOApp.Simple {
 
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   val cacheResource =
     Cache.memoryAsync[IO, Int, String](
-      CacheConfig.default.copy(clearConfig = CacheConfig.ClearConfig.Periodic(15, 1500.millis))
+      CacheConfig.default.copy(clearConfig = CacheConfig.ClearConfig.Periodic(15, 1500.millis)),
+      Clock[IO]
     )
 
   val calc: Int => IO[Option[String]] = n => IO.sleep(1.1.seconds).as(n.toString.some)

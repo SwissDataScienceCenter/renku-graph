@@ -69,16 +69,18 @@ private[cache] final case class CacheState[A, B](
 
   def put(key: Key[A], entry: B): CacheState[A, B] = put(key, Some(entry))
 
-  def shrink: CacheState[A, B] = {
+  def shrink: (CacheState[A, B], Int) = {
     val currentSize = keys.size
     val diff        = currentSize - config.clearConfig.maximumSize
-    if (diff <= 0) this
+    if (diff <= 0) (this, 0)
     else {
       val (toDrop, rest) = keys.splitAt(diff)
-      new CacheState[A, B](
-        data.removedAll(toDrop.unsorted.map(_.value)),
-        rest,
-        config
+      (new CacheState[A, B](
+         data.removedAll(toDrop.unsorted.map(_.value)),
+         rest,
+         config
+       ),
+       toDrop.size
       )
     }
   }

@@ -23,6 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import fs2.Stream
 import io.renku.cache.CacheConfig.ClearConfig
+import org.typelevel.log4cats.Logger
 
 trait Cache[F[_], A, B] {
 
@@ -36,7 +37,7 @@ object Cache {
   def noop[F[_], A, B]: Cache[F, A, B] =
     (f: A => F[Option[B]]) => f
 
-  def memoryAsync[F[_]: Async, A, B](cacheConfig: CacheConfig, clock: Clock[F]): Resource[F, Cache[F, A, B]] =
+  def memoryAsync[F[_]: Async: Logger, A, B](cacheConfig: CacheConfig, clock: Clock[F]): Resource[F, Cache[F, A, B]] =
     if (cacheConfig.isDisabled) Resource.pure(noop[F, A, B])
     else {
       val refState =
@@ -52,7 +53,7 @@ object Cache {
       }
     }
 
-  def memoryAsyncF[F[_]: Async, A, B](cacheConfig: CacheConfig, clock: Clock[F]): F[Cache[F, A, B]] =
+  def memoryAsyncF[F[_]: Async: Logger, A, B](cacheConfig: CacheConfig, clock: Clock[F]): F[Cache[F, A, B]] =
     if (cacheConfig.isDisabled) noop[F, A, B].pure[F]
     else {
       val refState =
@@ -65,7 +66,7 @@ object Cache {
       }
     }
 
-  private[cache] def cacheClearing[F[_]: Sync: Temporal, A, B](
+  private[cache] def cacheClearing[F[_]: Sync: Temporal: Logger, A, B](
       cacheConfig: CacheConfig,
       state:       Ref[F, CacheState[A, B]]
   ) =
@@ -73,19 +74,21 @@ object Cache {
       case ClearConfig.Periodic(_, interval) =>
         Stream
           .awakeEvery(interval)
-          .evalMap(_ => state.update(_.shrink))
+          .evalMap(_ => state.modify(_.shrink))
+          .evalMap(n => if (n > 0) Logger[F].trace(s"Periodic cache clean removed $n entries") else Sync[F].unit)
           .compile
           .drain
     }
 
-  private[cache] def baseCache[F[_]: Monad, A, B](
+  private[cache] def baseCache[F[_]: Monad: Logger, A, B](
       state: Ref[F, CacheState[A, B]],
       clock: Clock[F]
   ): Cache[F, A, B] =
     Cache(f =>
       a =>
         clock.realTime.flatMap(t => state.modify(_.get(a, t))).flatMap {
-          case CacheResult.Hit(_, b) => b.pure[F]
+          case CacheResult.Hit(_, b) =>
+            Logger[F].trace(s"Cache hit: $a -> $b").as(b)
           case _ =>
             (Key(a)(clock, Monad[F]), f(a)).flatMapN { (k, r) =>
               state.update(_.put(k, r)).as(r)
