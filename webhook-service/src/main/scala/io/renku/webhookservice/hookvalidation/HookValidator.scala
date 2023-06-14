@@ -23,10 +23,11 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import com.typesafe.config.ConfigFactory
-import io.renku.cache.{Cache, CacheConfigLoader}
+import io.renku.cache.{Cache, CacheBuilder, CacheConfigLoader}
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import io.renku.webhookservice.tokenrepository._
@@ -44,21 +45,26 @@ object HookValidator {
     final case object HookMissing extends HookValidationResult
   }
 
-  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] = for {
-    tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
-    projectHookVerifier   <- ProjectHookVerifier[F]
-    accessTokenAssociator <- AccessTokenAssociator[F]
-    accessTokenRemover    <- AccessTokenRemover[F]
-    cacheConfig           <- CacheConfigLoader.load[F]("services.self.hook-validation-cache", ConfigFactory.load())
-    validationCache       <- Cache.memoryAsyncF[F, GitLabId, HookValidationResult](cacheConfig, Async[F])
-  } yield new HookValidatorImpl[F](
-    projectHookUrl,
-    projectHookVerifier,
-    new AccessTokenFinderImpl(tokenRepositoryUrl),
-    accessTokenAssociator,
-    accessTokenRemover,
-    validationCache
-  )
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] =
+    for {
+      tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
+      projectHookVerifier   <- ProjectHookVerifier[F]
+      accessTokenAssociator <- AccessTokenAssociator[F]
+      accessTokenRemover    <- AccessTokenRemover[F]
+      cacheConfig           <- CacheConfigLoader.load[F]("services.self.hook-validation-cache", ConfigFactory.load())
+      validationCache <- CacheBuilder
+                           .default[F, GitLabId, HookValidationResult]
+                           .withConfig(cacheConfig)
+                           .withEventHandler(CacheMetricHandler[F]("hook-validation-cache"))
+                           .build
+    } yield new HookValidatorImpl[F](
+      projectHookUrl,
+      projectHookVerifier,
+      new AccessTokenFinderImpl(tokenRepositoryUrl),
+      accessTokenAssociator,
+      accessTokenRemover,
+      validationCache
+    )
 }
 
 private class HookValidatorImpl[F[_]: MonadThrow: Logger](
