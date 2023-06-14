@@ -26,7 +26,7 @@ sealed trait EvictStrategy {
 }
 
 object EvictStrategy {
-  case object LeastUsed extends EvictStrategy {
+  case object LeastRecentlyUsed extends EvictStrategy {
     private[cache] override def keyOrder[A]: Ordering[Key[A]] = Key.Order.leastRecentlyUsed
 
     private[cache] def isExpired(key: Key[_], ttl: FiniteDuration, currentTime: FiniteDuration): Boolean =

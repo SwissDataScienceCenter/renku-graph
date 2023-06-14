@@ -22,7 +22,8 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.cache.{Cache, CacheConfig}
+import com.typesafe.config.ConfigFactory
+import io.renku.cache.{Cache, CacheConfigLoader}
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -48,7 +49,8 @@ object HookValidator {
     projectHookVerifier   <- ProjectHookVerifier[F]
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
-    validationCache       <- Cache.memoryAsyncF[F, GitLabId, HookValidationResult](CacheConfig.default, Async[F])
+    cacheConfig           <- CacheConfigLoader.load[F]("services.self.hook-validation-cache", ConfigFactory.load())
+    validationCache       <- Cache.memoryAsyncF[F, GitLabId, HookValidationResult](cacheConfig, Async[F])
   } yield new HookValidatorImpl[F](
     projectHookUrl,
     projectHookVerifier,

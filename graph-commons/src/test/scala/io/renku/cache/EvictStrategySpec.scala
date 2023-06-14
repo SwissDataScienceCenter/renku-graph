@@ -35,7 +35,7 @@ class EvictStrategySpec extends AnyWordSpec with should.Matchers {
     }
 
     "expired based on accessedAt" in {
-      val s   = EvictStrategy.LeastUsed
+      val s   = EvictStrategy.LeastRecentlyUsed
       val ttl = 20.seconds
       val key = new Key(0, 0, 10)
       s.isExpired(key, ttl, 2.seconds)  shouldBe false

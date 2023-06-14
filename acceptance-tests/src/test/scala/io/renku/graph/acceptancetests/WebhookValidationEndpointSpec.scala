@@ -108,9 +108,6 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
       And("when the hook get deleted from GitLab")
       gitLabStub.removeWebhook(project.id)
 
-      // unfortunately it's not so easy to adjust the cache behaviour for this test
-      Thread.sleep(5100)
-
       And("user does POST webhook-service/projects/:id/webhooks/validation again")
       val afterDeletionResponse =
         webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", user.accessToken)
