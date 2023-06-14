@@ -45,7 +45,7 @@ object Cache {
 
       Resource.eval(refState).flatMap { state =>
         val cache = baseCache[F, A, B](state, clock)
-        val clear = cacheClearing(cacheConfig, state)
+        val clear = cacheClearing(cacheConfig, state, clock)
 
         Async[F]
           .background(fs2.Stream.repeatEval(clear).compile.drain)
@@ -61,20 +61,22 @@ object Cache {
 
       refState.flatMap { state =>
         val cache = baseCache[F, A, B](state, clock)
-        val clear = cacheClearing(cacheConfig, state)
+        val clear = cacheClearing(cacheConfig, state, clock)
         Spawn[F].start(clear).as(cache)
       }
     }
 
   private[cache] def cacheClearing[F[_]: Sync: Temporal: Logger, A, B](
       cacheConfig: CacheConfig,
-      state:       Ref[F, CacheState[A, B]]
+      state:       Ref[F, CacheState[A, B]],
+      clock:       Clock[F]
   ) =
     cacheConfig.clearConfig match {
       case ClearConfig.Periodic(_, interval) =>
         Stream
           .awakeEvery(interval)
-          .evalMap(_ => state.modify(_.shrink))
+          .evalMap(_ => clock.realTime)
+          .evalMap(currentTime => state.modify(_.shrink(currentTime)))
           .evalMap(n => if (n > 0) Logger[F].trace(s"Periodic cache clean removed $n entries") else Sync[F].unit)
           .compile
           .drain

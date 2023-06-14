@@ -69,7 +69,13 @@ private[cache] final case class CacheState[A, B](
 
   def put(key: Key[A], entry: B): CacheState[A, B] = put(key, Some(entry))
 
-  def shrink: (CacheState[A, B], Int) = {
+  def shrink(currentTime: FiniteDuration): (CacheState[A, B], Int) = {
+    val (next, count1) = removeExpired(currentTime)
+    val (res, count2)  = next.shrinkToMaximum
+    (res, count1 + count2)
+  }
+
+  private def shrinkToMaximum: (CacheState[A, B], Int) = {
     val currentSize = keys.size
     val diff        = currentSize - config.clearConfig.maximumSize
     if (diff <= 0) (this, 0)
@@ -83,6 +89,19 @@ private[cache] final case class CacheState[A, B](
        toDrop.size
       )
     }
+  }
+
+  private def removeExpired(currentTime: FiniteDuration): (CacheState[A, B], Int) = {
+    val toRemove = keys.filter(k => config.isExpired(k, currentTime))
+    if (toRemove.isEmpty) (this, 0)
+    else
+      (new CacheState[A, B](
+         data.removedAll(toRemove.unsorted.map(_.value)),
+         keys.removedAll(toRemove),
+         config
+       ),
+       toRemove.size
+      )
   }
 
   override def toString: String = s"CacheState(data=$data, keys=$keys)"

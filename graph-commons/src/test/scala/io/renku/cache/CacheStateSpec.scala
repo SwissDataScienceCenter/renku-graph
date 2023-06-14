@@ -18,6 +18,7 @@
 
 package io.renku.cache
 
+import cats.syntax.all._
 import io.renku.cache.CacheConfig.ClearConfig
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -31,7 +32,7 @@ class CacheStateSpec extends AnyWordSpec with should.Matchers {
     evictStrategy = EvictStrategy.Oldest,
     ignoreEmptyValues = true,
     ttl = 10.seconds,
-    clearConfig = CacheConfig.ClearConfig.Periodic(20, 2.seconds)
+    clearConfig = CacheConfig.ClearConfig.Periodic(10, 2.seconds)
   )
 
   val key1 = new Key[String]("a", 0, 0)
@@ -104,9 +105,35 @@ class CacheStateSpec extends AnyWordSpec with should.Matchers {
       .map { case (v, i) => new Key(v, i, 10 - i) }
       .foldLeft(CacheState.create[String, String](cfg))((c, e) => c.put(e, e.value))
 
-    val (next, removed) = cache.shrink
+    val (next, removed) = cache.shrink(Duration.Zero)
     removed                         shouldBe 2
     next.data.size                  shouldBe cfg.clearConfig.maximumSize
     next.data.values.map(_._2).toList should contain theSameElementsAs (List(Some("c"), Some("d")))
+  }
+
+  "shrink removes all expired reducing to less than maximum size" in {
+    val cfg    = config.copy(ttl = 2.seconds)
+    val values = List.range('a', 'z')
+    val cache = values.zipWithIndex
+      .map { case (v, i) => new Key(v.toString, i, values.size - i) }
+      .foldLeft(CacheState.create[String, String](cfg))((c, e) => c.put(e, e.value))
+
+    val (next, removed) = cache.shrink(values.size.seconds)
+    removed                         shouldBe (values.size - 2)
+    next.data.size                  shouldBe 2
+    next.data.values.map(_._2).toList should contain theSameElementsAs values.takeRight(2).map(_.toString.some)
+  }
+
+  "shrink removes all even not expired to reach maximum" in {
+    val cfg    = config.copy(ttl = 2000.seconds)
+    val max    = cfg.clearConfig.maximumSize
+    val values = List.range('a', 'z')
+    val cache = values.zipWithIndex
+      .map { case (v, i) => new Key(v.toString, i, values.size - i) }
+      .foldLeft(CacheState.create[String, String](cfg))((c, e) => c.put(e, e.value))
+
+    val (next, removed) = cache.shrink(values.size.seconds)
+    removed        shouldBe (values.size - max)
+    next.data.size shouldBe max
   }
 }

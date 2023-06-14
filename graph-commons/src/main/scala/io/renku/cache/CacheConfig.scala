@@ -48,7 +48,7 @@ object CacheConfig {
     CacheConfig(
       evictStrategy = EvictStrategy.Oldest,
       ignoreEmptyValues = true,
-      ttl = 10.seconds,
+      ttl = 5.seconds,
       ClearConfig.default
     )
 
