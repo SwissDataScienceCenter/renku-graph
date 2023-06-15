@@ -20,6 +20,7 @@ package io.renku.webhookservice.hookvalidation
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.cache.Cache
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -31,6 +32,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators._
+import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import io.renku.webhookservice.model.HookIdentifier
 import io.renku.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
@@ -269,7 +271,8 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       projectHookVerifier,
       accessTokenFinder,
       accessTokenAssociator,
-      accessTokenRemover
+      accessTokenRemover,
+      Cache.noop[IO, GitLabId, HookValidationResult]
     )
 
     def givenAccessTokenFinding(returning: IO[Option[AccessToken]]) =
