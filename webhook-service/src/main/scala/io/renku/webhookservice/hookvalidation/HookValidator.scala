@@ -56,7 +56,7 @@ object HookValidator {
       validationCache <- CacheBuilder
                            .default[F, GitLabId, HookValidationResult]
                            .withConfig(cacheConfig)
-                           .withCacheStats("hook-validator-cache")
+                           .withCacheStats("hook_validator_cache")
                            .build
     } yield new HookValidatorImpl[F](
       projectHookUrl,
