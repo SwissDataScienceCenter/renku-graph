@@ -34,7 +34,7 @@ object CacheEventHandler {
   def none[F[_]: Applicative]: CacheEventHandler[F] =
     apply(_ => Applicative[F].unit)
 
-  def ignoreErrors[F[_]: ApplicativeError[*, Throwable]](h: CacheEventHandler[F]): CacheEventHandler[F] =
+  def ignoreErrors[F[_]](h: CacheEventHandler[F])(implicit F: ApplicativeError[F, Throwable]): CacheEventHandler[F] =
     CacheEventHandler(ev => h(ev).attempt.void)
 
   def parCombine[F[_]: Parallel: Applicative](handlers: List[CacheEventHandler[F]]): CacheEventHandler[F] =
