@@ -155,7 +155,6 @@ class CacheSpec extends AsyncWordSpec with should.Matchers with AsyncIOSpec {
                  removed shouldBe 0
                  n       shouldBe 3
                }
-
         } yield ()
       }
     }

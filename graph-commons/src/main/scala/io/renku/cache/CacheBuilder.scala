@@ -20,11 +20,18 @@ package io.renku.cache
 
 import cats.effect._
 import cats.syntax.all._
+import cats.{Applicative, Monad}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import fs2.Stream
 import io.renku.cache.CacheConfig.ClearConfig
-import cats.Monad
+import io.renku.metrics.MetricsRegistry
 
-final class CacheBuilder[F[_], A, B](clock: Clock[F], config: CacheConfig, handler: List[CacheEventHandler[F]]) {
+final class CacheBuilder[F[_], A, B](
+    clock:   Clock[F],
+    config:  CacheConfig,
+    handler: List[F[CacheEventHandler[F]]]
+) {
 
   def withConfig(cc: CacheConfig): CacheBuilder[F, A, B] =
     new CacheBuilder[F, A, B](clock, cc, handler)
@@ -32,11 +39,22 @@ final class CacheBuilder[F[_], A, B](clock: Clock[F], config: CacheConfig, handl
   def withClock(clock: Clock[F]): CacheBuilder[F, A, B] =
     new CacheBuilder[F, A, B](clock, config, handler)
 
-  def withEventHandler(eh: CacheEventHandler[F]): CacheBuilder[F, A, B] =
+  def withEventHandler(eh: F[CacheEventHandler[F]])(implicit F: Applicative[F]): CacheBuilder[F, A, B] =
     new CacheBuilder[F, A, B](clock, config, eh :: handler)
+
+  def withEventHandler(eh: CacheEventHandler[F])(implicit F: Applicative[F]): CacheBuilder[F, A, B] =
+    withEventHandler(eh.pure[F])
+
+  def withCacheStats(
+      cacheId: String Refined NonEmpty
+  )(implicit R: MetricsRegistry[F], async: Async[F]): CacheBuilder[F, A, B] =
+    withEventHandler(CacheStatsHandler(cacheId).map(_.widen))
 
   def withConfigChanged(f: CacheConfig => CacheConfig): CacheBuilder[F, A, B] =
     withConfig(f(config))
+
+  private def createEventHandler(implicit F: Monad[F]): F[CacheEventHandler[F]] =
+    handler.sequence.map(CacheEventHandler.combine[F])
 
   def resource(implicit F: Async[F]): Resource[F, Cache[F, A, B]] =
     if (config.isDisabled) Resource.pure(Cache.noop[F, A, B])
@@ -44,9 +62,7 @@ final class CacheBuilder[F[_], A, B](clock: Clock[F], config: CacheConfig, handl
       val refState =
         Ref.of[F, CacheState[A, B]](CacheState.create(config))
 
-      val handle = CacheEventHandler.combine(handler)
-
-      Resource.eval(refState).flatMap { state =>
+      (Resource.eval(refState), Resource.eval(createEventHandler)).flatMapN { (state, handle) =>
         val cache = CacheBuilder.baseCache[F, A, B](state, clock, handle)
         val clear = CacheBuilder.cacheClearing(config, state, clock, handle)
 
@@ -62,9 +78,7 @@ final class CacheBuilder[F[_], A, B](clock: Clock[F], config: CacheConfig, handl
       val refState =
         Ref.of[F, CacheState[A, B]](CacheState.create(config))
 
-      val handle = CacheEventHandler.combine(handler)
-
-      refState.flatMap { state =>
+      (refState, createEventHandler).flatMapN { (state, handle) =>
         val cache = CacheBuilder.baseCache[F, A, B](state, clock, handle)
         val clear = CacheBuilder.cacheClearing(config, state, clock, handle)
         Spawn[F].start(clear).as(cache)
@@ -77,7 +91,7 @@ object CacheBuilder {
   def default[F[_]: Async, A, B]: CacheBuilder[F, A, B] =
     new CacheBuilder[F, A, B](Clock[F], CacheConfig.default, Nil)
 
-  private[cache] def cacheClearing[F[_]: Monad: Temporal, A, B](
+  private def cacheClearing[F[_]: Monad: Temporal, A, B](
       cacheConfig: CacheConfig,
       state:       Ref[F, CacheState[A, B]],
       clock:       Clock[F],
@@ -95,7 +109,7 @@ object CacheBuilder {
           .drain
     }
 
-  private[cache] def baseCache[F[_]: Monad, A, B](
+  private def baseCache[F[_]: Monad, A, B](
       state:  Ref[F, CacheState[A, B]],
       clock:  Clock[F],
       handle: CacheEventHandler[F]

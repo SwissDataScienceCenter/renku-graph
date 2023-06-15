@@ -16,17 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.webhookservice.hookvalidation
+package io.renku.cache
 
-import io.renku.cache.{CacheEvent, CacheEventHandler}
-import io.renku.metrics.MetricsRegistry
+import io.renku.cache.CacheStatsGauge.Label
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private final class CacheMetricHandler[F[_]](id: String) extends CacheEventHandler[F] {
-  s"use the $id"
-  override def apply(event: CacheEvent): F[Unit] = ???
-}
+class CacheStatsGaugeSpec extends AnyWordSpec with should.Matchers {
 
-object CacheMetricHandler {
-  def apply[F[_]: MetricsRegistry](id: String): CacheEventHandler[F] =
-    new CacheMetricHandler[F](id)
+  "LabelNames" should {
+    "be snake case" in {
+      Label.CacheHit.asString   shouldBe "cache_hit"
+      Label.CacheSize.asString  shouldBe "cache_size"
+      Label.CacheMiss.asString  shouldBe "cache_miss"
+      Label.CacheClear.asString shouldBe "cache_clear"
+    }
+  }
+
 }

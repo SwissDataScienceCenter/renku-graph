@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.auto._
 import io.renku.cache.{Cache, CacheBuilder, CacheConfigLoader}
 import io.renku.graph.model.projects.GitLabId
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
@@ -55,7 +56,7 @@ object HookValidator {
       validationCache <- CacheBuilder
                            .default[F, GitLabId, HookValidationResult]
                            .withConfig(cacheConfig)
-                           .withEventHandler(CacheMetricHandler[F]("hook-validation-cache"))
+                           .withCacheStats("hook-validator-cache")
                            .build
     } yield new HookValidatorImpl[F](
       projectHookUrl,
