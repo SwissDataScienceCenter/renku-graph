@@ -32,16 +32,16 @@ final class CacheStatsHandler[F[_]: Monad](gauge: CacheStatsGauge[F]) extends Ca
 
   override def apply(event: CacheEvent): F[Unit] = event match {
     case CacheEvent.CacheResponse(CacheResult.Hit(_, _), size) =>
-      gauge.update(Label.CacheSize -> size) *> gauge.increment(Label.CacheHit)
+      gauge.set(Label.CacheSize -> size) *> gauge.increment(Label.CacheHit)
 
     case CacheEvent.CacheResponse(CacheResult.Miss, size) =>
-      gauge.update(Label.CacheSize -> size) *> gauge.increment(Label.CacheMiss)
+      gauge.set(Label.CacheSize -> size) *> gauge.increment(Label.CacheMiss)
 
     case CacheEvent.CacheClear(dropped, size) =>
       List(
         Label.CacheSize  -> size.toDouble,
         Label.CacheClear -> dropped.toDouble
-      ).traverse_(gauge.update)
+      ).traverse_(gauge.set)
   }
 }
 

@@ -18,12 +18,13 @@
 
 package io.renku.cache
 
-import cats.{Applicative, Parallel}
+import cats.{Applicative, ApplicativeError, Parallel}
 import cats.syntax.all._
 
 trait CacheEventHandler[F[_]] {
 
   def apply(event: CacheEvent): F[Unit]
+
 }
 
 object CacheEventHandler {
@@ -32,6 +33,9 @@ object CacheEventHandler {
 
   def none[F[_]: Applicative]: CacheEventHandler[F] =
     apply(_ => Applicative[F].unit)
+
+  def ignoreErrors[F[_]: ApplicativeError[*, Throwable]](h: CacheEventHandler[F]): CacheEventHandler[F] =
+    CacheEventHandler(ev => h(ev).attempt.void)
 
   def parCombine[F[_]: Parallel: Applicative](handlers: List[CacheEventHandler[F]]): CacheEventHandler[F] =
     if (handlers.isEmpty) none[F]
