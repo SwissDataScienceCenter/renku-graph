@@ -45,7 +45,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenTSDataFinding(event.path, returning = Option.empty[DataExtract].pure[IO])
       givenGLDataFinding(event.path, returning = dataExtracts(having = event.path).generateSome.pure[IO])
 
-      processor.process(event).asserting(_ shouldBe ())
+      processor.process(event).assertNoException
     }
   }
 
@@ -55,7 +55,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenTSDataFinding(event.path, returning = dataExtracts(having = event.path).generateSome.pure[IO])
       givenGLDataFinding(event.path, returning = Option.empty[DataExtract].pure[IO])
 
-      processor.process(event).asserting(_ shouldBe ())
+      processor.process(event).assertNoException
     }
   }
 
@@ -77,7 +77,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       givenUpsertsRunning(upserts, returning = ().pure[IO])
 
-      processor.process(event).asserting(_ shouldBe ())
+      processor.process(event).assertNoException
     }
 
   it should "fetch relevant data from TS and GL, " +
@@ -103,7 +103,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
             givenUpsertsRunning(upserts, returning = ().pure[IO])
 
-            processor.process(event).asserting(_ shouldBe ())
+            processor.process(event).assertNoException
           case _ => fail("expecting payload")
         }
     }
@@ -119,7 +119,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
         val glData = dataExtracts(having = event.path).generateOne
         givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
-        processor.process(event).asserting(_ shouldBe ()) >>
+        processor.process(event).assertNoException >>
           logger.loggedOnly(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
       }
   }
