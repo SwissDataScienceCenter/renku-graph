@@ -29,7 +29,8 @@ trait CacheStatsGauge[F[_]] extends LabeledGauge[F, CacheStatsGauge.Label]
 
 object CacheStatsGauge {
   sealed trait Label extends Product {
-    final def asString: String = camelToSnake(productPrefix)
+    final lazy val asString: String = camelToSnake(productPrefix)
+    override def toString = asString
   }
   object Label {
     case object CacheHit   extends Label
