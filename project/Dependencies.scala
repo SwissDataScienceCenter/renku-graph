@@ -21,7 +21,7 @@ object Dependencies {
     val log4jCore              = "2.20.0"
     val logback                = "1.4.8"
     val luceneQueryParser      = "9.6.0"
-    val monocle                = "2.1.0"
+    val monocle                = "3.2.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
     val rdf4jQueryParserSparql = "4.3.2"
@@ -61,7 +61,7 @@ object Dependencies {
 
   val monocle = Seq(
     // libraryDependencies += "dev.optics" %% "monocle-core" % 3.x.x // to be used when circe-optics starts to use is
-    "com.github.julien-truffaut" %% "monocle-core" % V.monocle
+    "dev.optics" %% "monocle-core" % V.monocle
   )
 
   val diffx = Seq(
