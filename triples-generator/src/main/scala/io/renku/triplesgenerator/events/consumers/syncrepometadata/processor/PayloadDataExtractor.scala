@@ -18,8 +18,39 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
+import cats.MonadThrow
+import cats.syntax.all._
 import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.graph.model.projects
 
 private trait PayloadDataExtractor[F[_]] {
-  def extractPayloadData(payload: ZippedEventPayload): F[Option[DataExtract]]
+  def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract]]
+}
+
+private class PayloadDataExtractorImpl[F[_]: MonadThrow] extends PayloadDataExtractor[F] {
+
+  import io.circe.DecodingFailure
+  import io.renku.compression.Zip.unzip
+  import io.renku.graph.model.{entities, projects}
+  import io.renku.jsonld.JsonLDDecoder._
+  import io.renku.jsonld.parser._
+  import io.renku.jsonld.{JsonLD, JsonLDDecoder}
+
+  override def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract]] =
+    MonadThrow[F].fromEither {
+      unzip(payload.value) >>= parse >>= decode(path)
+    }
+
+  private def decode(path: projects.Path): JsonLD => Either[DecodingFailure, Option[DataExtract]] =
+    _.cursor.as(decodeList(dataExtract(path))).map(_.headOption)
+
+  private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract] =
+    JsonLDDecoder.entity(entities.Project.entityTypes) { cur =>
+      for {
+        name <- cur.downField(entities.Project.Ontology.nameProperty.id).as[Option[projects.Name]] >>= {
+                  case None    => DecodingFailure(DecodingFailure.Reason.MissingField, cur.jsonLD.toJson.hcursor).asLeft
+                  case Some(v) => v.asRight
+                }
+      } yield DataExtract(path, name)
+    }
 }

@@ -88,15 +88,15 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       syncRepoMetadataWithPayloadEvents[IO]
         .map(_.generateOne)
         .flatMap {
-          case event @ SyncRepoMetadata(_, Some(payload)) =>
-            val tsData = dataExtracts(having = event.path).generateOne
-            givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
+          case event @ SyncRepoMetadata(path, Some(payload)) =>
+            val tsData = dataExtracts(having = path).generateOne
+            givenTSDataFinding(path, returning = tsData.some.pure[IO])
 
-            val glData = dataExtracts(having = event.path).generateOne
-            givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+            val glData = dataExtracts(having = path).generateOne
+            givenGLDataFinding(path, returning = glData.some.pure[IO])
 
-            val maybePayloadData = dataExtracts(having = event.path).generateOption
-            givenPayloadDataExtraction(payload, returning = maybePayloadData.pure[IO])
+            val maybePayloadData = dataExtracts(having = path).generateOption
+            givenPayloadDataExtraction(path, payload, returning = maybePayloadData.pure[IO])
 
             val upserts = sparqlQueries.generateList()
             givenUpsertsCalculation(tsData, glData, maybePayloadData, returning = upserts)
@@ -143,9 +143,12 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .expects(path)
       .returning(returning)
 
-  private def givenPayloadDataExtraction(payload: ZippedEventPayload, returning: IO[Option[DataExtract]]) =
+  private def givenPayloadDataExtraction(path:      projects.Path,
+                                         payload:   ZippedEventPayload,
+                                         returning: IO[Option[DataExtract]]
+  ) =
     (payloadDataExtractor.extractPayloadData _)
-      .expects(payload)
+      .expects(path, payload)
       .returning(returning)
 
   private def givenUpsertsCalculation(tsData:           DataExtract,
