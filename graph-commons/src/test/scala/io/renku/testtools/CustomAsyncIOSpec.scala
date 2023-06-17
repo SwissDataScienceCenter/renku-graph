@@ -16,17 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
+package io.renku.testtools
 
-import io.renku.graph.model.projects
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.unsafe.IORuntime
+import io.renku.microservices.SuppressChannelClosedExceptionRuntime
+import org.scalatest.AsyncTestSuite
 
-private sealed trait DataExtract {
-  val path: projects.Path
-  val name: projects.Name
-}
-
-private object DataExtract {
-  final case class TS(id: projects.ResourceId, path: projects.Path, name: projects.Name) extends DataExtract
-  final case class GL(path: projects.Path, name: projects.Name)                          extends DataExtract
-  final case class Payload(path: projects.Path, name: projects.Name)                     extends DataExtract
+trait CustomAsyncIOSpec extends AsyncIOSpec { asyncTestSuite: AsyncTestSuite =>
+  implicit override lazy val ioRuntime: IORuntime = SuppressChannelClosedExceptionRuntime.runtime
 }

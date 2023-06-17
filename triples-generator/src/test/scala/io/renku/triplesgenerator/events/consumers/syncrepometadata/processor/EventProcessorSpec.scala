@@ -42,8 +42,8 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   it should "do nothing if the given project does not exist in TS" in {
 
     syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-      givenTSDataFinding(event.path, returning = Option.empty[DataExtract].pure[IO])
-      givenGLDataFinding(event.path, returning = dataExtracts(having = event.path).generateSome.pure[IO])
+      givenTSDataFinding(event.path, returning = Option.empty[DataExtract.TS].pure[IO])
+      givenGLDataFinding(event.path, returning = glDataExtracts(having = event.path).generateSome.pure[IO])
 
       processor.process(event).assertNoException
     }
@@ -52,8 +52,8 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   it should "do nothing if the given project does not exist in GL" in {
 
     syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-      givenTSDataFinding(event.path, returning = dataExtracts(having = event.path).generateSome.pure[IO])
-      givenGLDataFinding(event.path, returning = Option.empty[DataExtract].pure[IO])
+      givenTSDataFinding(event.path, returning = tsDataExtracts(having = event.path).generateSome.pure[IO])
+      givenGLDataFinding(event.path, returning = Option.empty[DataExtract.GL].pure[IO])
 
       processor.process(event).assertNoException
     }
@@ -66,10 +66,10 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
       val event = syncRepoMetadataWithoutPayloadEvents.generateOne
 
-      val tsData = dataExtracts(having = event.path).generateOne
+      val tsData = tsDataExtracts(having = event.path).generateOne
       givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
 
-      val glData = dataExtracts(having = event.path).generateOne
+      val glData = glDataExtracts(having = event.path).generateOne
       givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
       val upserts = sparqlQueries.generateList()
@@ -89,13 +89,13 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
         .map(_.generateOne)
         .flatMap {
           case event @ SyncRepoMetadata(path, Some(payload)) =>
-            val tsData = dataExtracts(having = path).generateOne
+            val tsData = tsDataExtracts(having = path).generateOne
             givenTSDataFinding(path, returning = tsData.some.pure[IO])
 
-            val glData = dataExtracts(having = path).generateOne
+            val glData = glDataExtracts(having = path).generateOne
             givenGLDataFinding(path, returning = glData.some.pure[IO])
 
-            val maybePayloadData = dataExtracts(having = path).generateOption
+            val maybePayloadData = payloadDataExtracts(having = path).generateOption
             givenPayloadDataExtraction(path, payload, returning = maybePayloadData.pure[IO])
 
             val upserts = sparqlQueries.generateList()
@@ -116,7 +116,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
         val exception = exceptions.generateOne
         givenTSDataFinding(event.path, returning = exception.raiseError[IO, Nothing])
 
-        val glData = dataExtracts(having = event.path).generateOne
+        val glData = glDataExtracts(having = event.path).generateOne
         givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
         processor.process(event).assertNoException >>
@@ -133,27 +133,27 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   private lazy val processor =
     new EventProcessorImpl[IO](tsDataFinder, glDataFinder, payloadDataExtractor, upsertsCalculator, upsertsRunner)
 
-  private def givenTSDataFinding(path: projects.Path, returning: IO[Option[DataExtract]]) =
+  private def givenTSDataFinding(path: projects.Path, returning: IO[Option[DataExtract.TS]]) =
     (tsDataFinder.fetchTSData _)
       .expects(path)
       .returning(returning)
 
-  private def givenGLDataFinding(path: projects.Path, returning: IO[Option[DataExtract]]) =
+  private def givenGLDataFinding(path: projects.Path, returning: IO[Option[DataExtract.GL]]) =
     (glDataFinder.fetchGLData _)
       .expects(path)
       .returning(returning)
 
   private def givenPayloadDataExtraction(path:      projects.Path,
                                          payload:   ZippedEventPayload,
-                                         returning: IO[Option[DataExtract]]
+                                         returning: IO[Option[DataExtract.Payload]]
   ) =
     (payloadDataExtractor.extractPayloadData _)
       .expects(path, payload)
       .returning(returning)
 
-  private def givenUpsertsCalculation(tsData:           DataExtract,
-                                      glData:           DataExtract,
-                                      maybePayloadData: Option[DataExtract],
+  private def givenUpsertsCalculation(tsData:           DataExtract.TS,
+                                      glData:           DataExtract.GL,
+                                      maybePayloadData: Option[DataExtract.Payload],
                                       returning:        List[SparqlQuery]
   ) =
     (upsertsCalculator.calculateUpserts _)

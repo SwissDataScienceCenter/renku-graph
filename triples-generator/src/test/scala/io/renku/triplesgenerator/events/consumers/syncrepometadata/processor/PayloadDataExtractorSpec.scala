@@ -46,7 +46,7 @@ class PayloadDataExtractorSpec extends AsyncFlatSpec with AsyncIOSpec with shoul
     val ioPayload        = Zip.zip[IO](cliProjectJsonLD.toJson.noSpaces).map(ZippedEventPayload)
 
     (ioPayload >>= (extractor.extractPayloadData(testProject.path, _)))
-      .asserting(_.value shouldBe DataExtract(testProject.path, testProject.name))
+      .asserting(_.value shouldBe DataExtract.Payload(testProject.path, testProject.name))
   }
 
   it should "fail if unzip fails" in {

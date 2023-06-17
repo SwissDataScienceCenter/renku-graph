@@ -29,7 +29,7 @@ import io.renku.triplesstore.client.syntax._
 import io.renku.triplesstore.{ResultsDecoder, SparqlQuery, TSClient}
 
 private trait TSDataFinder[F[_]] {
-  def fetchTSData(path: projects.Path): F[Option[DataExtract]]
+  def fetchTSData(path: projects.Path): F[Option[DataExtract.TS]]
 }
 
 private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSDataFinder[F] {
@@ -37,12 +37,12 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
   import ResultsDecoder._
   import io.circe.Decoder
 
-  override def fetchTSData(path: projects.Path): F[Option[DataExtract]] =
-    tsClient.queryExpecting[Option[DataExtract]] {
+  override def fetchTSData(path: projects.Path): F[Option[DataExtract.TS]] =
+    tsClient.queryExpecting[Option[DataExtract.TS]] {
       SparqlQuery.ofUnsafe(
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?path ?name
+        sparql"""|SELECT ?id ?path ?name
                  |WHERE {
                  |  BIND (${path.asObject} AS ?path)
                  |  GRAPH ?id {
@@ -56,12 +56,13 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
       )
     }(decoder(path))
 
-  private def decoder(path: projects.Path): Decoder[Option[DataExtract]] =
-    ResultsDecoder[Option, DataExtract] { implicit cur =>
+  private def decoder(path: projects.Path): Decoder[Option[DataExtract.TS]] =
+    ResultsDecoder[Option, DataExtract.TS] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
+        id   <- extract[projects.ResourceId]("id")
         path <- extract[projects.Path]("path")
         name <- extract[projects.Name]("name")
-      } yield DataExtract(path, name)
+      } yield DataExtract.TS(id, path, name)
     }(toOption(show"Multiple projects or values for '$path'"))
 }

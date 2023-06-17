@@ -61,7 +61,7 @@ class GLDataFinderSpec
     val accessToken = accessTokens.generateOne
     givenAccessTokenFinding(path, returning = accessToken.some.pure[IO])
 
-    val data = dataExtracts(path).generateOne
+    val data = glDataExtracts(path).generateOne
     givenSingleProjectAPICall(path, accessToken, returning = data.some.pure[IO])
 
     finder.fetchGLData(path).asserting(_ shouldBe data.some)
@@ -90,7 +90,7 @@ class GLDataFinderSpec
 
   it should "decode relevant data from the response with OK status" in {
 
-    val data = dataExtracts(projectPaths.generateOne).generateOne
+    val data = glDataExtracts(projectPaths.generateOne).generateOne
 
     mapResponse(Ok, Request[IO](), Response[IO]().withEntity(data.asJson))
       .asserting(_.value shouldBe data)
@@ -130,13 +130,15 @@ class GLDataFinderSpec
 
     givenAccessTokenFinding(path, returning = accessTokens.generateOption.pure[IO])
 
-    captureMapping(glClient)(finder.fetchGLData(path).unsafeRunSync(), dataExtracts(having = path).toGeneratorOfOptions)
+    captureMapping(glClient)(finder.fetchGLData(path).unsafeRunSync(),
+                             glDataExtracts(having = path).toGeneratorOfOptions
+    )
   }
 
-  private implicit lazy val encoder: Encoder[DataExtract] = Encoder.instance { case DataExtract(path, name) =>
+  private implicit lazy val encoder: Encoder[DataExtract.GL] = Encoder.instance { de =>
     json"""{
-      "name":                $name,
-      "path_with_namespace": $path
+      "name":                ${de.name},
+      "path_with_namespace": ${de.path}
     }"""
   }
 }
