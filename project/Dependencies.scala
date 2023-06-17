@@ -30,7 +30,7 @@ object Dependencies {
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.16"
-    val scalatestScalacheck    = "3.2.2.0"
+    val scalatestScalacheck    = "3.2.11.0"
     val sentryLogback          = "6.22.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.15"
@@ -44,7 +44,7 @@ object Dependencies {
   )
 
   val scalatestScalaCheck = Seq(
-    "org.scalatestplus" %% "scalacheck-1-14" % V.scalatestScalacheck
+    "org.scalatestplus" %% "scalacheck-1-15" % V.scalatestScalacheck
   )
 
   val scalatest = Seq(
