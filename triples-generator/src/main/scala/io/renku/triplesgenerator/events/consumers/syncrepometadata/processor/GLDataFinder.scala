@@ -29,9 +29,13 @@ private trait GLDataFinder[F[_]] {
   def fetchGLData(path: projects.Path): F[Option[DataExtract.GL]]
 }
 
-private class GLDataFinderImpl[F[_]: Async: GitLabClient](accessTokenFinder: AccessTokenFinder[F])
-    extends GLDataFinder[F] {
+private object GLDataFinder {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder]: GLDataFinder[F] = new GLDataFinderImpl[F]
+}
 
+private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] extends GLDataFinder[F] {
+
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder.findAccessToken
   import cats.data.OptionT
   import eu.timepit.refined.auto._

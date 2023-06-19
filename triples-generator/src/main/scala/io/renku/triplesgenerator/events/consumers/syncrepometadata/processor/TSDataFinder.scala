@@ -20,16 +20,24 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata
 package processor
 
 import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.{ResultsDecoder, SparqlQuery, TSClient}
+import org.typelevel.log4cats.Logger
 
 private trait TSDataFinder[F[_]] {
   def fetchTSData(path: projects.Path): F[Option[DataExtract.TS]]
+}
+
+private object TSDataFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](config: Config): F[TSDataFinder[F]] =
+    ProjectsConnectionConfig[F](config).map(TSClient[F](_)).map(new TSDataFinderImpl(_))
 }
 
 private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends TSDataFinder[F] {

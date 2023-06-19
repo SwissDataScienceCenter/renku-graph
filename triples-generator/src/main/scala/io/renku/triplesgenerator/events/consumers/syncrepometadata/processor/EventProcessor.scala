@@ -22,14 +22,24 @@ package processor
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.GitLabClient
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[syncrepometadata] trait EventProcessor[F[_]] {
   def process(event: SyncRepoMetadata): F[Unit]
 }
 
-private[syncrepometadata] object EventProcessor {}
+private[syncrepometadata] object EventProcessor {
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder: AccessTokenFinder: GitLabClient](
+      config: Config
+  ): F[EventProcessor[F]] =
+    (TSDataFinder[F](config), UpsertsRunner[F](config))
+      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpsertsCalculator(), _))
+}
 
 private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
     tsDataFinder:         TSDataFinder[F],

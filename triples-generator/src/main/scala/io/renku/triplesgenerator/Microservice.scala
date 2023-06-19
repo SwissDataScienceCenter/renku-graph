@@ -75,6 +75,7 @@ object Microservice extends IOMicroservice {
     cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
     minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
     migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    syncRepoMetadataSubscription                 <- syncrepometadata.SubscriptionFactory[IO](config)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
     projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
     datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
@@ -86,6 +87,7 @@ object Microservice extends IOMicroservice {
                                 minProjectInfoSubscription,
                                 cleanUpSubscription,
                                 migrationRequestSubscription,
+                                syncRepoMetadataSubscription,
                                 projectActivationsSubscription,
                                 projectViewingsSubscription,
                                 datasetViewingsSubscription,

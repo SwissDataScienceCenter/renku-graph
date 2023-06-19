@@ -103,9 +103,9 @@ class GLDataFinderSpec
     }
   }
 
-  private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-  private val accessTokenFinder = mock[AccessTokenFinder[IO]]
-  private lazy val finder       = new GLDataFinderImpl[IO](accessTokenFinder)
+  private implicit val glClient:          GitLabClient[IO]      = mock[GitLabClient[IO]]
+  private implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+  private lazy val finder = new GLDataFinderImpl[IO]
 
   private def givenAccessTokenFinding(path: projects.Path, returning: IO[Option[AccessToken]]) =
     (accessTokenFinder

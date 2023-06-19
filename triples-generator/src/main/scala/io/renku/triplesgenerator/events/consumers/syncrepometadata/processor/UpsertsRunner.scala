@@ -20,12 +20,19 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata
 package processor
 
 import cats.ApplicativeThrow
+import cats.effect.Async
 import cats.syntax.all._
-import io.renku.triplesstore.{SparqlQuery, TSClient}
+import com.typesafe.config.Config
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait UpsertsRunner[F[_]] {
   def run(queries: List[SparqlQuery]): F[Unit]
+}
+
+private object UpsertsRunner {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](config: Config): F[UpsertsRunner[F]] =
+    ProjectsConnectionConfig[F](config).map(TSClient[F](_)).map(new UpsertsRunnerImpl(_))
 }
 
 private class UpsertsRunnerImpl[F[_]: ApplicativeThrow: Logger](tsClient: TSClient[F]) extends UpsertsRunner[F] {

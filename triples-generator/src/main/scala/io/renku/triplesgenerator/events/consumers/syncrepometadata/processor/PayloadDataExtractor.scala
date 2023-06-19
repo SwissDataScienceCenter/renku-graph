@@ -27,6 +27,10 @@ private trait PayloadDataExtractor[F[_]] {
   def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract.Payload]]
 }
 
+private object PayloadDataExtractor {
+  def apply[F[_]: MonadThrow]: PayloadDataExtractor[F] = new PayloadDataExtractorImpl[F]
+}
+
 private class PayloadDataExtractorImpl[F[_]: MonadThrow] extends PayloadDataExtractor[F] {
 
   import io.circe.DecodingFailure
