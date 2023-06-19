@@ -19,18 +19,21 @@
 package io.renku.eventlog
 
 import cats.effect._
+import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.db.PostgresContainer
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import skunk._
-import eu.timepit.refined.auto._
 
-trait ContainerEventLogDb extends ForAllTestContainer { self: Suite with IOSpec =>
+trait ContainerEventLogDb extends ForAllTestContainer { self: Suite =>
+
+  implicit val ioRuntime: IORuntime
+
   private val initialDbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: PostgreSQLContainer = PostgresContainer.container(initialDbConfig)
