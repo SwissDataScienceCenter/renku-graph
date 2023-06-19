@@ -55,7 +55,7 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def extractPayloadData(event: SyncRepoMetadata) =
     event.maybePayload match {
-      case None          => Option.empty[DataExtract].pure[F]
+      case None          => Option.empty[DataExtract.Payload].pure[F]
       case Some(payload) => payloadDataExtractor.extractPayloadData(event.path, payload)
     }
 

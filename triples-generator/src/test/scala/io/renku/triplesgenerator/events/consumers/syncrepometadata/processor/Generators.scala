@@ -18,9 +18,10 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.{projectNames, projectPaths, projectResourceIds}
-import io.renku.graph.model.projects
+import io.renku.graph.model.{entities, projects}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -37,4 +38,16 @@ private object Generators {
   def payloadDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.Payload] = for {
     name <- projectNames
   } yield DataExtract.Payload(having, name)
+
+  def tsDataFrom(project: entities.Project): DataExtract.TS =
+    DataExtract.TS(project.resourceId, project.path, project.name)
+
+  def glDataFrom(data: DataExtract): DataExtract.GL =
+    DataExtract.GL(data.path, data.name)
+
+  def payloadDataFrom(data: DataExtract): DataExtract.Payload =
+    DataExtract.Payload(data.path, data.name)
+
+  def newValuesFrom(data: DataExtract.TS): NewValues =
+    NewValues(data.name.some)
 }

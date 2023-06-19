@@ -18,15 +18,20 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
-import io.renku.graph.model.projects
-
-private sealed trait DataExtract {
-  val path: projects.Path
-  val name: projects.Name
+private trait NewValueCalculator {
+  def findNewValues(tsData:           DataExtract.TS,
+                    glData:           DataExtract.GL,
+                    maybePayloadData: Option[DataExtract.Payload]
+  ): NewValues
 }
 
-private object DataExtract {
-  final case class TS(id: projects.ResourceId, path: projects.Path, name: projects.Name) extends DataExtract
-  final case class GL(path: projects.Path, name: projects.Name)                          extends DataExtract
-  final case class Payload(path: projects.Path, name: projects.Name)                     extends DataExtract
+private object NewValueCalculatord extends NewValueCalculator {
+
+  override def findNewValues(tsData:           DataExtract.TS,
+                             glData:           DataExtract.GL,
+                             maybePayloadData: Option[DataExtract.Payload]
+  ): NewValues = NewValues {
+    val potentiallyNew = maybePayloadData.getOrElse(glData)
+    Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name)
+  }
 }

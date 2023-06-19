@@ -21,8 +21,8 @@ package processor
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -30,45 +30,55 @@ import io.renku.triplesstore.client.syntax._
 
 private trait UpsertsCalculator {
   def calculateUpserts(tsData:           DataExtract.TS,
-                       glData:           DataExtract,
-                       maybePayloadData: Option[DataExtract]
+                       glData:           DataExtract.GL,
+                       maybePayloadData: Option[DataExtract.Payload]
   ): List[SparqlQuery]
 }
 
-private object UpsertsCalculator extends UpsertsCalculator {
+private object UpsertsCalculator {
+  def apply(): UpsertsCalculator = new UpsertsCalculatorImpl(NewValueCalculatord)
+}
+
+private class UpsertsCalculatorImpl(newValueCalculator: NewValueCalculator) extends UpsertsCalculator {
 
   override def calculateUpserts(tsData:           DataExtract.TS,
-                                glData:           DataExtract,
-                                maybePayloadData: Option[DataExtract]
-  ): List[SparqlQuery] = Option
-    .when(tsData.name != glData.name) {
-      List(
-        SparqlQuery.ofUnsafe(
-          show"$categoryName: update name in Project",
-          Prefixes of (renku -> "renku", schema -> "schema"),
-          sparql"""|DELETE { GRAPH ?id { ?id schema:name ?name } }
-                   |INSERT { GRAPH ?id { ?id schema:name ${glData.name.asObject} } }
-                   |WHERE {
-                   |  BIND (${tsData.id.asEntityId} AS ?id)
-                   |  GRAPH ?id {
-                   |    ?id schema:name ?name
-                   |  }
-                   |}""".stripMargin
-        ),
-        SparqlQuery.ofUnsafe(
-          show"$categoryName: update name in Projects",
-          Prefixes of (renku -> "renku", schema -> "schema"),
-          sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:name ?name } }
-                   |INSERT { GRAPH ${GraphClass.Projects.id} { ?id schema:name ${glData.name.asObject} } }
-                   |WHERE {
-                   |  BIND (${tsData.id.asEntityId} AS ?id)
-                   |  GRAPH ${GraphClass.Projects.id} {
-                   |    ?id schema:name ?name
-                   |  }
-                   |}""".stripMargin
-        )
-      )
-    }
-    .sequence
-    .flatten
+                                glData:           DataExtract.GL,
+                                maybePayloadData: Option[DataExtract.Payload]
+  ): List[SparqlQuery] = {
+    val newValues = newValueCalculator.findNewValues(tsData, glData, maybePayloadData)
+    newValues.maybeName.map(nameUpdates(tsData.id, _)).getOrElse(Nil)
+  }
+
+  private def nameUpdates(id: projects.ResourceId, newName: projects.Name) = List(
+    nameInProjectUpdate(id, newName),
+    nameInProjectsUpdate(id, newName)
+  )
+
+  private def nameInProjectUpdate(id: projects.ResourceId, newName: projects.Name) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update name in Project",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      sparql"""|DELETE { GRAPH ?id { ?id schema:name ?name } }
+               |INSERT { GRAPH ?id { ?id schema:name ${newName.asObject} } }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ?id {
+               |    ?id schema:name ?name
+               |  }
+               |}""".stripMargin
+    )
+
+  private def nameInProjectsUpdate(id: projects.ResourceId, newName: projects.Name) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update name in Projects",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:name ?name } }
+               |INSERT { GRAPH ${GraphClass.Projects.id} { ?id schema:name ${newName.asObject} } }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    ?id schema:name ?name
+               |  }
+               |}""".stripMargin
+    )
 }
