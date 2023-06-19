@@ -26,6 +26,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
@@ -59,7 +60,9 @@ class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](hookValidator: HookVa
 }
 
 object HookValidationEndpoint {
-  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidationEndpoint[F]] = for {
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](
+      projectHookUrl: ProjectHookUrl
+  ): F[HookValidationEndpoint[F]] = for {
     hookValidator <- hookvalidation.HookValidator(projectHookUrl)
   } yield new HookValidationEndpointImpl[F](hookValidator)
 }

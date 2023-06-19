@@ -12,8 +12,8 @@ object Dependencies {
     val circeGenericExtras     = "0.14.3"
     val circeOptics            = "0.14.1"
     val diffx                  = "0.8.3"
-    val http4s                 = "0.23.20"
-    val http4sEmber            = "0.23.20"
+    val http4s                 = "0.23.21"
+    val http4sEmber            = "0.23.21"
     val http4sPrometheus       = "0.24.3"
     val ip4s                   = "3.3.0"
     val jsonld4s               = "0.11.0"
@@ -25,16 +25,16 @@ object Dependencies {
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
     val rdf4jQueryParserSparql = "4.3.2"
-    val refined                = "0.10.3"
-    val refinedPureconfig      = "0.10.3"
+    val refined                = "0.11.0"
+    val refinedPureconfig      = "0.11.0"
     val scalacheck             = "1.17.0"
     val scalamock              = "5.2.0"
     val scalatest              = "3.2.16"
-    val scalatestScalacheck    = "3.2.2.0"
-    val sentryLogback          = "6.22.0"
+    val scalatestScalacheck    = "3.2.14.0"
+    val sentryLogback          = "6.23.0"
     val skunk                  = "0.6.0"
     val swaggerParser          = "2.1.15"
-    val testContainersScala    = "0.40.16"
+    val testContainersScala    = "0.40.17"
     val widoco                 = "1.4.19"
     val wiremock               = "2.35.0"
   }
@@ -44,7 +44,7 @@ object Dependencies {
   )
 
   val scalatestScalaCheck = Seq(
-    "org.scalatestplus" %% "scalacheck-1-14" % V.scalatestScalacheck
+    "org.scalatestplus" %% "scalacheck-1-16" % V.scalatestScalacheck
   )
 
   val scalatest = Seq(
