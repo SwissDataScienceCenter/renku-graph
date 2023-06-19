@@ -16,10 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
+package io.renku.triplesgenerator.events.consumers.syncrepometadata
+package processor
 
-import io.renku.triplesstore.SparqlQuery
+import cats.ApplicativeThrow
+import cats.syntax.all._
+import io.renku.triplesstore.{SparqlQuery, TSClient}
+import org.typelevel.log4cats.Logger
 
 private trait UpsertsRunner[F[_]] {
   def run(queries: List[SparqlQuery]): F[Unit]
+}
+
+private class UpsertsRunnerImpl[F[_]: ApplicativeThrow: Logger](tsClient: TSClient[F]) extends UpsertsRunner[F] {
+
+  override def run(queries: List[SparqlQuery]): F[Unit] =
+    queries.map(runAndLogError).sequence.void
+
+  private def runAndLogError(query: SparqlQuery) =
+    tsClient
+      .updateWithNoResult(query)
+      .handleErrorWith(Logger[F].error(_)(show"$categoryName: running '${query.name.value}'"))
 }
