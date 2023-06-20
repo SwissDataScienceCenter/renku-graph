@@ -16,27 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+private trait NewValueCalculator {
+  def findNewValues(tsData:           DataExtract.TS,
+                    glData:           DataExtract.GL,
+                    maybePayloadData: Option[DataExtract.Payload]
+  ): NewValues
+}
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite =>
+private object NewValueCalculatord extends NewValueCalculator {
 
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
+  override def findNewValues(tsData:           DataExtract.TS,
+                             glData:           DataExtract.GL,
+                             maybePayloadData: Option[DataExtract.Payload]
+  ): NewValues = NewValues {
+    val potentiallyNew = maybePayloadData.getOrElse(glData)
+    Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name)
   }
 }

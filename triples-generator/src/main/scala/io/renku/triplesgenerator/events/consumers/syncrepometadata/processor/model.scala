@@ -16,27 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.graph.model.projects
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite =>
-
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
-  }
+private sealed trait DataExtract {
+  val path: projects.Path
+  val name: projects.Name
 }
+
+private object DataExtract {
+  final case class TS(id: projects.ResourceId, path: projects.Path, name: projects.Name) extends DataExtract
+  final case class GL(path: projects.Path, name: projects.Name)                          extends DataExtract
+  final case class Payload(path: projects.Path, name: projects.Name)                     extends DataExtract
+}
+
+private final case class NewValues(maybeName: Option[projects.Name])

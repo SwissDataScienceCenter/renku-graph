@@ -1,0 +1,53 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
+
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectNames, projectPaths, projectResourceIds}
+import io.renku.graph.model.{entities, projects}
+import org.scalacheck.Gen
+
+private object Generators {
+
+  def tsDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.TS] = for {
+    id   <- projectResourceIds
+    name <- projectNames
+  } yield DataExtract.TS(id, having, name)
+
+  def glDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.GL] = for {
+    name <- projectNames
+  } yield DataExtract.GL(having, name)
+
+  def payloadDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.Payload] = for {
+    name <- projectNames
+  } yield DataExtract.Payload(having, name)
+
+  def tsDataFrom(project: entities.Project): DataExtract.TS =
+    DataExtract.TS(project.resourceId, project.path, project.name)
+
+  def glDataFrom(data: DataExtract): DataExtract.GL =
+    DataExtract.GL(data.path, data.name)
+
+  def payloadDataFrom(data: DataExtract): DataExtract.Payload =
+    DataExtract.Payload(data.path, data.name)
+
+  def newValuesFrom(data: DataExtract.TS): NewValues =
+    NewValues(data.name.some)
+}

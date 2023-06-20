@@ -16,27 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.testtools
 
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.microservices.SuppressChannelClosedExceptionRuntime
+import org.scalatest.AsyncTestSuite
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite =>
-
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
-  }
+// to be removed once the ChannelClosedException is not raised anymore
+trait CustomAsyncIOSpec extends AsyncIOSpec { asyncTestSuite: AsyncTestSuite =>
+  implicit override lazy val ioRuntime: IORuntime = SuppressChannelClosedExceptionRuntime.runtime
 }

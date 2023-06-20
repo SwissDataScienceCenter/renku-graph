@@ -16,27 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesgenerator.events.consumers
 
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.events.CategoryName
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite =>
-
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
-  }
+package object syncrepometadata {
+  val categoryName: CategoryName = CategoryName("SYNC_REPO_METADATA")
 }

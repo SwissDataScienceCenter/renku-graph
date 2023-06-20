@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.testtools.IOSpec
+import cats.effect.unsafe.IORuntime
 import org.scalatest.Suite
 import skunk._
 import skunk.codec.all._
@@ -30,7 +30,9 @@ import skunk.implicits._
  *  convenient debugging. 
  */
 trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
-  self: Suite with IOSpec =>
+  self: Suite =>
+
+  implicit val ioRuntime: IORuntime
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
     sessionResource.useK(query).unsafeRunSync()

@@ -16,27 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.eventlog.events.consumers.projectsync
 
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.ForAllTestContainer
-import org.scalatest.{BeforeAndAfter, Suite}
+import io.renku.graph.model.GraphModelGenerators._
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite =>
+private object Generators {
 
-  implicit val ioRuntime: IORuntime
-
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  def clearDatasetsBefore: Boolean = true
-
-  before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
-  }
+  lazy val projectSyncEvents = for {
+    id   <- projectIds
+    path <- projectPaths
+  } yield ProjectSyncEvent(id, path)
 }
