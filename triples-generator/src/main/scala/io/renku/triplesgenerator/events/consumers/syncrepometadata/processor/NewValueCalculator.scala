@@ -25,13 +25,16 @@ private trait NewValueCalculator {
   ): NewValues
 }
 
-private object NewValueCalculatord extends NewValueCalculator {
+private object NewValueCalculator extends NewValueCalculator {
 
   override def findNewValues(tsData:           DataExtract.TS,
                              glData:           DataExtract.GL,
                              maybePayloadData: Option[DataExtract.Payload]
-  ): NewValues = NewValues {
-    val potentiallyNew = maybePayloadData.getOrElse(glData)
-    Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name)
-  }
+  ): NewValues = NewValues(
+    {
+      val potentiallyNew = maybePayloadData.getOrElse(glData)
+      Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name)
+    },
+    Option.when(tsData.visibility != glData.visibility)(glData.visibility)
+  )
 }

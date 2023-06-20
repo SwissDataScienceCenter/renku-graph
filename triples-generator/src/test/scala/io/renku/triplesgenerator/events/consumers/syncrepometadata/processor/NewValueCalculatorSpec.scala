@@ -22,6 +22,8 @@ import Generators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectNames
+import io.renku.graph.model.projects
+import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,8 +37,7 @@ class NewValueCalculatorSpec extends AnyWordSpec with should.Matchers with Optio
       val tsData = tsDataExtracts().generateOne
       val glData = glDataFrom(tsData)
 
-      NewValueCalculatord.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
-        newValuesFrom(tsData).copy(maybeName = None)
+      NewValueCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
     }
 
     "be None if ts and payload names are the same" in {
@@ -45,8 +46,7 @@ class NewValueCalculatorSpec extends AnyWordSpec with should.Matchers with Optio
       val glData      = glDataFrom(tsData).copy(name = projectNames.generateOne)
       val payloadData = payloadDataFrom(tsData)
 
-      NewValueCalculatord.findNewValues(tsData, glData, payloadData.some) shouldBe
-        newValuesFrom(tsData).copy(maybeName = None)
+      NewValueCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe NewValues.empty
     }
 
     "be gl name if ts and gl contains different names - no payload case" in {
@@ -54,8 +54,8 @@ class NewValueCalculatorSpec extends AnyWordSpec with should.Matchers with Optio
       val tsData = tsDataExtracts().generateOne
       val glData = glDataFrom(tsData).copy(name = projectNames.generateOne)
 
-      NewValueCalculatord.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
-        newValuesFrom(tsData).copy(maybeName = glData.name.some)
+      NewValueCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeName = glData.name.some)
     }
 
     "be payload name if all ts, gl and payload contains different names" in {
@@ -64,8 +64,30 @@ class NewValueCalculatorSpec extends AnyWordSpec with should.Matchers with Optio
       val glData      = glDataFrom(tsData).copy(name = projectNames.generateOne)
       val payloadData = payloadDataFrom(tsData).copy(name = projectNames.generateOne)
 
-      NewValueCalculatord.findNewValues(tsData, glData, payloadData.some) shouldBe
-        newValuesFrom(tsData).copy(maybeName = payloadData.name.some)
+      NewValueCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
+        NewValues.empty.copy(maybeName = payloadData.name.some)
+    }
+  }
+
+  "new visibility" should {
+
+    "be None if ts and gl visibilities are the same" in {
+
+      val tsData = tsDataExtracts().generateOne
+      val glData = glDataFrom(tsData)
+
+      NewValueCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be gl visibility if ts and gl contains different values" in {
+
+      val tsData = tsDataExtracts().generateOne
+      val glData =
+        glDataFrom(tsData)
+          .copy(visibility = Gen.oneOf(projects.Visibility.all - tsData.visibility).generateOne)
+
+      NewValueCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeVisibility = glData.visibility.some)
     }
   }
 }

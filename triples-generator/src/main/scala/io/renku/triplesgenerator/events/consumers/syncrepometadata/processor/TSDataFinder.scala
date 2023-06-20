@@ -50,13 +50,14 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
       SparqlQuery.ofUnsafe(
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name
+        sparql"""|SELECT ?id ?path ?name ?visibility
                  |WHERE {
                  |  BIND (${path.asObject} AS ?path)
                  |  GRAPH ?id {
                  |    ?id a schema:Project;
                  |        renku:projectPath ?path;
-                 |        schema:name ?name
+                 |        schema:name ?name;
+                 |        renku:projectVisibility ?visibility
                  |  }
                  |}
                  |LIMIT 1
@@ -68,9 +69,10 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
     ResultsDecoder[Option, DataExtract.TS] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
-        id   <- extract[projects.ResourceId]("id")
-        path <- extract[projects.Path]("path")
-        name <- extract[projects.Name]("name")
-      } yield DataExtract.TS(id, path, name)
+        id         <- extract[projects.ResourceId]("id")
+        path       <- extract[projects.Path]("path")
+        name       <- extract[projects.Name]("name")
+        visibility <- extract[projects.Visibility]("visibility")
+      } yield DataExtract.TS(id, path, name, visibility)
     }(toOption(show"Multiple projects or values for '$path'"))
 }

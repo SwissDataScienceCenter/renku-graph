@@ -18,7 +18,9 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.graph.model.projects
+import io.renku.triplesstore.SparqlQuery
 
 private sealed trait DataExtract {
   val path: projects.Path
@@ -26,9 +28,22 @@ private sealed trait DataExtract {
 }
 
 private object DataExtract {
-  final case class TS(id: projects.ResourceId, path: projects.Path, name: projects.Name) extends DataExtract
-  final case class GL(path: projects.Path, name: projects.Name)                          extends DataExtract
-  final case class Payload(path: projects.Path, name: projects.Name)                     extends DataExtract
+  final case class TS(id:         projects.ResourceId,
+                      path:       projects.Path,
+                      name:       projects.Name,
+                      visibility: projects.Visibility
+  ) extends DataExtract
+  final case class GL(path: projects.Path, name: projects.Name, visibility: projects.Visibility) extends DataExtract
+  final case class Payload(path: projects.Path, name: projects.Name)                             extends DataExtract
 }
 
-private final case class NewValues(maybeName: Option[projects.Name])
+private final case class NewValues(maybeName: Option[projects.Name], maybeVisibility: Option[projects.Visibility])
+private object NewValues {
+  val empty: NewValues = NewValues(maybeName = None, maybeVisibility = None)
+}
+
+private sealed trait UpdateCommand extends Product
+private object UpdateCommand {
+  final case class Sparql(value: SparqlQuery)                                extends UpdateCommand
+  final case class Event(value: StatusChangeEvent.RedoProjectTransformation) extends UpdateCommand
+}

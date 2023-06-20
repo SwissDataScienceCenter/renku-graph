@@ -18,23 +18,24 @@
 
 package io.renku.events.producers
 
-import cats.{Applicative, Eval}
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import cats.{Applicative, Eval}
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender.EventContext
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.{EventConsumerUrl, EventConsumerUrlFactory}
 import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.metrics.MetricsRegistry
-import org.http4s._
 import org.http4s.Method.POST
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable, TooManyRequests}
+import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -49,12 +50,17 @@ trait EventSender[F[_]] {
 }
 
 object EventSender {
+
   def apply[F[_]: Async: Logger: MetricsRegistry](
-      consumerUrlFactory: EventConsumerUrlFactory
+      consumerUrlFactory: EventConsumerUrlFactory,
+      config:             Config
   ): F[EventSender[F]] = for {
-    consumerUrl     <- consumerUrlFactory()
+    consumerUrl     <- consumerUrlFactory(config)
     sentEventsGauge <- SentEventsGauge[F]
   } yield new EventSenderImpl(consumerUrl, sentEventsGauge, onBusySleep = 2 seconds, onErrorSleep = 15 seconds)
+
+  def apply[F[_]: Async: Logger: MetricsRegistry](consumerUrlFactory: EventConsumerUrlFactory): F[EventSender[F]] =
+    apply(consumerUrlFactory, ConfigFactory.load)
 
   final case class EventContext(categoryName: CategoryName, errorMessage: String)
 }
