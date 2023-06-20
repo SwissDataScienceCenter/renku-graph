@@ -54,14 +54,15 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
   import upsertsCalculator.calculateUpserts
 
   override def process(event: SyncRepoMetadata): F[Unit] =
-    (fetchTSData(event.path), fetchGLData(event.path))
-      .parFlatMapN {
-        case (Some(tsData), Some(glData)) =>
-          extractPayloadData(event).map(calculateUpserts(tsData, glData, _)) >>= upsertsRunner.run
-        case _ =>
-          ().pure[F]
-      }
-      .handleErrorWith(logError(event))
+    Logger[F].info(show"$categoryName: $event accepted") >>
+      (fetchTSData(event.path), fetchGLData(event.path))
+        .parFlatMapN {
+          case (Some(tsData), Some(glData)) =>
+            extractPayloadData(event).map(calculateUpserts(tsData, glData, _)) >>= upsertsRunner.run
+          case _ =>
+            ().pure[F]
+        }
+        .handleErrorWith(logError(event))
 
   private def extractPayloadData(event: SyncRepoMetadata) =
     event.maybePayload match {

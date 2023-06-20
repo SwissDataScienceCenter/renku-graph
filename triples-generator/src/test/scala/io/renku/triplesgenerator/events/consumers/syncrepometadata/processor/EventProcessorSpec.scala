@@ -120,7 +120,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
         givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
         processor.process(event).assertNoException >>
-          logger.loggedOnly(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
+          logger.logged(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
       }
   }
 
