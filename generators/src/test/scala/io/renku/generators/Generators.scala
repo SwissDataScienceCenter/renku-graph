@@ -402,16 +402,12 @@ object Generators {
 
     implicit class GenAppOps[G[_]: Applicative, T](generator: Gen[G[T]]) {
 
-      def sequence: G[Gen[T]] = {
-
-        @tailrec
-        def genG: G[Gen[T]] = generator.sample match {
+      @tailrec
+      final def sequence: G[Gen[T]] =
+        generator.sample match {
           case Some(value) => value.map(Gen.const)
-          case None        => genG
+          case None        => sequence
         }
-
-        genG
-      }
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)
