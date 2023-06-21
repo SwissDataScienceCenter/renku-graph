@@ -18,32 +18,33 @@
 
 package io.renku.lock
 
-import io.renku.graph.model.projects
+import skunk.codec.all._
+import skunk.implicits._
+import skunk._
 
-import scala.util.hashing.MurmurHash3
+import java.time.OffsetDateTime
 
-trait LongKey[A] { self =>
-  def asLong(a: A): Long
+object PostgresLockStats {
 
-  def contramap[B](f: B => A): LongKey[B] =
-    LongKey.create(b => self.asLong(f(b)))
-}
+  final case class Stats(
+      database:  String,
+      objectId:  Long,
+      pid:       Long,
+      granted:   Boolean,
+      waitstart: OffsetDateTime
+  )
 
-object LongKey {
-  def apply[A](implicit lk: LongKey[A]): LongKey[A] = lk
+  def getStats[F[_]](session: Session[F]): F[List[Stats]] =
+    session.execute[Stats](query)
 
-  def create[A](f: A => Long): LongKey[A] =
-    (a: A) => f(a)
+  private def query: Query[Void, Stats] =
+    sql"""
+       SELECT db.datname, pl.objid, pl.pid, pl.granted,pl.waitstart
+       FROM pg_locks pl
+       INNER JOIN pg_database db ON db.oid = pl.database
+       WHERE pl.locktype = 'advisory';
+    """
+      .query(varchar *: int8 *: int8 *: bool *: timestamptz)
+      .to[Stats]
 
-  implicit val forLong: LongKey[Long] =
-    create(identity)
-
-  implicit val forInt: LongKey[Int] =
-    create(_.toLong)
-
-  implicit val forString: LongKey[String] =
-    forInt.contramap(MurmurHash3.stringHash)
-
-  implicit val forProjectPath: LongKey[projects.Path] =
-    forString.contramap(_.value)
 }

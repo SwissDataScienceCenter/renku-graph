@@ -21,12 +21,13 @@ package membersync
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.events.{consumers, CategoryName}
+import io.renku.events.{CategoryName, consumers}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -36,7 +37,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     membersSynchronizer:       MembersSynchronizer[F],
     subscriptionMechanism:     SubscriptionMechanism[F],
-    processExecutor:           ProcessExecutor[F]
+    processExecutor:           ProcessExecutor[F],
+    tsWriteLock:               TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   import io.renku.events.consumers.EventDecodingTools._
@@ -48,7 +50,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       decode = _.event.getProjectPath,
-      process = synchronizeMembers,
+      process = ev => tsWriteLock(ev).use(_ => synchronizeMembers(ev)),
       precondition = verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )
@@ -59,7 +61,8 @@ private object EventHandler {
   import eu.timepit.refined.auto._
 
   def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger](
-      subscriptionMechanism: SubscriptionMechanism[F]
+      subscriptionMechanism: SubscriptionMechanism[F],
+      tsWriteLock:           TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker  <- TSReadinessForEventsChecker[F]
     membersSynchronizer <- MembersSynchronizer[F]
@@ -68,6 +71,7 @@ private object EventHandler {
                               tsReadinessChecker,
                               membersSynchronizer,
                               subscriptionMechanism,
-                              processExecutor
+                              processExecutor,
+                              tsWriteLock
   )
 }

@@ -28,21 +28,25 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.entities.viewings
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
@@ -57,25 +61,36 @@ object Microservice extends IOMicroservice {
     }
   }
 
-  override def run(args: List[String]): IO[ExitCode] = for {
+  override def run(args: List[String]): IO[ExitCode] = {
+    val resources = for {
+      config      <- Resource.eval(parseConfigArgs(args))
+      tsWriteLock <- TgLockDB.createLock[IO, projects.Path](500.millis)
+    } yield (config, tsWriteLock)
+
+    resources.use { case (config, tsWriteLock) =>
+      doRun(config, tsWriteLock)
+    }
+  }
+
+  private def doRun(config: Config, tsWriteLock: TsWriteLock[IO]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
     implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
     implicit0(gc: GitLabClient[IO])              <- GitLabClient[IO]()
     implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
-    config                                       <- parseConfigArgs(args)
-    projectConnConfig                            <- ProjectsConnectionConfig[IO](config)
-    certificateLoader                            <- CertificateLoader[IO]
-    gitCertificateInstaller                      <- GitCertificateInstaller[IO]
-    sentryInitializer                            <- SentryInitializer[IO]
-    cliVersionCompatChecker                      <- CliVersionCompatibilityChecker[IO](config)
-    awaitingGenerationSubscription               <- awaitinggeneration.SubscriptionFactory[IO]
-    membersSyncSubscription                      <- membersync.SubscriptionFactory[IO]
-    triplesGeneratedSubscription                 <- triplesgenerated.SubscriptionFactory[IO]
-    cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
-    minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
-    migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
-    syncRepoMetadataSubscription                 <- syncrepometadata.SubscriptionFactory[IO](config)
+
+    projectConnConfig              <- ProjectsConnectionConfig[IO](config)
+    certificateLoader              <- CertificateLoader[IO]
+    gitCertificateInstaller        <- GitCertificateInstaller[IO]
+    sentryInitializer              <- SentryInitializer[IO]
+    cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+    awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO](tsWriteLock)
+    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock)
+    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock)
+    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
+    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO]
+    migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
     projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
     datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
