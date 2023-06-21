@@ -18,9 +18,13 @@
 
 package io.renku.lock
 
-trait LongKey[A] {
+import scala.util.hashing.MurmurHash3
+
+trait LongKey[A] { self =>
   def asLong(a: A): Long
 
+  def contramap[B](f: B => A): LongKey[B] =
+    LongKey.create(b => self.asLong(f(b)))
 }
 
 object LongKey {
@@ -34,4 +38,7 @@ object LongKey {
 
   implicit val forInt: LongKey[Int] =
     create(_.toLong)
+
+  implicit val forString: LongKey[String] =
+    forInt.contramap(MurmurHash3.stringHash)
 }
