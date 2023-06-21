@@ -20,6 +20,7 @@ package io.renku.eventlog.api.events
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.renku.events.EventRequestContent
 import io.renku.events.producers.EventSender
 import io.renku.graph.config.EventLogUrl
@@ -32,9 +33,12 @@ trait Client[F[_]] {
 }
 
 object Client {
+
+  def apply[F[_]: Async: Logger: MetricsRegistry](config: Config): F[Client[F]] =
+    EventSender[F](EventLogUrl, config).map(new ClientImpl[F](_))
+
   def apply[F[_]: Async: Logger: MetricsRegistry]: F[Client[F]] =
-    EventSender[F](EventLogUrl)
-      .map(new ClientImpl[F](_))
+    EventSender[F](EventLogUrl).map(new ClientImpl[F](_))
 }
 
 private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {

@@ -27,6 +27,7 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -55,7 +56,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 private object EventHandler {
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder](
+  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
       config: Config
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]

@@ -128,7 +128,7 @@ class GLDataFinderSpec
 
     val path = projectPaths.generateOne
 
-    givenAccessTokenFinding(path, returning = accessTokens.generateOption.pure[IO])
+    givenAccessTokenFinding(path, returning = accessTokens.generateSome.pure[IO])
 
     captureMapping(glClient)(finder.fetchGLData(path).unsafeRunSync(),
                              glDataExtracts(having = path).toGeneratorOfOptions
@@ -138,7 +138,8 @@ class GLDataFinderSpec
   private implicit lazy val encoder: Encoder[DataExtract.GL] = Encoder.instance { de =>
     json"""{
       "name":                ${de.name},
-      "path_with_namespace": ${de.path}
+      "path_with_namespace": ${de.path},
+      "visibility":          ${de.visibility}
     }"""
   }
 }

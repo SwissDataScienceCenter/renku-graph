@@ -23,6 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.entities.searchgraphs.SearchInfoDatasets
+import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectNames
 import io.renku.graph.model.testentities._
@@ -39,7 +40,7 @@ import org.scalatest.matchers.should
 import org.scalatest.{OptionValues, Succeeded}
 import org.typelevel.log4cats.Logger
 
-class UpsertsCalculatorSpec
+class UpdateCommandsCalculatorSpec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
     with should.Matchers
@@ -49,10 +50,7 @@ class UpsertsCalculatorSpec
     with SearchInfoDatasets
     with AsyncMockFactory {
 
-  private lazy val newValueCalculator = mock[NewValueCalculator]
-  private lazy val upsertsCalculator  = new UpsertsCalculatorImpl(newValueCalculator)
-
-  it should "create upsert queries where there's a new name" in {
+  it should "create upsert queries when there's a new name" in {
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
@@ -60,13 +58,9 @@ class UpsertsCalculatorSpec
     val glData           = glDataExtracts(project.path).generateOne
     val maybePayloadData = payloadDataExtracts(project.path).generateOption
 
-    val newName = projectNames.generateOne
-    givenNewValuesFinding(tsData,
-                          glData,
-                          maybePayloadData,
-                          returning = newValuesFrom(tsData).copy(maybeName = newName.some)
-    )
-    val updatedTsData = tsData.copy(name = newName)
+    val newValue = projectNames.generateOne
+    givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeName = newValue.some))
+    val updatedTsData = tsData.copy(name = newValue)
 
     for {
       _ <- provisionProject(project).assertNoException
@@ -74,14 +68,14 @@ class UpsertsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(upsertsCalculator.calculateUpserts(tsData, glData, maybePayloadData)).assertNoException
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
     } yield Succeeded
   }
 
-  it should "create no upsert queries where there are no new values" in {
+  it should "create RedoTransformation event if there's a change in visibility" in {
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
 
@@ -89,20 +83,56 @@ class UpsertsCalculatorSpec
     val glData           = glDataExtracts(project.path).generateOne
     val maybePayloadData = payloadDataExtracts(project.path).generateOption
 
-    givenNewValuesFinding(tsData, glData, maybePayloadData, returning = newValuesFrom(tsData))
+    val newValue = projectVisibilities.generateOne
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeVisibility = newValue.some)
+    )
 
     for {
       _ <- provisionProject(project).assertNoException
 
-      _ <- execute(upsertsCalculator.calculateUpserts(tsData, glData, maybePayloadData)).assertNoException
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- updatesCalculator
+             .calculateUpdateCommands(tsData, glData, maybePayloadData)
+             .pure[IO]
+             .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.path))))
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
     } yield Succeeded
   }
 
-  private def execute(queries: List[SparqlQuery]) =
-    queries.traverse_(runUpdate(on = projectsDataset, _))
+  it should "create no upsert queries if there are no new values" in {
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+    } yield Succeeded
+  }
+
+  private lazy val newValueCalculator = mock[NewValueCalculator]
+  private lazy val updatesCalculator  = new UpdateCommandsCalculatorImpl(newValueCalculator)
+
+  private def execute(queries: List[UpdateCommand]) =
+    queries
+      .collect { case q: UpdateCommand.Sparql => q.value }
+      .traverse_(runUpdate(on = projectsDataset, _))
 
   private def dataInProjectGraph(project: entities.Project): IO[Option[DataExtract.TS]] =
     runSelect(
@@ -110,12 +140,13 @@ class UpsertsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpsertsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name
+        sparql"""|SELECT ?id ?path ?name ?visibility
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
                  |    ?id renku:projectPath ?path;
-                 |        schema:name ?name
+                 |        schema:name ?name;
+                 |        renku:projectVisibility ?visibility
                  |  }
                  |}""".stripMargin
       )
@@ -127,12 +158,13 @@ class UpsertsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpsertsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name
+        sparql"""|SELECT ?id ?path ?name ?visibility
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
                  |    ?id renku:projectPath ?path;
-                 |        schema:name ?name
+                 |        schema:name ?name;
+                 |        renku:projectVisibility ?visibility
                  |  }
                  |}""".stripMargin
       )
@@ -140,8 +172,11 @@ class UpsertsCalculatorSpec
 
   private lazy val toDataExtract: List[Map[String, String]] => List[DataExtract.TS] =
     _.flatMap(row =>
-      (row.get("id").map(projects.ResourceId), row.get("path").map(projects.Path), row.get("name").map(projects.Name))
-        .mapN(DataExtract.TS)
+      (row.get("id").map(projects.ResourceId),
+       row.get("path").map(projects.Path),
+       row.get("name").map(projects.Name),
+       row.get("visibility").map(projects.Visibility)
+      ).mapN(DataExtract.TS)
     )
 
   private def givenNewValuesFinding(tsData:           DataExtract.TS,

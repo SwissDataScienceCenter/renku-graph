@@ -46,7 +46,7 @@ class TSDataFinderSpec
 
     finder
       .fetchTSData(project.path)
-      .asserting(_.value shouldBe DataExtract.TS(project.resourceId, project.path, project.name))
+      .asserting(_.value shouldBe DataExtract.TS(project.resourceId, project.path, project.name, project.visibility))
   }
 
   it should "return None if there's no project with the given path" in {

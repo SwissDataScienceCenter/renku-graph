@@ -25,6 +25,7 @@ import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -34,31 +35,33 @@ private[syncrepometadata] trait EventProcessor[F[_]] {
 }
 
 private[syncrepometadata] object EventProcessor {
-  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder: AccessTokenFinder: GitLabClient](
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: Logger: AccessTokenFinder: GitLabClient: SparqlQueryTimeRecorder: MetricsRegistry](
       config: Config
   ): F[EventProcessor[F]] =
-    (TSDataFinder[F](config), UpsertsRunner[F](config))
-      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpsertsCalculator(), _))
+    (TSDataFinder[F](config), UpdateCommandsRunner[F](config))
+      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpdateCommandsCalculator(), _))
 }
 
 private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
-    tsDataFinder:         TSDataFinder[F],
-    glDataFinder:         GLDataFinder[F],
-    payloadDataExtractor: PayloadDataExtractor[F],
-    upsertsCalculator:    UpsertsCalculator,
-    upsertsRunner:        UpsertsRunner[F]
+    tsDataFinder:             TSDataFinder[F],
+    glDataFinder:             GLDataFinder[F],
+    payloadDataExtractor:     PayloadDataExtractor[F],
+    updateCommandsCalculator: UpdateCommandsCalculator,
+    updateCommandsRunner:     UpdateCommandsRunner[F]
 ) extends EventProcessor[F] {
 
   import glDataFinder.fetchGLData
   import tsDataFinder.fetchTSData
-  import upsertsCalculator.calculateUpserts
+  import updateCommandsCalculator.calculateUpdateCommands
 
   override def process(event: SyncRepoMetadata): F[Unit] =
     Logger[F].info(show"$categoryName: $event accepted") >>
       (fetchTSData(event.path), fetchGLData(event.path))
         .parFlatMapN {
           case (Some(tsData), Some(glData)) =>
-            extractPayloadData(event).map(calculateUpserts(tsData, glData, _)) >>= upsertsRunner.run
+            extractPayloadData(event).map(calculateUpdateCommands(tsData, glData, _)) >>= executeUpdates
           case _ =>
             ().pure[F]
         }
@@ -69,6 +72,9 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
       case None          => Option.empty[DataExtract.Payload].pure[F]
       case Some(payload) => payloadDataExtractor.extractPayloadData(event.path, payload)
     }
+
+  private def executeUpdates: List[UpdateCommand] => F[Unit] =
+    _.traverse_(updateCommandsRunner.run)
 
   private def logError(event: SyncRepoMetadata): Throwable => F[Unit] = { exception =>
     Logger[F].error(exception)(show"$categoryName: $event processing failure")

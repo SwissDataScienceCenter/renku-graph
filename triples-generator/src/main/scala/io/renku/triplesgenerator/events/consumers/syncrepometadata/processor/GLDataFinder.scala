@@ -58,7 +58,10 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
 
   private implicit lazy val decoder: Decoder[DataExtract.GL] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    (cursor.downField("path_with_namespace").as[projects.Path], cursor.downField("name").as[projects.Name])
-      .mapN(DataExtract.GL.apply)
+
+    (cursor.downField("path_with_namespace").as[projects.Path],
+     cursor.downField("name").as[projects.Name],
+     cursor.downField("visibility").as[projects.Visibility]
+    ).mapN(DataExtract.GL.apply)
   }
 }
