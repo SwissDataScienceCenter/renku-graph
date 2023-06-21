@@ -37,20 +37,21 @@ private trait UpdateCommandsCalculator {
 }
 
 private object UpdateCommandsCalculator {
-  def apply(): UpdateCommandsCalculator = new UpdateCommandsCalculatorImpl(NewValueCalculator)
+  def apply(): UpdateCommandsCalculator = new UpdateCommandsCalculatorImpl(NewValuesCalculator)
 }
 
-private class UpdateCommandsCalculatorImpl(newValueCalculator: NewValueCalculator) extends UpdateCommandsCalculator {
+private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalculator) extends UpdateCommandsCalculator {
 
   override def calculateUpdateCommands(tsData:           DataExtract.TS,
                                        glData:           DataExtract.GL,
                                        maybePayloadData: Option[DataExtract.Payload]
   ): List[UpdateCommand] = {
-    val newValues = newValueCalculator.findNewValues(tsData, glData, maybePayloadData)
+    val newValues = newValuesCalculator.findNewValues(tsData, glData, maybePayloadData)
 
     (
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
-        newValues.maybeVisibility.as(List(eventUpdate(tsData.path)))
+        newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
+        newValues.maybeDesc.map(descUpdates(tsData.id, _))
     ).getOrElse(Nil)
   }
 
@@ -89,4 +90,67 @@ private class UpdateCommandsCalculatorImpl(newValueCalculator: NewValueCalculato
 
   private def eventUpdate(projectPath: projects.Path): UpdateCommand =
     UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(projectPath))
+
+  private def descUpdates(id: projects.ResourceId, newValue: Option[projects.Description]): List[UpdateCommand] = List(
+    descInProjectUpdate(id, newValue),
+    descInProjectsUpdate(id, newValue)
+  ).map(UpdateCommand.Sparql)
+
+  private def descInProjectUpdate(id: projects.ResourceId, newValue: Option[projects.Description]) =
+    newValue match {
+      case Some(value) =>
+        SparqlQuery.ofUnsafe(
+          show"$categoryName: update desc in Project",
+          Prefixes of schema -> "schema",
+          sparql"""|DELETE { GRAPH ?id { ?id schema:description ?maybeDesc } }
+                   |INSERT { GRAPH ?id { ?id schema:description ${value.asObject} } }
+                   |WHERE {
+                   |  BIND (${id.asEntityId} AS ?id)
+                   |  GRAPH ?id {
+                   |    OPTIONAL { ?id schema:description ?maybeDesc }
+                   |  }
+                   |}""".stripMargin
+        )
+      case None =>
+        SparqlQuery.ofUnsafe(
+          show"$categoryName: delete desc in Project",
+          Prefixes of schema -> "schema",
+          sparql"""|DELETE { GRAPH ?id { ?id schema:description ?maybeDesc } }
+                   |WHERE {
+                   |  BIND (${id.asEntityId} AS ?id)
+                   |  GRAPH ?id {
+                   |    OPTIONAL { ?id schema:description ?maybeDesc }
+                   |  }
+                   |}""".stripMargin
+        )
+    }
+
+  private def descInProjectsUpdate(id: projects.ResourceId, newValue: Option[projects.Description]) =
+    newValue match {
+      case Some(value) =>
+        SparqlQuery.ofUnsafe(
+          show"$categoryName: update desc in Projects",
+          Prefixes of schema -> "schema",
+          sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:description ?maybeDesc } }
+                   |INSERT { GRAPH ${GraphClass.Projects.id} { ?id schema:description ${value.asObject} } }
+                   |WHERE {
+                   |  BIND (${id.asEntityId} AS ?id)
+                   |  GRAPH ${GraphClass.Projects.id} {
+                   |    OPTIONAL { ?id schema:description ?maybeDesc }
+                   |  }
+                   |}""".stripMargin
+        )
+      case None =>
+        SparqlQuery.ofUnsafe(
+          show"$categoryName: delete desc in Projects",
+          Prefixes of schema -> "schema",
+          sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:description ?maybeDesc } }
+                   |WHERE {
+                   |  BIND (${id.asEntityId} AS ?id)
+                   |  GRAPH ${GraphClass.Projects.id} {
+                   |    OPTIONAL { ?id schema:description ?maybeDesc }
+                   |  }
+                   |}""".stripMargin
+        )
+    }
 }
