@@ -18,32 +18,77 @@
 
 package io.renku.lock
 
+import cats._
+import cats.effect._
+import cats.syntax.all._
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
+import java.time.{Duration, OffsetDateTime}
+
 object PostgresLockStats {
 
-  final case class Stats(
-      database: String,
-      objectId: Long,
-      pid:      Int,
-      granted:  Boolean
+  final case class Waiting(
+      objectId:     Long,
+      pid:          Long,
+      createdAt:    OffsetDateTime,
+      waitDuration: Duration
   )
 
-  def getStats[F[_]](session: Session[F]): F[List[Stats]] =
-    session.execute[Stats](query)
+  final case class Stats(
+      currentLocks: Long,
+      waiting:      List[Waiting]
+  )
 
-  //   SELECT db.datname :: varchar, pl.objid :: bigint, pl.pid, pl.granted,pl.waitstart, now() - pl.waitstart
-  // ^^ unfortunately, we have postgres 12.x and the pl.waitstart was added in version 14
-  // see https://www.postgresql.org/docs/14/view-pg-locks.html
-  private def query: Query[Void, Stats] =
+  def getStats[F[_]: Monad](session: Session[F]): F[Stats] =
+    for {
+      n <- session.unique(countCurrentLocks)
+      w <- session.execute(queryWaiting)
+    } yield Stats(n, w)
+
+  def ensureStatsTable[F[_]: Applicative](session: Session[F]): F[Unit] =
+    session.execute(createTable).void
+
+  def recordWaiting[F[_]: MonadCancelThrow](session: Session[F])(key: Long): F[Unit] =
+    session.transaction.use(_ => session.execute(upsertWaiting)(key).void)
+
+  def removeWaiting[F[_]: MonadCancelThrow](session: Session[F])(key: Long): F[Unit] =
+    session.transaction.use(_ => session.execute(deleteWaiting)(key).void)
+
+  private val countCurrentLocks: Query[Void, Long] =
     sql"""
-       SELECT db.datname :: varchar, pl.objid :: bigint, pl.pid, pl.granted
-       FROM pg_locks pl
-       INNER JOIN pg_database db ON db.oid = pl.database
-       WHERE pl.locktype = 'advisory';
+       SELECT COUNT(objid)
+       FROM pg_locks
+       WHERE locktype = 'advisory' and granted = true;
     """
-      .query(varchar *: int8 *: int4 *: bool)
-      .to[Stats]
+      .query(int8)
+
+  private val queryWaiting: Query[Void, Waiting] =
+    sql"""
+          SELECT obj_id, sess_id, created_at, now() - created_at
+          FROM kg_lock_stats
+         """
+      .query(int8 *: int8 *: timestamptz *: interval)
+      .to[Waiting]
+
+  private val createTable: Command[Void] =
+    sql"""
+         CREATE TABLE IF NOT EXISTS "kg_lock_stats"(
+           obj_id bigint not null,
+           sess_id bigint not null,
+           created_at timestamptz not null,
+           primary key (obj_id, sess_id)
+         )""".command
+
+  private val upsertWaiting: Command[Long] =
+    sql"""
+         INSERT
+         INTO kg_lock_stats (obj_id, sess_id, created_at)
+         VALUES ($int8, pg_backend_pid(), now())
+         ON CONFLICT (obj_id, sess_id) DO NOTHING
+         """.command
+
+  private val deleteWaiting: Command[Long] =
+    sql"""DELETE FROM kg_lock_stats WHERE obj_id = $int8""".command
 }

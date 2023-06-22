@@ -54,13 +54,21 @@ object PostgresLock {
       unlockSql: Query[Long, Boolean]
   ): Lock[F, A] = {
     def acq(n: Long): F[Boolean] =
-      session.unique(lockSql)(n).attempt.flatMap {
-        case Right(v) => v.pure[F]
-        case Left(ex) => Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
-      }
+      session
+        .unique(lockSql)(n)
+        .attempt
+        .flatMap {
+          case Right(v) => v.pure[F]
+          case Left(ex) => Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
+        }
+        .flatTap {
+          case false => PostgresLockStats.recordWaiting(session)(n)
+          case true  => PostgresLockStats.removeWaiting(session)(n)
+        }
+        .map { r => println(s"${System.currentTimeMillis()} got: $n => $r"); r }
 
     def rel(n: Long): F[Unit] =
-      session.unique(unlockSql)(n).void
+      session.unique(unlockSql)(n).flatMap(_ => PostgresLockStats.removeWaiting(session)(n))
 
     Lock
       .create(Kleisli(acq), interval)(Kleisli(rel))
