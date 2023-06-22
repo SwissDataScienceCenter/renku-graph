@@ -26,6 +26,7 @@ private sealed trait DataExtract {
   val path:      projects.Path
   val name:      projects.Name
   val maybeDesc: Option[projects.Description]
+  val keywords:  Set[projects.Keyword]
 }
 
 private object DataExtract {
@@ -33,23 +34,29 @@ private object DataExtract {
                       path:       projects.Path,
                       name:       projects.Name,
                       visibility: projects.Visibility,
-                      maybeDesc:  Option[projects.Description]
+                      maybeDesc:  Option[projects.Description],
+                      keywords:   Set[projects.Keyword]
   ) extends DataExtract
   final case class GL(path:       projects.Path,
                       name:       projects.Name,
                       visibility: projects.Visibility,
-                      maybeDesc:  Option[projects.Description]
+                      maybeDesc:  Option[projects.Description],
+                      keywords:   Set[projects.Keyword]
   ) extends DataExtract
-  final case class Payload(path: projects.Path, name: projects.Name, maybeDesc: Option[projects.Description])
-      extends DataExtract
+  final case class Payload(path:      projects.Path,
+                           name:      projects.Name,
+                           maybeDesc: Option[projects.Description],
+                           keywords:  Set[projects.Keyword]
+  ) extends DataExtract
 }
 
 private final case class NewValues(maybeName:       Option[projects.Name],
                                    maybeVisibility: Option[projects.Visibility],
-                                   maybeDesc:       Option[Option[projects.Description]]
+                                   maybeDesc:       Option[Option[projects.Description]],
+                                   maybeKeywords:   Option[Set[projects.Keyword]]
 )
 private object NewValues {
-  val empty: NewValues = NewValues(maybeName = None, maybeVisibility = None, maybeDesc = None)
+  val empty: NewValues = NewValues(maybeName = None, maybeVisibility = None, maybeDesc = None, maybeKeywords = None)
 }
 
 private sealed trait UpdateCommand extends Product

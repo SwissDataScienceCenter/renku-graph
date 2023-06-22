@@ -44,7 +44,7 @@ class PayloadDataExtractorSpec
     with ScalaCheckPropertyChecks {
 
   forAll(anyRenkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons)) { testProject =>
-    it should s"unzip the payload, parse it and extract relevant data - case ${testProject.name}" in {
+    it should s"unzip the payload, parse it and extract relevant data - project ${testProject.name}" in {
 
       val cliProject       = testProject.to[CliProject]
       val cliProjectJsonLD = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
@@ -53,7 +53,11 @@ class PayloadDataExtractorSpec
       (ioPayload >>=
         (extractor.extractPayloadData(testProject.path, _)))
         .asserting(
-          _.value shouldBe DataExtract.Payload(testProject.path, testProject.name, testProject.maybeDescription)
+          _.value shouldBe DataExtract.Payload(testProject.path,
+                                               testProject.name,
+                                               testProject.maybeDescription,
+                                               testProject.keywords
+          )
         )
     }
   }

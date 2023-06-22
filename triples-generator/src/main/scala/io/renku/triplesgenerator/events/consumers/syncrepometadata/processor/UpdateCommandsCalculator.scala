@@ -51,7 +51,8 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
     (
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
         newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
-        newValues.maybeDesc.map(descUpdates(tsData.id, _))
+        newValues.maybeDesc.map(descUpdates(tsData.id, _)) combine
+        newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _))
     ).getOrElse(Nil)
   }
 
@@ -153,4 +154,41 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
                    |}""".stripMargin
         )
     }
+
+  private def keywordsUpdates(id: projects.ResourceId, newValue: Set[projects.Keyword]): List[UpdateCommand] = List(
+    keywordsInProjectUpdate(id, newValue),
+    keywordsInProjectsUpdate(id, newValue)
+  ).map(UpdateCommand.Sparql)
+
+  private def keywordsInProjectUpdate(id: projects.ResourceId, newValue: Set[projects.Keyword]) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update keywords in Project",
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE { GRAPH ?id { ?id schema:keywords ?keyword } }
+               |INSERT { GRAPH ?id {
+               |  ${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.""").toList.intercalate(fr"\n ")}
+               |} }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ?id {
+               |    OPTIONAL { ?id schema:keywords ?keyword }
+               |  }
+               |}""".stripMargin
+    )
+
+  private def keywordsInProjectsUpdate(id: projects.ResourceId, newValue: Set[projects.Keyword]) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update keywords in Projects",
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:keywords ?keyword } }
+               |INSERT { GRAPH ${GraphClass.Projects.id} {
+               |\t${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.\n""").toList.combineAll}
+               |} }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    OPTIONAL { ?id schema:keywords ?keyword }
+               |  }
+               |}""".stripMargin
+    )
 }

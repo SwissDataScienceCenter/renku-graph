@@ -29,6 +29,7 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class TSDataFinderSpec
     extends AsyncFlatSpec
@@ -36,20 +37,27 @@ class TSDataFinderSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
-    with OptionValues {
+    with OptionValues
+    with ScalaCheckPropertyChecks {
 
-  it should "fetch relevant data from the TS" in {
+  forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+    it should s"fetch relevant data from the TS - project ${project.name}" in {
 
-    val project = anyProjectEntities.generateOne.to[entities.Project]
+      upload(to = projectsDataset, project)
 
-    upload(to = projectsDataset, project)
-
-    finder
-      .fetchTSData(project.path)
-      .asserting(
-        _.value shouldBe DataExtract
-          .TS(project.resourceId, project.path, project.name, project.visibility, project.maybeDescription)
-      )
+      finder
+        .fetchTSData(project.path)
+        .asserting(
+          _.value shouldBe DataExtract
+            .TS(project.resourceId,
+                project.path,
+                project.name,
+                project.visibility,
+                project.maybeDescription,
+                project.keywords
+            )
+        )
+    }
   }
 
   it should "return None if there's no project with the given path" in {

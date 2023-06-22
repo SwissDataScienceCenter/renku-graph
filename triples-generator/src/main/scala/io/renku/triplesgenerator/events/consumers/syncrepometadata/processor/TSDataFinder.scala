@@ -24,6 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import eu.timepit.refined.auto._
+import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -51,6 +52,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
+                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |WHERE {
                  |  BIND (${path.asObject} AS ?path)
                  |  GRAPH ?id {
@@ -59,8 +61,10 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
+                 |    OPTIONAL { ?dsId schema:keywords ?keyword }
                  |  }
                  |}
+                 |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
                  |LIMIT 1
                  |""".stripMargin
       )
@@ -69,12 +73,21 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
   private def decoder(path: projects.Path): Decoder[Option[DataExtract.TS]] =
     ResultsDecoder[Option, DataExtract.TS] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
+
+      val toSetOfKeywords: Option[String] => Decoder.Result[Set[projects.Keyword]] =
+        _.map(_.split(',').toList.distinct.map(projects.Keyword.from).sequence).sequence
+          .leftMap(ex =>
+            DecodingFailure(DecodingFailure.Reason.CustomReason(s"Cannot decode keywords: ${ex.getMessage}"), cur)
+          )
+          .map(_.getOrElse(List.empty).toSet)
+
       for {
         id         <- extract[projects.ResourceId]("id")
         path       <- extract[projects.Path]("path")
         name       <- extract[projects.Name]("name")
         visibility <- extract[projects.Visibility]("visibility")
         maybeDesc  <- extract[Option[projects.Description]]("maybeDesc")
-      } yield DataExtract.TS(id, path, name, visibility, maybeDesc)
+        keywords   <- extract[Option[String]]("keywords") >>= toSetOfKeywords
+      } yield DataExtract.TS(id, path, name, visibility, maybeDesc, keywords)
     }(toOption(show"Multiple projects or values for '$path'"))
 }

@@ -38,7 +38,8 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
 
   import io.circe.DecodingFailure
   import io.renku.compression.Zip.unzip
-  import io.renku.graph.model.{entities, projects}
+  import io.renku.graph.model.entities.Project
+  import io.renku.graph.model.projects
   import io.renku.jsonld.JsonLDDecoder._
   import io.renku.jsonld.parser._
   import io.renku.jsonld.{JsonLD, JsonLDDecoder}
@@ -51,14 +52,15 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
     _.cursor.as(decodeList(dataExtract(path))).map(_.headOption)
 
   private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract.Payload] =
-    JsonLDDecoder.entity(entities.Project.entityTypes) { cur =>
+    JsonLDDecoder.entity(Project.entityTypes) { cur =>
       for {
-        name <- cur.downField(entities.Project.Ontology.nameProperty.id).as[Option[projects.Name]] >>= {
-                  case None    => decodingFailure(entities.Project.Ontology.nameProperty.id, cur).asLeft
+        name <- cur.downField(Project.Ontology.nameProperty.id).as[Option[projects.Name]] >>= {
+                  case None    => decodingFailure(Project.Ontology.nameProperty.id, cur).asLeft
                   case Some(v) => v.asRight
                 }
-        maybeDesc <- cur.downField(entities.Project.Ontology.descriptionProperty.id).as[Option[projects.Description]]
-      } yield DataExtract.Payload(path, name, maybeDesc)
+        maybeDesc <- cur.downField(Project.Ontology.descriptionProperty.id).as[Option[projects.Description]]
+        keywords <- cur.downField(Project.Ontology.keywordsProperty.id).as[Set[Option[projects.Keyword]]].map(_.flatten)
+      } yield DataExtract.Payload(path, name, maybeDesc, keywords)
     }
 
   private def decodingFailure(propName: Property, cur: Cursor) =

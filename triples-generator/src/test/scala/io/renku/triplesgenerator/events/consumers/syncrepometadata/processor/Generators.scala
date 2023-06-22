@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 import io.renku.eventlog.api.events.Generators.redoProjectTransformationEvents
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectNames, projectPaths, projectResourceIds, projectVisibilities, projectDescriptions}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectDescriptions, projectKeywords, projectNames, projectPaths, projectResourceIds, projectVisibilities}
 import io.renku.graph.model.{entities, projects}
 import org.scalacheck.Gen
 
@@ -32,27 +32,36 @@ private object Generators {
     name       <- projectNames
     visibility <- projectVisibilities
     maybeDesc  <- projectDescriptions.toGeneratorOfOptions
-  } yield DataExtract.TS(id, having, name, visibility, maybeDesc)
+    keywords   <- projectKeywords.toGeneratorOfSet(min = 0)
+  } yield DataExtract.TS(id, having, name, visibility, maybeDesc, keywords)
 
   def glDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.GL] = for {
     name       <- projectNames
     visibility <- projectVisibilities
     maybeDesc  <- projectDescriptions.toGeneratorOfOptions
-  } yield DataExtract.GL(having, name, visibility, maybeDesc)
+    keywords   <- projectKeywords.toGeneratorOfSet(min = 0)
+  } yield DataExtract.GL(having, name, visibility, maybeDesc, keywords)
 
   def payloadDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.Payload] = for {
     name      <- projectNames
     maybeDesc <- projectDescriptions.toGeneratorOfOptions
-  } yield DataExtract.Payload(having, name, maybeDesc)
+    keywords  <- projectKeywords.toGeneratorOfSet(min = 0)
+  } yield DataExtract.Payload(having, name, maybeDesc, keywords)
 
   def tsDataFrom(project: entities.Project): DataExtract.TS =
-    DataExtract.TS(project.resourceId, project.path, project.name, project.visibility, project.maybeDescription)
+    DataExtract.TS(project.resourceId,
+                   project.path,
+                   project.name,
+                   project.visibility,
+                   project.maybeDescription,
+                   project.keywords
+    )
 
   def glDataFrom(data: DataExtract.TS): DataExtract.GL =
-    DataExtract.GL(data.path, data.name, data.visibility, data.maybeDesc)
+    DataExtract.GL(data.path, data.name, data.visibility, data.maybeDesc, data.keywords)
 
   def payloadDataFrom(data: DataExtract): DataExtract.Payload =
-    DataExtract.Payload(data.path, data.name, data.maybeDesc)
+    DataExtract.Payload(data.path, data.name, data.maybeDesc, data.keywords)
 
   val sparqlUpdateCommands: Gen[UpdateCommand.Sparql] = sparqlQueries.map(UpdateCommand.Sparql)
   val eventUpdateCommands:  Gen[UpdateCommand.Event]  = redoProjectTransformationEvents.map(UpdateCommand.Event)

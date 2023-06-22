@@ -158,6 +158,99 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
+  it should "create upsert queries when there are new keywords" in {
+
+    val project = anyProjectEntities
+      .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
+      .generateOne
+      .to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = projectKeywords.generateSet(min = 1)
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeKeywords = newValue.some)
+    )
+    val updatedTsData = tsData.copy(keywords = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
+  it should "create queries that deletes keywords on removal" in {
+
+    val project = anyProjectEntities
+      .map(replaceProjectKeywords(projectKeywords.generateSet(min = 1)))
+      .generateOne
+      .to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = Set.empty[projects.Keyword]
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeKeywords = newValue.some)
+    )
+    val updatedTsData = tsData.copy(keywords = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
+  it should "create queries that inserts keywords when there were none" in {
+
+    val project = anyProjectEntities.map(replaceProjectKeywords(Set.empty)).generateOne.to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = projectKeywords.generateSet(min = 1)
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeKeywords = newValue.some)
+    )
+    val updatedTsData = tsData.copy(keywords = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
   it should "create no upsert queries if there are no new values" in {
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -193,6 +286,7 @@ class UpdateCommandsCalculatorSpec
         "UpsertsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
+                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
@@ -200,8 +294,11 @@ class UpdateCommandsCalculatorSpec
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
+                 |    OPTIONAL { ?id schema:keywords ?keyword }
                  |  }
-                 |}""".stripMargin
+                 |}
+                 |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
+                 |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
 
@@ -212,6 +309,7 @@ class UpdateCommandsCalculatorSpec
         "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
+                 |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
@@ -219,8 +317,11 @@ class UpdateCommandsCalculatorSpec
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
+                 |    OPTIONAL { ?id schema:keywords ?keyword }
                  |  }
-                 |}""".stripMargin
+                 |}
+                 |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
+                 |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
 
@@ -231,8 +332,12 @@ class UpdateCommandsCalculatorSpec
        row.get("name").map(projects.Name),
        row.get("visibility").map(projects.Visibility),
        Some(row.get("maybeDesc").map(projects.Description)),
+       Some(toSetOfKeywords(row.get("keywords")))
       ).mapN(DataExtract.TS)
     }
+
+  private lazy val toSetOfKeywords: Option[String] => Set[projects.Keyword] =
+    _.map(_.split(',').toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
 
   private def givenNewValuesFinding(tsData:           DataExtract.TS,
                                     glData:           DataExtract.GL,
