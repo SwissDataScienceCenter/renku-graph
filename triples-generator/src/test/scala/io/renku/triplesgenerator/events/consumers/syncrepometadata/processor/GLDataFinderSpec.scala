@@ -141,7 +141,8 @@ class GLDataFinderSpec
       "path_with_namespace": ${de.path},
       "visibility":          ${de.visibility},
       "description":         ${de.maybeDesc},
-      "topics":              ${de.keywords}
+      "topics":              ${de.keywords},
+      "avatar_url":          ${de.maybeImage}
     }""".deepDropNullValues
   }
 }

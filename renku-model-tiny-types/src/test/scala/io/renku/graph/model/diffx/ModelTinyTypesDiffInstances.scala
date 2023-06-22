@@ -24,7 +24,9 @@ import io.renku.graph.model.{commandParameters, datasets, projects}
 
 trait ModelTinyTypesDiffInstances extends TinyTypeDiffInstances {
 
-  implicit val imageUriDiff: Diff[ImageUri] = Diff.diffForString.contramap(_.value)
+  implicit val absoluteImageUriDiff: Diff[ImageUri.Absolute] = Diff.diffForString.contramap(_.value)
+  implicit val relativeImageUriDiff: Diff[ImageUri.Relative] = Diff.diffForString.contramap(_.value)
+  implicit val imageUriDiff:         Diff[ImageUri]          = Diff.diffForString.contramap(_.value)
 
   implicit val datasetsCreatedOrPublishedDiff: Diff[datasets.CreatedOrPublished] =
     Diff.derived[datasets.CreatedOrPublished]

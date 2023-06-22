@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes._
 
-trait ImageUri extends Any with TinyType {
+sealed trait ImageUri extends Any with TinyType {
   override type V = String
 }
 

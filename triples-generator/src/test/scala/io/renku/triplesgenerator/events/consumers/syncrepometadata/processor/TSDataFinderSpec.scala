@@ -49,12 +49,14 @@ class TSDataFinderSpec
         .fetchTSData(project.path)
         .asserting(
           _.value shouldBe DataExtract
-            .TS(project.resourceId,
-                project.path,
-                project.name,
-                project.visibility,
-                project.maybeDescription,
-                project.keywords
+            .TS(
+              project.resourceId,
+              project.path,
+              project.name,
+              project.visibility,
+              project.maybeDescription,
+              project.keywords,
+              project.images.sortBy(_.position).map(_.uri)
             )
         )
     }

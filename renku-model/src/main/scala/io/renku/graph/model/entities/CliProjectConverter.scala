@@ -66,7 +66,10 @@ private[entities] object CliProjectConverter {
         activities.sortBy(_.startTime),
         datasets,
         plans,
-        (cliProject.images ::: gitlabImage.toList).distinct
+        cliProject.images match {
+          case Nil  => gitlabImage.toList
+          case imgs => imgs
+        }
       )
     }
   }

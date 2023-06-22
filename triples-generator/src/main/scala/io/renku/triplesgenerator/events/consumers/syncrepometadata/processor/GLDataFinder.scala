@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
@@ -63,7 +64,8 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
      cursor.downField("name").as[projects.Name],
      cursor.downField("visibility").as[projects.Visibility],
      cursor.downField("description").as[Option[projects.Description]],
-     cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten)
+     cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten),
+     cursor.downField("avatar_url").as[Option[ImageUri]]
     ).mapN(DataExtract.GL.apply)
   }
 }

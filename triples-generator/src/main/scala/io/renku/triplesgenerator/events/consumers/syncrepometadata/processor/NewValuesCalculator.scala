@@ -18,6 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
+import io.renku.graph.model.images.Image
+
 private trait NewValuesCalculator {
   def findNewValues(tsData:           DataExtract.TS,
                     glData:           DataExtract.GL,
@@ -30,20 +32,49 @@ private object NewValuesCalculator extends NewValuesCalculator {
   override def findNewValues(tsData:           DataExtract.TS,
                              glData:           DataExtract.GL,
                              maybePayloadData: Option[DataExtract.Payload]
-  ): NewValues = {
-    val potentiallyNew = maybePayloadData.getOrElse(glData)
-    NewValues(
-      Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name),
-      Option.when(tsData.visibility != glData.visibility)(glData.visibility), {
-        val potentiallyNewDesc = maybePayloadData.flatMap(_.maybeDesc).orElse(glData.maybeDesc)
-        if (tsData.maybeDesc != potentiallyNewDesc) Some(potentiallyNewDesc) else None
-      }, {
-        val potentiallyNewKeywords = maybePayloadData.map(_.keywords).getOrElse(Set.empty) match {
-          case k if k.isEmpty => glData.keywords
-          case k              => k
-        }
-        Option.when(tsData.keywords != potentiallyNewKeywords)(potentiallyNewKeywords)
-      }
-    )
+  ): NewValues = NewValues(
+    maybeNewName(tsData, glData, maybePayloadData),
+    Option.when(tsData.visibility != glData.visibility)(glData.visibility),
+    maybeNewDesc(tsData, glData, maybePayloadData),
+    maybeNewKeywords(tsData, glData, maybePayloadData),
+    maybeNewImages(tsData, glData, maybePayloadData)
+  )
+
+  private def maybeNewName(tsData:           DataExtract.TS,
+                           glData:           DataExtract.GL,
+                           maybePayloadData: Option[DataExtract.Payload]
+  ) = {
+    val potentiallyNewName = maybePayloadData.getOrElse(glData).name
+    Option.when(tsData.name != potentiallyNewName)(potentiallyNewName)
+  }
+
+  private def maybeNewDesc(tsData:           DataExtract.TS,
+                           glData:           DataExtract.GL,
+                           maybePayloadData: Option[DataExtract.Payload]
+  ) = {
+    val potentiallyNewDesc = maybePayloadData.flatMap(_.maybeDesc).orElse(glData.maybeDesc)
+    if (tsData.maybeDesc != potentiallyNewDesc) Some(potentiallyNewDesc) else None
+  }
+
+  private def maybeNewKeywords(tsData:           DataExtract.TS,
+                               glData:           DataExtract.GL,
+                               maybePayloadData: Option[DataExtract.Payload]
+  ) = {
+    val potentiallyNewKeywords = maybePayloadData.map(_.keywords).getOrElse(Set.empty) match {
+      case k if k.isEmpty => glData.keywords
+      case k              => k
+    }
+    Option.when(tsData.keywords != potentiallyNewKeywords)(potentiallyNewKeywords)
+  }
+
+  private def maybeNewImages(tsData:           DataExtract.TS,
+                             glData:           DataExtract.GL,
+                             maybePayloadData: Option[DataExtract.Payload]
+  ) = {
+    val potentiallyNewImages = maybePayloadData.map(_.images).getOrElse(Nil) match {
+      case Nil    => glData.maybeImage.toList
+      case images => images
+    }
+    Option.when(tsData.images != potentiallyNewImages)(Image.projectImage(tsData.id, potentiallyNewImages))
   }
 }

@@ -26,6 +26,7 @@ import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.eventlog.api.events.StatusChangeEvent
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectNames
+import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, projects}
 import io.renku.interpreters.TestLogger
@@ -222,6 +223,67 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
+  it should "create upsert queries when there are new images" in {
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = imageUris.generateList(min = 1)
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeImages = Image.projectImage(tsData.id, newValue).some)
+    )
+    val updatedTsData = tsData.copy(images = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
+  it should "create queries that deletes images on removal" in {
+
+    val project = anyProjectEntities
+      .map(replaceImages(imageUris.generateList(min = 1)))
+      .generateOne
+      .to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = List.empty[Image]
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeImages = newValue.some)
+    )
+    val updatedTsData = tsData.copy(images = Nil)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
   it should "create queries that inserts keywords when there were none" in {
 
     val project = anyProjectEntities.map(replaceProjectKeywords(Set.empty)).generateOne.to[entities.Project]
@@ -283,10 +345,11 @@ class UpdateCommandsCalculatorSpec
     runSelect(
       on = projectsDataset,
       SparqlQuery.ofUnsafe(
-        "UpsertsCalculator Project fetch",
+        "UpdateCommandsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
@@ -295,6 +358,12 @@ class UpdateCommandsCalculatorSpec
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?id schema:keywords ?keyword }
+                 |    OPTIONAL {
+                 |      ?id schema:image ?imageId.
+                 |      ?imageId schema:position ?imagePosition;
+                 |               schema:contentUrl ?imageUrl.
+                 |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+                 |    }
                  |  }
                  |}
                  |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
@@ -310,6 +379,7 @@ class UpdateCommandsCalculatorSpec
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+                 |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
@@ -318,6 +388,12 @@ class UpdateCommandsCalculatorSpec
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?id schema:keywords ?keyword }
+                 |    OPTIONAL {
+                 |      ?id schema:image ?imageId.
+                 |      ?imageId schema:position ?imagePosition;
+                 |               schema:contentUrl ?imageUrl.
+                 |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+                 |    }
                  |  }
                  |}
                  |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
@@ -332,12 +408,16 @@ class UpdateCommandsCalculatorSpec
        row.get("name").map(projects.Name),
        row.get("visibility").map(projects.Visibility),
        Some(row.get("maybeDesc").map(projects.Description)),
-       Some(toSetOfKeywords(row.get("keywords")))
+       Some(toSetOfKeywords(row.get("keywords"))),
+       Some(toListOfImages(row.get("images")))
       ).mapN(DataExtract.TS)
     }
 
   private lazy val toSetOfKeywords: Option[String] => Set[projects.Keyword] =
     _.map(_.split(',').toList.map(projects.Keyword(_)).toSet).getOrElse(Set.empty)
+
+  private lazy val toListOfImages: Option[String] => List[ImageUri] =
+    _.map(ImageUri.fromSplitString(',')(_).fold(throw _, identity)).getOrElse(Nil)
 
   private def givenNewValuesFinding(tsData:           DataExtract.TS,
                                     glData:           DataExtract.GL,

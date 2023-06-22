@@ -25,9 +25,9 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.{GraphModelGenerators, entities}
 import io.renku.graph.model.testentities.RenkuProject
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{GraphModelGenerators, entities}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.{postDataQueriesOnly, preDataQueriesOnly}
@@ -139,8 +139,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
     maybeAgent     <- GraphModelGenerators.cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
-    projId         <- projectResourceIds
-    images         <- projectImageResourceIds(projId)
+    images         <- imageUris.toGeneratorOfList()
   } yield ProjectMutableData(name,
                              Nel.of(dateCreated),
                              maybeParentId,

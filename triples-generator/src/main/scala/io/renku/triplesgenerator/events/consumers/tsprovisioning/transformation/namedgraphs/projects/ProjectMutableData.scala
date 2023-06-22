@@ -19,9 +19,9 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import cats.data.{NonEmptyList => Nel}
-import io.renku.graph.model.{persons, projects}
-import io.renku.graph.model.images.ImageResourceId
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.versions.CliVersion
+import io.renku.graph.model.{persons, projects}
 
 private[projects] final case class ProjectMutableData(
     name:             projects.Name,
@@ -32,7 +32,7 @@ private[projects] final case class ProjectMutableData(
     keywords:         Set[projects.Keyword],
     maybeAgent:       Option[CliVersion],
     maybeCreatorId:   Option[persons.ResourceId],
-    images:           List[ImageResourceId]
+    images:           List[ImageUri]
 ) {
 
   lazy val earliestDateCreated: projects.DateCreated =
