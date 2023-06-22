@@ -218,7 +218,7 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
 
     "be None if ts and payload values are the same" in {
 
-      val tsData      = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val tsData      = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet(min = 1))
       val glData      = glDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
       val payloadData = payloadDataFrom(tsData)
 
