@@ -18,33 +18,32 @@
 
 package io.renku.lock
 
+import skunk._
 import skunk.codec.all._
 import skunk.implicits._
-import skunk._
-
-import java.time.OffsetDateTime
 
 object PostgresLockStats {
 
   final case class Stats(
-      database:  String,
-      objectId:  Long,
-      pid:       Long,
-      granted:   Boolean,
-      waitstart: OffsetDateTime
+      database: String,
+      objectId: Long,
+      pid:      Int,
+      granted:  Boolean
   )
 
   def getStats[F[_]](session: Session[F]): F[List[Stats]] =
     session.execute[Stats](query)
 
+  //   SELECT db.datname :: varchar, pl.objid :: bigint, pl.pid, pl.granted,pl.waitstart, now() - pl.waitstart
+  // ^^ unfortunately, we have postgres 12.x and the pl.waitstart was added in version 14
+  // see https://www.postgresql.org/docs/14/view-pg-locks.html
   private def query: Query[Void, Stats] =
     sql"""
-       SELECT db.datname, pl.objid, pl.pid, pl.granted,pl.waitstart
+       SELECT db.datname :: varchar, pl.objid :: bigint, pl.pid, pl.granted
        FROM pg_locks pl
        INNER JOIN pg_database db ON db.oid = pl.database
        WHERE pl.locktype = 'advisory';
     """
-      .query(varchar *: int8 *: int8 *: bool *: timestamptz)
+      .query(varchar *: int8 *: int4 *: bool)
       .to[Stats]
-
 }

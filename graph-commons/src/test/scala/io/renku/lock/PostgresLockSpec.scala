@@ -22,88 +22,28 @@ import cats.effect._
 import cats.effect.std.CountDownLatch
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import com.dimafeng.testcontainers.PostgreSQLContainer
-import com.dimafeng.testcontainers.scalatest.TestContainerForAll
-import io.renku.db.PostgresContainer
+import fs2.{Pipe, concurrent}
+import io.renku.interpreters.TestLogger
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
-import skunk.Session
-import natchez.Trace.Implicits.noop
+import org.typelevel.log4cats.Logger
+import skunk.data._
+import skunk.net.protocol.{Describe, Parse}
+import skunk.util.Typer
+import skunk.{Channel, Command, Cursor, PreparedCommand, PreparedQuery, Query, Session, Transaction}
 
 import scala.concurrent.duration._
 
-class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with TestContainerForAll {
+class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with PostgresLockTest {
 
-  override val containerDef = PostgreSQLContainer.Def(
-    dockerImageName = PostgresContainer.imageName,
-    databaseName = "locktest",
-    username = "pg",
-    password = "pg"
-  )
-
-  def session(c: Containers): Resource[IO, Session[IO]] =
-    Session.single[IO](
-      host = c.host,
-      port = c.underlyingUnsafeContainer.getFirstMappedPort,
-      user = c.username,
-      database = c.databaseName,
-      password = Some(c.password)
-    )
-
-  "PostgresLock.exclusiveBlocking" should {
-
-    "sequentially on same key" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.exclusiveBlocking[IO, String])
-
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
-        for {
-          result <- Ref.of[IO, List[FiniteDuration]](Nil)
-          update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
-          latch <- CountDownLatch[IO](1)
-
-          f1 <- Async[IO].start(latch.await *> l1("p1").use(_ => update))
-          f2 <- Async[IO].start(latch.await *> l2("p1").use(_ => update))
-          f3 <- Async[IO].start(latch.await *> l3("p1").use(_ => update))
-
-          _ <- latch.release
-          _ <- List(f1, f2, f3).traverse_(_.join)
-
-          diff <- result.get.map(list => list.max - list.min)
-          _ = diff should be >= 400.millis
-        } yield ()
-      }
-    }
-
-    "parallel on different key" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.exclusiveBlocking[IO, String])
-
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
-        for {
-          result <- Ref.of[IO, List[FiniteDuration]](Nil)
-          update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
-          latch <- CountDownLatch[IO](1)
-
-          f1 <- Async[IO].start(latch.await *> l1("p1").use(_ => update))
-          f2 <- Async[IO].start(latch.await *> l2("p2").use(_ => update))
-          f3 <- Async[IO].start(latch.await *> l3("p3").use(_ => update))
-
-          _ <- latch.release
-          _ <- List(f1, f2, f3).traverse_(_.join)
-
-          diff <- result.get.map(list => list.max - list.min)
-          _ = diff should be < 300.millis
-        } yield ()
-      }
-    }
-  }
-
-  "PostgresLock.exclusivePolling" should {
+  "PostgresLock.exclusive" should {
     val pollInterval = 100.millis
 
     "sequentially on same key" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.exclusive[IO, String](_, pollInterval))
+      implicit val logger: Logger[IO] = TestLogger()
+      def createLock = exclusiveLock(cnt, pollInterval)
 
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
+      (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
         for {
           result <- Ref.of[IO, List[FiniteDuration]](Nil)
           update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
@@ -123,9 +63,10 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
     }
 
     "parallel on different key" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.exclusive[IO, String](_))
+      implicit val logger: Logger[IO] = TestLogger()
+      def createLock = exclusiveLock(cnt)
 
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
+      (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
         for {
           result <- Ref.of[IO, List[FiniteDuration]](Nil)
           update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
@@ -141,15 +82,44 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           diff <- result.get.map(list => list.max - list.min)
           _ = diff should be < 300.millis
         } yield ()
+      }
+    }
+
+    "log if acquiring fails" in withContainers { cnt =>
+      implicit val logger: TestLogger[IO] = TestLogger()
+
+      val exception = new Exception("boom")
+      val makeSession = (Resource.eval(Ref.of[IO, Int](0)), session(cnt)).mapN { (counter, goodSession) =>
+        new PostgresLockSpec.TestSession {
+          override def unique[A, B](query: Query[A, B])(args: A) =
+            counter.getAndUpdate(_ + 1).flatMap {
+              case n if n < 2 => IO.raiseError(exception)
+              case _          => goodSession.unique(query)(args)
+            }
+        }
+      }
+
+      val interval = 50.millis
+      def lock     = makeSession.map(PostgresLock.exclusive[IO, String](_, interval))
+
+      lock.flatMap(_("p1")).use(_ => IO.unit).asserting { _ =>
+        logger.loggedOnly(
+          TestLogger.Level.Warn(
+            s"Acquiring postgres advisory lock failed! Retry in $interval.",
+            exception
+          ),
+          2
+        )
       }
     }
   }
 
   "PostgresLock.shared" should {
     "allow multiple shared locks" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.shared[IO, String](_))
+      implicit val logger: Logger[IO] = TestLogger()
+      def createLock = sharedLock(cnt)
 
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
+      (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
         for {
           result <- Ref.of[IO, List[FiniteDuration]](Nil)
           update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
@@ -168,27 +138,35 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       }
     }
   }
-  "PostgresLock.sharedBlocking" should {
-    "allow multiple shared locks" in withContainers { cnt =>
-      def makeLock = session(cnt).map(PostgresLock.sharedBlocking[IO, String])
+}
 
-      (makeLock, makeLock, makeLock).tupled.use { case (l1, l2, l3) =>
-        for {
-          result <- Ref.of[IO, List[FiniteDuration]](Nil)
-          update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
-          latch <- CountDownLatch[IO](1)
-
-          f1 <- Async[IO].start(latch.await *> l1("p1").use(_ => update))
-          f2 <- Async[IO].start(latch.await *> l2("p1").use(_ => update))
-          f3 <- Async[IO].start(latch.await *> l3("p1").use(_ => update))
-
-          _ <- latch.release
-          _ <- List(f1, f2, f3).traverse_(_.join)
-
-          diff <- result.get.map(list => list.max - list.min)
-          _ = diff should be < 300.millis
-        } yield ()
-      }
-    }
+object PostgresLockSpec {
+  abstract class TestSession extends Session[IO] {
+    override def execute[A, B](query:  Query[A, B])(args:      A): IO[List[B]] = ???
+    override def option[A, B](query:   Query[A, B])(args:      A): IO[Option[B]] = ???
+    override def stream[A, B](command: Query[A, B])(args:      A, chunkSize: Int): fs2.Stream[IO, B] = ???
+    override def cursor[A, B](query:   Query[A, B])(args:      A): Resource[IO, Cursor[IO, B]] = ???
+    override def execute[A](command:   Command[A])(args:       A): IO[Completion] = ???
+    override def pipe[A](command:      Command[A]): Pipe[IO, A, Completion] = ???
+    override def pipe[A, B](query:     Query[A, B], chunkSize: Int): Pipe[IO, A, B] = ???
+    override def parameters: concurrent.Signal[IO, Map[String, String]] = ???
+    override def parameter(key: String): fs2.Stream[IO, String] = ???
+    override def transactionStatus: concurrent.Signal[IO, TransactionStatus] = ???
+    override def execute[A](query:    Query[skunk.Void, A]): IO[List[A]] = ???
+    override def unique[A](query:     Query[skunk.Void, A]): IO[A] = ???
+    override def unique[A, B](query:  Query[A, B])(args: A): IO[B] = ???
+    override def option[A](query:     Query[skunk.Void, A]): IO[Option[A]] = ???
+    override def execute(command:     Command[skunk.Void]): IO[Completion] = ???
+    override def prepare[A, B](query: Query[A, B]): IO[PreparedQuery[IO, A, B]] = ???
+    override def prepare[A](command:  Command[A]): IO[PreparedCommand[IO, A]] = ???
+    override def channel(name:        Identifier): Channel[IO, String, String] = ???
+    override def transaction[A]: Resource[IO, Transaction[IO]] = ???
+    override def transaction[A](
+        isolationLevel: TransactionIsolationLevel,
+        accessMode:     TransactionAccessMode
+    ): Resource[IO, Transaction[IO]] = ???
+    override def typer:         Typer              = ???
+    override def describeCache: Describe.Cache[IO] = ???
+    override def parseCache:    Parse.Cache[IO]    = ???
   }
 }
