@@ -162,7 +162,7 @@ private object UpdatesCreator extends UpdatesCreator {
     }
 
   private def imageDeletion(project: Project, kgData: ProjectMutableData) =
-    Option.when(kgData.images.toSet != project.images.map(_.resourceId).toSet) {
+    Option.when(kgData.images != project.images.sortBy(_.position).map(_.uri)) {
       val resource = project.resourceId.asEntityId
       SparqlQuery.of(
         name = "transformation - delete project images",
@@ -183,7 +183,7 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData) =
+  override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery] =
     Option
       .when(project.dateCreated != kgData.dateCreated.toList.min) {
         val resource = project.resourceId.showAs[RdfResource]

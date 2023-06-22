@@ -89,7 +89,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
           )
           .map(_.getOrElse(List.empty).toSet)
 
-      def toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
+      val toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
         _.map(ImageUri.fromSplitString(','))
           .map(_.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
           .getOrElse(Nil.asRight)
