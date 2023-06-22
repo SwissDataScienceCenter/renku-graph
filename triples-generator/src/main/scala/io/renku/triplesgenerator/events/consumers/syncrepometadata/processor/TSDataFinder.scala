@@ -50,14 +50,15 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
       SparqlQuery.ofUnsafe(
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility
+        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |WHERE {
                  |  BIND (${path.asObject} AS ?path)
                  |  GRAPH ?id {
                  |    ?id a schema:Project;
                  |        renku:projectPath ?path;
                  |        schema:name ?name;
-                 |        renku:projectVisibility ?visibility
+                 |        renku:projectVisibility ?visibility.
+                 |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |  }
                  |}
                  |LIMIT 1
@@ -73,6 +74,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
         path       <- extract[projects.Path]("path")
         name       <- extract[projects.Name]("name")
         visibility <- extract[projects.Visibility]("visibility")
-      } yield DataExtract.TS(id, path, name, visibility)
+        maybeDesc  <- extract[Option[projects.Description]]("maybeDesc")
+      } yield DataExtract.TS(id, path, name, visibility, maybeDesc)
     }(toOption(show"Multiple projects or values for '$path'"))
 }

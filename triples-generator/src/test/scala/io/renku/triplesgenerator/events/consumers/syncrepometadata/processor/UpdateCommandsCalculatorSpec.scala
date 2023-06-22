@@ -106,6 +106,58 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
+  it should "create upsert queries when there's a new description" in {
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = projectDescriptions.generateSome
+    givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = newValue.some))
+    val updatedTsData = tsData.copy(maybeDesc = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
+  it should "create delete queries when description is removed" in {
+
+    val project = anyProjectEntities
+      .map(replaceProjectDesc(projectDescriptions.generateSome))
+      .generateOne
+      .to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    givenNewValuesFinding(tsData, glData, maybePayloadData, returning = NewValues.empty.copy(maybeDesc = Some(None)))
+    val updatedTsData = tsData.copy(maybeDesc = None)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
+    } yield Succeeded
+  }
+
   it should "create no upsert queries if there are no new values" in {
 
     val project = anyProjectEntities.generateOne.to[entities.Project]
@@ -126,8 +178,8 @@ class UpdateCommandsCalculatorSpec
     } yield Succeeded
   }
 
-  private lazy val newValueCalculator = mock[NewValueCalculator]
-  private lazy val updatesCalculator  = new UpdateCommandsCalculatorImpl(newValueCalculator)
+  private lazy val newValuesCalculator = mock[NewValuesCalculator]
+  private lazy val updatesCalculator   = new UpdateCommandsCalculatorImpl(newValuesCalculator)
 
   private def execute(queries: List[UpdateCommand]) =
     queries
@@ -140,13 +192,14 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpsertsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility
+        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |WHERE {
                  |  BIND (${GraphClass.Project.id(project.resourceId)} AS ?id)
                  |  GRAPH ?id {
                  |    ?id renku:projectPath ?path;
                  |        schema:name ?name;
-                 |        renku:projectVisibility ?visibility
+                 |        renku:projectVisibility ?visibility.
+                 |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |  }
                  |}""".stripMargin
       )
@@ -156,34 +209,36 @@ class UpdateCommandsCalculatorSpec
     runSelect(
       on = projectsDataset,
       SparqlQuery.ofUnsafe(
-        "UpsertsCalculator Projects fetch",
+        "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility
+        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |WHERE {
                  |  BIND (${project.resourceId.asEntityId} AS ?id)
                  |  GRAPH ${GraphClass.Projects.id} {
                  |    ?id renku:projectPath ?path;
                  |        schema:name ?name;
-                 |        renku:projectVisibility ?visibility
+                 |        renku:projectVisibility ?visibility.
+                 |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |  }
                  |}""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
 
   private lazy val toDataExtract: List[Map[String, String]] => List[DataExtract.TS] =
-    _.flatMap(row =>
+    _.flatMap { row =>
       (row.get("id").map(projects.ResourceId),
        row.get("path").map(projects.Path),
        row.get("name").map(projects.Name),
-       row.get("visibility").map(projects.Visibility)
+       row.get("visibility").map(projects.Visibility),
+       Some(row.get("maybeDesc").map(projects.Description)),
       ).mapN(DataExtract.TS)
-    )
+    }
 
   private def givenNewValuesFinding(tsData:           DataExtract.TS,
                                     glData:           DataExtract.GL,
                                     maybePayloadData: Option[DataExtract.Payload],
                                     returning:        NewValues
-  ) = (newValueCalculator.findNewValues _)
+  ) = (newValuesCalculator.findNewValues _)
     .expects(tsData, glData, maybePayloadData)
     .returning(returning)
 

@@ -61,7 +61,8 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
 
     (cursor.downField("path_with_namespace").as[projects.Path],
      cursor.downField("name").as[projects.Name],
-     cursor.downField("visibility").as[projects.Visibility]
+     cursor.downField("visibility").as[projects.Visibility],
+     cursor.downField("description").as[Option[projects.Description]]
     ).mapN(DataExtract.GL.apply)
   }
 }

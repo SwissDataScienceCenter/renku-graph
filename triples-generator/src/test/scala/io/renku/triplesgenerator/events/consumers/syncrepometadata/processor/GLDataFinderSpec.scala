@@ -139,7 +139,8 @@ class GLDataFinderSpec
     json"""{
       "name":                ${de.name},
       "path_with_namespace": ${de.path},
-      "visibility":          ${de.visibility}
-    }"""
+      "visibility":          ${de.visibility},
+      "description":         ${de.maybeDesc}
+    }""".deepDropNullValues
   }
 }

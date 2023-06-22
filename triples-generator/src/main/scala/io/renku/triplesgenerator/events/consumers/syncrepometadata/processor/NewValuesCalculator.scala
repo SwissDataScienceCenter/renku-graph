@@ -18,23 +18,26 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
-private trait NewValueCalculator {
+private trait NewValuesCalculator {
   def findNewValues(tsData:           DataExtract.TS,
                     glData:           DataExtract.GL,
                     maybePayloadData: Option[DataExtract.Payload]
   ): NewValues
 }
 
-private object NewValueCalculator extends NewValueCalculator {
+private object NewValuesCalculator extends NewValuesCalculator {
 
   override def findNewValues(tsData:           DataExtract.TS,
                              glData:           DataExtract.GL,
                              maybePayloadData: Option[DataExtract.Payload]
-  ): NewValues = NewValues(
-    {
-      val potentiallyNew = maybePayloadData.getOrElse(glData)
-      Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name)
-    },
-    Option.when(tsData.visibility != glData.visibility)(glData.visibility)
-  )
+  ): NewValues = {
+    val potentiallyNew = maybePayloadData.getOrElse(glData)
+    NewValues(
+      Option.when(tsData.name != potentiallyNew.name)(potentiallyNew.name),
+      Option.when(tsData.visibility != glData.visibility)(glData.visibility), {
+        val potentiallyNewDesc = maybePayloadData.flatMap(_.maybeDesc).orElse(glData.maybeDesc)
+        if (tsData.maybeDesc != potentiallyNewDesc) Some(potentiallyNewDesc) else None
+      }
+    )
+  }
 }

@@ -21,7 +21,6 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
-import io.circe.DecodingFailure
 import io.renku.cli.model.CliProject
 import io.renku.compression.Zip
 import io.renku.generators.Generators.Implicits._
@@ -29,49 +28,67 @@ import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.parser.ParsingFailure
+import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import org.scalacheck.Arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PayloadDataExtractorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers with OptionValues {
+class PayloadDataExtractorSpec
+    extends AsyncFlatSpec
+    with AsyncIOSpec
+    with should.Matchers
+    with OptionValues
+    with ScalaCheckPropertyChecks {
 
-  it should "unzip the payload, parse it and extract relevant data" in {
+  forAll(anyRenkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons)) { testProject =>
+    it should s"unzip the payload, parse it and extract relevant data - case ${testProject.name}" in {
 
-    val testProject      = anyRenkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).generateOne
-    val cliProject       = testProject.to[CliProject]
-    val cliProjectJsonLD = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
-    val ioPayload        = Zip.zip[IO](cliProjectJsonLD.toJson.noSpaces).map(ZippedEventPayload)
+      val cliProject       = testProject.to[CliProject]
+      val cliProjectJsonLD = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
+      val ioPayload        = Zip.zip[IO](cliProjectJsonLD.toJson.noSpaces).map(ZippedEventPayload)
 
-    (ioPayload >>= (extractor.extractPayloadData(testProject.path, _)))
-      .asserting(_.value shouldBe DataExtract.Payload(testProject.path, testProject.name))
+      (ioPayload >>=
+        (extractor.extractPayloadData(testProject.path, _)))
+        .asserting(
+          _.value shouldBe DataExtract.Payload(testProject.path, testProject.name, testProject.maybeDescription)
+        )
+    }
   }
 
-  it should "fail if unzip fails" in {
+  it should "log an error and return None if unzip fails" in {
+
+    logger.reset()
 
     val zippedPayload =
       Arbitrary.arbByte.arbitrary.toGeneratorOfList(min = 1).map(_.toArray).generateAs(ZippedEventPayload.apply)
 
-    extractor.extractPayloadData(projectPaths.generateOne, zippedPayload).assertThrows[Exception]
+    extractor.extractPayloadData(projectPaths.generateOne, zippedPayload).asserting(_ shouldBe None) >>
+      logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("Unzipping"))
   }
 
-  it should "fail if parsing fails" in {
+  it should "log an error and return None if parsing fails" in {
+
+    logger.reset()
 
     val ioPayload = Zip.zip[IO](nonEmptyStrings().generateOne).map(ZippedEventPayload)
 
-    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _)))
-      .assertThrows[ParsingFailure]
+    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
+      logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("ParsingFailure"))
   }
 
-  it should "fail if decoding fails" in {
+  it should "log an error and return None if decoding fails" in {
+
+    logger.reset()
 
     val ioPayload = Zip.zip[IO](jsonLDEntities.generateOne.toJson.noSpaces).map(ZippedEventPayload)
 
-    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _)))
-      .assertThrows[DecodingFailure]
+    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
+      logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("DecodingFailure"))
   }
 
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val extractor = new PayloadDataExtractorImpl[IO]
 }
