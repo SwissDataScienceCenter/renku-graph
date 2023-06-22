@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 import Generators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectDescriptions, projectNames}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectDescriptions, projectNames, projectKeywords}
 import io.renku.graph.model.projects
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
@@ -202,6 +202,55 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
 
       NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
         NewValues.empty.copy(maybeDesc = Some(glData.maybeDesc))
+    }
+  }
+
+  "new keywords" should {
+
+    "be None if ts and gl values are the same - no payload case" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val glData = glDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be None if ts and payload values are the same" in {
+
+      val tsData      = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val glData      = glDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
+      val payloadData = payloadDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe NewValues.empty
+    }
+
+    "be gl keywords if ts and gl contains different values - no payload case" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val glData = glDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeKeywords = glData.keywords.some)
+    }
+
+    "be gl keywords if ts and gl contains different values - no keywords in the payload" in {
+
+      val tsData      = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val glData      = glDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
+      val payloadData = payloadDataFrom(tsData).copy(keywords = Set.empty)
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
+        NewValues.empty.copy(maybeKeywords = glData.keywords.some)
+    }
+
+    "be payload keywords if ts and payload contains different values" in {
+
+      val tsData      = tsDataExtracts().generateOne.copy(keywords = projectKeywords.generateSet())
+      val glData      = glDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
+      val payloadData = payloadDataFrom(tsData).copy(keywords = projectKeywords.generateSet(min = 1))
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
+        NewValues.empty.copy(maybeKeywords = payloadData.keywords.some)
     }
   }
 }

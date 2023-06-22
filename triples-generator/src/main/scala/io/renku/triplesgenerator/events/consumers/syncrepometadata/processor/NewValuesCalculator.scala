@@ -37,6 +37,12 @@ private object NewValuesCalculator extends NewValuesCalculator {
       Option.when(tsData.visibility != glData.visibility)(glData.visibility), {
         val potentiallyNewDesc = maybePayloadData.flatMap(_.maybeDesc).orElse(glData.maybeDesc)
         if (tsData.maybeDesc != potentiallyNewDesc) Some(potentiallyNewDesc) else None
+      }, {
+        val potentiallyNewKeywords = maybePayloadData.map(_.keywords).getOrElse(Set.empty) match {
+          case k if k.isEmpty => glData.keywords
+          case k              => k
+        }
+        Option.when(tsData.keywords != potentiallyNewKeywords)(potentiallyNewKeywords)
       }
     )
   }

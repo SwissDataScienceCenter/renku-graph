@@ -140,7 +140,8 @@ class GLDataFinderSpec
       "name":                ${de.name},
       "path_with_namespace": ${de.path},
       "visibility":          ${de.visibility},
-      "description":         ${de.maybeDesc}
+      "description":         ${de.maybeDesc},
+      "topics":              ${de.keywords}
     }""".deepDropNullValues
   }
 }
