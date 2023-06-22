@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import io.renku.eventlog.api.events.StatusChangeEvent
+import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery
 
@@ -35,28 +36,33 @@ private object DataExtract {
                       name:       projects.Name,
                       visibility: projects.Visibility,
                       maybeDesc:  Option[projects.Description],
-                      keywords:   Set[projects.Keyword]
+                      keywords:   Set[projects.Keyword],
+                      images:     List[ImageUri]
   ) extends DataExtract
   final case class GL(path:       projects.Path,
                       name:       projects.Name,
                       visibility: projects.Visibility,
                       maybeDesc:  Option[projects.Description],
-                      keywords:   Set[projects.Keyword]
+                      keywords:   Set[projects.Keyword],
+                      maybeImage: Option[ImageUri]
   ) extends DataExtract
   final case class Payload(path:      projects.Path,
                            name:      projects.Name,
                            maybeDesc: Option[projects.Description],
-                           keywords:  Set[projects.Keyword]
+                           keywords:  Set[projects.Keyword],
+                           images:    List[ImageUri]
   ) extends DataExtract
 }
 
 private final case class NewValues(maybeName:       Option[projects.Name],
                                    maybeVisibility: Option[projects.Visibility],
                                    maybeDesc:       Option[Option[projects.Description]],
-                                   maybeKeywords:   Option[Set[projects.Keyword]]
+                                   maybeKeywords:   Option[Set[projects.Keyword]],
+                                   maybeImages:     Option[List[Image]]
 )
 private object NewValues {
-  val empty: NewValues = NewValues(maybeName = None, maybeVisibility = None, maybeDesc = None, maybeKeywords = None)
+  val empty: NewValues =
+    NewValues(maybeName = None, maybeVisibility = None, maybeDesc = None, maybeKeywords = None, maybeImages = None)
 }
 
 private sealed trait UpdateCommand extends Product

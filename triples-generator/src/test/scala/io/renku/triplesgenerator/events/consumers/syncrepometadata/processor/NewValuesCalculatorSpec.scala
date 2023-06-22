@@ -21,7 +21,8 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 import Generators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectDescriptions, projectNames, projectKeywords}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectNames}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
@@ -251,6 +252,57 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
 
       NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
         NewValues.empty.copy(maybeKeywords = payloadData.keywords.some)
+    }
+  }
+
+  "new images" should {
+
+    "be None if ts and gl values are the same - no payload case" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(images = imageUris.generateFixedSizeList(ofSize = 1))
+      val glData = glDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be None if ts and payload values are the same" in {
+
+      val tsData      = tsDataExtracts().generateOne.copy(images = imageUris.generateFixedSizeList(ofSize = 1))
+      val glData      = glDataFrom(tsData).copy(maybeImage = imageUris.generateSome)
+      val payloadData = payloadDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe NewValues.empty
+    }
+
+    "be gl image if ts and gl contains different values - no payload case" in {
+
+      val tsData  = tsDataExtracts().generateOne
+      val glImage = imageUris.generateOne
+      val glData  = glDataFrom(tsData).copy(maybeImage = glImage.some)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeImages = List(Image.projectImage(tsData.id, glImage)).some)
+    }
+
+    "be gl image if ts and gl contains different values - no images in the payload" in {
+
+      val tsData      = tsDataExtracts().generateOne
+      val glImage     = imageUris.generateOne
+      val glData      = glDataFrom(tsData).copy(maybeImage = glImage.some)
+      val payloadData = payloadDataFrom(tsData).copy(images = List.empty)
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
+        NewValues.empty.copy(maybeImages = List(Image.projectImage(tsData.id, glImage)).some)
+    }
+
+    "be payload images if ts and payload contains different values" in {
+
+      val tsData      = tsDataExtracts().generateOne
+      val glData      = glDataFrom(tsData).copy(maybeImage = imageUris.generateSome)
+      val payloadData = payloadDataFrom(tsData).copy(images = imageUris.generateFixedSizeList(ofSize = 1))
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe
+        NewValues.empty.copy(maybeImages = Image.projectImage(tsData.id, payloadData.images).some)
     }
   }
 }

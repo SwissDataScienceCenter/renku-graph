@@ -21,7 +21,10 @@ package processor
 
 import cats.MonadThrow
 import cats.syntax.all._
+import io.renku.cli.model.CliProject
+import io.renku.cli.model.Ontologies.{Schema => CliSchema}
 import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 import io.renku.jsonld.{Cursor, Property}
 import org.typelevel.log4cats.Logger
@@ -38,7 +41,6 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
 
   import io.circe.DecodingFailure
   import io.renku.compression.Zip.unzip
-  import io.renku.graph.model.entities.Project
   import io.renku.graph.model.projects
   import io.renku.jsonld.JsonLDDecoder._
   import io.renku.jsonld.parser._
@@ -52,15 +54,16 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
     _.cursor.as(decodeList(dataExtract(path))).map(_.headOption)
 
   private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract.Payload] =
-    JsonLDDecoder.entity(Project.entityTypes) { cur =>
+    JsonLDDecoder.entity(CliProject.entityTypes) { cur =>
       for {
-        name <- cur.downField(Project.Ontology.nameProperty.id).as[Option[projects.Name]] >>= {
-                  case None    => decodingFailure(Project.Ontology.nameProperty.id, cur).asLeft
+        name <- cur.downField(CliSchema.name).as[Option[projects.Name]] >>= {
+                  case None    => decodingFailure(CliSchema.name, cur).asLeft
                   case Some(v) => v.asRight
                 }
-        maybeDesc <- cur.downField(Project.Ontology.descriptionProperty.id).as[Option[projects.Description]]
-        keywords <- cur.downField(Project.Ontology.keywordsProperty.id).as[Set[Option[projects.Keyword]]].map(_.flatten)
-      } yield DataExtract.Payload(path, name, maybeDesc, keywords)
+        maybeDesc <- cur.downField(CliSchema.description).as[Option[projects.Description]]
+        keywords  <- cur.downField(CliSchema.keywords).as[Set[Option[projects.Keyword]]].map(_.flatten)
+        images    <- cur.downField(CliSchema.image).as[List[Image]].map(_.sortBy(_.position).map(_.uri))
+      } yield DataExtract.Payload(path, name, maybeDesc, keywords, images)
     }
 
   private def decodingFailure(propName: Property, cur: Cursor) =

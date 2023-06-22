@@ -56,7 +56,8 @@ class PayloadDataExtractorSpec
           _.value shouldBe DataExtract.Payload(testProject.path,
                                                testProject.name,
                                                testProject.maybeDescription,
-                                               testProject.keywords
+                                               testProject.keywords,
+                                               testProject.images
           )
         )
     }

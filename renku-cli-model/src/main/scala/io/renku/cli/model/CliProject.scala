@@ -136,7 +136,7 @@ object CliProject {
       JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD, _.asJsonLD, _.asJsonLD))
   }
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Schema.Project, Prov.Location)
+  val entityTypes: EntityTypes = EntityTypes.of(Schema.Project, Prov.Location)
 
   implicit val jsonLDDecoder: JsonLDEntityDecoder[CliProject] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>

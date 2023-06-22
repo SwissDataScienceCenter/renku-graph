@@ -22,11 +22,13 @@ package processor
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.api.events.StatusChangeEvent
-import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.images.Image
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
 
 private trait UpdateCommandsCalculator {
@@ -52,7 +54,8 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
         newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
         newValues.maybeDesc.map(descUpdates(tsData.id, _)) combine
-        newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _))
+        newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _)) combine
+        newValues.maybeImages.map(imagesUpdates(tsData.id, _))
     ).getOrElse(Nil)
   }
 
@@ -182,7 +185,7 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
       Prefixes of schema -> "schema",
       sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:keywords ?keyword } }
                |INSERT { GRAPH ${GraphClass.Projects.id} {
-               |\t${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.\n""").toList.combineAll}
+               |  ${newValue.map(k => fr"""?id schema:keywords ${k.asObject}.""").toList.intercalate(fr"\n")}
                |} }
                |WHERE {
                |  BIND (${id.asEntityId} AS ?id)
@@ -191,4 +194,62 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
                |  }
                |}""".stripMargin
     )
+
+  private def imagesUpdates(id: projects.ResourceId, newValue: List[Image]): List[UpdateCommand] = List(
+    imagesInProjectUpdate(id, newValue),
+    imagesInProjectsUpdate(id, newValue)
+  ).map(UpdateCommand.Sparql)
+
+  private def imagesInProjectUpdate(id: projects.ResourceId, newValue: List[Image]) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update images in Project",
+      Prefixes of (rdf -> "rdf", schema -> "schema"),
+      sparql"""|DELETE { GRAPH ?id {
+               |  ?id schema:image ?imageId.
+               |  ?imageId ?p ?o
+               |} }
+               |INSERT { GRAPH ?id {
+               |  ${newValue.flatMap(toTriple).intercalate(fr"\n ")}
+               |} }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ?id {
+               |    OPTIONAL {
+               |      ?id schema:image ?imageId.
+               |      ?imageId ?p ?o
+               |    }
+               |  }
+               |}""".stripMargin
+    )
+
+  private def imagesInProjectsUpdate(id: projects.ResourceId, newValue: List[Image]) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update keywords in Projects",
+      Prefixes of (rdf -> "rdf", schema -> "schema"),
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} {
+               |  ?id schema:image ?imageId.
+               |  ?imageId ?p ?o
+               |} }
+               |INSERT { GRAPH ${GraphClass.Projects.id} {
+               |  ${newValue.flatMap(toTriple).intercalate(fr"\n ")}
+               |} }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    OPTIONAL {
+               |      ?id schema:image ?imageId.
+               |      ?imageId ?p ?o
+               |    }
+               |  }
+               |}""".stripMargin
+    )
+
+  private lazy val toTriple: Image => List[Fragment] = { case Image(resourceId, uri, position) =>
+    List(
+      fr"""?id schema:image ${resourceId.asEntityId}.""",
+      fr"""${resourceId.asEntityId} rdf:type ${Image.Ontology.typeClass.id}.""",
+      fr"""${resourceId.asEntityId} ${Image.Ontology.contentUrlProperty.id} ${uri.asObject}.""",
+      fr"""${resourceId.asEntityId} ${Image.Ontology.positionProperty.id} ${position.asObject}."""
+    )
+  }
 }

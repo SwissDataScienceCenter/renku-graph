@@ -26,6 +26,7 @@ import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -53,6 +54,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
         Prefixes of (renku -> "renku", schema -> "schema"),
         sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+                 |  (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
                  |  BIND (${path.asObject} AS ?path)
                  |  GRAPH ?id {
@@ -62,6 +64,12 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |        renku:projectVisibility ?visibility.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?dsId schema:keywords ?keyword }
+                 |    OPTIONAL {
+                 |      ?id schema:image ?imageId.
+                 |      ?imageId schema:position ?imagePosition;
+                 |               schema:contentUrl ?imageUrl.
+                 |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+                 |    }
                  |  }
                  |}
                  |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
@@ -81,6 +89,11 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
           )
           .map(_.getOrElse(List.empty).toSet)
 
+      def toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
+        _.map(ImageUri.fromSplitString(','))
+          .map(_.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
+          .getOrElse(Nil.asRight)
+
       for {
         id         <- extract[projects.ResourceId]("id")
         path       <- extract[projects.Path]("path")
@@ -88,6 +101,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
         visibility <- extract[projects.Visibility]("visibility")
         maybeDesc  <- extract[Option[projects.Description]]("maybeDesc")
         keywords   <- extract[Option[String]]("keywords") >>= toSetOfKeywords
-      } yield DataExtract.TS(id, path, name, visibility, maybeDesc, keywords)
+        images     <- extract[Option[String]]("images") >>= toListOfImageUris
+      } yield DataExtract.TS(id, path, name, visibility, maybeDesc, keywords, images)
     }(toOption(show"Multiple projects or values for '$path'"))
 }
