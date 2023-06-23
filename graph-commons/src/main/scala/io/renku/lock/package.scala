@@ -25,4 +25,13 @@ package object lock {
 
   type Lock[F[_], A] = Kleisli[Resource[F, *], A, Unit]
 
+  object syntax {
+    final implicit class LockSyntax[F[_], A](self: Lock[F, A]) {
+      def surround[B](fa: A => F[B])(implicit F: MonadCancelThrow[F]): A => F[B] =
+        a => self(a).surround(fa(a))
+
+      def surround[B](k: Kleisli[F, A, B])(implicit F: MonadCancelThrow[F]): Kleisli[F, A, B] =
+        Kleisli(surround(k.run))
+    }
+  }
 }

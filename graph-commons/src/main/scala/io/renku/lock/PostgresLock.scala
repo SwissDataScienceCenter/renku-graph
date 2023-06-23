@@ -35,18 +35,32 @@ import scala.concurrent.duration._
 object PostgresLock {
 
   /** Obtains an exclusive lock, retrying periodically via non-blocking waits */
-  def exclusive[F[_]: Temporal: Logger, A: LongKey](
+  def exclusive_[F[_]: Temporal: Logger, A: LongKey](
       session:  Session[F],
       interval: FiniteDuration = 0.5.seconds
   ): Lock[F, A] =
     createPolling[F, A](session, interval, tryAdvisoryLockSql, advisoryUnlockSql)
 
+  /** Obtains an exclusive lock, retrying periodically via non-blocking waits */
+  def exclusive[F[_]: Temporal: Logger, A: LongKey](
+      session:  Resource[F, Session[F]],
+      interval: FiniteDuration = 0.5.seconds
+  ): Lock[F, A] =
+    Kleisli(key => session.flatMap(exclusive_[F, A](_, interval).run(key)))
+
   /** Obtains a shared lock, retrying periodically via non-blocking waits. */
-  def shared[F[_]: Temporal: Logger, A: LongKey](
+  def shared_[F[_]: Temporal: Logger, A: LongKey](
       session:  Session[F],
       interval: FiniteDuration = 0.5.seconds
   ): Lock[F, A] =
     createPolling(session, interval, tryAdvisoryLockSharedSql, advisoryUnlockSharedSql)
+
+  /** Obtains a shared lock, retrying periodically via non-blocking waits. */
+  def shared[F[_]: Temporal: Logger, A: LongKey](
+      session:  Resource[F, Session[F]],
+      interval: FiniteDuration = 0.5.seconds
+  ): Lock[F, A] =
+    Kleisli(key => session.flatMap(shared_[F, A](_, interval).run(key)))
 
   private def createPolling[F[_]: Temporal: Logger, A: LongKey](
       session:   Session[F],

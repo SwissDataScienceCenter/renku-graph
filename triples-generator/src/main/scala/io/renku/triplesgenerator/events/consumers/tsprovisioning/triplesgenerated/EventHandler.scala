@@ -27,6 +27,7 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -48,7 +49,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       eventDecoder.decode,
-      eventProcessor.process,
+      tsWriteLock.contramap[Event](_.project.path).surround(eventProcessor.process _),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )
@@ -66,12 +67,13 @@ private object EventHandler {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F]
     processExecutor    <- ProcessExecutor.concurrent(concurrentProcessesNumber.asRefined)
-  } yield new EventHandler[F](categoryName,
-                              tsReadinessChecker,
-                              EventDecoder(),
-                              subscriptionMechanism,
-                              eventProcessor,
-                              processExecutor,
-                              tsWriteLock
+  } yield new EventHandler[F](
+    categoryName,
+    tsReadinessChecker,
+    EventDecoder(),
+    subscriptionMechanism,
+    eventProcessor,
+    processExecutor,
+    tsWriteLock
   )
 }

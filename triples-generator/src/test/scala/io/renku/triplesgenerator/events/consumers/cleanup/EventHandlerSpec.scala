@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.cleanup
 
+import cats.data.Kleisli
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.syntax._
@@ -26,8 +27,11 @@ import io.renku.events.consumers.ConsumersModelGenerators.{consumerProjects, eve
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
+import io.renku.lock.Lock
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
@@ -59,6 +63,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       (eventProcessor.process _).expects(event.project).returns(().pure[IO])
 
       handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
+    }
+
+    "lock while executing" in new TestCase {
+      val test = Ref.unsafe[IO, Int](0)
+      override val tsWriteLock: TsWriteLock[IO] =
+        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+
+      val event = consumerProjects.map(CleanUpEvent(_)).generateOne
+
+      (eventProcessor.process _).expects(event.project).returns(().pure[IO])
+
+      handler.createHandlingDefinition().process(event).unsafeRunSync() shouldBe ()
+      test.get.unsafeRunSync()                                          shouldBe 2
     }
   }
 
@@ -93,11 +110,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
     val renewSubscriptionCalled       = Ref.unsafe[IO, Boolean](false)
     (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
-    val handler = new EventHandler[IO](categoryName,
-                                       tsReadinessChecker,
-                                       eventProcessor,
-                                       subscriptionMechanism,
-                                       mock[ProcessExecutor[IO]]
+    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+    lazy val handler = new EventHandler[IO](
+      categoryName,
+      tsReadinessChecker,
+      eventProcessor,
+      subscriptionMechanism,
+      mock[ProcessExecutor[IO]],
+      tsWriteLock
     )
   }
 }

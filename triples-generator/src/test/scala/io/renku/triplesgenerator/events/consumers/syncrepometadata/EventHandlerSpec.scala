@@ -24,7 +24,9 @@ import cats.syntax.all._
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
+import io.renku.lock.Lock
 import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.syncrepometadata.processor.EventProcessor
@@ -32,6 +34,7 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
+//TODO
 class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "handlingDefinition.decode" should {
@@ -89,5 +92,12 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   private lazy val eventProcessor = mock[EventProcessor[IO]]
 
   private lazy val handler =
-    new EventHandler[IO](categoryName, tsReadinessChecker, EventDecoder, eventProcessor, mock[ProcessExecutor[IO]])
+    new EventHandler[IO](
+      categoryName,
+      tsReadinessChecker,
+      EventDecoder,
+      eventProcessor,
+      mock[ProcessExecutor[IO]],
+      Lock.none[IO, projects.Path]
+    )
 }

@@ -30,7 +30,9 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
+import io.renku.lock.Lock
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -94,12 +96,14 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     (subscriptionMechanism.renewSubscription _).expects().returns(renewSubscriptionCalled.set(true))
 
     val eventProcessor = mock[EventProcessor[IO]]
-
-    val handler = new EventHandler[IO](categoryName,
-                                       tsReadinessChecker,
-                                       subscriptionMechanism,
-                                       eventProcessor,
-                                       mock[ProcessExecutor[IO]]
+    def tsWriteLock    = Lock.none[IO, projects.Path]
+    lazy val handler = new EventHandler[IO](
+      categoryName,
+      tsReadinessChecker,
+      subscriptionMechanism,
+      eventProcessor,
+      mock[ProcessExecutor[IO]],
+      tsWriteLock
     )
   }
 

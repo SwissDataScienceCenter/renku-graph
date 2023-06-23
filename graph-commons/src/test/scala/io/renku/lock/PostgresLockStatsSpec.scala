@@ -45,7 +45,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       session(cnt).use { s =>
         for {
           _            <- resetLockTable(s)
-          (_, release) <- PostgresLock.exclusive[IO, Int](s).run(1).allocated
+          (_, release) <- PostgresLock.exclusive_[IO, Int](s).run(1).allocated
           stats        <- PostgresLockStats.getStats(s)
           _            <- release
           _ = stats shouldBe Stats(1, Nil)

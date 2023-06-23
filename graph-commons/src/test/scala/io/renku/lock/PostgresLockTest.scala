@@ -49,13 +49,13 @@ trait PostgresLockTest extends TestContainerForAll { self: Suite =>
     )
 
   def makeExclusiveLock(s: Session[IO], interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    PostgresLock.exclusive[IO, String](s, interval)
+    PostgresLock.exclusive_[IO, String](s, interval)
 
   def exclusiveLock(cnt: Containers, interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    session(cnt).map(makeExclusiveLock(_, interval))
+    PostgresLock.exclusive[IO, String](session(cnt), interval)
 
   def sharedLock(cnt: Containers, interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    session(cnt).map(PostgresLock.shared[IO, String](_, interval))
+    PostgresLock.shared[IO, String](session(cnt), interval)
 
   def resetLockTable(s: Session[IO]) =
     PostgresLockStats.ensureStatsTable[IO](s) *>

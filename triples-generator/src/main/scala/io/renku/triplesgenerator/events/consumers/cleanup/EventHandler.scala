@@ -25,6 +25,8 @@ import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, consumers}
 import io.renku.metrics.MetricsRegistry
+import io.renku.lock.syntax._
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.CleanUpEvent
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -36,15 +38,16 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     eventProcessor:            EventProcessor[F],
     subscriptionMechanism:     SubscriptionMechanism[F],
-    processExecutor:           ProcessExecutor[F]
+    processExecutor:           ProcessExecutor[F],
+    tsWriteLock:               TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = CleanUpEvent
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      _.event.as[CleanUpEvent],
-      e => eventProcessor.process(e.project),
+      decode = _.event.as[CleanUpEvent],
+      process = tsWriteLock.contramap[Event](_.project.path).surround(e => eventProcessor.process(e.project)),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )
@@ -53,10 +56,18 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 private object EventHandler {
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      subscriptionMechanism: SubscriptionMechanism[F]
+      subscriptionMechanism: SubscriptionMechanism[F],
+      tsWriteLock:           TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F]
     processExecutor    <- ProcessExecutor.concurrent(processesCount = 1)
-  } yield new EventHandler[F](categoryName, tsReadinessChecker, eventProcessor, subscriptionMechanism, processExecutor)
+  } yield new EventHandler[F](
+    categoryName,
+    tsReadinessChecker,
+    eventProcessor,
+    subscriptionMechanism,
+    processExecutor,
+    tsWriteLock
+  )
 }

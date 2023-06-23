@@ -42,7 +42,29 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
     "sequentially on same key" in withContainers { cnt =>
       implicit val logger: Logger[IO] = TestLogger()
-      def createLock = exclusiveLock(cnt, pollInterval)
+      val lock = exclusiveLock(cnt, pollInterval)
+
+      for {
+        result <- Ref.of[IO, List[FiniteDuration]](Nil)
+        update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
+        latch <- CountDownLatch[IO](1)
+
+        f1 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+        f2 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+        f3 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+
+        _ <- latch.release
+        _ <- List(f1, f2, f3).traverse_(_.join)
+
+        diff <- result.get.map(list => list.max - list.min)
+        _ = diff should be >= 400.millis
+      } yield ()
+    }
+
+    "sequentially on same key using session constructor" in withContainers { cnt =>
+      implicit val logger: Logger[IO] = TestLogger()
+
+      def createLock = session(cnt).map(makeExclusiveLock(_, pollInterval))
 
       (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
         for {
@@ -65,25 +87,23 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
     "parallel on different key" in withContainers { cnt =>
       implicit val logger: Logger[IO] = TestLogger()
-      def createLock = exclusiveLock(cnt)
+      val lock = exclusiveLock(cnt)
 
-      (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
-        for {
-          result <- Ref.of[IO, List[FiniteDuration]](Nil)
-          update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
-          latch <- CountDownLatch[IO](1)
+      for {
+        result <- Ref.of[IO, List[FiniteDuration]](Nil)
+        update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
+        latch <- CountDownLatch[IO](1)
 
-          f1 <- Async[IO].start(latch.await *> l1("p1").use(_ => update))
-          f2 <- Async[IO].start(latch.await *> l2("p2").use(_ => update))
-          f3 <- Async[IO].start(latch.await *> l3("p3").use(_ => update))
+        f1 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+        f2 <- Async[IO].start(latch.await *> lock("p2").use(_ => update))
+        f3 <- Async[IO].start(latch.await *> lock("p3").use(_ => update))
 
-          _ <- latch.release
-          _ <- List(f1, f2, f3).traverse_(_.join)
+        _ <- latch.release
+        _ <- List(f1, f2, f3).traverse_(_.join)
 
-          diff <- result.get.map(list => list.max - list.min)
-          _ = diff should be < 300.millis
-        } yield ()
-      }
+        diff <- result.get.map(list => list.max - list.min)
+        _ = diff should be < 300.millis
+      } yield ()
     }
 
     "log if acquiring fails" in withContainers { cnt =>
@@ -104,7 +124,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       }
 
       val interval = 50.millis
-      def lock     = makeSession.map(PostgresLock.exclusive[IO, String](_, interval))
+      def lock     = makeSession.map(PostgresLock.exclusive_[IO, String](_, interval))
 
       lock.flatMap(_("p1")).use(_ => IO.unit).asserting { _ =>
         logger.logged(
@@ -120,25 +140,23 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   "PostgresLock.shared" should {
     "allow multiple shared locks" in withContainers { cnt =>
       implicit val logger: Logger[IO] = TestLogger()
-      def createLock = sharedLock(cnt)
+      val lock = sharedLock(cnt)
 
-      (createLock, createLock, createLock).tupled.use { case (l1, l2, l3) =>
-        for {
-          result <- Ref.of[IO, List[FiniteDuration]](Nil)
-          update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
-          latch <- CountDownLatch[IO](1)
+      for {
+        result <- Ref.of[IO, List[FiniteDuration]](Nil)
+        update = IO.sleep(200.millis) *> IO.realTime.flatMap(time => result.update(time :: _))
+        latch <- CountDownLatch[IO](1)
 
-          f1 <- Async[IO].start(latch.await *> l1("p1").use(_ => update))
-          f2 <- Async[IO].start(latch.await *> l2("p1").use(_ => update))
-          f3 <- Async[IO].start(latch.await *> l3("p1").use(_ => update))
+        f1 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+        f2 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
+        f3 <- Async[IO].start(latch.await *> lock("p1").use(_ => update))
 
-          _ <- latch.release
-          _ <- List(f1, f2, f3).traverse_(_.join)
+        _ <- latch.release
+        _ <- List(f1, f2, f3).traverse_(_.join)
 
-          diff <- result.get.map(list => list.max - list.min)
-          _ = diff should be < 300.millis
-        } yield ()
-      }
+        diff <- result.get.map(list => list.max - list.min)
+        _ = diff should be < 300.millis
+      } yield ()
     }
   }
 

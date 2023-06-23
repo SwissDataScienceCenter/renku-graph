@@ -18,6 +18,7 @@
 
 package io.renku.lock
 
+import io.renku.graph.model.entities.Project
 import io.renku.graph.model.projects
 
 import scala.util.hashing.MurmurHash3
@@ -46,4 +47,7 @@ object LongKey {
 
   implicit val forProjectPath: LongKey[projects.Path] =
     forString.contramap(_.value)
+
+  implicit val forProject: LongKey[Project] =
+    forProjectPath.contramap(_.path)
 }
