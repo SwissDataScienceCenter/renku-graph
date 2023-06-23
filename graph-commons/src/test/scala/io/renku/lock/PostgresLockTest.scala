@@ -26,6 +26,7 @@ import org.scalatest.Suite
 import skunk.Session
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
+import skunk.implicits._
 
 import scala.concurrent.duration._
 
@@ -47,9 +48,17 @@ trait PostgresLockTest extends TestContainerForAll { self: Suite =>
       password = Some(c.password)
     )
 
+  def makeExclusiveLock(s: Session[IO], interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
+    PostgresLock.exclusive[IO, String](s, interval)
+
   def exclusiveLock(cnt: Containers, interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
-    session(cnt).map(PostgresLock.exclusive[IO, String](_, interval))
+    session(cnt).map(makeExclusiveLock(_, interval))
 
   def sharedLock(cnt: Containers, interval: FiniteDuration = 100.millis)(implicit L: Logger[IO]) =
     session(cnt).map(PostgresLock.shared[IO, String](_, interval))
+
+  def resetLockTable(s: Session[IO]) =
+    PostgresLockStats.ensureStatsTable[IO](s) *>
+      s.execute(sql"DELETE FROM kg_lock_stats".command).void
+
 }

@@ -62,13 +62,15 @@ object PostgresLock {
           case Left(ex) => Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
         }
         .flatTap {
-          case false => PostgresLockStats.recordWaiting(session)(n)
-          case true  => PostgresLockStats.removeWaiting(session)(n)
+          case false => PostgresLockStats.recordWaiting(session)(n).attempt
+          case true  => PostgresLockStats.removeWaiting(session)(n).attempt
         }
-        .map { r => println(s"${System.currentTimeMillis()} got: $n => $r"); r }
 
     def rel(n: Long): F[Unit] =
-      session.unique(unlockSql)(n).flatMap(_ => PostgresLockStats.removeWaiting(session)(n))
+      session
+        .unique(unlockSql)(n)
+        .flatTap(_ => PostgresLockStats.removeWaiting(session)(n).attempt)
+        .void
 
     Lock
       .create(Kleisli(acq), interval)(Kleisli(rel))

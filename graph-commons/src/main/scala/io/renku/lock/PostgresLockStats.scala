@@ -51,10 +51,10 @@ object PostgresLockStats {
     session.execute(createTable).void
 
   def recordWaiting[F[_]: MonadCancelThrow](session: Session[F])(key: Long): F[Unit] =
-    session.transaction.use(_ => session.execute(upsertWaiting)(key).void)
+    session.execute(upsertWaiting)(key).void
 
   def removeWaiting[F[_]: MonadCancelThrow](session: Session[F])(key: Long): F[Unit] =
-    session.transaction.use(_ => session.execute(deleteWaiting)(key).void)
+    session.execute(deleteWaiting)(key).void
 
   private val countCurrentLocks: Query[Void, Long] =
     sql"""
@@ -90,5 +90,5 @@ object PostgresLockStats {
          """.command
 
   private val deleteWaiting: Command[Long] =
-    sql"""DELETE FROM kg_lock_stats WHERE obj_id = $int8""".command
+    sql"""DELETE FROM kg_lock_stats WHERE obj_id = $int8 AND sess_id = pg_backend_pid()""".command
 }

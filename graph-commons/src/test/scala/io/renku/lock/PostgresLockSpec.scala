@@ -96,6 +96,9 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
               case n if n < 2 => IO.raiseError(exception)
               case _          => goodSession.unique(query)(args)
             }
+
+          override def execute[A](command: Command[A])(args: A) =
+            goodSession.execute(command)(args)
         }
       }
 
@@ -134,6 +137,63 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
           diff <- result.get.map(list => list.max - list.min)
           _ = diff should be < 300.millis
+        } yield ()
+      }
+    }
+  }
+
+  "PostgresLock stats" should {
+
+    "show when a session is waiting for a lock" in withContainers { cnt =>
+      implicit val logger: Logger[IO] = TestLogger()
+      (session(cnt), session(cnt)).tupled.use { case (s1, s2) =>
+        for {
+          _            <- resetLockTable(s1)
+          (_, release) <- makeExclusiveLock(s1).run("1").allocated
+          fiber        <- Async[IO].start(makeExclusiveLock(s2).run("1").allocated)
+          _            <- IO.sleep(10.millis)
+          stats        <- PostgresLockStats.getStats(s1)
+          _            <- release
+          _            <- fiber.join
+          stats2       <- PostgresLockStats.getStats(s1)
+
+          _ = stats.waiting.size shouldBe 1
+          _ = stats2.waiting     shouldBe Nil
+        } yield ()
+      }
+    }
+
+    "remove records for the owning session only" in withContainers { cnt =>
+      implicit val logger: Logger[IO] = TestLogger()
+      (session(cnt), session(cnt), session(cnt)).tupled.use { case (s1, s2, s3) =>
+        for {
+          _            <- resetLockTable(s1)
+          (_, release) <- makeExclusiveLock(s1).run("1").allocated
+          f1           <- Async[IO].start(makeExclusiveLock(s2, 4.millis).run("1").allocated)
+          // use a longer interval so that there is no attempt to insert another record
+          f2 <- Async[IO].start(makeExclusiveLock(s3, 1.second).run("1").allocated)
+          _  <- IO.sleep(10.millis)
+
+          // there must be two records waiting for the same lock
+          stats <- PostgresLockStats.getStats(s1)
+          _ = stats.currentLocks                       shouldBe 1
+          _ = stats.waiting.size                       shouldBe 2
+          _ = stats.waiting.map(_.objectId).toSet.size shouldBe 1
+          _ = stats.waiting.map(_.pid).toSet.size      shouldBe 2
+
+          // releasing the lock so that f1 or f2 grabs it
+          // then it must not remove the record from the other one
+          _ <- release
+          _ <- IO.sleep(10.millis)
+
+          stats2 <- PostgresLockStats.getStats(s1)
+          _ = stats2.waiting.size shouldBe 1
+          _ = stats2.currentLocks shouldBe 1
+
+          _ <- List(f1, f2).parTraverse_(_.join.flatMap {
+                 case Outcome.Succeeded(rel) => rel.flatMap(_._2)
+                 case _                      => IO.raiseError(new Exception("joining failed"))
+               })
         } yield ()
       }
     }

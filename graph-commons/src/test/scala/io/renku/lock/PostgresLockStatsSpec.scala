@@ -22,13 +22,10 @@ import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.interpreters.TestLogger
-import io.renku.lock.PostgresLockStats.{Stats, Waiting}
+import io.renku.lock.PostgresLockStats.Stats
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration._
-import java.time.{Duration, OffsetDateTime}
 
 class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with PostgresLockTest {
   implicit val logger: Logger[IO] = TestLogger[IO]()
@@ -37,7 +34,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
     "obtain empty statistics" in withContainers { cnt =>
       session(cnt).use { s =>
         for {
-          _     <- PostgresLockStats.ensureStatsTable(s)
+          _     <- resetLockTable(s)
           stats <- PostgresLockStats.getStats[IO](s)
           _ = stats shouldBe Stats(0, Nil)
         } yield ()
@@ -47,7 +44,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
     "show when a lock is held" in withContainers { cnt =>
       session(cnt).use { s =>
         for {
-          _            <- PostgresLockStats.ensureStatsTable(s)
+          _            <- resetLockTable(s)
           (_, release) <- PostgresLock.exclusive[IO, Int](s).run(1).allocated
           stats        <- PostgresLockStats.getStats(s)
           _            <- release
@@ -59,7 +56,7 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
     "insert waiting info" in withContainers { cnt =>
       session(cnt).use { s =>
         for {
-          _     <- PostgresLockStats.ensureStatsTable(s)
+          _     <- resetLockTable(s)
           _     <- PostgresLockStats.recordWaiting(s)(5L)
           stats <- PostgresLockStats.getStats(s)
           _ = stats.currentLocks shouldBe 0
@@ -74,32 +71,27 @@ class PostgresLockStatsSpec extends AsyncWordSpec with AsyncIOSpec with should.M
       }
     }
 
-    "remove waiting info" in withContainers { cnt =>
-      session(cnt).use { s =>
+    "waiting info distinguishes sessions" in withContainers { cnt =>
+      (session(cnt), session(cnt)).tupled.use { case (s1, s2) =>
         for {
-          _     <- PostgresLockStats.ensureStatsTable(s)
-          _     <- PostgresLockStats.recordWaiting(s)(5L)
-          _     <- PostgresLockStats.removeWaiting(s)(5L)
-          stats <- PostgresLockStats.getStats(s)
-          _ = stats shouldBe Stats(0, Nil)
+          _     <- resetLockTable(s1)
+          _     <- PostgresLockStats.recordWaiting(s1)(5)
+          _     <- PostgresLockStats.recordWaiting(s2)(5)
+          stats <- PostgresLockStats.getStats(s1)
+          _ = stats.waiting.size                  shouldBe 2
+          _ = stats.waiting.map(_.pid).toSet.size shouldBe 2
         } yield ()
       }
     }
 
-    "show when a session is waiting for a lock" in withContainers { cnt =>
-      (session(cnt), session(cnt)).tupled.use { case (s1, _) =>
-        for { // ???
-          _            <- IO.print("***** TEST START")
-          _            <- PostgresLockStats.ensureStatsTable(s1)
-          (_, release) <- PostgresLock.exclusive[IO, Int](s1).run(1).allocated
-          // fiber        <- Async[IO].start(PostgresLock.exclusive[IO, Int](s2).run(1).allocated)
-          _     <- IO.sleep(10.millis)
-          _     <- IO.println("GET STATS")
-          stats <- PostgresLockStats.getStats(s1)
-          _     <- release
-          // _            <- fiber.join
-          _ <- IO.print("***** TEST END")
-          _ = stats shouldBe Stats(1, List(Waiting(1, 2, OffsetDateTime.now(), Duration.ZERO)))
+    "remove waiting info" in withContainers { cnt =>
+      session(cnt).use { s =>
+        for {
+          _     <- resetLockTable(s)
+          _     <- PostgresLockStats.recordWaiting(s)(5L)
+          _     <- PostgresLockStats.removeWaiting(s)(5L)
+          stats <- PostgresLockStats.getStats(s)
+          _ = stats shouldBe Stats(0, Nil)
         } yield ()
       }
     }
