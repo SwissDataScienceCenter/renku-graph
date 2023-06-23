@@ -143,6 +143,7 @@ trait JsonEncoders {
           "star_count"          -> project.starsCount.value.asJson,
           "path_with_namespace" -> project.path.value.asJson,
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
+          "updated_at"          -> project.entitiesProject.dateModified.value.asJson,
           "creator_id"          -> project.maybeCreator.map(_.gitLabId).asJson,
           "last_activity_at"    -> project.updatedAt.value.asJson,
           "permissions"         -> project.permissions.asJson,

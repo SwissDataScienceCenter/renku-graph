@@ -47,6 +47,7 @@ trait NonRenkuProjectEntitiesGenerators {
     name             <- Gen.const(path.toName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates(minDateCreated.value)
+    dateModified     <- projectModifiedDates(dateCreated.value)
     maybeCreator     <- creatorGen.toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
@@ -58,6 +59,7 @@ trait NonRenkuProjectEntitiesGenerators {
     name,
     maybeDescription,
     dateCreated,
+    dateModified,
     maybeCreator,
     visibility,
     forksCount,

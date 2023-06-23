@@ -25,6 +25,7 @@ import cats.data.EitherT.rightT
 import cats.data.{EitherT, Kleisli}
 import cats.syntax.all._
 import cats.{Foldable, Functor}
+import io.renku.cli.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
 import io.renku.cli.model.{CliDataset, CliProject}
 import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
@@ -40,7 +41,6 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.tools.AdditionalMatchers
-import io.renku.cli.model.tools.JsonLDTools.{flattenedJsonLD, flattenedJsonLDFrom}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -89,7 +89,7 @@ class EntityBuilderSpec
         )
         .value
 
-      results.success.value shouldMatchToRight combine(modelProject, glProject)
+      results.success.value shouldMatchToRight combine(modelProject, cliProject, glProject)
     }
 
     "successfully deserialize JsonLD to the model - case of a Non-Renku Project" in new TestCase {
@@ -114,7 +114,7 @@ class EntityBuilderSpec
         )
         .value
 
-      results.success.value shouldMatchToRight combine(modelProject, glProject)
+      results.success.value shouldMatchToRight combine(modelProject, cliProject, glProject)
     }
 
     "fail if there's no project info found for the project" in new TestCase {
@@ -241,7 +241,7 @@ class EntityBuilderSpec
           )
         }.value
 
-        results.success.value shouldMatchToRight combine(modelProject, glProject)
+        results.success.value shouldMatchToRight combine(modelProject, project.to[CliProject], glProject)
       }
 
     "fail if the payload is invalid" in new TestCase {
@@ -284,6 +284,7 @@ class EntityBuilderSpec
       project.name,
       project.path,
       project.dateCreated,
+      project.dateModified,
       project.maybeDescription,
       project.maybeCreator.map(_.to[ProjectMember]),
       project.keywords,
@@ -339,13 +340,14 @@ class EntityBuilderSpec
   private def payloadJsonLD(project: CliProject) =
     flattenedJsonLDFrom(project.asJsonLD, project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
 
-  private def combine(modelProject: entities.Project, glProject: GitLabProjectInfo) = {
+  private def combine(modelProject: entities.Project, cliProject: CliProject, glProject: GitLabProjectInfo) = {
     val creatorWithGLId = blend(modelProject.maybeCreator, glProject.maybeCreator)
+    val dateModified    = List(cliProject.dateModified, glProject.dateModified).max
     modelProject.fold(
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson)),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson)),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson)),
-      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson))
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified),
+      _.copy(maybeCreator = creatorWithGLId, members = glProject.members.map(toPerson), dateModified = dateModified)
     )
   }
 

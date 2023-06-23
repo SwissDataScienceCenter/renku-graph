@@ -99,6 +99,12 @@ object projects {
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
+  final class DateModified private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object DateModified
+      extends TinyTypeFactory[DateModified](new DateModified(_))
+      with InstantNotInTheFuture[DateModified]
+      with TinyTypeJsonLDOps[DateModified]
+
   final class DateViewed private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateViewed
       extends TinyTypeFactory[DateViewed](new DateViewed(_))

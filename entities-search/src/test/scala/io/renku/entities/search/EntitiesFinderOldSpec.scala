@@ -32,11 +32,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.{Dataset, RenkuProject, StepPlan}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.http.rest.{SortBy, Sorting}
+import io.renku.graph.model.testentities.{Dataset, RenkuProject, StepPlan}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
@@ -616,6 +616,7 @@ class EntitiesFinderOldSpec
       val projectDateCreated = timestamps(min = sinceAsInstant, max = Instant.now()).generateAs[projects.DateCreated]
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .withActivities(
           activityEntities(
             stepPlanEntities().map(
@@ -657,6 +658,7 @@ class EntitiesFinderOldSpec
       val projectDateCreated = timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
       val _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .withActivities(
           activityEntities(
             stepPlanEntities().map(
@@ -704,12 +706,10 @@ class EntitiesFinderOldSpec
       val since          = sinceParams.generateOne
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
+      val projectDateCreated = timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
       val matchingDS -> dsProject = renkuProjectEntities(visibilityPublic)
-        .modify(
-          replaceProjectDateCreated(to =
-            timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
-          )
-        )
+        .modify(replaceProjectDateCreated(projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .addDataset(
           datasetEntities(provenanceImportedExternal)
             .modify(
@@ -745,6 +745,7 @@ class EntitiesFinderOldSpec
       val projectDateCreated = timestamps(max = untilAsInstant).generateAs[projects.DateCreated]
       val ds -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .withActivities(
           activityEntities(
             stepPlanEntities().map(
@@ -787,6 +788,7 @@ class EntitiesFinderOldSpec
         .generateAs(projects.DateCreated)
       val _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .withActivities(
           activityEntities(
             stepPlanEntities().map(
@@ -832,12 +834,11 @@ class EntitiesFinderOldSpec
       val until          = Until(untilParams.generateOne.value minusDays 2)
       val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
 
+      val projectDateCreated =
+        timestampsNotInTheFuture(butYoungerThan = untilAsInstant plus (1, DAYS)).generateAs(projects.DateCreated)
       val matchingDS -> dsProject = renkuProjectEntities(visibilityPublic)
-        .modify(
-          replaceProjectDateCreated(to =
-            timestampsNotInTheFuture(butYoungerThan = untilAsInstant plus (1, DAYS)).generateAs(projects.DateCreated)
-          )
-        )
+        .modify(replaceProjectDateCreated(projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .addDataset(
           datasetEntities(provenanceImportedExternal)
             .modify(
@@ -879,6 +880,7 @@ class EntitiesFinderOldSpec
       val projectDateCreated = timestamps(min = sinceAsInstant, max = untilAsInstant).generateAs[projects.DateCreated]
       val dsInternal -> dsExternal -> _ -> _ -> project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .modify(replaceProjectDateModified(projectModifiedDates(projectDateCreated.value).generateOne))
         .withActivities(
           activityEntities(
             stepPlanEntities().map(

@@ -27,6 +27,7 @@ import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -67,7 +68,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    GitLabClient[F].get(uri"projects" / path.show, "single-project")(mapTo[ProjectAndCreator])
+    GitLabClient[F].get(uri"projects" / path, "single-project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -88,6 +89,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         name             <- cursor.downField("name").as[projects.Name]
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
+        dateModified     <- cursor.downField("updated_at").as[Option[projects.DateModified]]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         keywords         <- cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten)
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
@@ -100,6 +102,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         name,
         path,
         dateCreated,
+        dateModified getOrElse projects.DateModified(dateCreated.value),
         maybeDescription,
         maybeCreator = None,
         keywords,
@@ -119,7 +122,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
       case None => OptionT.some[F](Option.empty[ProjectMember])
       case Some(creatorId) =>
         OptionT.liftF {
-          GitLabClient[F].get(uri"users" / creatorId.show, "single-user")(mapTo[ProjectMember])
+          GitLabClient[F].get(uri"users" / creatorId, "single-user")(mapTo[ProjectMember])
         }
     }
 

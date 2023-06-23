@@ -24,47 +24,50 @@ import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
 import org.scalatest.OptionValues
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 class ProjectFetcherSpec
-    extends AnyFlatSpec
-    with IOSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
     with should.Matchers
     with InMemoryJenaForSpec
     with ProjectsDataset
     with OptionValues {
 
-  it should "fetch info about the project" in new TestCase {
+  it should "fetch info about the project" in {
 
     val project = anyProjectEntities.suchThat(_.images.size > 1).generateOne.to[entities.Project]
 
     upload(to = projectsDataset, project)
 
-    fetcher.fetchProject(project.path).unsafeRunSync().value shouldBe entities.NonRenkuProject.WithoutParent(
-      project.resourceId,
-      project.path,
-      project.name,
-      project.maybeDescription,
-      project.dateCreated,
-      project.maybeCreator.map(p => entities.Person.WithNameOnly(p.resourceId, p.name, None, None)),
-      project.visibility,
-      project.keywords,
-      members = Set.empty,
-      project.images
-    )
+    fetcher
+      .fetchProject(project.path)
+      .asserting(
+        _.value shouldBe entities.NonRenkuProject.WithoutParent(
+          project.resourceId,
+          project.path,
+          project.name,
+          project.maybeDescription,
+          project.dateCreated,
+          project.dateModified,
+          project.maybeCreator.map(p => entities.Person.WithNameOnly(p.resourceId, p.name, None, None)),
+          project.visibility,
+          project.keywords,
+          members = Set.empty,
+          project.images
+        )
+      )
   }
 
-  it should "return no project if one does not exists" in new TestCase {
-    fetcher.fetchProject(projectPaths.generateOne).unsafeRunSync() shouldBe None
+  it should "return no project if one does not exists" in {
+    fetcher.fetchProject(projectPaths.generateOne).asserting(_ shouldBe None)
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    lazy val fetcher = new ProjectFetcherImpl[IO](TSClient[IO](projectsDSConnectionInfo))
-  }
+  private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private lazy val fetcher = new ProjectFetcherImpl[IO](TSClient[IO](projectsDSConnectionInfo))
 }

@@ -118,6 +118,8 @@ trait RenkuTinyTypeGenerators {
 
   def projectCreatedDates(min: Instant = Instant.EPOCH): Gen[projects.DateCreated] =
     Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateCreated)
+  def projectModifiedDates(min: Instant = Instant.EPOCH): Gen[projects.DateModified] =
+    Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateModified)
   def projectViewedDates(min: Instant = Instant.EPOCH): Gen[projects.DateViewed] =
     Generators.timestamps(min, max = Instant.now()).toGeneratorOf(projects.DateViewed)
 

@@ -198,6 +198,8 @@ class ProjectFinderSpec
       "path_with_namespace": ${project.path},
       "name":                ${project.name},
       "created_at":          ${project.dateCreated},
+      "created_at":          ${project.dateCreated},
+      "updated_at":          ${project.dateModified},
       "visibility":          ${project.visibility},
       "topics":              ${project.keywords.map(_.value) + blankStrings().generateOne}
     }"""
