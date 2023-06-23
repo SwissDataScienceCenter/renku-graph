@@ -48,7 +48,7 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
 
   override def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract.Payload]] =
     (unzip(payload.value) >>= parse)
-      .fold(logError, _.some.pure[F])
+      .fold(logError(path), _.some.pure[F])
       .flatMap(decode(path))
 
   private def decode(path: projects.Path): Option[JsonLD] => F[Option[DataExtract.Payload]] = {
@@ -58,14 +58,14 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
       jsonLD.cursor
         .as(decodeList(dataExtract(path)))
         .map(_.headOption)
-        .fold(logInfo, _.pure[F])
+        .fold(logWarn(path), _.pure[F])
   }
 
   private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract.Payload] =
     JsonLDDecoder.entity(CliProject.entityTypes) { cur =>
       for {
         name <- cur.downField(CliSchema.name).as[Option[projects.Name]] >>= {
-                  case None    => decodingFailure(path, CliSchema.name, cur).asLeft
+                  case None    => decodingFailure(CliSchema.name, cur).asLeft
                   case Some(v) => v.asRight
                 }
         maybeDesc <- cur.downField(CliSchema.description).as[Option[projects.Description]]
@@ -74,19 +74,19 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
       } yield DataExtract.Payload(path, name, maybeDesc, keywords, images)
     }
 
-  private def decodingFailure(path: projects.Path, propName: Property, cur: Cursor) =
+  private def decodingFailure(propName: Property, cur: Cursor) =
     DecodingFailure(
-      DecodingFailure.Reason.CustomReason(show"no '$propName' property in the payload for $path"),
+      DecodingFailure.Reason.CustomReason(show"no '$propName' property in the payload"),
       cur.jsonLD.toJson.hcursor
     )
 
-  private lazy val logError: Throwable => F[Option[JsonLD]] =
+  private def logError(path: projects.Path): Throwable => F[Option[JsonLD]] =
     Logger[F]
-      .error(_)(show"$categoryName: cannot process data from the payload")
+      .error(_)(show"$categoryName: cannot process data from the payload for $path")
       .as(Option.empty[JsonLD])
 
-  private lazy val logInfo: DecodingFailure => F[Option[DataExtract.Payload]] =
+  private def logWarn(path: projects.Path): DecodingFailure => F[Option[DataExtract.Payload]] =
     Logger[F]
-      .info(_)(show"$categoryName: cannot decode the payload")
+      .warn(_)(show"$categoryName: cannot decode the payload for $path")
       .as(Option.empty[DataExtract.Payload])
 }

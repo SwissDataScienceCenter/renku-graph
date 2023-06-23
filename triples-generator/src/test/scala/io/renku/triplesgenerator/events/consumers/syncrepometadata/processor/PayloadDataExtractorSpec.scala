@@ -84,14 +84,14 @@ class PayloadDataExtractorSpec
       logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("ParsingFailure"))
   }
 
-  it should "log an info and return None if decoding fails" in {
+  it should "log a warn and return None if decoding fails" in {
 
     logger.reset()
 
     val ioPayload = Zip.zip[IO](jsonLDEntities.generateOne.toJson.noSpaces).map(ZippedEventPayload)
 
     (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
-      logger.getMessages(TestLogger.Level.Info).pure[IO].asserting(_.head.show should include("DecodingFailure"))
+      logger.getMessages(TestLogger.Level.Warn).pure[IO].asserting(_.head.show should include("DecodingFailure"))
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
