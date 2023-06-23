@@ -47,11 +47,19 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
   import io.renku.jsonld.{JsonLD, JsonLDDecoder}
 
   override def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract.Payload]] =
-    (unzip(payload.value) >>= parse >>= decode(path))
-      .fold(logError, _.pure[F])
+    (unzip(payload.value) >>= parse)
+      .fold(logError(path), _.some.pure[F])
+      .flatMap(decode(path))
 
-  private def decode(path: projects.Path): JsonLD => Either[DecodingFailure, Option[DataExtract.Payload]] =
-    _.cursor.as(decodeList(dataExtract(path))).map(_.headOption)
+  private def decode(path: projects.Path): Option[JsonLD] => F[Option[DataExtract.Payload]] = {
+    case None =>
+      Option.empty[DataExtract.Payload].pure[F]
+    case Some(jsonLD) =>
+      jsonLD.cursor
+        .as(decodeList(dataExtract(path)))
+        .map(_.headOption)
+        .fold(logWarn(path), _.pure[F])
+  }
 
   private def dataExtract(path: projects.Path): JsonLDDecoder[DataExtract.Payload] =
     JsonLDDecoder.entity(CliProject.entityTypes) { cur =>
@@ -68,12 +76,17 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
 
   private def decodingFailure(propName: Property, cur: Cursor) =
     DecodingFailure(
-      DecodingFailure.Reason.CustomReason(show"No '$propName' property in the payload"),
+      DecodingFailure.Reason.CustomReason(show"no '$propName' property in the payload"),
       cur.jsonLD.toJson.hcursor
     )
 
-  private lazy val logError: Throwable => F[Option[DataExtract.Payload]] =
+  private def logError(path: projects.Path): Throwable => F[Option[JsonLD]] =
     Logger[F]
-      .error(_)(show"$categoryName: cannot extract data from the payload")
+      .error(_)(show"$categoryName: cannot process data from the payload for $path")
+      .as(Option.empty[JsonLD])
+
+  private def logWarn(path: projects.Path): DecodingFailure => F[Option[DataExtract.Payload]] =
+    Logger[F]
+      .warn(_)(show"$categoryName: cannot decode the payload for $path")
       .as(Option.empty[DataExtract.Payload])
 }
