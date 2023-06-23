@@ -30,7 +30,8 @@ import org.typelevel.log4cats.Logger
 import skunk.data._
 import skunk.net.protocol.{Describe, Parse}
 import skunk.util.Typer
-import skunk.{Channel, Command, Cursor, PreparedCommand, PreparedQuery, Query, Session, Transaction}
+import skunk._
+import skunk.implicits._
 
 import scala.concurrent.duration._
 
@@ -106,12 +107,11 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
       def lock     = makeSession.map(PostgresLock.exclusive[IO, String](_, interval))
 
       lock.flatMap(_("p1")).use(_ => IO.unit).asserting { _ =>
-        logger.loggedOnly(
+        logger.logged(
           TestLogger.Level.Warn(
             s"Acquiring postgres advisory lock failed! Retry in $interval.",
             exception
-          ),
-          2
+          )
         )
       }
     }
@@ -143,6 +143,21 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   }
 
   "PostgresLock stats" should {
+    "log if writing/removing stats records fail" in withContainers { cnt =>
+      implicit val logger: TestLogger[IO] = TestLogger()
+      session(cnt).use { s =>
+        for {
+          _            <- s.execute(sql"DROP TABLE IF EXISTS kg_lock_stats".command)
+          (_, release) <- makeExclusiveLock(s).run("1").allocated
+          _            <- release
+
+          key = LongKey[String].asLong("1")
+          _ = logger.getMessages(TestLogger.Level.Error).map(_.message) shouldBe List(
+                s"Failed to remove lock stats record for key=$key"
+              )
+        } yield ()
+      }
+    }
 
     "show when a session is waiting for a lock" in withContainers { cnt =>
       implicit val logger: Logger[IO] = TestLogger()
@@ -184,7 +199,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           // releasing the lock so that f1 or f2 grabs it
           // then it must not remove the record from the other one
           _ <- release
-          _ <- IO.sleep(10.millis)
+          _ <- IO.sleep(20.millis)
 
           stats2 <- PostgresLockStats.getStats(s1)
           _ = stats2.waiting.size shouldBe 1

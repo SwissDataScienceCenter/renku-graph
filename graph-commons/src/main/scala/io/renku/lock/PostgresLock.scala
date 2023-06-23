@@ -18,6 +18,7 @@
 
 package io.renku.lock
 
+import cats.Applicative
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
@@ -62,20 +63,31 @@ object PostgresLock {
           case Left(ex) => Logger[F].warn(ex)(s"Acquiring postgres advisory lock failed! Retry in $interval.").as(false)
         }
         .flatTap {
-          case false => PostgresLockStats.recordWaiting(session)(n).attempt
-          case true  => PostgresLockStats.removeWaiting(session)(n).attempt
+          case false =>
+            PostgresLockStats
+              .recordWaiting(session)(n)
+              .attempt
+              .flatMap(ignoreError[F](s"Failed to write lock stats record for key=$n"))
+          case true =>
+            PostgresLockStats
+              .removeWaiting(session)(n)
+              .attempt
+              .flatMap(ignoreError[F](s"Failed to remove lock stats record for key=$n"))
         }
 
     def rel(n: Long): F[Unit] =
-      session
-        .unique(unlockSql)(n)
-        .flatTap(_ => PostgresLockStats.removeWaiting(session)(n).attempt)
-        .void
+      session.unique(unlockSql)(n).void
 
     Lock
       .create(Kleisli(acq), interval)(Kleisli(rel))
       .local(LongKey[A].asLong)
   }
+
+  private def ignoreError[F[_]: Logger: Applicative](msg: => String)(eab: Either[Throwable, Unit]): F[Unit] =
+    eab match {
+      case Right(_) => ().pure[F]
+      case Left(ex) => Logger[F].error(ex)(msg)
+    }
 
   // how to avoid that boilerplate???
   implicit val void: Codec[Void] =
