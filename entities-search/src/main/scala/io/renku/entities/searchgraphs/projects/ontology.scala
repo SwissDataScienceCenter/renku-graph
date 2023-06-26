@@ -26,14 +26,15 @@ import io.renku.jsonld.ontology._
 
 object ProjectSearchInfoOntology {
 
-  val nameProperty:        DataProperty.Def = Project.Ontology.nameProperty
-  val pathProperty:        DataProperty.Def = Project.Ontology.pathProperty
-  val visibilityProperty:  DataProperty.Def = Project.Ontology.visibilityProperty
-  val dateCreatedProperty: DataProperty.Def = Project.Ontology.dateCreatedProperty
-  val keywordsProperty:    DataProperty.Def = Project.Ontology.keywordsProperty
-  val descriptionProperty: DataProperty.Def = Project.Ontology.descriptionProperty
-  val creatorProperty:     Property         = Project.Ontology.creator
-  val imageProperty:       Property         = Project.Ontology.image
+  val nameProperty:         DataProperty.Def = Project.Ontology.nameProperty
+  val pathProperty:         DataProperty.Def = Project.Ontology.pathProperty
+  val visibilityProperty:   DataProperty.Def = Project.Ontology.visibilityProperty
+  val dateCreatedProperty:  DataProperty.Def = Project.Ontology.dateCreatedProperty
+  val dateModifiedProperty: DataProperty.Def = Project.Ontology.dateModifiedProperty
+  val keywordsProperty:     DataProperty.Def = Project.Ontology.keywordsProperty
+  val descriptionProperty:  DataProperty.Def = Project.Ontology.descriptionProperty
+  val creatorProperty:      Property         = Project.Ontology.creator
+  val imageProperty:        Property         = Project.Ontology.image
 
   lazy val typeDef: Type = Type.Def(
     Class(renku / "DiscoverableProject"),
@@ -46,6 +47,7 @@ object ProjectSearchInfoOntology {
       pathProperty,
       visibilityProperty,
       dateCreatedProperty,
+      dateModifiedProperty,
       keywordsProperty,
       descriptionProperty
     )

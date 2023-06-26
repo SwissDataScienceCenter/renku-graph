@@ -39,6 +39,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
         project.path,
         project.visibility,
         project.dateCreated,
+        project.dateModified,
         project.maybeCreator.map(PersonInfo.toPersonInfo),
         project.keywords.toList,
         project.maybeDescription,
