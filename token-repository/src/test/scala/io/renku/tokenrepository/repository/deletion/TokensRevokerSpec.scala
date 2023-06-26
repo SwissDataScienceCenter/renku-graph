@@ -29,18 +29,18 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.tokenrepository.repository.AccessTokenId
 import io.renku.tokenrepository.repository.RepositoryGenerators.accessTokenIds
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 
 import scala.util.Random
 
-class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec with MockFactory {
+class TokensRevokerSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matchers with AsyncMockFactory {
 
-  it should "revoke all found project tokens except from the given one" in new TestCase {
+  it should "revoke all found project tokens except from the given one" in {
 
     val projectId       = projectIds.generateOne
     val userAccessToken = accessTokens.generateOne
@@ -55,12 +55,11 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec wit
 
     tokensToRemove foreach (givenTokenRevoking(projectId, _: AccessTokenId, userAccessToken, returning = ().pure[IO]))
 
-    tokensRevoker.revokeAllTokens(projectId, tokenToLeave.some, userAccessToken).unsafeRunSync() shouldBe ()
-
-    logger.expectNoLogs()
+    tokensRevoker.revokeAllTokens(projectId, tokenToLeave.some, userAccessToken).assertNoException >>
+      logger.expectNoLogs().pure[IO]
   }
 
-  it should "revoke all found project tokens when not token to leave is given one" in new TestCase {
+  it should "revoke all found project tokens when no token to leave is given" in {
 
     val projectId       = projectIds.generateOne
     val userAccessToken = accessTokens.generateOne
@@ -74,12 +73,11 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec wit
 
     tokensToRemove foreach (givenTokenRevoking(projectId, _: AccessTokenId, userAccessToken, returning = ().pure[IO]))
 
-    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).unsafeRunSync() shouldBe ()
-
-    logger.expectNoLogs()
+    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).assertNoException >>
+      logger.expectNoLogs().pure[IO]
   }
 
-  it should "log a warning and succeed when token revoking process fails" in new TestCase {
+  it should "log a warning and succeed when token revoking fails" in {
 
     val projectId       = projectIds.generateOne
     val userAccessToken = accessTokens.generateOne
@@ -87,31 +85,27 @@ class TokensRevokerSpec extends AnyFlatSpec with should.Matchers with IOSpec wit
     val exception = exceptions.generateOne
     givenStreamOfTokensToRevoke(projectId, userAccessToken, returning = Stream.raiseError[IO](exception))
 
-    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).unsafeRunSync() shouldBe ()
-
-    logger.logged(Warn(show"removing old token in GitLab for project $projectId failed", exception))
+    tokensRevoker.revokeAllTokens(projectId, except = None, userAccessToken).assertNoException >>
+      logger.logged(Warn(show"removing old token in GitLab for project $projectId failed", exception)).pure[IO]
   }
 
-  private trait TestCase {
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private lazy val revokeCandidatesFinder = mock[RevokeCandidatesFinder[IO]]
+  private lazy val tokenRevoker           = mock[TokenRevoker[IO]]
+  private lazy val tokensRevoker          = new TokensRevokerImpl[IO](revokeCandidatesFinder, tokenRevoker)
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val revokeCandidatesFinder = mock[RevokeCandidatesFinder[IO]]
-    private val tokenRevoker           = mock[TokenRevoker[IO]]
-    val tokensRevoker                  = new TokensRevokerImpl[IO](revokeCandidatesFinder, tokenRevoker)
+  private def givenTokenRevoking(projectId:   projects.GitLabId,
+                                 tokenId:     AccessTokenId,
+                                 accessToken: AccessToken,
+                                 returning:   IO[Unit]
+  ) = (tokenRevoker.revokeToken _)
+    .expects(tokenId, projectId, accessToken)
+    .returning(returning)
 
-    def givenTokenRevoking(projectId:   projects.GitLabId,
-                           tokenId:     AccessTokenId,
-                           accessToken: AccessToken,
-                           returning:   IO[Unit]
-    ) = (tokenRevoker.revokeToken _)
-      .expects(tokenId, projectId, accessToken)
-      .returning(returning)
-
-    def givenStreamOfTokensToRevoke(projectId:   projects.GitLabId,
-                                    accessToken: AccessToken,
-                                    returning:   Stream[IO, AccessTokenId]
-    ) = (revokeCandidatesFinder.projectAccessTokensStream _)
-      .expects(projectId, accessToken)
-      .returning(returning)
-  }
+  private def givenStreamOfTokensToRevoke(projectId:   projects.GitLabId,
+                                          accessToken: AccessToken,
+                                          returning:   Stream[IO, AccessTokenId]
+  ) = (revokeCandidatesFinder.projectAccessTokensStream _)
+    .expects(projectId, accessToken)
+    .returning(returning)
 }
