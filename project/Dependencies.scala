@@ -6,7 +6,7 @@ object Dependencies {
   object V {
     val ammonite               = "2.4.1"
     val catsCore               = "2.9.0"
-    val catsEffect             = "3.5.0"
+    val catsEffect             = "3.5.1"
     val catsEffectScalaTest    = "1.5.0"
     val circeCore              = "0.14.5"
     val circeGenericExtras     = "0.14.3"
@@ -20,7 +20,7 @@ object Dependencies {
     val log4cats               = "2.6.0"
     val log4jCore              = "2.20.0"
     val logback                = "1.4.8"
-    val luceneQueryParser      = "9.6.0"
+    val luceneQueryParser      = "9.7.0"
     val monocle                = "2.1.0"
     val owlapi                 = "5.5.0"
     val pureconfig             = "0.17.4"
