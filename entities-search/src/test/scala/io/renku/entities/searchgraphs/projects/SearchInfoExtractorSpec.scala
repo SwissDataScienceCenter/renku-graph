@@ -22,29 +22,26 @@ import io.renku.entities.searchgraphs.PersonInfo
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
+class SearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
 
-  "extractSearchInfo" should {
+  it should "convert the given non-modified Datasets to SearchInfo objects" in {
 
-    "convert the given non-modified Datasets to SearchInfo objects" in {
+    val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-
-      SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
-        project.resourceId,
-        project.name,
-        project.path,
-        project.visibility,
-        project.dateCreated,
-        project.dateModified,
-        project.maybeCreator.map(PersonInfo.toPersonInfo),
-        project.keywords.toList,
-        project.maybeDescription,
-        project.images
-      )
-    }
+    SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
+      project.resourceId,
+      project.name,
+      project.path,
+      project.visibility,
+      project.dateCreated,
+      project.dateModified,
+      project.maybeCreator.map(PersonInfo.toPersonInfo),
+      project.keywords.toList,
+      project.maybeDescription,
+      project.images
+    )
   }
 }
