@@ -104,6 +104,6 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
         maybeDesc         <- extract[Option[projects.Description]]("maybeDesc")
         keywords          <- extract[Option[String]]("keywords") >>= toSetOfKeywords
         images            <- extract[Option[String]]("images") >>= toListOfImageUris
-      } yield DataExtract.TS(id, path, name, visibility,maybeDateModified, maybeDesc, keywords, images)
+      } yield DataExtract.TS(id, path, name, visibility, maybeDateModified, maybeDesc, keywords, images)
     }(toOption(show"Multiple projects or values for '$path'"))
 }
