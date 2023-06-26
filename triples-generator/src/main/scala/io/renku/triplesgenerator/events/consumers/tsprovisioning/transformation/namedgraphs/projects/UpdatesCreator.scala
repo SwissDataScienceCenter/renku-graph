@@ -19,19 +19,20 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import cats.syntax.all._
-import io.renku.triplesstore.client.syntax._
-import io.renku.jsonld.syntax._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities._
 import io.renku.graph.model.views.RdfResource
+import io.renku.jsonld.syntax._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.client.syntax._
 
 private trait UpdatesCreator {
-  def prepareUpdates(project:      Project, kgData: ProjectMutableData): List[SparqlQuery]
-  def postUpdates(project:         Project): List[SparqlQuery]
-  def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def prepareUpdates(project:       Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def postUpdates(project:          Project): List[SparqlQuery]
+  def dateCreatedDeletion(project:  Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def dateModifiedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -193,6 +194,20 @@ private object UpdatesCreator extends UpdatesCreator {
           s"""|DELETE { GRAPH $resource { $resource schema:dateCreated ?date } }
               |WHERE  { GRAPH $resource { $resource schema:dateCreated ?date } }
               |""".stripMargin
+        )
+      }
+      .toList
+
+  override def dateModifiedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery] =
+    Option
+      .when(project.dateModified.some != kgData.maybeMaxDateModified) {
+        val resource = project.resourceId.asEntityId
+        SparqlQuery.of(
+          name = "transformation - project dateModified delete",
+          Prefixes of schema -> "schema",
+          sparql"""|DELETE { GRAPH $resource { $resource schema:dateModified ?date } }
+                   |WHERE  { GRAPH $resource { $resource schema:dateModified ?date } }
+                   |""".stripMargin
         )
       }
       .toList

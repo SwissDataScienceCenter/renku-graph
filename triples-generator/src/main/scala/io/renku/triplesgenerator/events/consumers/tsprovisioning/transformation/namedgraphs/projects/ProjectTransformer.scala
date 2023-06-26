@@ -25,8 +25,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -38,9 +38,11 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
     kgProjectFinder:           KGProjectFinder[F],
     updatesCreator:            UpdatesCreator,
     dateCreatedUpdater:        DateCreatedUpdater,
+    dateModifiedUpdater:       DateModifiedUpdater,
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectTransformer[F] {
-  import dateCreatedUpdater._
+  import dateCreatedUpdater.updateDateCreated
+  import dateModifiedUpdater.updateDateModified
   import recoverableErrorsRecovery._
   import updatesCreator._
 
@@ -59,7 +61,7 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
     }
 
   private def transform(project: Project, kgData: ProjectMutableData): (Project, Queries) = (
-    updateDateCreated(kgData) >>> addOtherUpdates(kgData)
+    updateDateCreated(kgData) >>> updateDateModified(kgData) >>> addOtherUpdates(kgData)
   )(project, Queries.empty)
 
   private def addOtherUpdates(kgData: ProjectMutableData): ((Project, Queries)) => (Project, Queries) = {
@@ -69,7 +71,8 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
 }
 
 private[transformation] object ProjectTransformer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectTransformer[F]] = for {
-    kgProjectFinder <- KGProjectFinder[F]
-  } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator, DateCreatedUpdater())
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectTransformer[F]] =
+    KGProjectFinder[F].map(
+      new ProjectTransformerImpl[F](_, UpdatesCreator, DateCreatedUpdater(), DateModifiedUpdater())
+    )
 }
