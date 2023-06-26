@@ -21,7 +21,8 @@ package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 import Generators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectNames}
+import io.renku.generators.Generators.timestamps
+import io.renku.graph.model.RenkuTinyTypeGenerators.{imageUris, projectDescriptions, projectKeywords, projectModifiedDates, projectNames}
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 import org.scalacheck.Gen
@@ -89,6 +90,72 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
         NewValues.empty.copy(maybeVisibility = glData.visibility.some)
+    }
+  }
+
+  "new dateModified" should {
+
+    "be None if ts and gl values are the same" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = projectModifiedDates().generateSome)
+      val glData = glDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be None if ts and gl values are not set - no payload case" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = None)
+      val glData = glDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be None if ts and gl values are the same, irrespectively to the payload value" in {
+
+      val tsData      = tsDataExtracts().generateOne.copy(maybeDateModified = projectModifiedDates().generateOption)
+      val glData      = glDataFrom(tsData)
+      val payloadData = payloadDataFrom(tsData)
+
+      NewValuesCalculator.findNewValues(tsData, glData, payloadData.some) shouldBe NewValues.empty
+    }
+
+    "be None if gl date <= ts date" in {
+
+      val tsDate = projectModifiedDates().generateOne
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = tsDate.some)
+      val glData = glDataFrom(tsData)
+        .copy(maybeDateModified = timestamps(max = tsDate.value).generateAs(projects.DateModified).some)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be gl value if gl date > ts date" in {
+
+      val tsDate = projectModifiedDates().generateOne
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = tsDate.some)
+      val glData =
+        glDataFrom(tsData).copy(maybeDateModified = projectModifiedDates(tsDate.value.plusSeconds(1)).generateSome)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeDateModified = glData.maybeDateModified)
+    }
+
+    "be None if ts is set but gl not" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = projectModifiedDates().generateSome)
+      val glData = glDataFrom(tsData).copy(maybeDateModified = None)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
+    }
+
+    "be gl desc if ts is not set but gl is" in {
+
+      val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = None)
+      val glData = glDataFrom(tsData).copy(maybeDateModified = projectModifiedDates().generateSome)
+
+      NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
+        NewValues.empty.copy(maybeDateModified = glData.maybeDateModified)
     }
   }
 
