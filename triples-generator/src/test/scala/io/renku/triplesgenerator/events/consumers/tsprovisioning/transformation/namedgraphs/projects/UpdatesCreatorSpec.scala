@@ -343,7 +343,7 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, project)
 
       dateCreatedDeletion(project,
-                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateNonEmptyList())
+                          toProjectMutableData(project).copy(createdDates = projectCreatedDates().generateNonEmptyList())
       )
         .runAll(on = projectsDataset)
         .unsafeRunSync()

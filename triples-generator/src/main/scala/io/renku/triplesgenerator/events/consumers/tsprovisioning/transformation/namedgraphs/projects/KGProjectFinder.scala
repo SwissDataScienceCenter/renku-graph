@@ -55,6 +55,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     sparql"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription
              |  (GROUP_CONCAT(DISTINCT ?dateCreated; separator=',') AS ?createdDates)
+             |  (GROUP_CONCAT(DISTINCT ?dateModified; separator=',') AS ?modifiedDates)
              |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
              |  (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
              |WHERE {
@@ -64,6 +65,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |        schema:name ?name;
              |        schema:dateCreated ?dateCreated;
              |        renku:projectVisibility ?visibility.
+             |    OPTIONAL { ?id schema:dateModified ?dateModified }
              |    OPTIONAL { ?id schema:description ?maybeDescription }
              |    OPTIONAL { ?id schema:keywords ?keyword }
              |    OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent }
@@ -89,12 +91,18 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
           .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
           .map(_.getOrElse(Set.empty))
 
-      val toListOfDates: Option[String] => Decoder.Result[Nel[projects.DateCreated]] =
+      val toListOfCreatedDates: Option[String] => Decoder.Result[Nel[projects.DateCreated]] =
         _.toList
           .flatMap(_.split(',').toList.distinct)
           .map(io.circe.Json.fromString)
           .traverse(_.as[projects.DateCreated])
           .flatMap(Nel.fromList(_).toRight(DecodingFailure(show"No dateCreated provided for project $resourceId", Nil)))
+
+      val modifiedDates: Option[String] => Decoder.Result[List[projects.DateModified]] =
+        _.toList
+          .flatMap(_.split(',').toList.distinct)
+          .map(io.circe.Json.fromString)
+          .traverse(_.as[projects.DateModified])
 
       val toListOfImageUris: Option[String] => Decoder.Result[List[ImageUri]] =
         _.map(ImageUri.fromSplitString(','))
@@ -103,7 +111,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
       for {
         name             <- extract[projects.Name]("name")
-        dateCreated      <- extract[Option[String]]("createdDates") >>= toListOfDates
+        createdDates     <- extract[Option[String]]("createdDates") >>= toListOfCreatedDates
+        modifiedDates    <- extract[Option[String]]("modifiedDates") >>= modifiedDates
         maybeParent      <- extract[Option[projects.ResourceId]]("maybeParent")
         visibility       <- extract[projects.Visibility]("visibility")
         maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
@@ -113,7 +122,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         images           <- extract[Option[String]]("images") >>= toListOfImageUris
       } yield ProjectMutableData(
         name,
-        dateCreated,
+        createdDates,
+        modifiedDates,
         maybeParent,
         visibility,
         maybeDescription,

@@ -185,7 +185,7 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery] =
     Option
-      .when(project.dateCreated != kgData.dateCreated.toList.min) {
+      .when(project.dateCreated != kgData.createdDates.toList.min) {
         val resource = project.resourceId.showAs[RdfResource]
         SparqlQuery.of(
           name = "transformation - project dateCreated delete",

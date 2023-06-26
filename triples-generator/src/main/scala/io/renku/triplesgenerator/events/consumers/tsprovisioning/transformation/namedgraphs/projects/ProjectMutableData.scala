@@ -25,7 +25,8 @@ import io.renku.graph.model.{persons, projects}
 
 private[projects] final case class ProjectMutableData(
     name:             projects.Name,
-    dateCreated:      Nel[projects.DateCreated],
+    createdDates:     Nel[projects.DateCreated],
+    modifiedDates:    List[projects.DateModified],
     maybeParentId:    Option[projects.ResourceId],
     visibility:       projects.Visibility,
     maybeDescription: Option[projects.Description],
@@ -36,8 +37,14 @@ private[projects] final case class ProjectMutableData(
 ) {
 
   lazy val earliestDateCreated: projects.DateCreated =
-    dateCreated.toList.min
+    createdDates.toList.min
+
+  lazy val maybeMaxDateModified: Option[projects.DateModified] =
+    modifiedDates match {
+      case Nil      => Option.empty[projects.DateModified]
+      case nonEmpty => Some(nonEmpty.max)
+    }
 
   def selectEarliestDateCreated: ProjectMutableData =
-    copy(dateCreated = Nel.one(earliestDateCreated))
+    copy(createdDates = Nel.one(earliestDateCreated))
 }

@@ -41,7 +41,7 @@ class DateCreatedUpdaterSpec extends AnyWordSpec with should.Matchers with MockF
     "prepare dateCreated deletion queries and do not change the given project " +
       "if project dateCreated on the model is < dateCreated currently in KG" in new TestCase {
         val project = anyProjectEntities.generateOne.to[entities.Project]
-        val kgData = toProjectMutableData(project).copy(dateCreated =
+        val kgData = toProjectMutableData(project).copy(createdDates =
           Nel.of(timestampsNotInTheFuture(butYoungerThan = project.dateCreated.value).generateAs(DateCreated))
         )
 
@@ -59,7 +59,7 @@ class DateCreatedUpdaterSpec extends AnyWordSpec with should.Matchers with MockF
       "if project dateCreated on the model is > dateCreated currently in KG" in new TestCase {
         val project       = anyProjectEntities.generateOne.to[entities.Project]
         val kgDateCreated = timestamps(max = project.dateCreated.value.minusMillis(1)).generateAs(DateCreated)
-        val kgData        = toProjectMutableData(project).copy(dateCreated = Nel.of(kgDateCreated))
+        val kgData        = toProjectMutableData(project).copy(createdDates = Nel.of(kgDateCreated))
 
         val updatedProject -> queries = updater.updateDateCreated(kgData)(project -> initialQueries)
 
