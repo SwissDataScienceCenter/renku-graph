@@ -37,7 +37,7 @@ object SubscriptionFactory {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
-      config: Config,
+      config:      Config,
       tsWriteLock: TsWriteLock[F]
   ): F[(consumers.EventHandler[F], SubscriptionMechanism[F])] =
     EventHandler[F](config, tsWriteLock).map(_ -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName))
