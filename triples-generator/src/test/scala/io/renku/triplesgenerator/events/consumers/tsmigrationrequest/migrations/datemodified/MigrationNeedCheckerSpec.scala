@@ -77,8 +77,7 @@ class MigrationNeedCheckerSpec
       checker.checkMigrationNeeded.asserting(_ shouldBe a[ConditionedMigration.MigrationRequired.No])
   }
 
-  private implicit lazy val logger:    TestLogger[IO]              = TestLogger[IO]()
-  implicit override lazy val ioLogger: Logger[IO]                  = logger
+  implicit override lazy val ioLogger: Logger[IO]                  = TestLogger[IO]()
   private implicit val timeRecorder:   SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
   private lazy val checker = new MigrationNeedCheckerImpl[IO](TSClient[IO](projectsDSConnectionInfo))
 }
