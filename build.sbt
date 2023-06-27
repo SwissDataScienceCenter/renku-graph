@@ -177,6 +177,13 @@ lazy val triplesGenerator = project
   .in(file("triples-generator"))
   .withId("triples-generator")
   .settings(commonSettings)
+  .settings(
+    reStart / envVars := Map(
+      "JENA_RENKU_PASSWORD" -> "renku",
+      "JENA_ADMIN_PASSWORD" -> "renku",
+      "RENKU_URL"           -> "http://localhost:3000"
+    )
+  )
   .dependsOn(
     triplesGeneratorApi % "compile->compile; test->test",
     entitiesSearch,
