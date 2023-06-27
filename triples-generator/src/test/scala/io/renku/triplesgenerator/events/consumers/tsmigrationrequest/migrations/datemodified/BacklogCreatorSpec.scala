@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 package datemodified
 
 import cats.effect.IO
-import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
@@ -49,7 +48,8 @@ class BacklogCreatorSpec
     with ProjectsDataset
     with MigrationsDataset
     with SearchInfoDatasets
-    with AsyncMockFactory {
+    with AsyncMockFactory
+    with TSTooling {
 
   private val pageSize = 50
 
@@ -121,47 +121,6 @@ class BacklogCreatorSpec
                  |""".stripMargin
       )
     ).map(_.flatMap(_.get("path").map(projects.Path)))
-
-  private def deleteModifiedDates(projects: List[Project]): IO[Unit] =
-    projects.traverse_(p => deleteModifiedDates(p.resourceId))
-
-  private def deleteModifiedDates(id: projects.ResourceId): IO[Unit] =
-    deleteProjectDateModified(id) >> deleteProjectsDateModified(id)
-
-  private def deleteProjectDateModified(id: projects.ResourceId): IO[Unit] =
-    runUpdate(
-      on = projectsDataset,
-      SparqlQuery.ofUnsafe(
-        "test dateModified delete from Project",
-        Prefixes of schema -> "schema",
-        sparql"""|DELETE {
-                 |  GRAPH ?id { ?id schema:dateModified ?dm }
-                 |}
-                 |WHERE {
-                 |  BIND (${id.asEntityId} AS ?id)
-                 |  GRAPH ?id { ?id schema:dateModified ?dm }
-                 |}
-                 |""".stripMargin
-      )
-    )
-
-  private def deleteProjectsDateModified(id: projects.ResourceId): IO[Unit] =
-    runUpdate(
-      on = projectsDataset,
-      SparqlQuery.ofUnsafe(
-        "test dateModified delete from Project",
-        Prefixes of schema -> "schema",
-        sparql"""|DELETE {
-                 |  GRAPH ?gid { ?id schema:dateModified ?dm }
-                 |}
-                 |WHERE {
-                 |  BIND (${id.asEntityId} AS ?id)
-                 |  BIND (${GraphClass.Projects.id} AS ?gid)
-                 |  GRAPH ?gid { ?id schema:dateModified ?dm }
-                 |}
-                 |""".stripMargin
-      )
-    )
 
   private def provision(project: Project): IO[Unit] =
     provision(List(project))
