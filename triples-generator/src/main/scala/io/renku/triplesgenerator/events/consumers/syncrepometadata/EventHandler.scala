@@ -28,6 +28,7 @@ import io.renku.events.{CategoryName, consumers}
 import io.renku.lock.syntax._
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
@@ -59,7 +60,7 @@ private object EventHandler {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
-      config: Config,
+      config:      Config,
       tsWriteLock: TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
