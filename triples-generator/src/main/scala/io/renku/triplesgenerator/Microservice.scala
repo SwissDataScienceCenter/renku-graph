@@ -42,6 +42,7 @@ import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
+import io.renku.triplesgenerator.metrics.MetricsService
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
@@ -83,6 +84,9 @@ object Microservice extends IOMicroservice {
     implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
 
     _ <- dbSessionPool.session.use(PostgresLockStats.ensureStatsTable[IO])
+
+    metricsService <- MetricsService[IO](dbSessionPool)
+    _              <- metricsService.collectEvery(5.minutes).start
 
     tsWriteLock = TgLockDB.createLock[IO, projects.Path](dbSessionPool, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
