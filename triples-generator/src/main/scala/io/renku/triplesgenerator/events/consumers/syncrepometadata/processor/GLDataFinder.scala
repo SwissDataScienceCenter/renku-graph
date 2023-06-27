@@ -63,6 +63,7 @@ private class GLDataFinderImpl[F[_]: Async: GitLabClient: AccessTokenFinder] ext
     (cursor.downField("path_with_namespace").as[projects.Path],
      cursor.downField("name").as[projects.Name],
      cursor.downField("visibility").as[projects.Visibility],
+     cursor.downField("updated_at").as[Option[projects.DateModified]],
      cursor.downField("description").as[Option[projects.Description]],
      cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten),
      cursor.downField("avatar_url").as[Option[ImageUri]]

@@ -35,7 +35,10 @@ object ProcessingRecoverableError {
   }
 }
 
-sealed abstract class ProcessingNonRecoverableError(message: String, cause: Throwable) extends Exception(message, cause)
+sealed abstract class ProcessingNonRecoverableError(message: String, cause: Throwable)
+    extends Exception(message, cause) {
+  lazy val widen: ProcessingNonRecoverableError = this
+}
 object ProcessingNonRecoverableError {
 
   final case class MalformedRepository(message: String, cause: Throwable)

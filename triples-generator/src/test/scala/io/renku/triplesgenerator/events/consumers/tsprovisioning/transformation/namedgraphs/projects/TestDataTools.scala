@@ -27,6 +27,7 @@ private object TestDataTools {
   def toProjectMutableData(project: entities.Project): ProjectMutableData = ProjectMutableData(
     project.name,
     Nel.of(project.dateCreated),
+    List(project.dateModified),
     findParent(project),
     project.visibility,
     project.maybeDescription,

@@ -53,6 +53,7 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
     (
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
         newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
+        newValues.maybeDateModified.map(dateModifiedUpdates(tsData.id, _)) combine
         newValues.maybeDesc.map(descUpdates(tsData.id, _)) combine
         newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _)) combine
         newValues.maybeImages.map(imagesUpdates(tsData.id, _))
@@ -94,6 +95,39 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
 
   private def eventUpdate(projectPath: projects.Path): UpdateCommand =
     UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(projectPath))
+
+  private def dateModifiedUpdates(id: projects.ResourceId, newValue: projects.DateModified): List[UpdateCommand] = List(
+    dateModifiedInProjectUpdate(id, newValue),
+    dateModifiedInProjectsUpdate(id, newValue)
+  ).map(UpdateCommand.Sparql)
+
+  private def dateModifiedInProjectUpdate(id: projects.ResourceId, newValue: projects.DateModified) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update dateModified in Project",
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE { GRAPH ?id { ?id schema:dateModified ?maybeDateModified } }
+               |INSERT { GRAPH ?id { ?id schema:dateModified ${newValue.asObject} } }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ?id {
+               |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
+               |  }
+               |}""".stripMargin
+    )
+
+  private def dateModifiedInProjectsUpdate(id: projects.ResourceId, newValue: projects.DateModified) =
+    SparqlQuery.ofUnsafe(
+      show"$categoryName: update dateModified in Projects",
+      Prefixes of schema -> "schema",
+      sparql"""|DELETE { GRAPH ${GraphClass.Projects.id} { ?id schema:dateModified ?maybeDateModified } }
+               |INSERT { GRAPH ${GraphClass.Projects.id} { ?id schema:dateModified ${newValue.asObject} } }
+               |WHERE {
+               |  BIND (${id.asEntityId} AS ?id)
+               |  GRAPH ${GraphClass.Projects.id} {
+               |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
+               |  }
+               |}""".stripMargin
+    )
 
   private def descUpdates(id: projects.ResourceId, newValue: Option[projects.Description]): List[UpdateCommand] = List(
     descInProjectUpdate(id, newValue),

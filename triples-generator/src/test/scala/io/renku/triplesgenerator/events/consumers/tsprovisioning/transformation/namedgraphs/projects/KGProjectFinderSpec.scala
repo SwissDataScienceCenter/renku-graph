@@ -29,12 +29,12 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGProjectFinderSpec
-    extends AsyncWordSpec
+    extends AsyncFlatSpec
     with CustomAsyncIOSpec
     with should.Matchers
     with EntitiesGenerators
@@ -44,39 +44,36 @@ class KGProjectFinderSpec
     with InMemoryJenaForSpec
     with ProjectsDataset {
 
-  "find" should {
+  forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+    it should show"return project's mutable properties for a given ResourceId - project ${project.name}" in {
+      upload(to = projectsDataset, project)
 
-    forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-      show"return project's mutable properties for a given ResourceId - project ${project.name}" in {
-        upload(to = projectsDataset, project)
+      val expected = toProjectMutableData(project).some
+      finder
+        .find(project.resourceId)
+        .asserting(_.map(_.selectEarliestDateCreated) shouldMatchTo expected)
+    }
+  }
 
-        val expected = toProjectMutableData(project).some
-        finder
-          .find(project.resourceId)
-          .asserting(_.map(_.selectEarliestDateCreated) shouldMatchTo expected)
+  forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+    it should show"return no keywords if there are none for the given project - project ${project.name}" in {
+      val projectNoKeywords = project match {
+        case p: entities.RenkuProject.WithParent       => p.copy(keywords = Set.empty)
+        case p: entities.RenkuProject.WithoutParent    => p.copy(keywords = Set.empty)
+        case p: entities.NonRenkuProject.WithParent    => p.copy(keywords = Set.empty)
+        case p: entities.NonRenkuProject.WithoutParent => p.copy(keywords = Set.empty)
       }
+
+      upload(to = projectsDataset, projectNoKeywords)
+
+      finder
+        .find(project.resourceId)
+        .asserting(_ shouldMatchTo toProjectMutableData(project).copy(keywords = Set.empty).some)
     }
+  }
 
-    forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-      show"return no keywords if there are none for the given project - project ${project.name}" in {
-        val projectNoKeywords = project match {
-          case p: entities.RenkuProject.WithParent       => p.copy(keywords = Set.empty)
-          case p: entities.RenkuProject.WithoutParent    => p.copy(keywords = Set.empty)
-          case p: entities.NonRenkuProject.WithParent    => p.copy(keywords = Set.empty)
-          case p: entities.NonRenkuProject.WithoutParent => p.copy(keywords = Set.empty)
-        }
-
-        upload(to = projectsDataset, projectNoKeywords)
-
-        finder
-          .find(project.resourceId)
-          .asserting(_ shouldMatchTo toProjectMutableData(project).copy(keywords = Set.empty).some)
-      }
-    }
-
-    "return no None if there's no Project with the given resourceId" in {
-      finder.find(projectResourceIds.generateOne).asserting(_ shouldBe None)
-    }
+  it should "return no None if there's no Project with the given resourceId" in {
+    finder.find(projectResourceIds.generateOne).asserting(_ shouldBe None)
   }
 
   private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()

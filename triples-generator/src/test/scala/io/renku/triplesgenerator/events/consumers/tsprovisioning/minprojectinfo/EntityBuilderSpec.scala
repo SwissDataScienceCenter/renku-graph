@@ -35,24 +35,27 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.TryValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import projectinfo.ProjectInfoFinder
 import projects._
 
 import scala.language.reflectiveCalls
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 class EntityBuilderSpec
     extends AnyWordSpec
     with MockFactory
     with should.Matchers
+    with TryValues
     with EntitiesGenerators
     with ModelOps {
 
   "buildEntity" should {
 
     "find project info in GitLab and build the Project entity based on the info" in new TestCase {
+
       val projectInfo = gitLabProjectInfos.generateOne
 
       givenFindProjectInfo(projectInfo.path)
@@ -60,36 +63,56 @@ class EntityBuilderSpec
 
       entityBuilder
         .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.path)))
-        .value shouldBe projectInfo.to[entities.Project].asRight.pure[Try]
+        .value
+        .success
+        .value shouldBe projectInfo.to[entities.Project].asRight
     }
 
     "fail if there's no project info found for the project" in new TestCase {
+
       val event = minProjectInfoEvents.generateOne
 
       givenFindProjectInfo(event.project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](Option.empty[GitLabProjectInfo]))
 
-      val Failure(error) = entityBuilder.buildEntity(event).value
+      val error = entityBuilder.buildEntity(event).value.failure.exception
 
       error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       error.getMessage shouldBe show"${event.project} not found in GitLab"
     }
 
     "fail if fetching the project info fails" in new TestCase {
+
       val event = minProjectInfoEvents.generateOne
 
       val exception = exceptions.generateOne
       givenFindProjectInfo(event.project.path)
         .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]))
 
-      entityBuilder.buildEntity(event).value shouldBe Failure(exception)
+      entityBuilder.buildEntity(event).value.failure.exception shouldBe exception
+    }
+
+    "fail if converting GL info to Project fails" in new TestCase {
+
+      val projectInfo = {
+        val gl = gitLabProjectInfos.generateOne
+        gl.copy(dateModified = timestamps(max = gl.dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified))
+      }
+      givenFindProjectInfo(projectInfo.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectInfo.some))
+
+      entityBuilder
+        .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.path)))
+        .value
+        .failure
+        .exception shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
     }
   }
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectInfoFinder = mock[ProjectInfoFinder[Try]]
-    val entityBuilder     = new EntityBuilderImpl[Try](projectInfoFinder, renkuUrl)
+    private val projectInfoFinder = mock[ProjectInfoFinder[Try]]
+    val entityBuilder             = new EntityBuilderImpl[Try](projectInfoFinder)
 
     def givenFindProjectInfo(projectPath: projects.Path) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
@@ -109,6 +132,7 @@ class EntityBuilderSpec
                            name,
                            path,
                            dateCreated,
+                           dateModified,
                            maybeDescription,
                            maybeCreator,
                            keywords,
@@ -123,6 +147,7 @@ class EntityBuilderSpec
         name,
         maybeDescription,
         dateCreated,
+        dateModified,
         maybeCreator.map(toPerson),
         visibility,
         keywords,
@@ -134,6 +159,7 @@ class EntityBuilderSpec
                            name,
                            path,
                            dateCreated,
+                           dateModified,
                            maybeDescription,
                            maybeCreator,
                            keywords,
@@ -148,6 +174,7 @@ class EntityBuilderSpec
         name,
         maybeDescription,
         dateCreated,
+        dateModified,
         maybeCreator.map(toPerson),
         visibility,
         keywords,

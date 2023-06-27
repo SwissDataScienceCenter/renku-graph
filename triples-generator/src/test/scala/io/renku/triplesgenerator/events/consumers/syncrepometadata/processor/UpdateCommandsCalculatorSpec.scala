@@ -41,6 +41,8 @@ import org.scalatest.matchers.should
 import org.scalatest.{OptionValues, Succeeded}
 import org.typelevel.log4cats.Logger
 
+import java.time.Instant
+
 class UpdateCommandsCalculatorSpec
     extends AsyncFlatSpec
     with CustomAsyncIOSpec
@@ -104,6 +106,35 @@ class UpdateCommandsCalculatorSpec
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+    } yield Succeeded
+  }
+
+  it should "create upsert queries when there's a new dateModified" in {
+
+    val project = anyProjectEntities.generateOne.to[entities.Project]
+
+    val tsData           = tsDataFrom(project)
+    val glData           = glDataExtracts(project.path).generateOne
+    val maybePayloadData = payloadDataExtracts(project.path).generateOption
+
+    val newValue = projectModifiedDates(project.dateModified.value).generateSome
+    givenNewValuesFinding(tsData,
+                          glData,
+                          maybePayloadData,
+                          returning = NewValues.empty.copy(maybeDateModified = newValue)
+    )
+    val updatedTsData = tsData.copy(maybeDateModified = newValue)
+
+    for {
+      _ <- provisionProject(project).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
+
+      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+
+      _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
+      _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
     } yield Succeeded
   }
 
@@ -347,7 +378,7 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Project fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
+        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
@@ -356,6 +387,7 @@ class UpdateCommandsCalculatorSpec
                  |    ?id renku:projectPath ?path;
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
+                 |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?id schema:keywords ?keyword }
                  |    OPTIONAL {
@@ -366,7 +398,7 @@ class UpdateCommandsCalculatorSpec
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
+                 |GROUP BY ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -377,7 +409,7 @@ class UpdateCommandsCalculatorSpec
       SparqlQuery.ofUnsafe(
         "UpdateCommandsCalculator Projects fetch",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDesc
+        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
@@ -386,6 +418,7 @@ class UpdateCommandsCalculatorSpec
                  |    ?id renku:projectPath ?path;
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility.
+                 |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?id schema:keywords ?keyword }
                  |    OPTIONAL {
@@ -396,7 +429,7 @@ class UpdateCommandsCalculatorSpec
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?maybeDesc
+                 |GROUP BY ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
                  |""".stripMargin
       )
     ).map(toDataExtract).flatMap(toOptionOrFail)
@@ -407,6 +440,7 @@ class UpdateCommandsCalculatorSpec
        row.get("path").map(projects.Path),
        row.get("name").map(projects.Name),
        row.get("visibility").map(projects.Visibility),
+       Some(row.get("maybeDateModified").map(Instant.parse).map(projects.DateModified)),
        Some(row.get("maybeDesc").map(projects.Description)),
        Some(toSetOfKeywords(row.get("keywords"))),
        Some(toListOfImages(row.get("images")))

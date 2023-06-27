@@ -98,14 +98,15 @@ trait InMemoryJena {
       .map { case (connectionInfoFactory, _) => connectionInfoFactory(fusekiUrl).datasetName }
       .foreach(clear)
 
+  def clearIO(datasetName: DatasetName): IO[Unit] =
+    queryRunnerFor(datasetName) >>= {
+      _.runUpdate(
+        SparqlQuery.of("delete all data", "CLEAR ALL")
+      )
+    }
+
   def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit =
-    queryRunnerFor(dataset)
-      .flatMap {
-        _.runUpdate(
-          SparqlQuery.of("delete all data", "CLEAR ALL")
-        )
-      }
-      .unsafeRunSync()
+    clearIO(dataset).unsafeRunSync()
 
   def uploadIO(to: DatasetName, graphs: Graph*): IO[Unit] =
     graphs

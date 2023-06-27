@@ -24,45 +24,56 @@ import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery
 
 private sealed trait DataExtract {
-  val path:      projects.Path
-  val name:      projects.Name
-  val maybeDesc: Option[projects.Description]
-  val keywords:  Set[projects.Keyword]
+  val path:              projects.Path
+  val name:              projects.Name
+  val maybeDateModified: Option[projects.DateModified]
+  val maybeDesc:         Option[projects.Description]
+  val keywords:          Set[projects.Keyword]
 }
 
 private object DataExtract {
-  final case class TS(id:         projects.ResourceId,
-                      path:       projects.Path,
-                      name:       projects.Name,
-                      visibility: projects.Visibility,
-                      maybeDesc:  Option[projects.Description],
-                      keywords:   Set[projects.Keyword],
-                      images:     List[ImageUri]
+  final case class TS(id:                projects.ResourceId,
+                      path:              projects.Path,
+                      name:              projects.Name,
+                      visibility:        projects.Visibility,
+                      maybeDateModified: Option[projects.DateModified],
+                      maybeDesc:         Option[projects.Description],
+                      keywords:          Set[projects.Keyword],
+                      images:            List[ImageUri]
   ) extends DataExtract
-  final case class GL(path:       projects.Path,
-                      name:       projects.Name,
-                      visibility: projects.Visibility,
-                      maybeDesc:  Option[projects.Description],
-                      keywords:   Set[projects.Keyword],
-                      maybeImage: Option[ImageUri]
+  final case class GL(path:              projects.Path,
+                      name:              projects.Name,
+                      visibility:        projects.Visibility,
+                      maybeDateModified: Option[projects.DateModified],
+                      maybeDesc:         Option[projects.Description],
+                      keywords:          Set[projects.Keyword],
+                      maybeImage:        Option[ImageUri]
   ) extends DataExtract
   final case class Payload(path:      projects.Path,
                            name:      projects.Name,
                            maybeDesc: Option[projects.Description],
                            keywords:  Set[projects.Keyword],
                            images:    List[ImageUri]
-  ) extends DataExtract
+  ) extends DataExtract {
+    val maybeDateModified: Option[projects.DateModified] = None
+  }
 }
 
-private final case class NewValues(maybeName:       Option[projects.Name],
-                                   maybeVisibility: Option[projects.Visibility],
-                                   maybeDesc:       Option[Option[projects.Description]],
-                                   maybeKeywords:   Option[Set[projects.Keyword]],
-                                   maybeImages:     Option[List[Image]]
+private final case class NewValues(maybeName:         Option[projects.Name],
+                                   maybeVisibility:   Option[projects.Visibility],
+                                   maybeDateModified: Option[projects.DateModified],
+                                   maybeDesc:         Option[Option[projects.Description]],
+                                   maybeKeywords:     Option[Set[projects.Keyword]],
+                                   maybeImages:       Option[List[Image]]
 )
 private object NewValues {
-  val empty: NewValues =
-    NewValues(maybeName = None, maybeVisibility = None, maybeDesc = None, maybeKeywords = None, maybeImages = None)
+  val empty: NewValues = NewValues(maybeName = None,
+                                   maybeVisibility = None,
+                                   maybeDateModified = None,
+                                   maybeDesc = None,
+                                   maybeKeywords = None,
+                                   maybeImages = None
+  )
 }
 
 private sealed trait UpdateCommand extends Product

@@ -26,7 +26,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.images.Image
-import io.renku.graph.model.projects.{DateCreated, Description, Keyword, ResourceId}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, Keyword, ResourceId}
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 
 private[entities] object CliProjectConverter {
@@ -51,13 +51,15 @@ private[entities] object CliProjectConverter {
       case s if s.isEmpty => gitLabInfo.keywords
       case s              => s
     }
-    val dateCreated = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
-    val gitlabImage = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.path), _))
-    val all         = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
+    val dateCreated  = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
+    val dateModified = (gitLabInfo.dateModified :: cliProject.dateModified :: Nil).max
+    val gitlabImage  = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.path), _))
+    val all          = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
     all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
         gitLabInfo,
         dateCreated,
+        dateModified,
         descr,
         cliProject.agentVersion,
         keywords,
@@ -74,13 +76,14 @@ private[entities] object CliProjectConverter {
     }
   }
 
-  class DecodingDependencyLinks(allPlans: List[Plan]) extends DependencyLinks {
+  private class DecodingDependencyLinks(allPlans: List[Plan]) extends DependencyLinks {
     override def findStepPlan(planId: plans.ResourceId): Option[StepPlan] =
       collectStepPlans(allPlans).find(_.resourceId == planId)
   }
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          dateCreated:      DateCreated,
+                         dateModified:     DateModified,
                          maybeDescription: Option[Description],
                          maybeAgent:       Option[CliVersion],
                          keywords:         Set[Keyword],
@@ -101,6 +104,7 @@ private[entities] object CliProjectConverter {
             maybeDescription,
             agent,
             dateCreated,
+            dateModified,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             keywords,
@@ -122,6 +126,7 @@ private[entities] object CliProjectConverter {
             maybeDescription,
             agent,
             dateCreated,
+            dateModified,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             keywords,
@@ -134,13 +139,14 @@ private[entities] object CliProjectConverter {
           )
           .widen[Project]
       case (None, None, Some(parentPath)) =>
-        NonRenkuProject
-          .WithParent(
+        NonRenkuProject.WithParent
+          .from(
             ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,
+            dateModified,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             keywords,
@@ -148,23 +154,22 @@ private[entities] object CliProjectConverter {
             parentResourceId = ResourceId(parentPath),
             images
           )
-          .validNel[String]
           .widen[Project]
       case (None, None, None) =>
-        NonRenkuProject
-          .WithoutParent(
+        NonRenkuProject.WithoutParent
+          .from(
             ResourceId(gitLabInfo.path),
             gitLabInfo.path,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,
+            dateModified,
             maybeCreator(allJsonLdPersons)(gitLabInfo),
             gitLabInfo.visibility,
             keywords,
             members(allJsonLdPersons)(gitLabInfo),
             images
           )
-          .validNel[String]
           .widen[Project]
       case (maybeAgent, maybeVersion, maybeParent) =>
         Validated.invalidNel[String, Project](

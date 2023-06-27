@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
+import cats.syntax.all._
 import io.renku.graph.model.images.Image
 
 private trait NewValuesCalculator {
@@ -35,6 +36,7 @@ private object NewValuesCalculator extends NewValuesCalculator {
   ): NewValues = NewValues(
     maybeNewName(tsData, glData, maybePayloadData),
     Option.when(tsData.visibility != glData.visibility)(glData.visibility),
+    maybeNewDateModified(tsData, glData),
     maybeNewDesc(tsData, glData, maybePayloadData),
     maybeNewKeywords(tsData, glData, maybePayloadData),
     maybeNewImages(tsData, glData, maybePayloadData)
@@ -47,6 +49,13 @@ private object NewValuesCalculator extends NewValuesCalculator {
     val potentiallyNewName = maybePayloadData.getOrElse(glData).name
     Option.when(tsData.name != potentiallyNewName)(potentiallyNewName)
   }
+
+  private def maybeNewDateModified(tsData: DataExtract.TS, glData: DataExtract.GL) =
+    tsData.maybeDateModified -> glData.maybeDateModified match {
+      case Some(tsDate) -> Some(glDate) if tsDate < glDate => glDate.some
+      case None -> Some(glDate)                            => glDate.some
+      case _                                               => None
+    }
 
   private def maybeNewDesc(tsData:           DataExtract.TS,
                            glData:           DataExtract.GL,

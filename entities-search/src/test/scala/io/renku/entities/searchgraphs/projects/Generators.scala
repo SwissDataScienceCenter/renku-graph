@@ -31,10 +31,21 @@ private object Generators {
     name         <- projectNames
     path         <- projectPaths
     createdDate  <- projectCreatedDates()
+    modifiedDate <- projectModifiedDates(createdDate.value)
     visibility   <- projectVisibilities
     maybeCreator <- searchgraphs.Generators.personInfos.toGeneratorOfOptions
     keywords     <- projectKeywords.toGeneratorOfList(max = 2)
     maybeDesc    <- projectDescriptions.toGeneratorOfOptions
     images       <- imageUris.toGeneratorOfList(max = 2).map(convertImageUris(id.asEntityId))
-  } yield ProjectSearchInfo(id, name, path, visibility, createdDate, maybeCreator, keywords, maybeDesc, images.toList)
+  } yield ProjectSearchInfo(id,
+                            name,
+                            path,
+                            visibility,
+                            createdDate,
+                            modifiedDate,
+                            maybeCreator,
+                            keywords,
+                            maybeDesc,
+                            images
+  )
 }

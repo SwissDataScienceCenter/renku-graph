@@ -29,6 +29,7 @@ private final case class ProjectSearchInfo(id:               projects.ResourceId
                                            path:             projects.Path,
                                            visibility:       projects.Visibility,
                                            dateCreated:      projects.DateCreated,
+                                           dateModified:     projects.DateModified,
                                            maybeCreator:     Option[PersonInfo],
                                            keywords:         List[projects.Keyword],
                                            maybeDescription: Option[projects.Description],
@@ -38,13 +39,24 @@ private final case class ProjectSearchInfo(id:               projects.ResourceId
 private object ProjectSearchInfo {
 
   implicit val show: Show[ProjectSearchInfo] = Show.show {
-    case ProjectSearchInfo(id, name, path, visibility, dateCreated, maybeCreator, keywords, maybeDescription, images) =>
+    case ProjectSearchInfo(id,
+                           name,
+                           path,
+                           visibility,
+                           dateCreated,
+                           dateModified,
+                           maybeCreator,
+                           keywords,
+                           maybeDescription,
+                           images
+        ) =>
       List(
         show"id = $id".some,
         show"name = $name".some,
         show"path = $path".some,
         show"visibility = $visibility".some,
         show"dateCreated = $dateCreated".some,
+        show"dateModified = $dateModified".some,
         maybeCreator.map(creator => show"creator = $creator"),
         keywords match {
           case Nil => None

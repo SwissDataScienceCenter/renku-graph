@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
@@ -54,6 +55,7 @@ class TSDataFinderSpec
               project.path,
               project.name,
               project.visibility,
+              project.dateModified.some,
               project.maybeDescription,
               project.keywords,
               project.images.sortBy(_.position).map(_.uri)

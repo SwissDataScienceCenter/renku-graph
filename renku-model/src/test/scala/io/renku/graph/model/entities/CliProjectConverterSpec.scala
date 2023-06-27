@@ -16,32 +16,27 @@
  * limitations under the License.
  */
 
-package io.renku.entities.searchgraphs.projects
+package io.renku.graph.model.entities
 
-import io.renku.entities.searchgraphs.PersonInfo
+import io.renku.cli.model.CliProject
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
-class SearchInfoExtractorSpec extends AnyFlatSpec with should.Matchers {
+class CliProjectConverterSpec extends AnyFlatSpec with should.Matchers with EitherValues {
 
-  it should "convert the given non-modified Datasets to SearchInfo objects" in {
+  it should "take the max of GL and CLI Project's dateModified" in {
 
-    val project = anyProjectEntities.generateOne.to[entities.Project]
+    val glProject   = gitLabProjectInfos.generateOne
+    val testProject = projectEntities(anyVisibility, cliShapedPersons).generateOne
+    val cliProject  = testProject.to[CliProject]
 
-    SearchInfoExtractor.extractSearchInfo(project) shouldBe ProjectSearchInfo(
-      project.resourceId,
-      project.name,
-      project.path,
-      project.visibility,
-      project.dateCreated,
-      project.dateModified,
-      project.maybeCreator.map(PersonInfo.toPersonInfo),
-      project.keywords.toList,
-      project.maybeDescription,
-      project.images
-    )
+    CliProjectConverter
+      .fromCli(cliProject, allPersons = Set.empty, glProject)
+      .toEither
+      .value
+      .dateModified shouldBe List(glProject.dateModified, cliProject.dateModified).max
   }
 }

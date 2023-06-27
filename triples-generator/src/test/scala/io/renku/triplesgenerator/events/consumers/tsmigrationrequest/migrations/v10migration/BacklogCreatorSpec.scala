@@ -22,8 +22,8 @@ package v10migration
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
@@ -32,9 +32,9 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import io.renku.triplesstore.client.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -84,19 +84,23 @@ class BacklogCreatorSpec
       val migrationDate = timestampsNotInTheFuture.generateOne
       givenMigrationDateFinding(returning = migrationDate.pure[IO])
 
-      val v9Project1 = anyRenkuProjectEntities
-        .modify(replaceProjectDateCreated(timestamps(max = migrationDate).generateAs(projects.DateCreated)))
-        .map(setSchema(v9))
-        .generateOne
+      val v9Project1 = {
+        val dateCreated = timestamps(max = migrationDate).generateAs(projects.DateCreated)
+        anyRenkuProjectEntities
+          .modify(replaceProjectDateCreated(dateCreated))
+          .modify(replaceProjectDateModified(projectModifiedDates(dateCreated.value).generateOne))
+          .map(setSchema(v9))
+          .generateOne
+      }
       val v10Project = anyRenkuProjectEntities.map(setSchema(v10)).generateOne
-      val v9Project2 = anyRenkuProjectEntities
-        .modify(
-          replaceProjectDateCreated(
-            timestampsNotInTheFuture(butYoungerThan = migrationDate).generateAs(projects.DateCreated)
-          )
-        )
-        .map(setSchema(v9))
-        .generateOne
+      val v9Project2 = {
+        val dateCreated = timestampsNotInTheFuture(butYoungerThan = migrationDate).generateAs(projects.DateCreated)
+        anyRenkuProjectEntities
+          .modify(replaceProjectDateCreated(dateCreated))
+          .modify(replaceProjectDateModified(projectModifiedDates(dateCreated.value).generateOne))
+          .map(setSchema(v9))
+          .generateOne
+      }
 
       fetchBacklogProjects shouldBe Nil
 

@@ -140,6 +140,7 @@ class GLDataFinderSpec
       "name":                ${de.name},
       "path_with_namespace": ${de.path},
       "visibility":          ${de.visibility},
+      "updated_at":          ${de.maybeDateModified},
       "description":         ${de.maybeDesc},
       "topics":              ${de.keywords},
       "avatar_url":          ${de.maybeImage}
