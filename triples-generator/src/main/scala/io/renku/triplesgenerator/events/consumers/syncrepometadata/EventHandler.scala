@@ -36,7 +36,7 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import processor.EventProcessor
 
-private class EventHandler[F[_]: MonadCancelThrow: Logger](
+private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     eventDecoder:              EventDecoder,

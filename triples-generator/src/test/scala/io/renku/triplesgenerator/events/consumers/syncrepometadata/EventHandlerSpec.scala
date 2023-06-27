@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers.syncrepometadata
 
-import cats.effect.IO
+import cats.data.Kleisli
+import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
@@ -27,6 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.lock.Lock
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.syncrepometadata.processor.EventProcessor
@@ -34,29 +36,48 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-//TODO
 class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
 
   "handlingDefinition.decode" should {
 
     "be EventDecoder.decode" in {
+      val tc = new TestCase
 
-      expectTSReadinessCheckerCall
+      tc.expectTSReadinessCheckerCall
 
-      handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
+      tc.handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
     }
   }
 
   "handlingDefinition.process" should {
 
     "be the EventProcessor.process" in {
-
-      expectTSReadinessCheckerCall
+      val tc = new TestCase
+      tc.expectTSReadinessCheckerCall
 
       syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-        (eventProcessor.process _).expects(event).returns(().pure[IO])
+        (tc.eventProcessor.process _).expects(event).returns(().pure[IO])
 
-        handler.createHandlingDefinition().process(event).asserting(_ shouldBe ())
+        tc.handler.createHandlingDefinition().process(event).assertNoException
+      }
+    }
+
+    "lock while executing" in {
+      val test = Ref.unsafe[IO, Int](0)
+      val tc = new TestCase {
+        override val tsWriteLock: TsWriteLock[IO] =
+          Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+      }
+
+      tc.expectTSReadinessCheckerCall
+
+      syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
+        (tc.eventProcessor.process _).expects(event).returns(().pure[IO])
+
+        tc.handler.createHandlingDefinition().process(event).map { r =>
+          r                        shouldBe ()
+          test.get.unsafeRunSync() shouldBe 2
+        }
       }
     }
   }
@@ -64,40 +85,44 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   "handlingDefinition.precondition" should {
 
     "be the TSReadinessForEventsChecker.verifyTSReady" in {
+      val tc = new TestCase
+      tc.expectTSReadinessCheckerCall
 
-      expectTSReadinessCheckerCall
-
-      handler.createHandlingDefinition().precondition.asserting(_ shouldBe readinessCheckerResult)
+      tc.handler.createHandlingDefinition().precondition.asserting(_ shouldBe tc.readinessCheckerResult)
     }
   }
 
   "handlingDefinition.onRelease" should {
 
     "not be defined" in {
+      val tc = new TestCase
+      tc.expectTSReadinessCheckerCall
 
-      expectTSReadinessCheckerCall
-
-      handler.createHandlingDefinition().onRelease shouldBe None
+      tc.handler.createHandlingDefinition().onRelease shouldBe None
     }
   }
 
-  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  class TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-  private lazy val tsReadinessChecker     = mock[TSReadinessForEventsChecker[IO]]
-  private lazy val readinessCheckerResult = eventSchedulingResults.generateSome
+    lazy val tsReadinessChecker     = mock[TSReadinessForEventsChecker[IO]]
+    lazy val readinessCheckerResult = eventSchedulingResults.generateSome
 
-  private def expectTSReadinessCheckerCall =
-    (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
+    def expectTSReadinessCheckerCall =
+      (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
 
-  private lazy val eventProcessor = mock[EventProcessor[IO]]
+    lazy val eventProcessor = mock[EventProcessor[IO]]
 
-  private lazy val handler =
-    new EventHandler[IO](
-      categoryName,
-      tsReadinessChecker,
-      EventDecoder,
-      eventProcessor,
-      mock[ProcessExecutor[IO]],
-      Lock.none[IO, projects.Path]
-    )
+    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+
+    lazy val handler =
+      new EventHandler[IO](
+        categoryName,
+        tsReadinessChecker,
+        EventDecoder,
+        eventProcessor,
+        mock[ProcessExecutor[IO]],
+        tsWriteLock
+      )
+  }
 }
