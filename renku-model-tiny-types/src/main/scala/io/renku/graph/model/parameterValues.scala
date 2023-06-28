@@ -19,7 +19,7 @@
 package io.renku.graph.model
 
 import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
-import io.renku.tinytypes.constraints.{NonBlank, Url}
+import io.renku.tinytypes.constraints.Url
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object parameterValues {
@@ -33,6 +33,5 @@ object parameterValues {
   final class ValueOverride private (val value: String) extends AnyVal with StringTinyType
   implicit object ValueOverride
       extends TinyTypeFactory[ValueOverride](new ValueOverride(_))
-      with NonBlank[ValueOverride]
       with TinyTypeJsonLDOps[ValueOverride]
 }

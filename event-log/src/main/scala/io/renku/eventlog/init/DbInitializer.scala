@@ -165,6 +165,12 @@ object DbInitializer {
       currentStatus = GenerationNonRecoverableFailure,
       destinationStatus = New,
       discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%ValueOverride cannot be blank%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
     )
   )
 
