@@ -31,7 +31,7 @@ import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel}
-import model.Project.{DateUpdated, StarsCount}
+import model.Project.StarsCount
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import model._
@@ -101,7 +101,7 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
               persons.Affiliation("SDSC").some
       ).some
     ),
-    DateUpdated(Instant.parse("2012-11-16T10:00:00.000Z")),
+    projects.DateModified(Instant.parse("2012-11-16T10:00:00.000Z")),
     Urls(
       SshUrl("git@github.com:namespace/name.git"),
       HttpUrl("https://github.com/namespace/name.git"),

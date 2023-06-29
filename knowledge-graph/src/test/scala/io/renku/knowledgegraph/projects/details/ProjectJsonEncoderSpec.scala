@@ -36,7 +36,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
-import model.Project.{DateUpdated, ImageLinks, StarsCount}
+import model.Project.{ImageLinks, StarsCount}
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import model._
@@ -76,7 +76,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       visibility       <- cursor.downField("visibility").as[Visibility]
       created          <- cursor.downField("created").as[Creation](creationDecoder(project.created))
-      updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
+      dateModified     <- cursor.downField("dateModified").as[DateModified]
       urls             <- cursor.downField("urls").as[Urls]
       forks            <- cursor.downField("forking").as(forkingDecoder(project.forking))
       keywords         <- cursor.downField("keywords").as[Set[Keyword]]
@@ -93,7 +93,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
       maybeDescription,
       visibility,
       created,
-      updatedAt,
+      dateModified,
       urls,
       forks,
       keywords,

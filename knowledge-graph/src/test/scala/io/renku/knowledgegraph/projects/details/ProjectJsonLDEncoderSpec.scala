@@ -26,7 +26,6 @@ import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.jsonld.JsonLDDecoder
-import model.Project.DateUpdated
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -54,7 +53,7 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
         visibility   <- cursor.downField(renku / "projectVisibility").as[projects.Visibility]
         dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
         maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
-        dateUpdated  <- cursor.downField(schema / "dateModified").as[DateUpdated]
+        dateUpdated  <- cursor.downField(schema / "dateModified").as[projects.DateModified]
         maybeParent  <- cursor.downField(prov / "wasDerivedFrom").as[Option[ParentProject]]
         keywords     <- cursor.downField(schema / "keywords").as[List[Option[projects.Keyword]]].map(_.flatten)
         maybeVersion <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]

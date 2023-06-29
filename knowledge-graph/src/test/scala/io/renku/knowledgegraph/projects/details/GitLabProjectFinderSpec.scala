@@ -123,7 +123,7 @@ class GitLabProjectFinderSpec
     "web_url":          ${project.urls.web},
     "forks_count":      ${project.forksCount},
     "star_count":       ${project.starsCount},
-    "last_activity_at": ${project.updatedAt},
+    "last_activity_at": ${project.dateModified},
     "permissions":      ${toJson(project.permissions)},
     "statistics": {
       "commit_count":       ${project.statistics.commitsCount},
