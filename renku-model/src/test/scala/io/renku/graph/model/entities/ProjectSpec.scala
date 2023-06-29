@@ -142,6 +142,7 @@ class ProjectSpec
           .to[entities.Project]
           .asInstanceOf[entities.RenkuProject.WithoutParent]
           .copy(
+            dateModified = List(cliProject.dateModified, info.dateModified).max,
             activities = expectedActivities.map(_.to[entities.Activity]),
             maybeCreator = mergedCreator.to[entities.Person].some,
             datasets = List(
@@ -197,6 +198,7 @@ class ProjectSpec
           .to[entities.Project]
           .asInstanceOf[entities.RenkuProject.WithParent]
           .copy(
+            dateModified = List(cliProject.dateModified, info.dateModified).max,
             members = Set(member1.toPerson, mergedMember2.to[entities.Person], mergedMember3.to[entities.Person]),
             maybeCreator = mergedCreator.to[entities.Person].some,
             activities = expectedActivities.map(_.to[entities.Activity]),
@@ -506,7 +508,6 @@ class ProjectSpec
       result should beInvalidWithMessageIncluding(
         show"Plan ${planModification.id.asEntityId} is older than it's parent ${planModification.parent.id.asEntityId}"
       )
-
     }
 
     "return Invalid when there's a Dataset entity that cannot be decoded" in new TestCase {
@@ -731,11 +732,18 @@ class ProjectSpec
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
-      val projectInfo  = gitLabProjectInfos.map(_.copy(maybeParentPath = None, dateCreated = gitlabDate)).generateOne
+      val projectInfo = gitLabProjectInfos
+        .map(
+          _.copy(maybeParentPath = None,
+                 dateCreated = gitlabDate,
+                 dateModified = projectModifiedDates(gitlabDate.value).generateOne
+          )
+        )
+        .generateOne
 
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
         .asInstanceOf[testentities.RenkuProject.WithoutParent]
-        .copy(dateCreated = cliDate)
+        .copy(dateCreated = cliDate, dateModified = projectModifiedDates(cliDate.value).generateOne)
 
       val cliProject = testProject.to[CliProject]
       val allPersons = cliProject.collectAllPersons
@@ -745,7 +753,8 @@ class ProjectSpec
         .copy(
           members = projectInfo.members.map(_.toPerson),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
-          dateCreated = earliestDate
+          dateCreated = earliestDate,
+          dateModified = List(cliProject.dateModified, projectInfo.dateModified).max
         )
     }
 
@@ -756,6 +765,7 @@ class ProjectSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(
         maybeParentPath = None,
         dateCreated = gitlabDate,
+        dateModified = projectModifiedDates(gitlabDate.value).generateOne,
         maybeDescription = projectDescriptions.generateSome,
         keywords = projectKeywords.generateSet(min = 1)
       )
@@ -768,6 +778,7 @@ class ProjectSpec
           maybeDescription = description,
           keywords = keywords,
           dateCreated = cliDate,
+          dateModified = projectModifiedDates(cliDate.value).generateOne,
           maybeCreator = None
         )
       val cliProject = testProject.to[CliProject]
@@ -778,7 +789,8 @@ class ProjectSpec
         .copy(
           members = projectInfo.members.map(_.toPerson),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
-          dateCreated = earliestDate
+          dateCreated = earliestDate,
+          dateModified = List(projectInfo.dateModified, cliProject.dateModified).max
         )
     }
 
@@ -789,12 +801,18 @@ class ProjectSpec
       val projectInfo = gitLabProjectInfos.generateOne.copy(
         maybeParentPath = None,
         dateCreated = gitlabDate,
+        dateModified = projectModifiedDates(gitlabDate.value).generateOne,
         maybeDescription = projectDescriptions.generateSome,
         keywords = projectKeywords.generateSet(min = 1)
       )
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
         .asInstanceOf[testentities.RenkuProject.WithoutParent]
-        .copy(maybeDescription = None, keywords = Set.empty, maybeCreator = None, dateCreated = cliDate)
+        .copy(maybeDescription = None,
+              keywords = Set.empty,
+              maybeCreator = None,
+              dateCreated = cliDate,
+              dateModified = projectModifiedDates(cliDate.value).generateOne
+        )
 
       val cliProject = testProject.to[CliProject]
       val allPersons = cliProject.collectAllPersons
@@ -805,6 +823,7 @@ class ProjectSpec
           members = projectInfo.members.map(_.toPerson),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
+          dateModified = List(projectInfo.dateModified, cliProject.dateModified).max,
           maybeDescription = projectInfo.maybeDescription,
           keywords = projectInfo.keywords
         )
@@ -814,10 +833,12 @@ class ProjectSpec
       val gitlabDate   = projectCreatedDates().generateOne
       val cliDate      = projectCreatedDates().generateOne
       val earliestDate = List(gitlabDate, cliDate).min
-      val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
-                                                            dateCreated = gitlabDate,
-                                                            maybeDescription = projectDescriptions.generateNone,
-                                                            keywords = Set.empty
+      val projectInfo = gitLabProjectInfos.generateOne.copy(
+        maybeParentPath = None,
+        dateCreated = gitlabDate,
+        dateModified = projectModifiedDates(gitlabDate.value).generateOne,
+        maybeDescription = projectDescriptions.generateNone,
+        keywords = Set.empty
       )
 
       val testProject = createRenkuProject(projectInfo, cliVersion, schemaVersion)
@@ -826,7 +847,8 @@ class ProjectSpec
           maybeDescription = None,
           keywords = Set.empty,
           maybeCreator = None,
-          dateCreated = cliDate
+          dateCreated = cliDate,
+          dateModified = projectModifiedDates(cliDate.value).generateOne
         )
 
       val cliProject = testProject.to[CliProject]
@@ -838,9 +860,134 @@ class ProjectSpec
           members = projectInfo.members.map(_.toPerson),
           maybeCreator = projectInfo.maybeCreator.map(_.toPerson),
           dateCreated = earliestDate,
+          dateModified = List(projectInfo.dateModified, cliProject.dateModified).max,
           maybeDescription = None,
           keywords = Set.empty
         )
+    }
+  }
+
+  "RenkuProject.WithParent.from" should {
+
+    "fail if dateCreated > dateModified" in new TestCase {
+
+      val dateCreated  = projectCreatedDates().generateOne
+      val dateModified = timestamps(max = dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified)
+      RenkuProject.WithParent
+        .from(
+          projectResourceIds.generateOne,
+          projectPaths.generateOne,
+          projectNames.generateOne,
+          maybeDescription = None,
+          cliVersions.generateOne,
+          dateCreated,
+          dateModified,
+          maybeCreator = None,
+          projectVisibilities.generateOne,
+          keywords = Set.empty,
+          members = Set.empty,
+          projectSchemaVersions.generateOne,
+          activities = List.empty,
+          datasets = List.empty,
+          plans = List.empty,
+          parentResourceId = projectResourceIds.generateOne,
+          images = List.empty
+        )
+        .toEither
+        .left
+        .value shouldBe NonEmptyList.one(
+        show"Project dateModified $dateModified is older than dateCreated $dateCreated"
+      )
+    }
+  }
+
+  "RenkuProject.WithoutParent.from" should {
+
+    "fail if dateCreated > dateModified" in new TestCase {
+
+      val dateCreated  = projectCreatedDates().generateOne
+      val dateModified = timestamps(max = dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified)
+      RenkuProject.WithoutParent
+        .from(
+          projectResourceIds.generateOne,
+          projectPaths.generateOne,
+          projectNames.generateOne,
+          maybeDescription = None,
+          cliVersions.generateOne,
+          dateCreated,
+          dateModified,
+          maybeCreator = None,
+          projectVisibilities.generateOne,
+          keywords = Set.empty,
+          members = Set.empty,
+          projectSchemaVersions.generateOne,
+          activities = List.empty,
+          datasets = List.empty,
+          plans = List.empty,
+          images = List.empty
+        )
+        .toEither
+        .left
+        .value shouldBe NonEmptyList.one(
+        show"Project dateModified $dateModified is older than dateCreated $dateCreated"
+      )
+    }
+  }
+
+  "NonRenkuProject.WithParent.from" should {
+
+    "fail if dateCreated > dateModified" in new TestCase {
+
+      val dateCreated  = projectCreatedDates().generateOne
+      val dateModified = timestamps(max = dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified)
+      NonRenkuProject.WithParent
+        .from(
+          projectResourceIds.generateOne,
+          projectPaths.generateOne,
+          projectNames.generateOne,
+          maybeDescription = None,
+          dateCreated,
+          dateModified,
+          maybeCreator = None,
+          projectVisibilities.generateOne,
+          keywords = Set.empty,
+          members = Set.empty,
+          parentResourceId = projectResourceIds.generateOne,
+          images = List.empty
+        )
+        .toEither
+        .left
+        .value shouldBe NonEmptyList.one(
+        show"Project dateModified $dateModified is older than dateCreated $dateCreated"
+      )
+    }
+  }
+
+  "NonRenkuProject.WithoutParent.from" should {
+
+    "fail if dateCreated > dateModified" in new TestCase {
+
+      val dateCreated  = projectCreatedDates().generateOne
+      val dateModified = timestamps(max = dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified)
+      NonRenkuProject.WithoutParent
+        .from(
+          projectResourceIds.generateOne,
+          projectPaths.generateOne,
+          projectNames.generateOne,
+          maybeDescription = None,
+          dateCreated,
+          dateModified,
+          maybeCreator = None,
+          projectVisibilities.generateOne,
+          keywords = Set.empty,
+          members = Set.empty,
+          images = List.empty
+        )
+        .toEither
+        .left
+        .value shouldBe NonEmptyList.one(
+        show"Project dateModified $dateModified is older than dateCreated $dateCreated"
+      )
     }
   }
 
@@ -867,6 +1014,7 @@ class ProjectSpec
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "agent"            -> project.agent.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "dateModified"     -> project.dateModified.asJsonLD,
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
@@ -901,6 +1049,7 @@ class ProjectSpec
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "dateModified"     -> project.dateModified.asJsonLD,
               schema / "creator"          -> project.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
@@ -942,6 +1091,7 @@ class ProjectSpec
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "agent"            -> project.agent.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "dateModified"     -> project.dateModified.asJsonLD,
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
@@ -980,6 +1130,7 @@ class ProjectSpec
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "dateModified"     -> project.dateModified.asJsonLD,
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
@@ -1022,6 +1173,7 @@ class ProjectSpec
               renku / "projectNamespaces" -> project.namespaces.asJsonLD,
               schema / "description"      -> project.maybeDescription.asJsonLD,
               schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "dateModified"     -> project.dateModified.asJsonLD,
               schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
               renku / "projectVisibility" -> project.visibility.asJsonLD,
               schema / "keywords"         -> project.keywords.asJsonLD,
@@ -1071,13 +1223,15 @@ class ProjectSpec
       parentPath:    projects.Path,
       cliVersion:    CliVersion,
       schemaVersion: SchemaVersion
-  ) =
+  ) = {
+    val dateCreated = projectCreatedDates().generateOne
     testentities.RenkuProject.WithoutParent(
       path = parentPath,
       name = projectNames.generateOne,
       maybeDescription = None,
       agent = cliVersion,
-      dateCreated = projectCreatedDates().generateOne,
+      dateCreated = dateCreated,
+      dateModified = projectModifiedDates(dateCreated.value).generateOne,
       maybeCreator = None,
       visibility = projects.Visibility.Public,
       keywords = Set.empty,
@@ -1089,6 +1243,7 @@ class ProjectSpec
       images = Nil,
       forksCount = ForksCount(1)
     )
+  }
 
   private def createRenkuProject(info: GitLabProjectInfo, cliVersion: CliVersion, schemaVersion: SchemaVersion) =
     info.maybeParentPath match {
@@ -1099,6 +1254,7 @@ class ProjectSpec
           maybeDescription = info.maybeDescription,
           agent = cliVersion,
           dateCreated = info.dateCreated,
+          dateModified = info.dateModified,
           maybeCreator = None,
           visibility = info.visibility,
           forksCount = ForksCount(1),
@@ -1119,6 +1275,7 @@ class ProjectSpec
           maybeDescription = info.maybeDescription,
           agent = cliVersion,
           dateCreated = info.dateCreated,
+          dateModified = info.dateModified,
           maybeCreator = None,
           visibility = info.visibility,
           forksCount = ForksCount(1),
@@ -1133,12 +1290,14 @@ class ProjectSpec
         )
     }
 
-  private def createNonRenkuProjectFromPath(parentPath: projects.Path) =
+  private def createNonRenkuProjectFromPath(parentPath: projects.Path) = {
+    val createdDate = projectCreatedDates().generateOne
     testentities.NonRenkuProject.WithoutParent(
       path = parentPath,
       name = projectNames.generateOne,
       maybeDescription = None,
-      dateCreated = projectCreatedDates().generateOne,
+      dateCreated = createdDate,
+      dateModified = projectModifiedDates(createdDate.value).generateOne,
       maybeCreator = None,
       visibility = projects.Visibility.Public,
       forksCount = ForksCount(1),
@@ -1146,6 +1305,7 @@ class ProjectSpec
       members = Set.empty,
       images = Nil
     )
+  }
 
   private def createNonRenkuProject(info: GitLabProjectInfo) =
     info.maybeParentPath match {
@@ -1155,6 +1315,7 @@ class ProjectSpec
           name = info.name,
           maybeDescription = info.maybeDescription,
           dateCreated = info.dateCreated,
+          dateModified = info.dateModified,
           maybeCreator = None,
           visibility = info.visibility,
           forksCount = ForksCount(1),
@@ -1169,6 +1330,7 @@ class ProjectSpec
           name = info.name,
           maybeDescription = info.maybeDescription,
           dateCreated = info.dateCreated,
+          dateModified = info.dateModified,
           maybeCreator = None,
           visibility = info.visibility,
           forksCount = ForksCount(1),

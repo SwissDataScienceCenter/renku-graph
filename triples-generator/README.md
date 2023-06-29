@@ -93,6 +93,28 @@ Upon arrival, triples-generator will
 }
 ```
 
+- **SYNC_REPO_METADATA**
+
+Upon arrival, triples-generator will
+* fetch info about `visibility`, `images`, `name`, `description` and `keywords` from GitLab;
+* extract the same info from the payload;
+* calculate diffs and update the TS
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "SYNC_REPO_METADATA",
+  "project": {
+    "path": "project/path"
+  }
+}
+```
+
+`payload` part: binary of `application/zip` content-type with the latest project event metadata.
+
 - **MEMBER_SYNC**
 
 **Multipart Request**

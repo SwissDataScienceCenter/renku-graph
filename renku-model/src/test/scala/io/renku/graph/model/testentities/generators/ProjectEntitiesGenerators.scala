@@ -101,6 +101,10 @@ trait ProjectEntitiesGenerators {
     _.fold(_.copy(dateCreated = to), _.copy(dateCreated = to), _.copy(dateCreated = to), _.copy(dateCreated = to))
       .asInstanceOf[P]
 
+  def replaceProjectDateModified[P <: Project](to: projects.DateModified): P => P =
+    _.fold(_.copy(dateModified = to), _.copy(dateModified = to), _.copy(dateModified = to), _.copy(dateModified = to))
+      .asInstanceOf[P]
+
   def replaceImages[P <: Project](to: List[ImageUri]): P => P =
     _.fold(_.copy(images = to), _.copy(images = to), _.copy(images = to), _.copy(images = to)).asInstanceOf[P]
 }

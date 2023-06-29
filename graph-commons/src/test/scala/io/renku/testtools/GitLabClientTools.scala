@@ -29,12 +29,13 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
+import org.scalamock.clazz.Mock
+import org.scalamock.function.MockFunctions
 import org.scalamock.matchers.ArgCapture.CaptureOne
-import org.scalamock.matchers.MockParameter
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.matchers.{Matchers, MockParameter}
 
 trait GitLabClientTools[F[_]] {
-  self: MockFactory =>
+  self: Mock with MockFunctions with Matchers =>
 
   def captureMapping[ResultType](gitLabClient: GitLabClient[F])(
       findingMethod:         => Any,

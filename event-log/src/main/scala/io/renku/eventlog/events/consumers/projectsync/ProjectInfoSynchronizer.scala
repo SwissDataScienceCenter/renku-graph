@@ -38,18 +38,20 @@ private trait ProjectInfoSynchronizer[F[_]] {
 }
 
 private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
-    gitLabProjectFetcher: GitLabProjectFetcher[F],
-    projectRemover:       ProjectRemover[F],
-    eventSender:          EventSender[F]
+    gitLabProjectFetcher:   GitLabProjectFetcher[F],
+    projectRemover:         ProjectRemover[F],
+    eventSender:            EventSender[F],
+    syncRepoMetadataSender: SyncRepoMetadataSender[F]
 ) extends ProjectInfoSynchronizer[F] {
 
   import eventSender._
   import gitLabProjectFetcher._
   import io.circe.literal._
   import projectRemover._
+  import syncRepoMetadataSender.sendSyncRepoMetadata
 
   override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
-    case Right(Some(event.projectPath)) => ().pure[F]
+    case Right(Some(event.projectPath)) => sendSyncRepoMetadata(event)
     case Right(Some(newPath)) =>
       removeProject(event.projectId) >>
         send(cleanUpRequest(event)) >>
@@ -94,8 +96,9 @@ private object ProjectInfoSynchronizer {
       _
   ]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[ProjectInfoSynchronizer[F]] = for {
-    gitLabProjectFetcher <- GitLabProjectFetcher[F]
-    projectRemover       <- ProjectRemover[F]
-    eventSender          <- EventSender[F](EventLogUrl)
-  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender)
+    gitLabProjectFetcher   <- GitLabProjectFetcher[F]
+    projectRemover         <- ProjectRemover[F]
+    eventSender            <- EventSender[F](EventLogUrl)
+    syncRepoMetadataSender <- SyncRepoMetadataSender[F]
+  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender, syncRepoMetadataSender)
 }

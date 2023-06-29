@@ -30,6 +30,7 @@ private object SearchInfoExtractor {
       project.path,
       project.visibility,
       project.dateCreated,
+      project.dateModified,
       project.maybeCreator.map(toPersonInfo),
       project.keywords.toList,
       project.maybeDescription,

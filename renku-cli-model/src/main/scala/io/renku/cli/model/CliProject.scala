@@ -29,6 +29,8 @@ import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
+import java.time.Instant
+
 final case class CliProject(
     name:          Option[Name],
     description:   Option[Description],
@@ -41,7 +43,21 @@ final case class CliProject(
     activities:    List[CliActivity],
     agentVersion:  Option[CliVersion],
     schemaVersion: Option[SchemaVersion]
-) extends CliModel
+) extends CliModel {
+
+  lazy val dateModified: DateModified = DateModified(
+    (dateCreated.value :: planDates(plans) ::: datasetDates(datasets) ::: activityDates(activities)).max
+  )
+
+  private lazy val planDates: List[ProjectPlan] => List[Instant] =
+    _.map(_.fold(_.dateModified, _.dateModified, _.dateModified, _.dateModified).value)
+
+  private lazy val datasetDates: List[CliDataset] => List[Instant] =
+    _.map(_.dateModified.value)
+
+  private lazy val activityDates: List[CliActivity] => List[Instant] =
+    _.map(_.startTime.value)
+}
 
 object CliProject {
 
@@ -136,7 +152,7 @@ object CliProject {
       JsonLDEncoder.instance(_.fold(_.asJsonLD, _.asJsonLD, _.asJsonLD, _.asJsonLD))
   }
 
-  private val entityTypes: EntityTypes = EntityTypes.of(Schema.Project, Prov.Location)
+  val entityTypes: EntityTypes = EntityTypes.of(Schema.Project, Prov.Location)
 
   implicit val jsonLDDecoder: JsonLDEntityDecoder[CliProject] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>

@@ -18,14 +18,24 @@
 
 package io.renku.triplesgenerator.api.events
 
+import cats.effect.Sync
 import cats.syntax.all._
+import io.renku.compression.Zip
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.RenkuTinyTypeGenerators._
+import io.renku.graph.model.events.ZippedEventPayload
 import org.scalacheck.Gen
 
 object Generators {
+
+  val cleanUpEvents: Gen[CleanUpEvent] =
+    consumerProjects.map(CleanUpEvent.apply)
+
+  val datasetViewedEvents: Gen[DatasetViewedEvent] =
+    (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)
 
   val projectActivatedEvents: Gen[ProjectActivated] =
     (projectPaths -> timestampsNotInTheFuture.toGeneratorOf(ProjectActivated.DateActivated))
@@ -36,12 +46,20 @@ object Generators {
   val projectViewedEvents: Gen[ProjectViewedEvent] =
     (projectPaths, projectViewedDates(), userIds.toGeneratorOfOptions).mapN(ProjectViewedEvent.apply)
 
-  val datasetViewedEvents: Gen[DatasetViewedEvent] =
-    (datasetIdentifiers, datasetViewedDates(), personGitLabIds.toGeneratorOfOptions).mapN(DatasetViewedEvent.apply)
-
   val projectViewingDeletions: Gen[ProjectViewingDeletion] =
     projectPaths.map(ProjectViewingDeletion.apply)
 
-  val cleanUpEvents: Gen[CleanUpEvent] =
-    consumerProjects.map(CleanUpEvent.apply)
+  def zippedEventPayloads[F[_]: Sync]: F[Gen[ZippedEventPayload]] =
+    jsonLDEntities.map(_.toJson.noSpaces).map(Zip.zip[F](_).map(ZippedEventPayload)).sequence
+
+  def syncRepoMetadataEvents[F[_]: Sync]: F[Gen[SyncRepoMetadata]] =
+    zippedEventPayloads[F]
+      .map(payloadsGen => (projectPaths -> payloadsGen.toGeneratorOfOptions).mapN(SyncRepoMetadata.apply))
+
+  def syncRepoMetadataWithPayloadEvents[F[_]: Sync]: F[Gen[SyncRepoMetadata]] =
+    zippedEventPayloads[F]
+      .map(payloadsGen => (projectPaths -> payloadsGen.toGeneratorOfSomes).mapN(SyncRepoMetadata.apply))
+
+  val syncRepoMetadataWithoutPayloadEvents: Gen[SyncRepoMetadata] =
+    projectPaths.map(SyncRepoMetadata(_, maybePayload = None))
 }

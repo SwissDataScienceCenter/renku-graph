@@ -18,12 +18,14 @@
 
 package io.renku.triplesstore
 
+import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers.ForAllTestContainer
-import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfter, Suite}
 
 trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite with IOSpec =>
+  self: Suite =>
+
+  implicit val ioRuntime: IORuntime
 
   override def afterStart(): Unit = {
     super.afterStart()

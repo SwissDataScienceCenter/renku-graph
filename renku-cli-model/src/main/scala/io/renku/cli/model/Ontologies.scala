@@ -21,7 +21,7 @@ package io.renku.cli.model
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 
 //noinspection TypeAnnotation
-private[cli] object Ontologies {
+object Ontologies {
 
   object Schema {
     val Action           = schema / "Action"

@@ -18,22 +18,26 @@
 
 package io.renku.triplesgenerator.api.events
 
-import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import Generators._
 import cats.Show
-import io.circe.syntax._
+import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Encoder
-import io.renku.events.{CategoryName, EventRequestContent}
+import io.circe.syntax._
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.zippedEventPayloads
+import io.renku.http.client.RestClient
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues {
+class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with TryValues with IOSpec {
 
   "send ProjectActivated" should {
 
@@ -42,18 +46,6 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
       val event = projectActivatedEvents.generateOne
 
       givenSending(event, ProjectActivated.categoryName, returning = ().pure[Try])
-
-      client.send(event).success.value shouldBe ()
-    }
-  }
-
-  "send ProjectViewedEvent" should {
-
-    "send the given event through the EventSender" in new TestCase {
-
-      val event = projectViewedEvents.generateOne
-
-      givenSending(event, ProjectViewedEvent.categoryName, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -71,6 +63,18 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
     }
   }
 
+  "send ProjectViewedEvent" should {
+
+    "send the given event through the EventSender" in new TestCase {
+
+      val event = projectViewedEvents.generateOne
+
+      givenSending(event, ProjectViewedEvent.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
   "send ProjectViewingDeletion" should {
 
     "send the given event through the EventSender" in new TestCase {
@@ -78,6 +82,34 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
       val event = projectViewingDeletions.generateOne
 
       givenSending(event, ProjectViewingDeletion.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+  }
+
+  "send SyncRepoMetadata" should {
+
+    "send the given event without the payload through the EventSender" in new TestCase {
+
+      val event = syncRepoMetadataEvents[IO]
+        .unsafeRunSync()
+        .generateOne
+        .copy(maybePayload = None)
+
+      givenSending(event, SyncRepoMetadata.categoryName, returning = ().pure[Try])
+
+      client.send(event).success.value shouldBe ()
+    }
+
+    "send the given event with the payload through the EventSender" in new TestCase {
+
+      val payload = zippedEventPayloads.generateOne
+      val event = syncRepoMetadataEvents[IO]
+        .unsafeRunSync()
+        .generateOne
+        .copy(maybePayload = payload.some)
+
+      givenSending(event, payload, SyncRepoMetadata.categoryName, returning = ().pure[Try])
 
       client.send(event).success.value shouldBe ()
     }
@@ -96,6 +128,19 @@ class ClientSpec extends AnyWordSpec with should.Matchers with MockFactory with 
       .expects(
         EventRequestContent.NoPayload(event.asJson),
         EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed")
+      )
+      .returning(returning)
+
+    def givenSending[E, P](event: E, payload: P, categoryName: CategoryName, returning: Try[Unit])(implicit
+        eventEncoder: Encoder[E],
+        partEncoder:  RestClient.PartEncoder[P],
+        show:         Show[E]
+    ) = (eventSender
+      .sendEvent(_: EventRequestContent.WithPayload[P], _: EventSender.EventContext)(_: RestClient.PartEncoder[P]))
+      .expects(
+        EventRequestContent.WithPayload(event.asJson, payload),
+        EventSender.EventContext(categoryName, show"$categoryName: sending event $event failed"),
+        partEncoder
       )
       .returning(returning)
   }

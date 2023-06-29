@@ -64,7 +64,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
         Creator(creator.resourceId, creator.name, creator.maybeEmail, creator.maybeAffiliation)
       )
     ),
-    updatedAt = gitLabProject.updatedAt,
+    dateModified = gitLabProject.dateModified,
     urls = gitLabProject.urls,
     forking = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
     keywords = kgProject.keywords,

@@ -23,7 +23,7 @@ import io.renku.cli.model.CliProject
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, entities}
@@ -34,6 +34,7 @@ trait Project extends Product with Serializable {
   val name:             Name
   val maybeDescription: Option[Description]
   val dateCreated:      DateCreated
+  val dateModified:     DateModified
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val forksCount:       ForksCount

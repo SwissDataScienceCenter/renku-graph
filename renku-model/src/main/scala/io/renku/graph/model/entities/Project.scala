@@ -25,6 +25,7 @@ import cats.syntax.all._
 import io.renku.cli.model.{CliPerson, CliProject}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.RenkuProject.ProjectFactory
 import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.versions.{CliVersion, SchemaVersion}
@@ -33,12 +34,15 @@ import io.renku.jsonld.ontology._
 import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
+import Ordered.orderingToOrdered
+
 sealed trait Project extends Product with Serializable {
   val resourceId:       ResourceId
   val path:             Path
   val name:             Name
   val maybeDescription: Option[Description]
   val dateCreated:      DateCreated
+  val dateModified:     DateModified
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val keywords:         Set[Keyword]
@@ -76,6 +80,7 @@ object NonRenkuProject {
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  dateCreated:      DateCreated,
+                                 dateModified:     DateModified,
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
@@ -89,11 +94,41 @@ object NonRenkuProject {
     ): P = nrnp(this)
   }
 
+  object WithoutParent extends ProjectFactory {
+    def from(resourceId:       ResourceId,
+             path:             Path,
+             name:             Name,
+             maybeDescription: Option[Description],
+             dateCreated:      DateCreated,
+             dateModified:     DateModified,
+             maybeCreator:     Option[Person],
+             visibility:       Visibility,
+             keywords:         Set[Keyword],
+             members:          Set[Person],
+             images:           List[Image]
+    ): ValidatedNel[String, NonRenkuProject.WithoutParent] =
+      validateDates(dateCreated, dateModified).as(
+        NonRenkuProject.WithoutParent(resourceId,
+                                      path,
+                                      name,
+                                      maybeDescription,
+                                      dateCreated,
+                                      dateModified,
+                                      maybeCreator,
+                                      visibility,
+                                      keywords,
+                                      members,
+                                      images
+        )
+      )
+  }
+
   final case class WithParent(resourceId:       ResourceId,
                               path:             Path,
                               name:             Name,
                               maybeDescription: Option[Description],
                               dateCreated:      DateCreated,
+                              dateModified:     DateModified,
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
@@ -107,6 +142,37 @@ object NonRenkuProject {
                          nrnp: entities.NonRenkuProject.WithoutParent => P,
                          nrwp: NonRenkuProject.WithParent => P
     ): P = nrwp(this)
+  }
+
+  object WithParent extends ProjectFactory {
+    def from(resourceId:       ResourceId,
+             path:             Path,
+             name:             Name,
+             maybeDescription: Option[Description],
+             dateCreated:      DateCreated,
+             dateModified:     DateModified,
+             maybeCreator:     Option[Person],
+             visibility:       Visibility,
+             keywords:         Set[Keyword],
+             members:          Set[Person],
+             parentResourceId: ResourceId,
+             images:           List[Image]
+    ): ValidatedNel[String, NonRenkuProject.WithParent] =
+      validateDates(dateCreated, dateModified).as(
+        NonRenkuProject.WithParent(resourceId,
+                                   path,
+                                   name,
+                                   maybeDescription,
+                                   dateCreated,
+                                   dateModified,
+                                   maybeCreator,
+                                   visibility,
+                                   keywords,
+                                   members,
+                                   parentResourceId,
+                                   images
+        )
+      )
   }
 }
 
@@ -126,6 +192,7 @@ object RenkuProject {
                                  maybeDescription: Option[Description],
                                  agent:            CliVersion,
                                  dateCreated:      DateCreated,
+                                 dateModified:     DateModified,
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  keywords:         Set[Keyword],
@@ -151,6 +218,7 @@ object RenkuProject {
              maybeDescription: Option[Description],
              agent:            CliVersion,
              dateCreated:      DateCreated,
+             dateModified:     DateModified,
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
@@ -161,7 +229,7 @@ object RenkuProject {
              plans:            List[Plan],
              images:           List[Image]
     ): ValidatedNel[String, RenkuProject.WithoutParent] = (
-      validateDates(dateCreated, activities, datasets, plans),
+      validateDates(dateCreated, dateModified, activities, datasets, plans),
       validatePlansDates(plans),
       validateDatasets(datasets),
       updatePlansOriginalId(plans)
@@ -175,6 +243,7 @@ object RenkuProject {
         maybeDescription,
         agent,
         dateCreated,
+        dateModified,
         maybeCreator,
         visibility,
         keywords,
@@ -187,12 +256,14 @@ object RenkuProject {
       )
     }
 
-    private def validateDates(dateCreated: DateCreated,
-                              activities:  List[Activity],
-                              datasets:    List[Dataset[Provenance]],
-                              plans:       List[Plan]
+    private def validateDates(dateCreated:  DateCreated,
+                              dateModified: DateModified,
+                              activities:   List[Activity],
+                              datasets:     List[Dataset[Provenance]],
+                              plans:        List[Plan]
     ): ValidatedNel[String, Unit] =
-      validateDates(dateCreated, activitiesDates(activities)) |+|
+      validateDates(dateCreated, dateModified) |+|
+        validateDates(dateCreated, activitiesDates(activities)) |+|
         validateDates(dateCreated, datasetsDates(datasets)) |+|
         validateDates(dateCreated, planDates(plans))
 
@@ -220,7 +291,7 @@ object RenkuProject {
 
       toValidate
         .map { case (name, id, date) =>
-          if ((date.value compareTo projectDate.value) >= 0) ().validNel[String]
+          if (date.value >= projectDate.value) ().validNel[String]
           else show"$name $id date $date is older than project $projectDate".invalidNel
         }
         .sequence
@@ -234,6 +305,7 @@ object RenkuProject {
                               maybeDescription: Option[Description],
                               agent:            CliVersion,
                               dateCreated:      DateCreated,
+                              dateModified:     DateModified,
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               keywords:         Set[Keyword],
@@ -261,6 +333,7 @@ object RenkuProject {
              maybeDescription: Option[Description],
              agent:            CliVersion,
              dateCreated:      DateCreated,
+             dateModified:     DateModified,
              maybeCreator:     Option[Person],
              visibility:       Visibility,
              keywords:         Set[Keyword],
@@ -272,11 +345,12 @@ object RenkuProject {
              parentResourceId: ResourceId,
              images:           List[Image]
     ): ValidatedNel[String, RenkuProject.WithParent] = (
+      validateDates(dateCreated, dateModified),
       validateDatasets(datasets),
       validatePlansDates(plans),
       updatePlansOriginalId(plans),
       validateCompositePlanData(plans)
-    ) mapN { (_, _, updatedPlans, _) =>
+    ) mapN { (_, _, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
@@ -286,6 +360,7 @@ object RenkuProject {
         maybeDescription,
         agent,
         dateCreated,
+        dateModified,
         maybeCreator,
         visibility,
         keywords,
@@ -301,6 +376,13 @@ object RenkuProject {
   }
 
   trait ProjectFactory {
+
+    protected def validateDates(dateCreated: DateCreated, dateModified: DateModified): ValidatedNel[String, Unit] =
+      Validated.condNel(
+        dateCreated.value <= dateModified.value,
+        (),
+        show"Project dateModified $dateModified is older than dateCreated $dateCreated"
+      )
 
     protected def validateDatasets(datasets: List[Dataset[Provenance]]): ValidatedNel[String, Unit] = {
       val toDatasetsWithBrokenDerivedFrom: Dataset[Provenance] => Option[Dataset[Provenance.Modified]] = dataset =>
@@ -359,7 +441,7 @@ object RenkuProject {
             findParentPlan(derivation.derivedFrom, planList)
               .andThen(parentPlan =>
                 Validated.condNel[String, Plan](
-                  (plan.dateCreated.value compareTo parentPlan.dateCreated.value) >= 0,
+                  plan.dateCreated.value >= parentPlan.dateCreated.value,
                   plan,
                   show"Plan ${plan.resourceId} is older than it's parent ${parentPlan.resourceId}"
                 )
@@ -544,6 +626,7 @@ object Project {
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "agent"            -> project.agent.asJsonLD,
           schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "dateModified"     -> project.dateModified.asJsonLD,
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
@@ -572,6 +655,7 @@ object Project {
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "dateModified"     -> project.dateModified.asJsonLD,
           schema / "creator"          -> project.maybeCreator.asJsonLD,
           renku / "projectVisibility" -> project.visibility.asJsonLD,
           schema / "keywords"         -> project.keywords.asJsonLD,
@@ -594,10 +678,11 @@ object Project {
     val creator: Property = schema / "creator"
     val image:   Property = schema / "image"
 
-    val nameProperty:        DataProperty.Def = DataProperty(schema / "name", xsd / "string")
-    val pathProperty:        DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
-    val descriptionProperty: DataProperty.Def = DataProperty(schema / "description", xsd / "string")
-    val dateCreatedProperty: DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
+    val nameProperty:         DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val pathProperty:         DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
+    val descriptionProperty:  DataProperty.Def = DataProperty(schema / "description", xsd / "string")
+    val dateCreatedProperty:  DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
+    val dateModifiedProperty: DataProperty.Def = DataProperty(schema / "dateModified", xsd / "dateTime")
     val visibilityProperty: DataProperty.Def = DataProperty.top(
       renku / "projectVisibility",
       DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
@@ -624,6 +709,7 @@ object Project {
           DataProperty(renku / "projectNamespaces", xsd / "string"),
           descriptionProperty,
           dateCreatedProperty,
+          dateModifiedProperty,
           visibilityProperty,
           keywordsProperty,
           DataProperty(schema / "schemaVersion", xsd / "string")
@@ -635,6 +721,7 @@ object Project {
                                      name:             Name,
                                      path:             Path,
                                      dateCreated:      DateCreated,
+                                     dateModified:     DateModified,
                                      maybeDescription: Option[Description],
                                      maybeCreator:     Option[ProjectMember],
                                      keywords:         Set[Keyword],

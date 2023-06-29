@@ -22,7 +22,7 @@ import io.circe.DecodingFailure
 import io.renku.cli.model.diffx.CliDiffInstances
 import io.renku.cli.model.generators.ProjectGenerators
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl}
+import io.renku.graph.model.{RenkuTinyTypeGenerators, RenkuUrl, projects}
 import io.renku.jsonld.{JsonLD, JsonLDDecoder, Property}
 import io.renku.jsonld.syntax._
 import org.scalatest.EitherValues
@@ -76,6 +76,24 @@ class CliProjectSpec
       results.left.value.getMessage() should include(
         s"Finding Person entities for project ${Right(project.name)} failed: "
       )
+    }
+  }
+
+  "dateModified" should {
+
+    "be the max of Project's dateCreated, Plans' dateModified, Datasets' dateModified and Activities' startTime" in {
+      forAll(projectGen) { cliProject =>
+        cliProject.dateModified shouldBe projects.DateModified {
+          (
+            cliProject.dateCreated.value ::
+              cliProject.plans.map(
+                _.fold(_.dateModified.value, _.dateModified.value, _.dateModified.value, _.dateModified.value)
+              ) :::
+              cliProject.activities.map(_.startTime.value) :::
+              cliProject.datasets.map(_.dateModified.value)
+          ).max
+        }
+      }
     }
   }
 }
