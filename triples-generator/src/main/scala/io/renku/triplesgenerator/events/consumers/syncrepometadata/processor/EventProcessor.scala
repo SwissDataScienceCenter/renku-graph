@@ -41,14 +41,14 @@ private[syncrepometadata] object EventProcessor {
       config: Config
   ): F[EventProcessor[F]] =
     (TSDataFinder[F](config), UpdateCommandsRunner[F](config))
-      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpdateCommandsCalculator(), _))
+      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpdateCommandsCalculator[F](), _))
 }
 
 private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
     tsDataFinder:             TSDataFinder[F],
     glDataFinder:             GLDataFinder[F],
     payloadDataExtractor:     PayloadDataExtractor[F],
-    updateCommandsCalculator: UpdateCommandsCalculator,
+    updateCommandsCalculator: UpdateCommandsCalculator[F],
     updateCommandsRunner:     UpdateCommandsRunner[F]
 ) extends EventProcessor[F] {
 
@@ -61,7 +61,7 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
       (fetchTSData(event.path), fetchGLData(event.path))
         .parFlatMapN {
           case (Some(tsData), Some(glData)) =>
-            extractPayloadData(event).map(calculateUpdateCommands(tsData, glData, _)) >>= executeUpdates
+            extractPayloadData(event) >>= (calculateUpdateCommands(tsData, glData, _)) >>= executeUpdates
           case _ =>
             ().pure[F]
         }

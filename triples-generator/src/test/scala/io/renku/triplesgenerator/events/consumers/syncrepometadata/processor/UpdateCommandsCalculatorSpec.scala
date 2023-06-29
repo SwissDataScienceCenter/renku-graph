@@ -71,7 +71,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -101,7 +101,6 @@ class UpdateCommandsCalculatorSpec
 
       _ <- updatesCalculator
              .calculateUpdateCommands(tsData, glData, maybePayloadData)
-             .pure[IO]
              .asserting(_ shouldBe List(UpdateCommand.Event(StatusChangeEvent.RedoProjectTransformation(tsData.path))))
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
@@ -131,7 +130,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -156,7 +155,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -183,7 +182,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -215,7 +214,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -247,7 +246,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -276,7 +275,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -308,7 +307,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -337,7 +336,7 @@ class UpdateCommandsCalculatorSpec
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe updatedTsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe updatedTsData)
@@ -357,15 +356,16 @@ class UpdateCommandsCalculatorSpec
     for {
       _ <- provisionProject(project).assertNoException
 
-      _ <- execute(updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData)).assertNoException
+      _ <- (updatesCalculator.calculateUpdateCommands(tsData, glData, maybePayloadData) >>= execute).assertNoException
 
       _ <- dataInProjectGraph(project).asserting(_.value shouldBe tsData)
       _ <- dataInProjectsGraph(project).asserting(_.value shouldBe tsData)
     } yield Succeeded
   }
 
+  private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private lazy val newValuesCalculator = mock[NewValuesCalculator]
-  private lazy val updatesCalculator   = new UpdateCommandsCalculatorImpl(newValuesCalculator)
+  private lazy val updatesCalculator   = new UpdateCommandsCalculatorImpl[IO](newValuesCalculator)
 
   private def execute(queries: List[UpdateCommand]) =
     queries

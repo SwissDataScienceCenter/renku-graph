@@ -71,7 +71,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
       val updates = updateCommands.generateList()
-      givenUpdateCommandsCalculation(tsData, glData, maybePayloadData = None, returning = updates)
+      givenUpdateCommandsCalculation(tsData, glData, maybePayloadData = None, returning = updates.pure[IO])
 
       givenUpdateCommandsExecution(updates, returning = ().pure[IO])
 
@@ -95,7 +95,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
           givenPayloadDataExtraction(path, payload, returning = maybePayloadData.pure[IO])
 
           val updates = updateCommands.generateList()
-          givenUpdateCommandsCalculation(tsData, glData, maybePayloadData, returning = updates)
+          givenUpdateCommandsCalculation(tsData, glData, maybePayloadData, returning = updates.pure[IO])
 
           givenUpdateCommandsExecution(updates, returning = ().pure[IO])
 
@@ -122,7 +122,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   private lazy val tsDataFinder             = mock[TSDataFinder[IO]]
   private lazy val glDataFinder             = mock[GLDataFinder[IO]]
   private lazy val payloadDataExtractor     = mock[PayloadDataExtractor[IO]]
-  private lazy val updateCommandsCalculator = mock[UpdateCommandsCalculator]
+  private lazy val updateCommandsCalculator = mock[UpdateCommandsCalculator[IO]]
   private lazy val updateCommandsRunner     = mock[UpdateCommandsRunner[IO]]
   private lazy val processor = new EventProcessorImpl[IO](tsDataFinder,
                                                           glDataFinder,
@@ -151,7 +151,7 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
   private def givenUpdateCommandsCalculation(tsData:           DataExtract.TS,
                                              glData:           DataExtract.GL,
                                              maybePayloadData: Option[DataExtract.Payload],
-                                             returning:        List[UpdateCommand]
+                                             returning:        IO[List[UpdateCommand]]
   ) = (updateCommandsCalculator.calculateUpdateCommands _)
     .expects(tsData, glData, maybePayloadData)
     .returning(returning)
