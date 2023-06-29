@@ -661,7 +661,7 @@ Response body example for `Accept: application/json`:
       "affiliation": "SDSC" // optional
     }
   },
-  "updatedAt":  "2001-10-06T10:48:29.457Z",
+  "dateModified": "2001-10-06T10:48:29.457Z",
   "urls": {
     "ssh":    "git@renku.io:namespace/project-name.git",
     "http":   "https://renku.io/gitlab/namespace/project-name.git",

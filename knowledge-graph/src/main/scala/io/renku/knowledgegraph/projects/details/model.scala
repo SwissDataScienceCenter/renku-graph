@@ -26,16 +26,14 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
-import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.persons
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, GitLabId, Keyword, Name, Path, ResourceId, Visibility}
 import io.renku.graph.model.versions.SchemaVersion
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import model.Statistics._
 
 import java.net.{MalformedURLException, URL}
-import java.time.Instant
 
 private object model {
   import Forking.ForksCount
@@ -49,7 +47,7 @@ private object model {
                            maybeDescription: Option[Description],
                            visibility:       Visibility,
                            created:          Creation,
-                           updatedAt:        DateUpdated,
+                           dateModified:     DateModified,
                            urls:             Urls,
                            forking:          Forking,
                            keywords:         Set[Keyword],
@@ -69,12 +67,6 @@ private object model {
 
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
     implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt[StarsCount]
-
-    final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
-    implicit object DateUpdated
-        extends TinyTypeFactory[DateUpdated](new DateUpdated(_))
-        with InstantNotInTheFuture[DateUpdated]
-        with TinyTypeJsonLDOps[DateUpdated]
   }
 
   final case class Creation(date: DateCreated, maybeCreator: Option[Creator])

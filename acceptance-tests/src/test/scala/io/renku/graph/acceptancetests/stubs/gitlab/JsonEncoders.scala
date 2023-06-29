@@ -145,7 +145,7 @@ trait JsonEncoders {
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
           "updated_at"          -> project.entitiesProject.dateModified.value.asJson,
           "creator_id"          -> project.maybeCreator.map(_.gitLabId).asJson,
-          "last_activity_at"    -> project.updatedAt.value.asJson,
+          "last_activity_at"    -> project.dateModified.value.asJson,
           "permissions"         -> project.permissions.asJson,
           "statistics"          -> project.statistics.asJson,
           "forked_from_project" -> (project.entitiesProject match {
