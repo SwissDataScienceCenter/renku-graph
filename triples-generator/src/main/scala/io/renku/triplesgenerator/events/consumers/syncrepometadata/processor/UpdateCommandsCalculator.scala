@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata
 package processor
 
+import cats.Monad
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.api.events.StatusChangeEvent
@@ -30,26 +31,34 @@ import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.client.syntax._
+import org.typelevel.log4cats.Logger
 
-private trait UpdateCommandsCalculator {
+private trait UpdateCommandsCalculator[F[_]] {
   def calculateUpdateCommands(tsData:           DataExtract.TS,
                               glData:           DataExtract.GL,
                               maybePayloadData: Option[DataExtract.Payload]
-  ): List[UpdateCommand]
+  ): F[List[UpdateCommand]]
 }
 
 private object UpdateCommandsCalculator {
-  def apply(): UpdateCommandsCalculator = new UpdateCommandsCalculatorImpl(NewValuesCalculator)
+  def apply[F[_]: Monad: Logger](): UpdateCommandsCalculator[F] =
+    new UpdateCommandsCalculatorImpl[F](NewValuesCalculator)
 }
 
-private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalculator) extends UpdateCommandsCalculator {
+private class UpdateCommandsCalculatorImpl[F[_]: Monad: Logger](newValuesCalculator: NewValuesCalculator)
+    extends UpdateCommandsCalculator[F] {
 
   override def calculateUpdateCommands(tsData:           DataExtract.TS,
                                        glData:           DataExtract.GL,
                                        maybePayloadData: Option[DataExtract.Payload]
-  ): List[UpdateCommand] = {
+  ): F[List[UpdateCommand]] = {
     val newValues = newValuesCalculator.findNewValues(tsData, glData, maybePayloadData)
 
+    logUpdateStatus(tsData.path)(newValues)
+      .map(_ => calculateCommandsList(tsData, newValues))
+  }
+
+  private def calculateCommandsList(tsData: DataExtract.TS, newValues: NewValues) =
     (
       newValues.maybeName.map(nameUpdates(tsData.id, _)) combine
         newValues.maybeVisibility.as(List(eventUpdate(tsData.path))) combine
@@ -58,7 +67,6 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
         newValues.maybeKeywords.map(keywordsUpdates(tsData.id, _)) combine
         newValues.maybeImages.map(imagesUpdates(tsData.id, _))
     ).getOrElse(Nil)
-  }
 
   private def nameUpdates(id: projects.ResourceId, newValue: projects.Name): List[UpdateCommand] = List(
     nameInProjectUpdate(id, newValue),
@@ -285,5 +293,20 @@ private class UpdateCommandsCalculatorImpl(newValuesCalculator: NewValuesCalcula
       fr"""${resourceId.asEntityId} ${Image.Ontology.contentUrlProperty.id} ${uri.asObject}.""",
       fr"""${resourceId.asEntityId} ${Image.Ontology.positionProperty.id} ${position.asObject}."""
     )
+  }
+
+  private def logUpdateStatus(path: projects.Path): NewValues => F[Unit] = {
+    case NewValues(maybeName, maybeVisibility, maybeDateModified, maybeDesc, maybeKeywords, maybeImages) =>
+      List(
+        maybeName.map(v => show"name to '$v'"),
+        maybeVisibility.map(v => show"visibility to '$v'"),
+        maybeDateModified.map(v => show"dateModified to '$v'"),
+        maybeDesc.map(v => show"description to '$v'"),
+        maybeKeywords.map(v => show"keywords to '${v.mkString(", ")}'"),
+        maybeImages.map(v => show"images to '${v.map(_.uri).mkString(", ")}'")
+      ).flatten match {
+        case Nil     => ().pure[F]
+        case updates => Logger[F].info(show"$categoryName: updating ${updates.mkString(", ")} for project $path")
+      }
   }
 }
