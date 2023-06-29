@@ -19,6 +19,7 @@
 package io.renku.metrics
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.metrics.MetricsTools._
@@ -64,6 +65,14 @@ class SingleValueHistogramSpec extends AnyWordSpec with MockFactory with should.
 
       (observedDuration * 1000)              should be > simulatedDuration.toMillis.toDouble
       underlying.collectAllSamples.last._3 shouldBe 1d
+    }
+  }
+
+  "observe" should {
+    "call the underlying impl" in new TestCase {
+      val histogram = new LabeledHistogramImpl[Try](name, help, "label", Seq(0.1))
+      histogram.observe("label", 101d)
+      histogram.wrappedCollector.labels("label").get().sum shouldBe 101d
     }
   }
 

@@ -35,7 +35,7 @@ trait MetricsService[F[_]] {
   def collect: F[Unit]
 
   def collectEvery(interval: FiniteDuration)(implicit C: Compiler[F, F], T: Temporal[F]) =
-    Stream.repeatEval(collect *> T.sleep(interval)).compile.drain
+    Stream.awakeEvery(interval).evalMap(_ => collect).compile.drain
 }
 
 object MetricsService {
