@@ -48,6 +48,6 @@ object TgLockDB {
 
 class TgLockDbConfigProvider[F[_]: MonadThrow]()
     extends DBConfigProvider[F, TgLockDB](
-      namespace = "tg-lock",
+      namespace = "triples-generator-db",
       dbName = "triples_generator"
     )

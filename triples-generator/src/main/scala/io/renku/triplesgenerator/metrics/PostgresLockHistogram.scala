@@ -25,7 +25,7 @@ import io.renku.metrics.{LabeledHistogram, LabeledHistogramImpl, MetricsRegistry
 
 import scala.concurrent.duration._
 
-trait PostgresLockHistogram[F[_]] extends LabeledHistogram[F] {}
+trait PostgresLockHistogram[F[_]] extends LabeledHistogram[F]
 
 object PostgresLockHistogram {
   def apply[F[_]: MonadThrow: MetricsRegistry]: F[PostgresLockHistogram[F]] = MetricsRegistry[F].register {
@@ -34,7 +34,7 @@ object PostgresLockHistogram {
       help = "PostgresLock wait times",
       labelName = "object_id",
       buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50),
-      maybeThreshold = 750.millis.some
+      maybeThreshold = 200.millis.some
     ) with PostgresLockHistogram[F]
   }.widen
 }

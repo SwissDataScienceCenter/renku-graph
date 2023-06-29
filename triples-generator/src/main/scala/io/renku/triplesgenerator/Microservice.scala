@@ -86,7 +86,7 @@ object Microservice extends IOMicroservice {
     _ <- dbSessionPool.session.use(PostgresLockStats.ensureStatsTable[IO])
 
     metricsService <- MetricsService[IO](dbSessionPool)
-    _              <- metricsService.collectEvery(5.minutes).start
+    _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
 
     tsWriteLock = TgLockDB.createLock[IO, projects.Path](dbSessionPool, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
