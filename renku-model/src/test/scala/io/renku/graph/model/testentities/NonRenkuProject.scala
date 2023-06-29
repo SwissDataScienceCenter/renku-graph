@@ -22,7 +22,7 @@ import io.renku.cli.model.CliProject
 import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 
@@ -43,6 +43,7 @@ object NonRenkuProject {
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  dateCreated:      DateCreated,
+                                 dateModified:     DateModified,
                                  maybeCreator:     Option[Person],
                                  visibility:       Visibility,
                                  forksCount:       ForksCount,
@@ -58,6 +59,7 @@ object NonRenkuProject {
                               name:             Name,
                               maybeDescription: Option[Description],
                               dateCreated:      DateCreated,
+                              dateModified:     DateModified,
                               maybeCreator:     Option[Person],
                               visibility:       Visibility,
                               forksCount:       ForksCount,
@@ -87,6 +89,7 @@ object NonRenkuProject {
         project.name,
         project.maybeDescription,
         project.dateCreated,
+        project.dateModified,
         project.maybeCreator.map(_.to[entities.Person]),
         project.visibility,
         project.keywords,
@@ -104,6 +107,7 @@ object NonRenkuProject {
         project.name,
         project.maybeDescription,
         project.dateCreated,
+        project.dateModified,
         project.maybeCreator.map(_.to[entities.Person]),
         project.visibility,
         project.keywords,

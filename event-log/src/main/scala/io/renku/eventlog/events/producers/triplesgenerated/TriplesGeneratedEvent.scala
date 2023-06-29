@@ -41,11 +41,11 @@ private object TriplesGeneratedEventEncoder {
   import io.circe.literal.JsonStringContext
 
   lazy val encodeEvent: TriplesGeneratedEvent => Json = event => json"""{
-    "categoryName": ${SubscriptionCategory.categoryName.value},
-    "id":           ${event.id.id.value},
+    "categoryName": ${SubscriptionCategory.categoryName},
+    "id":           ${event.id.id},
     "project": {
-      "id":         ${event.id.projectId.value},
-      "path": ${event.projectPath.value}
+      "id":   ${event.id.projectId},
+      "path": ${event.projectPath}
     }
   }"""
 

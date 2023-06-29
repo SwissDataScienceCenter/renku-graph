@@ -22,8 +22,8 @@ import cats.Show
 import cats.effect.kernel.Sync
 import cats.syntax.all._
 import io.renku.interpreters.TestLogger.LogMessage._
-import org.scalatest.Assertion
 import org.scalatest.matchers.should
+import org.scalatest.{Assertion, Succeeded}
 import org.typelevel.log4cats.Logger
 
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -59,11 +59,12 @@ class TestLogger[F[_]: Sync] extends Logger[F] with should.Matchers {
   def loggedOnly(expected: List[LogEntry]): Assertion =
     invocations.asScala.toList should contain theSameElementsAs expected
 
-  def expectNoLogs(): Unit =
-    if (!invocations.isEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
+  def expectNoLogs(): Assertion =
+    if (invocations.isEmpty) Succeeded
+    else fail(s"No logs expected but got $invocationsPrettyPrint")
 
-  def expectNoLogs(severity: Level): Unit = invocations(of = severity).toList match {
-    case Nil         => ()
+  def expectNoLogs(severity: Level): Assertion = invocations(of = severity).toList match {
+    case Nil         => Succeeded
     case invocations => fail(s"No $severity logs expected but got ${prettyPrint(invocations)}")
   }
 

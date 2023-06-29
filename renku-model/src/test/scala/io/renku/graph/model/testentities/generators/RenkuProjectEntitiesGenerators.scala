@@ -78,6 +78,7 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
     dateCreated      <- projectDateCreatedGen
+    dateModified     <- projectModifiedDates(dateCreated.value)
     maybeCreator     <- creatorGen.toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
@@ -93,6 +94,7 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription,
     agent,
     dateCreated,
+    dateModified,
     maybeCreator,
     visibility,
     forksCount,
@@ -122,6 +124,7 @@ trait RenkuProjectEntitiesGenerators {
     path             <- projectPaths
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
+    dateModified     <- projectModifiedDates(dateCreated.value)
     maybeCreator     <- projectMembers.toGeneratorOfOptions
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
     members          <- projectMembers.toGeneratorOfList(min = 1).map(_.toSet)
@@ -132,6 +135,7 @@ trait RenkuProjectEntitiesGenerators {
                             name,
                             path,
                             dateCreated,
+                            dateModified,
                             maybeDescription,
                             maybeCreator,
                             keywords,

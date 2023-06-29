@@ -30,7 +30,7 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
@@ -169,7 +169,8 @@ trait EventLogDataProvisioning {
                                    eventStatus:     EventStatus,
                                    maybePayload:    Option[ZippedEventPayload]
   ): Unit = eventStatus match {
-    case TriplesGenerated | TransformationRecoverableFailure | TransformingTriples | TriplesStore | AwaitingDeletion =>
+    case TriplesGenerated | TransformingTriples | TransformationRecoverableFailure |
+        TransformationNonRecoverableFailure | TriplesStore | AwaitingDeletion =>
       maybePayload
         .map { payload =>
           execute[Unit] {

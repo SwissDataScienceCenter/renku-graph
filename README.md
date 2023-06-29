@@ -333,15 +333,23 @@ sequenceDiagram
     participant TriplesGenerator
     participant TokenRepository
     participant GitLab
+    participant TriplesStore
 
     EventLog ->> EventLog: sends PROJECT_SYNC
     activate EventLog
-    EventLog ->> TokenRepository: fetches access token
-    EventLog ->> GitLab: calls the Project Details
-    loop if there project path is NOT the same in EventLog and GitLab
-    EventLog ->> CommitEventService: sends COMMIT_SYNC for the new path
-    EventLog ->> TriplesGenerator: sends CLEAN_UP_REQUEST for the old path
-    end
+      EventLog ->> TokenRepository: fetches access token
+      EventLog ->> GitLab: calls the Project Details
+      loop if there project path is NOT the same in EventLog and GitLab
+        EventLog ->> CommitEventService: sends COMMIT_SYNC for the new path
+        EventLog ->> TriplesGenerator: sends CLEAN_UP_REQUEST for the old path
+      end
+      EventLog ->> TriplesGenerator: sends SYNC_REPO_METADATA
+      activate TriplesGenerator
+        TriplesGenerator ->> GitLab: fetches project metadata
+        TriplesGenerator ->> TriplesStore: fetches project metadata
+        TriplesGenerator ->> TriplesStore: sends update queries if values needs updating (not for visibility changes)
+        TriplesGenerator ->> EventLog: sends RedoProjectTransformation (only when visibility changes)
+      deactivate TriplesGenerator
     deactivate EventLog    
 ```
 

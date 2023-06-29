@@ -20,7 +20,7 @@ package io.renku.generators
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import cats.{Functor, Monad, Semigroupal}
+import cats.{Applicative, Functor, Monad, Semigroupal}
 import com.comcast.ip4s.Port
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -34,6 +34,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import java.time.{Duration => JavaDuration, _}
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object Generators {
@@ -331,6 +332,7 @@ object Generators {
   object Implicits {
 
     implicit class GenOps[T](generator: Gen[T]) {
+      self =>
 
       def generateOne: T = generateExample(generator)
 
@@ -370,9 +372,12 @@ object Generators {
 
       def toGeneratorOfFixedValue: Gen[T] = fixed(generateExample(generator))
 
-      def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
-      def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
+      def toGeneratorOfSomes: Gen[Option[T]] = generator map Option.apply
+
+      def toGeneratorOfNones: Gen[Option[T]] = Gen.const(None)
+
       def toGeneratorOfOptions: Gen[Option[T]] = frequency(3 -> const(None), 7 -> some(generator))
+
       def toGeneratorOfNonEmptyList(min: Int = 1, max: Int = 5): Gen[NonEmptyList[T]] =
         nonEmptyList(generator, min, max)
 
@@ -393,6 +398,16 @@ object Generators {
 
         loop(0)
       }
+    }
+
+    implicit class GenAppOps[G[_]: Applicative, T](generator: Gen[G[T]]) {
+
+      @tailrec
+      final def sequence: G[Gen[T]] =
+        generator.sample match {
+          case Some(value) => value.map(Gen.const)
+          case None        => sequence
+        }
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

@@ -25,9 +25,8 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.{GraphModelGenerators, entities}
-import io.renku.graph.model.testentities.RenkuProject
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{GraphModelGenerators, entities}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.{postDataQueriesOnly, preDataQueriesOnly}
@@ -35,10 +34,17 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.{EitherValues, TryValues}
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
-class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers with EntitiesGenerators {
+class ProjectTransformerSpec
+    extends AnyWordSpec
+    with MockFactory
+    with should.Matchers
+    with EitherValues
+    with TryValues
+    with EntitiesGenerators {
 
   "createTransformationStep" should {
 
@@ -55,38 +61,46 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects(kgProjectData)
         .returning(transformation(in = project -> Queries.empty, out = step1Result))
 
+      val step2Result @ (step2UpdatedProject, step2Queries) = generateProjAndQueries
+      (dateModifiedUpdater
+        .updateDateModified(_: ProjectMutableData))
+        .expects(kgProjectData)
+        .returning(transformation(in = step1UpdatedProject -> step1Queries, out = step2Result))
+
       val otherQueries = sparqlQueries.generateList()
       val postQueries  = sparqlQueries.generateList()
       (updatesCreator.prepareUpdates _)
-        .expects(step1UpdatedProject, kgProjectData)
+        .expects(step2UpdatedProject, kgProjectData)
         .returning(otherQueries)
 
       (updatesCreator.postUpdates _)
-        .expects(step1UpdatedProject)
+        .expects(step2UpdatedProject)
         .returning(postQueries)
 
       val step = transformer.createTransformationStep
 
       step.name.value shouldBe "Project Details Updates"
-      val Success(Right(updateResult)) = (step run project).value
+      val Right(updateResult) = (step run project).value.success.value
       updateResult shouldBe (
-        step1UpdatedProject,
-        List(step1Queries, preDataQueriesOnly(otherQueries), postDataQueriesOnly(postQueries)).combineAll
+        step2UpdatedProject,
+        List(step2Queries, preDataQueriesOnly(otherQueries), postDataQueriesOnly(postQueries)).combineAll
       )
     }
 
     "do nothing if no project found in KG" in new TestCase {
+
       (kgProjectFinder.find _)
         .expects(project.resourceId)
         .returning(None.pure[Try])
 
       val step = transformer.createTransformationStep
 
-      val Success(Right(updateResult)) = step.run(project).value
+      val Right(updateResult) = step.run(project).value.success.value
       updateResult shouldBe (project, Queries.empty)
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
+
       val exception = recoverableClientErrors.generateOne
       (kgProjectFinder.find _)
         .expects(project.resourceId)
@@ -94,13 +108,14 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(project).value
+      val recoverableError = step.run(project).value.success.value.left.value
 
       recoverableError          shouldBe a[ProcessingRecoverableError]
       recoverableError.getMessage should startWith("Problem finding project details in KG")
     }
 
     "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {
+
       val exception = exceptions.generateOne
       (kgProjectFinder.find _)
         .expects(project.resourceId)
@@ -108,8 +123,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      step.run(project).value shouldBe exception
-        .raiseError[Try, Either[ProcessingRecoverableError, (RenkuProject, Queries)]]
+      step.run(project).value.failure.exception shouldBe exception
     }
   }
 
@@ -122,27 +136,30 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       case _    => fail("Project or Queries different than expected")
     }
 
-    val kgProjectFinder    = mock[KGProjectFinder[Try]]
-    val updatesCreator     = mock[UpdatesCreator]
-    val dateCreatedUpdater = mock[DateCreatedUpdater]
-    val transformer        = new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator, dateCreatedUpdater)
+    val kgProjectFinder     = mock[KGProjectFinder[Try]]
+    val updatesCreator      = mock[UpdatesCreator]
+    val dateCreatedUpdater  = mock[DateCreatedUpdater]
+    val dateModifiedUpdater = mock[DateModifiedUpdater]
+    val transformer =
+      new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator, dateCreatedUpdater, dateModifiedUpdater)
 
     val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
 
   private lazy val projectMutableDataGen: Gen[ProjectMutableData] = for {
-    name           <- projectNames
-    dateCreated    <- projectCreatedDates()
-    maybeParentId  <- projectResourceIds.toGeneratorOfOptions
-    visibility     <- projectVisibilities
-    maybeDesc      <- projectDescriptions.toGeneratorOfOptions
-    keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
-    maybeAgent     <- GraphModelGenerators.cliVersions.toGeneratorOfOptions
-    maybeCreatorId <- personResourceIds.toGeneratorOfOptions
-    projId         <- projectResourceIds
-    images         <- projectImageResourceIds(projId)
+    name              <- projectNames
+    dateCreated       <- projectCreatedDates()
+    maybeDateModified <- projectModifiedDates(dateCreated.value).toGeneratorOfOptions
+    maybeParentId     <- projectResourceIds.toGeneratorOfOptions
+    visibility        <- projectVisibilities
+    maybeDesc         <- projectDescriptions.toGeneratorOfOptions
+    keywords          <- projectKeywords.toGeneratorOfSet(min = 0)
+    maybeAgent        <- GraphModelGenerators.cliVersions.toGeneratorOfOptions
+    maybeCreatorId    <- personResourceIds.toGeneratorOfOptions
+    images            <- imageUris.toGeneratorOfList()
   } yield ProjectMutableData(name,
                              Nel.of(dateCreated),
+                             maybeDateModified.toList,
                              maybeParentId,
                              visibility,
                              maybeDesc,

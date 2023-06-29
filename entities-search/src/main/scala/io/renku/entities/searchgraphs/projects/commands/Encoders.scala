@@ -74,6 +74,7 @@ private object Encoders {
       searchInfoQuad(ProjectSearchInfoOntology.pathProperty.id, info.path.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.dateCreatedProperty.id, info.dateCreated.asObject).some,
+      searchInfoQuad(ProjectSearchInfoOntology.dateModifiedProperty.id, info.dateModified.asObject).some,
       maybeDescriptionQuad
     ).flatten ++ creatorQuads ++ keywordsQuads ++ imagesQuads
   }

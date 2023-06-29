@@ -35,6 +35,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
                                       path,
                                       visibility,
                                       dateCreated,
+                                      dateModified,
                                       maybeCreator,
                                       keywords,
                                       maybeDescription,
@@ -46,6 +47,7 @@ class ProjectSearchInfoSpec extends AnyWordSpec with should.Matchers with ScalaC
             show"path = $path".some,
             show"visibility = $visibility".some,
             show"dateCreated = $dateCreated".some,
+            show"dateModified = $dateModified".some,
             maybeCreator.map(c => show"creator = $c"),
             keywords match {
               case Nil => None

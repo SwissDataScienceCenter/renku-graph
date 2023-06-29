@@ -37,6 +37,7 @@ sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with
   val maybeDescription:     Option[Description]
   val agent:                CliVersion
   val dateCreated:          DateCreated
+  val dateModified:         DateModified
   val maybeCreator:         Option[Person]
   val visibility:           Visibility
   val forksCount:           ForksCount
@@ -86,6 +87,7 @@ object RenkuProject {
                                  maybeDescription:     Option[Description],
                                  agent:                CliVersion,
                                  dateCreated:          DateCreated,
+                                 dateModified:         DateModified,
                                  maybeCreator:         Option[Person],
                                  visibility:           Visibility,
                                  forksCount:           ForksCount,
@@ -163,6 +165,7 @@ object RenkuProject {
                               maybeDescription:     Option[Description],
                               agent:                CliVersion,
                               dateCreated:          DateCreated,
+                              dateModified:         DateModified,
                               maybeCreator:         Option[Person],
                               visibility:           Visibility,
                               forksCount:           ForksCount,
@@ -253,6 +256,7 @@ object RenkuProject {
           project.maybeDescription,
           project.agent,
           project.dateCreated,
+          project.dateModified,
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
           project.keywords,
@@ -277,6 +281,7 @@ object RenkuProject {
           project.maybeDescription,
           project.agent,
           project.dateCreated,
+          project.dateModified,
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
           project.keywords,

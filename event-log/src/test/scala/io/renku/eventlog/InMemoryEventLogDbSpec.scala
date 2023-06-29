@@ -19,11 +19,11 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
+import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
 import io.renku.db.DbSpec
 import io.renku.eventlog.init.EventLogDbMigrations
-import io.renku.testtools.IOSpec
-import org.scalatest.TestSuite
+import org.scalatest.Suite
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -35,7 +35,9 @@ trait InMemoryEventLogDbSpec
     with EventLogDataProvisioning
     with EventDataFetching {
 
-  self: TestSuite with IOSpec =>
+  self: Suite =>
+
+  implicit val ioRuntime: IORuntime
 
   protected def initDb(): Unit = allMigrations.map(_.run).sequence.void.unsafeRunSync()
 

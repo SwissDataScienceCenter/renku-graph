@@ -19,25 +19,32 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.namedgraphs.projects
 
 import cats.data.{NonEmptyList => Nel}
-import io.renku.graph.model.{persons, projects}
-import io.renku.graph.model.images.ImageResourceId
+import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.versions.CliVersion
+import io.renku.graph.model.{persons, projects}
 
 private[projects] final case class ProjectMutableData(
     name:             projects.Name,
-    dateCreated:      Nel[projects.DateCreated],
+    createdDates:     Nel[projects.DateCreated],
+    modifiedDates:    List[projects.DateModified],
     maybeParentId:    Option[projects.ResourceId],
     visibility:       projects.Visibility,
     maybeDescription: Option[projects.Description],
     keywords:         Set[projects.Keyword],
     maybeAgent:       Option[CliVersion],
     maybeCreatorId:   Option[persons.ResourceId],
-    images:           List[ImageResourceId]
+    images:           List[ImageUri]
 ) {
 
   lazy val earliestDateCreated: projects.DateCreated =
-    dateCreated.toList.min
+    createdDates.toList.min
+
+  lazy val maybeMaxDateModified: Option[projects.DateModified] =
+    modifiedDates match {
+      case Nil      => Option.empty[projects.DateModified]
+      case nonEmpty => Some(nonEmpty.max)
+    }
 
   def selectEarliestDateCreated: ProjectMutableData =
-    copy(dateCreated = Nel.one(earliestDateCreated))
+    copy(createdDates = Nel.one(earliestDateCreated))
 }

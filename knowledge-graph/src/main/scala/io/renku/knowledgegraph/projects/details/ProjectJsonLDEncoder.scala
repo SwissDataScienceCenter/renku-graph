@@ -43,7 +43,7 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
       renku / "projectVisibility" -> project.visibility.asJsonLD,
       schema / "dateCreated"      -> project.created.date.asJsonLD,
       schema / "creator"          -> project.created.maybeCreator.asJsonLD,
-      schema / "dateModified"     -> project.updatedAt.asJsonLD,
+      schema / "dateModified"     -> project.dateModified.asJsonLD,
       schema / "keywords"         -> project.keywords.asJsonLD,
       schema / "schemaVersion"    -> project.maybeVersion.asJsonLD,
       prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD,

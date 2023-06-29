@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.consumers
 package projectsync
 
+import Generators._
 import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
@@ -31,102 +32,115 @@ import io.renku.graph.model.projects
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import io.renku.testtools.CustomAsyncIOSpec
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectInfoSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class ProjectInfoSynchronizerSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with AsyncMockFactory
+    with should.Matchers {
 
-  "syncProjectInfo" should {
+  it should "fetch relevant project info from GitLab and send SYNC_REPO_METADATA " +
+    "if both paths from event and GitLab are the same" in {
 
-    "fetches relevant project info from GitLab and " +
-      "does nothing if both paths from event and GitLab are the same" in new TestCase {
+      val event = projectSyncEvents.generateOne
 
-        givenGitLabProject(by = event.projectId, returning = event.projectPath.some.asRight.pure[IO])
+      givenGitLabProject(by = event.projectId, returning = event.projectPath.some.asRight.pure[IO])
 
-        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
-      }
-
-    "fetches relevant project info from GitLab and " +
-      "if GitLab returns a different path " +
-      "project info in the project table is changed " +
-      "and a COMMIT_SYNC_REQUEST event with the updated project info " +
-      "and a CLEAN_UP_REQUEST event with the old project info " +
-      "are sent" in new TestCase {
-
-        val newPath = projectPaths.generateOne
-
-        inSequence {
-          givenGitLabProject(by = event.projectId, returning = newPath.some.asRight.pure[IO])
-
-          givenProjectRemovedFromDB(event.projectId, returning = ().pure[IO])
-
-          givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
-
-          givenSending(commitSyncRequestEvent(event.projectId, newPath), returning = ().pure[IO])
-        }
-
-        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
-      }
-
-    "fetches relevant project info from GitLab and " +
-      "if GitLab returns no path " +
-      "only a CLEAN_UP_REQUEST event with the old project info is sent" in new TestCase {
-
-        givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Path].asRight.pure[IO])
-
-        givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
-
-        synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
-      }
-
-    "log an error if finding project info in GitLab returns Left" in new TestCase {
-      givenGitLabProject(by = event.projectId, returning = UnauthorizedException.asLeft.pure[IO])
+      givenSendingSyncRepoMetadata(event, returning = ().pure[IO])
 
       synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(Info(show"PROJECT_SYNC: $event failed: $UnauthorizedException"))
     }
 
-    "fail if process fails" in new TestCase {
-      val exception = exceptions.generateOne
-      givenGitLabProject(by = event.projectId,
-                         returning = exception.raiseError[IO, Either[UnauthorizedException, Option[projects.Path]]]
-      )
+  it should "fetch relevant project info from GitLab and " +
+    "if GitLab returns a different path " +
+    "project info in the project table is changed " +
+    "and a COMMIT_SYNC_REQUEST event with the updated project info " +
+    "and a CLEAN_UP_REQUEST event with the old project info " +
+    "are sent" in {
 
-      intercept[Exception](synchronizer.syncProjectInfo(event).unsafeRunSync()) shouldBe exception
+      val event   = projectSyncEvents.generateOne
+      val newPath = projectPaths.generateOne
+
+      givenGitLabProject(by = event.projectId, returning = newPath.some.asRight.pure[IO])
+
+      givenProjectRemovedFromDB(event.projectId, returning = ().pure[IO])
+
+      givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
+
+      givenSending(commitSyncRequestEvent(event.projectId, newPath), returning = ().pure[IO])
+
+      synchronizer.syncProjectInfo(event).assertNoException
     }
-  }
 
-  private trait TestCase {
+  it should "fetch relevant project info from GitLab and " +
+    "if GitLab returns no path " +
+    "only a CLEAN_UP_REQUEST event with the old project info is sent" in {
+
+      val event = projectSyncEvents.generateOne
+
+      givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Path].asRight.pure[IO])
+
+      givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
+
+      synchronizer.syncProjectInfo(event).assertNoException
+    }
+
+  it should "log an error if finding project info in GitLab returns Left" in {
+
     val event = projectSyncEvents.generateOne
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabProjectFetcher = mock[GitLabProjectFetcher[IO]]
-    val projectRemover       = mock[ProjectRemover[IO]]
-    val eventSender          = mock[EventSender[IO]]
-    val synchronizer         = new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender)
+    givenGitLabProject(by = event.projectId, returning = UnauthorizedException.asLeft.pure[IO])
 
-    def givenGitLabProject(by: projects.GitLabId, returning: IO[Either[UnauthorizedException, Option[projects.Path]]]) =
-      (gitLabProjectFetcher.fetchGitLabProject _)
-        .expects(by)
-        .returning(returning)
-
-    def givenProjectRemovedFromDB(id: projects.GitLabId, returning: IO[Unit]) =
-      (projectRemover.removeProject _)
-        .expects(id)
-        .returning(returning)
-
-    def givenSending(categoryAndRequest: (CategoryName, EventRequestContent.NoPayload), returning: IO[Unit]) =
-      (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-        .expects(
-          categoryAndRequest._2,
-          EventSender.EventContext(categoryAndRequest._1, show"$categoryName: sending ${categoryAndRequest._1} failed")
-        )
-        .returning(returning)
+    synchronizer.syncProjectInfo(event).assertNoException >>
+      logger.loggedOnly(Info(show"PROJECT_SYNC: $event failed: $UnauthorizedException")).pure[IO]
   }
+
+  it should "fail if process fails" in {
+
+    val event = projectSyncEvents.generateOne
+
+    val exception = exceptions.generateOne
+    givenGitLabProject(by = event.projectId,
+                       returning = exception.raiseError[IO, Either[UnauthorizedException, Option[projects.Path]]]
+    )
+
+    synchronizer.syncProjectInfo(event).assertThrowsError[Exception](_ shouldBe exception)
+  }
+
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  private lazy val gitLabProjectFetcher   = mock[GitLabProjectFetcher[IO]]
+  private lazy val projectRemover         = mock[ProjectRemover[IO]]
+  private lazy val eventSender            = mock[EventSender[IO]]
+  private lazy val syncRepoMetadataSender = mock[SyncRepoMetadataSender[IO]]
+  private lazy val synchronizer =
+    new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender, syncRepoMetadataSender)
+
+  private def givenGitLabProject(by:        projects.GitLabId,
+                                 returning: IO[Either[UnauthorizedException, Option[projects.Path]]]
+  ) = (gitLabProjectFetcher.fetchGitLabProject _)
+    .expects(by)
+    .returning(returning)
+
+  private def givenProjectRemovedFromDB(id: projects.GitLabId, returning: IO[Unit]) =
+    (projectRemover.removeProject _)
+      .expects(id)
+      .returning(returning)
+
+  private def givenSending(categoryAndRequest: (CategoryName, EventRequestContent.NoPayload), returning: IO[Unit]) =
+    (eventSender
+      .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+      .expects(
+        categoryAndRequest._2,
+        EventSender.EventContext(categoryAndRequest._1, show"$categoryName: sending ${categoryAndRequest._1} failed")
+      )
+      .returning(returning)
+
+  private def givenSendingSyncRepoMetadata(event: ProjectSyncEvent, returning: IO[Unit]) =
+    (syncRepoMetadataSender.sendSyncRepoMetadata _).expects(event).returning(returning)
 
   private def commitSyncRequestEvent(id:   projects.GitLabId,
                                      path: projects.Path
@@ -153,9 +167,4 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with IOSpec with MockFacto
     }"""
     category -> EventRequestContent.NoPayload(payload)
   }
-
-  private lazy val projectSyncEvents = for {
-    id   <- projectIds
-    path <- projectPaths
-  } yield ProjectSyncEvent(id, path)
 }

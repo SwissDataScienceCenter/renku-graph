@@ -32,7 +32,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.projects.DateCreated
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.jsonld.syntax._
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.tinytypes.syntax.all._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -42,15 +42,15 @@ import monocle.Lens
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 import scala.concurrent.duration._
 
 class UpdatesCreatorSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
     with should.Matchers
     with EntitiesGenerators
     with DiffShouldMatcher
@@ -63,7 +63,9 @@ class UpdatesCreatorSpec
   import UpdatesCreator._
 
   "postUpdates" should {
+
     "remove duplicate created dates" in {
+
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project1 =
         projectCreatedLens.set(dateCreated)(
@@ -73,15 +75,16 @@ class UpdatesCreatorSpec
       upload(to = projectsDataset, project1)
       upload(to = projectsDataset, project2)
 
-      postUpdates(project1).runAll(projectsDataset).unsafeRunSync()
-
-      val projects = findProjects
-      projects.size                  shouldBe 1
-      projects.head.maybeName        shouldBe project1.name.value.some
-      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+      postUpdates(project1).runAll(projectsDataset) >>
+        findProjects.asserting { projects =>
+          projects.size                  shouldBe 1
+          projects.head.maybeName        shouldBe project1.name.value.some
+          projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+        }
     }
 
     "retain any single date" in {
+
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project =
         projectCreatedLens.set(dateCreated)(
@@ -89,15 +92,16 @@ class UpdatesCreatorSpec
         )
       upload(to = projectsDataset, project)
 
-      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
-
-      val projects = findProjects
-      projects.size                  shouldBe 1
-      projects.head.maybeName        shouldBe project.name.value.some
-      projects.head.maybeDateCreated shouldBe project.dateCreated.some
+      postUpdates(project).runAll(projectsDataset) >>
+        findProjects.asserting { projects =>
+          projects.size                  shouldBe 1
+          projects.head.maybeName        shouldBe project.name.value.some
+          projects.head.maybeDateCreated shouldBe project.dateCreated.some
+        }
     }
 
     "retain minimum date when delete concurrently" in {
+
       val dateCreated = DateCreated(Instant.parse("2022-12-09T13:45:13Z"))
       val project1 =
         projectCreatedLens.set(dateCreated)(
@@ -117,36 +121,38 @@ class UpdatesCreatorSpec
           _   <- fib.join
         } yield ()
 
-      run.unsafeRunSync()
-
-      val projects = findProjects
-      projects.size                  shouldBe 1
-      projects.head.maybeName        shouldBe project1.name.value.some
-      projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+      run >>
+        findProjects.asserting { projects =>
+          projects.size                  shouldBe 1
+          projects.head.maybeName        shouldBe project1.name.value.some
+          projects.head.maybeDateCreated shouldBe project2.dateCreated.some
+        }
     }
 
     "don't confuse with datasets when removing dates" in {
+
       val (dataset, project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
         .bimap(identity, _.to[entities.Project])
       upload(to = projectsDataset, project)
 
-      postUpdates(project).runAll(projectsDataset).unsafeRunSync()
-
-      val projects = findProjects
-      projects.size                  shouldBe 1
-      projects.head.maybeName        shouldBe project.name.value.some
-      projects.head.maybeDateCreated shouldBe project.dateCreated.some
-
-      val datasets = findDatasets
-      datasets.size      shouldBe 1
-      datasets.head.name shouldBe dataset.identification.title.value.some
+      postUpdates(project).runAll(projectsDataset) >>
+        findProjects.asserting { projects =>
+          projects.size                  shouldBe 1
+          projects.head.maybeName        shouldBe project.name.value.some
+          projects.head.maybeDateCreated shouldBe project.dateCreated.some
+        } >>
+        findDatasets.asserting { datasets =>
+          datasets.size      shouldBe 1
+          datasets.head.name shouldBe dataset.identification.title.value.some
+        }
     }
   }
 
   "prepareUpdates" should {
     "not delete existing images if they did not change" in {
+
       val project = anyProjectEntities
         .suchThat(_.images.nonEmpty)
         .generateOne
@@ -154,14 +160,13 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      prepareUpdates(project, toProjectMutableData(project))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      project.images.foreach { im =>
-        findImage(im.resourceId) shouldBe im.some
-      }
-      findProjects.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)
+      prepareUpdates(project, toProjectMutableData(project)).runAll(on = projectsDataset) >>
+        project.images.map { im =>
+          findImage(im.resourceId).asserting(_ shouldBe im.some)
+        }.sequence >>
+        findProjects.asserting(
+          _.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)
+        )
     }
 
     "generate queries which delete the project images when changed" in {
@@ -170,28 +175,25 @@ class UpdatesCreatorSpec
 
       upload(to = projectsDataset, project)
 
-      findProjects.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)
-
-      prepareUpdates(project, toProjectMutableData(project).copy(images = Nil))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findProjects.flatMap(_.images) shouldBe Set.empty
-      project.images.foreach { im =>
-        findImage(im.resourceId) shouldBe None
-      }
+      findProjects
+        .asserting(_.flatMap(_.images) should contain theSameElementsAs project.images.map(_.resourceId.show)) >>
+        prepareUpdates(project, toProjectMutableData(project).copy(images = Nil))
+          .runAll(on = projectsDataset) >>
+        project.images.map { im =>
+          findImage(im.resourceId).asserting(_ shouldBe None)
+        }.sequence >>
+        findProjects.asserting(_.flatMap(_.images) shouldBe Set.empty)
     }
 
     "generate queries which delete the project name when changed" in {
+
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)
 
       prepareUpdates(project, toProjectMutableData(project).copy(name = projectNames.generateOne))
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None))
+        .runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None)))
     }
 
     val projectWithParentScenarios = Table(
@@ -209,9 +211,8 @@ class UpdatesCreatorSpec
 
         val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = projectResourceIds.generateSome)
 
-        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
+        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None)))
       }
     }
 
@@ -237,13 +238,11 @@ class UpdatesCreatorSpec
                )
         )
 
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = parentId.show.some))
-
-        val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = parentId.some)
-
-        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
+        findProjects
+          .asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = parentId.show.some))) >>
+          prepareUpdates(project, toProjectMutableData(project).copy(maybeParentId = parentId.some))
+            .runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None)))
       }
     }
 
@@ -252,115 +251,124 @@ class UpdatesCreatorSpec
 
         upload(to = projectsDataset, project)
 
-        prepareUpdates(project, toProjectMutableData(project)).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project))
+        prepareUpdates(project, toProjectMutableData(project)).runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project)))
       }
     }
 
     "generate queries which deletes the project visibility when changed" in {
+
       val project = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo = toProjectMutableData(project)
         .copy(visibility = Gen.oneOf(projects.Visibility.all.filterNot(_ == project.visibility)).generateOne)
 
       upload(to = projectsDataset, project)
 
-      prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeVisibility = None))
+      prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeVisibility = None)))
     }
 
-    "generate queries which deletes the project description when changed" in {
-      forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+    forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+      s"generate queries which deletes the project description when changed - project ${project.name}" in {
+
         val kgProjectInfo = toProjectMutableData(project).copy(maybeDescription = projectDescriptions.generateSome)
 
         upload(to = projectsDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDesc = None))
-
-        clear(projectsDataset)
+        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeDesc = None)))
       }
     }
 
     "generate queries which deletes the project keywords when changed" in {
+
       val project       = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo = toProjectMutableData(project).copy(keywords = projectKeywords.generateSet(min = 1))
 
       upload(to = projectsDataset, project)
 
-      prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project).copy(keywords = Set.empty))
+      prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(keywords = Set.empty)))
     }
 
-    "generate queries which deletes the project agent when changed" in {
-      forAll(anyRenkuProjectEntities.map(_.to[entities.RenkuProject])) { project =>
+    forAll(anyRenkuProjectEntities.map(_.to[entities.RenkuProject])) { project =>
+      s"generate queries which deletes the project agent when changed - project ${project.name}" in {
         val kgProjectInfo =
           toProjectMutableData(project).copy(maybeAgent = GraphModelGenerators.cliVersions.generateSome)
 
         upload(to = projectsDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeAgent = None))
-
-        clear(projectsDataset)
+        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeAgent = None)))
       }
     }
 
-    "generate queries which deletes the project creator when changed" in {
-      forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+    forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+      s"generate queries which deletes the project creator when changed - project ${project.name}" in {
+
         val kgProjectInfo = toProjectMutableData(project).copy(maybeCreatorId = personResourceIds.generateSome)
 
         upload(to = projectsDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset).unsafeRunSync()
-
-        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeCreatorId = None))
-
-        clear(projectsDataset)
+        prepareUpdates(project, kgProjectInfo).runAll(on = projectsDataset) >>
+          findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeCreatorId = None)))
       }
     }
 
     "not generate queries when nothing changed" in {
+
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)
 
-      prepareUpdates(project, toProjectMutableData(project)).runAll(on = projectsDataset).unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project))
+      prepareUpdates(project, toProjectMutableData(project)).runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project)))
     }
   }
 
   "dateCreatedDeletion" should {
 
     "generate queries which delete the project dateCreated when changed" in {
+
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       upload(to = projectsDataset, project)
 
-      dateCreatedDeletion(project,
-                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateNonEmptyList())
-      )
-        .runAll(on = projectsDataset)
-        .unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None))
+      dateCreatedDeletion(
+        project,
+        toProjectMutableData(project).copy(createdDates = projectCreatedDates().generateNonEmptyList())
+      ).runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None)))
     }
   }
 
-  private case class CurrentProjectState(maybeName:        Option[String],
-                                         maybeDateCreated: Option[projects.DateCreated],
-                                         maybeParentId:    Option[String],
-                                         maybeVisibility:  Option[String],
-                                         maybeDesc:        Option[String],
-                                         keywords:         Set[String],
-                                         maybeAgent:       Option[String],
-                                         maybeCreatorId:   Option[String],
-                                         images:           Set[String]
+  "dateModifiedDeletion" should {
+
+    "generate queries which delete the project dateModified when changed" in {
+
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      upload(to = projectsDataset, project)
+
+      dateModifiedDeletion(
+        project,
+        toProjectMutableData(project)
+          .copy(modifiedDates = projectModifiedDates(project.dateCreated.value).generateNonEmptyList().toList)
+      ).runAll(on = projectsDataset) >>
+        findProjects.asserting(_ shouldBe Set(CurrentProjectState.from(project).copy(maybeDateModified = None)))
+    }
+  }
+
+  private case class CurrentProjectState(maybeName:         Option[String],
+                                         maybeDateCreated:  Option[projects.DateCreated],
+                                         maybeDateModified: Option[projects.DateModified],
+                                         maybeParentId:     Option[String],
+                                         maybeVisibility:   Option[String],
+                                         maybeDesc:         Option[String],
+                                         keywords:          Set[String],
+                                         maybeAgent:        Option[String],
+                                         maybeCreatorId:    Option[String],
+                                         images:            Set[String]
   )
 
   private case class CurrentDatasetState(name: Option[String], dateCreated: Option[Instant])
@@ -369,6 +377,7 @@ class UpdatesCreatorSpec
     def from(project: entities.Project): CurrentProjectState = CurrentProjectState(
       project.name.value.some,
       project.dateCreated.some,
+      project.dateModified.some,
       findParent(project).map(_.value),
       project.visibility.value.some,
       project.maybeDescription.map(_.value),
@@ -382,7 +391,7 @@ class UpdatesCreatorSpec
       Diff.derived[CurrentProjectState]
   }
 
-  private def findDatasets: Set[CurrentDatasetState] =
+  private def findDatasets: IO[Set[CurrentDatasetState]] =
     runSelect(
       projectsDataset,
       SparqlQuery.of(
@@ -398,21 +407,21 @@ class UpdatesCreatorSpec
            |}
            |""".stripMargin
       )
-    ).unsafeRunSync()
-      .map(row =>
+    ).map(
+      _.map(row =>
         CurrentDatasetState(
           name = row.get("name"),
           dateCreated = row.get("dateCreated").map(d => Instant.parse(d))
         )
-      )
-      .toSet
+      ).toSet
+    )
 
-  private def findProjects: Set[CurrentProjectState] = runSelect(
+  private def findProjects: IO[Set[CurrentProjectState]] = runSelect(
     on = projectsDataset,
     SparqlQuery.of(
       "fetch project data",
       Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-      s"""|SELECT ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc
+      s"""|SELECT ?name ?dateCreated ?dateModified ?maybeParent ?visibility ?maybeDesc
           |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
           |  (GROUP_CONCAT(?imageId; separator=',') AS ?images)
           |WHERE {
@@ -420,7 +429,8 @@ class UpdatesCreatorSpec
           |    ?id a schema:Project
           |    OPTIONAL { ?id schema:name ?name } 
           |    OPTIONAL { ?id schema:dateCreated ?dateCreated } 
-          |    OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
+          |    OPTIONAL { ?id schema:dateModified ?dateModified }
+          |    OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent }
           |    OPTIONAL { ?id renku:projectVisibility ?visibility } 
           |    OPTIONAL { ?id schema:description ?maybeDesc } 
           |    OPTIONAL { ?id schema:keywords ?keyword } 
@@ -429,14 +439,15 @@ class UpdatesCreatorSpec
           |    OPTIONAL { ?id schema:image ?imageId }
           |  }
           |}
-          |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
+          |GROUP BY ?name ?dateCreated ?dateModified ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
           |""".stripMargin
     )
-  ).unsafeRunSync()
-    .map(row =>
+  ).map(
+    _.map(row =>
       CurrentProjectState(
         maybeName = row.get("name"),
         maybeDateCreated = row.get("dateCreated").map(d => projects.DateCreated(Instant.parse(d))),
+        maybeDateModified = row.get("dateModified").map(d => projects.DateModified(Instant.parse(d))),
         maybeParentId = row.get("maybeParent"),
         maybeVisibility = row.get("visibility"),
         maybeDesc = row.get("maybeDesc"),
@@ -445,10 +456,10 @@ class UpdatesCreatorSpec
         maybeCreatorId = row.get("maybeCreatorId"),
         images = row.get("images").map(_.split(',').toSet).getOrElse(Set.empty)
       )
-    )
-    .toSet
+    ).toSet
+  )
 
-  private def findImage(id: model.images.ImageResourceId): Option[model.images.Image] = runSelect(
+  private def findImage(id: model.images.ImageResourceId): IO[Option[model.images.Image]] = runSelect(
     on = projectsDataset,
     SparqlQuery.of(
       "fetch image",
@@ -463,17 +474,17 @@ class UpdatesCreatorSpec
           |}
           |""".stripMargin
     )
-  ).unsafeRunSync()
-    .map(row =>
+  ).map(
+    _.map(row =>
       model.images.Image(
         row.get("imageId").map(model.images.ImageResourceId.apply).getOrElse(fail("No image id")),
         row.get("uri").map(model.images.ImageUri.apply).getOrElse(fail("No image uri")),
         row.get("position").map(p => model.images.ImagePosition(p.toInt)).getOrElse(fail("No image position"))
       )
-    )
-    .headOption
+    ).headOption
+  )
 
-  def projectCreatedLens: Lens[entities.Project, DateCreated] =
+  private def projectCreatedLens: Lens[entities.Project, DateCreated] =
     Lens[entities.Project, DateCreated](_.dateCreated) { created =>
       {
         case p: entities.NonRenkuProject.WithParent    => p.copy(dateCreated = created)

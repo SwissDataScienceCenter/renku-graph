@@ -27,18 +27,17 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.projects.{GitLabId, Name, Path}
-import io.renku.graph.model.testentities
+import io.renku.graph.model.{projects, testentities}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
 import java.net.{MalformedURLException, URL}
-import java.time.Instant
 
 final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              GitLabId,
                          maybeCreator:    Option[ProjectMember],
                          members:         NonEmptyList[ProjectMember],
-                         updatedAt:       DateUpdated,
+                         dateModified:    projects.DateModified,
                          urls:            Urls,
                          starsCount:      StarsCount,
                          permissions:     Permissions,
@@ -52,11 +51,6 @@ object Project {
 
   final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
   implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt[StarsCount]
-
-  final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object DateUpdated
-      extends TinyTypeFactory[DateUpdated](new DateUpdated(_))
-      with InstantNotInTheFuture[DateUpdated]
 
   sealed trait Permissions extends Product with Serializable
 

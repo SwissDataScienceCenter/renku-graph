@@ -27,13 +27,14 @@ private object TestDataTools {
   def toProjectMutableData(project: entities.Project): ProjectMutableData = ProjectMutableData(
     project.name,
     Nel.of(project.dateCreated),
+    List(project.dateModified),
     findParent(project),
     project.visibility,
     project.maybeDescription,
     project.keywords,
     findAgent(project),
     project.maybeCreator.map(_.resourceId),
-    project.images.map(_.resourceId)
+    project.images.sortBy(_.position).map(_.uri)
   )
 
   def findParent(project: entities.Project) = project match {
