@@ -18,20 +18,56 @@
 
 package io.renku.graph.acceptancetests.db
 
+import cats.effect.{IO, Resource, Temporal}
 import cats.{Applicative, Monad}
-import cats.effect.{IO, Temporal}
+import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import eu.timepit.refined.auto._
+import io.renku.db.{DBConfigProvider, PostgresContainer}
+import io.renku.triplesgenerator.TgLockDB.SessionResource
+import io.renku.triplesgenerator.{TgLockDB, TgLockDbConfigProvider}
 import io.renku.triplesstore._
+import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
+import skunk.Session
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDataset {
 
   protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
 
+  private lazy val dbConfig: DBConfigProvider.DBConfig[TgLockDB] =
+    new TgLockDbConfigProvider[Try].get().fold(throw _, identity)
+
+  private lazy val postgresContainer = FixedHostPortGenericContainer(
+    imageName = PostgresContainer.image,
+    env = Map(
+      "POSTGRES_USER"     -> dbConfig.user.value,
+      "POSTGRES_PASSWORD" -> dbConfig.pass.value,
+      "POSTGRES_DB"       -> dbConfig.name.value
+    ),
+    exposedPorts = Seq(dbConfig.port.value),
+    exposedHostPort = dbConfig.port.value,
+    exposedContainerPort = dbConfig.port.value,
+    command = Seq(s"-p ${dbConfig.port.value}")
+  )
+
+  lazy val sessionResource: Resource[IO, SessionResource[IO]] =
+    Session
+      .pooled[IO](
+        host = postgresContainer.host,
+        port = dbConfig.port.value,
+        database = dbConfig.name.value,
+        user = dbConfig.user.value,
+        password = Some(dbConfig.pass.value),
+        max = dbConfig.connectionPool.value
+      )
+      .map(new SessionResource(_))
+
   def start()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- Applicative[IO].unlessA(isRunning)(IO(container.start()))
+    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
     _ <- waitForReadiness
     _ <- logger.info("Triples Store started")
   } yield ()
@@ -40,4 +76,5 @@ object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDat
 
   private def waitForReadiness(implicit logger: Logger[IO]): IO[Unit] =
     Monad[IO].whileM_(IO(!isRunning))(logger.info("Waiting for TS") >> (Temporal[IO] sleep (500 millis)))
+
 }
