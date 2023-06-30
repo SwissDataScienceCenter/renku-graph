@@ -14,7 +14,7 @@ object Dependencies {
     val diffx                  = "0.8.3"
     val http4s                 = "0.23.21"
     val http4sEmber            = "0.23.21"
-    val http4sPrometheus       = "0.24.3"
+    val http4sPrometheus       = "0.24.4"
     val ip4s                   = "3.3.0"
     val jsonld4s               = "0.11.0"
     val log4cats               = "2.6.0"
