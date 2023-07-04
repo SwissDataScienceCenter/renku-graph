@@ -156,6 +156,7 @@ private class MicroserviceRunner[F[_]: Async: Logger](
       _      <- Resource.eval(cliVersionCompatibilityVerifier.run)
       _      <- Spawn[F].background(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run)
       server <- httpServer.createServer
+      _      <- Resource.eval(Logger[F].info(s"Triples-Generator service started"))
     } yield server
   } recoverWith logAndThrow
 
