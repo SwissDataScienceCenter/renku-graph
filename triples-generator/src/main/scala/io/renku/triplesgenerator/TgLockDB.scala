@@ -19,11 +19,13 @@
 package io.renku.triplesgenerator
 
 import cats._
-import cats.effect.Temporal
+import cats.effect.{MonadCancelThrow, Temporal}
+import cats.syntax.all._
 import eu.timepit.refined.auto._
+import fs2.Stream
 import io.renku.db.DBConfigProvider
 import io.renku.graph.model.projects
-import io.renku.lock.{Lock, LongKey, PostgresLock}
+import io.renku.lock.{Lock, LongKey, PostgresLock, PostgresLockStats}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -44,6 +46,18 @@ object TgLockDB {
       interval:    FiniteDuration
   ): Lock[F, A] =
     PostgresLock.exclusive[F, A](sessionPool.session, interval)
+
+  def migrate[F[_]: MonadCancelThrow: Temporal: Logger](dbPool: SessionResource[F], retry: FiniteDuration): F[Unit] = {
+    val run = dbPool.session.use(PostgresLockStats.ensureStatsTable[F]).attempt
+    (Stream.eval(run) ++ Stream.awakeDelay(retry).evalMap(_ => run))
+      .evalMap {
+        case Right(_) => Logger[F].info(s"triples_generator db migration done").as(0)
+        case Left(ex) => Logger[F].error(ex)(s"Error running triples_generator migrations").as(1)
+      }
+      .find(_ == 0)
+      .compile
+      .drain
+  }
 }
 
 class TgLockDbConfigProvider[F[_]: MonadThrow]()

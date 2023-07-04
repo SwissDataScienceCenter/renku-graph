@@ -33,7 +33,6 @@ import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
-import io.renku.lock.PostgresLockStats
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ResourceUse, ServiceReadinessChecker}
@@ -83,7 +82,7 @@ object Microservice extends IOMicroservice {
     implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
 
-    _ <- dbSessionPool.session.use(PostgresLockStats.ensureStatsTable[IO])
+    _ <- TgLockDB.migrate[IO](dbSessionPool, 20.seconds)
 
     metricsService <- MetricsService[IO](dbSessionPool)
     _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
