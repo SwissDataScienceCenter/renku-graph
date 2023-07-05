@@ -77,26 +77,6 @@ class EndpointSpec
       }
     }
 
-    "respond with OK using new search when secret header is present" in new TestCase {
-      override val finder: EntitiesFinder[IO] = new EntitiesFinder[IO] {
-        override def findEntities(criteria: Criteria): IO[PagingResponse[model.Entity]] = ???
-      }
-      override val finderNew: EntitiesFinder[IO] = mock[EntitiesFinder[IO]]
-
-      forAll(pagingResponses(modelEntities)) { results =>
-        (finderNew.findEntities(_: Criteria)).expects(criteria).returning(results.pure[IO])
-
-        val response =
-          endpoint.`GET /entities`(criteria, request.putHeaders("Renku-Kg-QueryNew" -> "true")).unsafeRunSync()
-
-        response.status        shouldBe Ok
-        response.contentType   shouldBe Some(`Content-Type`(application.json))
-        response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-
-        response.as[Json].unsafeRunSync() shouldBe results.results.asJson
-      }
-    }
-
     "respond with OK with an empty list if no entities found" in new TestCase {
       val results = PagingResponse.empty[model.Entity](pagingRequests.generateOne)
       (finder.findEntities(_: Criteria)).expects(criteria).returning(results.pure[IO])
@@ -136,12 +116,10 @@ class EndpointSpec
     implicit val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
     implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
+
     val finder = mock[EntitiesFinder[IO]]
-    def finderNew = new EntitiesFinder[IO] {
-      override def findEntities(criteria: Criteria): IO[PagingResponse[model.Entity]] = ???
-    }
     // the endpoint should by default not use the new search graph
-    lazy val endpoint = new EndpointImpl[IO](finderNew, finder, renkuUrl, renkuApiUrl, gitLabUrl)
+    lazy val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuApiUrl, gitLabUrl)
   }
 
   private lazy val criterias: Gen[Criteria] = for {
