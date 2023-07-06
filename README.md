@@ -19,7 +19,7 @@
 #### Running the tests
 
 ```bash
-sbt clean test && sbt "project acceptance-tests" test
+sbt clean test acceptance-tests/test
 ```
 
 Depending on your global configuration of sbt you have installed, you might need to set `SBT_OPTS` to avoid OutOfMemory exception. 
