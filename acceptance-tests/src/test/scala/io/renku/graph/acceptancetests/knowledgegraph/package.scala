@@ -45,7 +45,7 @@ package object knowledgegraph {
     "name":         ${project.name.value},
     "visibility":   ${project.entitiesProject.visibility.value},
     "created":      ${(project.entitiesProject.dateCreated, project.entitiesProject.maybeCreator)},
-    "dateModified": ${project.dateModified.value},
+    "dateModified": ${project.entitiesProject.dateModified.value},
     "urls":         ${project.urls.toJson},
     "forking":      ${project.entitiesProject.forksCount -> project.entitiesProject},
     "keywords":     ${project.entitiesProject.keywords.map(_.value).toList.sorted},

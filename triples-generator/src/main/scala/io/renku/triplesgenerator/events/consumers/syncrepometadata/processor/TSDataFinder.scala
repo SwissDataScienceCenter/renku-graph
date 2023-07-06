@@ -52,7 +52,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
       SparqlQuery.ofUnsafe(
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+        sparql"""|SELECT ?id ?path ?name ?visibility ?dateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
@@ -61,8 +61,8 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |    ?id a schema:Project;
                  |        renku:projectPath ?path;
                  |        schema:name ?name;
-                 |        renku:projectVisibility ?visibility.
-                 |    OPTIONAL { ?id schema:dateModified ?maybeDateModified }
+                 |        renku:projectVisibility ?visibility;
+                 |        schema:dateModified ?dateModified.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
                  |    OPTIONAL { ?dsId schema:keywords ?keyword }
                  |    OPTIONAL {
@@ -73,7 +73,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?maybeDateModified ?maybeDesc
+                 |GROUP BY ?id ?path ?name ?visibility ?dateModified ?maybeDesc
                  |LIMIT 1
                  |""".stripMargin
       )
@@ -96,14 +96,14 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
           .getOrElse(Nil.asRight)
 
       for {
-        id                <- extract[projects.ResourceId]("id")
-        path              <- extract[projects.Path]("path")
-        name              <- extract[projects.Name]("name")
-        visibility        <- extract[projects.Visibility]("visibility")
-        maybeDateModified <- extract[Option[projects.DateModified]]("maybeDateModified")
-        maybeDesc         <- extract[Option[projects.Description]]("maybeDesc")
-        keywords          <- extract[Option[String]]("keywords") >>= toSetOfKeywords
-        images            <- extract[Option[String]]("images") >>= toListOfImageUris
-      } yield DataExtract.TS(id, path, name, visibility, maybeDateModified, maybeDesc, keywords, images)
+        id           <- extract[projects.ResourceId]("id")
+        path         <- extract[projects.Path]("path")
+        name         <- extract[projects.Name]("name")
+        visibility   <- extract[projects.Visibility]("visibility")
+        dateModified <- extract[projects.DateModified]("dateModified")
+        maybeDesc    <- extract[Option[projects.Description]]("maybeDesc")
+        keywords     <- extract[Option[String]]("keywords") >>= toSetOfKeywords
+        images       <- extract[Option[String]]("images") >>= toListOfImageUris
+      } yield DataExtract.TS(id, path, name, visibility, dateModified.some, maybeDesc, keywords, images)
     }(toOption(show"Multiple projects or values for '$path'"))
 }
