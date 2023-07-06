@@ -36,6 +36,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val pathVar             = VarName("path")
   private val visibilityVar       = VarName("visibility")
   private val dateVar             = VarName("date")
+  private val dateModifiedVar     = VarName("dateModified")
   private val maybeCreatorNameVar = VarName("maybeCreatorName")
   private val maybeDescriptionVar = VarName("maybeDescription")
   private val keywordsVar         = VarName("keywords")
@@ -54,6 +55,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
                                                   pathVar,
                                                   visibilityVar,
                                                   dateVar,
+                                                  dateModifiedVar,
                                                   maybeCreatorNameVar,
                                                   maybeDescriptionVar,
                                                   keywordsVar,
@@ -79,6 +81,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
              |                    renku:projectPath $pathVar;
+             |                    schema:dateModified $dateModifiedVar;
              |                    schema:dateCreated $someDateVar.
              |
              |      ${filters.maybeOnDateCreated(someDateVar)}
@@ -201,6 +204,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       name             <- read[projects.Name](nameVar)
       visibility       <- read[projects.Visibility](visibilityVar)
       dateCreated      <- read[projects.DateCreated](dateVar)
+      dateModified     <- read[projects.DateModified](dateModifiedVar)
       maybeCreatorName <- read[Option[persons.Name]](maybeCreatorNameVar)
       maybeDescription <- read[Option[projects.Description]](maybeDescriptionVar)
       images           <- read[Option[String]](imagesVar) >>= toListOfImageUris
@@ -211,6 +215,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
                            name,
                            visibility,
                            dateCreated,
+                           dateModified,
                            maybeCreatorName,
                            keywords,
                            maybeDescription,

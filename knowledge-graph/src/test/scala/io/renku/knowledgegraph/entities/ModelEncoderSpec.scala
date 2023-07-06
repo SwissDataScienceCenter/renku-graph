@@ -61,6 +61,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       name = projects.Name("my-project"),
       visibility = Visibility.Public,
       date = projects.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
+      dateModified = projects.DateModified(Instant.parse("2013-04-31T13:03:45Z")),
       maybeCreator = Some(persons.Name("John Creator")),
       keywords = List("word", "super-word").map(projects.Keyword),
       maybeDescription = Some(projects.Description("description of it")),
