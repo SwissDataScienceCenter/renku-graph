@@ -122,12 +122,12 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent row " +
       "- case when there are multiple rows for the same version, any in Sent or Done " +
-      "but some in RecoverableFailure for more than 2 mins" in new TestCase {
+      "but some in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
 
         insertSubscriptionRecord(url, version, New, changeDate)
 
         val urlForRecoverable = subscriberUrls.generateOne
-        insertSubscriptionRecord(urlForRecoverable, version, RecoverableFailure, more(than = twoMins))
+        insertSubscriptionRecord(urlForRecoverable, version, RecoverableFailure, more(than = recoverableStatusTimeout))
 
         finder.popEvent().unsafeRunSync() should {
           be(MigrationRequestEvent(urlForRecoverable, version).some) or
@@ -139,19 +139,27 @@ class EventFinderSpec
 
     "return no Event " +
       "- case when there are multiple rows for the same version, any in Sent, Done or New " +
-      "but some in RecoverableFailure for less than 2 mins" in new TestCase {
+      "but some in RecoverableFailure for less than RecoverableStatusTimeout" in new TestCase {
 
         insertSubscriptionRecord(url, version, NonRecoverableFailure, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, less(than = twoMins))
+        insertSubscriptionRecord(subscriberUrls.generateOne,
+                                 version,
+                                 RecoverableFailure,
+                                 less(than = recoverableStatusTimeout)
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return Migration Request Event for the most recent row but not for the RecoverableFailure for less than 2 mins " +
+    "return Migration Request Event for the most recent row but not for the RecoverableFailure for less than RecoverableStatusTimeout " +
       "- case when there are multiple rows for the same version, any in Sent or Done but some in New" in new TestCase {
 
         insertSubscriptionRecord(url, version, New, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, less(than = twoMins))
+        insertSubscriptionRecord(subscriberUrls.generateOne,
+                                 version,
+                                 RecoverableFailure,
+                                 less(than = recoverableStatusTimeout)
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
 
@@ -160,20 +168,20 @@ class EventFinderSpec
 
     "return no Event " +
       "- case when there are multiple rows for the same version, any in Done " +
-      "but one in Sent for less than an hour" in new TestCase {
+      "but one in Sent for less than SentStatusTimeout" in new TestCase {
 
         insertSubscriptionRecord(subscriberUrls.generateOne, version, New, changeDate)
-        insertSubscriptionRecord(url, version, Sent, less(than = anHour, butAfter = changeDate))
+        insertSubscriptionRecord(url, version, Sent, less(than = sentStatusTimeout, butAfter = changeDate))
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return no Event " +
       "- case when there are multiple rows for the same version " +
-      "one in Sent for more than an hour" +
+      "one in Sent for more than SentStatusTimeout" +
       "but also one in Done" in new TestCase {
 
-        val newestVersionDate = more(than = anHour)
+        val newestVersionDate = more(than = sentStatusTimeout)
         insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateAfter(newestVersionDate))
         insertSubscriptionRecord(subscriberUrls.generateOne, version, Done, dateAfter(newestVersionDate))
         insertSubscriptionRecord(url, version, Sent, newestVersionDate)
@@ -183,9 +191,9 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
-      "and there's one with Sent for more than an hour" in new TestCase {
+      "and there's one with Sent for more than SentStatusTimeout" in new TestCase {
 
-        override val changeDate = more(than = anHour)
+        override val changeDate = more(than = sentStatusTimeout)
         val newUrl              = subscriberUrls.generateOne
         val newUrlDate          = dateAfter(changeDate)
         insertSubscriptionRecord(newUrl, version, New, newUrlDate)
@@ -202,11 +210,15 @@ class EventFinderSpec
 
     "return no Event " +
       "- case when there are multiple rows for the same version " +
-      "one in Sent for less than an hour" +
-      "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
+      "one in Sent for less than SentStatusTimeout" +
+      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = anHour))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, more(than = twoMins))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = sentStatusTimeout))
+        insertSubscriptionRecord(subscriberUrls.generateOne,
+                                 version,
+                                 RecoverableFailure,
+                                 more(than = recoverableStatusTimeout)
+        )
         insertSubscriptionRecord(url, version, New, ChangeDate(now))
 
         finder.popEvent().unsafeRunSync() shouldBe None
@@ -214,13 +226,13 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
-      "one in Sent for more than an hour " +
-      "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
+      "one in Sent for more than SentStatusTimeout " +
+      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
 
-        val sentUrlDate = more(than = anHour)
+        val sentUrlDate = more(than = sentStatusTimeout)
         insertSubscriptionRecord(url, version, Sent, sentUrlDate)
         val failedUrl     = subscriberUrls.generateOne
-        val failedUrlDate = more(than = twoMins)
+        val failedUrlDate = more(than = recoverableStatusTimeout)
         insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate)
         val newUrl = subscriberUrls.generateOne
         insertSubscriptionRecord(newUrl, version, New, changeDate)
@@ -248,10 +260,10 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
-      "one in Sent for more than an hour " +
+      "one in Sent for more than SentStatusTimeout " +
       "but also one in RecoverableFailure older than the one in Sent" in new TestCase {
 
-        val sentUrlDate = more(than = anHour)
+        val sentUrlDate = more(than = sentStatusTimeout)
         insertSubscriptionRecord(url, version, Sent, sentUrlDate)
         val failedUrl     = subscriberUrls.generateOne
         val failedUrlDate = dateBefore(sentUrlDate)
@@ -322,8 +334,8 @@ class EventFinderSpec
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val currentTime = mockFunction[Instant]
-    val finder      = new EventFinderImpl[IO](currentTime)
+    private val currentTime = mockFunction[Instant]
+    val finder              = new EventFinderImpl[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
@@ -346,6 +358,6 @@ class EventFinderSpec
   private def dateBefore(date: ChangeDate) =
     timestamps(max = date.value.minusSeconds(1)).generateAs(ChangeDate)
 
-  private lazy val anHour  = Duration ofHours 1
-  private lazy val twoMins = Duration ofMinutes 2
+  private lazy val sentStatusTimeout        = Duration ofMinutes 1
+  private lazy val recoverableStatusTimeout = Duration ofSeconds 30
 }
