@@ -58,11 +58,12 @@ class StatusUpdaterSpec
       ToNonRecoverableFailure(url, version, message)
     ) foreach { event =>
       s"succeed updating to ${event.newStatus} only if corresponding record in Sent" in new TestCase {
-        insertSubscriptionRecord(url, version, Sent, changeDate)
+
+        insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
 
         updater.updateStatus(event).unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe event.newStatus -> ChangeDate(now)
+        findRow(url, version).unsafeRunSync() shouldBe event.newStatus -> ChangeDate(now)
 
         if (Set(RecoverableFailure, NonRecoverableFailure) contains event.newStatus)
           findMessage(url, version) shouldBe message.some
@@ -73,11 +74,12 @@ class StatusUpdaterSpec
 
     MigrationStatus.all - Sent foreach { status =>
       s"do nothing and succeed if corresponding record is not in $status" in new TestCase {
-        insertSubscriptionRecord(url, version, status, changeDate)
+
+        insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
 
         updater.updateStatus(ToDone(url, version)).unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe status -> changeDate
+        findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
       }
     }
 
@@ -86,19 +88,20 @@ class StatusUpdaterSpec
     }
 
     "do update only corresponding record" in new TestCase {
-      insertSubscriptionRecord(url, version, Sent, changeDate)
+
+      insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
 
       val otherUrl = subscriberUrls.generateOne
-      insertSubscriptionRecord(otherUrl, version, Sent, changeDate)
+      insertSubscriptionRecord(otherUrl, version, Sent, changeDate).unsafeRunSync()
 
       val otherVersion = serviceVersions.generateOne
-      insertSubscriptionRecord(url, otherVersion, Sent, changeDate)
+      insertSubscriptionRecord(url, otherVersion, Sent, changeDate).unsafeRunSync()
 
       updater.updateStatus(ToDone(url, version)).unsafeRunSync() shouldBe ()
 
-      findRow(url, version)      shouldBe Done -> ChangeDate(now)
-      findRow(otherUrl, version) shouldBe Sent -> changeDate
-      findRow(url, otherVersion) shouldBe Sent -> changeDate
+      findRow(url, version).unsafeRunSync()      shouldBe Done -> ChangeDate(now)
+      findRow(otherUrl, version).unsafeRunSync() shouldBe Sent -> changeDate
+      findRow(url, otherVersion).unsafeRunSync() shouldBe Sent -> changeDate
     }
   }
 

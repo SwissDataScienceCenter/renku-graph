@@ -21,339 +21,437 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
-import io.renku.eventlog.{ChangeDate, InMemoryEventLogDbSpec, MigrationStatus}
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
 import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{ChangeDate, InMemoryEventLogDbSpec, MigrationStatus}
 import io.renku.events.Generators.subscriberUrls
 import io.renku.events.Subscription.SubscriberUrl
 import io.renku.generators.CommonGraphGenerators.serviceVersions
-import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.metrics.TestMetricsRegistry
-import io.renku.testtools.IOSpec
-import org.scalamock.scalatest.MockFactory
+import io.renku.testtools.CustomAsyncIOSpec
+import org.scalatest.OptionValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.{Duration, Instant}
-import java.time.Instant.now
 import java.time.temporal.ChronoUnit.MICROS
+import java.time.{Duration, Instant}
 
 class EventFinderSpec
-    extends AnyWordSpec
-    with IOSpec
+    extends AsyncWordSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with OptionValues
     with InMemoryEventLogDbSpec
     with TsMigrationTableProvisioning
-    with ScalaCheckPropertyChecks
-    with MockFactory
-    with should.Matchers {
+    with ScalaCheckPropertyChecks {
 
   "pop - cases testing many versions" should {
 
     "return Migration Request Event for the most recent row " +
-      "- case when there are multiple rows with New for the same url but different versions" in new TestCase {
+      "- case when there are multiple rows with New for the same url but different versions" in {
 
-        insertSubscriptionRecord(url, serviceVersions.generateOne, New, dateBefore(changeDate))
+        val changeDate = changeDates.generateOne
 
-        insertSubscriptionRecord(url, version, New, changeDate)
+        for {
+          _ <- insertSubscriptionRecord(url, serviceVersions.generateOne, New, dateBefore(changeDate)).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
-        findRow(url, version)             shouldBe MigrationStatus.Sent -> ChangeDate(now)
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+          _ <- findRow(url, version).asserting(_ shouldBe MigrationStatus.Sent -> ChangeDate(now))
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent row " +
-      "- case when there are multiple rows for different urls and versions" in new TestCase {
+      "- case when there are multiple rows for different urls and versions" in {
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, serviceVersions.generateOne, New, dateBefore(changeDate))
+        val changeDate = changeDates.generateOne
 
-        insertSubscriptionRecord(url, version, New, changeDate)
+        for {
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        serviceVersions.generateOne,
+                                        New,
+                                        dateBefore(changeDate)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return no Event " +
       "- case when there are New and RecoverableFailure for older versions " +
-      "but the most recent version has Done" in new TestCase {
+      "but the most recent version has Done" in {
 
-        // the most recent version records
-        insertSubscriptionRecord(url, version, New, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Done, dateAfter(changeDate))
+        val changeDate = changeDates.generateOne
 
-        // older versions records
-        insertSubscriptionRecord(subscriberUrls.generateOne, serviceVersions.generateOne, New, dateBefore(changeDate))
-        insertSubscriptionRecord(url, serviceVersions.generateOne, RecoverableFailure, dateBefore(changeDate))
+        for {
+          // the most recent version records
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
+          _ <-
+            insertSubscriptionRecord(subscriberUrls.generateOne, version, Done, dateAfter(changeDate)).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          // older versions records
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        serviceVersions.generateOne,
+                                        New,
+                                        dateBefore(changeDate)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(url,
+                                        serviceVersions.generateOne,
+                                        RecoverableFailure,
+                                        dateBefore(changeDate)
+               ).assertNoException
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
   }
 
   "pop - cases testing different statuses within the recent version" should {
 
     "return Migration Request Event for the most recent row " +
-      "- case when there are multiple rows for the same version but any in Sent or Done" in new TestCase {
+      "- case when there are multiple rows for the same version but any in Sent or Done" in {
 
-        insertSubscriptionRecord(url, version, New, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, dateBefore(changeDate))
+        val changeDate = changeDates.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        for {
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
+          _ <-
+            insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate)).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        RecoverableFailure,
+                                        dateBefore(changeDate)
+               ).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent row " +
       "- case when there are multiple rows for the same version but any in Sent or Done " +
-      "and the latest is in NonRecoverableFailure" in new TestCase {
+      "and the latest is in NonRecoverableFailure" in {
 
-        insertSubscriptionRecord(url, version, New, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, NonRecoverableFailure, dateAfter(changeDate))
+        val changeDate = changeDates.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        for {
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
+          _ <-
+            insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate)).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        NonRecoverableFailure,
+                                        dateAfter(changeDate)
+               ).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent row " +
       "- case when there are multiple rows for the same version, any in Sent or Done " +
-      "but some in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
+      "but some in RecoverableFailure for more than RecoverableStatusTimeout" in {
 
-        insertSubscriptionRecord(url, version, New, changeDate)
+        val changeDate = changeDates.generateOne
 
-        val urlForRecoverable = subscriberUrls.generateOne
-        insertSubscriptionRecord(urlForRecoverable, version, RecoverableFailure, more(than = recoverableStatusTimeout))
+        for {
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() should {
-          be(MigrationRequestEvent(urlForRecoverable, version).some) or
-            be(MigrationRequestEvent(url, version).some)
-        }
+          urlForRecoverable = subscriberUrls.generateOne
+          _ <- insertSubscriptionRecord(urlForRecoverable,
+                                        version,
+                                        RecoverableFailure,
+                                        more(than = recoverableStatusTimeout)
+               ).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder
+                 .popEvent()
+                 .asserting(_.value should {
+                   be(MigrationRequestEvent(urlForRecoverable, version)) or be(MigrationRequestEvent(url, version))
+                 })
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return no Event " +
       "- case when there are multiple rows for the same version, any in Sent, Done or New " +
-      "but some in RecoverableFailure for less than RecoverableStatusTimeout" in new TestCase {
+      "but some in RecoverableFailure for less than RecoverableStatusTimeout" in {
 
-        insertSubscriptionRecord(url, version, NonRecoverableFailure, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne,
-                                 version,
-                                 RecoverableFailure,
-                                 less(than = recoverableStatusTimeout)
-        )
+        val changeDate = changeDates.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+        for {
+          _ <- insertSubscriptionRecord(url, version, NonRecoverableFailure, changeDate).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        RecoverableFailure,
+                                        less(than = recoverableStatusTimeout)
+               ).assertNoException
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent row but not for the RecoverableFailure for less than RecoverableStatusTimeout " +
-      "- case when there are multiple rows for the same version, any in Sent or Done but some in New" in new TestCase {
+      "- case when there are multiple rows for the same version, any in Sent or Done but some in New" in {
 
-        insertSubscriptionRecord(url, version, New, changeDate)
-        insertSubscriptionRecord(subscriberUrls.generateOne,
-                                 version,
-                                 RecoverableFailure,
-                                 less(than = recoverableStatusTimeout)
-        )
+        val changeDate = changeDates.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        for {
+          _ <- insertSubscriptionRecord(url, version, New, changeDate).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        RecoverableFailure,
+                                        less(than = recoverableStatusTimeout)
+               ).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return no Event " +
       "- case when there are multiple rows for the same version, any in Done " +
-      "but one in Sent for less than SentStatusTimeout" in new TestCase {
+      "but one in Sent for less than SentStatusTimeout" in {
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, changeDate)
-        insertSubscriptionRecord(url, version, Sent, less(than = sentStatusTimeout, butAfter = changeDate))
+        val changeDate = changeDates.generateOne
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+        for {
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne, version, New, changeDate).assertNoException
+          _ <- insertSubscriptionRecord(url,
+                                        version,
+                                        Sent,
+                                        less(than = sentStatusTimeout, butAfter = changeDate)
+               ).assertNoException
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return no Event " +
       "- case when there are multiple rows for the same version " +
       "one in Sent for more than SentStatusTimeout" +
-      "but also one in Done" in new TestCase {
+      "but also one in Done" in {
 
         val newestVersionDate = more(than = sentStatusTimeout)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateAfter(newestVersionDate))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Done, dateAfter(newestVersionDate))
-        insertSubscriptionRecord(url, version, Sent, newestVersionDate)
+        for {
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        New,
+                                        dateAfter(newestVersionDate)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        Done,
+                                        dateAfter(newestVersionDate)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(url, version, Sent, newestVersionDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
-      "and there's one with Sent for more than SentStatusTimeout" in new TestCase {
+      "and there's one with Sent for more than SentStatusTimeout" in {
 
-        override val changeDate = more(than = sentStatusTimeout)
-        val newUrl              = subscriberUrls.generateOne
-        val newUrlDate          = dateAfter(changeDate)
-        insertSubscriptionRecord(newUrl, version, New, newUrlDate)
-        insertSubscriptionRecord(url, version, Sent, changeDate)
+        val changeDate = more(than = sentStatusTimeout)
+        val newUrl     = subscriberUrls.generateOne
+        val newUrlDate = dateAfter(changeDate)
 
-        findRows(version) shouldBe Set((newUrl, New, newUrlDate), (url, Sent, changeDate))
+        for {
+          _ <- insertSubscriptionRecord(newUrl, version, New, newUrlDate).assertNoException
+          _ <- insertSubscriptionRecord(url, version, Sent, changeDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
-        findRows(version)                 shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now)))
+          _ <- findRows(version).asserting(_ shouldBe Set((newUrl, New, newUrlDate), (url, Sent, changeDate)))
 
-        finder.popEvent().unsafeRunSync() shouldBe None
-        findRows(version)                 shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now)))
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+          _ <- findRows(version).asserting(_ shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now))))
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+          _ <- findRows(version).asserting(_ shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now))))
+        } yield ()
       }
 
     "return no Event " +
       "- case when there are multiple rows for the same version " +
       "one in Sent for less than SentStatusTimeout" +
-      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
+      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in {
+        for {
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        Sent,
+                                        less(than = sentStatusTimeout)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(subscriberUrls.generateOne,
+                                        version,
+                                        RecoverableFailure,
+                                        more(than = recoverableStatusTimeout)
+               ).assertNoException
+          _ <- insertSubscriptionRecord(url, version, New, ChangeDate(now)).assertNoException
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = sentStatusTimeout))
-        insertSubscriptionRecord(subscriberUrls.generateOne,
-                                 version,
-                                 RecoverableFailure,
-                                 more(than = recoverableStatusTimeout)
-        )
-        insertSubscriptionRecord(url, version, New, ChangeDate(now))
-
-        finder.popEvent().unsafeRunSync() shouldBe None
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+        } yield ()
       }
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
       "one in Sent for more than SentStatusTimeout " +
-      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in new TestCase {
+      "but also one in RecoverableFailure for more than RecoverableStatusTimeout" in {
 
+        val changeDate  = changeDates.generateOne
         val sentUrlDate = more(than = sentStatusTimeout)
-        insertSubscriptionRecord(url, version, Sent, sentUrlDate)
-        val failedUrl     = subscriberUrls.generateOne
-        val failedUrlDate = more(than = recoverableStatusTimeout)
-        insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate)
-        val newUrl = subscriberUrls.generateOne
-        insertSubscriptionRecord(newUrl, version, New, changeDate)
 
-        findRows(version) shouldBe Set(
-          (url, Sent, sentUrlDate),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, changeDate)
-        )
+        for {
+          _ <- insertSubscriptionRecord(url, version, Sent, sentUrlDate).assertNoException
+          failedUrl     = subscriberUrls.generateOne
+          failedUrlDate = more(than = recoverableStatusTimeout)
+          _ <- insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
-        findRows(version) shouldBe Set(
-          (url, Sent, ChangeDate(now)),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, changeDate)
-        )
+          newUrl = subscriberUrls.generateOne
+          _ <- insertSubscriptionRecord(newUrl, version, New, changeDate).assertNoException
 
-        finder.popEvent().unsafeRunSync() shouldBe None
-        findRows(version) shouldBe Set(
-          (url, Sent, ChangeDate(now)),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, changeDate)
-        )
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, sentUrlDate),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, changeDate)
+                 )
+               )
+
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, ChangeDate(now)),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, changeDate)
+                 )
+               )
+
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, ChangeDate(now)),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, changeDate)
+                 )
+               )
+        } yield ()
       }
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
       "one in Sent for more than SentStatusTimeout " +
-      "but also one in RecoverableFailure older than the one in Sent" in new TestCase {
+      "but also one in RecoverableFailure older than the one in Sent" in {
 
         val sentUrlDate = more(than = sentStatusTimeout)
-        insertSubscriptionRecord(url, version, Sent, sentUrlDate)
-        val failedUrl     = subscriberUrls.generateOne
-        val failedUrlDate = dateBefore(sentUrlDate)
-        insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate)
-        val newUrl  = subscriberUrls.generateOne
-        val newDate = dateBefore(failedUrlDate)
-        insertSubscriptionRecord(newUrl, version, New, newDate)
+        for {
+          _ <- insertSubscriptionRecord(url, version, Sent, sentUrlDate).assertNoException
+          failedUrl     = subscriberUrls.generateOne
+          failedUrlDate = dateBefore(sentUrlDate)
+          _ <- insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate).assertNoException
+          newUrl  = subscriberUrls.generateOne
+          newDate = dateBefore(failedUrlDate)
+          _ <- insertSubscriptionRecord(newUrl, version, New, newDate).assertNoException
 
-        findRows(version) shouldBe Set(
-          (url, Sent, sentUrlDate),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, newDate)
-        )
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, sentUrlDate),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, newDate)
+                 )
+               )
 
-        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
-        findRows(version) shouldBe Set(
-          (url, Sent, ChangeDate(now)),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, newDate)
-        )
+          _ <- finder.popEvent().asserting(_.value shouldBe MigrationRequestEvent(url, version))
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, ChangeDate(now)),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, newDate)
+                 )
+               )
 
-        finder.popEvent().unsafeRunSync() shouldBe None
-        findRows(version) shouldBe Set(
-          (url, Sent, ChangeDate(now)),
-          (failedUrl, RecoverableFailure, failedUrlDate),
-          (newUrl, New, newDate)
-        )
+          _ <- finder.popEvent().asserting(_ shouldBe None)
+          _ <- findRows(version).asserting(
+                 _ shouldBe Set(
+                   (url, Sent, ChangeDate(now)),
+                   (failedUrl, RecoverableFailure, failedUrlDate),
+                   (newUrl, New, newDate)
+                 )
+               )
+        } yield ()
       }
 
     "return no Event " +
-      "- case when there is a single NonRecoverableFailure for the most recent version" in new TestCase {
+      "- case when there is a single NonRecoverableFailure for the most recent version" in {
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, NonRecoverableFailure, changeDate)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
+        insertSubscriptionRecord(subscriberUrls.generateOne,
+                                 version,
+                                 NonRecoverableFailure,
+                                 changeDates.generateOne
+        ).assertNoException >>
+          finder.popEvent().asserting(_ shouldBe None)
       }
   }
 
   "pop" should {
 
-    "never return more than one event for a single version " +
-      "- case when there are multiple urls for the most recent version coming at the very same time" in new TestCase {
+    val changeDate = changeDates.generateOne
 
-        forAll { (url1: SubscriberUrl, url2: SubscriberUrl, version: ServiceVersion) =>
+    forAll { (url1: SubscriberUrl, url2: SubscriberUrl, version: ServiceVersion) =>
+      "never return more than one event for a single version " +
+        "- case when there are multiple urls for the most recent version coming at the very same time " +
+        s"- $url1, $url2, $version" in {
+
           def singleEvent(subscriberUrl: SubscriberUrl) =
-            IO(insertSubscriptionRecord(subscriberUrl, version, New, changeDate)) >> finder.popEvent()
+            insertSubscriptionRecord(subscriberUrl, version, New, changeDate) >> finder.popEvent()
 
           val result = (singleEvent(url1), singleEvent(url2)).parTupled
-            .unsafeRunSync()
-            .bimap(_.isDefined, _.isDefined)
+            .map(_.bimap(_.isDefined, _.isDefined))
 
-          result should {
-            be(false -> true) or be(true -> false)
-          }
-
-          Set(url1, url2).map(findRow(_, version)._1) shouldBe Set(New, Sent)
-
-          prepareDbForTest()
+          result.asserting(_ should { be(false -> true) or be(true -> false) }) >>
+            List(url1, url2).map(findRow(_, version).map(_._1)).sequence.asserting(_.toSet shouldBe Set(New, Sent))
         }
-      }
+    }
   }
 
-  private trait TestCase {
-    val url        = subscriberUrls.generateOne
-    val version    = serviceVersions.generateOne
-    val changeDate = changeDates.generateOne
-    val now        = Instant.now().truncatedTo(MICROS)
+  private lazy val url     = subscriberUrls.generateOne
+  private lazy val version = serviceVersions.generateOne
+  private lazy val now     = Instant.now().truncatedTo(MICROS)
 
-    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
-    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    private val currentTime = mockFunction[Instant]
-    val finder              = new EventFinderImpl[IO](currentTime)
-
-    currentTime.expects().returning(now).anyNumberOfTimes()
-  }
+  private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+  private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+  private lazy val currentTime:          () => Instant             = () => now
+  private lazy val finder = new EventFinderImpl[IO](currentTime)
 
   private def dateAfter(date: ChangeDate) =
     timestampsNotInTheFuture(butYoungerThan = date.value).generateAs(ChangeDate)
 
   private def less(than: Duration) =
-    timestampsNotInTheFuture(butYoungerThan = now() minus than).generateAs(ChangeDate)
+    timestampsNotInTheFuture(butYoungerThan = Instant.now() minus than).generateAs(ChangeDate)
 
   private def less(than: Duration, butAfter: ChangeDate) =
-    if ((Duration.between(butAfter.value, now()) compareTo than) < 0)
+    if ((Duration.between(butAfter.value, Instant.now()) compareTo than) < 0)
       timestampsNotInTheFuture(butYoungerThan = butAfter.value).generateAs(ChangeDate)
     else
-      timestampsNotInTheFuture(butYoungerThan = now() minus than).generateAs(ChangeDate)
+      timestampsNotInTheFuture(butYoungerThan = Instant.now() minus than).generateAs(ChangeDate)
 
   private def more(than: Duration) =
-    timestamps(max = now().minus(than).minusSeconds(1)).generateAs(ChangeDate)
+    timestamps(max = Instant.now().minus(than).minusSeconds(1)).generateAs(ChangeDate)
 
   private def dateBefore(date: ChangeDate) =
     timestamps(max = date.value.minusSeconds(1)).generateAs(ChangeDate)
