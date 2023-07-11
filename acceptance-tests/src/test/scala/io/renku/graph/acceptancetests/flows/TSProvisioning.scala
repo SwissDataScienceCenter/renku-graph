@@ -74,15 +74,20 @@ trait TSProvisioning
       sleep((5 seconds).toMillis)
     }
 
-    `wait for events to be processed`(project.id, accessToken)
+    `wait for events to be processed`(project.id, accessToken, commitIds.size)
   }
 
-  def `wait for events to be processed`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion =
+  def `wait for events to be processed`(
+      projectId:    projects.GitLabId,
+      accessToken:  AccessToken,
+      expectedDone: Int
+  ): Assertion =
     eventually {
       val response = webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken)
       response.status                                                                          shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
       response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
+      response.jsonBody.hcursor.downField("progress").downField("total").as[Int].value         shouldBe expectedDone
     }
 
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {

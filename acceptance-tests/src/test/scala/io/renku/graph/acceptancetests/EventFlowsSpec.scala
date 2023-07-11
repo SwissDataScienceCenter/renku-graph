@@ -59,7 +59,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken)
+      `wait for events to be processed`(project.id, user.accessToken, 1)
 
       Then(s"all the events should get the $TriplesStore status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(TriplesStore)
@@ -89,7 +89,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("relevant commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken)
+      `wait for events to be processed`(project.id, user.accessToken, 1)
 
       And(s"all the events should get the $GenerationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(GenerationNonRecoverableFailure)
@@ -151,7 +151,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("relevant commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken)
+      `wait for events to be processed`(project.id, user.accessToken, 1)
 
       Then(s"all the events should get the $TransformationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(TransformationNonRecoverableFailure)
