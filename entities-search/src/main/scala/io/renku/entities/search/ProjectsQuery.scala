@@ -43,11 +43,12 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val imagesVar           = VarName("images")
 
   // local vars
-  private val projectIdVar       = VarName("projectId")
-  private val someDateVar        = VarName("someDate")
-  private val someCreatorNameVar = VarName("someCreatorName")
-  private val keywordVar         = VarName("keyword")
-  private val encodedImageUrlVar = VarName("encodedImageUrl")
+  private val projectIdVar        = VarName("projectId")
+  private val someDateVar         = VarName("someDate")
+  private val someDateModifiedVar = VarName("someDateModified")
+  private val someCreatorNameVar  = VarName("someCreatorName")
+  private val keywordVar          = VarName("keyword")
+  private val encodedImageUrlVar  = VarName("encodedImageUrl")
 
   override val selectVariables: Set[String] = Set(entityTypeVar,
                                                   matchingScoreVar,
@@ -67,6 +68,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     sparql"""|{
              |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar
              |    (MIN($someDateVar) AS $dateVar)
+             |    (MAX($someDateModifiedVar) AS $dateModifiedVar)
              |    (SAMPLE($someCreatorNameVar) AS $maybeCreatorNameVar)
              |    $maybeDescriptionVar
              |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
@@ -81,7 +83,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
              |                    renku:projectPath $pathVar;
-             |                    schema:dateModified $dateModifiedVar;
+             |                    schema:dateModified $someDateModifiedVar;
              |                    schema:dateCreated $someDateVar.
              |
              |      ${filters.maybeOnDateCreated(someDateVar)}
