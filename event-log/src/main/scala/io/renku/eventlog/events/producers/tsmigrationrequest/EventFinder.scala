@@ -46,8 +46,8 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
     with EventFinder[F]
     with TSMigtationTypeSerializers {
 
-  private val SentStatusTimeout        = Duration ofHours 1
-  private val RecoverableStatusTimeout = Duration ofMinutes 2
+  private val SentStatusTimeout        = Duration ofMinutes 1
+  private val RecoverableStatusTimeout = Duration ofSeconds 30
 
   override def popEvent(): F[Option[MigrationRequestEvent]] =
     SessionResource[F].useWithTransactionK[Option[MigrationRequestEvent]] {

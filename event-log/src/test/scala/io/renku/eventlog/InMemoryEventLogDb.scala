@@ -34,8 +34,11 @@ trait InMemoryEventLogDb extends ContainerEventLogDb with TypeSerializers {
 
   implicit val ioRuntime: IORuntime
 
+  def executeIO[O](query: Kleisli[IO, Session[IO], O]): IO[O] =
+    sessionResource.useK(query)
+
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
-    sessionResource.useK(query).unsafeRunSync()
+    executeIO(query).unsafeRunSync()
 
   def executeCommand(sql: Command[Void]): Unit =
     execute[Unit](Kleisli(session => session.execute(sql).void))

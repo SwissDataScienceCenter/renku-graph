@@ -56,42 +56,46 @@ class DispatchRecoverySpec
 
     "change the status of the corresponding row in the ts_migration table to New " +
       "if it was in Sent and the reason is NOT TemporarilyUnavailable" in new TestCase {
-        insertSubscriptionRecord(url, version, Sent, changeDate)
+
+        insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
 
         recovery
           .returnToQueue(MigrationRequestEvent(url, version), reason = notBusyStatus.generateOne)
           .unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe New -> ChangeDate(now)
+        findRow(url, version).unsafeRunSync() shouldBe New -> ChangeDate(now)
       }
 
     "leave the status of the corresponding row in the ts_migration table as Sent " +
       "and update the change_date " +
       "if it was in Sent and the reason is TemporarilyUnavailable" in new TestCase {
-        insertSubscriptionRecord(url, version, Sent, changeDate)
+
+        insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
 
         recovery
           .returnToQueue(MigrationRequestEvent(url, version), reason = TemporarilyUnavailable)
           .unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe Sent -> ChangeDate(now)
+        findRow(url, version).unsafeRunSync() shouldBe Sent -> ChangeDate(now)
       }
 
     MigrationStatus.all - Sent foreach { status =>
       s"do no change the status of the corresponding row if it's in $status" in new TestCase {
-        insertSubscriptionRecord(url, version, status, changeDate)
+
+        insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
 
         recovery
           .returnToQueue(MigrationRequestEvent(url, version), reason = sendingResults.generateOne)
           .unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe status -> changeDate
+        findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
       }
     }
 
     "do no change the status of rows other than the one pointed by the event" in new TestCase {
+
       val status = Gen.oneOf(MigrationStatus.all).generateOne
-      insertSubscriptionRecord(url, version, status, changeDate)
+      insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
 
       recovery
         .returnToQueue(MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne),
@@ -99,7 +103,7 @@ class DispatchRecoverySpec
         )
         .unsafeRunSync() shouldBe ()
 
-      findRow(url, version) shouldBe status -> changeDate
+      findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
     }
   }
 
@@ -108,35 +112,38 @@ class DispatchRecoverySpec
     val exception = exceptions.generateOne
 
     "change status of the relevant row to NonRecoverableFailure if in Sent" in new TestCase {
-      insertSubscriptionRecord(url, version, Sent, changeDate)
+
+      insertSubscriptionRecord(url, version, Sent, changeDate).unsafeRunSync()
 
       recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-      findRow(url, version)     shouldBe NonRecoverableFailure -> ChangeDate(now)
-      findMessage(url, version) shouldBe MigrationMessage(exception).some
+      findRow(url, version).unsafeRunSync() shouldBe NonRecoverableFailure -> ChangeDate(now)
+      findMessage(url, version)             shouldBe MigrationMessage(exception).some
 
       logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))
     }
 
     MigrationStatus.all - Sent foreach { status =>
       s"do no change the status of the corresponding row if it's in $status" in new TestCase {
-        insertSubscriptionRecord(url, version, status, changeDate)
+
+        insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
 
         recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-        findRow(url, version) shouldBe status -> changeDate
+        findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
       }
     }
 
     "do no change the status of rows other than the one pointed by the event" in new TestCase {
+
       val status = Gen.oneOf(MigrationStatus.all).generateOne
-      insertSubscriptionRecord(url, version, status, changeDate)
+      insertSubscriptionRecord(url, version, status, changeDate).unsafeRunSync()
 
       val failingEvent = MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne)
 
       recovery.recover(failingEvent.subscriberUrl, failingEvent)(exception).unsafeRunSync() shouldBe ()
 
-      findRow(url, version) shouldBe status -> changeDate
+      findRow(url, version).unsafeRunSync() shouldBe status -> changeDate
     }
   }
 

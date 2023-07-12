@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.producers.tsmigrationrequest
 
 import cats.data.Kleisli
+import cats.effect.IO
 import io.renku.config.ServiceVersion
 import io.renku.eventlog.TSMigtationTypeSerializers._
 import io.renku.eventlog._
@@ -33,7 +34,7 @@ trait TsMigrationTableProvisioning {
                                          version:    ServiceVersion,
                                          status:     MigrationStatus,
                                          changeDate: ChangeDate
-  ): Unit = execute[Unit] {
+  ): IO[Unit] = executeIO[Unit] {
     Kleisli { session =>
       val query: Command[ServiceVersion *: SubscriberUrl *: MigrationStatus *: ChangeDate *: EmptyTuple] = sql"""
         INSERT INTO ts_migration (subscriber_version, subscriber_url, status, change_date)
@@ -46,8 +47,8 @@ trait TsMigrationTableProvisioning {
     }
   }
 
-  protected def findRow(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
-    execute {
+  protected def findRow(url: SubscriberUrl, version: ServiceVersion): IO[(MigrationStatus, ChangeDate)] =
+    executeIO {
       Kleisli { session =>
         val query: Query[SubscriberUrl *: ServiceVersion *: EmptyTuple, (MigrationStatus, ChangeDate)] = sql"""
             SELECT status, change_date
@@ -59,7 +60,7 @@ trait TsMigrationTableProvisioning {
       }
     }
 
-  protected def findRows(version: ServiceVersion): Set[(SubscriberUrl, MigrationStatus, ChangeDate)] = execute {
+  protected def findRows(version: ServiceVersion): IO[Set[(SubscriberUrl, MigrationStatus, ChangeDate)]] = executeIO {
     Kleisli { session =>
       val query: Query[ServiceVersion, (SubscriberUrl, MigrationStatus, ChangeDate)] = sql"""
             SELECT subscriber_url, status, change_date
