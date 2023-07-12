@@ -20,6 +20,7 @@ package io.renku.graph.acceptancetests.flows
 
 import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime
+import cats.syntax.all._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
@@ -74,15 +75,20 @@ trait TSProvisioning
       sleep((5 seconds).toMillis)
     }
 
-    `wait for events to be processed`(project.id, accessToken)
+    `wait for events to be processed`(project.id, accessToken, 5)
   }
 
-  def `wait for events to be processed`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion =
+  def `wait for events to be processed`(
+      projectId:        projects.GitLabId,
+      accessToken:      AccessToken,
+      expectedMinTotal: Int
+  ): Assertion =
     eventually {
       val response = webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken)
       response.status                                                                          shouldBe Ok
       response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
       response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
+      response.jsonBody.hcursor.downField("progress").downField("total").as[Int].value should be >= expectedMinTotal
     }
 
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {

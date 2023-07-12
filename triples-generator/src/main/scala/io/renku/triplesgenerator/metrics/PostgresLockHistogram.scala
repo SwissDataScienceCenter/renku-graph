@@ -16,23 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.db
+package io.renku.triplesgenerator.metrics
 
-import cats.effect.IO
-import io.renku.db.DBConfigProvider
-import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
-import org.typelevel.log4cats.Logger
+import cats.MonadThrow
+import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.metrics.{LabeledHistogram, LabeledHistogramImpl, MetricsRegistry}
 
-import scala.util.Try
+import scala.concurrent.duration._
 
-object TokenRepository {
+trait PostgresLockHistogram[F[_]] extends LabeledHistogram[F]
 
-  private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
-    new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
-
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
-    _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("projects_tokens DB started")
-  } yield ()
+object PostgresLockHistogram {
+  def apply[F[_]: MonadThrow: MetricsRegistry]: F[PostgresLockHistogram[F]] = MetricsRegistry[F].register {
+    new LabeledHistogramImpl[F](
+      name = "postgres_lock_wait_times",
+      help = "PostgresLock wait times",
+      labelName = "object_id",
+      buckets = Seq(.05, .1, .5, 1, 2.5, 5, 10, 50),
+      maybeThreshold = 200.millis.some
+    ) with PostgresLockHistogram[F]
+  }.widen
 }

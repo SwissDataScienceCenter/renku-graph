@@ -37,6 +37,8 @@ class SessionResource[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Se
   ): F[ResultType] = resource.use { session =>
     session.transaction.use(transaction => query.run((transaction, session)))
   }
+
+  val session: Resource[F, Session[F]] = resource
 }
 
 object SessionPoolResource {

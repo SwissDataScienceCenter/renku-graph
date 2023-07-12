@@ -25,9 +25,11 @@ import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, consumers}
+import io.renku.lock.syntax._
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
@@ -35,12 +37,13 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import processor.EventProcessor
 
-private class EventHandler[F[_]: MonadCancelThrow: Logger](
+private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
     tsReadinessChecker:        TSReadinessForEventsChecker[F],
     eventDecoder:              EventDecoder,
     eventProcessor:            EventProcessor[F],
-    processExecutor:           ProcessExecutor[F]
+    processExecutor:           ProcessExecutor[F],
+    tsWriteLock:               TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = SyncRepoMetadata
@@ -48,7 +51,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       eventDecoder.decode,
-      eventProcessor.process,
+      tsWriteLock.contramap[Event](_.path).surround(eventProcessor.process),
       precondition = tsReadinessChecker.verifyTSReady
     )
 }
@@ -57,10 +60,18 @@ private object EventHandler {
   def apply[F[
       _
   ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: ReProvisioningStatus: SparqlQueryTimeRecorder: MetricsRegistry](
-      config: Config
+      config:      Config,
+      tsWriteLock: TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F](config)
     processExecutor    <- ProcessExecutor.concurrent(1)
-  } yield new EventHandler[F](categoryName, tsReadinessChecker, EventDecoder, eventProcessor, processExecutor)
+  } yield new EventHandler[F](
+    categoryName,
+    tsReadinessChecker,
+    EventDecoder,
+    eventProcessor,
+    processExecutor,
+    tsWriteLock
+  )
 }

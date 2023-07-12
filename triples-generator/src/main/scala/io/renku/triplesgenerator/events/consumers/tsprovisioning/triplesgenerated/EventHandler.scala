@@ -19,18 +19,20 @@
 package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.triplesgenerated
 
-import cats.{NonEmptyParallel, Parallel}
 import cats.effect._
 import cats.syntax.all._
-import io.renku.events.{CategoryName, consumers}
+import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.{CategoryName, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.TgLockDB.TsWriteLock
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 
 private class EventHandler[F[_]: MonadCancelThrow: Logger](
     override val categoryName: CategoryName,
@@ -38,7 +40,8 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     eventDecoder:              EventDecoder,
     subscriptionMechanism:     SubscriptionMechanism[F],
     eventProcessor:            EventProcessor[F],
-    processExecutor:           ProcessExecutor[F]
+    processExecutor:           ProcessExecutor[F],
+    tsWriteLock:               TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = TriplesGeneratedEvent
@@ -46,7 +49,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       eventDecoder.decode,
-      eventProcessor.process,
+      tsWriteLock.contramap[Event](_.project.path).surround(eventProcessor.process _),
       precondition = tsReadinessChecker.verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )
@@ -58,16 +61,19 @@ private object EventHandler {
       _
   ]: Async: NonEmptyParallel: Parallel: ReProvisioningStatus: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism:     SubscriptionMechanism[F],
-      concurrentProcessesNumber: ConcurrentProcessesNumber
+      concurrentProcessesNumber: ConcurrentProcessesNumber,
+      tsWriteLock:               TsWriteLock[F]
   ): F[consumers.EventHandler[F]] = for {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F]
     processExecutor    <- ProcessExecutor.concurrent(concurrentProcessesNumber.asRefined)
-  } yield new EventHandler[F](categoryName,
-                              tsReadinessChecker,
-                              EventDecoder(),
-                              subscriptionMechanism,
-                              eventProcessor,
-                              processExecutor
+  } yield new EventHandler[F](
+    categoryName,
+    tsReadinessChecker,
+    EventDecoder(),
+    subscriptionMechanism,
+    eventProcessor,
+    processExecutor,
+    tsWriteLock
   )
 }

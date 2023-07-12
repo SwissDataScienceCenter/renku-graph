@@ -122,6 +122,7 @@ class ExecutionTimeRecorderSpec
           labelValue shouldBe "label"
           mock[Histogram.Timer[IO]].pure[IO]
         }
+        override def observe(labelValue: String, amt: Double): IO[Unit] = ???
       }
 
       override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))

@@ -86,7 +86,7 @@ class CommitHistoryChangesSpec
 
       sleep((10 seconds).toMillis)
 
-      `wait for events to be processed`(project.id, user.accessToken)
+      `wait for events to be processed`(project.id, user.accessToken, 5)
 
       eventually {
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet

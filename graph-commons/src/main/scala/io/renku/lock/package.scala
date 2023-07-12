@@ -16,23 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.db
+package io.renku
 
-import cats.effect.IO
-import io.renku.db.DBConfigProvider
-import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
-import org.typelevel.log4cats.Logger
+import cats.data.Kleisli
+import cats.effect._
 
-import scala.util.Try
+package object lock {
 
-object TokenRepository {
+  type Lock[F[_], A] = Kleisli[Resource[F, *], A, Unit]
 
-  private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
-    new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
+  object syntax {
+    final implicit class LockSyntax[F[_], A](self: Lock[F, A]) {
+      def surround[B](fa: A => F[B])(implicit F: MonadCancelThrow[F]): A => F[B] =
+        a => self(a).surround(fa(a))
 
-  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- PostgresDB.startPostgres
-    _ <- PostgresDB.initializeDatabase(dbConfig)
-    _ <- logger.info("projects_tokens DB started")
-  } yield ()
+      def surround[B](k: Kleisli[F, A, B])(implicit F: MonadCancelThrow[F]): Kleisli[F, A, B] =
+        Kleisli(surround(k.run))
+    }
+  }
 }

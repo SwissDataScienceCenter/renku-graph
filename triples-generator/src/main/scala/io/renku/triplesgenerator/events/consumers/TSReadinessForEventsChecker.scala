@@ -28,7 +28,7 @@ import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-private trait TSReadinessForEventsChecker[F[_]] {
+private[consumers] trait TSReadinessForEventsChecker[F[_]] {
   def verifyTSReady: F[Option[EventSchedulingResult]]
 }
 
