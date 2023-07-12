@@ -51,13 +51,13 @@ trait InMemoryJena {
   lazy val container: SingleContainer[_] = jenaRunMode match {
     case JenaRunMode.GenericContainer =>
       GenericContainer(
-        dockerImage = "renku/renku-jena:0.0.20",
+        dockerImage = "renku/renku-jena:0.0.21",
         exposedPorts = Seq(3030),
         waitStrategy = Wait forHttp "/$/ping"
       )
     case JenaRunMode.FixedPortContainer(fixedPort) =>
       FixedHostPortGenericContainer(
-        imageName = "renku/renku-jena:0.0.20",
+        imageName = "renku/renku-jena:0.0.21",
         exposedPorts = Seq(3030),
         exposedHostPort = fixedPort,
         exposedContainerPort = fixedPort,
