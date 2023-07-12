@@ -125,7 +125,7 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
       val tsDate = projectModifiedDates().generateOne
       val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = tsDate.some)
       val glData = glDataFrom(tsData)
-        .copy(maybeDateModified = timestamps(max = tsDate.value).generateAs(projects.DateModified).some)
+        .copy(updatedAt = timestamps(max = tsDate.value).generateOne.some)
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
     }
@@ -135,7 +135,8 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
       val tsDate = projectModifiedDates().generateOne
       val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = tsDate.some)
       val glData =
-        glDataFrom(tsData).copy(maybeDateModified = projectModifiedDates(tsDate.value.plusSeconds(1)).generateSome)
+        glDataFrom(tsData)
+          .copy(updatedAt = projectModifiedDates(tsDate.value.plusSeconds(1)).generateSome.map(_.value))
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
         NewValues.empty.copy(maybeDateModified = glData.maybeDateModified)
@@ -144,7 +145,7 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
     "be None if ts is set but gl not" in {
 
       val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = projectModifiedDates().generateSome)
-      val glData = glDataFrom(tsData).copy(maybeDateModified = None)
+      val glData = glDataFrom(tsData).copy(updatedAt = None, lastActivityAt = None)
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe NewValues.empty
     }
@@ -152,7 +153,10 @@ class NewValuesCalculatorSpec extends AnyWordSpec with should.Matchers with Opti
     "be gl desc if ts is not set but gl is" in {
 
       val tsData = tsDataExtracts().generateOne.copy(maybeDateModified = None)
-      val glData = glDataFrom(tsData).copy(maybeDateModified = projectModifiedDates().generateSome)
+      val glData = glDataFrom(tsData).copy(
+        updatedAt = projectModifiedDates().generateSome.map(_.value),
+        lastActivityAt = None
+      )
 
       NewValuesCalculator.findNewValues(tsData, glData, maybePayloadData = None) shouldBe
         NewValues.empty.copy(maybeDateModified = glData.maybeDateModified)

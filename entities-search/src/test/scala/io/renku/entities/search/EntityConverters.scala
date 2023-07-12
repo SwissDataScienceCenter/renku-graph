@@ -32,6 +32,7 @@ private object EntityConverters {
       project.name,
       project.visibility,
       project.dateCreated,
+      project.dateModified,
       project.maybeCreator.map(_.name),
       project.keywords.toList.sorted,
       project.maybeDescription,

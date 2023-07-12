@@ -110,7 +110,8 @@ object Variables {
     val projectPath     = VarName("projectPath")
     val visibility      = VarName("visibility")
     val creatorNames    = VarName("creatorNames")
-    val date            = VarName("date")
+    val dateCreated     = VarName("dateCreated")
+    val dateModified    = VarName("dateModified")
     val description     = VarName("description")
     val keywords        = VarName("keywords")
     val images          = VarName("images")
@@ -123,7 +124,8 @@ object Variables {
       projectPath,
       visibility,
       creatorNames,
-      date,
+      dateCreated,
+      dateModified,
       description,
       viewedDate,
       keywords,
@@ -136,7 +138,8 @@ object Variables {
         name             <- read[projects.Name](projectName)
         path             <- read[projects.Path](projectPath)
         visibility       <- read[projects.Visibility](visibility)
-        dateCreated      <- read[projects.DateCreated](date)
+        dateCreated      <- read[projects.DateCreated](dateCreated)
+        dateModified     <- read[projects.DateModified](dateModified)
         maybeCreatorName <- read[Option[persons.Name]](creatorNames)
         keywords <-
           read[Option[String]](keywords) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
@@ -148,6 +151,7 @@ object Variables {
         name,
         visibility,
         dateCreated,
+        dateModified,
         maybeCreatorName,
         keywords,
         maybeDescription,

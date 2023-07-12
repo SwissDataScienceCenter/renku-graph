@@ -48,6 +48,7 @@ object model {
         name:             projects.Name,
         visibility:       projects.Visibility,
         date:             projects.DateCreated,
+        dateModified:     projects.DateModified,
         maybeCreator:     Option[persons.Name],
         keywords:         List[projects.Keyword],
         maybeDescription: Option[projects.Description],

@@ -147,6 +147,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       projects.Name("name"),
       projects.Visibility.Public,
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      projects.DateModified(Instant.parse("2012-11-16T10:00:00.000Z")),
       persons.Name("Jan Kowalski").some,
       List(projects.Keyword("key")),
       projects.Description("Some project").some,

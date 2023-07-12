@@ -101,24 +101,24 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
         .map(Image.projectImage(id, _))
 
     for {
-      id                <- extract[projects.ResourceId]("id")
-      path              <- extract[projects.Path]("path")
-      name              <- extract[projects.Name]("name")
-      maybeDesc         <- extract[Option[projects.Description]]("maybeDesc")
-      dateCreated       <- extract[projects.DateCreated]("dateCreated")
-      maybeDateModified <- extract[Option[projects.DateModified]]("dateModified")
-      maybeCreatorId    <- extract[Option[persons.ResourceId]]("maybeCreatorId")
-      maybeCreatorName  <- extract[Option[persons.Name]]("maybeCreatorName")
-      visibility        <- extract[projects.Visibility]("visibility")
-      keywords          <- extract[Option[String]]("keywords") >>= toListOfKeywords
-      images            <- extract[Option[String]]("images") >>= toListOfImages(id)
+      id               <- extract[projects.ResourceId]("id")
+      path             <- extract[projects.Path]("path")
+      name             <- extract[projects.Name]("name")
+      maybeDesc        <- extract[Option[projects.Description]]("maybeDesc")
+      dateCreated      <- extract[projects.DateCreated]("dateCreated")
+      dateModified     <- extract[projects.DateModified]("dateModified")
+      maybeCreatorId   <- extract[Option[persons.ResourceId]]("maybeCreatorId")
+      maybeCreatorName <- extract[Option[persons.Name]]("maybeCreatorName")
+      visibility       <- extract[projects.Visibility]("visibility")
+      keywords         <- extract[Option[String]]("keywords") >>= toListOfKeywords
+      images           <- extract[Option[String]]("images") >>= toListOfImages(id)
     } yield NonRenkuProject.WithoutParent(
       id,
       path,
       name,
       maybeDesc,
       dateCreated,
-      maybeDateModified.getOrElse(projects.DateModified(dateCreated.value)),
+      dateModified,
       (maybeCreatorId -> maybeCreatorName).mapN(Person.WithNameOnly(_, _, None, None)),
       visibility,
       keywords.toSet,

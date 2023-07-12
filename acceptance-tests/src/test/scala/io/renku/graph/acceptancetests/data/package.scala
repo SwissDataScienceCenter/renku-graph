@@ -33,8 +33,6 @@ import io.renku.graph.model.testentities.projectMembers
 import io.renku.graph.model.versions.CliVersion
 import org.scalacheck.Gen
 
-import java.time.Instant.now
-
 package object data extends TSData with ProjectFunctions {
 
   implicit val cliVersion: CliVersion   = currentVersionPair.cliVersion
@@ -44,14 +42,13 @@ package object data extends TSData with ProjectFunctions {
       projectGen:   Gen[testentities.RenkuProject],
       commitsCount: CommitsCount = CommitsCount.one
   ): Gen[Project] = for {
-    project      <- projectGen
-    id           <- projectIds
-    members      <- projectMembers.toGeneratorOfNonEmptyList(max = 3)
-    dateModified <- timestamps(min = project.dateCreated.value, max = now).toGeneratorOf[projects.DateModified]
-    urls         <- urlsObjects
-    starsCount   <- starsCounts
-    permissions  <- permissionsObjects
-    statistics   <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
+    project     <- projectGen
+    id          <- projectIds
+    members     <- projectMembers.toGeneratorOfNonEmptyList(max = 3)
+    urls        <- urlsObjects
+    starsCount  <- starsCounts
+    permissions <- permissionsObjects
+    statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
     _ = if (project.members.nonEmpty)
           throw new Exception(show"Test project should not have members")
     _ = if (project.maybeCreator.flatMap(_.maybeGitLabId).nonEmpty)
@@ -60,7 +57,6 @@ package object data extends TSData with ProjectFunctions {
                   id,
                   maybeCreator = project.maybeCreator.map(_.to[ProjectMember]),
                   members,
-                  dateModified,
                   urls,
                   starsCount,
                   permissions,
