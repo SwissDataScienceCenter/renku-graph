@@ -87,7 +87,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
 
       Then("the old data in the TS should be replaced with the new")
       sleep((10 seconds).toMillis)
-      `wait for events to be processed`(project.id, user.accessToken, 1)
+      `wait for events to be processed`(project.id, user.accessToken, 5)
 
       eventually {
         knowledgeGraphClient

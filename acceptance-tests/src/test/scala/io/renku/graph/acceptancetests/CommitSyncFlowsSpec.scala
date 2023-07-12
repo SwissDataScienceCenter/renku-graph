@@ -83,7 +83,7 @@ class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with T
       EventLog.forceCategoryEventTriggering(CategoryName("COMMIT_SYNC"), project.id)
 
       And("commit events for the missed event are created and processed")
-      `wait for events to be processed`(project.id, user.accessToken, 1)
+      `wait for events to be processed`(project.id, user.accessToken, 5)
 
       Then("triples for both of the project's commits should be in the Triples Store")
       eventually {
