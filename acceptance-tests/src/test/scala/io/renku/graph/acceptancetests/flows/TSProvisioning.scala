@@ -19,24 +19,22 @@
 package io.renku.graph.acceptancetests.flows
 
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.syntax.all._
 import io.renku.events.CategoryName
-import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
-import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
+import org.scalatest.{Assertion, EitherValues}
 
 import java.lang.Thread.sleep
 import scala.annotation.tailrec
@@ -54,7 +52,7 @@ trait TSProvisioning
 
   def `data in the Triples Store`(
       project:     data.Project,
-      commitId:    CommitId = commitIds.generateOne,
+      commitId:    CommitId,
       accessToken: AccessToken
   )(implicit ioRuntime: IORuntime): Assertion =
     `data in the Triples Store`(project, NonEmptyList(commitId, Nil), accessToken)
@@ -71,25 +69,41 @@ trait TSProvisioning
       webhookServiceClient
         .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
-
-      sleep((5 seconds).toMillis)
-      `wait for events to be processed`(project.id, accessToken, 5)
     }
-    `wait for events to be processed`(project.id, accessToken, 5)
+
+    // commitId is the eventId
+    val condition = commitIds.map(e => EventId(e.value)).toList.map(_ -> EventStatus.TriplesStore)
+    waitForAllEvents(project.id, condition: _*)
   }
 
-  def `wait for events to be processed`(
-      projectId:        projects.GitLabId,
-      accessToken:      AccessToken,
-      expectedMinTotal: Int
-  ): Assertion =
-    eventually {
-      val response = webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken)
-      response.status                                                                          shouldBe Ok
-      response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
-      response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
-      response.jsonBody.hcursor.downField("progress").downField("total").as[Int].value should be >= expectedMinTotal
-    }
+  def waitForAllEvents(projectId: projects.GitLabId, expect: (EventId, EventStatus)*) = {
+    val expectedResult = expect.toSet
+    val ids            = expect.map(_._1).toSet
+
+    val findEvents =
+      eventLogClient
+        .getEvents(Left(projectId))
+        .map(list =>
+          list
+            .filter(ev => ids.contains(ev.id))
+            .map(ev => ev.id -> ev.status)
+            .toSet
+        )
+
+    val waitTimes = fs2.Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
+
+    val tries =
+      fs2.Stream
+        .repeatEval(findEvents)
+        .zip(waitTimes)
+        .map(_._1)
+        .evalTap(result => IO.println(s"Wait for event status: $result -> $expectedResult"))
+        .takeThrough(found => found != expectedResult)
+        .limit(13)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    lastValue shouldBe expectedResult
+  }
 
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
     webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken).status shouldBe NotFound

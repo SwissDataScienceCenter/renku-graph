@@ -24,6 +24,7 @@ import flows.TSProvisioning
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.testentities.cliShapedPersons
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -59,7 +60,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken, 5)
+      `data in the Triples Store`(project, commitId, user.accessToken)
 
       Then(s"all the events should get the $TriplesStore status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(TriplesStore)
@@ -89,7 +90,8 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("relevant commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken, 5)
+      val statuses = EventId(commitId.value) -> EventStatus.GenerationNonRecoverableFailure
+      waitForAllEvents(project.id, statuses)
 
       And(s"all the events should get the $GenerationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(GenerationNonRecoverableFailure)
@@ -151,7 +153,8 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
         .status shouldBe Accepted
 
       And("relevant commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken, 5)
+      val statuses = EventId(commitId.value) -> EventStatus.TransformationNonRecoverableFailure
+      waitForAllEvents(project.id, statuses)
 
       Then(s"all the events should get the $TransformationNonRecoverableFailure status in the Event Log")
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(TransformationNonRecoverableFailure)

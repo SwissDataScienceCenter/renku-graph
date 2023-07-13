@@ -37,9 +37,6 @@ import org.scalatest.enablers.Retrying
 import org.scalatest.time.{Minutes, Seconds, Span}
 import tooling.{AcceptanceSpec, ApplicationServices}
 
-import java.lang.Thread.sleep
-import scala.concurrent.duration._
-
 class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("Project re-provisioning") {
@@ -86,8 +83,7 @@ class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices 
       }""")
 
       Then("the old data in the TS should be replaced with the new")
-      sleep((10 seconds).toMillis)
-      `wait for events to be processed`(project.id, user.accessToken, 5)
+      `data in the Triples Store`(project, commitId, user.accessToken)
 
       eventually {
         knowledgeGraphClient
