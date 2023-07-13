@@ -73,8 +73,8 @@ trait TSProvisioning
         .status shouldBe Accepted
 
       sleep((5 seconds).toMillis)
+      `wait for events to be processed`(project.id, accessToken, 5)
     }
-
     `wait for events to be processed`(project.id, accessToken, 5)
   }
 
