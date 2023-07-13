@@ -64,7 +64,7 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |        renku:projectVisibility ?visibility;
                  |        schema:dateModified ?dateModified.
                  |    OPTIONAL { ?id schema:description ?maybeDesc }
-                 |    OPTIONAL { ?dsId schema:keywords ?keyword }
+                 |    OPTIONAL { ?id schema:keywords ?keyword }
                  |    OPTIONAL {
                  |      ?id schema:image ?imageId.
                  |      ?imageId schema:position ?imagePosition;
