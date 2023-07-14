@@ -86,6 +86,7 @@ class ProjectsResourcesSpec
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project.entitiesProject), commitId)
       gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId, accessToken)
+      waitForAllEventsInFinalState(project.id)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
