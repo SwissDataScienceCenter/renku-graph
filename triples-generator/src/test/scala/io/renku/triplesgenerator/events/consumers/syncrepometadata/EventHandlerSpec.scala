@@ -41,40 +41,38 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   "handlingDefinition.decode" should {
 
     "be EventDecoder.decode" in {
-      val tc = new TestCase
 
-      tc.expectTSReadinessCheckerCall
+      expectTSReadinessCheckerCall
 
-      tc.handler.createHandlingDefinition().decode shouldBe EventDecoder.decode
+      handler(noLock).createHandlingDefinition().decode shouldBe EventDecoder.decode
     }
   }
 
   "handlingDefinition.process" should {
 
-    "be the EventProcessor.process" ignore {
-      val tc = new TestCase
-      tc.expectTSReadinessCheckerCall
+    "be the EventProcessor.process" in {
+
+      expectTSReadinessCheckerCall
 
       syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-        (tc.eventProcessor.process _).expects(event).returns(().pure[IO])
+        (eventProcessor.process _).expects(event).returns(().pure[IO])
 
-        tc.handler.createHandlingDefinition().process(event).assertNoException
+        handler(noLock).createHandlingDefinition().process(event).assertNoException
       }
     }
 
-    "lock while executing" ignore {
-      val test = Ref.unsafe[IO, Int](0)
-      val tc = new TestCase {
-        override val tsWriteLock: TsWriteLock[IO] =
-          Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
-      }
+    "lock while executing" in {
 
-      tc.expectTSReadinessCheckerCall
+      val test = Ref.unsafe[IO, Int](0)
+      val tsWriteLock: TsWriteLock[IO] =
+        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+
+      expectTSReadinessCheckerCall
 
       syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-        (tc.eventProcessor.process _).expects(event).returns(().pure[IO])
+        (eventProcessor.process _).expects(event).returns(().pure[IO])
 
-        tc.handler.createHandlingDefinition().process(event).map { r =>
+        handler(tsWriteLock).createHandlingDefinition().process(event).map { r =>
           r                        shouldBe ()
           test.get.unsafeRunSync() shouldBe 2
         }
@@ -85,44 +83,42 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   "handlingDefinition.precondition" should {
 
     "be the TSReadinessForEventsChecker.verifyTSReady" in {
-      val tc = new TestCase
-      tc.expectTSReadinessCheckerCall
 
-      tc.handler.createHandlingDefinition().precondition.asserting(_ shouldBe tc.readinessCheckerResult)
+      expectTSReadinessCheckerCall
+
+      handler(noLock).createHandlingDefinition().precondition.asserting(_ shouldBe readinessCheckerResult)
     }
   }
 
   "handlingDefinition.onRelease" should {
 
     "not be defined" in {
-      val tc = new TestCase
-      tc.expectTSReadinessCheckerCall
 
-      tc.handler.createHandlingDefinition().onRelease shouldBe None
+      expectTSReadinessCheckerCall
+
+      handler(noLock).createHandlingDefinition().onRelease shouldBe None
     }
   }
 
-  class TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
-    lazy val tsReadinessChecker     = mock[TSReadinessForEventsChecker[IO]]
-    lazy val readinessCheckerResult = eventSchedulingResults.generateSome
+  private lazy val tsReadinessChecker     = mock[TSReadinessForEventsChecker[IO]]
+  private lazy val readinessCheckerResult = eventSchedulingResults.generateSome
 
-    def expectTSReadinessCheckerCall =
-      (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
+  private def expectTSReadinessCheckerCall =
+    (() => tsReadinessChecker.verifyTSReady).expects().returns(readinessCheckerResult.pure[IO])
 
-    lazy val eventProcessor = mock[EventProcessor[IO]]
+  private lazy val eventProcessor = mock[EventProcessor[IO]]
 
-    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+  private lazy val noLock = Lock.none[IO, projects.Path]
 
-    lazy val handler =
-      new EventHandler[IO](
-        categoryName,
-        tsReadinessChecker,
-        EventDecoder,
-        eventProcessor,
-        mock[ProcessExecutor[IO]],
-        tsWriteLock
-      )
-  }
+  private def handler(tsWriteLock: TsWriteLock[IO]) =
+    new EventHandler[IO](
+      categoryName,
+      tsReadinessChecker,
+      EventDecoder,
+      eventProcessor,
+      mock[ProcessExecutor[IO]],
+      tsWriteLock
+    )
 }
