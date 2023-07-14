@@ -79,6 +79,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       makeNamespaces(project.path),
       project.visibility,
       project.date,
+      project.dateModified,
       project.keywords,
       project.images.map(makeImageLink(project.path))
     )
@@ -209,6 +210,7 @@ object ModelEncoderSpec {
       namespaces:    List[Ns],
       visibility:    Visibility,
       date:          projects.DateCreated,
+      dateModified:  projects.DateModified,
       keywords:      List[projects.Keyword],
       images:        List[ImageLink],
       `type`:        EntityType = EntityType.Project

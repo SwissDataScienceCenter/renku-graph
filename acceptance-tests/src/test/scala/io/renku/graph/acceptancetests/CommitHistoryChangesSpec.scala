@@ -19,23 +19,22 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
-import data._
-import db.EventLog
-import flows.TSProvisioning
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data._
+import io.renku.graph.acceptancetests.db.EventLog
+import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{jsonEntityDecoder, JsonOps}
+import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.webhookservice.model
-import knowledgegraph.{fullJson, DatasetsApiEncoders}
 import org.http4s.Status._
 import org.scalatest.EitherValues
-import tooling.{AcceptanceSpec, ApplicationServices}
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
@@ -65,10 +64,7 @@ class CommitHistoryChangesSpec
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
 
       `data in the Triples Store`(project, commits, user.accessToken)
-
-      eventually {
-        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
-      }
+      waitForAllEventsInFinalState(project.id)
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
@@ -84,13 +80,9 @@ class CommitHistoryChangesSpec
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
         .status shouldBe Accepted
 
-      sleep((10 seconds).toMillis)
+      `data in the Triples Store`(project, newCommits, user.accessToken)
 
-      `wait for events to be processed`(project.id, user.accessToken, 5)
-
-      eventually {
-        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet
-      }
+      waitForAllEventsInFinalState(project.id)
 
       Then("the project should contain the new data")
       assertProjectDataIsCorrect(project, projectWithNewData, user.accessToken)
@@ -110,10 +102,6 @@ class CommitHistoryChangesSpec
 
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
       `data in the Triples Store`(project, commits, user.accessToken)
-
-      eventually {
-        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
-      }
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 

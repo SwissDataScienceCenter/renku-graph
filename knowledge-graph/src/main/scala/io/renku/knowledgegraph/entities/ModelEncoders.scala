@@ -63,6 +63,7 @@ trait ModelEncoders {
         "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
         "visibility":    ${project.visibility},
         "date":          ${project.date},
+        "dateModified":  ${project.dateModified},
         "keywords":      ${project.keywords},
         "images":        ${(project.images -> project.path).asJson}
       }"""
