@@ -38,12 +38,12 @@ import org.typelevel.log4cats.Logger
 import processor.EventProcessor
 
 private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
-    override val categoryName: CategoryName,
-    tsReadinessChecker:        TSReadinessForEventsChecker[F],
-    eventDecoder:              EventDecoder,
-    eventProcessor:            EventProcessor[F],
-    processExecutor:           ProcessExecutor[F],
-    tsWriteLock:               TsWriteLock[F]
+    override val categoryName:         CategoryName,
+    tsReadinessChecker:                TSReadinessForEventsChecker[F],
+    eventDecoder:                      EventDecoder,
+    @annotation.nowarn eventProcessor: EventProcessor[F],
+    processExecutor:                   ProcessExecutor[F],
+    tsWriteLock:                       TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = SyncRepoMetadata
@@ -51,7 +51,7 @@ private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
       eventDecoder.decode,
-      tsWriteLock.contramap[Event](_.path).surround(eventProcessor.process),
+      tsWriteLock.contramap[Event](_.path).surround(_ => ().pure[F]),
       precondition = tsReadinessChecker.verifyTSReady
     )
 }

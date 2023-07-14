@@ -21,12 +21,14 @@ package io.renku.graph.acceptancetests.flows
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import fs2.Stream
 import io.renku.events.CategoryName
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
+import io.renku.graph.acceptancetests.tooling.EventLogClient.ProjectEvent
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
-import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
+import io.renku.graph.model.events.{CommitId, EventId, EventStatus, EventStatusProgress}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
@@ -76,33 +78,44 @@ trait TSProvisioning
     waitForAllEvents(project.id, condition: _*)
   }
 
+  private def projectEvents(projectId: projects.GitLabId): Stream[IO, List[ProjectEvent]] = {
+    val findEvents =
+      eventLogClient
+        .getEvents(Left(projectId))
+
+    val waitTimes = Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
+
+    Stream
+      .repeatEval(findEvents)
+      .zip(waitTimes)
+      .map(_._1)
+  }
+
   def waitForAllEvents(projectId: projects.GitLabId, expect: (EventId, EventStatus)*) = {
     val expectedResult = expect.toSet
     val ids            = expect.map(_._1).toSet
 
-    val findEvents =
-      eventLogClient
-        .getEvents(Left(projectId))
-        .map(list =>
-          list
-            .filter(ev => ids.contains(ev.id))
-            .map(ev => ev.id -> ev.status)
-            .toSet
-        )
-
-    val waitTimes = fs2.Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
-
     val tries =
-      fs2.Stream
-        .repeatEval(findEvents)
-        .zip(waitTimes)
-        .map(_._1)
+      projectEvents(projectId)
+        .map(_.filter(ev => ids.contains(ev.id)).map(ev => ev.id -> ev.status).toSet)
         .evalTap(result => IO.println(s"Wait for event status: $result -> $expectedResult"))
         .takeThrough(found => found != expectedResult)
-        .limit(13)
+        .take(13)
 
     val lastValue = tries.compile.lastOrError.unsafeRunSync()
     lastValue shouldBe expectedResult
+  }
+
+  def waitForAllEventsInFinalState(projectId: projects.GitLabId) = {
+    val tries =
+      projectEvents(projectId)
+        .map(_.map(ev => EventStatusProgress.Stage(ev.status)).toSet)
+        .evalTap(stages => IO.println(s"Wait for final state: $stages"))
+        .takeThrough(stages => stages.exists(_ != EventStatusProgress.Stage.Final))
+        .take(15)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    lastValue.forall(_ == EventStatusProgress.Stage.Final) shouldBe true
   }
 
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
