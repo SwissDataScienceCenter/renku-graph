@@ -64,6 +64,7 @@ class CommitHistoryChangesSpec
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commits)
 
       `data in the Triples Store`(project, commits, user.accessToken)
+      waitForAllEventsInFinalState(project.id)
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
