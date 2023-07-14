@@ -43,6 +43,7 @@ object Endpoint {
                        ontology.EndpointDocs[F],
                        projects.delete.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.details.EndpointDocs[F],
+                       projects.update.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.files.lineage.EndpointDocs.pure[F].widen[docs.EndpointDocs],
                        projects.datasets.EndpointDocs[F],
                        projects.datasets.tags.EndpointDocs[F],
@@ -64,8 +65,8 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion, endpoint
 
     val document = OpenApiDocument(
       openApiVersion = "3.0.3",
-      Info("Knowledge Graph API",
-           "Get info about datasets, users, activities, and other entities".some,
+      Info("Knowledge Graph APIs",
+           "APIs to fetch and manipulate data in the Triples Store".some,
            serviceVersion.value
       )
     ).addServer(server)
