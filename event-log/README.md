@@ -17,7 +17,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
 | GET    | ```/version```                              | Returns info about service version                                         |
 
-All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
+All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is under migration.
 
 ### GET /events
 
