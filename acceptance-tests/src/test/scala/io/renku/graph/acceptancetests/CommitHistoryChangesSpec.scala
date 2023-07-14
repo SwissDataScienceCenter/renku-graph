@@ -30,9 +30,9 @@ import io.renku.graph.model.events
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
-import io.renku.http.server.EndpointTester.{jsonEntityDecoder, JsonOps}
+import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.webhookservice.model
-import knowledgegraph.{fullJson, DatasetsApiEncoders}
+import knowledgegraph.{DatasetsApiEncoders, fullJson}
 import org.http4s.Status._
 import org.scalatest.EitherValues
 import tooling.{AcceptanceSpec, ApplicationServices}
@@ -66,10 +66,6 @@ class CommitHistoryChangesSpec
 
       `data in the Triples Store`(project, commits, user.accessToken)
 
-      eventually {
-        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
-      }
-
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
       When("the commit history changes")
@@ -84,13 +80,7 @@ class CommitHistoryChangesSpec
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
         .status shouldBe Accepted
 
-      sleep((10 seconds).toMillis)
-
-      `wait for events to be processed`(project.id, user.accessToken, 5)
-
-      eventually {
-        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet
-      }
+      `data in the Triples Store`(project, newCommits, user.accessToken)
 
       Then("the project should contain the new data")
       assertProjectDataIsCorrect(project, projectWithNewData, user.accessToken)
