@@ -32,7 +32,6 @@ import io.renku.graph.model.events.{EventId, EventInfo, EventStatus, StatusProce
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import org.scalacheck.Gen
-import org.scalamock.handlers.{CallHandler1, CallHandler2}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.TryValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -46,10 +45,9 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
   it should "fetch id of the latest project event in status TRIPLES_STORE " +
     "and then fetch this event payload" in {
 
-      val projectId   = projectIds.generateOne
       val projectPath = projectPaths.generateOne
       val eventId     = eventIds.generateOne
-      givenEventFinding(projectId, projectPath, returning = eventId.some.pure[Try])
+      givenEventFinding(projectPath, returning = eventId.some.pure[Try])
 
       val maybePayload = Gen.option(EventPayload(ByteVector.fromValidHex("cafebabe"))).generateOne
       givenPayloadFinding(eventId, projectPath, returning = maybePayload.pure[Try])
@@ -60,7 +58,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
   it should "return None if fetching id of the latest project event in status TRIPLES_STORE returns no results" in {
 
     val projectPath = projectPaths.generateOne
-    givenEventFinding(projectIds.generateOne, projectPath, returning = Option.empty.pure[Try])
+    givenEventFinding(projectPath, returning = Option.empty.pure[Try])
 
     finder.findLatestPayload(projectPath).success.value shouldBe None
   }
@@ -69,7 +67,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
 
     val projectPath = projectPaths.generateOne
     val exception   = exceptions.generateOne
-    givenEventFinding(projectIds.generateOne, projectPath, returning = exception.raiseError[Try, Nothing])
+    givenEventFindingResponding(projectPath, exception.raiseError[Try, Nothing])
 
     finder.findLatestPayload(projectPath).failure.exception shouldBe exception
   }
@@ -78,7 +76,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
 
     val projectPath = projectPaths.generateOne
     val exception   = nonEmptyStrings().generateOne
-    givenEventFinding(projectPath, returning = Result.failure(exception).pure[Try])
+    givenEventFindingResponding(projectPath, Result.failure(exception).pure[Try])
 
     finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
   }
@@ -86,17 +84,16 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
   it should "fail if finding eventId returns unavailable" in {
 
     val projectPath = projectPaths.generateOne
-    givenEventFinding(projectPath, returning = Result.unavailable.pure[Try])
+    givenEventFindingResponding(projectPath, Result.unavailable.pure[Try])
 
     finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
 
   it should "fail if finding payload fails" in {
 
-    val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectId, projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
 
     val exception = exceptions.generateOne
     givenPayloadFinding(eventId, projectPath, returning = exception.raiseError[Try, Nothing])
@@ -106,25 +103,23 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
 
   it should "fail if finding payload returns a failure" in {
 
-    val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectId, projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
 
     val exception = nonEmptyStrings().generateOne
-    givenPayloadFindingResponding(eventId, projectPath, returning = Result.failure(exception).pure[Try])
+    givenPayloadFindingResponding(eventId, projectPath, Result.failure(exception).pure[Try])
 
     finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
   }
 
   it should "fail if finding payload returns unavailable" in {
 
-    val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectId, projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
 
-    givenPayloadFindingResponding(eventId, projectPath, returning = Result.unavailable.pure[Try])
+    givenPayloadFindingResponding(eventId, projectPath, Result.unavailable.pure[Try])
 
     finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
@@ -132,15 +127,10 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
   private lazy val elClient = mock[EventLogClient[Try]]
   private lazy val finder   = new LatestPayloadFinderImpl[Try](elClient)
 
-  private def givenEventFinding(id:        projects.GitLabId,
-                                path:      projects.Path,
-                                returning: Try[Option[EventId]]
-  ): CallHandler1[SearchCriteria, Try[Result[List[EventInfo]]]] =
-    givenEventFinding(path, toEventsFindingResult(id, path, returning))
+  private def givenEventFinding(path: projects.Path, returning: Try[Option[EventId]]) =
+    givenEventFindingResponding(path, toEventsFindingResult(path, returning))
 
-  private def givenEventFinding(path:      projects.Path,
-                                returning: Try[Result[List[EventInfo]]]
-  ): CallHandler1[SearchCriteria, Try[Result[List[EventInfo]]]] =
+  private def givenEventFindingResponding(path: projects.Path, response: Try[Result[List[EventInfo]]]) =
     (elClient.getEvents _)
       .expects(
         SearchCriteria
@@ -149,9 +139,9 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
           .withPerPage(PerPage(1))
           .sortBy(SearchCriteria.Sort.EventDateDesc)
       )
-      .returning(returning)
+      .returning(response)
 
-  private def toEventsFindingResult(id: projects.GitLabId, path: projects.Path, returning: Try[Option[EventId]]) =
+  private def toEventsFindingResult(path: projects.Path, returning: Try[Option[EventId]]) =
     returning match {
       case Success(Some(eventId)) =>
         val status = EventStatus.TriplesStore
@@ -160,7 +150,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
             List(
               EventInfo(
                 eventId,
-                ProjectIds(id, path),
+                ProjectIds(projectIds.generateOne, path),
                 status,
                 eventDates.generateOne,
                 executionDates.generateOne,
@@ -174,10 +164,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
       case Failure(exception) => exception.raiseError[Try, Result[List[EventInfo]]]
     }
 
-  private def givenPayloadFinding(eventId:   EventId,
-                                  path:      projects.Path,
-                                  returning: Try[Option[EventPayload]]
-  ): CallHandler2[EventId, projects.Path, Try[Result[Option[EventPayload]]]] = {
+  private def givenPayloadFinding(eventId: EventId, path: projects.Path, returning: Try[Option[EventPayload]]) = {
 
     val result = returning match {
       case Success(maybePayload) => Result.Success(maybePayload).pure[Try]
@@ -187,11 +174,10 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     givenPayloadFindingResponding(eventId, path, result)
   }
 
-  private def givenPayloadFindingResponding(eventId:   EventId,
-                                            path:      projects.Path,
-                                            returning: Try[Result[Option[EventPayload]]]
-  ): CallHandler2[EventId, projects.Path, Try[Result[Option[EventPayload]]]] =
-    (elClient.getEventPayload _)
-      .expects(eventId, path)
-      .returning(returning)
+  private def givenPayloadFindingResponding(eventId:  EventId,
+                                            path:     projects.Path,
+                                            response: Try[Result[Option[EventPayload]]]
+  ) = (elClient.getEventPayload _)
+    .expects(eventId, path)
+    .returning(response)
 }
