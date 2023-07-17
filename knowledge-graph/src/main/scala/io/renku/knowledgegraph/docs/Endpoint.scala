@@ -65,10 +65,7 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion, endpoint
 
     val document = OpenApiDocument(
       openApiVersion = "3.0.3",
-      Info("Knowledge Graph APIs",
-           "APIs to fetch and manipulate data in the Triples Store".some,
-           serviceVersion.value
-      )
+      Info("Knowledge Graph APIs", "APIs to fetch and manipulate data in the Triples Store".some, serviceVersion.value)
     ).addServer(server)
 
     endpointsDocs
