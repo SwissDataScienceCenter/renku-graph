@@ -31,16 +31,22 @@ import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventId, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
+import io.renku.testtools.CustomAsyncIOSpec
 import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.TryValues
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import scodec.bits.ByteVector
 
 import scala.util.{Failure, Success, Try}
 
-class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryValues with MockFactory {
+class LatestPayloadFinderSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with should.Matchers
+    with TryValues
+    with AsyncMockFactory {
 
   it should "fetch id of the latest project event in status TRIPLES_STORE " +
     "and then fetch this event payload" in {
@@ -52,7 +58,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
       val maybePayload = Gen.option(EventPayload(ByteVector.fromValidHex("cafebabe"))).generateOne
       givenPayloadFinding(eventId, projectPath, returning = maybePayload.pure[Try])
 
-      finder.findLatestPayload(projectPath).success.value shouldBe maybePayload
+      finder.fetchLatestPayload(projectPath).success.value shouldBe maybePayload
     }
 
   it should "return None if fetching id of the latest project event in status TRIPLES_STORE returns no results" in {
@@ -60,7 +66,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val projectPath = projectPaths.generateOne
     givenEventFinding(projectPath, returning = Option.empty.pure[Try])
 
-    finder.findLatestPayload(projectPath).success.value shouldBe None
+    finder.fetchLatestPayload(projectPath).success.value shouldBe None
   }
 
   it should "fail if finding eventId fails" in {
@@ -69,7 +75,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val exception   = exceptions.generateOne
     givenEventFindingResponding(projectPath, exception.raiseError[Try, Nothing])
 
-    finder.findLatestPayload(projectPath).failure.exception shouldBe exception
+    finder.fetchLatestPayload(projectPath).failure.exception shouldBe exception
   }
 
   it should "fail if finding eventId returns a failure" in {
@@ -78,7 +84,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val exception   = nonEmptyStrings().generateOne
     givenEventFindingResponding(projectPath, Result.failure(exception).pure[Try])
 
-    finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
+    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
   }
 
   it should "fail if finding eventId returns unavailable" in {
@@ -86,7 +92,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val projectPath = projectPaths.generateOne
     givenEventFindingResponding(projectPath, Result.unavailable.pure[Try])
 
-    finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
+    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
 
   it should "fail if finding payload fails" in {
@@ -98,7 +104,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val exception = exceptions.generateOne
     givenPayloadFinding(eventId, projectPath, returning = exception.raiseError[Try, Nothing])
 
-    finder.findLatestPayload(projectPath).failure.exception shouldBe exception
+    finder.fetchLatestPayload(projectPath).failure.exception shouldBe exception
   }
 
   it should "fail if finding payload returns a failure" in {
@@ -110,7 +116,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
     val exception = nonEmptyStrings().generateOne
     givenPayloadFindingResponding(eventId, projectPath, Result.failure(exception).pure[Try])
 
-    finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
+    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
   }
 
   it should "fail if finding payload returns unavailable" in {
@@ -121,7 +127,7 @@ class LatestPayloadFinderSpec extends AnyFlatSpec with should.Matchers with TryV
 
     givenPayloadFindingResponding(eventId, projectPath, Result.unavailable.pure[Try])
 
-    finder.findLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
+    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
 
   private lazy val elClient = mock[EventLogClient[Try]]

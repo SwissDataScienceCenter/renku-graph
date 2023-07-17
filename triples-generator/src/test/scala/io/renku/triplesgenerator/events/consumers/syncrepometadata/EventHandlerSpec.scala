@@ -22,6 +22,8 @@ import cats.data.Kleisli
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.circe.syntax._
+import io.renku.events.EventRequestContent
 import io.renku.events.consumers.ConsumersModelGenerators.eventSchedulingResults
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.generators.Generators.Implicits._
@@ -33,10 +35,16 @@ import io.renku.triplesgenerator.api.events.Generators.syncRepoMetadataEvents
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.syncrepometadata.processor.EventProcessor
 import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 
-class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matchers with AsyncMockFactory {
+class EventHandlerSpec
+    extends AsyncWordSpec
+    with AsyncIOSpec
+    with should.Matchers
+    with EitherValues
+    with AsyncMockFactory {
 
   "handlingDefinition.decode" should {
 
@@ -44,7 +52,12 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
       expectTSReadinessCheckerCall
 
-      handler(noLock).createHandlingDefinition().decode shouldBe EventDecoder.decode
+      val event = syncRepoMetadataEvents.generateOne
+
+      handler(noLock)
+        .createHandlingDefinition()
+        .decode(EventRequestContent.NoPayload(event.asJson))
+        .value shouldBe event
     }
   }
 
@@ -54,11 +67,11 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
       expectTSReadinessCheckerCall
 
-      syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-        (eventProcessor.process _).expects(event).returns(().pure[IO])
+      val event = syncRepoMetadataEvents.generateOne
 
-        handler(noLock).createHandlingDefinition().process(event).assertNoException
-      }
+      (eventProcessor.process _).expects(event).returns(().pure[IO])
+
+      handler(noLock).createHandlingDefinition().process(event).assertNoException
     }
 
     "lock while executing" in {
@@ -69,14 +82,12 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
 
       expectTSReadinessCheckerCall
 
-      syncRepoMetadataEvents[IO].map(_.generateOne).flatMap { event =>
-        (eventProcessor.process _).expects(event).returns(().pure[IO])
+      val event = syncRepoMetadataEvents.generateOne
 
-        handler(tsWriteLock).createHandlingDefinition().process(event).map { r =>
-          r                        shouldBe ()
-          test.get.unsafeRunSync() shouldBe 2
-        }
-      }
+      (eventProcessor.process _).expects(event).returns(().pure[IO])
+
+      handler(tsWriteLock).createHandlingDefinition().process(event).assertNoException >>
+        test.get.asserting(_ shouldBe 2)
     }
   }
 
@@ -113,12 +124,5 @@ class EventHandlerSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
   private lazy val noLock = Lock.none[IO, projects.Path]
 
   private def handler(tsWriteLock: TsWriteLock[IO]) =
-    new EventHandler[IO](
-      categoryName,
-      tsReadinessChecker,
-      EventDecoder,
-      eventProcessor,
-      mock[ProcessExecutor[IO]],
-      tsWriteLock
-    )
+    new EventHandler[IO](categoryName, tsReadinessChecker, eventProcessor, mock[ProcessExecutor[IO]], tsWriteLock)
 }

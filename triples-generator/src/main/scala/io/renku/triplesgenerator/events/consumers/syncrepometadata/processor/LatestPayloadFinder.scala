@@ -19,20 +19,27 @@
 package io.renku.triplesgenerator.events.consumers.syncrepometadata.processor
 
 import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.api.EventLogClient
 import io.renku.eventlog.api.EventLogClient.{EventPayload, SearchCriteria}
 import io.renku.graph.model.events.{EventInfo, EventStatus}
 import io.renku.graph.model.{events, projects}
 import io.renku.http.rest.paging.model.PerPage
+import org.typelevel.log4cats.Logger
 
 private trait LatestPayloadFinder[F[_]] {
-  def findLatestPayload(path: projects.Path): F[Option[EventPayload]]
+  def fetchLatestPayload(path: projects.Path): F[Option[EventPayload]]
+}
+
+private object LatestPayloadFinder {
+  def apply[F[_]: Async: Logger]: F[LatestPayloadFinder[F]] =
+    EventLogClient[F].map(new LatestPayloadFinderImpl[F](_))
 }
 
 private class LatestPayloadFinderImpl[F[_]: MonadThrow](elClient: EventLogClient[F]) extends LatestPayloadFinder[F] {
 
-  override def findLatestPayload(path: projects.Path): F[Option[EventPayload]] =
+  override def fetchLatestPayload(path: projects.Path): F[Option[EventPayload]] =
     findMostRecentSuccessfulEventId(path) >>= {
       case None          => Option.empty[EventPayload].pure[F]
       case Some(eventId) => findEventPayload(eventId, path)

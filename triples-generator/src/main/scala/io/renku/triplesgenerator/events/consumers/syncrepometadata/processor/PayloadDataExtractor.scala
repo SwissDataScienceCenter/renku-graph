@@ -23,14 +23,14 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.cli.model.CliProject
 import io.renku.cli.model.Ontologies.{Schema => CliSchema}
-import io.renku.graph.model.events.ZippedEventPayload
+import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.graph.model.images.Image
 import io.renku.graph.model.projects
 import io.renku.jsonld.{Cursor, Property}
 import org.typelevel.log4cats.Logger
 
 private trait PayloadDataExtractor[F[_]] {
-  def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract.Payload]]
+  def extractPayloadData(path: projects.Path, payload: EventPayload): F[Option[DataExtract.Payload]]
 }
 
 private object PayloadDataExtractor {
@@ -46,8 +46,8 @@ private class PayloadDataExtractorImpl[F[_]: MonadThrow: Logger] extends Payload
   import io.renku.jsonld.parser._
   import io.renku.jsonld.{JsonLD, JsonLDDecoder}
 
-  override def extractPayloadData(path: projects.Path, payload: ZippedEventPayload): F[Option[DataExtract.Payload]] =
-    (unzip(payload.value) >>= parse)
+  override def extractPayloadData(path: projects.Path, payload: EventPayload): F[Option[DataExtract.Payload]] =
+    (unzip(payload.data.toArray) >>= parse)
       .fold(logError(path), _.some.pure[F])
       .flatMap(decode(path))
 

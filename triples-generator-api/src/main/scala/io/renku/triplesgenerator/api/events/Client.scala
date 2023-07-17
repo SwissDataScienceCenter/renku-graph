@@ -65,10 +65,8 @@ private class ClientImpl[F[_]](eventSender: EventSender[F]) extends Client[F] {
   override def send(event: ProjectViewingDeletion): F[Unit] =
     send(event, ProjectViewingDeletion.categoryName)
 
-  override def send(event: SyncRepoMetadata): F[Unit] = event.maybePayload match {
-    case None          => send(event, SyncRepoMetadata.categoryName)
-    case Some(payload) => send(event, payload, SyncRepoMetadata.categoryName)
-  }
+  override def send(event: SyncRepoMetadata): F[Unit] =
+    send(event, SyncRepoMetadata.categoryName)
 
   private def send[E](event: E, category: CategoryName)(implicit enc: Encoder[E], show: Show[E]): F[Unit] =
     eventSender.sendEvent(

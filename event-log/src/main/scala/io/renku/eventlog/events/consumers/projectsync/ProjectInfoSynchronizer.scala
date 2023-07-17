@@ -31,6 +31,8 @@ import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoSynchronizer[F[_]] {
@@ -38,20 +40,19 @@ private trait ProjectInfoSynchronizer[F[_]] {
 }
 
 private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
-    gitLabProjectFetcher:   GitLabProjectFetcher[F],
-    projectRemover:         ProjectRemover[F],
-    eventSender:            EventSender[F],
-    syncRepoMetadataSender: SyncRepoMetadataSender[F]
+    gitLabProjectFetcher: GitLabProjectFetcher[F],
+    projectRemover:       ProjectRemover[F],
+    eventSender:          EventSender[F],
+    tgClient:             triplesgenerator.api.events.Client[F]
 ) extends ProjectInfoSynchronizer[F] {
 
   import eventSender._
   import gitLabProjectFetcher._
   import io.circe.literal._
   import projectRemover._
-  import syncRepoMetadataSender.sendSyncRepoMetadata
 
   override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
-    case Right(Some(event.projectPath)) => sendSyncRepoMetadata(event)
+    case Right(Some(event.projectPath)) => tgClient.send(SyncRepoMetadata(event.projectPath))
     case Right(Some(newPath)) =>
       removeProject(event.projectId) >>
         send(cleanUpRequest(event)) >>
@@ -96,9 +97,9 @@ private object ProjectInfoSynchronizer {
       _
   ]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[ProjectInfoSynchronizer[F]] = for {
-    gitLabProjectFetcher   <- GitLabProjectFetcher[F]
-    projectRemover         <- ProjectRemover[F]
-    eventSender            <- EventSender[F](EventLogUrl)
-    syncRepoMetadataSender <- SyncRepoMetadataSender[F]
-  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender, syncRepoMetadataSender)
+    gitLabProjectFetcher <- GitLabProjectFetcher[F]
+    projectRemover       <- ProjectRemover[F]
+    eventSender          <- EventSender[F](EventLogUrl)
+    tgClient             <- triplesgenerator.api.events.Client[F]
+  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender, tgClient)
 }
