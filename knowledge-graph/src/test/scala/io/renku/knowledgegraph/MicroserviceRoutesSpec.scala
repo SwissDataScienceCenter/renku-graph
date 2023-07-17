@@ -49,7 +49,7 @@ import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
 import org.http4s._
 import org.http4s.MediaType.application
-import org.http4s.Method.{DELETE, GET}
+import org.http4s.Method.{DELETE, GET, PUT}
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
@@ -564,6 +564,55 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "PUT /knowledge-graph/projects/:namespace/../:name" should {
+
+    val projectPath = projectPaths.generateOne
+    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+
+    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.option)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectPath, Set(projectPath))))
+
+      (projectUpdateEndpoint
+        .`PUT /projects/:path`(_: model.projects.Path, _: Request[IO], _: AuthUser))
+        .expects(projectPath, request, authUser.option.get)
+        .returning(Response[IO](Accepted).pure[IO])
+
+      routes(authUser).call(request).status shouldBe Accepted
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"return $Unauthorized when authentication fails" in new TestCase {
+      routes(givenAuthAsUnauthorized)
+        .call(request)
+        .status shouldBe Unauthorized
+    }
+
+    s"return $NotFound when no auth header" in new TestCase {
+      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
+    }
+
+    s"return $NotFound when the user has no rights to the project" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.option)
+        .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
+
+      val response = routes(authUser).call(request)
+
+      response.status             shouldBe NotFound
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+    }
+  }
+
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
 
     s"return $Ok for valid path parameters" in new TestCase {
@@ -908,6 +957,7 @@ class MicroserviceRoutesSpec
     val ontologyEndpoint                = mock[ontology.Endpoint[IO]]
     val projectDeleteEndpoint           = mock[projects.delete.Endpoint[IO]]
     val projectDetailsEndpoint          = mock[projects.details.Endpoint[IO]]
+    val projectUpdateEndpoint           = mock[projects.update.Endpoint[IO]]
     val projectDatasetsEndpoint         = mock[projects.datasets.Endpoint[IO]]
     val projectDatasetTagsEndpoint      = mock[projects.datasets.tags.Endpoint[IO]]
     val docsEndpoint                    = mock[docs.Endpoint[IO]]
@@ -932,6 +982,7 @@ class MicroserviceRoutesSpec
         ontologyEndpoint,
         projectDeleteEndpoint,
         projectDetailsEndpoint,
+        projectUpdateEndpoint,
         projectDatasetsEndpoint,
         projectDatasetTagsEndpoint,
         recentEntitiesEndpoint,
