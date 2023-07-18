@@ -117,7 +117,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     .returning(returning)
 
   private def givenSyncRepoMetadataSending(path: projects.Path, returning: IO[Unit]) =
-    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(path, None)).returning(returning)
+    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(path)).returning(returning)
 
   private implicit lazy val payloadEncoder: Encoder[NewValues] = Encoder.instance { case NewValues(visibility) =>
     json"""{"visibility":  $visibility}"""

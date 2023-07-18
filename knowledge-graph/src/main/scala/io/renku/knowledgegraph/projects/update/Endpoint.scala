@@ -75,7 +75,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
       newValues: NewValues
   ): EitherT[F, Response[F], Response[F]] =
     EitherT {
-      (updateProject(path, newValues, authUser.accessToken) >> send(SyncRepoMetadata(path, None)))
+      (updateProject(path, newValues, authUser.accessToken) >> send(SyncRepoMetadata(path)))
         .as(Response[F](Accepted).withEntity(InfoMessage("Project update accepted")).asRight[Response[F]])
         .handleErrorWith(serverError(path)(_).map(_.asLeft[Response[F]]))
     }
