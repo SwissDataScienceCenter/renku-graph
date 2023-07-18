@@ -171,17 +171,6 @@ object model {
 
   object Operation {
 
-    def GET(summary: String, description: String, uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
-      val parameters = uri.parts.flatMap {
-        case ParameterPart(parameter) => Some(parameter)
-        case _                        => None
-      }
-
-      OpMapping(Uri.getTemplate(uri.parts),
-                Get(summary.some, description.some, parameters, None, statusAndResponse.toMap, Nil)
-      )
-    }
-
     def DELETE(summary: String, description: String, uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
@@ -193,6 +182,41 @@ object model {
       )
     }
 
+    def GET(summary: String, description: String, uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Get(summary.some, description.some, parameters, None, statusAndResponse.toMap, Nil)
+      )
+    }
+
+    def PUT(summary:           String,
+            description:       String,
+            uri:               Uri,
+            requestBody:       RequestBody,
+            statusAndResponse: (Status, Response)*
+    ): OpMapping = {
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(Uri.getTemplate(uri.parts),
+                Put(summary.some, description.some, parameters, requestBody.some, statusAndResponse.toMap, Nil)
+      )
+    }
+
+    case class Delete(summary:     Option[String],
+                      description: Option[String],
+                      parameters:  List[Parameter],
+                      requestBody: Option[RequestBody],
+                      responses:   Map[Status, Response],
+                      security:    List[SecurityRequirement]
+    ) extends Operation
+
     case class Get(summary:     Option[String],
                    description: Option[String],
                    parameters:  List[Parameter],
@@ -201,12 +225,12 @@ object model {
                    security:    List[SecurityRequirement]
     ) extends Operation
 
-    case class Delete(summary:     Option[String],
-                      description: Option[String],
-                      parameters:  List[Parameter],
-                      requestBody: Option[RequestBody],
-                      responses:   Map[Status, Response],
-                      security:    List[SecurityRequirement]
+    case class Put(summary:     Option[String],
+                   description: Option[String],
+                   parameters:  List[Parameter],
+                   requestBody: Option[RequestBody],
+                   responses:   Map[Status, Response],
+                   security:    List[SecurityRequirement]
     ) extends Operation
   }
 
@@ -262,27 +286,36 @@ object model {
     }
   }
 
-  final case class RequestBody(description: String, content: Map[String, MediaType])
+  final case class RequestBody(description: String, required: Boolean, content: Map[String, MediaType])
 
-  final case class MediaType(name: String, examples: Map[String, Example])
+  sealed trait MediaType {
+    val name: String
+  }
   object MediaType {
 
-    def apply(name: String, exampleName: String, example: Example): MediaType =
-      MediaType(name, Map(exampleName -> example))
+    final case class WithoutSchema(name: String, examples: Map[String, Example]) extends MediaType
+    final case class WithSchema(name: String, schema: Schema, example: Example)  extends MediaType
 
-    lazy val `text/html`: MediaType = MediaType("text/html", Map.empty)
+    def apply(name: String, exampleName: String, example: Example): MediaType =
+      MediaType.WithoutSchema(name, Map(exampleName -> example))
+
+    lazy val `text/html`: MediaType =
+      MediaType.WithoutSchema("text/html", Map.empty)
 
     def `application/json`(exampleName: String, example: Json): MediaType =
-      MediaType("application/json", Map(exampleName -> JsonExample(example)))
+      MediaType.WithoutSchema("application/json", Map(exampleName -> JsonExample(example)))
+
+    def `application/json`(schema: Schema, example: Json): MediaType =
+      MediaType.WithSchema("application/json", schema, JsonExample(example))
 
     def `application/ld+json`(exampleName: String, example: JsonLD): MediaType =
-      MediaType("application/ld+json", Map(exampleName -> JsonLDExample(example)))
+      MediaType.WithoutSchema("application/ld+json", Map(exampleName -> JsonLDExample(example)))
 
     def `application/json`[P](exampleName: String, example: P)(implicit encoder: Encoder[P]): MediaType =
-      MediaType("application/json", Map(exampleName -> JsonExample(encoder(example))))
+      MediaType.WithoutSchema("application/json", Map(exampleName -> JsonExample(encoder(example))))
 
     def `application/json`: MediaType =
-      MediaType("application/json", Map.empty)
+      MediaType.WithoutSchema("application/json", Map.empty)
   }
 
   final case class Response(
@@ -412,6 +445,14 @@ object model {
     final case object Integer extends Schema {
       override val `type`: String = "integer"
     }
+
+    final case class EnumString(values: Set[String]) extends Schema {
+      override val `type`: String = "string"
+    }
+
+    final case class `Object`(properties: Map[String, Schema]) extends Schema {
+      override val `type`: String = "object"
+    }
   }
 
   final case class Components(schemas:         Map[String, Schema],
@@ -424,20 +465,19 @@ object model {
   }
 
   trait Example {
-    def value:   T
-    def summary: Option[String]
+    def value: T
     type T
   }
 
   object Example {
 
-    case class JsonExample(value: Json, summary: Option[String] = None) extends Example {
+    case class JsonExample(value: Json) extends Example {
       type T = Json
     }
-    case class JsonLDExample(value: JsonLD, summary: Option[String] = None) extends Example {
+    case class JsonLDExample(value: JsonLD) extends Example {
       type T = JsonLD
     }
-    case class StringExample(value: String, summary: Option[String] = None) extends Example {
+    case class StringExample(value: String) extends Example {
       type T = String
     }
   }
