@@ -69,7 +69,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished 
-               |  ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+               |  ?maybeDateModified ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
                |WHERE {        
                |  {
                |    SELECT ?projectId ?projectPath ?projectName ?projectVisibility
@@ -110,6 +110,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |    OPTIONAL { ?datasetId schema:description ?description }
                |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
+               |    OPTIONAL { ?datasetId schema:dateModified ?maybeDateModified }
                |  }
                |}
                |""".stripMargin
@@ -121,7 +122,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?datasetId ?name ?maybeDateCreated ?slug
                |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished
-               |  ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
+               |  ?maybeDateModified ?projectId ?projectPath ?projectName ?projectVisibility ?projectDSId
                |WHERE {
                |  {
                |    SELECT ?datasetId ?projectId ?projectPath ?projectName ?projectVisibility
@@ -156,6 +157,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |    OPTIONAL { ?datasetId schema:description ?description }
                |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
+               |    OPTIONAL { ?datasetId schema:dateModified ?maybeDateModified }
                |  }
                |}
                |""".stripMargin
@@ -275,10 +277,22 @@ private object BaseDetailsFinderImpl {
                                    SameAs,
                                    OriginalIdentifier,
                                    CreatedOrPublished,
+                                   Option[DateModified],
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (_, resourceId, title, name, Some(derived), _, initialVersion, dates: DateCreated, maybeDesc, project) =>
+    case (_,
+          resourceId,
+          title,
+          name,
+          Some(derived),
+          _,
+          initialVersion,
+          dates: DateCreated,
+          Some(dateModified),
+          maybeDesc,
+          project
+        ) =>
       ModifiedDataset(
         resourceId,
         title,
@@ -289,13 +303,14 @@ private object BaseDetailsFinderImpl {
         maybeDesc,
         creators = List.empty,
         createdOrPublished = dates,
+        dateModified = dateModified,
         parts = List.empty,
         project = project,
         usedIn = List.empty,
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (_, resourceId, title, name, None, sameAs, initialVersion, date, maybeDescription, project) =>
+    case (_, resourceId, title, name, None, sameAs, initialVersion, date, None, maybeDescription, project) =>
       NonModifiedDataset(
         resourceId,
         title,
@@ -312,7 +327,7 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (requestedDS, _, title, _, _, _, _, _, _, _) =>
+    case (requestedDS, _, title, _, _, _, _, _, _, _, _) =>
       DecodingFailure(
         show"'$title' dataset with id '$requestedDS' does not meet validation for modified nor non-modified dataset",
         Nil
@@ -338,7 +353,8 @@ private object BaseDetailsFinderImpl {
                                     }
                                     .widen[CreatedOrPublished]
                               }
-        maybeDescription <- extract[Option[Description]]("description")
+        maybeDateModified <- extract[Option[DateModified]]("dateModified")
+        maybeDescription  <- extract[Option[Description]]("description")
 
         project <- (extract[projects.ResourceId]("projectId"),
                     extract[projects.Path]("projectPath"),
@@ -355,6 +371,7 @@ private object BaseDetailsFinderImpl {
                                  sameAs,
                                  initialVersion,
                                  createdOrPublished,
+                                 maybeDateModified,
                                  maybeDescription,
                                  project
                    )

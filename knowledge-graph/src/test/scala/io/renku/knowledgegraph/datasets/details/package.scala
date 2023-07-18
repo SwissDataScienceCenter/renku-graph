@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.datasets
 
 import cats.syntax.all._
 import io.renku.graph.model.datasets.{PartLocation, ResourceId, SameAs}
+import io.renku.graph.model.plans.DateModified
 import io.renku.graph.model.testentities.{HavingInvalidationTime, RenkuProject, Dataset => ModelDataset}
 import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
@@ -100,6 +101,7 @@ package object details {
       .filterNot { case _: testentities.DatasetPart with HavingInvalidationTime => true; case _ => false }
       .map(part => DatasetPart(PartLocation(part.entity.location.value)))
       .sortBy(_.location),
+    DateModified(dataset.provenance.date.value),
     toDatasetProject(project, dataset),
     usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,
