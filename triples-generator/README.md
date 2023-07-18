@@ -97,7 +97,8 @@ Upon arrival, triples-generator will
 
 Upon arrival, triples-generator will
 * fetch info about `visibility`, `images`, `name`, `description` and `keywords` from GitLab;
-* extract the same info from the payload;
+* fetch the payload of the latest project event
+* extract the same info from the payload as fetched from GitLab;
 * calculate diffs and update the TS
 
 **Multipart Request**
@@ -112,8 +113,6 @@ Upon arrival, triples-generator will
   }
 }
 ```
-
-`payload` part: binary of `application/zip` content-type with the latest project event metadata.
 
 - **MEMBER_SYNC**
 

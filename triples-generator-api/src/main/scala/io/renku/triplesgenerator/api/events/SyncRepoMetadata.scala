@@ -23,22 +23,16 @@ import cats.syntax.all._
 import io.circe.DecodingFailure.Reason.CustomReason
 import io.circe.literal._
 import io.circe.{Decoder, DecodingFailure, Encoder}
-import io.renku.compression.Zip.unzip
 import io.renku.events.CategoryName
-import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.projects
-import io.renku.jsonld.{JsonLD, parser}
 
-final case class SyncRepoMetadata(path: projects.Path, maybePayload: Option[ZippedEventPayload]) {
-  lazy val maybeJsonLDPayload: Option[Either[Exception, JsonLD]] =
-    maybePayload.map(p => unzip(p.value) >>= parser.parse)
-}
+final case class SyncRepoMetadata(path: projects.Path)
 
 object SyncRepoMetadata {
 
   val categoryName: CategoryName = CategoryName("SYNC_REPO_METADATA")
 
-  implicit val eventEncoder: Encoder[SyncRepoMetadata] = Encoder.instance { case SyncRepoMetadata(path, _) =>
+  implicit val eventEncoder: Encoder[SyncRepoMetadata] = Encoder.instance { case SyncRepoMetadata(path) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
@@ -56,10 +50,10 @@ object SyncRepoMetadata {
     }
 
     (validateCategory >> cursor.downField("project").downField("path").as[projects.Path])
-      .map(SyncRepoMetadata(_, maybePayload = None))
+      .map(SyncRepoMetadata(_))
   }
 
-  implicit val show: Show[SyncRepoMetadata] = Show.show { case SyncRepoMetadata(path, _) =>
+  implicit val show: Show[SyncRepoMetadata] = Show.show { case SyncRepoMetadata(path) =>
     show"projectPath = $path"
   }
 }

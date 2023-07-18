@@ -27,7 +27,7 @@ import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.EventLogClient.ProjectEvent
-import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus, EventStatusProgress}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
@@ -37,6 +37,7 @@ import org.http4s.Status._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.{Assertion, EitherValues}
+import org.typelevel.log4cats.Logger
 
 import java.lang.Thread.sleep
 import scala.annotation.tailrec
@@ -50,7 +51,7 @@ trait TSProvisioning
     with should.Matchers
     with EitherValues {
 
-  self: ApplicationServices with IOSpec =>
+  self: ApplicationServices with AcceptanceSpec with IOSpec =>
 
   def `data in the Triples Store`(
       project:     data.Project,
@@ -98,7 +99,7 @@ trait TSProvisioning
     val tries =
       projectEvents(projectId)
         .map(_.filter(ev => ids.contains(ev.id)).map(ev => ev.id -> ev.status).toSet)
-        .evalTap(result => IO.println(s"Wait for event status: $result -> $expectedResult"))
+        .evalTap(result => Logger[IO].debug(s"Wait for event status: $result -> $expectedResult"))
         .takeThrough(found => found != expectedResult)
         .take(13)
 
@@ -110,7 +111,7 @@ trait TSProvisioning
     val tries =
       projectEvents(projectId)
         .map(_.map(ev => EventStatusProgress.Stage(ev.status)).toSet)
-        .evalTap(stages => IO.println(s"Wait for final state: $stages"))
+        .evalTap(stages => Logger[IO].debug(s"Wait for final state: $stages"))
         .takeThrough(stages => stages.exists(_ != EventStatusProgress.Stage.Final))
         .take(15)
 
