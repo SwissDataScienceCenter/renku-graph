@@ -93,6 +93,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
+      None,
       List(persons.Name("John Creator")),
       List("ds-word", "word two").map(datasets.Keyword),
       Some(datasets.Description("hello description")),
@@ -109,6 +110,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       dataset.name,
       dataset.visibility,
       dataset.date,
+      dataset.dateModified,
       dataset.creators,
       dataset.keywords,
       dataset.maybeDescription,
@@ -191,6 +193,7 @@ object ModelEncoderSpec {
       slug:          datasets.Name,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
+      dateModified:  Option[datasets.DateModified],
       creators:      List[persons.Name],
       keywords:      List[datasets.Keyword],
       description:   Option[datasets.Description],
@@ -226,7 +229,7 @@ object ModelEncoderSpec {
     deriveEncoder[JsonProject]
 
   implicit val datasetEncoder: Encoder[JsonDataset] =
-    deriveEncoder[JsonDataset]
+    deriveEncoder[JsonDataset].mapJson(_.dropNullValues)
 
   implicit val workflowEncoder: Encoder[JsonWorkflow] =
     deriveEncoder[JsonWorkflow]

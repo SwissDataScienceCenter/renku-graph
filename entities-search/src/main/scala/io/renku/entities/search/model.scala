@@ -64,6 +64,7 @@ object model {
         name:                datasets.Name,
         visibility:          projects.Visibility,
         date:                datasets.CreatedOrPublished,
+        dateModified:        Option[datasets.DateModified],
         creators:            List[persons.Name],
         keywords:            List[datasets.Keyword],
         maybeDescription:    Option[datasets.Description],

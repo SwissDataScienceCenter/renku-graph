@@ -351,6 +351,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       name,
       pathAndVisibility._2,
       date,
+      maybeDateModified.map(d => datasets.DateModified(d.value)),
       creators,
       keywords,
       maybeDesc,

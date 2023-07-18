@@ -108,6 +108,7 @@ trait ModelEncoders {
         "images":        ${(ds.images -> ds.exemplarProjectPath).asJson}
       }"""
         .addIfDefined("description" -> ds.maybeDescription)
+        .addIfDefined("dateModified" -> ds.dateModified)
         .deepMerge(
           _links(
             Link(
