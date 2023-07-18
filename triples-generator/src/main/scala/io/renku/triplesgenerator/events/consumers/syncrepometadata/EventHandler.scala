@@ -23,11 +23,12 @@ import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import eu.timepit.refined.auto._
+import io.renku.events.consumers.EventDecodingTools._
 import io.renku.events.consumers.ProcessExecutor
 import io.renku.events.{CategoryName, consumers}
-import io.renku.lock.syntax._
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
+import io.renku.lock.syntax._
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.TgLockDB.TsWriteLock
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
@@ -38,20 +39,19 @@ import org.typelevel.log4cats.Logger
 import processor.EventProcessor
 
 private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
-    override val categoryName:         CategoryName,
-    tsReadinessChecker:                TSReadinessForEventsChecker[F],
-    eventDecoder:                      EventDecoder,
-    @annotation.nowarn eventProcessor: EventProcessor[F],
-    processExecutor:                   ProcessExecutor[F],
-    tsWriteLock:                       TsWriteLock[F]
+    override val categoryName: CategoryName,
+    tsReadinessChecker:        TSReadinessForEventsChecker[F],
+    eventProcessor:            EventProcessor[F],
+    processExecutor:           ProcessExecutor[F],
+    tsWriteLock:               TsWriteLock[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](processExecutor) {
 
   protected override type Event = SyncRepoMetadata
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      eventDecoder.decode,
-      tsWriteLock.contramap[Event](_.path).surround(_ => ().pure[F]),
+      _.event.getProjectPath.map(SyncRepoMetadata(_)),
+      tsWriteLock.contramap[Event](_.path).surround(eventProcessor.process),
       precondition = tsReadinessChecker.verifyTSReady
     )
 }
@@ -66,12 +66,5 @@ private object EventHandler {
     tsReadinessChecker <- TSReadinessForEventsChecker[F]
     eventProcessor     <- EventProcessor[F](config)
     processExecutor    <- ProcessExecutor.concurrent(1)
-  } yield new EventHandler[F](
-    categoryName,
-    tsReadinessChecker,
-    EventDecoder,
-    eventProcessor,
-    processExecutor,
-    tsWriteLock
-  )
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, eventProcessor, processExecutor, tsWriteLock)
 }

@@ -33,6 +33,8 @@ import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.CustomAsyncIOSpec
+import io.renku.triplesgenerator
+import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -112,12 +114,12 @@ class ProjectInfoSynchronizerSpec
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-  private lazy val gitLabProjectFetcher   = mock[GitLabProjectFetcher[IO]]
-  private lazy val projectRemover         = mock[ProjectRemover[IO]]
-  private lazy val eventSender            = mock[EventSender[IO]]
-  private lazy val syncRepoMetadataSender = mock[SyncRepoMetadataSender[IO]]
+  private lazy val gitLabProjectFetcher = mock[GitLabProjectFetcher[IO]]
+  private lazy val projectRemover       = mock[ProjectRemover[IO]]
+  private lazy val eventSender          = mock[EventSender[IO]]
+  private lazy val tgClient             = mock[triplesgenerator.api.events.Client[IO]]
   private lazy val synchronizer =
-    new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender, syncRepoMetadataSender)
+    new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender, tgClient)
 
   private def givenGitLabProject(by:        projects.GitLabId,
                                  returning: IO[Either[UnauthorizedException, Option[projects.Path]]]
@@ -140,7 +142,7 @@ class ProjectInfoSynchronizerSpec
       .returning(returning)
 
   private def givenSendingSyncRepoMetadata(event: ProjectSyncEvent, returning: IO[Unit]) =
-    (syncRepoMetadataSender.sendSyncRepoMetadata _).expects(event).returning(returning)
+    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(event.projectPath)).returning(returning)
 
   private def commitSyncRequestEvent(id:   projects.GitLabId,
                                      path: projects.Path

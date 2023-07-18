@@ -40,9 +40,7 @@ object ServicesState {
   val cancelTokens = new ConcurrentHashMap[ServiceRun, IO[Unit]]()
 }
 
-class ServicesRunner(semaphore: Semaphore[IO])(implicit
-    logger: Logger[IO]
-) {
+class ServicesRunner(semaphore: Semaphore[IO])(implicit logger: Logger[IO]) {
 
   import ServiceClient.ServiceReadiness._
   import cats.syntax.all._
