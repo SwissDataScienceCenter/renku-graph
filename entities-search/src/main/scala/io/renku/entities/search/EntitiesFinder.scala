@@ -36,14 +36,10 @@ trait EntitiesFinder[F[_]] {
 }
 
 object EntitiesFinder {
-  private[search] val newFinders = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-  private[search] val oldFinders = List(ProjectsQuery, DatasetsQueryOld, WorkflowsQuery, PersonsQuery)
+  private[search] val finders = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, newFinders))
-
-  def createOld[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, oldFinders))
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_, finders))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](

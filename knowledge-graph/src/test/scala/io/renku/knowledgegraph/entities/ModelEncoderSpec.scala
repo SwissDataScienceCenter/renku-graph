@@ -89,7 +89,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
   it should "encode datasets with topmost-sameas" in {
     val dataset = Entity.Dataset(
       MatchingScore(0.65f),
-      Right(datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123")),
+      datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123"),
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
@@ -100,39 +100,8 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       projects.Path("projx/my-project")
     )
     val result     = ModelEncoders.datasetEncoder.apply(dataset)
-    val sameAs     = datasets.SameAs(dataset.sameAs.toOption.get.value)
+    val sameAs     = datasets.SameAs(dataset.sameAs.value)
     val detailsUri = Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / RequestedDataset(sameAs)
-    val expected = JsonDataset(
-      List(Href("details", detailsUri.renderString)),
-      dataset.matchingScore,
-      dataset.name,
-      dataset.name,
-      dataset.visibility,
-      dataset.date,
-      dataset.creators,
-      dataset.keywords,
-      dataset.maybeDescription,
-      dataset.images.map(makeImageLink(dataset.exemplarProjectPath))
-    )
-    result shouldBe expected.asJson
-  }
-
-  it should "encode datasets with identifier" in {
-    val dataset = Entity.Dataset(
-      MatchingScore(0.65f),
-      Left(datasets.Identifier("123456")),
-      datasets.Name("my-dataset"),
-      Visibility.Public,
-      datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
-      List(persons.Name("John Creator")),
-      List("ds-word", "word two").map(datasets.Keyword),
-      Some(datasets.Description("hello description")),
-      List(ImageUri("http://absolu.te/uri.png")),
-      projects.Path("projx/my-project")
-    )
-    val result     = ModelEncoders.datasetEncoder.apply(dataset)
-    val identifier = dataset.sameAs.left.toOption.get
-    val detailsUri = Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / RequestedDataset(identifier)
     val expected = JsonDataset(
       List(Href("details", detailsUri.renderString)),
       dataset.matchingScore,

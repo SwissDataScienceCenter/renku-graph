@@ -112,11 +112,7 @@ trait ModelEncoders {
           _links(
             Link(
               Rel("details") ->
-                ds.sameAs.fold(
-                  ident => knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(ident)),
-                  sameAs =>
-                    knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(SameAs(sameAs.value)))
-                )
+                knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(SameAs(ds.sameAs.value)))
             )
           )
         )

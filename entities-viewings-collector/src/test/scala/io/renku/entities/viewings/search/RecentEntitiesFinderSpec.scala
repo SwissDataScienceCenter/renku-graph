@@ -65,16 +65,16 @@ class RecentEntitiesFinderSpec extends SearchTestBase {
 
     val expect = List(
       EntityType.Project -> project1.path.value,
-      EntityType.Dataset -> Right(dataset1.provenance.topmostSameAs.value),
+      EntityType.Dataset -> dataset1.provenance.topmostSameAs.value,
       EntityType.Project -> project2.path.value,
-      EntityType.Dataset -> Right(dataset2.provenance.topmostSameAs.value)
+      EntityType.Dataset -> dataset2.provenance.topmostSameAs.value
     )
 
     result.pagingInfo.total.value shouldBe 4
 
     result.results
       .collect {
-        case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.map(_.value)
+        case e: SearchEntity.Dataset => EntityType.Dataset -> e.sameAs.value
         case e: SearchEntity.Project => EntityType.Project -> e.path.value
       } shouldBe expect
   }

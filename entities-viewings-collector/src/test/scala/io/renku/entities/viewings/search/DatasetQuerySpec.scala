@@ -79,7 +79,7 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = Right(dataset.provenance.topmostSameAs),
+        sameAs = dataset.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
         name = dataset.identification.name,
         visibility = project.visibility,
@@ -118,7 +118,7 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = Right(dataset1.provenance.topmostSameAs),
+        sameAs = dataset1.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
         name = dataset1.identification.name,
         visibility = project1.visibility,
