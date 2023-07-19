@@ -19,8 +19,7 @@
 package io.renku.knowledgegraph.datasets
 
 import cats.syntax.all._
-import io.renku.graph.model.datasets.{PartLocation, ResourceId, SameAs}
-import io.renku.graph.model.plans.DateModified
+import io.renku.graph.model.datasets.{CreatedOrPublished, DateModified, PartLocation, ResourceId, SameAs}
 import io.renku.graph.model.testentities.{HavingInvalidationTime, RenkuProject, Dataset => ModelDataset}
 import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
@@ -85,8 +84,9 @@ package object details {
     dataset.additionalInfo.images
   )
 
-  private[details] def modifiedToModified(dataset: ModelDataset[ModelDataset.Provenance.Modified],
-                                          project: RenkuProject
+  private[details] def modifiedToModified(dataset:            ModelDataset[ModelDataset.Provenance.Modified],
+                                          createdOrPublished: CreatedOrPublished,
+                                          project:            RenkuProject
   )(implicit renkuUrl: RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.title,
@@ -96,12 +96,12 @@ package object details {
     maybeInitialTag = None,
     dataset.additionalInfo.maybeDescription,
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
-    dataset.provenance.date,
+    createdOrPublished,
+    DateModified(dataset.provenance.date.value),
     dataset.parts
       .filterNot { case _: testentities.DatasetPart with HavingInvalidationTime => true; case _ => false }
       .map(part => DatasetPart(PartLocation(part.entity.location.value)))
       .sortBy(_.location),
-    DateModified(dataset.provenance.date.value),
     toDatasetProject(project, dataset),
     usedIn = List(toDatasetProject(project, dataset)),
     dataset.additionalInfo.keywords.sorted,

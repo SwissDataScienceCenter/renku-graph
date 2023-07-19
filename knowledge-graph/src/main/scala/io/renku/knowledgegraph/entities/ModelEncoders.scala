@@ -109,14 +109,10 @@ trait ModelEncoders {
       }"""
         .addIfDefined("description" -> ds.maybeDescription)
         .addIfDefined("dateModified" -> ds.dateModified)
-        .addIfDefined("dateCreated" -> (ds.date match {
+        .addIfDefined("date" -> (ds.date match {
           case c: DateCreated   => Some(c.asJson)
           case _: DatePublished => None
 
-        }))
-        .addIfDefined("dateModified" -> (ds.date match {
-          case p: DatePublished => Some(p.asJson)
-          case _: DateCreated   => None
         }))
         .deepMerge(
           _links(

@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.datasets.ResourceId
+import io.renku.graph.model.datasets.{CreatedOrPublished, DateCreated, DatePublished, ResourceId}
 import io.renku.graph.model.testentities.{Dataset => _, _}
 import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
@@ -77,10 +77,10 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       forAll(
         anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
         blankStrings()
-      ) { case ((_ ::~ dataset, project), description) =>
-        modifiedToResultSet(project, dataset, description)
+      ) { case ((original ::~ dataset, project), description) =>
+        modifiedToResultSet(project, dataset, original.provenance.date, description)
           .as[Option[Dataset]](maybeDatasetDecoder(RequestedDataset(dataset.identification.identifier))) shouldBe
-          modifiedToModified(dataset, project)
+          modifiedToModified(dataset, original.provenance.date, project)
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
             .copy(parts = Nil)
@@ -123,10 +123,18 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     json"""{"results": {"bindings": [$binding]}}"""
   }
 
-  private def modifiedToResultSet(project:     testentities.RenkuProject,
-                                  dataset:     testentities.Dataset[testentities.Dataset.Provenance.Modified],
-                                  description: String
+  private def modifiedToResultSet(project:            testentities.RenkuProject,
+                                  dataset:            testentities.Dataset[testentities.Dataset.Provenance.Modified],
+                                  createdOrPublished: CreatedOrPublished,
+                                  description:        String
   ) = {
+    val dateJson = createdOrPublished match {
+      case d: DateCreated =>
+        json"""{"maybeDateCreated": {"value": $d }}"""
+      case d: DatePublished =>
+        json"""{"maybeDatePublished": {"value": $d }}"""
+    }
+
     val binding = json"""{
       "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":        {"value": ${dataset.identifier}},
@@ -135,14 +143,14 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "description":       {"value": $description},
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "maybeDerivedFrom":  {"value": ${dataset.provenance.derivedFrom}},
-      "maybeDateCreated":  {"value": ${dataset.provenance.date}},
+      "maybeDateModified":  {"value": ${dataset.provenance.date}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
       "projectId":         {"value": ${project.resourceId}},
       "projectPath":       {"value": ${project.path}},
       "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}},
       "projectDSId":       {"value": ${dataset.identification.identifier}}
-    }"""
+    }""".deepMerge(dateJson)
 
     json"""{"results": {"bindings": [$binding]}}"""
   }

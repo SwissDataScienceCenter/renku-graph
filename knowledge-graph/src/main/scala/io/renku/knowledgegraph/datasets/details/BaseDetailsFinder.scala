@@ -105,12 +105,14 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |               schema:name ?name;
                |               renku:slug ?slug;
                |               renku:topmostSameAs ?topmostSameAs;
+               |               renku:topmostDerivedFrom ?topmostDerivedFrom;
                |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
                |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
                |    OPTIONAL { ?datasetId schema:description ?description }
-               |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }
+               |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateModified }
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
-               |    OPTIONAL { ?datasetId schema:dateModified ?maybeDateModified }
+               |    OPTIONAL { ?topmostDerivedFrom schema:dateCreated ?maybeDateCreated }
+               |    OPTIONAL { ?topmostDerivedFrom schema:datePublished ?maybeDatePublished }
                |  }
                |}
                |""".stripMargin
@@ -152,12 +154,14 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
                |               ^renku:hasDataset ?projectId;
                |               schema:name ?name;
                |               renku:slug ?slug;
+               |               renku:topmostDerivedFrom ?topmostDerivedFrom;
                |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
                |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
                |    OPTIONAL { ?datasetId schema:description ?description }
-               |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }
+               |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateModified }
                |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
-               |    OPTIONAL { ?datasetId schema:dateModified ?maybeDateModified }
+               |    OPTIONAL { ?topmostDerivedFrom schema:dateCreated ?maybeDateCreated }
+               |    OPTIONAL { ?topmostDerivedFrom schema:datePublished ?maybeDatePublished }
                |  }
                |}
                |""".stripMargin
@@ -281,18 +285,7 @@ private object BaseDetailsFinderImpl {
                                    Option[Description],
                                    DatasetProject
   ) => Result[Dataset] = {
-    case (_,
-          resourceId,
-          title,
-          name,
-          Some(derived),
-          _,
-          initialVersion,
-          dates: DateCreated,
-          Some(dateModified),
-          maybeDesc,
-          project
-        ) =>
+    case (_, resourceId, title, name, Some(derived), _, initialVersion, date, Some(dateModified), maybeDesc, project) =>
       ModifiedDataset(
         resourceId,
         title,
@@ -302,7 +295,7 @@ private object BaseDetailsFinderImpl {
         maybeInitialTag = None,
         maybeDesc,
         creators = List.empty,
-        createdOrPublished = dates,
+        createdOrPublished = date,
         dateModified = dateModified,
         parts = List.empty,
         project = project,
@@ -310,7 +303,7 @@ private object BaseDetailsFinderImpl {
         keywords = List.empty,
         images = List.empty
       ).asRight[DecodingFailure]
-    case (_, resourceId, title, name, None, sameAs, initialVersion, date, None, maybeDescription, project) =>
+    case (_, resourceId, title, name, None, sameAs, initialVersion, date, _, maybeDescription, project) =>
       NonModifiedDataset(
         resourceId,
         title,
@@ -337,24 +330,26 @@ private object BaseDetailsFinderImpl {
   private[datasets] def maybeDatasetDecoder(requestedDataset: RequestedDataset): Decoder[Option[Dataset]] =
     ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
-        resourceId       <- extract[ResourceId]("datasetId")
-        title            <- extract[Title]("name")
-        name             <- extract[Name]("slug")
-        maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
-        sameAs           <- extract[SameAs]("topmostSameAs")
-        initialVersion   <- extract[OriginalIdentifier]("initialVersion")
-        createdOrPublished <- maybeDerivedFrom match {
-                                case Some(_) => extract[DateCreated]("maybeDateCreated").widen[CreatedOrPublished]
-                                case _ =>
-                                  extract[Option[DatePublished]]("maybeDatePublished")
-                                    .flatMap {
-                                      case Some(published) => published.asRight
-                                      case None            => extract[DateCreated]("maybeDateCreated")
-                                    }
-                                    .widen[CreatedOrPublished]
+        resourceId         <- extract[ResourceId]("datasetId")
+        title              <- extract[Title]("name")
+        name               <- extract[Name]("slug")
+        maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+        sameAs             <- extract[SameAs]("topmostSameAs")
+        initialVersion     <- extract[OriginalIdentifier]("initialVersion")
+        maybeDateModified  <- extract[Option[DateModified]]("maybeDateModified")
+        maybeDateCreated   <- extract[Option[DateCreated]]("maybeDateCreated")
+        maybeDatePublished <- extract[Option[DatePublished]]("maybeDatePublished")
+        createdOrPublished <- maybeDateCreated.orElse(maybeDatePublished) match {
+                                case Some(d) => Right(d)
+                                case None =>
+                                  Left(
+                                    DecodingFailure(
+                                      s"No dateCreated and no datePublished found in dataset $resourceId",
+                                      Nil
+                                    )
+                                  )
                               }
-        maybeDateModified <- extract[Option[DateModified]]("dateModified")
-        maybeDescription  <- extract[Option[Description]]("description")
+        maybeDescription <- extract[Option[Description]]("description")
 
         project <- (extract[projects.ResourceId]("projectId"),
                     extract[projects.Path]("projectPath"),

@@ -81,7 +81,7 @@ private object Dataset {
                                    maybeInitialTag:    Option[Tag],
                                    maybeDescription:   Option[Description],
                                    creators:           List[DatasetCreator],
-                                   createdOrPublished: DateCreated,
+                                   createdOrPublished: CreatedOrPublished,
                                    dateModified:       DateModified,
                                    parts:              List[DatasetPart],
                                    project:            DatasetProject,

@@ -86,8 +86,9 @@ class EndpointSpec
         ("modified",
          anyRenkuProjectEntities
            .addDatasetAndModification(datasetEntities(provenanceInternal))
-           .map { case (_ -> modified, project) => modified -> project }
-           .map((modifiedToModified _).tupled)
+           .map { case (original -> modified, project) =>
+             modifiedToModified(modified, original.provenance.date, project)
+           }
            .generateOne
         )
       )
