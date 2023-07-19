@@ -32,6 +32,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -68,9 +69,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       val response = endpoint.processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe Accepted
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
+      response.status                          shouldBe Accepted
+      response.contentType                     shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
 
       logger.loggedOnly(
         Info(

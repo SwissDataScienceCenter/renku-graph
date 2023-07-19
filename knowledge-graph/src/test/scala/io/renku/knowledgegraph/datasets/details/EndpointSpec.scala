@@ -32,12 +32,13 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model._
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
@@ -171,7 +172,7 @@ class EndpointSpec
       response.status      shouldBe InternalServerError
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(show"Finding dataset '$requestedDataset' failed").asJson
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(show"Finding dataset '$requestedDataset' failed")
 
       logger.loggedOnly(Error(show"Finding dataset '$requestedDataset' failed", exception))
     }

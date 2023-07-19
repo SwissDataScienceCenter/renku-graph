@@ -30,24 +30,35 @@ import org.http4s.circe.jsonEncoderOf
 
 object ErrorMessage {
 
-  type ErrorMessage = DataErrorMessage.ErrorMessage
+  type ErrorMessage = DataErrorMessage
 
-  def apply(errorMessage: String): ErrorMessage = DataErrorMessage(errorMessage)
+  def apply(errorMessage: Json): DataErrorMessage.JsonMessage = DataErrorMessage(errorMessage)
 
-  def apply(exception: Throwable): ErrorMessage = DataErrorMessage.withExceptionMessage(exception)
+  def apply(errorMessage: String): DataErrorMessage.StringMessage = DataErrorMessage(errorMessage)
 
-  implicit val errorMessageJsonEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
-    Json.obj("message" -> Json.fromString(message.value))
+  def apply(exception: Throwable): DataErrorMessage.StringMessage = DataErrorMessage.withExceptionMessage(exception)
+
+  implicit def errorMessageJsonEncoder[T <: ErrorMessage]: Encoder[T] = Encoder.instance[T] {
+    case m: DataErrorMessage.StringMessage =>
+      Json.obj("message" -> Json.fromString(m.value.value))
+    case DataErrorMessage.JsonMessage(value: Json) =>
+      Json.obj("message" -> value)
   }
 
-  implicit def errorMessageJsonEntityEncoder[F[_]]: EntityEncoder[F, ErrorMessage] = jsonEncoderOf[F, ErrorMessage]
+  implicit def errorMessageJsonEntityEncoder[F[_], T <: ErrorMessage]: EntityEncoder[F, T] = jsonEncoderOf[F, T]
 
-  implicit val errorMessageJsonLDEncoder: JsonLDEncoder[ErrorMessage] = JsonLDEncoder.instance[ErrorMessage] {
-    message =>
+  implicit def errorMessageJsonLDEncoder[T <: ErrorMessage]: JsonLDEncoder[T] = JsonLDEncoder.instance[T] {
+    case DataErrorMessage.StringMessage(value) =>
       JsonLD.entity(
         EntityId.blank,
-        EntityTypes.of(renku / "Error"),
-        schema / "description" -> message.value.asJsonLD
+        EntityTypes of renku / "Error",
+        schema / "description" -> value.value.asJsonLD
+      )
+    case DataErrorMessage.JsonMessage(value: Json) =>
+      JsonLD.entity(
+        EntityId.blank,
+        EntityTypes of renku / "Error",
+        schema / "description" -> value.noSpaces.asJsonLD
       )
   }
 }

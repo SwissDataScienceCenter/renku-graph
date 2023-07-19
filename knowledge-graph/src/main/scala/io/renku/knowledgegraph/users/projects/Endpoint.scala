@@ -129,6 +129,6 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage("Finding user's projects failed")
-    Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }

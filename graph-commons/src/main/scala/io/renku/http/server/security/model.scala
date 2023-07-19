@@ -21,6 +21,7 @@ package io.renku.http.server.security
 import cats.Applicative
 import cats.syntax.all._
 import io.renku.graph.model.persons
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure

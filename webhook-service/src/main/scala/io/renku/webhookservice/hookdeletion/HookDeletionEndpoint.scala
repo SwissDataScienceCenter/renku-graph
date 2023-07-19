@@ -23,6 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser

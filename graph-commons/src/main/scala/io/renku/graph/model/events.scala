@@ -134,7 +134,7 @@ object events {
     implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
     implicit val encoder: Encoder[EventMessage] = Encoder.encodeString.contramap(_.value)
 
-    def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
+    def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).show)
   }
 
   final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType

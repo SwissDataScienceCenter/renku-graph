@@ -20,8 +20,8 @@ package io.renku.eventlog.status
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import io.renku.eventlog.events.producers.EventProducerStatus.Capacity
+import io.renku.eventlog.events.producers.{EventProducerStatus, EventProducersRegistry}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -41,9 +41,9 @@ private class StatusEndpointImpl[F[_]: MonadThrow: Logger](eventProducersRegistr
     extends Http4sDsl[F]
     with StatusEndpoint[F] {
 
+  import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
-  import io.circe.Encoder
   import io.renku.http.ErrorMessage
   import io.renku.http.ErrorMessage._
   import org.http4s.circe.CirceEntityEncoder._
@@ -61,7 +61,7 @@ private class StatusEndpointImpl[F[_]: MonadThrow: Logger](eventProducersRegistr
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val message = ErrorMessage("Finding EL status failed")
-    Logger[F].error(exception)(message.value) >> InternalServerError(message.asJson)
+    Logger[F].error(exception)(message.show) >> InternalServerError(message.asJson)
   }
 
   private implicit lazy val producerStatusDecoder: Encoder[EventProducerStatus] = Encoder.instance {

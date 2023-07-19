@@ -33,48 +33,46 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
     import ErrorMessage._
 
     "be instantiatable from a non blank String" in {
+
       val line1                 = nonEmptyStrings().generateOne
       val (line2Message, line2) = tabbedLines.generateOne
 
-      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1; $line2Message"
+      ErrorMessage(s"$line1\n$line2").value.value shouldBe s"$line1; $line2Message"
     }
 
     "be instantiable from an Exception with a non-null, non-blank, single line message" in {
+
       val exception = exceptions.generateOne
 
-      val message = ErrorMessage(exception)
-
-      message.value shouldBe exception.getMessage
+      ErrorMessage(exception).value.value shouldBe exception.getMessage
     }
 
     "be instantiable from an Exception with a multi-line message having some tabbing" in {
+
       val line1                 = nonEmptyStrings().generateOne
       val (line2Message, line2) = tabbedLines.generateOne
       val exception             = new Exception(s"$line1\n$line2")
 
-      val message = ErrorMessage(exception)
-
-      message.value shouldBe s"$line1; $line2Message"
+      ErrorMessage(exception).value.value shouldBe s"$line1; $line2Message"
     }
 
     "be instantiable from an Exception with a null message" in {
+
       val exception = new Exception()
       assume(exception.getMessage == null)
 
-      val message = ErrorMessage(exception)
-
-      message.value shouldBe s"${exception.getClass.getName}"
+      ErrorMessage(exception).value.value shouldBe s"${exception.getClass.getName}"
     }
 
     "be instantiable from an Exception with a blank message" in {
+
       val exception = new Exception(blankStrings().generateOne)
 
-      val message = ErrorMessage(exception)
-
-      message.value shouldBe s"${exception.getClass.getName}"
+      ErrorMessage(exception).value.value shouldBe s"${exception.getClass.getName}"
     }
 
     "be encodable to JSON-LD" in {
+
       val exception = new Exception(blankStrings().generateOne)
       val message   = ErrorMessage(exception)
 

@@ -24,7 +24,8 @@ import cats.effect.{Concurrent, IO, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.api.RefType
 import io.circe._
-import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.data.ErrorMessage
+import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
@@ -63,14 +64,34 @@ object EndpointTester {
       Kleisli(a => routes.run(a).getOrElse(response))
   }
 
-  implicit val errorMessageDecoder: Decoder[ErrorMessage] = Decoder.instance[ErrorMessage] {
-    _.downField("message")
-      .as[String]
-      .flatMap(RefType.applyRef[ErrorMessage](_))
-      .leftMap(error => DecodingFailure(s"Cannot deserialize 'message' to ErrorMessage: $error", Nil))
+  implicit val errorMessageDecoder: Decoder[ErrorMessage] = Decoder.instance[ErrorMessage] { cur =>
+    def failure(v: Any): Decoder.Result[ErrorMessage] =
+      DecodingFailure(s"Cannot deserialize 'message': $v to ErrorMessage", Nil).asLeft[ErrorMessage]
+
+    cur
+      .downField("message")
+      .as[Json]
+      .flatMap { json =>
+        json.fold[Decoder.Result[ErrorMessage]](failure(Json.Null),
+                                                failure(_),
+                                                failure(_),
+                                                ErrorMessage(_).asRight[DecodingFailure],
+                                                failure(_),
+                                                _ => ErrorMessage(json).asRight[DecodingFailure]
+        )
+      }
   }
 
   implicit def errorMessageEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]
+
+  implicit val infoMessageDecoder: Decoder[InfoMessage] = Decoder.instance[InfoMessage] {
+    _.downField("message")
+      .as[String]
+      .flatMap(RefType.applyRef[InfoMessage](_))
+      .leftMap(error => DecodingFailure(s"Cannot deserialize 'message' to InfoMessage: $error", Nil))
+  }
+
+  implicit def infoMessageEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, InfoMessage] = jsonOf[F, InfoMessage]
 
   implicit class JsonOps(override val json: Json) extends JsonExt {
     import io.circe.Decoder

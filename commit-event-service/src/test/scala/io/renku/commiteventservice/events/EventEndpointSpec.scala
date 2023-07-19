@@ -23,24 +23,24 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators.eventRequestContents
-import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.events.consumers.ConsumersModelGenerators.badRequests
-import io.renku.generators.Generators.{exceptions, jsons, nonEmptyStrings}
+import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.generators.Generators.{exceptions, jsons, nonEmptyStrings}
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient.PartEncoder
 import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s.{Method, Request}
 import org.http4s.MediaType._
 import org.http4s.Status.{Accepted, BadRequest, InternalServerError, ServiceUnavailable, TooManyRequests}
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.multipart.Part
+import org.http4s.{Method, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks

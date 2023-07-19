@@ -19,23 +19,23 @@
 package io.renku.triplesgenerator.events.consumers
 package tsmigrationrequest
 
+import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
-import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.consumers.EventSchedulingResult.{SchedulingError, ServiceUnavailable}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.Subscription.SubscriberUrl
 import io.renku.events.consumers.{EventSchedulingResult, ProcessExecutor}
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.config.EventLogUrl
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
-import migrations.reprovisioning.ReProvisioningStatus
-import TSStateChecker.TSState.{MissingDatasets, ReProvisioning, Ready}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -97,11 +97,11 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   private def toRecoverableFailure(recoverableFailure: ProcessingRecoverableError) =
     changeMigrationStatus(
       "RECOVERABLE_FAILURE",
-      ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).value.some
+      ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).show.some
     )
 
   private def nonRecoverableFailure: PartialFunction[Throwable, F[Unit]] = { case NonFatal(e) =>
-    changeMigrationStatus("NON_RECOVERABLE_FAILURE", ErrorMessage.withStackTrace(e).value.some)
+    changeMigrationStatus("NON_RECOVERABLE_FAILURE", ErrorMessage.withStackTrace(e).show.some)
   }
 
   private def verifyTSState: F[Option[EventSchedulingResult]] =

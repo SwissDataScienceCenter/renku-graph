@@ -27,8 +27,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage.InfoMessage
-import io.renku.http.server.EndpointTester.errorMessageEntityDecoder
+import io.renku.http.InfoMessage._
+import io.renku.http.server.EndpointTester.{errorMessageEntityDecoder, infoMessageEntityDecoder}
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec

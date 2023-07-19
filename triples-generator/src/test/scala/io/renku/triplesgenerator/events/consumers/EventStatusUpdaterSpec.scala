@@ -190,7 +190,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                     "path": $projectPath
                   },
                   "subCategory": "ToFailure",
-                  "message":   ${ErrorMessage.withStackTrace(exception).value},  
+                  "message":   ${ErrorMessage.withStackTrace(exception).show},
                   "newStatus": $eventStatus 
                 }"""
               ),

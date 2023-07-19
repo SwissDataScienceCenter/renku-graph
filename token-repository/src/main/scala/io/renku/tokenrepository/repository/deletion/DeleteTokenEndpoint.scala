@@ -47,8 +47,7 @@ class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F]
   private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-      Logger[F].error(exception)(errorMessage.value) >>
-        InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }
 

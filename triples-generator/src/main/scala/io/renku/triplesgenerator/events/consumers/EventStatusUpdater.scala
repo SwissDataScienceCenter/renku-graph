@@ -169,7 +169,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       },
       "subCategory": "ToFailure",
       "newStatus": $eventStatus,
-      "message":   ${ErrorMessage.withStackTrace(exception).value}
+      "message":   ${ErrorMessage.withStackTrace(exception).show}
     }""".addIfDefined("executionDelay" -> maybeExecutionDelay)),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                              errorMessage = s"$categoryName: Change event status as $eventStatus failed"

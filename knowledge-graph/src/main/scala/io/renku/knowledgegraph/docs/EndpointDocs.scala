@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.docs
 import cats.MonadThrow
 import cats.implicits._
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 

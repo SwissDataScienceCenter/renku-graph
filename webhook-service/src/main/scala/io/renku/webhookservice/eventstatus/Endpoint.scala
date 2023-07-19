@@ -27,6 +27,7 @@ import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}

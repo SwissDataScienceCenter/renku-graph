@@ -25,6 +25,7 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -67,7 +68,7 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
       projectIdentifier: ID
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-    Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 
   implicit val findById:   projects.GitLabId => OptionT[F, AccessToken] = tokenFinder.findToken
