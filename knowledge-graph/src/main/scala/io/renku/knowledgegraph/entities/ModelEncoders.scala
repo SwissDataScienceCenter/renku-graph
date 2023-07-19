@@ -63,6 +63,7 @@ trait ModelEncoders {
         "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
         "visibility":    ${project.visibility},
         "date":          ${project.date},
+        "dateCreated":   ${project.date},
         "dateModified":  ${project.dateModified},
         "keywords":      ${project.keywords},
         "images":        ${(project.images -> project.path).asJson}
@@ -109,11 +110,12 @@ trait ModelEncoders {
       }"""
         .addIfDefined("description" -> ds.maybeDescription)
         .addIfDefined("dateModified" -> ds.dateModified)
-        .addIfDefined("date" -> (ds.date match {
-          case c: DateCreated   => Some(c.asJson)
-          case _: DatePublished => None
-
-        }))
+        .deepMerge(
+          ds.date match {
+            case d: DateCreated   => json"""{"dateCreated":  $d }"""
+            case d: DatePublished => json"""{"datePublished":  $d }"""
+          }
+        )
         .deepMerge(
           _links(
             Link(
