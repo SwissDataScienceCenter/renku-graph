@@ -57,7 +57,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def query(resourceId: ResourceId, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    sparql"""|SELECT ?resourceId ?name ?visibility ?maybeDescription ?dateCreated
+    sparql"""|SELECT ?resourceId ?name ?visibility ?maybeDescription ?dateCreated ?dateModified
              |       ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
              |       ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
              |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
@@ -69,6 +69,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |    ?resourceId a schema:Project;
              |                schema:name ?name;
              |                renku:projectVisibility ?visibility;
+             |                schema:dateModified ?dateModified;
              |                schema:dateCreated ?dateCreated.
              |    OPTIONAL { ?resourceId schema:schemaVersion ?maybeSchemaVersion }
              |    OPTIONAL { ?resourceId schema:description ?maybeDescription }
@@ -106,7 +107,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
              |    }
              |  }
              |}
-             |GROUP BY ?resourceId ?name ?visibility ?maybeDescription ?dateCreated
+             |GROUP BY ?resourceId ?name ?visibility ?maybeDescription ?dateCreated ?dateModified
              |         ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
              |         ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
              |         ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
@@ -155,6 +156,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         name                          <- extract[Name]("name")
         visibility                    <- extract[Visibility]("visibility")
         dateCreated                   <- extract[DateCreated]("dateCreated")
+        dateModified                  <- extract[DateModified]("dateModified")
         maybeDescription              <- extract[Option[Description]]("maybeDescription")
         keywords                      <- extract[Option[String]]("keywords").flatMap(toSetOfKeywords)
         maybeCreatorResourceId        <- extract[Option[persons.ResourceId]]("maybeCreatorResourceId")
@@ -180,6 +182,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                           ProjectCreator(id, name, maybeCreatorEmail, maybeCreatorAffiliation)
                         }
         ),
+        dateModified,
         visibility,
         maybeParent = (maybeParentResourceId, maybeParentPath, maybeParentName, maybeParentDateCreated) mapN {
           case (parentId, path, name, dateCreated) =>
@@ -211,16 +214,18 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 private object KGProjectFinder {
 
-  final case class KGProject(resourceId:       ResourceId,
-                             path:             Path,
-                             name:             Name,
-                             created:          ProjectCreation,
-                             visibility:       Visibility,
-                             maybeParent:      Option[KGParent],
-                             maybeVersion:     Option[SchemaVersion],
-                             maybeDescription: Option[Description],
-                             keywords:         Set[Keyword],
-                             images:           List[ImageUri]
+  final case class KGProject(
+      resourceId:       ResourceId,
+      path:             Path,
+      name:             Name,
+      created:          ProjectCreation,
+      dateModified:     DateModified,
+      visibility:       Visibility,
+      maybeParent:      Option[KGParent],
+      maybeVersion:     Option[SchemaVersion],
+      maybeDescription: Option[Description],
+      keywords:         Set[Keyword],
+      images:           List[ImageUri]
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
