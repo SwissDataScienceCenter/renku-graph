@@ -28,6 +28,7 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.{GitLabId, Path}
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry

@@ -24,7 +24,6 @@ import Endpoint.Sort
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
@@ -33,10 +32,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.{GraphModelGenerators, projects}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.{GraphModelGenerators, projects}
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
@@ -109,7 +108,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
         case None         => s"Finding all datasets failed"
       }
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(errorMessage).asJson
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

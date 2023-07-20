@@ -24,6 +24,7 @@ import cats.effect.kernel.Concurrent
 import io.circe.Json
 import io.renku.events.Subscription
 import io.renku.http.ErrorMessage
+import io.renku.http.ErrorMessage._
 import org.http4s.{Request, Response}
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -73,7 +74,7 @@ class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
       }
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage("Registering subscriber failed")
-      Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 }
 

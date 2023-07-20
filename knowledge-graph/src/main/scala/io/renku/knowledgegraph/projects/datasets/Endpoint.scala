@@ -27,7 +27,7 @@ import io.renku.config.renku
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -69,7 +69,7 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
       projectPath: projects.Path
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-    Logger[F].error(exception)(errorMessage.value) >>
+    Logger[F].error(exception)(errorMessage.show) >>
       InternalServerError(errorMessage)
   }
 

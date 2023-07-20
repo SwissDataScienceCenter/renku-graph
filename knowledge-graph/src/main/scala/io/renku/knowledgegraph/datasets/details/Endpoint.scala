@@ -27,6 +27,7 @@ import io.renku.config.renku
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.Href
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -83,7 +84,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private def httpResult(identifier: RequestedDataset): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(show"Finding dataset '$identifier' failed")
-      Logger[F].error(exception)(errorMessage.value) >>
+      Logger[F].error(exception)(errorMessage.show) >>
         InternalServerError(errorMessage)
   }
 

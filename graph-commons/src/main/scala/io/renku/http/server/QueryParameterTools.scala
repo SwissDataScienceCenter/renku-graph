@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import io.circe.syntax._
 import io.renku.http.ErrorMessage._
+import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.circe._
 import org.http4s.{ParseFailure, Response, Status}

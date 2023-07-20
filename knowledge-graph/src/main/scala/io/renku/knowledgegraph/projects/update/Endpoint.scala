@@ -21,9 +21,11 @@ package io.renku.knowledgegraph.projects.update
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.syntax._
 import io.renku.data.ErrorMessage
 import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
@@ -51,13 +53,13 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
-  import glProjectUpdater.updateProject
-  import tgClient.send
-
   override def `PUT /projects/:path`(path: projects.Path, request: Request[F], authUser: AuthUser): F[Response[F]] =
     decodePayload(request)
-      .flatMap(updateGLAndSendEvent(path, authUser))
+      .flatMap(updateGL(path, authUser))
+      .semiflatMap(_ => tgClient.send(SyncRepoMetadata(path)))
+      .as(Response[F](Accepted).withEntity(InfoMessage("Project update accepted")))
       .merge
+      .handleErrorWith(serverError(path)(_))
 
   private lazy val decodePayload: Request[F] => EitherT[F, Response[F], NewValues] = req =>
     EitherT {
@@ -67,18 +69,15 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
         .handleError(badRequest(_).asLeft[NewValues])
     }
 
-  private lazy val badRequest: Throwable => Response[F] = { _ =>
+  private def badRequest: Throwable => Response[F] = { _ =>
     Response[F](BadRequest).withEntity(ErrorMessage("Invalid payload").asJson)
   }
 
-  private def updateGLAndSendEvent(path: projects.Path, authUser: AuthUser)(
-      newValues: NewValues
-  ): EitherT[F, Response[F], Response[F]] =
-    EitherT {
-      (updateProject(path, newValues, authUser.accessToken) >> send(SyncRepoMetadata(path)))
-        .as(Response[F](Accepted).withEntity(InfoMessage("Project update accepted")).asRight[Response[F]])
-        .handleErrorWith(serverError(path)(_).map(_.asLeft[Response[F]]))
-    }
+  private def badRequest(message: Json): Response[F] =
+    Response[F](BadRequest).withEntity(ErrorMessage(message))
+
+  private def updateGL(path: projects.Path, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
+    glProjectUpdater.updateProject(path, newValues, authUser.accessToken).leftMap(badRequest)
 
   private def serverError(path: projects.Path): Throwable => F[Response[F]] =
     Logger[F]

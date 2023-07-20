@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -58,7 +59,7 @@ private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F])
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage("Lineage generation failed")
-    Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }
 

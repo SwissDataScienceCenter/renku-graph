@@ -19,31 +19,43 @@
 package io.renku.knowledgegraph.projects.update
 
 import cats.MonadThrow
+import cats.data.EitherT
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.{Decoder, Json}
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
 import org.http4s.Status._
+import org.http4s.circe.jsonOf
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, UrlForm}
 
 private trait GLProjectUpdater[F[_]] {
-  def updateProject(path: projects.Path, newValues: NewValues, at: AccessToken): F[Unit]
+  def updateProject(path: projects.Path, newValues: NewValues, at: AccessToken): EitherT[F, Json, Unit]
 }
 
 private object GLProjectUpdater {
-  def apply[F[_]: MonadThrow: GitLabClient]: GLProjectUpdater[F] = new GLProjectUpdaterImpl[F]
+  def apply[F[_]: Async: GitLabClient]: GLProjectUpdater[F] = new GLProjectUpdaterImpl[F]
 }
 
-private class GLProjectUpdaterImpl[F[_]: MonadThrow: GitLabClient] extends GLProjectUpdater[F] {
+private class GLProjectUpdaterImpl[F[_]: Async: GitLabClient] extends GLProjectUpdater[F] {
 
-  override def updateProject(path: projects.Path, newValues: NewValues, at: AccessToken): F[Unit] =
-    GitLabClient[F].put(uri"projects" / path, "edit-project", UrlForm("visibility" -> newValues.visibility.value))(
-      mapResponse
-    )(at.some)
+  override def updateProject(path: projects.Path, newValues: NewValues, at: AccessToken): EitherT[F, Json, Unit] =
+    EitherT {
+      GitLabClient[F].put(uri"projects" / path, "edit-project", UrlForm("visibility" -> newValues.visibility.value))(
+        mapResponse
+      )(at.some)
+    }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = { case (Ok, _, _) =>
-    ().pure[F]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Either[Json, Unit]]] = {
+    case (Ok, _, _)                => ().asRight[Json].pure[F]
+    case (BadRequest, _, response) => response.as[Json](MonadThrow[F], jsonOf(Async[F], errorDecoder)).map(_.asLeft)
+  }
+
+  private lazy val errorDecoder: Decoder[Json] = { cur =>
+    (cur.downField("error").as[Option[Json]], cur.downField("message").as[Option[Json]])
+      .mapN(_ orElse _ getOrElse cur.value)
   }
 }

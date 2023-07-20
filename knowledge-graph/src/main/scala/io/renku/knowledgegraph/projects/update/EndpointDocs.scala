@@ -22,6 +22,7 @@ package projects.update
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.docs.model.Operation.PUT

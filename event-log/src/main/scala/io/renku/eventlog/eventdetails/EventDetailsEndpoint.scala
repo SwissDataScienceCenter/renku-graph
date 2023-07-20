@@ -26,6 +26,7 @@ import io.circe.syntax.EncoderOps
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.Response
@@ -52,7 +53,7 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 
   private lazy val internalServerError: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage("Finding event details failed")
-    Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 
   private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>

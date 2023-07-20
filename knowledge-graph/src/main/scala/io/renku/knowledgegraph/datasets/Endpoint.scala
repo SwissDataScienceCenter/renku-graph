@@ -28,7 +28,7 @@ import io.renku.config.renku.ResourceUrl
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
@@ -93,8 +93,7 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         .map(phrase => s"Finding datasets matching '$phrase' failed")
         .getOrElse("Finding all datasets failed")
     )
-    Logger[F].error(exception)(errorMessage.value) >>
-      InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[F], String] = {

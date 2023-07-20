@@ -94,7 +94,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .expects(
           statusChangePayload(
             status = "RECOVERABLE_FAILURE",
-            ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).value.some
+            ErrorMessage.withMessageAndStackTrace(recoverableFailure.message, recoverableFailure.cause).show.some
           ),
           expectedEventContext
         )
@@ -120,9 +120,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       val eventCursor = payloadCaptor.value.event.hcursor
       eventCursor.downField("newStatus").as[String] shouldBe "NON_RECOVERABLE_FAILURE".asRight
-      eventCursor.downField("message").as[String].fold(throw _, identity) should include(
-        ErrorMessage.withStackTrace(exception).value
-      )
+      eventCursor.downField("message").as[String].fold(throw _, identity) should
+        include(ErrorMessage.withStackTrace(exception).show)
     }
   }
 

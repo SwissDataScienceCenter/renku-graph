@@ -28,8 +28,9 @@ import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
-import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.http.ErrorMessage._
 import io.renku.http.InfoMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`

@@ -21,7 +21,6 @@ package io.renku.knowledgegraph.projects.datasets
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
-import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -31,7 +30,7 @@ import io.renku.graph.model.datasets.{Identifier, Name, OriginalIdentifier, Titl
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Path
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
@@ -105,7 +104,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding $projectPath's datasets failed").asJson
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(s"Finding $projectPath's datasets failed")
 
       logger.loggedOnly(Error(s"Finding $projectPath's datasets failed", exception))
     }

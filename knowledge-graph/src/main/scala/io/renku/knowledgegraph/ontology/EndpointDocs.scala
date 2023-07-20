@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.implicits._
 import io.circe.literal._
 import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import io.renku.http.ErrorMessage._
 import io.renku.jsonld.parser._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET

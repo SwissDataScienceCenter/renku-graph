@@ -83,7 +83,7 @@ object MigrationMessage
     extends TinyTypeFactory[MigrationMessage](new MigrationMessage(_))
     with NonBlank[MigrationMessage] {
 
-  def apply(exception: Throwable): MigrationMessage = MigrationMessage(ErrorMessage.withStackTrace(exception).value)
+  def apply(exception: Throwable): MigrationMessage = MigrationMessage(ErrorMessage.withStackTrace(exception).show)
 
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
   implicit val decoder: Decoder[MigrationMessage] = stringDecoder(MigrationMessage)
