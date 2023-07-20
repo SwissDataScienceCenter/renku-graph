@@ -109,7 +109,7 @@ class MigrationMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
 
     "be instantiatable from an exception and contain the stack trace" in {
       forAll(nestedExceptions) { exception =>
-        MigrationMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).value
+        MigrationMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).show
       }
     }
   }
