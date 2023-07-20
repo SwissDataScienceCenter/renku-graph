@@ -128,13 +128,14 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "ErrorMessage.show" should {
+  "ErrorMessage.show & toString" should {
 
     "return value in case of a StringMessage" in {
 
       val message = nonBlankStrings().generateOne
 
       ErrorMessage(message.value).show shouldBe message.value
+      ErrorMessage(message.value).toString shouldBe message.value
     }
 
     "return value in case of a JsonMessage" in {
@@ -142,6 +143,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
       val message = jsons.generateOne
 
       ErrorMessage(message).show shouldBe message.noSpaces
+      ErrorMessage(message).toString shouldBe message.noSpaces
     }
   }
 

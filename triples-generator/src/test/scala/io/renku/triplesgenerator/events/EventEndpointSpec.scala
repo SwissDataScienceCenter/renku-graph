@@ -23,24 +23,24 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators._
-import io.renku.events.consumers._
 import io.renku.events.consumers.ConsumersModelGenerators.badRequests
-import io.renku.generators.Generators._
+import io.renku.events.consumers._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient._
 import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s._
 import org.http4s.MediaType._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.multipart.Part
@@ -64,7 +64,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
     }
 
     s"return $BadRequest if there is no event part in the request" in new TestCase {
@@ -76,7 +76,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
     }
 
     s"return $BadRequest if the event part in the request is malformed" in new TestCase {
@@ -87,7 +87,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
     }
 
     val scenarios = Table(
@@ -153,7 +153,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe TooManyRequests
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
     }
 
     s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {

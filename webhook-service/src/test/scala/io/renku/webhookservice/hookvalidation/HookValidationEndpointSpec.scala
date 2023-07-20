@@ -91,7 +91,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return INTERNAL_SERVER_ERROR when there was an error during hook validation and log the error" in new TestCase {
 
       val errorMessage      = ErrorMessage("some error")
-      private val exception = new Exception(errorMessage.toString())
+      private val exception = new Exception(errorMessage.show)
       (hookValidator
         .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))

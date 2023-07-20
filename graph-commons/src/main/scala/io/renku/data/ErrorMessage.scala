@@ -28,7 +28,8 @@ import java.io.{PrintWriter, StringWriter}
 sealed trait ErrorMessage {
   type T
   val value: T
-  def show: String
+  def show:                   String
+  override lazy val toString: String = show
 }
 
 object ErrorMessage {

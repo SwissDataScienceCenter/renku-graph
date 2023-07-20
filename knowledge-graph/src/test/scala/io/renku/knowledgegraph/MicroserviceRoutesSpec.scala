@@ -18,39 +18,39 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{EitherT, Kleisli}
 import cats.data.EitherT.{leftT, rightT}
+import cats.data.{EitherT, Kleisli}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
+import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
-import org.http4s._
 import org.http4s.MediaType.application
 import org.http4s.Method.{DELETE, GET, PUT}
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.server.AuthMiddleware
@@ -73,10 +73,10 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/datasets?query=<phrase>" should {
 
-    import datasets._
     import datasets.Endpoint.Query._
     import datasets.Endpoint.Sort
     import datasets.Endpoint.Sort._
+    import datasets._
 
     s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
@@ -260,14 +260,14 @@ class MicroserviceRoutesSpec
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
   }
 
   "GET /knowledge-graph/entities" should {
     import io.renku.entities.search.Criteria
-    import io.renku.entities.search.Criteria._
     import io.renku.entities.search.Criteria.Sort._
+    import io.renku.entities.search.Criteria._
     import io.renku.entities.search.Generators._
 
     forAll {
@@ -497,7 +497,7 @@ class MicroserviceRoutesSpec
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
   }
 
@@ -560,7 +560,7 @@ class MicroserviceRoutesSpec
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
   }
 
@@ -609,7 +609,7 @@ class MicroserviceRoutesSpec
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
   }
 
@@ -657,7 +657,7 @@ class MicroserviceRoutesSpec
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
   }
 
@@ -845,9 +845,9 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/users/:id/projects" should {
-    import users.projects._
-    import users.projects.Endpoint._
     import users.projects.Endpoint.Criteria._
+    import users.projects.Endpoint._
+    import users.projects._
 
     val userId = personGitLabIds.generateOne
 

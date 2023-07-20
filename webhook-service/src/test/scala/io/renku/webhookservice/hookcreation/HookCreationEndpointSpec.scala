@@ -92,7 +92,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation and log the error" in new TestCase {
 
       val errorMessage = ErrorMessage("some error")
-      val exception    = new Exception(errorMessage.toString())
+      val exception    = new Exception(errorMessage.show)
       (hookCreator
         .createHook(_: GitLabId, _: AuthUser))
         .expects(projectId, authUser)

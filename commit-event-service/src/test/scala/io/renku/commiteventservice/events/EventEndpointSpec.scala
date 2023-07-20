@@ -61,7 +61,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
     }
 
     s"return $BadRequest if there is no event part in the request" in new TestCase {
@@ -73,7 +73,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
     }
 
     s"return $BadRequest if the event part in the request is malformed" in new TestCase {
@@ -84,7 +84,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
     }
 
     forAll(
@@ -148,7 +148,7 @@ class EventEndpointSpec
 
       response.status                          shouldBe TooManyRequests
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
     }
 
     s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {

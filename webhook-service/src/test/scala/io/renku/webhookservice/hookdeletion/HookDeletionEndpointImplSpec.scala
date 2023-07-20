@@ -81,7 +81,7 @@ class HookDeletionEndpointImplSpec extends AnyWordSpec with MockFactory with sho
     "return INTERNAL_SERVER_ERROR when there was an error during hook deletion and log the error" in new TestCase {
 
       val errorMessage = ErrorMessage("some error")
-      val exception    = new Exception(errorMessage.toString())
+      val exception    = new Exception(errorMessage.show)
       (hookRemover
         .deleteHook(_: HookIdentifier, _: AccessToken))
         .expects(projectHookId, authUser.accessToken)
