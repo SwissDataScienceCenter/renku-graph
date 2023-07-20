@@ -50,25 +50,39 @@ class FixMultipleProjectVersionsSpec
 
     val currentVersion = SchemaVersion("10")
     val olderVersion   = SchemaVersion("9")
-    val projects @ project1 :: project2 :: Nil =
+    val project1 =
       anyRenkuProjectEntities
         .map(replaceSchemaVersion(to = currentVersion))
-        .generateFixedSizeList(ofSize = 2)
-        .map(_.to[entities.RenkuProject])
+        .generateOne
+        .to[entities.RenkuProject]
+    val project2 =
+      anyRenkuProjectEntities
+        .map(replaceSchemaVersion(to = currentVersion))
+        .generateOne
+        .to[entities.RenkuProject]
+    val project3 =
+      anyRenkuProjectEntities
+        .map(replaceSchemaVersion(to = olderVersion))
+        .generateOne
+        .to[entities.RenkuProject]
 
     for {
-      _ <- provisionProjects(projects: _*)
+      _ <- provisionProjects(project1, project2, project3)
       _ <- add(to = project1.resourceId, olderVersion)
       _ <- findProjectVersions.asserting(
              _ shouldBe Map(project1.resourceId -> Set(currentVersion, olderVersion),
-                            project2.resourceId -> Set(currentVersion)
+                            project2.resourceId -> Set(currentVersion),
+                            project3.resourceId -> Set(olderVersion)
              )
            )
 
       _ <- runUpdate(projectsDataset, FixMultipleProjectVersions.query(currentVersion)).assertNoException
 
       _ <- findProjectVersions.asserting(
-             _ shouldBe Map(project1.resourceId -> Set(currentVersion), project2.resourceId -> Set(currentVersion))
+             _ shouldBe Map(project1.resourceId -> Set(currentVersion),
+                            project2.resourceId -> Set(currentVersion),
+                            project3.resourceId -> Set(olderVersion)
+             )
            )
     } yield ()
   }
