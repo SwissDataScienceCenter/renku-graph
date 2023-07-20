@@ -25,6 +25,7 @@ import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.ProjectIdentification
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
+import io.renku.graph.model.versions.SchemaVersion
 import io.renku.graph.model.{persons, projects}
 import monocle.Lens
 import org.scalacheck.Gen
@@ -104,6 +105,9 @@ trait ProjectEntitiesGenerators {
   def replaceProjectDateModified[P <: Project](to: projects.DateModified): P => P =
     _.fold(_.copy(dateModified = to), _.copy(dateModified = to), _.copy(dateModified = to), _.copy(dateModified = to))
       .asInstanceOf[P]
+
+  def replaceSchemaVersion[P <: Project](to: SchemaVersion): P => P =
+    _.fold(_.copy(version = to), _.copy(version = to), identity, identity).asInstanceOf[P]
 
   def replaceImages[P <: Project](to: List[ImageUri]): P => P =
     _.fold(_.copy(images = to), _.copy(images = to), _.copy(images = to), _.copy(images = to)).asInstanceOf[P]

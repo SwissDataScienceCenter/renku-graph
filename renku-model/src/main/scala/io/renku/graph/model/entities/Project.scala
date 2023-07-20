@@ -687,7 +687,8 @@ object Project {
       renku / "projectVisibility",
       DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
     )
-    val keywordsProperty: DataProperty.Def = DataProperty(schema / "keywords", xsd / "string")
+    val keywordsProperty:      DataProperty.Def = DataProperty(schema / "keywords", xsd / "string")
+    val schemaVersionProperty: DataProperty.Def = DataProperty(schema / "schemaVersion", xsd / "string")
 
     lazy val typeDef: Type =
       Type.Def(
@@ -712,7 +713,7 @@ object Project {
           dateModifiedProperty,
           visibilityProperty,
           keywordsProperty,
-          DataProperty(schema / "schemaVersion", xsd / "string")
+          schemaVersionProperty
         )
       )
   }
