@@ -123,7 +123,7 @@ class DatasetsEntitiesFinderSpec
       result.results shouldMatchTo List(
         (modifiedDS -> originalDSProject).to[model.Entity.Dataset],
         importedDSAndProject.to[model.Entity.Dataset]
-      ).sortBy(_.dateAsInstant)
+      ).sortBy(_.dateAsInstant).map(_.copy(date = originalDS.provenance.date))
     }
   }
 
@@ -152,7 +152,7 @@ class DatasetsEntitiesFinderSpec
   "findEntities - in case of a forks with datasets" should {
 
     "de-duplicate datasets when on forked projects" in new TestCase {
-      val ((_, modifiedDS), originalDSProject) = renkuProjectEntities(visibilityPublic)
+      val ((originalDS, modifiedDS), originalDSProject) = renkuProjectEntities(visibilityPublic)
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
@@ -164,8 +164,8 @@ class DatasetsEntitiesFinderSpec
       }
 
       result.results should {
-        be(List((modifiedDS -> original).to[model.Entity.Dataset])) or
-          be(List((modifiedDS -> fork).to[model.Entity.Dataset]))
+        be(List((modifiedDS -> original).to[model.Entity.Dataset].copy(date = originalDS.provenance.date))) or
+          be(List((modifiedDS -> fork).to[model.Entity.Dataset].copy(date = originalDS.provenance.date)))
       }
     }
   }
