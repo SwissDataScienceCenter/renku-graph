@@ -38,6 +38,7 @@ package object knowledgegraph {
     val imageEncoders = new ImageApiEncoders {
       override def gitLabUrl: GitLabUrl = theGitLabUrl
     }
+
     import imageEncoders._
 
     val modified = List(
