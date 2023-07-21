@@ -21,7 +21,7 @@ package io.renku.entities.search
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model._
 import io.renku.graph.model.testentities.{Entity => _, _}
-import io.renku.graph.model.{RenkuUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 
 private object EntityConverters {
 
@@ -48,6 +48,11 @@ private object EntityConverters {
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,
+      dataset.provenance match {
+        case m: Dataset.Provenance.Modified =>
+          Some(datasets.DateModified(m.date.value))
+        case _ => None
+      },
       dataset.provenance.creators.map(_.name).toList.sorted,
       dataset.additionalInfo.keywords.sorted,
       dataset.additionalInfo.maybeDescription,

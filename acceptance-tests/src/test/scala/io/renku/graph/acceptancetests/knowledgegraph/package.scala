@@ -19,6 +19,7 @@
 package io.renku.graph.acceptancetests
 
 import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.cli.CliConverters
 
 package object knowledgegraph {
 
@@ -37,7 +38,13 @@ package object knowledgegraph {
     val imageEncoders = new ImageApiEncoders {
       override def gitLabUrl: GitLabUrl = theGitLabUrl
     }
+
     import imageEncoders._
+
+    val modified = List(
+      CliConverters.from(project.entitiesProject).dateModified,
+      project.entitiesProject.dateModified
+    ).max
 
     json"""{
     "identifier":   ${project.id.value},
@@ -45,7 +52,7 @@ package object knowledgegraph {
     "name":         ${project.name.value},
     "visibility":   ${project.entitiesProject.visibility.value},
     "created":      ${(project.entitiesProject.dateCreated, project.entitiesProject.maybeCreator)},
-    "dateModified": ${project.entitiesProject.dateModified.value},
+    "dateModified": ${modified.value},
     "urls":         ${project.urls.toJson},
     "forking":      ${project.entitiesProject.forksCount -> project.entitiesProject},
     "keywords":     ${project.entitiesProject.keywords.map(_.value).toList.sorted},

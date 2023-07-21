@@ -93,6 +93,7 @@ object Variables {
         name,
         visibility,
         date,
+        maybeDateModified.map(d => datasets.DateModified(d.value)),
         creators,
         keywords,
         maybeDesc,

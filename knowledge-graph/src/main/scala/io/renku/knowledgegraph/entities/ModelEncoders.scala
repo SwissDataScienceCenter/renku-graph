@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.entities.search.{Criteria, model}
-import io.renku.graph.model.datasets.SameAs
+import io.renku.graph.model.datasets.{DateCreated, DatePublished, SameAs}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
@@ -63,6 +63,7 @@ trait ModelEncoders {
         "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
         "visibility":    ${project.visibility},
         "date":          ${project.date},
+        "dateCreated":   ${project.date},
         "dateModified":  ${project.dateModified},
         "keywords":      ${project.keywords},
         "images":        ${(project.images -> project.path).asJson}
@@ -108,6 +109,13 @@ trait ModelEncoders {
         "images":        ${(ds.images -> ds.exemplarProjectPath).asJson}
       }"""
         .addIfDefined("description" -> ds.maybeDescription)
+        .addIfDefined("dateModified" -> ds.dateModified)
+        .deepMerge(
+          ds.date match {
+            case d: DateCreated   => json"""{"dateCreated":  $d }"""
+            case d: DatePublished => json"""{"datePublished":  $d }"""
+          }
+        )
         .deepMerge(
           _links(
             Link(

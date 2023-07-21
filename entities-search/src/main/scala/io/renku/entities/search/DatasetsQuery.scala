@@ -337,9 +337,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       maybeDatePublished <- read[Option[datasets.DatePublished]](maybeDatePublishedVar)
       maybeDateModified  <- read[Option[datasets.DateCreated]](maybeDateModified)
       date <-
-        Either.fromOption(maybeDateModified.orElse(maybeDateCreated.orElse(maybeDatePublished)),
-                          ifNone = DecodingFailure("No dataset date", Nil)
-        )
+        Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
       creators <- read[Option[String]](creatorsNamesVar) >>= toListOf[persons.Name, persons.Name.type](persons.Name)
       keywords <-
         read[Option[String]](keywordsVar) >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
@@ -351,6 +349,7 @@ object DatasetsQuery extends EntityQuery[Entity.Dataset] {
       name,
       pathAndVisibility._2,
       date,
+      maybeDateModified.map(d => datasets.DateModified(d.value)),
       creators,
       keywords,
       maybeDesc,

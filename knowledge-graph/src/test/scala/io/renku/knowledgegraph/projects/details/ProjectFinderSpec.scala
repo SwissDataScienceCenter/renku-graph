@@ -203,7 +203,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
         kgProject.created.date,
         kgProject.created.maybeCreator.map(toModelCreator)
       ),
-      dateModified = gitLabProject.dateModified,
+      dateModified = kgProject.dateModified,
       urls = gitLabProject.urls,
       forking = model.Forking(
         gitLabProject.forksCount,

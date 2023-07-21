@@ -87,8 +87,9 @@ class EndpointSpec
         ("modified",
          anyRenkuProjectEntities
            .addDatasetAndModification(datasetEntities(provenanceInternal))
-           .map { case (_ -> modified, project) => modified -> project }
-           .map((modifiedToModified _).tupled)
+           .map { case (original -> modified, project) =>
+             modifiedToModified(modified, original.provenance.date, project)
+           }
            .generateOne
         )
       )
@@ -284,59 +285,63 @@ class EndpointSpec
 
   private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
-      title            <- cursor.downField("title").as[Title]
-      name             <- cursor.downField("name").as[Name]
-      resourceId       <- cursor.downField("url").as[ResourceId]
-      maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
-      maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
-      parts            <- cursor.downField("hasPart").as[List[Dataset.DatasetPart]]
-      project          <- cursor.downField("project").as[DatasetProject]
-      usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
-      keywords         <- cursor.downField("keywords").as[List[Keyword]]
-      maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
-      maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
-      versions         <- cursor.downField("versions").as[DatasetVersions]
-      maybeInitialTag  <- cursor.downField("tags").downField("initial").as[Option[Tag]]
-      images           <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
+      title             <- cursor.downField("title").as[Title]
+      name              <- cursor.downField("name").as[Name]
+      resourceId        <- cursor.downField("url").as[ResourceId]
+      maybeDescription  <- cursor.downField("description").as[Option[Description]]
+      published         <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
+      maybeDateCreated  <- cursor.downField("created").as[Option[DateCreated]]
+      maybeDateModified <- cursor.downField("dateModified").as[Option[DateModified]]
+      parts             <- cursor.downField("hasPart").as[List[Dataset.DatasetPart]]
+      project           <- cursor.downField("project").as[DatasetProject]
+      usedIn            <- cursor.downField("usedIn").as[List[DatasetProject]]
+      keywords          <- cursor.downField("keywords").as[List[Keyword]]
+      maybeSameAs       <- cursor.downField("sameAs").as[Option[SameAs]]
+      maybeDerivedFrom  <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
+      versions          <- cursor.downField("versions").as[DatasetVersions]
+      maybeInitialTag   <- cursor.downField("tags").downField("initial").as[Option[Tag]]
+      images            <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
       date <-
         maybeDateCreated
           .orElse(published._2)
           .widen[CreatedOrPublished]
           .map(_.asRight)
           .getOrElse(DecodingFailure("No date found", Nil).asLeft)
-    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
-      case (Some(sameAs), _, None) =>
-        NonModifiedDataset(resourceId,
-                           title,
-                           name,
-                           sameAs,
-                           versions,
-                           maybeInitialTag,
-                           maybeDescription,
-                           published._1.toList,
-                           date,
-                           parts,
-                           project,
-                           usedIn,
-                           keywords,
-                           images
+    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom, maybeDateModified) match {
+      case (Some(sameAs), _, None, _) =>
+        NonModifiedDataset(
+          resourceId,
+          title,
+          name,
+          sameAs,
+          versions,
+          maybeInitialTag,
+          maybeDescription,
+          published._1.toList,
+          date,
+          parts,
+          project,
+          usedIn,
+          keywords,
+          images
         )
-      case (None, Some(dateCreated), Some(derivedFrom)) =>
-        ModifiedDataset(resourceId,
-                        title,
-                        name,
-                        derivedFrom,
-                        versions,
-                        maybeInitialTag,
-                        maybeDescription,
-                        published._1.toList,
-                        dateCreated,
-                        parts,
-                        project,
-                        usedIn,
-                        keywords,
-                        images
+      case (None, Some(dateCreated), Some(derivedFrom), Some(dateModified)) =>
+        ModifiedDataset(
+          resourceId,
+          title,
+          name,
+          derivedFrom,
+          versions,
+          maybeInitialTag,
+          maybeDescription,
+          published._1.toList,
+          dateCreated,
+          dateModified,
+          parts,
+          project,
+          usedIn,
+          keywords,
+          images
         )
       case _ => fail("Cannot decode payload as Dataset")
     }

@@ -92,6 +92,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      Some(datasets.DateModified(Instant.parse("2013-11-15T10:00:00.000Z"))),
       List(persons.Name("Jan Kowalski")),
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,

@@ -25,6 +25,7 @@ import io.renku.config.renku.ApiUrl
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.graph.model.datasets.DateCreated
 import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
@@ -79,6 +80,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       makeNamespaces(project.path),
       project.visibility,
       project.date,
+      project.date,
       project.dateModified,
       project.keywords,
       project.images.map(makeImageLink(project.path))
@@ -93,6 +95,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
+      None,
       List(persons.Name("John Creator")),
       List("ds-word", "word two").map(datasets.Keyword),
       Some(datasets.Description("hello description")),
@@ -109,6 +112,9 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       dataset.name,
       dataset.visibility,
       dataset.date,
+      dataset.dateModified,
+      Some(dataset.date.asInstanceOf[DateCreated]),
+      None,
       dataset.creators,
       dataset.keywords,
       dataset.maybeDescription,
@@ -179,6 +185,7 @@ object ModelEncoderSpec {
       namespaces:    List[Ns],
       visibility:    Visibility,
       date:          projects.DateCreated,
+      dateCreated:   projects.DateCreated,
       dateModified:  projects.DateModified,
       keywords:      List[projects.Keyword],
       images:        List[ImageLink],
@@ -191,6 +198,9 @@ object ModelEncoderSpec {
       slug:          datasets.Name,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
+      dateModified:  Option[datasets.DateModified],
+      dateCreated:   Option[datasets.DateCreated],
+      datePublished: Option[datasets.DatePublished],
       creators:      List[persons.Name],
       keywords:      List[datasets.Keyword],
       description:   Option[datasets.Description],
@@ -226,7 +236,7 @@ object ModelEncoderSpec {
     deriveEncoder[JsonProject]
 
   implicit val datasetEncoder: Encoder[JsonDataset] =
-    deriveEncoder[JsonDataset]
+    deriveEncoder[JsonDataset].mapJson(_.dropNullValues)
 
   implicit val workflowEncoder: Encoder[JsonWorkflow] =
     deriveEncoder[JsonWorkflow]
