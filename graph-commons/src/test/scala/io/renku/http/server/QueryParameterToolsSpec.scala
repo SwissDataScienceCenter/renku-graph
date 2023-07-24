@@ -18,9 +18,9 @@
 
 package io.renku.http.server
 
-import EndpointTester._
 import cats.effect.IO
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.CustomAsyncIOSpec
@@ -44,8 +44,8 @@ class QueryParameterToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with 
       for {
         response <- badRequestResponse(parseFailuresList)
         _ = response.status shouldBe BadRequest
-        r <- response.as[ErrorMessage].asserting {
-               _ shouldBe ErrorMessage(parseFailuresList.toList.map(_.message).mkString("; "))
+        r <- response.as[Message].asserting {
+               _ shouldBe Message.Error.unsafeApply(parseFailuresList.toList.map(_.message).mkString("; "))
              }
       } yield r
     }

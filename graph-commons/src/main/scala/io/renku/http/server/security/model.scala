@@ -20,12 +20,11 @@ package io.renku.http.server.security
 
 import cats.Applicative
 import cats.syntax.all._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.persons
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
-import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.{Response, Status}
 
 import java.util.Objects
@@ -42,7 +41,7 @@ object model {
       required.fold(_.toHttpResponse[F].pure[F], code)
 
     def withUserOrNotFound[F[_]: Applicative](code: AuthUser => F[Response[F]]): F[Response[F]] =
-      required.fold(_ => Response.notFound[F].withEntity(InfoMessage("Resource not found")).pure[F], code)
+      required.fold(_ => Response.notFound[F].withEntity(Message.Info.unsafeApply("Resource not found")).pure[F], code)
 
     override def equals(obj: Any): Boolean = obj match {
       case o: MaybeAuthUser => o.user == user
@@ -70,7 +69,7 @@ object EndpointSecurityException {
     override lazy val getMessage: String = "User authentication failure"
 
     override def toHttpResponse[F[_]]: Response[F] =
-      Response[F](Status.Unauthorized).withEntity(ErrorMessage(getMessage))
+      Response[F](Status.Unauthorized).withEntity(Message.Error.unsafeApply(getMessage))
   }
   type AuthenticationFailure = AuthenticationFailure.type
 
@@ -79,7 +78,7 @@ object EndpointSecurityException {
     override lazy val getMessage: String = "Resource not found"
 
     override def toHttpResponse[F[_]]: Response[F] =
-      Response[F](Status.NotFound).withEntity(ErrorMessage(getMessage))
+      Response[F](Status.NotFound).withEntity(Message.Error.unsafeApply(getMessage))
   }
   type AuthorizationFailure = AuthorizationFailure.type
 }

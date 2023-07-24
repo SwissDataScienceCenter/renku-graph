@@ -19,9 +19,8 @@
 package io.renku.http.server.security
 
 import cats.effect.IO
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.server.EndpointTester._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
@@ -37,20 +36,20 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.
     s"return an $Unauthorized response with a relevant error message" in {
       val response = AuthenticationFailure.toHttpResponse[IO]
 
-      response.status                           shouldBe Unauthorized
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("User authentication failure")
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply("User authentication failure")
     }
   }
 
   "AuthorizationFailure.toHttpResponse" should {
 
-    s"return a $NotFound response with a relavant error message" in {
+    s"return a $NotFound response with a relevant error message" in {
       val response = AuthorizationFailure.toHttpResponse[IO]
 
-      response.status                           shouldBe NotFound
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Resource not found")
+      response.status                      shouldBe NotFound
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply("Resource not found")
     }
   }
 }

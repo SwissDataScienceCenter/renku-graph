@@ -20,10 +20,10 @@ package io.renku.http.server.endpoint
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.ErrorMessage._
-import io.renku.http.server.EndpointTester.errorMessageEntityDecoder
 import io.renku.testtools.IOSpec
 import org.http4s.EntityEncoder.stringEncoder
 import org.http4s.MediaRange.`*/*`
@@ -87,7 +87,7 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
 
       response.map(_.status).unsafeRunSync() shouldBe Status.BadRequest
       response
-        .flatMap(_.as[ErrorMessage])
+        .flatMap(_.as[Message])
         .unsafeRunSync()
         .show shouldBe s"Accept: ${otherAccept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported"
     }

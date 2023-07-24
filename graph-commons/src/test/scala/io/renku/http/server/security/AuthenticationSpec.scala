@@ -21,11 +21,11 @@ package io.renku.http.server.security
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken.UserOAuthAccessToken
-import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.testtools.IOSpec
@@ -146,9 +146,9 @@ class AuthenticationSpec
       val Some(response) = maybeResponse.value.unsafeRunSync()
 
       val expectedResponse = exception.toHttpResponse[IO]
-      response.status                           shouldBe expectedResponse.status
-      response.contentType                      shouldBe expectedResponse.contentType
-      response.as[ErrorMessage].unsafeRunSync() shouldBe expectedResponse.as[ErrorMessage].unsafeRunSync()
+      response.status                      shouldBe expectedResponse.status
+      response.contentType                 shouldBe expectedResponse.contentType
+      response.as[Message].unsafeRunSync() shouldBe expectedResponse.as[Message].unsafeRunSync()
     }
   }
 
@@ -176,9 +176,9 @@ class AuthenticationSpec
       val Some(response) = maybeResponse.value.unsafeRunSync()
 
       val expectedResponse = exception.toHttpResponse[IO]
-      response.status                           shouldBe expectedResponse.status
-      response.contentType                      shouldBe expectedResponse.contentType
-      response.as[ErrorMessage].unsafeRunSync() shouldBe expectedResponse.as[ErrorMessage].unsafeRunSync()
+      response.status                      shouldBe expectedResponse.status
+      response.contentType                 shouldBe expectedResponse.contentType
+      response.as[Message].unsafeRunSync() shouldBe expectedResponse.as[Message].unsafeRunSync()
     }
   }
 

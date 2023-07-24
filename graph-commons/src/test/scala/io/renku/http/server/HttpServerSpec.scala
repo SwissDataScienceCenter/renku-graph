@@ -19,57 +19,49 @@
 package io.renku.http.server
 
 import cats.effect._
-import io.circe.Json
-import io.circe.literal._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpPorts
 import io.renku.http.server.EndpointTester._
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s._
 import org.http4s.client.Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.scalatest.BeforeAndAfter
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with should.Matchers with BeforeAndAfter {
+class HttpServerSpec extends AsyncWordSpec with CustomAsyncIOSpec with Http4sDsl[IO] with should.Matchers {
 
   "run" should {
 
-    "create an http server to serve the given routes" in new TestCase {
-
+    "create an http server to serve the given routes" in {
       client
         .run(Request[IO](Method.GET, baseUri / "resource"))
         .use { response =>
-          IO {
-            response.status                     shouldBe Status.Ok
-            response.as[String].unsafeRunSync() shouldBe "response"
-          }
+          for {
+            _ <- response.as[String].asserting(_ shouldBe "response")
+            _ = response.status shouldBe Status.Ok
+          } yield ()
         }
-        .unsafeRunSync()
-
     }
 
-    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in new TestCase {
-
+    "create an http server which responds with NOT_FOUND and JSON body for non-existing resource" in {
       client
         .run(Request[IO](Method.GET, baseUri / "non-existing"))
         .use { response =>
-          IO {
-            response.status                   shouldBe Status.NotFound
-            response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-            response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Resource not found"}"""
-          }
+          for {
+            _ <- response.as[Message].asserting(_ shouldBe Message.Info.unsafeApply("Resource not found"))
+            _ = response.status      shouldBe Status.NotFound
+            _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+          } yield ()
         }
-        .unsafeRunSync()
     }
   }
 
-  private trait TestCase {
-    private lazy val port = httpPorts.generateOne
-    lazy val baseUri: Uri = Uri.unsafeFromString(s"http://localhost:$port")
-    private lazy val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
-    val client: Client[IO] = Client.fromHttpApp(HttpServer[IO](port, routes).httpApp)
-  }
+  private lazy val port = httpPorts.generateOne
+  private lazy val baseUri: Uri = Uri.unsafeFromString(s"http://localhost:$port")
+  private lazy val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
+  private lazy val client: Client[IO] = Client.fromHttpApp(HttpServer[IO](port, routes).httpApp)
 }
