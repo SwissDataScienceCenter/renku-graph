@@ -29,7 +29,6 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import org.http4s.dsl.Http4sDsl
@@ -46,7 +45,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
     extends Http4sDsl[F]
     with EventsEndpoint[F] {
 
-  import io.renku.http.ErrorMessage._
+  import io.renku.data.Message
+  import io.renku.data.Message.Codecs._
 
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
@@ -58,9 +58,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
   private def httpResponse(request: Request[F]): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
-      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed") *> InternalServerError(
-        ErrorMessage(exception)
-      )
+      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed") *>
+        InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 }
 

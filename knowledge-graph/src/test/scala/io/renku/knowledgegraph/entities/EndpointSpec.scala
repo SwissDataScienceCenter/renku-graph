@@ -24,6 +24,8 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
@@ -32,8 +34,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -103,7 +103,7 @@ class EndpointSpec
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Cross-entity search failed"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

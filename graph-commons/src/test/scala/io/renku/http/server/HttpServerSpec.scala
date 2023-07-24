@@ -19,6 +19,7 @@
 package io.renku.http.server
 
 import cats.effect._
+import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
@@ -52,7 +53,7 @@ class HttpServerSpec extends AsyncWordSpec with CustomAsyncIOSpec with Http4sDsl
         .run(Request[IO](Method.GET, baseUri / "non-existing"))
         .use { response =>
           for {
-            _ <- response.as[Message].asserting(_ shouldBe Message.Info.unsafeApply("Resource not found"))
+            _ <- response.as[Message].asserting(_ shouldBe Message.Info("Resource not found"))
             _ = response.status      shouldBe Status.NotFound
             _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
           } yield ()

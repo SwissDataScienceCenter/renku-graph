@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.effect.kernel.Concurrent
 import cats.syntax.all._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
@@ -64,9 +64,9 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
 
   private def httpResponse(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case BadRequestError(exception) =>
-      BadRequest(ErrorMessage(exception))
+      BadRequest(Message.Error.fromExceptionMessage(exception))
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(show"Associating token with projectId: $projectId failed")
+      val errorMessage = Message.Error.unsafeApply(show"Associating token with projectId: $projectId failed")
       Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }

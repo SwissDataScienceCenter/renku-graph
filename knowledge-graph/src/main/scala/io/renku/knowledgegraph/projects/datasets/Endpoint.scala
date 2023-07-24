@@ -24,10 +24,10 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -68,9 +68,8 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
   private def httpResult(
       projectPath: projects.Path
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-    Logger[F].error(exception)(errorMessage.show) >>
-      InternalServerError(errorMessage)
+    val errorMessage = Message.Error.unsafeApply(s"Finding $projectPath's datasets failed")
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {

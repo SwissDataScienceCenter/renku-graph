@@ -21,14 +21,15 @@ package io.renku.knowledgegraph.entities
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.circe.CirceEntityEncoder._
@@ -75,7 +76,7 @@ private class EndpointImpl[F[_]: Async: Logger](
   }
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage("Cross-entity search failed")
+    val errorMessage = Message.Error("Cross-entity search failed")
     Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }

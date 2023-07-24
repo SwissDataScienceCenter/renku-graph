@@ -20,6 +20,7 @@ package io.renku.http.server
 
 import cats.MonadThrow
 import cats.data.NonEmptyList
+import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.data.Message.Codecs._
 import org.http4s.{ParseFailure, Response, Status}
@@ -34,6 +35,6 @@ object QueryParameterTools {
 
   def resourceNotFound[F[_]: MonadThrow]: F[Response[F]] = MonadThrow[F].catchNonFatal {
     Response(Status.NotFound)
-      .withEntity(Message.Info.unsafeApply("Resource not found"))
+      .withEntity(Message.Info("Resource not found"))
   }
 }

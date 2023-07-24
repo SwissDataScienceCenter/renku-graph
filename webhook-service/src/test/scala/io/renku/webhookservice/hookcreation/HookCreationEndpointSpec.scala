@@ -20,15 +20,15 @@ package io.renku.webhookservice.hookcreation
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
@@ -56,9 +56,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe Created
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook created"}"""
+      response.status                      shouldBe Created
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Hook created")
     }
 
     "return OK when hook was already created" in new TestCase {
@@ -70,9 +70,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe Ok
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook already existed"}"""
+      response.status                      shouldBe Ok
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Hook already existed")
     }
 
     "return NOT_FOUND when hook creation returns None" in new TestCase {
@@ -84,14 +84,14 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe NotFound
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Project not found"}"""
+      response.status                      shouldBe NotFound
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Project not found")
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation and log the error" in new TestCase {
 
-      val errorMessage = ErrorMessage("some error")
+      val errorMessage = Message.Error("some error")
       val exception    = new Exception(errorMessage.show)
       (hookCreator
         .createHook(_: GitLabId, _: AuthUser))
@@ -116,9 +116,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.fromExceptionMessage(UnauthorizedException)
     }
   }
 

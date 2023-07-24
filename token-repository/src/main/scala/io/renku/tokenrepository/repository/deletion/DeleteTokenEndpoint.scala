@@ -20,9 +20,9 @@ package io.renku.tokenrepository.repository.deletion
 
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
@@ -46,8 +46,8 @@ class DeleteTokenEndpointImpl[F[_]: Async: Logger](tokenRemover: TokenRemover[F]
 
   private def httpResult(projectId: GitLabId): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Deleting token for projectId: $projectId failed")
-      Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
+      val message = Message.Error.unsafeApply(s"Deleting token for projectId: $projectId failed")
+      Logger[F].error(exception)(message.show) >> InternalServerError(message)
   }
 }
 

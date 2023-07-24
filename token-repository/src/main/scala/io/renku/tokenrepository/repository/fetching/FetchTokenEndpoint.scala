@@ -23,11 +23,10 @@ import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.syntax._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
@@ -61,13 +60,13 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
       projectIdentifier: ID
   ): Option[AccessToken] => F[Response[F]] = {
     case Some(token) => Ok(token.asJson)
-    case None        => NotFound(InfoMessage(s"Token for project: $projectIdentifier not found"))
+    case None        => NotFound(Message.Info.unsafeApply(s"Token for project: $projectIdentifier not found"))
   }
 
   private def httpResult[ID](
       projectIdentifier: ID
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
+    val errorMessage = Message.Error.unsafeApply(s"Finding token for project: $projectIdentifier failed")
     Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 

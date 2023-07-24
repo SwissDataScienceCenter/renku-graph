@@ -24,6 +24,8 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.entities.search.Generators.modelEntities
 import io.renku.entities.search.diff.SearchDiffInstances
 import io.renku.entities.search.model.Entity
@@ -35,11 +37,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model.tools.AdditionalMatchers
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
-import io.renku.http.server.EndpointTester.errorMessageEntityDecoder
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.entities.ModelEncoders
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -115,7 +114,7 @@ class EndpointSpec
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Recent entity search failed!"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(TestLogger.Level.Error(errorMessage, exception))
     }

@@ -21,13 +21,13 @@ package io.renku.webhookservice.hookcreation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation
@@ -54,20 +54,19 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
   } recoverWith httpResponse
 
   private lazy val toHttpResponse: Option[CreationResult] => F[Response[F]] = {
-    case Some(HookCreated) => Created(InfoMessage("Hook created"))
-    case Some(HookExisted) => Ok(InfoMessage("Hook already existed"))
-    case None              => NotFound(InfoMessage("Project not found"))
+    case Some(HookCreated) => Created(Message.Info("Hook created"))
+    case Some(HookExisted) => Ok(Message.Info("Hook already existed"))
+    case None              => NotFound(Message.Info("Project not found"))
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
     case ex @ UnauthorizedException =>
       Response[F](Status.Unauthorized)
-        .withEntity[ErrorMessage](ErrorMessage(ex))
+        .withEntity(Message.Error.fromExceptionMessage(ex))
         .pure[F]
     case NonFatal(exception) =>
-      Logger[F]
-        .error(exception)(exception.getMessage)
-        .flatMap(_ => InternalServerError(ErrorMessage(exception)))
+      Logger[F].error(exception)(exception.getMessage) >>
+        InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 }
 

@@ -23,12 +23,12 @@ import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.kernel.Concurrent
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
@@ -63,12 +63,12 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
   }
 
   private lazy val toHttpResult: EventSchedulingResult => F[Response[F]] = {
-    case EventSchedulingResult.Accepted                   => Accepted(InfoMessage("Event accepted"))
-    case EventSchedulingResult.Busy                       => TooManyRequests(InfoMessage("Too many events to handle"))
-    case EventSchedulingResult.UnsupportedEventType       => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest(reason)         => BadRequest(ErrorMessage(reason))
-    case EventSchedulingResult.ServiceUnavailable(reason) => ServiceUnavailable(ErrorMessage(reason))
-    case EventSchedulingResult.SchedulingError(_) => InternalServerError(ErrorMessage("Failed to schedule event"))
+    case EventSchedulingResult.Accepted                   => Accepted(Message.Info("Event accepted"))
+    case EventSchedulingResult.Busy                       => TooManyRequests(Message.Info("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType       => BadRequest(Message.Error("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest(reason)         => BadRequest(Message.Error.unsafeApply(reason))
+    case EventSchedulingResult.ServiceUnavailable(reason) => ServiceUnavailable(Message.Error.unsafeApply(reason))
+    case EventSchedulingResult.SchedulingError(_) => InternalServerError(Message.Error("Failed to schedule event"))
   }
 
   private def toMultipart(request: Request[F]): EitherT[F, Response[F], Multipart[F]] = EitherT {
@@ -76,7 +76,7 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
       .as[Multipart[F]]
       .map(_.asRight[Response[F]])
       .recoverWith { case NonFatal(_) =>
-        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[F]])
+        BadRequest(Message.Error("Not multipart request")).map(_.asLeft[Multipart[F]])
       }
   }
 
@@ -84,9 +84,9 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
     multipart.parts
       .find(_.name.contains("event"))
       .map(_.as[Json].map(_.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
-        BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
+        BadRequest(Message.Error("Malformed event body")).map(_.asLeft[Json])
       })
-      .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
+      .getOrElse(BadRequest(Message.Error("Missing event part")).map(_.asLeft[Json]))
   }
 
   private def getPayload(multipart: Multipart[F]): EitherT[F, Response[F], Option[String]] = EitherT {
@@ -94,7 +94,7 @@ class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumers
       .find(_.name.contains("payload"))
       .map {
         _.as[String].map(_.some.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
-          BadRequest(ErrorMessage("Malformed event payload")).map(_.asLeft[Option[String]])
+          BadRequest(Message.Error("Malformed event payload")).map(_.asLeft[Option[String]])
         }
       }
       .getOrElse(Option.empty[String].asRight[Response[F]].pure[F])

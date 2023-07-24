@@ -21,16 +21,16 @@ package io.renku.webhookservice.webhookevents
 import cats.data.NonEmptyList
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Decoder
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.eventlog
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.{GitLabId, Path}
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -64,7 +64,7 @@ class EndpointImpl[F[_]: Concurrent: Logger](
       _                                  <- validate(hookToken, commitSyncRequest)
       _                                  <- Spawn[F].start(elClient.send(commitSyncRequest))
       _                                  <- logInfo(pushEvent)
-      response                           <- Accepted(InfoMessage("Event accepted"))
+      response                           <- Accepted(Message.Info("Event accepted"))
     } yield response
   } recoverWith httpResponse
 
@@ -98,14 +98,13 @@ class EndpointImpl[F[_]: Concurrent: Logger](
     else UnauthorizedException.raiseError[F, Unit]
 
   private lazy val httpResponse: PartialFunction[Throwable, F[Response[F]]] = {
-    case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
+    case BadRequestError(exception) =>
+      BadRequest(Message.Error.fromExceptionMessage(exception))
     case ex @ UnauthorizedException =>
-      Response[F](Status.Unauthorized)
-        .withEntity[ErrorMessage](ErrorMessage(ex))
-        .pure[F]
+      Response[F](Status.Unauthorized).withEntity(Message.Error.fromExceptionMessage(ex)).pure[F]
     case NonFatal(exception) =>
-      Logger[F].error(exception)(exception.getMessage)
-      InternalServerError(ErrorMessage(exception))
+      Logger[F].error(exception)(exception.getMessage) >>
+        InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 
   private lazy val logInfo: ((CommitId, CommitSyncRequest)) => F[Unit] = {

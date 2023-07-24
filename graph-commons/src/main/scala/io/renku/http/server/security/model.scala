@@ -20,6 +20,7 @@ package io.renku.http.server.security
 
 import cats.Applicative
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.data.Message.Codecs._
 import io.renku.graph.model.persons
@@ -41,7 +42,7 @@ object model {
       required.fold(_.toHttpResponse[F].pure[F], code)
 
     def withUserOrNotFound[F[_]: Applicative](code: AuthUser => F[Response[F]]): F[Response[F]] =
-      required.fold(_ => Response.notFound[F].withEntity(Message.Info.unsafeApply("Resource not found")).pure[F], code)
+      required.fold(_ => Response.notFound[F].withEntity(Message.Info("Resource not found")).pure[F], code)
 
     override def equals(obj: Any): Boolean = obj match {
       case o: MaybeAuthUser => o.user == user

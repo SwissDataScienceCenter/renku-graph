@@ -20,9 +20,10 @@ package io.renku.knowledgegraph.ontology
 
 import cats.MonadThrow
 import cats.implicits._
+import eu.timepit.refined.auto._
 import io.circe.literal._
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.jsonld.parser._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
@@ -44,7 +45,7 @@ private class EndpointDocsImpl() extends docs.EndpointDocs {
       ),
       Status.InternalServerError -> Response("Error",
                                              Contents(MediaType.`text/html`,
-                                                      MediaType.`application/json`("Reason", ErrorMessage("Message"))
+                                                      MediaType.`application/json`("Reason", Message.Error("Message"))
                                              )
       )
     )

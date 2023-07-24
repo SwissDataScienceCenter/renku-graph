@@ -20,10 +20,11 @@ package io.renku.knowledgegraph
 package projects.delete
 
 import cats.syntax.all._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.docs.model._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.knowledgegraph.docs.model.Operation.DELETE
+import io.renku.knowledgegraph.docs.model._
 
 object EndpointDocs extends docs.EndpointDocs {
 
@@ -34,18 +35,18 @@ object EndpointDocs extends docs.EndpointDocs {
       Uri / "projects" / namespace / projectName,
       Status.Accepted -> Response(
         "Project deleted",
-        Contents(MediaType.`application/json`("Project deleted", InfoMessage("Project deleted")))
+        Contents(MediaType.`application/json`("Project deleted", Message.Info("Project deleted")))
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.NotFound -> Response(
         "Project not found",
-        Contents(MediaType.`application/json`("Reason", InfoMessage("Project does not exist")))
+        Contents(MediaType.`application/json`("Reason", Message.Info("Project does not exist")))
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )

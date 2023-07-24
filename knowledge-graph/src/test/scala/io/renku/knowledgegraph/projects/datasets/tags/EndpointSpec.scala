@@ -24,13 +24,13 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths, renkuUrls}
 import io.renku.graph.model.publicationEvents
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -90,7 +90,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Project Dataset Tags search failed"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Info.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

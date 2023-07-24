@@ -21,12 +21,12 @@ package io.renku.webhookservice.hookvalidation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.hookvalidation
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
@@ -49,14 +49,14 @@ class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](hookValidator: HookVa
   } handleErrorWith withHttpResult
 
   private lazy val toHttpResponse: Option[HookValidationResult] => F[Response[F]] = {
-    case Some(HookExists)  => Ok(InfoMessage("Hook valid"))
-    case Some(HookMissing) => NotFound(InfoMessage("Hook not found"))
-    case None              => Response[F](Unauthorized).withEntity[ErrorMessage](ErrorMessage("Unauthorized")).pure[F]
+    case Some(HookExists)  => Ok(Message.Info("Hook valid"))
+    case Some(HookMissing) => NotFound(Message.Info("Hook not found"))
+    case None              => Response[F](Unauthorized).withEntity(Message.Error("Unauthorized")).pure[F]
   }
 
   private lazy val withHttpResult: Throwable => F[Response[F]] = { exception =>
     Logger[F].error(exception)(exception.getMessage) >>
-      InternalServerError(ErrorMessage(exception))
+      InternalServerError(Message.Error.fromExceptionMessage(exception))
   }
 }
 

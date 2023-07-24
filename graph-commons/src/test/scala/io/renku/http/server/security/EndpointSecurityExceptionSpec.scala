@@ -19,6 +19,7 @@
 package io.renku.http.server.security
 
 import cats.effect.IO
+import eu.timepit.refined.auto._
 import io.renku.data.Message
 import io.renku.data.Message.Codecs._
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
@@ -38,7 +39,7 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.
 
       response.status                      shouldBe Unauthorized
       response.contentType                 shouldBe Some(`Content-Type`(application.json))
-      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply("User authentication failure")
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("User authentication failure")
     }
   }
 
@@ -49,7 +50,7 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with IOSpec with should.
 
       response.status                      shouldBe NotFound
       response.contentType                 shouldBe Some(`Content-Type`(application.json))
-      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply("Resource not found")
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Resource not found")
     }
   }
 }

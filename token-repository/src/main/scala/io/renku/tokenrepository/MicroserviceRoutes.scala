@@ -52,9 +52,10 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._
+  import eu.timepit.refined.auto._
   import fetchTokenEndpoint._
-  import io.renku.http.InfoMessage
-  import io.renku.http.InfoMessage._
+  import io.renku.data.Message
+  import io.renku.data.Message.Codecs._
   import org.http4s.HttpRoutes
   import routesMetrics._
 
@@ -72,7 +73,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
 
   private def whenDBReady(thunk: => F[Response[F]]): F[Response[F]] = dbReady.get >>= {
     case true  => thunk
-    case false => ServiceUnavailable(InfoMessage("DB migration running"))
+    case false => ServiceUnavailable(Message.Info("DB migration running"))
   }
 
   private def withAccessToken(request: Request[F])(f: Option[AccessToken] => F[Response[F]]): F[Response[F]] =

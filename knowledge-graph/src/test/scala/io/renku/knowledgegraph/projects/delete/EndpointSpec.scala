@@ -20,6 +20,9 @@ package io.renku.knowledgegraph.projects.delete
 
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -27,16 +30,12 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
-import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
-import io.renku.{eventlog, triplesgenerator}
 import io.renku.triplesgenerator.api.events.CleanUpEvent
+import io.renku.{eventlog, triplesgenerator}
 import org.http4s.MediaType.application
 import org.http4s.Status.{Accepted, InternalServerError, NotFound}
 import org.http4s.headers.`Content-Type`
@@ -62,9 +61,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
         val response = endpoint.`DELETE /projects/:path`(project.path, authUser).unsafeRunSync()
 
-        response.status                          shouldBe Accepted
-        response.contentType                     shouldBe `Content-Type`(application.json).some
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Project deleted")
+        response.status                      shouldBe Accepted
+        response.contentType                 shouldBe `Content-Type`(application.json).some
+        response.as[Message].unsafeRunSync() shouldBe Message.Info("Project deleted")
 
         ensureCommitSyncSent.get.unsafeRunSync() shouldBe true
         ensureCleanUpSent.get.unsafeRunSync()    shouldBe true
@@ -84,9 +83,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
         val response = endpoint.`DELETE /projects/:path`(project.path, authUser).unsafeRunSync()
 
-        response.status                          shouldBe Accepted
-        response.contentType                     shouldBe `Content-Type`(application.json).some
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Project deleted")
+        response.status                      shouldBe Accepted
+        response.contentType                 shouldBe `Content-Type`(application.json).some
+        response.as[Message].unsafeRunSync() shouldBe Message.Info("Project deleted")
 
         ensureCommitSyncSent.get.unsafeRunSync() shouldBe true
         ensureCleanUpSent.get.unsafeRunSync()    shouldBe true
@@ -99,9 +98,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
       val response = endpoint.`DELETE /projects/:path`(project.path, authUser).unsafeRunSync()
 
-      response.status                          shouldBe NotFound
-      response.contentType                     shouldBe `Content-Type`(application.json).some
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Project does not exist")
+      response.status                      shouldBe NotFound
+      response.contentType                 shouldBe `Content-Type`(application.json).some
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Project does not exist")
     }
 
     "be sure the project gets deleted from GL before the COMMIT_SYNC_REQUEST event is sent to EL" in new TestCase {
@@ -129,8 +128,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe `Content-Type`(application.json).some
-      response.as[ErrorMessage].unsafeRunSync() shouldBe
-        ErrorMessage(s"Project deletion failure: ${exception.getMessage}")
+      response.as[Message].unsafeRunSync() shouldBe
+        Message.Error.unsafeApply(s"Project deletion failure: ${exception.getMessage}")
 
       logger.loggedOnly(Error(s"Deleting '${project.path}' project failed", exception))
     }

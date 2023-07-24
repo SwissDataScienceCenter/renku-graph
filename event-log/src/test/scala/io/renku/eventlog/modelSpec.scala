@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.generators.Generators._
 import io.renku.graph.model.events.{CreatedDate, EventDate, EventMessage, ExecutionDate}
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
@@ -93,7 +93,7 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
 
     "be instantiatable from an exception and contain the stack trace" in {
       forAll(nestedExceptions) { exception =>
-        EventMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).show
+        EventMessage(exception).value shouldBe Message.Error.fromStackTrace(exception).show
       }
     }
   }
