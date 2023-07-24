@@ -152,7 +152,7 @@ class EventEndpointSpec
 
       response.status                      shouldBe TooManyRequests
       response.contentType                 shouldBe Some(`Content-Type`(application.json))
-      response.as[Message].unsafeRunSync() shouldBe Message.Error("Too many events to handle")
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Too many events to handle")
     }
 
     s"$ServiceUnavailable if the handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {

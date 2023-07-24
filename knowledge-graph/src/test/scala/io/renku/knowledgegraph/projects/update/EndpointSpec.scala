@@ -104,7 +104,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
-        response.as[Message].asserting(_ shouldBe Message.Error("Update failed").asJson)
+        response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
   }
 
@@ -120,7 +120,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
-        response.as[Message].asserting(_ shouldBe Message.Error("Update failed").asJson)
+        response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
   }
 

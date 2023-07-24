@@ -20,13 +20,12 @@ package io.renku.tokenrepository.repository.deletion
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Json
-import io.circe.literal._
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -66,7 +65,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       val expectedMessage = s"Deleting token for projectId: $projectId failed"
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(expectedMessage)
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

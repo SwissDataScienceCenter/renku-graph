@@ -90,7 +90,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Project Dataset Tags search failed"
-      response.as[Message].unsafeRunSync() shouldBe Message.Info.unsafeApply(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

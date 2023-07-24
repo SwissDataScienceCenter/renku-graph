@@ -22,6 +22,8 @@ import cats.data.OptionT
 import cats.effect.IO
 import io.circe.Json
 import io.circe.syntax.EncoderOps
+import io.renku.data.Message
+import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -118,9 +120,8 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
 
       response.status      shouldBe Status.NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe Json.obj(
-        "message" -> Json.fromString(s"Token for project: $projectId not found")
-      )
+      response.as[Message].unsafeRunSync() shouldBe
+        Message.Info.unsafeApply(s"Token for project: $projectId not found")
 
       logger.expectNoLogs()
     }
@@ -140,9 +141,8 @@ class FetchTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory wi
 
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe Json.obj(
-        "message" -> Json.fromString(s"Finding token for project: $projectId failed")
-      )
+      response.as[Message].unsafeRunSync() shouldBe
+        Message.Error.unsafeApply(s"Finding token for project: $projectId failed")
 
       logger.loggedOnly(Error(s"Finding token for project: $projectId failed", exception))
     }
