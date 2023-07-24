@@ -209,7 +209,8 @@ Response body example:
       }
     ]
   },
-  "created": "2012-10-15T03:02:25.639Z",         // optional property
+  "created":      "2012-10-15T03:02:25.639Z",    // optional property
+  "dateModified": "2012-11-15T03:02:25.639Z",    // optional property,
   "hasPart": [
     {
       "atLocation": "data/dataset-name/file1"
@@ -371,6 +372,8 @@ Response body example:
     ],
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00.000Z",
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2012-11-16T10:00:00Z",
     "creator":       "Jan Kowalski",
     "keywords":      [ "keyword1", "keyword2" ],
     "description":   "desc",
@@ -399,6 +402,8 @@ Response body example:
     "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2013-11-15T10:00:00Z",
     "creators":      [ "Jan Kowalski", "Zoe" ],
     "keywords":      [ "keyword1", "keyword2" ],
     "description":   "desc",
@@ -494,8 +499,10 @@ Response body example:
         "namespace": "group/subgroup"
       }
     ],
-    "visibility": "public",
-    "date":       "2012-11-15T10:00:00Z",
+    "visibility":   "public",
+    "date":         "2012-11-15T10:00:00Z",
+    "dateCreated":  "2012-11-15T10:00:00Z",
+    "dateModified": "2012-11-16T10:00:00Z",
     "keywords": [ 
       "key" 
     ],
@@ -525,6 +532,8 @@ Response body example:
     "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00Z",
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2013-11-15T10:00:00Z",
     "creators": [
       "Jan Kowalski"
     ],
@@ -842,6 +851,7 @@ Response body example:
       },
       "title":       "rmDaYfpehl",
       "name":        "mniouUnmal",
+      "slug":        "mniouUnmal",
       "sameAs":      "http://host/url1",
       "derivedFrom": "http://host/url1",
       "images": [],
@@ -866,7 +876,8 @@ Response body example:
         "initial": "22222222-2222-2222-2222-222222222222"
       },
       "name":        "a",
-      "sameAs":      "http://host/url2",        // optional property when no "derivedFrom" exists
+      "slug":        "a",
+      "sameAs":      "http://host/url2",   // optional property when no "derivedFrom" exists
       "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
