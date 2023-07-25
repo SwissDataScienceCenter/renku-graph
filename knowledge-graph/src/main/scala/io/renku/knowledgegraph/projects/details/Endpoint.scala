@@ -22,15 +22,13 @@ import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.jsonld.syntax._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -91,7 +89,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
   private def toHttpResult(path: projects.Path)(implicit request: Request[F]): Option[Project] => F[Response[F]] = {
     case None =>
-      val message = InfoMessage(s"No '$path' project found")
+      val message = Message.Info.unsafeApply(s"No '$path' project found")
       whenAccept(
         application.`ld+json` --> NotFound(message.asJsonLD),
         application.json      --> NotFound(message.asJson)
@@ -106,7 +104,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private def httpResult(path: projects.Path)(implicit
       request: Request[F]
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val message = ErrorMessage(s"Finding '$path' project failed")
+    val message = Message.Error.unsafeApply(s"Finding '$path' project failed")
     Logger[F].error(exception)(message.show) >> whenAccept(
       application.`ld+json` --> InternalServerError(message.asJsonLD),
       application.json      --> InternalServerError(message.asJson)

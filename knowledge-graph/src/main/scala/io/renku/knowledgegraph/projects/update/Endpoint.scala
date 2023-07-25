@@ -21,20 +21,16 @@ package io.renku.knowledgegraph.projects.update
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
-import io.circe.syntax._
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import org.http4s.circe.CirceEntityDecoder._
-import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -57,7 +53,7 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
     decodePayload(request)
       .flatMap(updateGL(path, authUser))
       .semiflatMap(_ => tgClient.send(SyncRepoMetadata(path)))
-      .as(Response[F](Accepted).withEntity(InfoMessage("Project update accepted")))
+      .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
       .merge
       .handleErrorWith(serverError(path)(_))
 
@@ -70,11 +66,11 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
     }
 
   private def badRequest: Throwable => Response[F] = { _ =>
-    Response[F](BadRequest).withEntity(ErrorMessage("Invalid payload").asJson)
+    Response[F](BadRequest).withEntity(Message.Error("Invalid payload"))
   }
 
   private def badRequest(message: Json): Response[F] =
-    Response[F](BadRequest).withEntity(ErrorMessage(message))
+    Response[F](BadRequest).withEntity(Message.Error.fromJsonUnsafe(message))
 
   private def updateGL(path: projects.Path, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
     glProjectUpdater.updateProject(path, newValues, authUser.accessToken).leftMap(badRequest)
@@ -82,5 +78,5 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
   private def serverError(path: projects.Path): Throwable => F[Response[F]] =
     Logger[F]
       .error(_)(show"Updating project $path failed")
-      .as(Response[F](InternalServerError).withEntity(ErrorMessage("Update failed").asJson))
+      .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
 }

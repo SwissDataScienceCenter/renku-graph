@@ -22,19 +22,18 @@ import Generators._
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesgenerator
@@ -59,7 +58,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
       endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
-          response.as[Json].asserting(_ shouldBe InfoMessage("Project update accepted").asJson)
+          response.as[Json].asserting(_ shouldBe Message.Info("Project update accepted").asJson)
       }
     }
 
@@ -70,7 +69,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
-        response.as[ErrorMessage].asserting(_ shouldBe ErrorMessage("Invalid payload"))
+        response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
     }
   }
 
@@ -85,7 +84,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
-        response.as[ErrorMessage].asserting(_ shouldBe ErrorMessage(error))
+        response.as[Message].asserting(_ shouldBe Message.Error.fromJsonUnsafe(error))
     }
   }
 
@@ -104,7 +103,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
-        response.as[Json].asserting(_ shouldBe ErrorMessage("Update failed").asJson)
+        response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
   }
 
@@ -120,7 +119,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
     endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
-        response.as[Json].asserting(_ shouldBe ErrorMessage("Update failed").asJson)
+        response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
   }
 

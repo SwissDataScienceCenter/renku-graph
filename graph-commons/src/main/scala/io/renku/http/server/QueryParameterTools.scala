@@ -20,21 +20,20 @@ package io.renku.http.server
 
 import cats.MonadThrow
 import cats.data.NonEmptyList
-import io.circe.syntax._
-import io.renku.http.ErrorMessage._
-import io.renku.http.InfoMessage._
-import io.renku.http.{ErrorMessage, InfoMessage}
-import org.http4s.circe._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import org.http4s.{ParseFailure, Response, Status}
 
 object QueryParameterTools {
 
   def toBadRequest[F[_]: MonadThrow]: NonEmptyList[ParseFailure] => F[Response[F]] = errors =>
     MonadThrow[F].catchNonFatal {
-      Response[F](Status.BadRequest).withEntity(ErrorMessage(errors.toList.map(_.message).mkString("; ")).asJson)
+      Response[F](Status.BadRequest)
+        .withEntity(Message.Error.unsafeApply(errors.toList.map(_.message).mkString("; ")))
     }
 
   def resourceNotFound[F[_]: MonadThrow]: F[Response[F]] = MonadThrow[F].catchNonFatal {
-    Response(Status.NotFound).withEntity(InfoMessage("Resource not found"))
+    Response(Status.NotFound)
+      .withEntity(Message.Info("Resource not found"))
   }
 }

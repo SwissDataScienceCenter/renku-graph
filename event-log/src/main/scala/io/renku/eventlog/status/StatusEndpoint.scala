@@ -41,11 +41,11 @@ private class StatusEndpointImpl[F[_]: MonadThrow: Logger](eventProducersRegistr
     extends Http4sDsl[F]
     with StatusEndpoint[F] {
 
+  import eu.timepit.refined.auto._
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
+  import io.renku.data.Message
   import org.http4s.circe.CirceEntityEncoder._
 
   override def `GET /status`: F[Response[F]] =
@@ -60,7 +60,7 @@ private class StatusEndpointImpl[F[_]: MonadThrow: Logger](eventProducersRegistr
   }
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val message = ErrorMessage("Finding EL status failed")
+    val message = Message.Error("Finding EL status failed")
     Logger[F].error(exception)(message.show) >> InternalServerError(message.asJson)
   }
 

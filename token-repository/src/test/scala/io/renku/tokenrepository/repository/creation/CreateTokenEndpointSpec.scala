@@ -20,9 +20,9 @@ package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.Json
-import io.circe.literal._
+import eu.timepit.refined.auto._
 import io.circe.syntax.EncoderOps
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -85,11 +85,9 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
-      response.status      shouldBe Status.BadRequest
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response
-        .as[Json]
-        .unsafeRunSync() shouldBe json"""{"message": "Malformed message body: Invalid JSON: empty body"}"""
+      response.status                      shouldBe Status.BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Malformed message body: Invalid JSON: empty body")
 
       logger.expectNoLogs()
     }
@@ -108,7 +106,7 @@ class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory w
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       val expectedMessage = s"Associating token with projectId: $projectId failed"
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(expectedMessage)
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

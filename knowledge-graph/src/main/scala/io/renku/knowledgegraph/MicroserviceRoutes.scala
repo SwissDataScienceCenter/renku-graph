@@ -24,6 +24,8 @@ import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.RenkuUrlLoader
@@ -31,8 +33,6 @@ import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
@@ -306,7 +306,7 @@ private class MicroserviceRoutes[F[_]: Async](
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
       Location
         .from(Uri.decode(location))
-        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
 
     (projectPathParts.toProjectPath -> toLocation(location))
@@ -320,7 +320,7 @@ private class MicroserviceRoutes[F[_]: Async](
     lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
       model.projects.Path
         .from(parts mkString "/")
-        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
   }
 }

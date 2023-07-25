@@ -21,8 +21,7 @@ package io.renku.http.server.endpoint
 import cats.syntax.all._
 import cats.{Applicative, Eval}
 import io.circe.syntax._
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
+import io.renku.data.Message
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.headers.Accept
 import org.http4s.{MediaRange, MediaType, Request, Response, Status}
@@ -39,9 +38,12 @@ trait ResponseTools {
   def whenAccept[F[_]: Applicative](
       mapping: AcceptMapping[F]*
   )(default: => F[Response[F]])(implicit request: Request[F]): F[Response[F]] = {
+
     def notSupported(accept: Accept) = Response[F](Status.BadRequest)
       .withEntity(
-        ErrorMessage(s"Accept: ${accept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported").asJson
+        Message.Error
+          .unsafeApply(s"Accept: ${accept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported")
+          .asJson
       )
       .pure[F]
 

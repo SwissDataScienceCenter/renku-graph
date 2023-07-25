@@ -105,10 +105,10 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
+  import eu.timepit.refined.auto._
   import io.circe.Json
   import io.circe.syntax._
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
+  import io.renku.data.Message
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Request, Response, Status}
 
@@ -128,7 +128,7 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage("Finding user's projects failed")
-    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
+    val message = Message.Error("Finding user's projects failed")
+    Logger[F].error(exception)(message.show) >> InternalServerError(message)
   }
 }

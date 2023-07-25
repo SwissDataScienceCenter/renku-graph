@@ -20,13 +20,13 @@ package io.renku.webhookservice.tokenrepository
 
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.tokenrepository.TokenRepositoryUrl
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -62,7 +62,7 @@ class AccessTokenAssociatorImplSpec
 
       val accessToken = accessTokens.generateOne
 
-      val responseBody = ErrorMessage("some error").asJson.noSpaces
+      val responseBody = Message.Error("some error").asJson.noSpaces
       stubFor {
         post(s"/projects/$projectId/tokens")
           .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
