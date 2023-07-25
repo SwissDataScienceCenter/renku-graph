@@ -48,6 +48,7 @@ object model {
         name:             projects.Name,
         visibility:       projects.Visibility,
         date:             projects.DateCreated,
+        dateModified:     projects.DateModified,
         maybeCreator:     Option[persons.Name],
         keywords:         List[projects.Keyword],
         maybeDescription: Option[projects.Description],
@@ -59,10 +60,11 @@ object model {
 
     final case class Dataset(
         matchingScore:       MatchingScore,
-        sameAs:              Either[datasets.Identifier, datasets.TopmostSameAs],
+        sameAs:              datasets.TopmostSameAs,
         name:                datasets.Name,
         visibility:          projects.Visibility,
         date:                datasets.CreatedOrPublished,
+        dateModified:        Option[datasets.DateModified],
         creators:            List[persons.Name],
         keywords:            List[datasets.Keyword],
         maybeDescription:    Option[datasets.Description],

@@ -20,8 +20,8 @@ package io.renku.knowledgegraph.docs
 
 import cats.MonadThrow
 import cats.implicits._
-import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
@@ -42,7 +42,7 @@ private class EndpointDocsImpl() extends EndpointDocs {
       Uri / "spec.json",
       Status.Ok -> Response("Specification in JSON", Contents(MediaType.`application/json`)),
       Status.InternalServerError ->
-        Response("Error", Contents(MediaType.`application/json`("Reason", ErrorMessage("Message"))))
+        Response("Error", Contents(MediaType.`application/json`("Reason", Message.Error("Message"))))
     )
   )
 }

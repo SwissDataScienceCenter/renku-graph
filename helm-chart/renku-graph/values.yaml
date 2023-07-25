@@ -20,11 +20,16 @@ global:
         # Password for the `eventlog` user
         # Generate one using: `openssl rand -hex 16`
         value:
-  tokenRepository:
-    postgresPassword:
-      # Password for the `tokenstorage` user
-      # Generate one using: `openssl rand -hex 16`
-      value:
+    tokenRepository:
+      postgresPassword:
+        # Password for the `tokenstorage` user
+        # Generate one using: `openssl rand -hex 16`
+        value:
+    triplesGenerator:
+      postgresPassword:
+        # Password for the `triplesgenerator` user
+        # Generate one using: `openssl rand -hex 16`
+        value:
   ## to enable debug mode
   debug: false
 
@@ -130,6 +135,7 @@ triplesGenerator:
   ## a demanded number of concurrent triples generation processes
   generationProcessesNumber: 2
   transformationProcessesNumber: 2
+  connectionPool: 10
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 

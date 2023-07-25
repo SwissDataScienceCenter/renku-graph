@@ -15,6 +15,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
+| PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
@@ -208,7 +209,8 @@ Response body example:
       }
     ]
   },
-  "created": "2012-10-15T03:02:25.639Z",         // optional property
+  "created":      "2012-10-15T03:02:25.639Z",    // optional property
+  "dateModified": "2012-11-15T03:02:25.639Z",    // optional property,
   "hasPart": [
     {
       "atLocation": "data/dataset-name/file1"
@@ -370,6 +372,8 @@ Response body example:
     ],
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00.000Z",
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2012-11-16T10:00:00Z",
     "creator":       "Jan Kowalski",
     "keywords":      [ "keyword1", "keyword2" ],
     "description":   "desc",
@@ -398,6 +402,8 @@ Response body example:
     "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2013-11-15T10:00:00Z",
     "creators":      [ "Jan Kowalski", "Zoe" ],
     "keywords":      [ "keyword1", "keyword2" ],
     "description":   "desc",
@@ -493,8 +499,10 @@ Response body example:
         "namespace": "group/subgroup"
       }
     ],
-    "visibility": "public",
-    "date":       "2012-11-15T10:00:00Z",
+    "visibility":   "public",
+    "date":         "2012-11-15T10:00:00Z",
+    "dateCreated":  "2012-11-15T10:00:00Z",
+    "dateModified": "2012-11-16T10:00:00Z",
     "keywords": [ 
       "key" 
     ],
@@ -524,6 +532,8 @@ Response body example:
     "slug":          "name",
     "visibility":    "public",
     "date":          "2012-11-15T10:00:00Z",
+    "dateCreated":   "2012-11-15T10:00:00Z",
+    "dateModified":  "2013-11-15T10:00:00Z",
     "creators": [
       "Jan Kowalski"
     ],
@@ -790,6 +800,33 @@ Response body example for `Accept: application/ld+json`:
 }
 ```
 
+#### PUT /knowledge-graph/projects/:namespace/:name
+
+API to update selected properies of the project with the given `namespace/name` in both the Triples Store and GitLab
+
+The endpoint requires an authorization token to be passed. Supported headers are:
+
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+
+**Request**
+
+```json
+{
+  "visibility": "public|internal|private"
+}
+```
+
+**Response**
+
+| Status                      | Description                                                                                                |
+|-----------------------------|------------------------------------------------------------------------------------------------------------|
+| ACCEPTED (202)              | If the update process was successfully scheduled                                                           |
+| BAD_REQUEST (400)           | If the given payload is empty or malformed                                                                 |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                               |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or the user is not authorised to access the project |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                                  |
+
 #### GET /knowledge-graph/projects/:namespace/:name/datasets
 
 Finds list of datasets of the project with the given `namespace/name`.
@@ -814,6 +851,7 @@ Response body example:
       },
       "title":       "rmDaYfpehl",
       "name":        "mniouUnmal",
+      "slug":        "mniouUnmal",
       "sameAs":      "http://host/url1",
       "derivedFrom": "http://host/url1",
       "images": [],
@@ -838,7 +876,8 @@ Response body example:
         "initial": "22222222-2222-2222-2222-222222222222"
       },
       "name":        "a",
-      "sameAs":      "http://host/url2",        // optional property when no "derivedFrom" exists
+      "slug":        "a",
+      "sameAs":      "http://host/url2",   // optional property when no "derivedFrom" exists
       "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {

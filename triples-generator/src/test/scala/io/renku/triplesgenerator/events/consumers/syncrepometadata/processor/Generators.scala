@@ -39,13 +39,14 @@ private object Generators {
   } yield DataExtract.TS(id, having, name, visibility, maybeDateModified, maybeDesc, keywords, images)
 
   def glDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.GL] = for {
-    name              <- projectNames
-    visibility        <- projectVisibilities
-    maybeDateModified <- projectModifiedDates().toGeneratorOfOptions
-    maybeDesc         <- projectDescriptions.toGeneratorOfOptions
-    keywords          <- projectKeywords.toGeneratorOfSet(min = 0)
-    maybeImage        <- imageUris.toGeneratorOfOptions
-  } yield DataExtract.GL(having, name, visibility, maybeDateModified, maybeDesc, keywords, maybeImage)
+    name           <- projectNames
+    visibility     <- projectVisibilities
+    updatedAt      <- projectModifiedDates().map(_.value).toGeneratorOfOptions
+    lastActivityAt <- projectModifiedDates().map(_.value).toGeneratorOfOptions
+    maybeDesc      <- projectDescriptions.toGeneratorOfOptions
+    keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
+    maybeImage     <- imageUris.toGeneratorOfOptions
+  } yield DataExtract.GL(having, name, visibility, updatedAt, lastActivityAt, maybeDesc, keywords, maybeImage)
 
   def payloadDataExtracts(having: projects.Path = projectPaths.generateOne): Gen[DataExtract.Payload] = for {
     name      <- projectNames
@@ -70,13 +71,15 @@ private object Generators {
 
     assert(data.images.size <= 1, "More than 1 number of images cannot be modeled in GL")
 
-    DataExtract.GL(data.path,
-                   data.name,
-                   data.visibility,
-                   data.maybeDateModified,
-                   data.maybeDesc,
-                   data.keywords,
-                   data.images.headOption
+    DataExtract.GL(
+      data.path,
+      data.name,
+      data.visibility,
+      data.maybeDateModified.map(_.value),
+      data.maybeDateModified.map(_.value),
+      data.maybeDesc,
+      data.keywords,
+      data.images.headOption
     )
   }
 

@@ -25,6 +25,7 @@ import io.renku.config.renku.ApiUrl
 import io.renku.entities.search.Criteria.Filters.EntityType
 import io.renku.entities.search.model.Entity.Workflow.WorkflowType
 import io.renku.entities.search.model.{Entity, MatchingScore}
+import io.renku.graph.model.datasets.DateCreated
 import io.renku.graph.model.entities.DiffInstances
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects.Visibility
@@ -61,6 +62,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       name = projects.Name("my-project"),
       visibility = Visibility.Public,
       date = projects.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
+      dateModified = projects.DateModified(Instant.parse("2013-04-30T16:03:45Z")),
       maybeCreator = Some(persons.Name("John Creator")),
       keywords = List("word", "super-word").map(projects.Keyword),
       maybeDescription = Some(projects.Description("description of it")),
@@ -78,6 +80,8 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       makeNamespaces(project.path),
       project.visibility,
       project.date,
+      project.date,
+      project.dateModified,
       project.keywords,
       project.images.map(makeImageLink(project.path))
     )
@@ -87,10 +91,11 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
   it should "encode datasets with topmost-sameas" in {
     val dataset = Entity.Dataset(
       MatchingScore(0.65f),
-      Right(datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123")),
+      datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123"),
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
+      None,
       List(persons.Name("John Creator")),
       List("ds-word", "word two").map(datasets.Keyword),
       Some(datasets.Description("hello description")),
@@ -98,7 +103,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       projects.Path("projx/my-project")
     )
     val result     = ModelEncoders.datasetEncoder.apply(dataset)
-    val sameAs     = datasets.SameAs(dataset.sameAs.toOption.get.value)
+    val sameAs     = datasets.SameAs(dataset.sameAs.value)
     val detailsUri = Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / RequestedDataset(sameAs)
     val expected = JsonDataset(
       List(Href("details", detailsUri.renderString)),
@@ -107,37 +112,9 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       dataset.name,
       dataset.visibility,
       dataset.date,
-      dataset.creators,
-      dataset.keywords,
-      dataset.maybeDescription,
-      dataset.images.map(makeImageLink(dataset.exemplarProjectPath))
-    )
-    result shouldBe expected.asJson
-  }
-
-  it should "encode datasets with identifier" in {
-    val dataset = Entity.Dataset(
-      MatchingScore(0.65f),
-      Left(datasets.Identifier("123456")),
-      datasets.Name("my-dataset"),
-      Visibility.Public,
-      datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
-      List(persons.Name("John Creator")),
-      List("ds-word", "word two").map(datasets.Keyword),
-      Some(datasets.Description("hello description")),
-      List(ImageUri("http://absolu.te/uri.png")),
-      projects.Path("projx/my-project")
-    )
-    val result     = ModelEncoders.datasetEncoder.apply(dataset)
-    val identifier = dataset.sameAs.left.toOption.get
-    val detailsUri = Uri.unsafeFromString(renkuApiUrl.value) / "datasets" / RequestedDataset(identifier)
-    val expected = JsonDataset(
-      List(Href("details", detailsUri.renderString)),
-      dataset.matchingScore,
-      dataset.name,
-      dataset.name,
-      dataset.visibility,
-      dataset.date,
+      dataset.dateModified,
+      Some(dataset.date.asInstanceOf[DateCreated]),
+      None,
       dataset.creators,
       dataset.keywords,
       dataset.maybeDescription,
@@ -208,6 +185,8 @@ object ModelEncoderSpec {
       namespaces:    List[Ns],
       visibility:    Visibility,
       date:          projects.DateCreated,
+      dateCreated:   projects.DateCreated,
+      dateModified:  projects.DateModified,
       keywords:      List[projects.Keyword],
       images:        List[ImageLink],
       `type`:        EntityType = EntityType.Project
@@ -219,6 +198,9 @@ object ModelEncoderSpec {
       slug:          datasets.Name,
       visibility:    Visibility,
       date:          datasets.CreatedOrPublished,
+      dateModified:  Option[datasets.DateModified],
+      dateCreated:   Option[datasets.DateCreated],
+      datePublished: Option[datasets.DatePublished],
       creators:      List[persons.Name],
       keywords:      List[datasets.Keyword],
       description:   Option[datasets.Description],
@@ -254,7 +236,7 @@ object ModelEncoderSpec {
     deriveEncoder[JsonProject]
 
   implicit val datasetEncoder: Encoder[JsonDataset] =
-    deriveEncoder[JsonDataset]
+    deriveEncoder[JsonDataset].mapJson(_.dropNullValues)
 
   implicit val workflowEncoder: Encoder[JsonWorkflow] =
     deriveEncoder[JsonWorkflow]

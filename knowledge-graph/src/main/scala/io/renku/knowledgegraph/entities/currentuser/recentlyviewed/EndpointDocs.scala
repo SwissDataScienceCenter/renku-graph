@@ -20,20 +20,20 @@ package io.renku.knowledgegraph.entities.currentuser.recentlyviewed
 
 import cats.MonadThrow
 import cats.implicits._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.entities.search.model.Entity._
 import io.renku.entities.search.model.MatchingScore
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.entities.ModelEncoders._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
+import io.renku.knowledgegraph.entities.ModelEncoders._
 
 import java.time.Instant
 
@@ -47,14 +47,14 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
       Status.Ok -> Response("Found entities", Contents(MediaType.`application/json`("Sample response", example))),
       Status.BadRequest -> Response(
         "In case of invalid query parameters",
-        Contents(MediaType.`application/json`("Reason", InfoMessage("Invalid parameters")))
+        Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )
@@ -80,6 +80,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
       projects.Name("name"),
       projects.Visibility.Public,
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      projects.DateModified(Instant.parse("2012-11-16T10:00:00.000Z")),
       persons.Name("Jan Kowalski").some,
       List(projects.Keyword("key")),
       projects.Description("Some project").some,
@@ -87,10 +88,11 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
     ).asJson,
     Dataset(
       MatchingScore(1),
-      Right(datasets.TopmostSameAs("http://localhost/123444")),
+      datasets.TopmostSameAs("http://localhost/123444"),
       datasets.Name("name"),
       projects.Visibility.Public,
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      Some(datasets.DateModified(Instant.parse("2013-11-15T10:00:00.000Z"))),
       List(persons.Name("Jan Kowalski")),
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,

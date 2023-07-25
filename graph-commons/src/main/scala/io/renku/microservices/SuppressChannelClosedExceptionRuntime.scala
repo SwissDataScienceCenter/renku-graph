@@ -50,7 +50,7 @@ object SuppressChannelClosedExceptionRuntime {
       { () =>
         compDown()
         blockDown()
-      // IORuntime.resetGlobal()
+        // IORuntime.resetGlobal()
       },
       runtimeConfig
     )

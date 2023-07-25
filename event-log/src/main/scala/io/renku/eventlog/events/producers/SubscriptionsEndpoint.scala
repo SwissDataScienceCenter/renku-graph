@@ -21,11 +21,12 @@ package io.renku.eventlog.events.producers
 import EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import cats.MonadThrow
 import cats.effect.kernel.Concurrent
+import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.data.Message
 import io.renku.events.Subscription
-import io.renku.http.ErrorMessage
-import org.http4s.{Request, Response}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -41,17 +42,15 @@ class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
 
   import SubscriptionsEndpointImpl._
   import cats.syntax.all._
-  import io.renku.http.InfoMessage
-  import io.renku.http.InfoMessage._
-  import org.http4s.{Request, Response}
   import org.http4s.circe._
+  import org.http4s.{Request, Response}
 
   override def addSubscription(request: Request[F]): F[Response[F]] = {
     for {
       json         <- request.asJson recoverWith badRequest
       eitherResult <- subscriptionCategoryRegistry register json
       _            <- badRequestIfError(eitherResult)
-      response     <- Accepted(InfoMessage("Subscription added"))
+      response     <- Accepted(Message.Info("Subscription added"))
     } yield response
   } recoverWith httpResponse
 
@@ -69,11 +68,12 @@ class SubscriptionsEndpointImpl[F[_]: Concurrent: Logger](
     case NotFoundError => NotFound("Category not found")
     case exception: BadRequestError =>
       BadRequest {
-        Option(exception.getCause) map ErrorMessage.apply getOrElse ErrorMessage(exception.getMessage)
+        Option(exception.getCause) map Message.Error.fromExceptionMessage getOrElse
+          Message.Error.fromExceptionMessage(exception)
       }
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage("Registering subscriber failed")
-      Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
+      val errorMessage = Message.Error("Registering subscriber failed")
+      Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 }
 

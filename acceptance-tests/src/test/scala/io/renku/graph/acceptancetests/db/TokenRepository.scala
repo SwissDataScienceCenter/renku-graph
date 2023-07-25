@@ -18,11 +18,8 @@
 
 package io.renku.graph.acceptancetests.db
 
-import cats.Applicative
 import cats.effect.IO
-import cats.effect.unsafe.IORuntime
-import com.dimafeng.testcontainers.FixedHostPortGenericContainer
-import io.renku.db.{DBConfigProvider, PostgresContainer}
+import io.renku.db.DBConfigProvider
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import org.typelevel.log4cats.Logger
 
@@ -33,20 +30,9 @@ object TokenRepository {
   private lazy val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
-  private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = PostgresContainer.image,
-    env = Map("POSTGRES_USER"     -> dbConfig.user.value,
-              "POSTGRES_PASSWORD" -> dbConfig.pass.value,
-              "POSTGRES_DB"       -> dbConfig.name.value
-    ),
-    exposedPorts = Seq(dbConfig.port.value),
-    exposedHostPort = dbConfig.port.value,
-    exposedContainerPort = dbConfig.port.value,
-    command = Seq(s"-p ${dbConfig.port.value}")
-  )
-
-  def startDB()(implicit ioRuntime: IORuntime, logger: Logger[IO]): IO[Unit] = for {
-    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
+  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
+    _ <- PostgresDB.startPostgres
+    _ <- PostgresDB.initializeDatabase(dbConfig)
     _ <- logger.info("projects_tokens DB started")
   } yield ()
 }

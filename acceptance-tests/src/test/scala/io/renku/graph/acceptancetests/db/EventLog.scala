@@ -18,26 +18,22 @@
 
 package io.renku.graph.acceptancetests.db
 
-import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO._
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import com.dimafeng.testcontainers.FixedHostPortGenericContainer
-import io.renku.db.{DBConfigProvider, PostgresContainer, SessionResource}
+import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.text.varchar
 import skunk.implicits._
 
-import scala.collection.immutable
 import scala.util.Try
 
 object EventLog extends TypeSerializers {
@@ -95,18 +91,6 @@ object EventLog extends TypeSerializers {
   private lazy val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[Try].get().fold(throw _, identity)
 
-  private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = PostgresContainer.image,
-    env = immutable.Map("POSTGRES_USER"     -> dbConfig.user.value,
-                        "POSTGRES_PASSWORD" -> dbConfig.pass.value,
-                        "POSTGRES_DB"       -> dbConfig.name.value
-    ),
-    exposedPorts = Seq(dbConfig.port.value),
-    exposedHostPort = dbConfig.port.value,
-    exposedContainerPort = dbConfig.port.value,
-    command = Seq(s"-p ${dbConfig.port.value}")
-  )
-
   def removeGlobalCommitSyncRow(projectId: GitLabId)(implicit ioRuntime: IORuntime): Unit = execute { session =>
     val command: Command[projects.GitLabId] = sql"""
       DELETE FROM subscription_category_sync_time
@@ -116,19 +100,11 @@ object EventLog extends TypeSerializers {
   }
 
   def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
-    _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
+    _ <- PostgresDB.startPostgres
+    _ <- PostgresDB.initializeDatabase(dbConfig)
     _ <- logger.info("event_log DB started")
   } yield ()
 
   private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =
-    Session
-      .pooled(
-        host = postgresContainer.host,
-        port = dbConfig.port.value,
-        database = dbConfig.name.value,
-        user = dbConfig.user.value,
-        password = Some(dbConfig.pass.value),
-        max = dbConfig.connectionPool.value
-      )
-      .map(new SessionResource(_))
+    PostgresDB.sessionPoolResource(dbConfig)
 }

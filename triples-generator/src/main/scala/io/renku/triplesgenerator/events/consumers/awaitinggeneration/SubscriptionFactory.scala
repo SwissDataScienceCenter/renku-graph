@@ -20,15 +20,15 @@ package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.Subscription.SubscriberCapacity
 import io.renku.events.consumers
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.defaultSubscriptionPayloadComposerFactory
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.Microservice
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 

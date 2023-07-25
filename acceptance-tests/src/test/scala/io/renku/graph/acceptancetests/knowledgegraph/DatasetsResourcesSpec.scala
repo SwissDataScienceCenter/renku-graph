@@ -125,6 +125,7 @@ class DatasetsResourcesSpec
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'") shouldBe datasetUsedInProjectLink
 
+      `data in the Triples Store`(project, commitId, user.accessToken)
       val getProjectResponseStatus -> getProjectResponseBody = restClient
         .GET(datasetUsedInProjectLink.toString, user.accessToken)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
@@ -492,7 +493,6 @@ class DatasetsResourcesSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, toPayloadJsonLD(project), commitId)
       `data in the Triples Store`(project, commitId, creator.accessToken)
-      `wait for events to be processed`(project.id, creator.accessToken)
 
       When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")
       val detailsResponse =

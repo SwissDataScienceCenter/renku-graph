@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.api.events
 import cats.effect.Sync
 import cats.syntax.all._
 import io.renku.compression.Zip
+import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
@@ -28,6 +29,7 @@ import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.RenkuTinyTypeGenerators._
 import io.renku.graph.model.events.ZippedEventPayload
 import org.scalacheck.Gen
+import scodec.bits.ByteVector
 
 object Generators {
 
@@ -50,16 +52,17 @@ object Generators {
     projectPaths.map(ProjectViewingDeletion.apply)
 
   def zippedEventPayloads[F[_]: Sync]: F[Gen[ZippedEventPayload]] =
-    jsonLDEntities.map(_.toJson.noSpaces).map(Zip.zip[F](_).map(ZippedEventPayload)).sequence
+    zippedContent(jsonLDEntities.map(_.toJson.noSpaces)).map(_.map(ZippedEventPayload(_)))
 
-  def syncRepoMetadataEvents[F[_]: Sync]: F[Gen[SyncRepoMetadata]] =
-    zippedEventPayloads[F]
-      .map(payloadsGen => (projectPaths -> payloadsGen.toGeneratorOfOptions).mapN(SyncRepoMetadata.apply))
+  def eventPayloads[F[_]: Sync]: F[Gen[EventPayload]] =
+    zippedContent(jsonLDEntities.map(_.toJson.noSpaces)).map(_.map(ba => EventPayload(ByteVector(ba.toVector))))
 
-  def syncRepoMetadataWithPayloadEvents[F[_]: Sync]: F[Gen[SyncRepoMetadata]] =
-    zippedEventPayloads[F]
-      .map(payloadsGen => (projectPaths -> payloadsGen.toGeneratorOfSomes).mapN(SyncRepoMetadata.apply))
+  def eventPayloads[F[_]: Sync](contentGen: Gen[String]): F[Gen[EventPayload]] =
+    zippedContent(contentGen).map(_.map(ba => EventPayload(ByteVector(ba.toVector))))
 
-  val syncRepoMetadataWithoutPayloadEvents: Gen[SyncRepoMetadata] =
-    projectPaths.map(SyncRepoMetadata(_, maybePayload = None))
+  private def zippedContent[F[_]: Sync](contentGen: Gen[String]): F[Gen[Array[Byte]]] =
+    contentGen.map(Zip.zip[F](_)).sequence
+
+  val syncRepoMetadataEvents: Gen[SyncRepoMetadata] =
+    projectPaths.map(SyncRepoMetadata(_))
 }

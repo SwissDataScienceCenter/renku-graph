@@ -20,26 +20,25 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.data.Message
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators.eventRequestContents
-import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.events.consumers.ConsumersModelGenerators.badRequests
 import io.renku.events.consumers.EventSchedulingResult.SchedulingError
-import io.renku.generators.Generators._
+import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
-import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient._
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import org.http4s._
 import org.http4s.MediaType._
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.multipart.Part
@@ -61,9 +60,9 @@ class EventEndpointSpec
 
       val response = endpoint.processEvent(Request()).unsafeRunSync()
 
-      response.status                          shouldBe BadRequest
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Not multipart request")
     }
 
     s"$BadRequest if there is no event part in the request" in new TestCase {
@@ -73,9 +72,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                          shouldBe BadRequest
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Missing event part")
     }
 
     s"$BadRequest if there the event part in the request is malformed" in new TestCase {
@@ -84,9 +83,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                          shouldBe BadRequest
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Malformed event body")
     }
 
     val scenarios = Table(
@@ -109,9 +108,9 @@ class EventEndpointSpec
 
         val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-        response.status                          shouldBe Accepted
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
+        response.status                      shouldBe Accepted
+        response.contentType                 shouldBe Some(`Content-Type`(application.json))
+        response.as[Message].unsafeRunSync() shouldBe Message.Info("Event accepted")
       }
     }
 
@@ -123,9 +122,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Unsupported Event Type")
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Unsupported Event Type")
     }
 
     s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
@@ -137,9 +136,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(badRequest.reason)
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(badRequest.reason)
     }
 
     s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
@@ -150,9 +149,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                          shouldBe TooManyRequests
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
+      response.status                      shouldBe TooManyRequests
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Too many events to handle")
     }
 
     s"$ServiceUnavailable if the handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
@@ -165,9 +164,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                           shouldBe ServiceUnavailable
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(handlingResult.reason)
+      response.status                      shouldBe ServiceUnavailable
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(handlingResult.reason)
     }
 
     s"$InternalServerError if the handler returns $SchedulingError" in new TestCase {
@@ -178,9 +177,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                           shouldBe InternalServerError
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Failed to schedule event")
     }
 
     s"$InternalServerError if the handler fails" in new TestCase {
@@ -191,9 +190,9 @@ class EventEndpointSpec
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
-      response.status                           shouldBe InternalServerError
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Failed to schedule event")
     }
   }
 

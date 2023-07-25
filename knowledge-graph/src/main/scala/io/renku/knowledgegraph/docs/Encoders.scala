@@ -54,8 +54,9 @@ private object Encoders {
     val operations: Json = path.operations
       .map { operation: Operation =>
         operation match {
-          case _: Operation.Get    => json"""{"get": $operation}"""
           case _: Operation.Delete => json"""{"delete": $operation}"""
+          case _: Operation.Get    => json"""{"get": $operation}"""
+          case _: Operation.Put    => json"""{"put": $operation}"""
         }
       }
       .foldLeft(Json.obj())((acc, opJson) => acc deepMerge opJson)
@@ -100,24 +101,42 @@ private object Encoders {
     }"""
   }
 
-  implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance { schema =>
-    json"""{"type": ${schema.`type`}}"""
+  implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance {
+    case sch: model.Schema.String.type =>
+      json"""{"type": ${sch.`type`}}"""
+    case sch: model.Schema.Integer.type =>
+      json"""{"type": ${sch.`type`}}"""
+    case sch: model.Schema.EnumString =>
+      json"""{"type": ${sch.`type`}, "enum": ${sch.values.toList.sorted}}"""
+    case sch: model.Schema.`Object` =>
+      json"""{"type": ${sch.`type`}, "properties": ${sch.properties}}"""
   }
 
   implicit val requestBodyEncoder: Encoder[model.RequestBody] = Encoder.instance { requestBody =>
     val content = requestBody.content.foldLeft(Json.obj()) { case (acc, (key, mediaType)) =>
       json"""{$key: $mediaType}""" deepMerge acc
     }
+
     json"""{
       "description": ${requestBody.description},
+      "required":    ${requestBody.required},
       "content":     $content
-    }""" deepMerge content
+    }"""
   }
 
-  implicit val mediaTypeEncoder: Encoder[model.MediaType] = Encoder.instance { mediaType =>
-    json"""{
-      "examples": ${mediaType.examples}
-    }"""
+  implicit val mediaTypeEncoder: Encoder[model.MediaType] = Encoder.instance {
+    case MediaType.WithoutSchema(_, examples) =>
+      val examplesJson = examples.foldLeft(Json.obj()) { case (json, (name, example)) =>
+        json deepMerge json"""{$name: {"value": $example}}"""
+      }
+      json"""{
+        "examples": $examplesJson
+      }"""
+    case MediaType.WithSchema(_, schema, example) =>
+      json"""{
+        "schema":  $schema,
+        "example": $example
+      }"""
   }
 
   implicit val responseEncoder: Encoder[model.Response] = Encoder.instance { response =>
@@ -135,7 +154,7 @@ private object Encoders {
     case SecurityRequirementAuth(name, scopes) =>
       json"""{$name: $scopes}"""
     case SecurityRequirementNoAuth =>
-      json"""{}"""
+      Json.obj()
   }
 
   implicit val inEncoder: Encoder[model.In] = Encoder.instance { inType =>
@@ -185,15 +204,9 @@ private object Encoders {
       }""" deepMerge description
   }
 
-  implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
-    val value = example match {
-      case JsonExample(value, _)   => json"""{"value": $value}"""
-      case JsonLDExample(value, _) => json"""{"value": ${value.toJson}}"""
-      case StringExample(value, _) => json"""{"value": $value}"""
-    }
-
-    val summary = example.summary.map(s => json"""{"summary": $s}""").getOrElse(Json.obj())
-
-    value deepMerge summary
+  implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance {
+    case JsonExample(value)   => value
+    case JsonLDExample(value) => value.toJson
+    case StringExample(value) => Json.fromString(value)
   }
 }

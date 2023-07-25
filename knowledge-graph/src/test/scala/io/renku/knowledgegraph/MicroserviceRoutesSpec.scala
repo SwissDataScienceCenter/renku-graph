@@ -18,27 +18,26 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{EitherT, Kleisli}
 import cats.data.EitherT.{leftT, rightT}
+import cats.data.{EitherT, Kleisli}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
-import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuUrl
-import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
+import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
@@ -47,10 +46,10 @@ import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
-import org.http4s._
 import org.http4s.MediaType.application
-import org.http4s.Method.{DELETE, GET}
+import org.http4s.Method.{DELETE, GET, PUT}
 import org.http4s.Status._
+import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.http4s.server.AuthMiddleware
@@ -73,10 +72,10 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/datasets?query=<phrase>" should {
 
-    import datasets._
     import datasets.Endpoint.Query._
     import datasets.Endpoint.Sort
     import datasets.Endpoint.Sort._
+    import datasets._
 
     s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
@@ -192,7 +191,7 @@ class MicroserviceRoutesSpec
         }
 
         response.status shouldBe BadRequest
-        response.body[ErrorMessage] shouldBe ErrorMessage(
+        response.body[Message] shouldBe Message.Error.unsafeApply(
           List(
             s"'${query.parameterName}' parameter with invalid value",
             Sort.sort.errorMessage(sortProperty),
@@ -258,16 +257,16 @@ class MicroserviceRoutesSpec
 
       val response = routes(maybeAuthUser).call(Request(GET, uri"/knowledge-graph/datasets" / RequestedDataset(id)))
 
-      response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
     }
   }
 
   "GET /knowledge-graph/entities" should {
     import io.renku.entities.search.Criteria
-    import io.renku.entities.search.Criteria._
     import io.renku.entities.search.Criteria.Sort._
+    import io.renku.entities.search.Criteria._
     import io.renku.entities.search.Generators._
 
     forAll {
@@ -401,9 +400,9 @@ class MicroserviceRoutesSpec
           Request[IO](GET, uri"/knowledge-graph/entities" +? ("visibility" -> nonEmptyStrings().generateOne))
         )
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'visibility' parameter with invalid value")
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'visibility' parameter with invalid value")
     }
 
     s"return $BadRequest for if since > until" in new TestCase {
@@ -413,9 +412,9 @@ class MicroserviceRoutesSpec
         Request[IO](GET, uri"/knowledge-graph/entities" +? ("since" -> since.show) +? ("until" -> until.show))
       }
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'since' parameter > 'until'")
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'since' parameter > 'until'")
     }
 
     "authenticate user from the request if given" in new TestCase {
@@ -495,9 +494,9 @@ class MicroserviceRoutesSpec
 
       val response = routes(authUser).call(request)
 
-      response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
     }
   }
 
@@ -534,9 +533,9 @@ class MicroserviceRoutesSpec
         Request(GET, uri"/knowledge-graph/projects" / namespace)
       )
 
-      response.status            shouldBe NotFound
-      response.contentType       shouldBe Some(`Content-Type`(application.json))
-      response.body[InfoMessage] shouldBe InfoMessage("Resource not found")
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Info("Resource not found")
     }
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
@@ -558,9 +557,58 @@ class MicroserviceRoutesSpec
         Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
       )
 
-      response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
+    }
+  }
+
+  "PUT /knowledge-graph/projects/:namespace/../:name" should {
+
+    val projectPath = projectPaths.generateOne
+    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+
+    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.option)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectPath, Set(projectPath))))
+
+      (projectUpdateEndpoint
+        .`PUT /projects/:path`(_: model.projects.Path, _: Request[IO], _: AuthUser))
+        .expects(projectPath, request, authUser.option.get)
+        .returning(Response[IO](Accepted).pure[IO])
+
+      routes(authUser).call(request).status shouldBe Accepted
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"return $Unauthorized when authentication fails" in new TestCase {
+      routes(givenAuthAsUnauthorized)
+        .call(request)
+        .status shouldBe Unauthorized
+    }
+
+    s"return $NotFound when no auth header" in new TestCase {
+      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
+    }
+
+    s"return $NotFound when the user has no rights to the project" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, authUser.option)
+        .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
+
+      val response = routes(authUser).call(request)
+
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
     }
   }
 
@@ -606,9 +654,9 @@ class MicroserviceRoutesSpec
           Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
         )
 
-      response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+      response.status        shouldBe NotFound
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(AuthorizationFailure.getMessage)
     }
   }
 
@@ -670,9 +718,9 @@ class MicroserviceRoutesSpec
 
       val response = routes().call(Request[IO](GET, projectDsTagsUri +? ("per_page" -> invalidPerPage)))
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage(s"'$invalidPerPage' not a valid 'per_page' value")
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error.unsafeApply(s"'$invalidPerPage' not a valid 'per_page' value")
     }
 
     "authenticate user from the request if given" in new TestCase {
@@ -796,9 +844,9 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/users/:id/projects" should {
-    import users.projects._
-    import users.projects.Endpoint._
     import users.projects.Endpoint.Criteria._
+    import users.projects.Endpoint._
+    import users.projects._
 
     val userId = personGitLabIds.generateOne
 
@@ -846,9 +894,9 @@ class MicroserviceRoutesSpec
           Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects" +? ("state" -> -1))
         )
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'state' parameter with invalid value")
+      response.status        shouldBe BadRequest
+      response.contentType   shouldBe Some(`Content-Type`(application.json))
+      response.body[Message] shouldBe Message.Error("'state' parameter with invalid value")
     }
 
     "authenticate user from the request if given" in new TestCase {
@@ -908,6 +956,7 @@ class MicroserviceRoutesSpec
     val ontologyEndpoint                = mock[ontology.Endpoint[IO]]
     val projectDeleteEndpoint           = mock[projects.delete.Endpoint[IO]]
     val projectDetailsEndpoint          = mock[projects.details.Endpoint[IO]]
+    val projectUpdateEndpoint           = mock[projects.update.Endpoint[IO]]
     val projectDatasetsEndpoint         = mock[projects.datasets.Endpoint[IO]]
     val projectDatasetTagsEndpoint      = mock[projects.datasets.tags.Endpoint[IO]]
     val docsEndpoint                    = mock[docs.Endpoint[IO]]
@@ -932,6 +981,7 @@ class MicroserviceRoutesSpec
         ontologyEndpoint,
         projectDeleteEndpoint,
         projectDetailsEndpoint,
+        projectUpdateEndpoint,
         projectDatasetsEndpoint,
         projectDatasetTagsEndpoint,
         recentEntitiesEndpoint,

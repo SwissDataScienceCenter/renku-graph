@@ -25,10 +25,12 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.string.Url
-import io.circe.Json
+import io.circe.generic.semiauto.deriveDecoder
+import io.circe.{Decoder, Json}
 import io.circe.literal._
 import io.renku.control.Throttler
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
+import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import io.renku.http.tinytypes.TinyTypeURIEncoder._
@@ -120,6 +122,21 @@ object KnowledgeGraphClient {
 }
 
 object EventLogClient {
+  final case class ProjectEvent(
+      id:      EventId,
+      project: ProjectEvent.Project,
+      status:  EventStatus
+  )
+  object ProjectEvent {
+    import io.renku.tinytypes.json.TinyTypeDecoders._
+
+    final case class Project(id: projects.GitLabId, path: projects.Path)
+    object Project {
+      implicit val jsonDecoder: Decoder[Project] = deriveDecoder
+    }
+
+    implicit val jsonDecoder: Decoder[ProjectEvent] = deriveDecoder
+  }
 
   def apply()(implicit logger: Logger[IO]): EventLogClient = new EventLogClient
 
@@ -137,6 +154,19 @@ object EventLogClient {
         _   <- send(req) { case (Accepted, _, _) => ().pure[IO] }
       } yield ()
     }.unsafeRunSync()
+
+    def getEvents(project: Either[projects.GitLabId, projects.Path]): IO[List[ProjectEvent]] =
+      for {
+        uri <- validateUri(s"$baseUrl/events").map(uri =>
+                 project.fold(id => uri.withQueryParam("project-id", id.value),
+                              path => uri.withQueryParam("project-path", path.value)
+                 )
+               )
+        req = request(Method.GET, uri)
+        r <- send(req) { case (Status.Ok, _, resp) =>
+               resp.as[List[ProjectEvent]]
+             }
+      } yield r
 
     private def createRequest(uri: Uri, event: Json) =
       request(Method.POST, uri).withMultipartBuilder

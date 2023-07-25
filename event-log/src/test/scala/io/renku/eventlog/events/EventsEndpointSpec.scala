@@ -20,21 +20,19 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.graph.model.EventContentGenerators.eventDates
+import io.renku.data.Message
 import io.renku.eventlog.events.EventsEndpoint._
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.EventContentGenerators
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events._
-import io.renku.graph.model.EventContentGenerators
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -96,9 +94,9 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val response = endpoint.findEvents(criteria, request).unsafeRunSync()
 
-      response.status                           shouldBe InternalServerError
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(exception.getMessage)
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(exception.getMessage)
 
       logger.loggedOnly(Error(show"Finding events for '${request.uri}' failed", exception))
     }

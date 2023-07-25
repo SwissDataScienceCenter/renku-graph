@@ -22,9 +22,9 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.{Decoder, Encoder}
 import io.circe.Decoder.decodeString
-import io.renku.data.ErrorMessage
+import io.circe.{Decoder, Encoder}
+import io.renku.data.Message
 import io.renku.graph.model.events.EventInfo.ProjectIds
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -134,7 +134,7 @@ object events {
     implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
     implicit val encoder: Encoder[EventMessage] = Encoder.encodeString.contramap(_.value)
 
-    def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
+    def apply(exception: Throwable): EventMessage = EventMessage(Message.Error.fromStackTrace(exception).show)
   }
 
   final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType

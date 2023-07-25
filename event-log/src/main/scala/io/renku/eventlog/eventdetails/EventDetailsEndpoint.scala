@@ -20,14 +20,14 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.Concurrent
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
+import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
-import io.renku.http.InfoMessage._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -47,12 +47,12 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
   override def getDetails(eventId: CompoundEventId): F[Response[F]] =
     eventDetailsFinder.findDetails(eventId) flatMap {
       case Some(eventDetails) => Ok(eventDetails.asJson)
-      case None               => NotFound(InfoMessage("Event not found"))
+      case None               => NotFound(Message.Info("Event not found"))
     } recoverWith internalServerError
 
   private lazy val internalServerError: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage("Finding event details failed")
-    Logger[F].error(exception)(errorMessage.value) *> InternalServerError(errorMessage)
+    val errorMessage = Message.Error("Finding event details failed")
+    Logger[F].error(exception)(errorMessage.show) *> InternalServerError(errorMessage)
   }
 
   private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>

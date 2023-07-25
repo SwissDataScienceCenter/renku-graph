@@ -44,7 +44,7 @@ trait FinderSpecOps {
 
   protected[search] trait TestCase {
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val finder: EntitiesFinder[IO] = new EntitiesFinderImpl[IO](projectsDSConnectionInfo, EntitiesFinder.newFinders)
+    val finder: EntitiesFinder[IO] = new EntitiesFinderImpl[IO](projectsDSConnectionInfo, EntitiesFinder.finders)
   }
 
   protected[search] implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
@@ -84,19 +84,6 @@ trait FinderSpecOps {
         .addAllDatasetsFrom(project)
         .addAllPlansFrom(project)
         .addAllPersonsFrom(project) ::: entities
-    }.distinct
-
-    def addAllEntitiesOldFrom(project: RenkuProject): List[model.Entity] = {
-      List(project.to[model.Entity.Project])
-        .addAllDatasetsFromOld(project)
-        .addAllPlansFrom(project)
-        .addAllPersonsFrom(project) ::: entities
-    }.distinct
-
-    def addAllDatasetsFromOld(project: RenkuProject): List[model.Entity] = {
-      project.datasets
-        .map(_ -> project)
-        .map(t => t.to[model.Entity.Dataset].copy(sameAs = Left(t._1.identification.identifier))) ::: entities
     }.distinct
 
     def addAllDatasetsFrom(project: RenkuProject): List[model.Entity] = {

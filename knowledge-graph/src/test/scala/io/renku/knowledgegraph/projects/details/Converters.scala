@@ -35,6 +35,7 @@ private trait Converters {
         project.dateCreated,
         project.maybeCreator.map(_.to(projectCreatorConverter))
       ),
+      dateModified = project.dateModified,
       visibility = project.visibility,
       maybeParent =
         project.fold(_.parent.to(kgParentConverter).some, _ => None, _.parent.to(kgParentConverter).some, _ => None),

@@ -20,9 +20,11 @@ package io.renku.http.server.endpoint
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec
+import org.http4s.EntityEncoder.stringEncoder
 import org.http4s.MediaRange.`*/*`
 import org.http4s.MediaType.application
 import org.http4s.headers.Accept
@@ -43,8 +45,8 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
       implicit val request: Request[IO] = Request(headers = Headers(Accept(application.json)))
 
       val response = whenAccept(
-        application.json      --> Response[IO](Status.Ok).withEntity(bodyFactory()).pure[IO],
-        application.`ld+json` --> Response[IO](Status.Ok).withEntity(bodyFactory()).pure[IO]
+        application.json      --> Response[IO](Status.Ok).withEntity(bodyFactory())(stringEncoder[IO]).pure[IO],
+        application.`ld+json` --> Response[IO](Status.Ok).withEntity(bodyFactory())(stringEncoder[IO]).pure[IO]
       )(default = Response[IO](Status.Accepted).pure[IO])
 
       response.map(_.status).unsafeRunSync()         shouldBe Status.Ok
@@ -74,6 +76,7 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
     }
 
     "return BadRequest with an error message result when no matching MediaType defined" in new TestCase {
+
       val otherAccept = Accept(application.`ld+json`)
       implicit val request: Request[IO] = Request(headers = Headers(otherAccept))
 
@@ -83,8 +86,9 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
 
       response.map(_.status).unsafeRunSync() shouldBe Status.BadRequest
       response
-        .flatMap(_.as[String])
-        .unsafeRunSync() shouldBe s"Accept: ${otherAccept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported"
+        .flatMap(_.as[Message])
+        .unsafeRunSync()
+        .show shouldBe s"Accept: ${otherAccept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported"
     }
   }
 

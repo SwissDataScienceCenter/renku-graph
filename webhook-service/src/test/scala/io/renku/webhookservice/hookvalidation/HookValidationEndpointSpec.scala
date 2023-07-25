@@ -20,15 +20,14 @@ package io.renku.webhookservice.hookvalidation
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -55,9 +54,9 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe Ok
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook valid"}"""
+      response.status                      shouldBe Ok
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Hook valid")
     }
 
     "return NOT_FOUND when the hook does not exist" in new TestCase {
@@ -69,9 +68,9 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe NotFound
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook not found"}"""
+      response.status                      shouldBe NotFound
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Info("Hook not found")
     }
 
     "return UNAUTHORIZED when validation cannot determine hook existence" in new TestCase {
@@ -83,15 +82,15 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = endpoint.validateHook(projectId, authUser).unsafeRunSync()
 
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Unauthorized"}"""
+      response.status                      shouldBe Unauthorized
+      response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error("Unauthorized")
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook validation and log the error" in new TestCase {
 
-      val errorMessage      = ErrorMessage("some error")
-      private val exception = new Exception(errorMessage.toString())
+      val errorMessage      = Message.Error("some error")
+      private val exception = new Exception(errorMessage.show)
       (hookValidator
         .validateHook(_: projects.GitLabId, _: Option[AccessToken]))
         .expects(projectId, Some(authUser.accessToken))

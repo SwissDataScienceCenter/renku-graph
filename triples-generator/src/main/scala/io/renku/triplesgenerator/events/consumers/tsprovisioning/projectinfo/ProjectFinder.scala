@@ -35,6 +35,8 @@ import org.http4s.implicits._
 import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
+import java.time.Instant
+
 private trait ProjectFinder[F[_]] {
   def findProject(path: projects.Path)(implicit
       maybeAccessToken: Option[AccessToken]
@@ -89,7 +91,8 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         name             <- cursor.downField("name").as[projects.Name]
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
-        dateModified     <- cursor.downField("updated_at").as[Option[projects.DateModified]]
+        updatedAt        <- cursor.downField("updated_at").as[Option[Instant]]
+        lastActivityAt   <- cursor.downField("last_activity_at").as[Option[Instant]]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         keywords         <- cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten)
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
@@ -102,7 +105,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         name,
         path,
         dateCreated,
-        dateModified getOrElse projects.DateModified(dateCreated.value),
+        projects.DateModified(List(updatedAt, lastActivityAt, dateCreated.value.some).max.head),
         maybeDescription,
         maybeCreator = None,
         keywords,

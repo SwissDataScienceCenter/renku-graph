@@ -347,6 +347,7 @@ sequenceDiagram
       activate TriplesGenerator
         TriplesGenerator ->> GitLab: fetches project metadata
         TriplesGenerator ->> TriplesStore: fetches project metadata
+        TriplesGenerator ->> EventLog: fetches the payload of the latest project event
         TriplesGenerator ->> TriplesStore: sends update queries if values needs updating (not for visibility changes)
         TriplesGenerator ->> EventLog: sends RedoProjectTransformation (only when visibility changes)
       deactivate TriplesGenerator

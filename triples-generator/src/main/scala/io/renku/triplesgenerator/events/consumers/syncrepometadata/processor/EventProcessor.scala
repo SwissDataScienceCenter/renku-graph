@@ -23,6 +23,7 @@ import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
+import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
@@ -40,38 +41,39 @@ private[syncrepometadata] object EventProcessor {
   ]: Async: NonEmptyParallel: Logger: AccessTokenFinder: GitLabClient: SparqlQueryTimeRecorder: MetricsRegistry](
       config: Config
   ): F[EventProcessor[F]] =
-    (TSDataFinder[F](config), UpdateCommandsRunner[F](config))
-      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], PayloadDataExtractor[F], UpdateCommandsCalculator[F](), _))
+    (TSDataFinder[F](config), LatestPayloadFinder[F], UpdateCommandsRunner[F](config))
+      .mapN(new EventProcessorImpl[F](_, GLDataFinder[F], _, PayloadDataExtractor[F], UpdateCommandsCalculator[F](), _))
 }
 
 private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
     tsDataFinder:             TSDataFinder[F],
     glDataFinder:             GLDataFinder[F],
+    payloadFinder:            LatestPayloadFinder[F],
     payloadDataExtractor:     PayloadDataExtractor[F],
     updateCommandsCalculator: UpdateCommandsCalculator[F],
     updateCommandsRunner:     UpdateCommandsRunner[F]
 ) extends EventProcessor[F] {
 
   import glDataFinder.fetchGLData
+  import payloadFinder.fetchLatestPayload
   import tsDataFinder.fetchTSData
   import updateCommandsCalculator.calculateUpdateCommands
 
   override def process(event: SyncRepoMetadata): F[Unit] =
     Logger[F].info(show"$categoryName: $event accepted") >>
-      (fetchTSData(event.path), fetchGLData(event.path))
+      (fetchTSData(event.path), fetchGLData(event.path), fetchLatestPayload(event.path) >>= extractPayloadData(event))
         .parFlatMapN {
-          case (Some(tsData), Some(glData)) =>
-            extractPayloadData(event) >>= (calculateUpdateCommands(tsData, glData, _)) >>= executeUpdates
+          case (Some(tsData), Some(glData), maybePayloadData) =>
+            calculateUpdateCommands(tsData, glData, maybePayloadData) >>= executeUpdates
           case _ =>
             ().pure[F]
         }
         .handleErrorWith(logError(event))
 
-  private def extractPayloadData(event: SyncRepoMetadata) =
-    event.maybePayload match {
-      case None          => Option.empty[DataExtract.Payload].pure[F]
-      case Some(payload) => payloadDataExtractor.extractPayloadData(event.path, payload)
-    }
+  private def extractPayloadData(event: SyncRepoMetadata): Option[EventPayload] => F[Option[DataExtract.Payload]] = {
+    case None          => Option.empty[DataExtract.Payload].pure[F]
+    case Some(payload) => payloadDataExtractor.extractPayloadData(event.path, payload)
+  }
 
   private def executeUpdates: List[UpdateCommand] => F[Unit] =
     _.traverse_(updateCommandsRunner.run)

@@ -18,73 +18,25 @@
 
 package io.renku.triplesgenerator.api.events
 
-import Generators.{syncRepoMetadataEvents, syncRepoMetadataWithoutPayloadEvents}
-import cats.effect.IO
-import cats.effect.testing.scalatest.AsyncIOSpec
-import cats.syntax.all._
+import Generators.syncRepoMetadataEvents
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.compression.Zip
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
-import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.projects
-import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AsyncWordSpec
-import org.scalatest.{EitherValues, OptionValues}
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SyncRepoMetadataSpec
-    extends AsyncWordSpec
-    with should.Matchers
-    with ScalaCheckPropertyChecks
-    with OptionValues
-    with EitherValues
-    with AsyncIOSpec
-    with AsyncMockFactory {
-
-  "maybeJsonLDPayload" should {
-
-    "return None if no payload given" in {
-      syncRepoMetadataWithoutPayloadEvents.generateOne.maybeJsonLDPayload shouldBe None
-    }
-
-    "return some failure if payload cannot be unzipped or parsed to JSON-LD" in {
-
-      val result = syncRepoMetadataEvents[IO].map(
-        _.generateOne
-          .copy(maybePayload = zippedEventPayloads.generateSome)
-          .maybeJsonLDPayload
-          .value
-      )
-
-      result.asserting(_.left.value shouldBe a[Exception])
-    }
-
-    "return some JSON-LD payload for a valid payload" in {
-
-      val jsonLDPayload = jsonLDEntities.generateOne
-
-      syncRepoMetadataEvents[IO]
-        .map(
-          _.generateOne
-            .copy(maybePayload = ZippedEventPayload(Zip.zip[IO](jsonLDPayload.toJson.noSpaces).unsafeRunSync()).some)
-            .maybeJsonLDPayload
-        )
-        .asserting(_.value shouldBe jsonLDPayload.asRight)
-    }
-  }
+class SyncRepoMetadataSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks with EitherValues {
 
   "json codec" should {
 
-    "encode and decode the event part" in {
-      syncRepoMetadataEvents[IO]
-        .map(_.generateOne)
-        .asserting(event => event.asJson.hcursor.as[SyncRepoMetadata].value shouldBe event.copy(maybePayload = None))
+    "encode and decode the event" in {
+      val event = syncRepoMetadataEvents.generateOne
+      event.asJson.hcursor.as[SyncRepoMetadata].value shouldBe event
     }
 
     "be able to decode json valid from the contract point of view" in {
@@ -93,9 +45,7 @@ class SyncRepoMetadataSpec
         "project": {
           "path": "project/path"
         }
-      }""".hcursor.as[SyncRepoMetadata].value shouldBe SyncRepoMetadata(projects.Path("project/path"),
-                                                                        maybePayload = None
-      )
+      }""".hcursor.as[SyncRepoMetadata].value shouldBe SyncRepoMetadata(projects.Path("project/path"))
     }
 
     "fail if categoryName does not match" in {

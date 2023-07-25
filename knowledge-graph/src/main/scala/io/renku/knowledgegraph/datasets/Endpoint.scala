@@ -25,10 +25,9 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config._
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
-import io.renku.http.ErrorMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
@@ -88,13 +87,12 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
   private def httpResult(
       maybePhrase: Option[Phrase]
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(
+    val errorMessage = Message.Error.unsafeApply(
       maybePhrase
         .map(phrase => s"Finding datasets matching '$phrase' failed")
         .getOrElse("Finding all datasets failed")
     )
-    Logger[F].error(exception)(errorMessage.value) >>
-      InternalServerError(errorMessage)
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[F], String] = {
@@ -143,7 +141,7 @@ object Endpoint {
     final case object DatePublishedProperty extends SearchProperty("datePublished")
     final case object ProjectsCountProperty extends SearchProperty("projectsCount")
 
-    val default = Sorting(Sort.By(TitleProperty, io.renku.http.rest.SortBy.Direction.Asc))
+    val default: Sorting[Sort.type] = Sorting(Sort.By(TitleProperty, io.renku.http.rest.SortBy.Direction.Asc))
 
     override lazy val properties: Set[SearchProperty] = Set(
       TitleProperty,

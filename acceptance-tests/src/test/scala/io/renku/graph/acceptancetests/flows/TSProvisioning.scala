@@ -19,23 +19,25 @@
 package io.renku.graph.acceptancetests.flows
 
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.effect.unsafe.IORuntime
+import fs2.Stream
 import io.renku.events.CategoryName
-import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
-import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events.CommitId
+import io.renku.graph.acceptancetests.tooling.EventLogClient.ProjectEvent
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
+import io.renku.graph.model.events.{CommitId, EventId, EventStatus, EventStatusProgress}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
+import org.scalatest.{Assertion, EitherValues}
+import org.typelevel.log4cats.Logger
 
 import java.lang.Thread.sleep
 import scala.annotation.tailrec
@@ -49,11 +51,11 @@ trait TSProvisioning
     with should.Matchers
     with EitherValues {
 
-  self: ApplicationServices with IOSpec =>
+  self: ApplicationServices with AcceptanceSpec with IOSpec =>
 
   def `data in the Triples Store`(
       project:     data.Project,
-      commitId:    CommitId = commitIds.generateOne,
+      commitId:    CommitId,
       accessToken: AccessToken
   )(implicit ioRuntime: IORuntime): Assertion =
     `data in the Triples Store`(project, NonEmptyList(commitId, Nil), accessToken)
@@ -70,20 +72,52 @@ trait TSProvisioning
       webhookServiceClient
         .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
-
-      sleep((5 seconds).toMillis)
     }
 
-    `wait for events to be processed`(project.id, accessToken)
+    // commitId is the eventId
+    val condition = commitIds.map(e => EventId(e.value)).toList.map(_ -> EventStatus.TriplesStore)
+    waitForAllEvents(project.id, condition: _*)
   }
 
-  def `wait for events to be processed`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion =
-    eventually {
-      val response = webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken)
-      response.status                                                                          shouldBe Ok
-      response.jsonBody.hcursor.downField("activated").as[Boolean].value                       shouldBe true
-      response.jsonBody.hcursor.downField("progress").downField("percentage").as[Double].value shouldBe 100d
-    }
+  private def projectEvents(projectId: projects.GitLabId): Stream[IO, List[ProjectEvent]] = {
+    val findEvents =
+      eventLogClient
+        .getEvents(Left(projectId))
+
+    val waitTimes = Stream.iterate(1d)(_ * 1.5).map(_.seconds).covary[IO].evalMap(IO.sleep)
+
+    Stream
+      .repeatEval(findEvents)
+      .zip(waitTimes)
+      .map(_._1)
+  }
+
+  def waitForAllEvents(projectId: projects.GitLabId, expect: (EventId, EventStatus)*) = {
+    val expectedResult = expect.toSet
+    val ids            = expect.map(_._1).toSet
+
+    val tries =
+      projectEvents(projectId)
+        .map(_.filter(ev => ids.contains(ev.id)).map(ev => ev.id -> ev.status).toSet)
+        .evalTap(result => Logger[IO].debug(s"Wait for event status: $result -> $expectedResult"))
+        .takeThrough(found => found != expectedResult)
+        .take(13)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    lastValue shouldBe expectedResult
+  }
+
+  def waitForAllEventsInFinalState(projectId: projects.GitLabId) = {
+    val tries =
+      projectEvents(projectId)
+        .map(_.map(ev => EventStatusProgress.Stage(ev.status)).toSet)
+        .evalTap(stages => Logger[IO].debug(s"Wait for final state: $stages"))
+        .takeThrough(stages => stages.exists(_ != EventStatusProgress.Stage.Final))
+        .take(15)
+
+    val lastValue = tries.compile.lastOrError.unsafeRunSync()
+    lastValue.forall(_ == EventStatusProgress.Stage.Final) shouldBe true
+  }
 
   def `check hook cannot be found`(projectId: projects.GitLabId, accessToken: AccessToken): Assertion = eventually {
     webhookServiceClient.`GET projects/:id/events/status`(projectId, accessToken).status shouldBe NotFound

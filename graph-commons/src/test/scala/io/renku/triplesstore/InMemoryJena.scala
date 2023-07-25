@@ -31,8 +31,8 @@ import io.renku.graph.model.entities.{EntityFunctions, Person}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld._
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
+import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.triplesstore.client.model.{Quad, Triple}
 import io.renku.triplesstore.client.syntax._
@@ -51,13 +51,13 @@ trait InMemoryJena {
   lazy val container: SingleContainer[_] = jenaRunMode match {
     case JenaRunMode.GenericContainer =>
       GenericContainer(
-        dockerImage = "renku/renku-jena:0.0.20",
+        dockerImage = "renku/renku-jena:0.0.21",
         exposedPorts = Seq(3030),
         waitStrategy = Wait forHttp "/$/ping"
       )
     case JenaRunMode.FixedPortContainer(fixedPort) =>
       FixedHostPortGenericContainer(
-        imageName = "renku/renku-jena:0.0.20",
+        imageName = "renku/renku-jena:0.0.21",
         exposedPorts = Seq(3030),
         exposedHostPort = fixedPort,
         exposedContainerPort = fixedPort,
@@ -238,21 +238,16 @@ sealed trait NamedGraphDataset {
       })
       .unsafeRunSync()
 
+  def insertIO(to: DatasetName, quad: Quad): IO[Unit] =
+    queryRunnerFor(to) >>= (_.runUpdate {
+      SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
+    })
+
   def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit =
-    queryRunnerFor(to)
-      .flatMap(_.runUpdate {
-        SparqlQuery.of("insert quad", show"INSERT DATA { ${quad.asSparql.sparql} }")
-      })
-      .unsafeRunSync()
+    insertIO(to, quad).unsafeRunSync()
 
   def insert(to: DatasetName, quads: Set[Quad])(implicit ioRuntime: IORuntime): Unit =
-    queryRunnerFor(to)
-      .flatMap(_.runUpdate {
-        SparqlQuery.of("insert quads",
-                       show"INSERT DATA { ${quads.map(_.asSparql.sparql).mkString("\n\t", "\n\t", "\n\t")} }"
-        )
-      })
-      .unsafeRunSync()
+    quads.toList.traverse_(insertIO(to, _)).unsafeRunSync()
 }
 
 trait GraphsProducer[T] {

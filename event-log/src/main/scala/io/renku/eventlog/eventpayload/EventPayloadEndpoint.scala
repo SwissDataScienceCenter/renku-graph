@@ -20,12 +20,11 @@ package io.renku.eventlog.eventpayload
 
 import cats.effect.Concurrent
 import cats.syntax.all._
+import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.projects.{Path => ProjectPath}
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
@@ -57,7 +56,7 @@ object EventPayloadEndpoint {
                   )
             } yield r
           case None =>
-            NotFound(InfoMessage(show"Event/Project $eventId/$projectPath not found"))
+            NotFound(Message.Info.unsafeApply(show"Event/Project $eventId/$projectPath not found"))
         }
     }
 }

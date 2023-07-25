@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.data.NonEmptyList
 import data.Project.Statistics.CommitsCount
 import data._
 import db.EventLog
@@ -69,7 +70,7 @@ class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with T
         .status shouldBe Accepted
 
       And("relevant commit events are processed")
-      `wait for events to be processed`(project.id, user.accessToken)
+      `data in the Triples Store`(project, nonMissedCommitId, user.accessToken)
 
       Then("the non missed events should be in the Triples Store")
       eventually {
@@ -83,7 +84,7 @@ class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with T
       EventLog.forceCategoryEventTriggering(CategoryName("COMMIT_SYNC"), project.id)
 
       And("commit events for the missed event are created and processed")
-      `wait for events to be processed`(project.id, user.accessToken)
+      `data in the Triples Store`(project, NonEmptyList.of(missedCommitId, nonMissedCommitId), user.accessToken)
 
       Then("triples for both of the project's commits should be in the Triples Store")
       eventually {

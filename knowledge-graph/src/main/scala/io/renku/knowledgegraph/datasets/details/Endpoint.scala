@@ -24,12 +24,11 @@ import cats.effect._
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}
-import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.Href
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
@@ -76,14 +75,14 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   }
 
   private def toHttpResult(requestedDataset: RequestedDataset): Option[Dataset] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(show"No '$requestedDataset' dataset found"))
+    case None          => NotFound(Message.Info.unsafeApply(show"No '$requestedDataset' dataset found"))
     case Some(dataset) => Ok(dataset.asJson(Dataset.encoder(requestedDataset)))
   }
 
   private def httpResult(identifier: RequestedDataset): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(show"Finding dataset '$identifier' failed")
-      Logger[F].error(exception)(errorMessage.value) >>
+      val errorMessage = Message.Error.unsafeApply(show"Finding dataset '$identifier' failed")
+      Logger[F].error(exception)(errorMessage.show) >>
         InternalServerError(errorMessage)
   }
 

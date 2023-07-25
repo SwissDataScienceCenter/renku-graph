@@ -22,19 +22,19 @@ import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
 import io.renku.cli.model.CliProject
-import io.renku.compression.Zip
+import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
+import io.renku.triplesgenerator.api.events.Generators.eventPayloads
 import org.scalacheck.Arbitrary
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import scodec.bits.ByteVector
 
 class PayloadDataExtractorSpec
     extends AsyncFlatSpec
@@ -48,7 +48,7 @@ class PayloadDataExtractorSpec
 
       val cliProject       = testProject.to[CliProject]
       val cliProjectJsonLD = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
-      val ioPayload        = Zip.zip[IO](cliProjectJsonLD.toJson.noSpaces).map(ZippedEventPayload)
+      val ioPayload        = eventPayloads[IO](cliProjectJsonLD.toJson.noSpaces).map(_.generateOne)
 
       (ioPayload >>=
         (extractor.extractPayloadData(testProject.path, _)))
@@ -68,7 +68,10 @@ class PayloadDataExtractorSpec
     logger.reset()
 
     val zippedPayload =
-      Arbitrary.arbByte.arbitrary.toGeneratorOfList(min = 1).map(_.toArray).generateAs(ZippedEventPayload.apply)
+      Arbitrary.arbByte.arbitrary
+        .toGeneratorOfList(min = 1)
+        .map(ba => ByteVector(ba.toVector))
+        .generateAs(EventPayload.apply)
 
     extractor.extractPayloadData(projectPaths.generateOne, zippedPayload).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("Unzipping"))
@@ -78,7 +81,7 @@ class PayloadDataExtractorSpec
 
     logger.reset()
 
-    val ioPayload = Zip.zip[IO](nonEmptyStrings().generateOne).map(ZippedEventPayload)
+    val ioPayload = eventPayloads[IO](contentGen = nonEmptyStrings()).map(_.generateOne)
 
     (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("ParsingFailure"))
@@ -88,7 +91,7 @@ class PayloadDataExtractorSpec
 
     logger.reset()
 
-    val ioPayload = Zip.zip[IO](jsonLDEntities.generateOne.toJson.noSpaces).map(ZippedEventPayload)
+    val ioPayload = eventPayloads[IO].map(_.generateOne)
 
     (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Warn).pure[IO].asserting(_.head.show should include("DecodingFailure"))
