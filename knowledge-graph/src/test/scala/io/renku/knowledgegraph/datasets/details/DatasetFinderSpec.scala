@@ -103,7 +103,7 @@ class DatasetFinderSpec
       "- a case where the dataset is modified" in new TestCase {
 
         val commonSameAs = datasetExternalSameAs.generateOne
-        val (_ -> dataset1Modified, project1) = anyRenkuProjectEntities(visibilityPublic)
+        val (originalDs -> dataset1Modified, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic)
@@ -116,7 +116,7 @@ class DatasetFinderSpec
         findById(dataset2.identifier, project2.path).value shouldBe expectedDS2
         findBySameAs(commonSameAs, project2.path).value    shouldBe expectedDS2
 
-        val expectedDS1Modified = modifiedToModified(dataset1Modified, project1)
+        val expectedDS1Modified = modifiedToModified(dataset1Modified, originalDs.provenance.date, project1)
         findById(dataset1Modified.identifier, project1.path).value                          shouldBe expectedDS1Modified
         findByTopmostSameAs(dataset1Modified.provenance.topmostSameAs, project1.path).value shouldBe expectedDS1Modified
       }
@@ -191,7 +191,8 @@ class DatasetFinderSpec
       findById(dataset.identifier, project.path).value                    shouldBe expectedDS
       findByTopmostSameAs(dataset.provenance.topmostSameAs, project.path) shouldBe None
 
-      val expectedDSWithInvalidatedPart = modifiedToModified(datasetWithInvalidatedPart, projectBothDatasets)
+      val expectedDSWithInvalidatedPart =
+        modifiedToModified(datasetWithInvalidatedPart, dataset.provenance.date, projectBothDatasets)
       findById(datasetWithInvalidatedPart.identifier, project.path).value shouldBe expectedDSWithInvalidatedPart
       findByTopmostSameAs(datasetWithInvalidatedPart.provenance.topmostSameAs,
                           project.path
@@ -347,11 +348,13 @@ class DatasetFinderSpec
         findById(original.identifier, project.path).value shouldBe
           internalToNonModified(original, project).copy(usedIn = Nil)
 
-        val expectedUsedIns  = List(toDatasetProject(project, modified), toDatasetProject(fork, modified)).sorted
-        val expectedModified = modifiedToModified(modified, project).copy(usedIn = expectedUsedIns)
+        val expectedUsedIns = List(toDatasetProject(project, modified), toDatasetProject(fork, modified)).sorted
+        val expectedModified =
+          modifiedToModified(modified, original.provenance.date, project).copy(usedIn = expectedUsedIns)
         findById(modified.identifier, project.path).value shouldBe expectedModified
 
-        val expectedModifiedFork = modifiedToModified(modified, fork).copy(usedIn = expectedUsedIns)
+        val expectedModifiedFork =
+          modifiedToModified(modified, original.provenance.date, fork).copy(usedIn = expectedUsedIns)
         findByTopmostSameAs(modified.provenance.topmostSameAs, project.path, fork.path).value should
           (be(expectedModified) or be(expectedModifiedFork))
       }
@@ -372,11 +375,12 @@ class DatasetFinderSpec
         findByTopmostSameAs(original.provenance.topmostSameAs, projectUpdated.path) shouldBe None
 
         val expectedModified =
-          modifiedToModified(modified, projectUpdated).copy(usedIn = List(toDatasetProject(fork, modified)))
+          modifiedToModified(modified, original.provenance.date, projectUpdated)
+            .copy(usedIn = List(toDatasetProject(fork, modified)))
         findById(modified.identifier, projectUpdated.path).value                    shouldBe expectedModified
         findByTopmostSameAs(modified.provenance.topmostSameAs, projectUpdated.path) shouldBe None
 
-        val expectedLastModification = modifiedToModified(modifiedAgain, projectUpdated)
+        val expectedLastModification = modifiedToModified(modifiedAgain, original.provenance.date, projectUpdated)
         findById(modifiedAgain.identifier, projectUpdated.path).value shouldBe expectedLastModification
         findByTopmostSameAs(modifiedAgain.provenance.topmostSameAs,
                             projectUpdated.path
@@ -398,7 +402,7 @@ class DatasetFinderSpec
         findById(original.identifier, project.path).value                          shouldBe expectedOriginal
         findByTopmostSameAs(original.provenance.topmostSameAs, project.path).value shouldBe expectedOriginal
 
-        val expectedModificationOnFork = modifiedToModified(modifiedOnFork, forkUpdated)
+        val expectedModificationOnFork = modifiedToModified(modifiedOnFork, original.provenance.date, forkUpdated)
         findById(modifiedOnFork.identifier, forkUpdated.path).value shouldBe expectedModificationOnFork
         findByTopmostSameAs(modifiedOnFork.provenance.topmostSameAs,
                             forkUpdated.path
@@ -545,7 +549,7 @@ class DatasetFinderSpec
         findById(dataset1.identifier, project1.path).value                          shouldBe expectedDS1
         findByTopmostSameAs(dataset1.provenance.topmostSameAs, project1.path).value shouldBe expectedDS1
 
-        val expectedDS2Modified = modifiedToModified(dataset2Modified, project2Updated)
+        val expectedDS2Modified = modifiedToModified(dataset2Modified, dataset1.provenance.date, project2Updated)
           .copy(usedIn =
             List(toDatasetProject(project2Updated, dataset2Modified), toDatasetProject(project3, dataset3)).sorted
           )

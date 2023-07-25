@@ -21,12 +21,11 @@ package io.renku.eventlog.events.producers
 import EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
@@ -55,9 +54,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
 
         val response = endpoint.addSubscription(request).unsafeRunSync()
 
-        response.status                          shouldBe Accepted
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Subscription added")
+        response.status                      shouldBe Accepted
+        response.contentType                 shouldBe Some(`Content-Type`(application.json))
+        response.as[Message].unsafeRunSync() shouldBe Message.Info("Subscription added")
 
         logger.expectNoLogs()
       }
@@ -67,11 +66,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
 
       val response = endpoint.addSubscription(request).unsafeRunSync()
 
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Malformed message body: Invalid JSON"
-      )
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error(s"Malformed message body: Invalid JSON")
 
       logger.expectNoLogs()
     }
@@ -88,9 +85,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
 
       val response = endpoint.addSubscription(request).unsafeRunSync()
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.status                      shouldBe BadRequest
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.expectNoLogs()
     }
@@ -110,9 +107,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory
       val response = endpoint.addSubscription(request).unsafeRunSync()
 
       val expectedMessage = "Registering subscriber failed"
-      response.status                           shouldBe InternalServerError
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(expectedMessage)
+      response.status                      shouldBe InternalServerError
+      response.contentType                 shouldBe Some(`Content-Type`(application.json))
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(expectedMessage)
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

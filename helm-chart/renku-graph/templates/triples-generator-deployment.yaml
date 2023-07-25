@@ -64,6 +64,23 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-users-renku-password
+            - name: TRIPLES_GENERATOR_POSTGRES_HOST
+              value: "{{ template "postgresql.fullname" . }}"
+            - name: TRIPLES_GENERATOR_POSTGRES_PORT
+              value: "5432"
+            - name: TRIPLES_GENERATOR_POSTGRES_USER
+              value: {{ .Values.global.graph.triplesGenerator.postgresUser }}
+            - name: TRIPLES_GENERATOR_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+{{- if .Values.global.graph.triplesGenerator.existingSecret }}
+                  name: {{ tpl .Values.global.graph.triplesGenerator.existingSecret . }}
+{{- else }}
+                  name: {{ template "triplesGenerator.fullname" . }}-postgres
+{{- end }}
+                  key: graph-triplesGenerator-postgresPassword
+            - name: TRIPLES_GENERATOR_POSTGRES_CONNECTION_POOL
+              value: "{{ .Values.triplesGenerator.connectionPool }}"
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
             - name: SENTRY_ENABLED

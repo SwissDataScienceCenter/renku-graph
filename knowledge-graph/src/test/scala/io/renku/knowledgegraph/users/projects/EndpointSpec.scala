@@ -24,13 +24,12 @@ import finder.ProjectsFinder
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, relativePaths}
 import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.{persons, projects}
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
@@ -89,7 +88,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
       val errorMessage = "Finding user's projects failed"
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(errorMessage)
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

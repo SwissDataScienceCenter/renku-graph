@@ -22,14 +22,14 @@ package eventstatus
 import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
+import io.renku.data.Message
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId
-import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
@@ -76,7 +76,7 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
           case (None, Some(si)) =>
             sendProjectViewed(projectId, authUser) >> Ok(si.asJson)
           case (None, None) =>
-            NotFound(InfoMessage("Info about project cannot be found"))
+            NotFound(Message.Info("Info about project cannot be found"))
         }
         .handleErrorWith(internalServerError(projectId))
     }
@@ -97,7 +97,7 @@ private class EndpointImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeR
 
   private def internalServerError(projectId: projects.GitLabId): Throwable => F[Response[F]] = { exception =>
     val message = show"Finding status info for project '$projectId' failed"
-    Logger[F].error(exception)(message) >> InternalServerError(ErrorMessage(message))
+    Logger[F].error(exception)(message) >> InternalServerError(Message.Error.unsafeApply(message))
   }
 
   private def logMessage(projectId: GitLabId): PartialFunction[Response[F], String] =

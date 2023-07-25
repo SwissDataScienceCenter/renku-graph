@@ -18,15 +18,14 @@
 
 package io.renku.knowledgegraph.projects.details
 
-import cats.{MonadThrow, Parallel}
 import cats.effect._
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{projects, GitLabUrl}
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
@@ -37,9 +36,9 @@ import io.renku.triplesgenerator
 import io.renku.triplesgenerator.api.events.ProjectViewedEvent
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import model._
-import org.http4s.{Request, Response}
 import org.http4s.MediaType.application
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import java.time.Instant
@@ -90,7 +89,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
 
   private def toHttpResult(path: projects.Path)(implicit request: Request[F]): Option[Project] => F[Response[F]] = {
     case None =>
-      val message = InfoMessage(s"No '$path' project found")
+      val message = Message.Info.unsafeApply(s"No '$path' project found")
       whenAccept(
         application.`ld+json` --> NotFound(message.asJsonLD),
         application.json      --> NotFound(message.asJson)
@@ -105,8 +104,8 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   private def httpResult(path: projects.Path)(implicit
       request: Request[F]
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val message = ErrorMessage(s"Finding '$path' project failed")
-    Logger[F].error(exception)(message.value) >> whenAccept(
+    val message = Message.Error.unsafeApply(s"Finding '$path' project failed")
+    Logger[F].error(exception)(message.show) >> whenAccept(
       application.`ld+json` --> InternalServerError(message.asJsonLD),
       application.json      --> InternalServerError(message.asJson)
     )(default = InternalServerError(message.asJson))

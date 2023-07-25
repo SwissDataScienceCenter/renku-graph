@@ -24,26 +24,24 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder._
-import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
-import io.renku.graph.model._
-import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
@@ -86,8 +84,9 @@ class EndpointSpec
         ("modified",
          anyRenkuProjectEntities
            .addDatasetAndModification(datasetEntities(provenanceInternal))
-           .map { case (_ -> modified, project) => modified -> project }
-           .map((modifiedToModified _).tupled)
+           .map { case (original -> modified, project) =>
+             modifiedToModified(modified, original.provenance.date, project)
+           }
            .generateOne
         )
       )
@@ -151,7 +150,7 @@ class EndpointSpec
       response.status      shouldBe NotFound
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(show"No '$requestedDataset' dataset found").asJson
+      response.as[Message].unsafeRunSync() shouldBe Message.Info.unsafeApply(show"No '$requestedDataset' dataset found")
 
       logger.loggedOnly(
         Warn(show"Finding '$requestedDataset' dataset finished${executionTimeRecorder.executionTimeInfo}")
@@ -171,7 +170,9 @@ class EndpointSpec
       response.status      shouldBe InternalServerError
       response.contentType shouldBe `Content-Type`(MediaType.application.json).some
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(show"Finding dataset '$requestedDataset' failed").asJson
+      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(
+        show"Finding dataset '$requestedDataset' failed"
+      )
 
       logger.loggedOnly(Error(show"Finding dataset '$requestedDataset' failed", exception))
     }
@@ -283,59 +284,63 @@ class EndpointSpec
 
   private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
-      title            <- cursor.downField("title").as[Title]
-      name             <- cursor.downField("name").as[Name]
-      resourceId       <- cursor.downField("url").as[ResourceId]
-      maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
-      maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
-      parts            <- cursor.downField("hasPart").as[List[Dataset.DatasetPart]]
-      project          <- cursor.downField("project").as[DatasetProject]
-      usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
-      keywords         <- cursor.downField("keywords").as[List[Keyword]]
-      maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
-      maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
-      versions         <- cursor.downField("versions").as[DatasetVersions]
-      maybeInitialTag  <- cursor.downField("tags").downField("initial").as[Option[Tag]]
-      images           <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
+      title             <- cursor.downField("title").as[Title]
+      name              <- cursor.downField("name").as[Name]
+      resourceId        <- cursor.downField("url").as[ResourceId]
+      maybeDescription  <- cursor.downField("description").as[Option[Description]]
+      published         <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
+      maybeDateCreated  <- cursor.downField("created").as[Option[DateCreated]]
+      maybeDateModified <- cursor.downField("dateModified").as[Option[DateModified]]
+      parts             <- cursor.downField("hasPart").as[List[Dataset.DatasetPart]]
+      project           <- cursor.downField("project").as[DatasetProject]
+      usedIn            <- cursor.downField("usedIn").as[List[DatasetProject]]
+      keywords          <- cursor.downField("keywords").as[List[Keyword]]
+      maybeSameAs       <- cursor.downField("sameAs").as[Option[SameAs]]
+      maybeDerivedFrom  <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
+      versions          <- cursor.downField("versions").as[DatasetVersions]
+      maybeInitialTag   <- cursor.downField("tags").downField("initial").as[Option[Tag]]
+      images            <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
       date <-
         maybeDateCreated
           .orElse(published._2)
           .widen[CreatedOrPublished]
           .map(_.asRight)
           .getOrElse(DecodingFailure("No date found", Nil).asLeft)
-    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom) match {
-      case (Some(sameAs), _, None) =>
-        NonModifiedDataset(resourceId,
-                           title,
-                           name,
-                           sameAs,
-                           versions,
-                           maybeInitialTag,
-                           maybeDescription,
-                           published._1.toList,
-                           date,
-                           parts,
-                           project,
-                           usedIn,
-                           keywords,
-                           images
+    } yield (maybeSameAs, maybeDateCreated, maybeDerivedFrom, maybeDateModified) match {
+      case (Some(sameAs), _, None, _) =>
+        NonModifiedDataset(
+          resourceId,
+          title,
+          name,
+          sameAs,
+          versions,
+          maybeInitialTag,
+          maybeDescription,
+          published._1.toList,
+          date,
+          parts,
+          project,
+          usedIn,
+          keywords,
+          images
         )
-      case (None, Some(dateCreated), Some(derivedFrom)) =>
-        ModifiedDataset(resourceId,
-                        title,
-                        name,
-                        derivedFrom,
-                        versions,
-                        maybeInitialTag,
-                        maybeDescription,
-                        published._1.toList,
-                        dateCreated,
-                        parts,
-                        project,
-                        usedIn,
-                        keywords,
-                        images
+      case (None, Some(dateCreated), Some(derivedFrom), Some(dateModified)) =>
+        ModifiedDataset(
+          resourceId,
+          title,
+          name,
+          derivedFrom,
+          versions,
+          maybeInitialTag,
+          maybeDescription,
+          published._1.toList,
+          dateCreated,
+          dateModified,
+          parts,
+          project,
+          usedIn,
+          keywords,
+          images
         )
       case _ => fail("Cannot decode payload as Dataset")
     }

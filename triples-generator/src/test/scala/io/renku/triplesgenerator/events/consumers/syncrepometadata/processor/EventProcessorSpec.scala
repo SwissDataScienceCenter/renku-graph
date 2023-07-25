@@ -23,14 +23,13 @@ import Generators._
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.syntax.all._
+import io.renku.eventlog.api.EventLogClient.EventPayload
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.triplesgenerator.api.events.Generators._
-import io.renku.triplesgenerator.api.events.SyncRepoMetadata
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
@@ -39,9 +38,12 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   it should "do nothing if the given project does not exist in TS" in {
 
-    syncRepoMetadataEvents[IO].map(_.generateOne) >>= { event =>
+    val event = syncRepoMetadataEvents.generateOne
+
+    eventPayloads[IO].map(_.generateOption) >>= { maybePayload =>
       givenTSDataFinding(event.path, returning = Option.empty[DataExtract.TS].pure[IO])
       givenGLDataFinding(event.path, returning = glDataExtracts(having = event.path).generateSome.pure[IO])
+      givenPayloadFinding(event.path, returning = maybePayload.pure[IO])
 
       processor.process(event).assertNoException
     }
@@ -49,26 +51,31 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
 
   it should "do nothing if the given project does not exist in GL" in {
 
-    syncRepoMetadataEvents[IO].map(_.generateOne) >>= { event =>
+    val event = syncRepoMetadataEvents.generateOne
+
+    eventPayloads[IO].map(_.generateOption) >>= { maybePayload =>
       givenTSDataFinding(event.path, returning = tsDataExtracts(having = event.path).generateSome.pure[IO])
       givenGLDataFinding(event.path, returning = Option.empty[DataExtract.GL].pure[IO])
+      givenPayloadFinding(event.path, returning = maybePayload.pure[IO])
 
       processor.process(event).assertNoException
     }
   }
 
   it should "fetch relevant data from TS and GL, " +
-    "extract data from the payload, " +
+    "fetch the payload and " +
     "calculate relevant update commands and execute them" +
     "- case when no payload in the event" in {
 
-      val event = syncRepoMetadataWithoutPayloadEvents.generateOne
+      val event = syncRepoMetadataEvents.generateOne
 
       val tsData = tsDataExtracts(having = event.path).generateOne
       givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
 
       val glData = glDataExtracts(having = event.path).generateOne
       givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+
+      givenPayloadFinding(event.path, returning = None.pure[IO])
 
       val updates = updateCommands.generateList()
       givenUpdateCommandsCalculation(tsData, glData, maybePayloadData = None, returning = updates.pure[IO])
@@ -79,53 +86,60 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
     }
 
   it should "fetch relevant data from TS and GL, " +
-    "extract data from the payload, " +
+    "fetch the payload, " +
+    "extract data from the payload and " +
     "calculate relevant update commands and execute them" +
     "- case with payload in the event" in {
 
-      syncRepoMetadataWithPayloadEvents[IO].map(_.generateOne) >>= {
-        case event @ SyncRepoMetadata(path, Some(payload)) =>
-          val tsData = tsDataExtracts(having = path).generateOne
-          givenTSDataFinding(path, returning = tsData.some.pure[IO])
+      val event = syncRepoMetadataEvents.generateOne
 
-          val glData = glDataExtracts(having = path).generateOne
-          givenGLDataFinding(path, returning = glData.some.pure[IO])
+      val tsData = tsDataExtracts(having = event.path).generateOne
+      givenTSDataFinding(event.path, returning = tsData.some.pure[IO])
 
-          val maybePayloadData = payloadDataExtracts(having = path).generateOption
-          givenPayloadDataExtraction(path, payload, returning = maybePayloadData.pure[IO])
+      val glData = glDataExtracts(having = event.path).generateOne
+      givenGLDataFinding(event.path, returning = glData.some.pure[IO])
 
-          val updates = updateCommands.generateList()
-          givenUpdateCommandsCalculation(tsData, glData, maybePayloadData, returning = updates.pure[IO])
+      eventPayloads[IO].map(_.generateOne) >>= { payload =>
+        givenPayloadFinding(event.path, returning = payload.some.pure[IO])
 
-          givenUpdateCommandsExecution(updates, returning = ().pure[IO])
+        val maybePayloadData = payloadDataExtracts(having = event.path).generateOption
+        givenPayloadDataExtraction(event.path, payload, returning = maybePayloadData.pure[IO])
 
-          processor.process(event).assertNoException
-        case _ => fail("expecting payload")
+        val updates = updateCommands.generateList()
+        givenUpdateCommandsCalculation(tsData, glData, maybePayloadData, returning = updates.pure[IO])
+
+        givenUpdateCommandsExecution(updates, returning = ().pure[IO])
+
+        processor.process(event).assertNoException
       }
     }
 
   it should "log an error in the case of a failure" in {
 
-    syncRepoMetadataEvents[IO].map(_.generateOne) >>= { event =>
-      val exception = exceptions.generateOne
-      givenTSDataFinding(event.path, returning = exception.raiseError[IO, Nothing])
+    val event = syncRepoMetadataEvents.generateOne
 
-      val glData = glDataExtracts(having = event.path).generateOne
-      givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+    val exception = exceptions.generateOne
+    givenTSDataFinding(event.path, returning = exception.raiseError[IO, Nothing])
 
-      processor.process(event).assertNoException >>
-        logger.logged(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
-    }
+    val glData = glDataExtracts(having = event.path).generateOne
+    givenGLDataFinding(event.path, returning = glData.some.pure[IO])
+
+    givenPayloadFinding(event.path, returning = None.pure[IO])
+
+    processor.process(event).assertNoException >>
+      logger.logged(Error(show"$categoryName: $event processing failure", exception)).pure[IO]
   }
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger()
   private lazy val tsDataFinder             = mock[TSDataFinder[IO]]
   private lazy val glDataFinder             = mock[GLDataFinder[IO]]
+  private lazy val payloadFinder            = mock[LatestPayloadFinder[IO]]
   private lazy val payloadDataExtractor     = mock[PayloadDataExtractor[IO]]
   private lazy val updateCommandsCalculator = mock[UpdateCommandsCalculator[IO]]
   private lazy val updateCommandsRunner     = mock[UpdateCommandsRunner[IO]]
   private lazy val processor = new EventProcessorImpl[IO](tsDataFinder,
                                                           glDataFinder,
+                                                          payloadFinder,
                                                           payloadDataExtractor,
                                                           updateCommandsCalculator,
                                                           updateCommandsRunner
@@ -141,8 +155,13 @@ class EventProcessorSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matc
       .expects(path)
       .returning(returning)
 
+  private def givenPayloadFinding(path: projects.Path, returning: IO[Option[EventPayload]]) =
+    (payloadFinder.fetchLatestPayload _)
+      .expects(path)
+      .returning(returning)
+
   private def givenPayloadDataExtraction(path:      projects.Path,
-                                         payload:   ZippedEventPayload,
+                                         payload:   EventPayload,
                                          returning: IO[Option[DataExtract.Payload]]
   ) = (payloadDataExtractor.extractPayloadData _)
     .expects(path, payload)

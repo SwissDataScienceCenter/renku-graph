@@ -22,7 +22,7 @@ import cats.effect.{IO, Sync}
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.compression.Zip
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -190,7 +190,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                     "path": $projectPath
                   },
                   "subCategory": "ToFailure",
-                  "message":   ${ErrorMessage.withStackTrace(exception).value},  
+                  "message":   ${Message.Error.fromStackTrace(exception).show},
                   "newStatus": $eventStatus 
                 }"""
               ),

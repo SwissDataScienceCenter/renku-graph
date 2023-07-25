@@ -55,8 +55,8 @@ object EventLogClient {
 
   sealed trait Result[+A] {
     def toEither: Either[Throwable, A]
-
   }
+
   object Result {
     final case class Success[+A](value: A) extends Result[A] {
       def toEither: Either[Throwable, A] = Right(value)

@@ -23,7 +23,7 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{DateModified, GitLabId, Visibility}
+import io.renku.graph.model.projects.{GitLabId, Visibility}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import model.Forking.ForksCount
 import model.Project.StarsCount
@@ -111,7 +111,6 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
         forksCount     <- cursor.downField("forks_count").as[ForksCount]
         visibility     <- cursor.downField("visibility").as[Visibility]
         starsCount     <- cursor.downField("star_count").as[StarsCount]
-        dateModified   <- cursor.downField("last_activity_at").as[DateModified]
         statistics     <- cursor.downField("statistics").as[Statistics]
         permissions    <- cursor.downField("permissions").as[Permissions]
       } yield GitLabProject(
@@ -120,7 +119,6 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
         Urls(sshUrl, httpUrl, webUrl, maybeReadmeUrl),
         forksCount,
         starsCount,
-        dateModified,
         permissions,
         statistics
       )
@@ -131,14 +129,14 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
 
 private object GitLabProjectFinder {
 
-  final case class GitLabProject(id:           GitLabId,
-                                 visibility:   Visibility,
-                                 urls:         Urls,
-                                 forksCount:   ForksCount,
-                                 starsCount:   StarsCount,
-                                 dateModified: DateModified,
-                                 permissions:  Permissions,
-                                 statistics:   Statistics
+  final case class GitLabProject(
+      id:          GitLabId,
+      visibility:  Visibility,
+      urls:        Urls,
+      forksCount:  ForksCount,
+      starsCount:  StarsCount,
+      permissions: Permissions,
+      statistics:  Statistics
   )
 
   def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectFinder[F]] =

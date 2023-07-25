@@ -18,35 +18,35 @@
 
 package io.renku.http.server
 
-import EndpointTester._
 import cats.effect.IO
+import io.renku.data.Message
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.ErrorMessage
-import io.renku.http.ErrorMessage.ErrorMessage
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.wordspec.AsyncWordSpec
 
-class QueryParameterToolsSpec extends AnyWordSpec with IOSpec with should.Matchers {
+class QueryParameterToolsSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers {
 
   import QueryParameterTools._
 
   "toBadRequest" should {
 
     "return a BAD_REQUEST response containing JSON body with information about the query parameter name and validation errors" in {
+
       val parseFailuresList  = parseFailures.generateNonEmptyList()
       val badRequestResponse = toBadRequest[IO]
 
-      val response = badRequestResponse(parseFailuresList).unsafeRunSync()
-
-      response.status shouldBe BadRequest
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        parseFailuresList.toList.map(_.message).mkString("; ")
-      )
+      for {
+        response <- badRequestResponse(parseFailuresList)
+        _ = response.status shouldBe BadRequest
+        r <- response.as[Message].asserting {
+               _ shouldBe Message.Error.unsafeApply(parseFailuresList.toList.map(_.message).mkString("; "))
+             }
+      } yield r
     }
   }
 

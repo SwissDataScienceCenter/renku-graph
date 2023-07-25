@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
 import io.renku.compression.Zip
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.events
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -169,7 +169,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       },
       "subCategory": "ToFailure",
       "newStatus": $eventStatus,
-      "message":   ${ErrorMessage.withStackTrace(exception).value}
+      "message":   ${Message.Error.fromStackTrace(exception).show}
     }""".addIfDefined("executionDelay" -> maybeExecutionDelay)),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
                              errorMessage = s"$categoryName: Change event status as $eventStatus failed"

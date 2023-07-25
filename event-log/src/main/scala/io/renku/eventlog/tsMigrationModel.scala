@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.data.ErrorMessage
+import io.renku.data.Message
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
@@ -83,7 +83,7 @@ object MigrationMessage
     extends TinyTypeFactory[MigrationMessage](new MigrationMessage(_))
     with NonBlank[MigrationMessage] {
 
-  def apply(exception: Throwable): MigrationMessage = MigrationMessage(ErrorMessage.withStackTrace(exception).value)
+  def apply(exception: Throwable): MigrationMessage = MigrationMessage(Message.Error.fromStackTrace(exception).show)
 
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
   implicit val decoder: Decoder[MigrationMessage] = stringDecoder(MigrationMessage)

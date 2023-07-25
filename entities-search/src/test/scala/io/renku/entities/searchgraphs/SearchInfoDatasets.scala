@@ -47,6 +47,11 @@ trait SearchInfoDatasets {
       graphsProducer:  GraphsProducer[entities.Project]
   ): IO[Unit] = provisionProject(p.to[entities.Project])
 
+  def provisionProjects(projects: entities.Project*)(implicit
+      entityFunctions: EntityFunctions[entities.Project],
+      graphsProducer:  GraphsProducer[entities.Project]
+  ): IO[Unit] = projects.traverse_[IO, Unit](provisionProject)
+
   def provisionProject(
       project: entities.Project
   )(implicit

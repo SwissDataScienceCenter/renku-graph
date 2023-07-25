@@ -17,7 +17,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
 | GET    | ```/version```                              | Returns info about service version                                         |
 
-All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
+All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is under migration.
 
 ### GET /events
 
@@ -461,7 +461,7 @@ Forces issuing a GLOBAL_COMMIT_SYNC event for the given project.
 
 - **PROJECT_SYNC**
 
-Checks if the data stored for the project in EL matches the data in GitLab. If not, the process fixes the data in EL as well as sends a relevant `GLOBAL_COMMIT_SYNC` and `CLEAN_UP` events.
+Checks if the data stored for the project in EL matches the data in GitLab. If not, the process fixes the data in EL as well as sends a relevant `GLOBAL_COMMIT_SYNC` and `CLEAN_UP` events. Irrespectively of the EL data matching the GitLab data, `SYNC_REPO_METADATA` event is sent to TG to sync data between TS, GitLab and the state of the project metadata. 
 
 **Multipart Request**
 

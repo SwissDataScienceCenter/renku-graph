@@ -64,11 +64,11 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
+  import eu.timepit.refined.auto._
   import io.circe.Encoder._
   import io.circe.Json
   import io.circe.syntax._
-  import io.renku.http.ErrorMessage
-  import io.renku.http.ErrorMessage._
+  import io.renku.data.Message
   import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Status}
@@ -91,7 +91,7 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
 
   private lazy val httpResult: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage("Project Dataset Tags search failed")
-    Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
+    val errorMessage = Message.Error("Project Dataset Tags search failed")
+    Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 }

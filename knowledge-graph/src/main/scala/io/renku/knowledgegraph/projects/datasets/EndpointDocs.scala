@@ -23,14 +23,14 @@ import ProjectDatasetEncoder.encoder
 import ProjectDatasetsFinder.ProjectDataset
 import cats.MonadThrow
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
+import io.renku.data.Message
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{GitLabUrl, datasets, projects}
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
@@ -51,16 +51,16 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       Status.Ok -> Response("Datasets found", Contents(MediaType.`application/json`("Sample data", example))),
       Status.Unauthorized -> Response(
         "Unauthorized",
-        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+        Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
       ),
       Status.NotFound -> Response(
         "Project not found or no privileges",
         Contents(
-          MediaType.`application/json`("Reason", InfoMessage("No namespace/project datasets found"))
+          MediaType.`application/json`("Reason", Message.Info("No namespace/project datasets found"))
         )
       ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
+                                             Contents(MediaType.`application/json`("Reason", Message.Info("Message")))
       )
     )
   )

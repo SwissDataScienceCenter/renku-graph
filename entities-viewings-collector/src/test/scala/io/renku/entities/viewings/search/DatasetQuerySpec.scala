@@ -79,11 +79,12 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = Right(dataset.provenance.topmostSameAs),
+        sameAs = dataset.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
         name = dataset.identification.name,
         visibility = project.visibility,
         date = dataset.provenance.date,
+        dateModified = None,
         keywords = dataset.additionalInfo.keywords.sorted,
         maybeDescription = dataset.additionalInfo.maybeDescription,
         images = dataset.additionalInfo.images.map(_.uri),
@@ -118,11 +119,12 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     val decoded = tsClient.queryExpecting[List[SearchEntity.Dataset]](query)(datasetDecoder).unsafeRunSync()
     decoded.head shouldMatchTo
       SearchEntity.Dataset(
-        sameAs = Right(dataset1.provenance.topmostSameAs),
+        sameAs = dataset1.provenance.topmostSameAs,
         matchingScore = MatchingScore(1f),
         name = dataset1.identification.name,
         visibility = project1.visibility,
         date = dataset1.provenance.date,
+        dateModified = None,
         keywords = dataset1.additionalInfo.keywords.sorted,
         maybeDescription = dataset1.additionalInfo.maybeDescription,
         images = dataset1.additionalInfo.images.map(_.uri),

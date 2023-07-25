@@ -27,7 +27,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.projects.{GitLabId, Name, Path}
-import io.renku.graph.model.{projects, testentities}
+import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
@@ -37,7 +37,6 @@ final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              GitLabId,
                          maybeCreator:    Option[ProjectMember],
                          members:         NonEmptyList[ProjectMember],
-                         dateModified:    projects.DateModified,
                          urls:            Urls,
                          starsCount:      StarsCount,
                          permissions:     Permissions,

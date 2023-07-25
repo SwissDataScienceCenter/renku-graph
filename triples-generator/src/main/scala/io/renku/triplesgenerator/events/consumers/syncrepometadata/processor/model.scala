@@ -23,6 +23,8 @@ import io.renku.graph.model.images.{Image, ImageUri}
 import io.renku.graph.model.projects
 import io.renku.triplesstore.SparqlQuery
 
+import java.time.Instant
+
 private sealed trait DataExtract {
   val path:              projects.Path
   val name:              projects.Name
@@ -41,14 +43,18 @@ private object DataExtract {
                       keywords:          Set[projects.Keyword],
                       images:            List[ImageUri]
   ) extends DataExtract
-  final case class GL(path:              projects.Path,
-                      name:              projects.Name,
-                      visibility:        projects.Visibility,
-                      maybeDateModified: Option[projects.DateModified],
-                      maybeDesc:         Option[projects.Description],
-                      keywords:          Set[projects.Keyword],
-                      maybeImage:        Option[ImageUri]
-  ) extends DataExtract
+  final case class GL(path:           projects.Path,
+                      name:           projects.Name,
+                      visibility:     projects.Visibility,
+                      updatedAt:      Option[Instant],
+                      lastActivityAt: Option[Instant],
+                      maybeDesc:      Option[projects.Description],
+                      keywords:       Set[projects.Keyword],
+                      maybeImage:     Option[ImageUri]
+  ) extends DataExtract {
+    override val maybeDateModified =
+      List(updatedAt, lastActivityAt).max.map(projects.DateModified.apply)
+  }
   final case class Payload(path:      projects.Path,
                            name:      projects.Name,
                            maybeDesc: Option[projects.Description],

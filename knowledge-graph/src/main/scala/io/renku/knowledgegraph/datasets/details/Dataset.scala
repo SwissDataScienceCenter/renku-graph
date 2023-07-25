@@ -81,7 +81,8 @@ private object Dataset {
                                    maybeInitialTag:    Option[Tag],
                                    maybeDescription:   Option[Description],
                                    creators:           List[DatasetCreator],
-                                   createdOrPublished: DateCreated,
+                                   createdOrPublished: CreatedOrPublished,
+                                   dateModified:       DateModified,
                                    parts:              List[DatasetPart],
                                    project:            DatasetProject,
                                    usedIn:             List[DatasetProject],
@@ -124,6 +125,12 @@ private object Dataset {
             case DatePublished(_)  => Option.empty[(String, Json)]
             case DateCreated(date) => ("created" -> date.asJson).some
           },
+          (dataset match {
+            case m: Dataset.ModifiedDataset =>
+              ("dateModified" -> m.dateModified.asJson).some
+            case _ =>
+              None
+          }),
           ("hasPart" -> dataset.parts.asJson).some,
           ("project" -> dataset.project.asJson).some,
           ("usedIn" -> dataset.usedIn.asJson).some,

@@ -67,6 +67,7 @@ class SingleValueHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmp
 
 trait LabeledHistogram[F[_]] extends Histogram[F] {
   def startTimer(labelValue: String): F[Histogram.Timer[F]]
+  def observe(labelValue:    String, amt: Double): F[Unit]
 }
 
 object LabeledHistogram {
@@ -116,6 +117,11 @@ class LabeledHistogramImpl[F[_]: MonadThrow](val name: String Refined NonEmpty,
       .create()
 
   private val maybeThresholdMillis = maybeThreshold.map(_.toMillis.toDouble)
+
+  def observe(labelValue: String, amt: Double): F[Unit] =
+    MonadThrow[F].catchNonFatal {
+      wrappedCollector.labels(labelValue).observe(amt)
+    }
 
   override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
     maybeThresholdMillis match {

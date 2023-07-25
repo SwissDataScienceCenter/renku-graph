@@ -18,11 +18,14 @@
 
 package io.renku.knowledgegraph
 
-import cats.data.{EitherT, Validated, ValidatedNel}
+import QueryParamDecoders._
+import cats.Parallel
 import cats.data.Validated.Valid
+import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
-import cats.Parallel
+import eu.timepit.refined.auto._
+import io.renku.data.Message
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.RenkuUrlLoader
@@ -30,8 +33,6 @@ import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.InfoMessage
-import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.PagingRequest
@@ -42,12 +43,11 @@ import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.{AuthUser, MaybeAuthUser}
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
-import QueryParamDecoders._
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
-import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
+import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 private class MicroserviceRoutes[F[_]: Async](
@@ -57,6 +57,7 @@ private class MicroserviceRoutes[F[_]: Async](
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDeleteEndpoint:      projects.delete.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
+    projectUpdateEndpoint:      projects.update.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
     recentEntitiesEndpoint:     entities.currentuser.recentlyviewed.Endpoint[F],
@@ -79,11 +80,12 @@ private class MicroserviceRoutes[F[_]: Async](
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
-  import projectDatasetsEndpoint._
   import projectDatasetTagsEndpoint._
+  import projectDatasetsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
+  import projectUpdateEndpoint._
   import routesMetrics._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
@@ -140,10 +142,10 @@ private class MicroserviceRoutes[F[_]: Async](
 
   private lazy val `GET /users/*` : AuthedRoutes[MaybeAuthUser, F] = {
     import users.binders._
-    import users.projects.Endpoint._
     import users.projects.Endpoint.Criteria.Filters
-    import users.projects.Endpoint.Criteria.Filters._
     import users.projects.Endpoint.Criteria.Filters.ActivationState._
+    import users.projects.Endpoint.Criteria.Filters._
+    import users.projects.Endpoint._
     import usersProjectsEndpoint._
 
     AuthedRoutes.of {
@@ -161,9 +163,6 @@ private class MicroserviceRoutes[F[_]: Async](
 
   private lazy val `GET /projects/*` : AuthedRoutes[MaybeAuthUser, F] = AuthedRoutes.of {
 
-    case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
-      routeToProjectsEndpoints(path, maybeUser.option)(authReq.req)
-
     case DELETE -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>
         path.segments.toList
@@ -171,6 +170,19 @@ private class MicroserviceRoutes[F[_]: Async](
           .toProjectPath
           .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
           .semiflatMap(`DELETE /projects/:path`(_, user))
+          .merge
+      }
+
+    case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      routeToProjectsEndpoints(path, maybeUser.option)(authReq.req)
+
+    case authReq @ PUT -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      maybeUser.withUserOrNotFound { user =>
+        path.segments.toList
+          .map(_.toString)
+          .toProjectPath
+          .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
+          .semiflatMap(`PUT /projects/:path`(_, authReq.req, user))
           .merge
       }
   }
@@ -214,8 +226,8 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeUser:    Option[AuthUser],
       request:      Request[F]
   ): F[Response[F]] = {
-    import EntitiesSearchCriteria.{Filters, Sort}
     import EntitiesSearchCriteria.Filters._
+    import EntitiesSearchCriteria.{Filters, Sort}
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
       types.map(_.toSet),
@@ -294,7 +306,7 @@ private class MicroserviceRoutes[F[_]: Async](
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
       Location
         .from(Uri.decode(location))
-        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
 
     (projectPathParts.toProjectPath -> toLocation(location))
@@ -308,7 +320,7 @@ private class MicroserviceRoutes[F[_]: Async](
     lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
       model.projects.Path
         .from(parts mkString "/")
-        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
   }
 }
@@ -329,6 +341,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint           <- ontology.Endpoint[F]
     projectDeleteEndpoint      <- projects.delete.Endpoint[F]
     projectDetailsEndpoint     <- projects.details.Endpoint[F]
+    projectUpdateEndpoint      <- projects.update.Endpoint[F]
     projectDatasetsEndpoint    <- projects.datasets.Endpoint[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[F]
     lineageEndpoint            <- projects.files.lineage.Endpoint[F]
@@ -347,6 +360,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint,
     projectDeleteEndpoint,
     projectDetailsEndpoint,
+    projectUpdateEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,
     recentEntitiesEndpoint,

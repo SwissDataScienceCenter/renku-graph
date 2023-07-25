@@ -25,9 +25,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import fs2.concurrent.{Signal, SignallingRef}
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
+import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.entities.viewings
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
@@ -39,10 +41,13 @@ import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
+import io.renku.triplesgenerator.metrics.MetricsService
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
+import natchez.Trace.Implicits.noop
 import org.http4s.server.Server
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
@@ -57,25 +62,44 @@ object Microservice extends IOMicroservice {
     }
   }
 
-  override def run(args: List[String]): IO[ExitCode] = for {
+  override def run(args: List[String]): IO[ExitCode] = {
+    val resources = for {
+      config <- Resource.eval(parseConfigArgs(args))
+      dbSessionPool <- Resource
+                         .eval(new TgLockDbConfigProvider[IO].map(SessionPoolResource[IO, TgLockDB]))
+                         .flatMap(identity)
+    } yield (config, dbSessionPool)
+
+    resources.use { case (config, dbSessionPool) =>
+      doRun(config, dbSessionPool)
+    }
+  }
+
+  private def doRun(config: Config, dbSessionPool: SessionResource[IO, TgLockDB]): IO[ExitCode] = for {
     implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
     implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO]()
     implicit0(gc: GitLabClient[IO])              <- GitLabClient[IO]()
     implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
     implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
-    config                                       <- parseConfigArgs(args)
-    projectConnConfig                            <- ProjectsConnectionConfig[IO](config)
-    certificateLoader                            <- CertificateLoader[IO]
-    gitCertificateInstaller                      <- GitCertificateInstaller[IO]
-    sentryInitializer                            <- SentryInitializer[IO]
-    cliVersionCompatChecker                      <- CliVersionCompatibilityChecker[IO](config)
-    awaitingGenerationSubscription               <- awaitinggeneration.SubscriptionFactory[IO]
-    membersSyncSubscription                      <- membersync.SubscriptionFactory[IO]
-    triplesGeneratedSubscription                 <- triplesgenerated.SubscriptionFactory[IO]
-    cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
-    minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
-    migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
-    syncRepoMetadataSubscription                 <- syncrepometadata.SubscriptionFactory[IO](config)
+
+    _ <- TgLockDB.migrate[IO](dbSessionPool, 20.seconds)
+
+    metricsService <- MetricsService[IO](dbSessionPool)
+    _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
+
+    tsWriteLock = TgLockDB.createLock[IO, projects.Path](dbSessionPool, 0.5.seconds)
+    projectConnConfig              <- ProjectsConnectionConfig[IO](config)
+    certificateLoader              <- CertificateLoader[IO]
+    gitCertificateInstaller        <- GitCertificateInstaller[IO]
+    sentryInitializer              <- SentryInitializer[IO]
+    cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+    awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
+    membersSyncSubscription        <- membersync.SubscriptionFactory[IO](tsWriteLock)
+    triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO](tsWriteLock)
+    cleanUpSubscription            <- cleanup.SubscriptionFactory[IO](tsWriteLock)
+    minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO](tsWriteLock)
+    migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    syncRepoMetadataSubscription   <- syncrepometadata.SubscriptionFactory[IO](config, tsWriteLock)
     projectActivationsSubscription <- viewings.collector.projects.activated.SubscriptionFactory[IO](projectConnConfig)
     projectViewingsSubscription    <- viewings.collector.projects.viewed.SubscriptionFactory[IO](projectConnConfig)
     datasetViewingsSubscription    <- viewings.collector.datasets.SubscriptionFactory[IO](projectConnConfig)
@@ -131,6 +155,7 @@ private class MicroserviceRunner[F[_]: Async: Logger](
       _      <- Resource.eval(cliVersionCompatibilityVerifier.run)
       _      <- Spawn[F].background(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run)
       server <- httpServer.createServer
+      _      <- Resource.eval(Logger[F].info(s"Triples-Generator service started"))
     } yield server
   } recoverWith logAndThrow
 

@@ -18,20 +18,32 @@
 
 package io.renku.graph.acceptancetests.db
 
+import cats.effect.{IO, Resource, Temporal}
 import cats.{Applicative, Monad}
-import cats.effect.{IO, Temporal}
 import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider
+import io.renku.triplesgenerator.TgLockDB.SessionResource
+import io.renku.triplesgenerator.{TgLockDB, TgLockDbConfigProvider}
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDataset {
 
   protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
 
+  private val dbConfig: DBConfigProvider.DBConfig[TgLockDB] =
+    new TgLockDbConfigProvider[Try].get().fold(throw _, identity)
+
+  lazy val sessionResource: Resource[IO, SessionResource[IO]] =
+    PostgresDB.sessionPoolResource(dbConfig)
+
   def start()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- Applicative[IO].unlessA(isRunning)(IO(container.start()))
+    _ <- PostgresDB.startPostgres
+    _ <- PostgresDB.initializeDatabase(dbConfig)
     _ <- waitForReadiness
     _ <- logger.info("Triples Store started")
   } yield ()
@@ -40,4 +52,5 @@ object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDat
 
   private def waitForReadiness(implicit logger: Logger[IO]): IO[Unit] =
     Monad[IO].whileM_(IO(!isRunning))(logger.info("Waiting for TS") >> (Temporal[IO] sleep (500 millis)))
+
 }

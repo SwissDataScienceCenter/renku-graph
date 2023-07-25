@@ -48,7 +48,7 @@ private object ProjectsGenerators {
       date = kgProject.created.date,
       kgProject.created.maybeCreator.map(toModelCreator)
     ),
-    dateModified = gitLabProject.dateModified,
+    dateModified = kgProject.dateModified,
     urls = gitLabProject.urls,
     forking = Forking(
       gitLabProject.forksCount,
@@ -73,15 +73,14 @@ private object ProjectsGenerators {
   )
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {
-    id           <- projectIds
-    visibility   <- projectVisibilities
-    urls         <- urlsObjects
-    forksCount   <- forksCounts
-    starsCount   <- starsCounts
-    dateModified <- projectModifiedDates()
-    permissions  <- permissionsObjects
-    statistics   <- statisticsObjects
-  } yield GitLabProject(id, visibility, urls, forksCount, starsCount, dateModified, permissions, statistics)
+    id          <- projectIds
+    visibility  <- projectVisibilities
+    urls        <- urlsObjects
+    forksCount  <- forksCounts
+    starsCount  <- starsCounts
+    permissions <- permissionsObjects
+    statistics  <- statisticsObjects
+  } yield GitLabProject(id, visibility, urls, forksCount, starsCount, permissions, statistics)
 
   implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls
