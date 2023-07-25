@@ -55,7 +55,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
   override def updateDB(event: RedoProjectTransformation): UpdateOp[F] =
     findLatestSuccessfulEvent(event.project.path) >>= {
       case Some(eventId) => toTriplesGenerated(eventId) flatMapF toDBUpdateResults(eventId, event.project.path)
-      case None          => triggerMinProjectInfoEvent(event.project.path) map (_ => DBUpdateResults.ForProjects.empty)
+      case None          => triggerMinProjectInfoEvent(event.project.path).as(DBUpdateResults.ForProjects.empty)
     }
 
   private def findLatestSuccessfulEvent(path: projects.Path) = measureExecutionTime {
