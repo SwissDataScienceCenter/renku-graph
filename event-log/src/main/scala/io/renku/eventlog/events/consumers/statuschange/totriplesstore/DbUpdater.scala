@@ -49,14 +49,17 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
 
   import deliveryInfoRemover._
 
-  override def onRollback(event: ToTriplesStore): RollbackOp[F] = { _ =>
-    deleteDelivery(event.eventId).as(DBUpdateResults.ForProjects.empty)
+  override def onRollback(event: ToTriplesStore): RollbackOp[F] = {
+    case DeadlockDetected(_) =>
+      updateDB(event).map(_.widen)
+    case ex =>
+      deleteDelivery(event.eventId).flatMapF(_ => ex.raiseError[F, DBUpdateResults])
   }
 
   override def updateDB(event: ToTriplesStore): UpdateOp[F] = for {
     _                      <- deleteDelivery(event.eventId)
     updateResults          <- updateEvent(event)
-    ancestorsUpdateResults <- updateAncestors(event, updateResults) recoverWith retryOnDeadlock(event, updateResults)
+    ancestorsUpdateResults <- updateAncestors(event, updateResults)
   } yield updateResults combine ancestorsUpdateResults
 
   private def updateEvent(event: ToTriplesStore) = for {
@@ -159,13 +162,6 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
             }
         }
     }
-
-  private def retryOnDeadlock(
-      event:         ToTriplesStore,
-      updateResults: DBUpdateResults.ForProjects
-  ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
-    updateAncestors(event, updateResults)
-  }
 
   private def `status IN`(statuses: Set[EventStatus]) =
     s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
