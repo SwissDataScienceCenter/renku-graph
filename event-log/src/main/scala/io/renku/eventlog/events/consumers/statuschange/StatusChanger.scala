@@ -50,13 +50,12 @@ private[statuschange] class StatusChangerImpl[F[_]: MonadCancelThrow: SessionRes
         {
           for {
             savepoint <- Kleisli.liftF(transaction.savepoint)
-            updateResults <-
+            results <-
               dbUpdater
                 .updateDB(event)
-                .flatMapF(res => transaction.commit.as(res))
+                .flatMapF(transaction.commit.as(_))
                 .handleErrorWith(rollback(transaction)(savepoint)(event)(dbUpdater))
-            _ <-
-              Kleisli.liftF(updateGauges(updateResults).handleErrorWith(Logger[F].error(_)("Updating gauges failed")))
+            _ <- Kleisli.liftF(updateGauges(results).handleErrorWith(Logger[F].error(_)("Updating gauges failed")))
           } yield ()
         } run session
       }
