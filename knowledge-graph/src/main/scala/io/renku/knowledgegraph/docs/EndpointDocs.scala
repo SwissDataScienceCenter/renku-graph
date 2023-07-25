@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.implicits._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 

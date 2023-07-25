@@ -25,7 +25,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.syntax._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.GitLabId

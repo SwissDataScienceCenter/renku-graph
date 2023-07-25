@@ -24,7 +24,6 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource

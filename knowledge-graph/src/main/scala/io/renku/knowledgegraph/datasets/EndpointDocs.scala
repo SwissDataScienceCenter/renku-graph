@@ -27,7 +27,6 @@ import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.graph.model.images.ImageUri

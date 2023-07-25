@@ -55,7 +55,6 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
   import eu.timepit.refined.auto._
   import fetchTokenEndpoint._
   import io.renku.data.Message
-  import io.renku.data.Message.Codecs._
   import org.http4s.HttpRoutes
   import routesMetrics._
 

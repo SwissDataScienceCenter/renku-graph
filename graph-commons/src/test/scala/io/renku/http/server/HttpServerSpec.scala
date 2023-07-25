@@ -21,7 +21,6 @@ package io.renku.http.server
 import cats.effect._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpPorts
 import io.renku.http.server.EndpointTester._

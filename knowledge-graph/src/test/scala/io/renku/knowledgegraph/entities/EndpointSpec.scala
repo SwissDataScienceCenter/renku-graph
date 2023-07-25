@@ -25,7 +25,6 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.entities.search.Criteria.Filters
 import io.renku.entities.search.Generators.modelEntities
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}

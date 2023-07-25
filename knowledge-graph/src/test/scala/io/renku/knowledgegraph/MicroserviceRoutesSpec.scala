@@ -25,7 +25,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

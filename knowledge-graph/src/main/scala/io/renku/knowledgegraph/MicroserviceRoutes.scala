@@ -26,7 +26,6 @@ import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.entities.search.{Criteria => EntitiesSearchCriteria}
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.RenkuUrlLoader

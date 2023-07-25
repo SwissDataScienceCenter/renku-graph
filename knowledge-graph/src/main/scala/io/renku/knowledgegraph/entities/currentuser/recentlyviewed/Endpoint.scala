@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.entities.viewings.search.RecentEntitiesFinder
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl

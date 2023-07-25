@@ -109,7 +109,6 @@ private class EndpointImpl[F[_]: Async: Logger](projectsFinder: ProjectsFinder[F
   import io.circe.Json
   import io.circe.syntax._
   import io.renku.data.Message
-  import io.renku.data.Message.Codecs._
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Request, Response, Status}
 

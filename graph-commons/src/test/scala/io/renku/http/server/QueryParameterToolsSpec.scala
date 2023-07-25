@@ -20,7 +20,6 @@ package io.renku.http.server
 
 import cats.effect.IO
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.CustomAsyncIOSpec

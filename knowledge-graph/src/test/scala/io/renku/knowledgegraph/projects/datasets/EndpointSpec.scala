@@ -23,7 +23,6 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

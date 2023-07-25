@@ -25,7 +25,6 @@ import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}

@@ -18,15 +18,9 @@
 
 package io.renku.data
 
-import Message.Codecs._
 import io.circe.Json
-import io.circe.literal._
-import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.Schemas.{renku, schema}
-import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalacheck.Gen
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -203,73 +197,6 @@ class MessageSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
       Message.Error.fromJsonUnsafe(message).show     shouldBe message.noSpaces
       Message.Error.fromJsonUnsafe(message).toString shouldBe message.noSpaces
-    }
-  }
-
-  "Message.Error codecs" should {
-
-    "provide JsonLD encoder producing a JsonLD Entity with renku:Error type and the message as description" in {
-
-      val exception = new Exception(blankStrings().generateOne)
-      val message   = Message.Error.fromExceptionMessage(exception)
-
-      val jsonLD = message.asJsonLD
-
-      jsonLD shouldBe JsonLD.entity(
-        jsonLD.entityId getOrElse fail("No entityId found"),
-        EntityTypes of renku / "Error",
-        schema / "description" -> s"${exception.getClass.getName}".asJsonLD
-      )
-    }
-  }
-
-  "provide Json codecs" in {
-
-    val message = Message.Error.fromExceptionMessage(new Exception(blankStrings().generateOne))
-
-    message.asJson.as[Message].value shouldBe message
-  }
-
-  "provide Json encoder producing a Json object with the message in the 'message' property" in {
-
-    val exception = new Exception(blankStrings().generateOne)
-
-    Message.Error.fromExceptionMessage(exception).asJson shouldBe json"""{
-      "severity": ${Message.Severity.Error.value},
-      "message":  ${exception.getClass.getName}
-    }"""
-  }
-
-  "Message.Info JsonLD encoder" should {
-
-    "provide JsonLD encoder producing a JsonLD Entity with renku:Info type and the message as description" in {
-
-      val message = Message.Info(nonBlankStrings().generateOne)
-
-      val jsonLD = message.asJsonLD
-
-      jsonLD shouldBe JsonLD.entity(
-        jsonLD.entityId getOrElse fail("No entityId found"),
-        EntityTypes of renku / "Info",
-        schema / "description" -> s"${message.value}".asJsonLD
-      )
-    }
-
-    "provide Json codecs" in {
-
-      val message = Message.Info(nonBlankStrings().generateOne)
-
-      message.asJson.as[Message].value shouldBe message
-    }
-
-    "provide Json encoder producing a Json object with the message in the 'message' property" in {
-
-      val value = nonBlankStrings().generateOne
-
-      Message.Info(value).asJson shouldBe json"""{
-        "severity": ${Message.Severity.Info.value},
-        "message":  ${value.value}
-      }"""
     }
   }
 

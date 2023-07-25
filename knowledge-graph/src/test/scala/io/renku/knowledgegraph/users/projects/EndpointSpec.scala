@@ -25,7 +25,6 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, relativePaths}

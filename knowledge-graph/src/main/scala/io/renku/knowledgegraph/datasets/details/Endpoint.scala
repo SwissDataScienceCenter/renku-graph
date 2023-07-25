@@ -25,7 +25,6 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.{GitLabUrl, RenkuUrl}

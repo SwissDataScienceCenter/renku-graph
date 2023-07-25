@@ -22,7 +22,6 @@ package projects.delete
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.knowledgegraph.docs.model.Operation.DELETE
 import io.renku.knowledgegraph.docs.model._
 

@@ -23,7 +23,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators.eventRequestContents
 import io.renku.events.consumers.ConsumersModelGenerators.badRequests

@@ -21,7 +21,6 @@ package io.renku.eventlog.events
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.eventlog.events.EventsEndpoint._
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._

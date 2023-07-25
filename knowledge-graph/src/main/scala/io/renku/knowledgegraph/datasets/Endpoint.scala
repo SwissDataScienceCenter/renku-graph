@@ -23,11 +23,9 @@ import Endpoint.Sort
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import eu.timepit.refined.auto._
 import io.renku.config._
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabUrl
 import io.renku.http.rest.Sorting

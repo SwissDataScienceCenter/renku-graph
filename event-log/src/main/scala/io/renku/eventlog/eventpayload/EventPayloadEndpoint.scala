@@ -20,9 +20,7 @@ package io.renku.eventlog.eventpayload
 
 import cats.effect.Concurrent
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId

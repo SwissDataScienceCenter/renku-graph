@@ -22,7 +22,6 @@ import cats.Applicative
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.model.persons
 import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure

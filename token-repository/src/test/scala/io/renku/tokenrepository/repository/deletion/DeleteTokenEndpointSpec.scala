@@ -21,7 +21,6 @@ package io.renku.tokenrepository.repository.deletion
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

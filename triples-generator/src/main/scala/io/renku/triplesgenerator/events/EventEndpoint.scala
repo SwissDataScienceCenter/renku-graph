@@ -48,7 +48,6 @@ class EventEndpointImpl[F[_]: Async: Logger](eventConsumersRegistry: EventConsum
   import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.renku.data.Message
-  import io.renku.data.Message.Codecs._
   import org.http4s._
 
   override def processEvent(request: Request[F]): F[Response[F]] = {

@@ -22,7 +22,6 @@ import cats.syntax.all._
 import cats.{Applicative, Eval}
 import io.circe.syntax._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.headers.Accept
 import org.http4s.{MediaRange, MediaType, Request, Response, Status}

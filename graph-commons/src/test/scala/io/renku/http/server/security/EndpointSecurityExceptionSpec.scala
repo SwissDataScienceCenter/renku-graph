@@ -18,11 +18,10 @@
 
 package io.renku.http.server.security
 
+import EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
-import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status.{NotFound, Unauthorized}

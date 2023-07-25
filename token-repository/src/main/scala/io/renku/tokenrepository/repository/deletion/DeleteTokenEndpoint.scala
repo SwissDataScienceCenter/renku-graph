@@ -21,7 +21,6 @@ package io.renku.tokenrepository.repository.deletion
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.graph.model.projects.GitLabId
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource

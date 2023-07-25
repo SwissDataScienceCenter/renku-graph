@@ -28,7 +28,6 @@ import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

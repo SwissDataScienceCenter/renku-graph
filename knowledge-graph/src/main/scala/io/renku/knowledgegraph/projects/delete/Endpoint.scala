@@ -22,7 +22,6 @@ import cats.effect.{Async, Spawn, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.eventlog.api.events.CommitSyncRequest
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects

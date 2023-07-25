@@ -27,7 +27,6 @@ import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.renku.config.renku
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

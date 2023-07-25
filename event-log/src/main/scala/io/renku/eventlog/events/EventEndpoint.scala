@@ -26,7 +26,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.events.EventRequestContent
 import io.renku.events.EventRequestContent.WithPayload
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}

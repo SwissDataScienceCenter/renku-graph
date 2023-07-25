@@ -23,7 +23,6 @@ import cats.implicits._
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.jsonld.parser._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET

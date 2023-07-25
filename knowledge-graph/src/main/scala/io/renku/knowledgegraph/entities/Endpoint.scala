@@ -26,7 +26,6 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.entities.search.{Criteria, EntitiesFinder, model}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._

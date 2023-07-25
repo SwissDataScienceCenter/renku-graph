@@ -24,7 +24,6 @@ import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.syntax.EncoderOps
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.http.client.AccessToken

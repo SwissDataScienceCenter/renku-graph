@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.data.NonEmptyList
 import eu.timepit.refined.auto._
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import org.http4s.{ParseFailure, Response, Status}
 
 object QueryParameterTools {

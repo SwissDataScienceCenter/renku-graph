@@ -24,7 +24,6 @@ import cats.effect.kernel.Concurrent
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.data.Message
-import io.renku.data.Message.Codecs._
 import io.renku.events.Subscription
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}

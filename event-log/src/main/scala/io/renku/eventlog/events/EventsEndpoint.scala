@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
 import io.circe.{Encoder, Json}
+import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
 import io.renku.eventlog.events.EventsEndpoint.JsonEncoders
@@ -44,9 +45,6 @@ trait EventsEndpoint[F[_]] {
 class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F], eventLogUrl: EventLogUrl)
     extends Http4sDsl[F]
     with EventsEndpoint[F] {
-
-  import io.renku.data.Message
-  import io.renku.data.Message.Codecs._
 
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder

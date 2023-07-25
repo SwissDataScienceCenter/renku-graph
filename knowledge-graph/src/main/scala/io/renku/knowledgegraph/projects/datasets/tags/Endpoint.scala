@@ -69,7 +69,6 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
   import io.circe.Json
   import io.circe.syntax._
   import io.renku.data.Message
-  import io.renku.data.Message.Codecs._
   import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Status}
