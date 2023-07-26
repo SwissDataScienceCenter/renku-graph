@@ -37,6 +37,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   private val visibilityVar       = VarName("visibility")
   private val dateVar             = VarName("date")
   private val dateModifiedVar     = VarName("dateModified")
+  private val maybeDateCreatedVar = VarName("maybeDateCreated")
   private val maybeCreatorNameVar = VarName("maybeCreatorName")
   private val maybeDescriptionVar = VarName("maybeDescription")
   private val keywordsVar         = VarName("keywords")
@@ -44,31 +45,34 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   // local vars
   private val projectIdVar        = VarName("projectId")
-  private val someDateVar         = VarName("someDate")
+  private val someDateCreatedVar  = VarName("someDateCreated")
   private val someDateModifiedVar = VarName("someDateModified")
   private val someCreatorNameVar  = VarName("someCreatorName")
   private val keywordVar          = VarName("keyword")
   private val encodedImageUrlVar  = VarName("encodedImageUrl")
 
-  override val selectVariables: Set[String] = Set(entityTypeVar,
-                                                  matchingScoreVar,
-                                                  nameVar,
-                                                  pathVar,
-                                                  visibilityVar,
-                                                  dateVar,
-                                                  dateModifiedVar,
-                                                  maybeCreatorNameVar,
-                                                  maybeDescriptionVar,
-                                                  keywordsVar,
-                                                  imagesVar
-  ).map(_.name)
+  override val selectVariables: Set[String] =
+    Set(
+      entityTypeVar,
+      matchingScoreVar,
+      nameVar,
+      pathVar,
+      visibilityVar,
+      dateVar,
+      dateModifiedVar,
+      maybeCreatorNameVar,
+      maybeDescriptionVar,
+      keywordsVar,
+      imagesVar
+    ).map(_.name)
 
   override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
              |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar
-             |    (MIN($someDateVar) AS $dateVar)
+             |    (MIN($someDateCreatedVar) AS $maybeDateCreatedVar)
              |    (MAX($someDateModifiedVar) AS $dateModifiedVar)
+             |    (MAX($someDateModifiedVar) AS $dateVar)
              |    (SAMPLE($someCreatorNameVar) AS $maybeCreatorNameVar)
              |    $maybeDescriptionVar
              |    (GROUP_CONCAT(DISTINCT $keywordVar; separator=',') AS $keywordsVar)
@@ -84,9 +88,9 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |                    schema:name $nameVar;
              |                    renku:projectPath $pathVar;
              |                    schema:dateModified $someDateModifiedVar;
-             |                    schema:dateCreated $someDateVar.
+             |                    schema:dateCreated $someDateCreatedVar.
              |
-             |      ${filters.maybeOnDateCreated(someDateVar)}
+             |      ${filters.maybeOnDateCreated(someDateCreatedVar)}
              |
              |      GRAPH $projectIdVar {
              |        ${accessRightsAndVisibility(criteria.maybeUser, criteria.filters.visibilities)}
@@ -205,7 +209,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       path             <- read[projects.Path](pathVar)
       name             <- read[projects.Name](nameVar)
       visibility       <- read[projects.Visibility](visibilityVar)
-      dateCreated      <- read[projects.DateCreated](dateVar)
+      dateCreated      <- read[projects.DateCreated](maybeDateCreatedVar)
       dateModified     <- read[projects.DateModified](dateModifiedVar)
       maybeCreatorName <- read[Option[persons.Name]](maybeCreatorNameVar)
       maybeDescription <- read[Option[projects.Description]](maybeDescriptionVar)

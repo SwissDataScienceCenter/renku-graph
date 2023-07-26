@@ -67,8 +67,8 @@ trait FinderSpecOps {
 
   protected[search] implicit class EntityOps(entity: model.Entity) {
     lazy val dateAsInstant: Instant = entity match {
-      case proj:     model.Entity.Project  => proj.date.value
-      case ds:       model.Entity.Dataset  => ds.date.instant
+      case proj:     model.Entity.Project  => proj.dateModified.value
+      case ds:       model.Entity.Dataset  => ds.dateModified.map(_.value).getOrElse(ds.date.instant)
       case workflow: model.Entity.Workflow => workflow.date.value
       case person:   model.Entity.Person   => person.date.value
     }
