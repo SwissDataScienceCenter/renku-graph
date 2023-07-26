@@ -19,8 +19,6 @@
 package io.renku.knowledgegraph
 package projects.datasets
 
-import ProjectDatasetEncoder.encoder
-import ProjectDatasetsFinder.ProjectDataset
 import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -75,21 +73,23 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
   private val example = {
-    implicit val dsEncoder: Encoder[ProjectDataset] = encoder(projects.Path("namespace/name"))
+    implicit val dsEncoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projects.Path("namespace/name"))
     Json.arr(
-      (datasets.Identifier("123"),
-       datasets.OriginalIdentifier("123"),
-       datasets.Title("dataset"),
-       datasets.Name("dataset"),
-       datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
-       List(ImageUri("image.png"))
+      ProjectDataset(
+        datasets.Identifier("123"),
+        datasets.OriginalIdentifier("123"),
+        datasets.Title("dataset"),
+        datasets.Name("dataset"),
+        datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
+        List(ImageUri("image.png"))
       ).asJson,
-      (datasets.Identifier("123"),
-       datasets.OriginalIdentifier("123"),
-       datasets.Title("dataset"),
-       datasets.Name("dataset"),
-       datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
-       List(ImageUri("image.png"))
+      ProjectDataset(
+        datasets.Identifier("123"),
+        datasets.OriginalIdentifier("123"),
+        datasets.Title("dataset"),
+        datasets.Name("dataset"),
+        datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
+        List(ImageUri("image.png"))
       ).asJson
     )
   }

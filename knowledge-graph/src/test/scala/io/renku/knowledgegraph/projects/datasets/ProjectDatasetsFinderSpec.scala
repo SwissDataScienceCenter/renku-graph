@@ -20,144 +20,159 @@ package io.renku.knowledgegraph.projects.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectDatasetsFinderSpec
-    extends AnyWordSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
     with should.Matchers
-    with EntitiesGenerators
     with InMemoryJenaForSpec
     with ProjectsDataset
+    with SearchInfoDatasets
     with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks
-    with IOSpec {
+    with ScalaCheckPropertyChecks {
 
-  "findProjectDatasets" should {
+  it should "return the very last modification of a dataset for the given project" in {
 
-    "return the very last modification of a dataset for the given project" in new TestCase {
-      val (original -> modification1, project) =
-        renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-      val (modification2, projectComplete) = project.addDataset(modification1.createModification())
+    val (original -> modification1, project) =
+      renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+    val (modification2, projectComplete) = project.addDataset(modification1.createModification())
+    val otherProject =
+      renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
 
-      upload(to = projectsDataset,
-             renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
-             projectComplete
-      )
-
+    provisionTestProjects(otherProject, projectComplete) >>
       datasetsFinder
         .findProjectDatasets(projectComplete.path)
-        .unsafeRunSync() shouldBe List(
-        (modification2.identification.identifier,
-         OriginalIdentifier(original.identification.identifier),
-         modification2.identification.title,
-         modification2.identification.name,
-         modification2.provenance.derivedFrom.asRight,
-         modification2.additionalInfo.images
+        .asserting(
+          _ shouldBe List(
+            ProjectDataset(
+              modification2.identification.identifier,
+              OriginalIdentifier(original.identification.identifier),
+              modification2.identification.title,
+              modification2.identification.name,
+              modification2.provenance.derivedFrom.asRight,
+              modification2.additionalInfo.images
+            )
+          )
         )
-      )
-    }
-
-    "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
-      val (dataset1 -> dataset2 -> modified2, project) = renkuProjectEntities(anyVisibility)
-        .addDataset(datasetEntities(provenanceImportedExternal))
-        .addDatasetAndModification(datasetEntities(provenanceInternal))
-        .generateOne
-
-      upload(to = projectsDataset, project)
-
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
-        (dataset1.identification.identifier,
-         OriginalIdentifier(dataset1.identification.identifier),
-         dataset1.identification.title,
-         dataset1.identification.name,
-         dataset1.provenance.sameAs.asLeft,
-         dataset1.additionalInfo.images
-        ),
-        (modified2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         modified2.identification.title,
-         modified2.identification.name,
-         modified2.provenance.derivedFrom.asRight,
-         modified2.additionalInfo.images
-        )
-      ).sortBy(_._3)
-    }
-
-    "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
-      val (original, originalProject) =
-        anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
-      val (dataset1 -> dataset2, project) =
-        anyRenkuProjectEntities.importDataset(original).importDataset(original).generateOne
-
-      assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
-      assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
-
-      upload(to = projectsDataset, originalProject, project)
-
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-        (dataset1.identification.identifier,
-         OriginalIdentifier(dataset1.identification.identifier),
-         dataset1.identification.title,
-         original.identification.name,
-         dataset1.provenance.sameAs.asLeft,
-         original.additionalInfo.images
-        ),
-        (dataset2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         dataset2.identification.title,
-         original.identification.name,
-         dataset2.provenance.sameAs.asLeft,
-         original.additionalInfo.images
-        )
-      )
-    }
-
-    "return None if there are no datasets in the project" in new TestCase {
-      datasetsFinder.findProjectDatasets(projectPaths.generateOne).unsafeRunSync() shouldBe List.empty
-    }
-
-    "not returned deleted dataset" in new TestCase {
-      val (_ -> _ -> dataset2, project) = renkuProjectEntities(anyVisibility)
-        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
-        .addDataset(datasetEntities(provenanceInternal))
-        .generateOne
-
-      upload(to = projectsDataset, project)
-
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
-        (dataset2.identification.identifier,
-         OriginalIdentifier(dataset2.identification.identifier),
-         dataset2.identification.title,
-         dataset2.identification.name,
-         SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
-         dataset2.additionalInfo.images
-        )
-      )
-    }
-
-    "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      val (_ -> modification, project) =
-        renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-
-      upload(to = projectsDataset, project.addDatasets(modification.invalidateNow(personEntities)))
-
-      datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe Nil
-    }
   }
 
-  private trait TestCase {
-    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](projectsDSConnectionInfo)
+  it should "return non-modified datasets and the very last modifications of project's datasets" in {
+
+    val (dataset1 -> dataset2 -> modified2, project) = renkuProjectEntities(anyVisibility)
+      .addDataset(datasetEntities(provenanceImportedExternal))
+      .addDatasetAndModification(datasetEntities(provenanceInternal))
+      .generateOne
+
+    provisionTestProject(project) >>
+      datasetsFinder
+        .findProjectDatasets(project.path)
+        .asserting(
+          _ shouldBe List(
+            ProjectDataset(
+              dataset1.identification.identifier,
+              OriginalIdentifier(dataset1.identification.identifier),
+              dataset1.identification.title,
+              dataset1.identification.name,
+              dataset1.provenance.sameAs.asLeft,
+              dataset1.additionalInfo.images
+            ),
+            ProjectDataset(
+              modified2.identification.identifier,
+              OriginalIdentifier(dataset2.identification.identifier),
+              modified2.identification.title,
+              modified2.identification.name,
+              modified2.provenance.derivedFrom.asRight,
+              modified2.additionalInfo.images
+            )
+          ).sortBy(_.title)
+        )
   }
+
+  it should "return all datasets of the given project without merging datasets having the same sameAs" in {
+
+    val (original, originalProject) =
+      anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+    val (dataset1 -> dataset2, project) =
+      anyRenkuProjectEntities.importDataset(original).importDataset(original).generateOne
+
+    assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
+    assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
+
+    provisionTestProjects(originalProject, project) >>
+      datasetsFinder
+        .findProjectDatasets(project.path)
+        .asserting(
+          _ shouldBe List(
+            ProjectDataset(
+              dataset1.identification.identifier,
+              OriginalIdentifier(dataset1.identification.identifier),
+              dataset1.identification.title,
+              original.identification.name,
+              dataset1.provenance.sameAs.asLeft,
+              original.additionalInfo.images
+            ),
+            ProjectDataset(
+              dataset2.identification.identifier,
+              OriginalIdentifier(dataset2.identification.identifier),
+              dataset2.identification.title,
+              original.identification.name,
+              dataset2.provenance.sameAs.asLeft,
+              original.additionalInfo.images
+            )
+          ).sortBy(_.title)
+        )
+  }
+
+  it should "return None if there are no datasets in the project" in {
+    datasetsFinder.findProjectDatasets(projectPaths.generateOne).asserting(_ shouldBe List.empty)
+  }
+
+  it should "not returned deleted dataset" in {
+
+    val (_ -> _ -> dataset2, project) = renkuProjectEntities(anyVisibility)
+      .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
+      .addDataset(datasetEntities(provenanceInternal))
+      .generateOne
+
+    provisionTestProject(project) >>
+      datasetsFinder
+        .findProjectDatasets(project.path)
+        .asserting(
+          _ shouldBe List(
+            ProjectDataset(
+              dataset2.identification.identifier,
+              OriginalIdentifier(dataset2.identification.identifier),
+              dataset2.identification.title,
+              dataset2.identification.name,
+              SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
+              dataset2.additionalInfo.images
+            )
+          )
+        )
+  }
+
+  it should "not returned deleted dataset when its latest version was deleted" in {
+
+    val (_ -> modification, project) =
+      renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+
+    provisionTestProject(project.addDatasets(modification.invalidateNow(personEntities))) >>
+      datasetsFinder.findProjectDatasets(project.path).asserting(_ shouldBe Nil)
+  }
+
+  implicit override def ioLogger:    TestLogger[IO]              = TestLogger[IO]()
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
+  private lazy val datasetsFinder = new ProjectDatasetsFinderImpl[IO](projectsDSConnectionInfo)
 }

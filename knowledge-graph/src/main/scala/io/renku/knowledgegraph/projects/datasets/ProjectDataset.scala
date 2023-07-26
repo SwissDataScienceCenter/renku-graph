@@ -18,38 +18,46 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
+import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.Encoder
 import io.renku.config.renku
-import io.renku.graph.model.{projects, GitLabUrl}
-import io.renku.graph.model.datasets.{DerivedFrom, SameAs}
-import io.renku.http.rest.Links.{_links, Rel}
+import io.renku.graph.model.datasets._
+import io.renku.graph.model.images.ImageUri
+import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.http.rest.Links.{Rel, _links}
 import io.renku.knowledgegraph
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.knowledgegraph.projects.images.ImagesEncoder
 
-private object ProjectDatasetEncoder extends ImagesEncoder {
+private final case class ProjectDataset(identifier:          Identifier,
+                                        originalIdentifier:  OriginalIdentifier,
+                                        title:               Title,
+                                        name:                Name,
+                                        sameAsOrDerivedFrom: ProjectDataset.SameAsOrDerived,
+                                        images:              List[ImageUri]
+)
 
-  import ProjectDatasetsFinder._
+private object ProjectDataset extends ImagesEncoder {
+  type SameAsOrDerived = Either[SameAs, DerivedFrom]
 
   private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
-    case Left(sameAs: SameAs)            => json"""{"sameAs": ${sameAs.toString}}"""
-    case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
+    case Left(sameAs: SameAs)            => json"""{"sameAs": $sameAs}"""
+    case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": $derivedFrom}"""
   }
 
   def encoder(
       projectPath: projects.Path
   )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
+    Encoder.instance[ProjectDataset] { case ProjectDataset(id, originalId, title, name, sameAsOrDerived, images) =>
       json"""{
-        "identifier": ${id.toString},
+        "identifier": $id,
         "versions": {
-          "initial": ${originalId.toString}
+          "initial": $originalId
         },
-        "title":  ${title},
-        "name":   ${name},
-        "slug":   ${name},
+        "title":  $title,
+        "name":   $name,
+        "slug":   $name,
         "images": ${images -> projectPath}
       }"""
         .deepMerge(sameAsOrDerived.asJson)

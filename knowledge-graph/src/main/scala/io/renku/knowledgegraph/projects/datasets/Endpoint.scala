@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
@@ -56,7 +55,7 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
 
   def getProjectDatasets(projectPath: projects.Path): F[Response[F]] =
     measureAndLogTime(finishedSuccessfully(projectPath)) {
-      implicit val encoder: Encoder[ProjectDataset] = ProjectDatasetEncoder.encoder(projectPath)
+      implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectPath)
 
       projectDatasetsFinder
         .findProjectDatasets(projectPath)

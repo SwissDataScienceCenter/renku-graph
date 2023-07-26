@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.MonadThrow
 import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuUrl
@@ -35,12 +34,10 @@ private trait ProjectDatasetsFinder[F[_]] {
 }
 
 private object ProjectDatasetsFinder {
-  type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connectionConfig: ProjectsConnectionConfig)(implicit
       renkuUrl: RenkuUrl
-  ) =
+  ): F[ProjectDatasetsFinder[F]] =
     MonadThrow[F].catchNonFatal(
       new ProjectDatasetsFinderImpl[F](connectionConfig)
     )
@@ -100,7 +97,7 @@ private object ProjectDatasetsFinderImpl {
     implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
-      def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
+      def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): ProjectDataset.SameAsOrDerived = from -> and match {
         case (_, Some(derivedFrom)) => Right(derivedFrom)
         case (sameAs, _)            => Left(sameAs)
       }
@@ -126,6 +123,12 @@ private object ProjectDatasetsFinderImpl {
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         originalId       <- extract[OriginalIdentifier]("originalId")
         images           <- extract[Option[String]]("images").map(toListOfImageUrls)
-      } yield (id, originalId, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
+      } yield ProjectDataset(id,
+                             originalId,
+                             title,
+                             name,
+                             sameAsOrDerived(from = sameAs, and = maybeDerivedFrom),
+                             images
+      )
   }
 }
