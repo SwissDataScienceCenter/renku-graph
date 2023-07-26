@@ -50,6 +50,7 @@ lazy val root = project
     triplesGeneratorApi,
     entitiesSearch,
     entitiesViewingsCollector,
+    projectAuth,
     triplesGenerator,
     knowledgeGraph
   )
@@ -157,6 +158,16 @@ lazy val entitiesSearch = project
   .withId("entities-search")
   .settings(commonSettings)
   .dependsOn(graphCommons % "compile->compile; test->test")
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val projectAuth = project
+  .in(file("project-auth"))
+  .withId("project-auth")
+  .settings(commonSettings)
+  .dependsOn(
+    renkuModelTinyTypes % "compile->compile; test->test",
+    graphCommons        % "compile->compile; test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val triplesGeneratorApi = project
