@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.api.events.StatusChangeEvent.ToTriplesStore
+import io.renku.eventlog.events.consumers.statuschange.SkunkExceptionsGenerators.postgresErrors
 import io.renku.eventlog.events.consumers.statuschange.{DBUpdateResults, DeliveryInfoRemover}
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
@@ -38,6 +39,7 @@ import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.SqlState
 
 import java.time.Instant
 
@@ -52,15 +54,9 @@ class DbUpdaterSpec
   "updateDB" should {
 
     "change the status of all events in statuses before TRIPLES_STORE up to the current event with the status TRIPLES_STORE" in new TestCase {
+
       val eventDate = eventDates.generateOne
 
-      val statusesToUpdate = Set(New,
-                                 GeneratingTriples,
-                                 GenerationRecoverableFailure,
-                                 TriplesGenerated,
-                                 TransformingTriples,
-                                 TransformationRecoverableFailure
-      )
       val eventsToUpdate = statusesToUpdate.map(addEvent(_, timestamps(max = eventDate.value).generateAs(EventDate)))
       val eventsToSkip = EventStatus.all
         .diff(statusesToUpdate)
@@ -69,10 +65,9 @@ class DbUpdaterSpec
 
       val event = addEvent(TransformingTriples, eventDate)
 
-      val statusChangeEvent =
-        ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
+      val statusChangeEvent = ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
 
-      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
       sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
         .ForProjects(
@@ -123,7 +118,7 @@ class DbUpdaterSpec
       val statusChangeEvent =
         ToTriplesStore(event1._1, project, eventProcessingTimes.generateOne)
 
-      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
       sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
         .ForProjects(
@@ -154,7 +149,7 @@ class DbUpdaterSpec
         val statusChangeEvent =
           ToTriplesStore(eventId, project, eventProcessingTimes.generateOne)
 
-        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+        givenDeliveryInfoRemoved(statusChangeEvent.eventId)
 
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
@@ -168,29 +163,83 @@ class DbUpdaterSpec
 
   "onRollback" should {
 
-    "clean the delivery info for the event" in new TestCase {
-      val event = ToTriplesStore(EventsGenerators.eventIds.generateOne, project, eventProcessingTimes.generateOne)
+    "retry the updateDB procedure on DeadlockDetected" in new TestCase {
 
-      (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
+      val eventDate = eventDates.generateOne
 
+      // event to update =
+      addEvent(New, timestamps(max = eventDate.value).generateAs(EventDate))
+
+      // event to skip
+      addEvent(EventStatus.all.diff(statusesToUpdate).head, timestamps(max = eventDate.value).generateAs(EventDate))
+
+      val event = addEvent(TransformingTriples, eventDate)
+
+      val statusChangeEvent = ToTriplesStore(event._1, project, eventProcessingTimes.generateOne)
+
+      givenDeliveryInfoRemoved(statusChangeEvent.eventId)
+
+      val deadlockException = postgresErrors(SqlState.DeadlockDetected).generateOne
       sessionResource
-        .useK((dbUpdater onRollback event)(exceptions.generateOne))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+        .useK((dbUpdater onRollback statusChangeEvent)(deadlockException))
+        .unsafeRunSync() shouldBe DBUpdateResults
+        .ForProjects(
+          project.path,
+          Map(
+            New                 -> -1 /* for the event to update */,
+            TransformingTriples -> -1 /* for the event */,
+            TriplesStore        -> 2 /* event to update + the event */
+          )
+        )
+
+      findFullEvent(CompoundEventId(event._1, project.id))
+        .map { case (_, status, _, maybePayload, processingTimes) =>
+          status        shouldBe TriplesStore
+          maybePayload  shouldBe a[Some[_]]
+          processingTimes should contain(statusChangeEvent.processingTime)
+        }
+        .getOrElse(fail("No event found for main event"))
     }
+
+    "clean the delivery info for the event when Exception different than DeadlockDetected " +
+      "and rethrow the exception" in new TestCase {
+
+        val event = ToTriplesStore(EventsGenerators.eventIds.generateOne, project, eventProcessingTimes.generateOne)
+
+        givenDeliveryInfoRemoved(event.eventId)
+
+        val exception = exceptions.generateOne
+        intercept[Exception] {
+          sessionResource
+            .useK((dbUpdater onRollback event)(exception))
+            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+        } shouldBe exception
+      }
   }
 
   private trait TestCase {
 
+    val statusesToUpdate = Set(New,
+                               GeneratingTriples,
+                               GenerationRecoverableFailure,
+                               TriplesGenerated,
+                               TransformingTriples,
+                               TransformationRecoverableFailure
+    )
+
     val project = ConsumersModelGenerators.consumerProjects.generateOne
 
-    val currentTime         = mockFunction[Instant]
-    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    private val currentTime         = mockFunction[Instant]
+    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
     val dbUpdater = new DbUpdater[IO](deliveryInfoRemover, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
+
+    def givenDeliveryInfoRemoved(eventId: CompoundEventId) =
+      (deliveryInfoRemover.deleteDelivery _).expects(eventId).returning(Kleisli.pure(()))
 
     def addEvent(status:    EventStatus,
                  eventDate: EventDate
