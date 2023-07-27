@@ -287,10 +287,17 @@ private class MicroserviceRoutes[F[_]: Async](
 
     case projectPathParts :+ "datasets" =>
       import projects.datasets.Endpoint.Criteria
-      projectPathParts.toProjectPath
-        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(path => projectDatasetsEndpoint.`GET /projects/:path/datasets`(request, Criteria(path)))
-        .merge
+
+      PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
+        .map(paging =>
+          projectPathParts.toProjectPath
+            .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+            .semiflatMap(path =>
+              projectDatasetsEndpoint.`GET /projects/:path/datasets`(request, Criteria(path, paging))
+            )
+            .merge
+        )
+        .fold(toBadRequest, identity)
     case projectPathParts :+ "files" :+ location :+ "lineage" =>
       getLineage(projectPathParts, location, maybeAuthUser)
     case projectPathParts =>

@@ -831,14 +831,34 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 Finds list of datasets of the project with the given `namespace/name`.
 
+**Sorting:**
+* `name` - to sort by Dataset name - **default when no `query` parameter is given**
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                             |
-|------------------------------|---------------------------------------------------------------------------------------------------------|
-| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
+| Status                      | Description                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                    | If there are datasets for the project or `[]` if nothing is found                                       |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                                     |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                               |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 
@@ -921,14 +941,31 @@ Response body example:
 
 Finds list of tags existing on the Dataset with the given `dsName` on the project with the given `namespace/name`.
 
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------|
-| OK (200)                     | If tags are found or `[]` if nothing is found                                                 |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                  |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access it |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                     |
+| Status                      | Description                                                                                   |
+|-----------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                    | If tags are found or `[]` if nothing is found                                                 |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                           |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                     |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 

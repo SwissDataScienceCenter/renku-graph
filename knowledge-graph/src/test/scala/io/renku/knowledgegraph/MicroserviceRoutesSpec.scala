@@ -613,30 +613,52 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
+    import projects.datasets.Endpoint.Criteria
 
-    s"return $Ok for valid path parameters" in new TestCase {
+    val projectPath = projectPaths.generateOne
+    val projectDsUri = projectPath.toNamespaces
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectPath.toName.show / "datasets"
 
-      val criteria      = projects.datasets.Endpoint.Criteria(projectPaths.generateOne)
-      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-
-      (projectPathAuthorizer.authorize _)
-        .expects(criteria.projectPath, maybeAuthUser.option)
-        .returning(
-          rightT[IO, EndpointSecurityException](
-            AuthContext(maybeAuthUser.option, criteria.projectPath, Set(criteria.projectPath))
+    forAll {
+      Table(
+        "uri"        -> "criteria",
+        projectDsUri -> Criteria(projectPath),
+        pages
+          .map(page =>
+            projectDsUri +? ("page" -> page.show) -> Criteria(projectPath, PagingRequest.default.copy(page = page))
           )
-        )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            projectDsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+                                                                     PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
+      )
+    } { (uri, criteria) =>
+      s"read the parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
 
-      val request =
-        Request[IO](GET, Uri.unsafeFromString(s"/knowledge-graph/projects/${criteria.projectPath}/datasets"))
+        val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
-      (projectDatasetsEndpoint.`GET /projects/:path/datasets` _)
-        .expects(request, criteria)
-        .returning(Response[IO](Ok).pure[IO])
+        (projectPathAuthorizer.authorize _)
+          .expects(criteria.projectPath, maybeAuthUser.option)
+          .returning(
+            rightT[IO, EndpointSecurityException](
+              AuthContext(maybeAuthUser.option, criteria.projectPath, Set(criteria.projectPath))
+            )
+          )
 
-      routes(maybeAuthUser).call(request).status shouldBe Ok
+        val request = Request[IO](GET, uri)
 
-      routesMetrics.clearRegistry()
+        (projectDatasetsEndpoint.`GET /projects/:path/datasets` _)
+          .expects(request, criteria)
+          .returning(Response[IO](Ok).pure[IO])
+
+        routes(maybeAuthUser).call(request).status shouldBe Ok
+
+        routesMetrics.clearRegistry()
+      }
     }
 
     s"return $Unauthorized when user authentication fails" in new TestCase {

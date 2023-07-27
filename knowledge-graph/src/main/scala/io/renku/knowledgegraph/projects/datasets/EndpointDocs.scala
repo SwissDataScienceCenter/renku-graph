@@ -45,8 +45,15 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     GET(
       "Project Datasets",
       "Finds Project's Datasets",
-      Uri / "projects" / namespace / projectName / "datasets",
-      Status.Ok -> Response("Datasets found", Contents(MediaType.`application/json`("Sample data", example))),
+      Uri / "projects" / namespace / projectName / "datasets" :? page & perPage,
+      Status.Ok -> Response("Datasets found",
+                            Contents(MediaType.`application/json`("Sample data", example)),
+                            responseHeaders
+      ),
+      Status.BadRequest -> Response(
+        "In case of invalid query parameters",
+        Contents(MediaType.`application/json`("Reason", Message.Info("Invalid parameters")))
+      ),
       Status.Unauthorized -> Response(
         "Unauthorized",
         Contents(MediaType.`application/json`("Invalid token", Message.Info("Unauthorized")))
@@ -71,6 +78,30 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   )
 
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
+
+  private lazy val page = Parameter.Query(
+    "page",
+    Schema.Integer,
+    "the page query parameter is optional and defaults to 1.".some,
+    required = false
+  )
+
+  private lazy val perPage = Parameter.Query(
+    "per_page",
+    Schema.Integer,
+    "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+    required = false
+  )
+
+  private lazy val responseHeaders = Map(
+    "Total"       -> Header("The total number of projects".some, Schema.Integer),
+    "Total-Pages" -> Header("The total number of pages".some, Schema.Integer),
+    "Per-Page"    -> Header("The number of items per page".some, Schema.Integer),
+    "Page"        -> Header("The index of the current page (starting at 1)".some, Schema.Integer),
+    "Next-Page"   -> Header("The index of the next page (optional)".some, Schema.Integer),
+    "Prev-Page"   -> Header("The index of the previous page (optional)".some, Schema.Integer),
+    "Link" -> Header("The set of prev/next/first/last link headers (prev and next are optional)".some, Schema.String)
+  )
 
   private val example = {
     implicit val dsEncoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projects.Path("namespace/name"))
