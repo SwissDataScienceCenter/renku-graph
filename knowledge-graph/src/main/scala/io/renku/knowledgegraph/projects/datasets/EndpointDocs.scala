@@ -32,6 +32,8 @@ import io.renku.graph.model.{GitLabUrl, datasets, projects}
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
+import java.time.{Duration, Instant, LocalDate}
+
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
@@ -111,6 +113,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
         datasets.OriginalIdentifier("123"),
         datasets.Title("dataset"),
         datasets.Name("dataset"),
+        datasets.DateCreated(Instant.now().minus(Duration.ofDays(20))),
+        maybeDateModified = None,
         datasets.SameAs("http://datasets-repo/abcd").asLeft[datasets.DerivedFrom],
         List(ImageUri("image.png"))
       ).asJson,
@@ -119,6 +123,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
         datasets.OriginalIdentifier("123"),
         datasets.Title("dataset"),
         datasets.Name("dataset"),
+        datasets.DatePublished(LocalDate.now().minusDays(20)),
+        datasets.DateModified(Instant.now()).some,
         datasets.DerivedFrom("http://datasets-repo/abcd").asRight[datasets.SameAs],
         List(ImageUri("image.png"))
       ).asJson

@@ -30,7 +30,20 @@ private object Generators {
     title               <- datasetTitles
     name                <- datasetNames
     sameAsOrDerivedFrom <- Gen.either(datasetSameAs, datasetDerivedFroms)
-    images              <- imageUris.toGeneratorOfList()
-  } yield ProjectDataset(id, originalIdentifier, title, name, sameAsOrDerivedFrom, images)
+    createdOrPublished  <- datasetCreatedOrPublished
+    maybeDateModified <- sameAsOrDerivedFrom.fold(
+                           _ => datasetModifiedDates(createdOrPublished).toGeneratorOfNones,
+                           _ => datasetModifiedDates(createdOrPublished).toGeneratorOfSomes
+                         )
+    images <- imageUris.toGeneratorOfList()
+  } yield ProjectDataset(id,
+                         originalIdentifier,
+                         title,
+                         name,
+                         createdOrPublished,
+                         maybeDateModified,
+                         sameAsOrDerivedFrom,
+                         images
+  )
 
 }

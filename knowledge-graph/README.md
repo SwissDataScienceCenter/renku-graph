@@ -869,11 +869,13 @@ Response body example:
       "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title":       "rmDaYfpehl",
-      "name":        "mniouUnmal",
-      "slug":        "mniouUnmal",
-      "sameAs":      "http://host/url1",
-      "derivedFrom": "http://host/url1",
+      "title":         "rmDaYfpehl",
+      "name":          "mniouUnmal",
+      "slug":          "mniouUnmal",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "sameAs":        "http://host/url1",
       "images": [],
       "_links": [  
         {  
@@ -895,10 +897,12 @@ Response body example:
       "versions": {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name":        "a",
-      "slug":        "a",
-      "sameAs":      "http://host/url2",   // optional property when no "derivedFrom" exists
-      "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
+      "name":          "a",
+      "slug":          "a",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "derivedFrom":   "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
           "location": "image.png",

@@ -20,8 +20,9 @@ package io.renku.knowledgegraph.projects.datasets
 
 import Endpoint.Criteria
 import cats.NonEmptyParallel
-import cats.effect.kernel.Async
-import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.graph.model.datasets.{DateCreated, DateModified, DatePublished, DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
@@ -49,7 +50,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
 
   import ResultsDecoder._
   import eu.timepit.refined.auto._
-  import io.circe.Decoder
+  import io.circe.{Decoder, DecodingFailure}
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
   import io.renku.triplesstore.client.syntax._
@@ -63,8 +64,10 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "ds projects",
     Prefixes of (renku -> "renku", schema -> "schema", prov -> "prov"),
-    sparql"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
-             | (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    sparql"""|SELECT ?identifier ?name ?slug
+             |  ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |  ?topmostSameAs ?maybeDerivedFrom ?originalId
+             |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
              |WHERE {
              |   BIND (${projects.ResourceId(criteria.projectPath).asEntityId} AS ?projectId)
              |   Graph ?projectId {
@@ -74,8 +77,13 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
              |               schema:name ?name;
              |               renku:slug ?slug;
              |               renku:topmostSameAs ?topmostSameAs;
-             |               renku:topmostDerivedFrom/schema:identifier ?originalId.
+             |               renku:topmostDerivedFrom ?topmostDerivedFrom.
+             |     ?topmostDerivedFrom schema:identifier ?originalId.
              |     OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
+             |     OPTIONAL { ?datasetId schema:dateCreated ?maybeDateModified }
+             |     OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
+             |     OPTIONAL { ?topmostDerivedFrom schema:dateCreated ?maybeDateCreated }
+             |     OPTIONAL { ?topmostDerivedFrom schema:datePublished ?maybeDatePublished }
              |     FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
              |     FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
              |     OPTIONAL {
@@ -86,7 +94,9 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
              |     }
              |   }
              |}
-             |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
+             |GROUP BY ?identifier ?name ?slug
+             |  ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |  ?topmostSameAs ?maybeDerivedFrom ?originalId
              |ORDER BY ASC(?name)
              |""".stripMargin
   )
@@ -112,14 +122,52 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
         )
         .getOrElse(Nil)
 
+    def toCreatedOrPublished(maybeDateCreated:   Option[DateCreated],
+                             maybeDatePublished: Option[DatePublished],
+                             id:                 Identifier
+    ) = (maybeDateCreated orElse maybeDatePublished).toRight(
+      DecodingFailure(
+        DecodingFailure.Reason.CustomReason(s"Neither date created nor published found for dataset $id"),
+        cur
+      )
+    )
+
+    def toValidatedDateModified(maybeDerivedFrom:  Option[DerivedFrom],
+                                maybeDateModified: Option[DateModified],
+                                id:                Identifier
+    ): Decoder.Result[Option[DateModified]] = maybeDerivedFrom match {
+      case None => Option.empty.asRight
+      case Some(_) =>
+        maybeDateModified match {
+          case Some(d) => d.some.asRight
+          case None =>
+            DecodingFailure(DecodingFailure.Reason.CustomReason(s"No date modified for modified dataset $id"),
+                            cur
+            ).asLeft
+        }
+    }
+
     for {
-      id               <- extract[Identifier]("identifier")
-      title            <- extract[Title]("name")
-      name             <- extract[Name]("slug")
-      sameAs           <- extract[SameAs]("topmostSameAs")
-      maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
-      originalId       <- extract[OriginalIdentifier]("originalId")
-      images           <- extract[Option[String]]("images").map(toListOfImageUrls)
-    } yield ProjectDataset(id, originalId, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
+      id                    <- extract[Identifier]("identifier")
+      title                 <- extract[Title]("name")
+      name                  <- extract[Name]("slug")
+      maybeDateModified     <- extract[Option[DateModified]]("maybeDateModified")
+      maybeDateCreated      <- extract[Option[DateCreated]]("maybeDateCreated")
+      maybeDatePublished    <- extract[Option[DatePublished]]("maybeDatePublished")
+      createdOrPublished    <- toCreatedOrPublished(maybeDateCreated, maybeDatePublished, id)
+      sameAs                <- extract[SameAs]("topmostSameAs")
+      maybeDerivedFrom      <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+      originalId            <- extract[OriginalIdentifier]("originalId")
+      images                <- extract[Option[String]]("images").map(toListOfImageUrls)
+      dateModifiedValidated <- toValidatedDateModified(maybeDerivedFrom, maybeDateModified, id)
+    } yield ProjectDataset(id,
+                           originalId,
+                           title,
+                           name,
+                           createdOrPublished,
+                           dateModifiedValidated,
+                           sameAsOrDerived(from = sameAs, and = maybeDerivedFrom),
+                           images
+    )
   }
 }

@@ -18,7 +18,7 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.config.renku
@@ -34,6 +34,8 @@ private final case class ProjectDataset(identifier:          Identifier,
                                         originalIdentifier:  OriginalIdentifier,
                                         title:               Title,
                                         name:                Name,
+                                        createdOrPublished:  CreatedOrPublished,
+                                        maybeDateModified:   Option[DateModified],
                                         sameAsOrDerivedFrom: ProjectDataset.SameAsOrDerived,
                                         images:              List[ImageUri]
 )
@@ -46,11 +48,31 @@ private object ProjectDataset extends ImagesEncoder {
     case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": $derivedFrom}"""
   }
 
+  private implicit val createdOrPublishedEncoder: Encoder[CreatedOrPublished] = Encoder.instance[CreatedOrPublished] {
+    case d: DateCreated   => json"""{"dateCreated": $d}"""
+    case d: DatePublished => json"""{"datePublished": $d}"""
+  }
+
+  private implicit val maybeDateModifiedEncoder: Encoder[(SameAsOrDerived, Option[DateModified])] =
+    Encoder.instance[(SameAsOrDerived, Option[DateModified])] {
+      case (Right(_), Some(dateModified)) => json"""{"dateModified": $dateModified}"""
+      case _                              => Json.obj()
+    }
+
   def encoder(
       projectPath: projects.Path
   )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case ProjectDataset(id, originalId, title, name, sameAsOrDerived, images) =>
-      json"""{
+    Encoder.instance[ProjectDataset] {
+      case ProjectDataset(id,
+                          originalId,
+                          title,
+                          name,
+                          createdOrPublished,
+                          maybeDateModified,
+                          sameAsOrDerived,
+                          images
+          ) =>
+        json"""{
         "identifier": $id,
         "versions": {
           "initial": $originalId
@@ -60,14 +82,17 @@ private object ProjectDataset extends ImagesEncoder {
         "slug":   $name,
         "images": ${images -> projectPath}
       }"""
-        .deepMerge(sameAsOrDerived.asJson)
-        .deepMerge(
-          _links(
-            Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)),
-            Rel("initial-version") ->
-              knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(originalId.asIdentifier)),
-            Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, name)
+          .deepMerge(sameAsOrDerived.asJson)
+          .deepMerge(createdOrPublished.asJson)
+          .deepMerge((sameAsOrDerived -> maybeDateModified).asJson)
+          .deepMerge(
+            _links(
+              Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(id)),
+              Rel("initial-version") ->
+                knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, RequestedDataset(originalId.asIdentifier)),
+              Rel("tags") -> knowledgegraph.projects.datasets.tags.Endpoint.href(renkuApiUrl, projectPath, name)
+            )
           )
-        )
+          .deepDropNullValues
     }
 }
