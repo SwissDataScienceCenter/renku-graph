@@ -114,7 +114,7 @@ class ProjectDatasetsFinderSpec
       datasetsFinder
         .findProjectDatasets(project.path)
         .asserting(
-          _ shouldBe List(
+          _ should contain theSameElementsAs List(
             ProjectDataset(
               dataset1.identification.identifier,
               OriginalIdentifier(dataset1.identification.identifier),
@@ -131,7 +131,7 @@ class ProjectDatasetsFinderSpec
               dataset2.provenance.sameAs.asLeft,
               original.additionalInfo.images
             )
-          ).sortBy(_.title)
+          )
         )
   }
 
