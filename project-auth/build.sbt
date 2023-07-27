@@ -1,4 +1,4 @@
 organization := "io.renku"
-name := "graph-auth"
+name := "project-auth"
 
 libraryDependencies ++= Dependencies.http4sClient

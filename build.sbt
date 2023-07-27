@@ -162,7 +162,6 @@ lazy val entitiesSearch = project
 
 lazy val projectAuth = project
   .in(file("project-auth"))
-  .withId("project-auth")
   .settings(commonSettings)
   .dependsOn(
     renkuModelTinyTypes % "compile->compile; test->test",

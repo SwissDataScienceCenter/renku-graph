@@ -1,7 +1,7 @@
 package io.renku.projectauth
 
-import io.renku.graph.model.{GitLabUrl, RenkuUrl, Schemas, persons}
 import io.renku.graph.model.projects.{GitLabId, Path, ResourceId, Visibility}
+import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.JsonLD.JsonLDArray
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}

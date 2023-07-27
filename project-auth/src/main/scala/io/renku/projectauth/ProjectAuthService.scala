@@ -1,10 +1,14 @@
 package io.renku.projectauth
 
+import cats.effect._
 import fs2.Pipe
+import fs2.io.net.Network
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
-import io.renku.projectauth.sparql.SparqlClient
+import io.renku.projectauth.sparql.{ConnectionConfig, DefaultSparqlClient, SparqlClient}
+
+import scala.concurrent.duration._
 
 /** Manage authorization data for projects and members. */
 trait ProjectAuthService[F[_]] {
@@ -16,6 +20,13 @@ trait ProjectAuthService[F[_]] {
 }
 
 object ProjectAuthService {
+
+  def apply[F[_]: Async: Network](
+      connectionConfig: ConnectionConfig,
+      timeout:          Duration = 20.minutes
+  )(implicit renkuUrl: RenkuUrl): Resource[F, ProjectAuthService[F]] =
+    DefaultSparqlClient(connectionConfig, timeout)
+      .map(c => apply[F](c, renkuUrl))
 
   def apply[F[_]](client: SparqlClient[F], renkuUrl: RenkuUrl): ProjectAuthService[F] =
     new Impl[F](client)(renkuUrl)

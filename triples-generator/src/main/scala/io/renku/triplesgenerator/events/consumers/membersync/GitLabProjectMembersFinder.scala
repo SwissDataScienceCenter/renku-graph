@@ -30,7 +30,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s._
-import org.http4s.circe.jsonOf
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
@@ -90,16 +90,8 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] 
   private def maybeNextPage(response: Response[F]): Option[Int] =
     response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 
-  private implicit lazy val projectDecoder: EntityDecoder[F, List[GitLabProjectMember]] = {
-    import io.renku.graph.model.persons
-
-    implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
-      (cursor.downField("id").as[GitLabId] -> cursor.downField("name").as[persons.Name])
-        .mapN(GitLabProjectMember)
-    }
-
-    jsonOf[F, List[GitLabProjectMember]]
-  }
+  private implicit val memberDecoder: Decoder[GitLabProjectMember] =
+    Decoder.forProduct3("id", "name", "accessLevel")(GitLabProjectMember.apply)
 }
 
 private object GitLabProjectMembersFinder {
@@ -107,4 +99,4 @@ private object GitLabProjectMembersFinder {
     new GitLabProjectMembersFinderImpl[F].pure[F].widen[GitLabProjectMembersFinder[F]]
 }
 
-private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name)
+private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name, accessLevel: Int)

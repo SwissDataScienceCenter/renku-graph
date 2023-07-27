@@ -29,7 +29,7 @@ private object KGSynchronizerFunctions {
   def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
                        membersInKG:     Set[KGProjectMember]
   ): Set[GitLabProjectMember] = membersInGitLab.collect {
-    case member @ GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
+    case member @ GitLabProjectMember(gitlabId, _, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
   }
 
   def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
