@@ -20,12 +20,12 @@ package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.data.NonEmptyList
 import io.circe.literal._
+import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
-import io.renku.graph.model.datasets.{DatePublished, Identifier, Title}
 import io.renku.graph.model.testentities.{Dataset, Person}
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.{GitLabUrl, datasets, projects}
 import io.renku.http.rest.Links.{Href, Rel, _links}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.scalatest.matchers.should
@@ -64,6 +64,20 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
         )
       )
       .deepMerge(provenanceEncoder(dataset.provenance))
+      .deepMerge(dataset.provenance.date.asInstanceOf[datasets.CreatedOrPublished].asJson)
+      .deepMerge(encodeMaybeDateModified(dataset.provenance))
+      .deepDropNullValues
+  }
+
+  private implicit lazy val createdOrPublishedEncoder: Encoder[datasets.CreatedOrPublished] =
+    Encoder.instance[datasets.CreatedOrPublished] {
+      case d: datasets.DateCreated   => json"""{"dateCreated": $d}"""
+      case d: datasets.DatePublished => json"""{"datePublished": $d}"""
+    }
+
+  private def encodeMaybeDateModified[P <: Dataset.Provenance]: P => Json = {
+    case p: Dataset.Provenance.Modified => json"""{"dateModified": ${p.date}}"""
+    case _ => Json.obj()
   }
 
   implicit def provenanceEncoder: Encoder[Dataset.Provenance] = Encoder.instance {
@@ -107,7 +121,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(NonEmptyList[Person], P#D)] =
     Encoder.instance {
-      case (creators, DatePublished(date)) => json"""{
+      case (creators, datasets.DatePublished(date)) => json"""{
           "creator": ${creators.toList},
           "datePublished": $date
         }"""
@@ -124,12 +138,12 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   implicit class JsonsOps(jsons: List[Json]) {
 
-    def findId(title: Title): Option[Identifier] =
+    def findId(title: datasets.Title): Option[datasets.Identifier] =
       jsons
         .find(_.hcursor.downField("title").as[String].fold(throw _, _ == title.toString))
-        .map(_.hcursor.downField("identifier").as[Identifier].fold(throw _, identity))
+        .map(_.hcursor.downField("identifier").as[datasets.Identifier].fold(throw _, identity))
   }
 
-  def findIdentifier(json: Json): Identifier =
-    json.hcursor.downField("identifier").as[Identifier].fold(throw _, identity)
+  def findIdentifier(json: Json): datasets.Identifier =
+    json.hcursor.downField("identifier").as[datasets.Identifier].fold(throw _, identity)
 }
