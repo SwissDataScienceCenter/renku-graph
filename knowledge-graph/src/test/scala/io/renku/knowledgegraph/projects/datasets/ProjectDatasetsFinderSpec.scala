@@ -24,7 +24,10 @@ import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
 import io.renku.graph.model.testentities._
+import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.interpreters.TestLogger
+import io.renku.knowledgegraph.projects.datasets.Endpoint.Criteria
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
@@ -52,20 +55,18 @@ class ProjectDatasetsFinderSpec
       renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
 
     provisionTestProjects(otherProject, projectComplete) >>
-      datasetsFinder
-        .findProjectDatasets(projectComplete.path)
-        .asserting(
-          _ shouldBe List(
-            ProjectDataset(
-              modification2.identification.identifier,
-              OriginalIdentifier(original.identification.identifier),
-              modification2.identification.title,
-              modification2.identification.name,
-              modification2.provenance.derivedFrom.asRight,
-              modification2.additionalInfo.images
-            )
+      datasetsFinder.findProjectDatasets(Criteria(projectComplete.path)).asserting {
+        _.results shouldBe List(
+          ProjectDataset(
+            modification2.identification.identifier,
+            OriginalIdentifier(original.identification.identifier),
+            modification2.identification.title,
+            modification2.identification.name,
+            modification2.provenance.derivedFrom.asRight,
+            modification2.additionalInfo.images
           )
         )
+      }
   }
 
   it should "return non-modified datasets and the very last modifications of project's datasets" in {
@@ -76,28 +77,26 @@ class ProjectDatasetsFinderSpec
       .generateOne
 
     provisionTestProject(project) >>
-      datasetsFinder
-        .findProjectDatasets(project.path)
-        .asserting(
-          _ shouldBe List(
-            ProjectDataset(
-              dataset1.identification.identifier,
-              OriginalIdentifier(dataset1.identification.identifier),
-              dataset1.identification.title,
-              dataset1.identification.name,
-              dataset1.provenance.sameAs.asLeft,
-              dataset1.additionalInfo.images
-            ),
-            ProjectDataset(
-              modified2.identification.identifier,
-              OriginalIdentifier(dataset2.identification.identifier),
-              modified2.identification.title,
-              modified2.identification.name,
-              modified2.provenance.derivedFrom.asRight,
-              modified2.additionalInfo.images
-            )
-          ).sortBy(_.title)
-        )
+      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+        _.results shouldBe List(
+          ProjectDataset(
+            dataset1.identification.identifier,
+            OriginalIdentifier(dataset1.identification.identifier),
+            dataset1.identification.title,
+            dataset1.identification.name,
+            dataset1.provenance.sameAs.asLeft,
+            dataset1.additionalInfo.images
+          ),
+          ProjectDataset(
+            modified2.identification.identifier,
+            OriginalIdentifier(dataset2.identification.identifier),
+            modified2.identification.title,
+            modified2.identification.name,
+            modified2.provenance.derivedFrom.asRight,
+            modified2.additionalInfo.images
+          )
+        ).sortBy(_.title)
+      }
   }
 
   it should "return all datasets of the given project without merging datasets having the same sameAs" in {
@@ -111,32 +110,30 @@ class ProjectDatasetsFinderSpec
     assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
 
     provisionTestProjects(originalProject, project) >>
-      datasetsFinder
-        .findProjectDatasets(project.path)
-        .asserting(
-          _ should contain theSameElementsAs List(
-            ProjectDataset(
-              dataset1.identification.identifier,
-              OriginalIdentifier(dataset1.identification.identifier),
-              dataset1.identification.title,
-              original.identification.name,
-              dataset1.provenance.sameAs.asLeft,
-              original.additionalInfo.images
-            ),
-            ProjectDataset(
-              dataset2.identification.identifier,
-              OriginalIdentifier(dataset2.identification.identifier),
-              dataset2.identification.title,
-              original.identification.name,
-              dataset2.provenance.sameAs.asLeft,
-              original.additionalInfo.images
-            )
+      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+        _.results should contain theSameElementsAs List(
+          ProjectDataset(
+            dataset1.identification.identifier,
+            OriginalIdentifier(dataset1.identification.identifier),
+            dataset1.identification.title,
+            original.identification.name,
+            dataset1.provenance.sameAs.asLeft,
+            original.additionalInfo.images
+          ),
+          ProjectDataset(
+            dataset2.identification.identifier,
+            OriginalIdentifier(dataset2.identification.identifier),
+            dataset2.identification.title,
+            original.identification.name,
+            dataset2.provenance.sameAs.asLeft,
+            original.additionalInfo.images
           )
         )
+      }
   }
 
   it should "return None if there are no datasets in the project" in {
-    datasetsFinder.findProjectDatasets(projectPaths.generateOne).asserting(_ shouldBe List.empty)
+    datasetsFinder.findProjectDatasets(Criteria(projectPaths.generateOne)).asserting(_.results shouldBe List.empty)
   }
 
   it should "not returned deleted dataset" in {
@@ -147,20 +144,18 @@ class ProjectDatasetsFinderSpec
       .generateOne
 
     provisionTestProject(project) >>
-      datasetsFinder
-        .findProjectDatasets(project.path)
-        .asserting(
-          _ shouldBe List(
-            ProjectDataset(
-              dataset2.identification.identifier,
-              OriginalIdentifier(dataset2.identification.identifier),
-              dataset2.identification.title,
-              dataset2.identification.name,
-              SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
-              dataset2.additionalInfo.images
-            )
+      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
+        _.results shouldBe List(
+          ProjectDataset(
+            dataset2.identification.identifier,
+            OriginalIdentifier(dataset2.identification.identifier),
+            dataset2.identification.title,
+            dataset2.identification.name,
+            SameAs(dataset2.provenance.topmostSameAs.value).asLeft,
+            dataset2.additionalInfo.images
           )
         )
+      }
   }
 
   it should "not returned deleted dataset when its latest version was deleted" in {
@@ -169,7 +164,37 @@ class ProjectDatasetsFinderSpec
       renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
     provisionTestProject(project.addDatasets(modification.invalidateNow(personEntities))) >>
-      datasetsFinder.findProjectDatasets(project.path).asserting(_ shouldBe Nil)
+      datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting(_.results shouldBe Nil)
+  }
+
+  it should "return the requested page" in {
+
+    val (dataset1 -> dataset2 -> modified2, project) = renkuProjectEntities(anyVisibility)
+      .addDataset(datasetEntities(provenanceImportedExternal))
+      .addDatasetAndModification(datasetEntities(provenanceInternal))
+      .generateOne
+
+    provisionTestProject(project) >>
+      datasetsFinder.findProjectDatasets(Criteria(project.path, PagingRequest(Page(2), PerPage(1)))).asserting {
+        _.results shouldBe List(
+          ProjectDataset(
+            dataset1.identification.identifier,
+            OriginalIdentifier(dataset1.identification.identifier),
+            dataset1.identification.title,
+            dataset1.identification.name,
+            dataset1.provenance.sameAs.asLeft,
+            dataset1.additionalInfo.images
+          ),
+          ProjectDataset(
+            modified2.identification.identifier,
+            OriginalIdentifier(dataset2.identification.identifier),
+            modified2.identification.title,
+            modified2.identification.name,
+            modified2.provenance.derivedFrom.asRight,
+            modified2.additionalInfo.images
+          )
+        ).sortBy(_.title).slice(1, 2)
+      }
   }
 
   implicit override def ioLogger:    TestLogger[IO]              = TestLogger[IO]()

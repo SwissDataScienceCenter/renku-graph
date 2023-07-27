@@ -24,12 +24,14 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
+import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
@@ -54,16 +56,22 @@ class EndpointSpec
 
   it should "respond with OK and the found datasets" in {
 
-    val datasetsList = projectDatasetGen.generateList(min = 1)
-    givenProjectFinding(projectPath, returning = datasetsList.pure[IO])
+    val criteria = Endpoint.Criteria(projectPath)
 
-    endpoint.getProjectDatasets(projectPath) >>= { response =>
+    val pagingResponse = pagingResponses(projectDatasetGen).generateOne
+    givenProjectFinding(criteria, returning = pagingResponse.pure[IO])
+
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
       for {
-        _ <- response.as[List[Json]].asserting(_ shouldBe datasetsList.map(_.asJson))
-        _ = response.status      shouldBe Ok
-        _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+        _ <- response.as[List[Json]].asserting(_ shouldBe pagingResponse.results.map(_.asJson))
+        _ = response.status        shouldBe Ok
+        _ = response.contentType   shouldBe Some(`Content-Type`(MediaType.application.json))
+        _ = response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
+
         _ =
-          logger.loggedOnly(Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}"))
+          logger.loggedOnly(
+            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+          )
       } yield ()
     }
 
@@ -71,51 +79,59 @@ class EndpointSpec
 
   it should "respond with OK an empty JSON array if no datasets found" in {
 
-    givenProjectFinding(projectPath, returning = List.empty.pure[IO])
+    val criteria = Endpoint.Criteria(projectPath)
 
-    endpoint.getProjectDatasets(projectPath) >>= { response =>
+    givenProjectFinding(criteria, returning = PagingResponse.empty[ProjectDataset](pagingRequests.generateOne).pure[IO])
+
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
       for {
         _ <- response.as[List[Json]].asserting(_ shouldBe List.empty)
-        _ = response.status      shouldBe Ok
-        _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+        _ = response.status shouldBe Ok
         _ =
-          logger.loggedOnly(Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}"))
+          logger.loggedOnly(
+            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+          )
       } yield ()
     }
   }
 
   it should "respond with INTERNAL_SERVER_ERROR if finding datasets fails" in {
 
-    val exception = exceptions.generateOne
-    givenProjectFinding(projectPath, returning = exception.raiseError[IO, List[ProjectDataset]])
+    val criteria = Endpoint.Criteria(projectPath)
 
-    endpoint.getProjectDatasets(projectPath) >>= { response =>
+    val exception = exceptions.generateOne
+    givenProjectFinding(criteria, returning = exception.raiseError[IO, PagingResponse[ProjectDataset]])
+
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
       for {
         _ <- response
                .as[Message]
-               .asserting(_ shouldBe Message.Error.unsafeApply(s"Finding $projectPath's datasets failed"))
+               .asserting(_ shouldBe Message.Error.unsafeApply(s"Finding ${criteria.projectPath}'s datasets failed"))
         _ = response.status      shouldBe InternalServerError
         _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-        _ = logger.loggedOnly(Error(s"Finding $projectPath's datasets failed", exception))
+        _ = logger.loggedOnly(Error(s"Finding ${criteria.projectPath}'s datasets failed", exception))
       } yield ()
     }
   }
 
+  private lazy val request     = Request[IO]()
   private lazy val projectPath = projectPaths.generateOne
 
   private implicit lazy val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectPath)
 
   private lazy val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
-  private implicit lazy val renkuApiUrl: renku.ApiUrl   = renkuApiUrls.generateOne
-  private implicit lazy val gitLabUrl:   GitLabUrl      = gitLabUrls.generateOne
-  private implicit lazy val logger:      TestLogger[IO] = TestLogger[IO]()
+  private implicit lazy val renkuApiUrl:      renku.ApiUrl      = renkuApiUrls.generateOne
+  private implicit lazy val renkuUrl:         RenkuUrl          = renkuUrls.generateOne
+  private implicit lazy val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
+  private implicit lazy val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+  private implicit lazy val logger:           TestLogger[IO]    = TestLogger[IO]()
   private lazy val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-  private lazy val endpoint = new EndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+  private lazy val endpoint              = new EndpointImpl[IO](projectDatasetsFinder, executionTimeRecorder)
 
   protected override def beforeEach() = logger.reset()
 
-  private def givenProjectFinding(path: projects.Path, returning: IO[List[ProjectDataset]]) =
+  private def givenProjectFinding(criteria: Endpoint.Criteria, returning: IO[PagingResponse[ProjectDataset]]) =
     (projectDatasetsFinder.findProjectDatasets _)
-      .expects(path)
+      .expects(criteria)
       .returning(returning)
 }

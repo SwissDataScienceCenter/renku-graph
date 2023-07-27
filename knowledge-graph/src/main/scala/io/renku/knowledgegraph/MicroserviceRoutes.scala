@@ -81,7 +81,6 @@ private class MicroserviceRoutes[F[_]: Async](
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetTagsEndpoint._
-  import projectDatasetsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
@@ -287,9 +286,10 @@ private class MicroserviceRoutes[F[_]: Async](
         .fold(toBadRequest, identity)
 
     case projectPathParts :+ "datasets" =>
+      import projects.datasets.Endpoint.Criteria
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(getProjectDatasets)
+        .semiflatMap(path => projectDatasetsEndpoint.`GET /projects/:path/datasets`(request, Criteria(path)))
         .merge
     case projectPathParts :+ "files" :+ location :+ "lineage" =>
       getLineage(projectPathParts, location, maybeAuthUser)

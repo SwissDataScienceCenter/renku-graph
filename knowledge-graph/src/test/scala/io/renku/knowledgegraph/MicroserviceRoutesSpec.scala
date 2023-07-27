@@ -615,20 +615,26 @@ class MicroserviceRoutesSpec
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
 
     s"return $Ok for valid path parameters" in new TestCase {
-      val projectPath   = projectPaths.generateOne
+
+      val criteria      = projects.datasets.Endpoint.Criteria(projectPaths.generateOne)
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(criteria.projectPath, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](
+            AuthContext(maybeAuthUser.option, criteria.projectPath, Set(criteria.projectPath))
+          )
         )
 
-      (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+      val request =
+        Request[IO](GET, Uri.unsafeFromString(s"/knowledge-graph/projects/${criteria.projectPath}/datasets"))
 
-      routes(maybeAuthUser)
-        .call(Request(GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets")))
-        .status shouldBe Ok
+      (projectDatasetsEndpoint.`GET /projects/:path/datasets` _)
+        .expects(request, criteria)
+        .returning(Response[IO](Ok).pure[IO])
+
+      routes(maybeAuthUser).call(request).status shouldBe Ok
 
       routesMetrics.clearRegistry()
     }
@@ -642,17 +648,16 @@ class MicroserviceRoutesSpec
     }
 
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
-      val projectPath   = projectPaths.generateOne
+
+      val criteria      = projects.datasets.Endpoint.Criteria(projectPaths.generateOne)
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(criteria.projectPath, maybeAuthUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser)
-        .call(
-          Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
-        )
+        .call(Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${criteria.projectPath}/datasets")))
 
       response.status        shouldBe NotFound
       response.contentType   shouldBe Some(`Content-Type`(application.json))

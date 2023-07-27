@@ -18,6 +18,8 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
+import Endpoint.Criteria
+import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
 import io.circe.Encoder
@@ -27,43 +29,48 @@ import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
 import io.renku.http.rest.Links._
+import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
-import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Header, Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def getProjectDatasets(projectPath: projects.Path): F[Response[F]]
+  def `GET /projects/:path/datasets`(request: Request[F], criteria: Criteria): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     projectDatasetsFinder: ProjectDatasetsFinder[F],
-    renkuApiUrl:           renku.ApiUrl,
-    gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
-) extends Http4sDsl[F]
+)(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl, gitLabUrl: GitLabUrl)
+    extends Http4sDsl[F]
     with Endpoint[F] {
 
   import executionTimeRecorder._
   import org.http4s.circe._
 
-  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
-  private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
-
-  def getProjectDatasets(projectPath: projects.Path): F[Response[F]] =
-    measureAndLogTime(finishedSuccessfully(projectPath)) {
-      implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectPath)
-
+  def `GET /projects/:path/datasets`(request: Request[F], criteria: Criteria): F[Response[F]] =
+    measureAndLogTime(finishedSuccessfully(criteria.projectPath)) {
       projectDatasetsFinder
-        .findProjectDatasets(projectPath)
-        .flatMap(datasets => Ok(datasets.asJson))
-        .recoverWith(httpResult(projectPath))
+        .findProjectDatasets(criteria)
+        .map(toHttpResponse(request, criteria))
+        .recoverWith(errorHttpResponse(criteria.projectPath))
     }
 
-  private def httpResult(
+  private def toHttpResponse(request: Request[F], criteria: Criteria)(
+      response: PagingResponse[ProjectDataset]
+  ): Response[F] = {
+    implicit val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(criteria.projectPath)
+    val resourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+    Response[F](Ok)
+      .withEntity(response.results.asJson)
+      .putHeaders(PagingHeaders.from(response)(resourceUrl, renku.ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
+  }
+
+  private def errorHttpResponse(
       projectPath: projects.Path
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = Message.Error.unsafeApply(s"Finding $projectPath's datasets failed")
@@ -77,17 +84,15 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
 
 object Endpoint {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader()
-    renkuConnectionConfig         <- ProjectsConnectionConfig[F]()
-    gitLabUrl                     <- GitLabUrlLoader[F]()
-    renkuResourceUrl              <- renku.ApiUrl[F]()
-    executionTimeRecorder         <- ExecutionTimeRecorder[F]()
-  } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig),
-                              renkuResourceUrl,
-                              gitLabUrl,
-                              executionTimeRecorder
-  )
+  final case class Criteria(projectPath: projects.Path, paging: PagingRequest = PagingRequest.default)
+
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+    implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
+    implicit0(gitLabUrl: GitLabUrl)      <- GitLabUrlLoader[F]()
+    implicit0(renkuApiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
+    renkuConnectionConfig                <- ProjectsConnectionConfig[F]()
+    executionTimeRecorder                <- ExecutionTimeRecorder[F]()
+  } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig), executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath / "datasets")
