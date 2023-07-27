@@ -1,8 +1,14 @@
-package io.renku.projectauth.sparql
+package io.renku.triplesstore.client.http
 
 import cats.MonadThrow
+import cats.effect.{Async, Resource}
+import fs2.io.net.Network
 import io.circe.{Decoder, Json}
 import io.renku.jsonld.JsonLD
+import org.http4s.ember.client.EmberClientBuilder
+import org.typelevel.log4cats.Logger
+
+import scala.concurrent.duration._
 
 trait SparqlClient[F[_]] {
 
@@ -19,4 +25,16 @@ trait SparqlClient[F[_]] {
     val decoder = Decoder.instance(c => c.downField("results").downField("bindings").as[List[A]])
     F.flatMap(query(request))(json => decoder.decodeJson(json).fold(F.raiseError, F.pure))
   }
+}
+
+object SparqlClient {
+  def apply[F[_]: Async: Network: Logger](
+      connectionConfig: ConnectionConfig,
+      timeout:          Duration = 20.minutes
+  ): Resource[F, SparqlClient[F]] =
+    EmberClientBuilder
+      .default[F]
+      .withTimeout(timeout)
+      .build
+      .map(c => new DefaultSparqlClient[F](c, connectionConfig))
 }

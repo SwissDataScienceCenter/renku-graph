@@ -1,13 +1,12 @@
-package io.renku.projectauth.sparql
+package io.renku.triplesstore.client.http
 
 import cats.effect._
 import cats.effect.testing.scalatest.AsyncIOSpec
-import io.renku.graph.model.Schemas
-import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder, Schema}
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.http4s.implicits._
-import org.scalatest.flatspec.AsyncFlatSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
@@ -25,7 +24,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
                                     |} LIMIT 100""".stripMargin)
 
   it should "run sparql queries" in {
-    DefaultSparqlClient[IO](cc).use { c =>
+    SparqlClient[IO](cc).use { c =>
       for {
         _ <- c.update(
                SparqlUpdate.raw(
@@ -53,7 +52,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
   }
 
   it should "upload jsonld" in {
-    DefaultSparqlClient[IO](cc).use { c =>
+    SparqlClient[IO](cc).use { c =>
       val data = Data("http://localhost/project/123", Instant.now())
       for {
         _ <- c.upload(data.asJsonLD)
@@ -69,6 +68,11 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
         _ <- IO.println(r)
       } yield ()
     }
+  }
+
+  object Schemas {
+    val renku:  Schema = Schema.from("https://swissdatasciencecenter.github.io/renku-ontology", separator = "#")
+    val schema: Schema = Schema.from("http://schema.org")
   }
 
   case class Data(projId: String, modified: Instant)

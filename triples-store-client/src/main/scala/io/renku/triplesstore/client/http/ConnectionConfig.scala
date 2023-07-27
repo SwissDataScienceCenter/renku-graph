@@ -1,7 +1,6 @@
-package io.renku.projectauth.sparql
+package io.renku.triplesstore.client.http
 
 import org.http4s.{BasicCredentials, Uri}
-
 import scala.concurrent.duration.FiniteDuration
 
 final case class ConnectionConfig(

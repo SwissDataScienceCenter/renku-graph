@@ -6,7 +6,7 @@ import fs2.io.net.Network
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
-import io.renku.projectauth.sparql.{ConnectionConfig, DefaultSparqlClient, SparqlClient}
+import io.renku.triplesstore.client.http.{ConnectionConfig, DefaultSparqlClient, SparqlClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -26,8 +26,7 @@ object ProjectAuthService {
       connectionConfig: ConnectionConfig,
       timeout:          Duration = 20.minutes
   )(implicit renkuUrl: RenkuUrl): Resource[F, ProjectAuthService[F]] =
-    DefaultSparqlClient(connectionConfig, timeout)
-      .map(c => apply[F](c, renkuUrl))
+    SparqlClient(connectionConfig, timeout).map(c => apply[F](c, renkuUrl))
 
   def apply[F[_]](client: SparqlClient[F], renkuUrl: RenkuUrl): ProjectAuthService[F] =
     new Impl[F](client)(renkuUrl)

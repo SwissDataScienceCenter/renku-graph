@@ -1,27 +1,19 @@
-package io.renku.projectauth.sparql
+package io.renku.triplesstore.client.http
 
 import io.renku.triplesstore.client.sparql.Fragment
-import io.renku.triplesstore.{SparqlQuery => SQuery}
 import org.http4s.{EntityEncoder, MediaType}
 import org.http4s.headers.`Content-Type`
 
-sealed trait SparqlQuery {
-
+trait SparqlQuery {
   def render: String
-
 }
 
 object SparqlQuery {
-  def raw(sparql: String): SparqlQuery =
-    new SparqlQuery {
-      override def render: String = sparql
-    }
+  final case class Raw(render: String) extends SparqlQuery
 
-  def apply(q: SQuery): SparqlQuery =
-    raw(q.toString)
+  def raw(sparql: String): SparqlQuery = Raw(sparql)
 
-  def apply(fr: Fragment): SparqlQuery =
-    raw(fr.sparql)
+  def apply(fr: Fragment): SparqlQuery = raw(fr.sparql)
 
   implicit def entityEncoder[F[_]]: EntityEncoder[F, SparqlQuery] =
     EntityEncoder

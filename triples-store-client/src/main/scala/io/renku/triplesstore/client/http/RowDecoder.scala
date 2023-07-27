@@ -1,4 +1,4 @@
-package io.renku.projectauth.sparql
+package io.renku.triplesstore.client.http
 
 import cats.syntax.all._
 import io.circe.{Decoder, HCursor}
