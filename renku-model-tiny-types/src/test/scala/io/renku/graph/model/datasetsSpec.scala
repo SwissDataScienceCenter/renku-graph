@@ -278,6 +278,16 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       val date: DatePublished = datasetPublishedDates().generateOne
       date.asInstanceOf[CreatedOrPublished].asJson shouldBe date.value.asJson
     }
+
+    "provide decoder if it's a DateCreated" in {
+      val date: DateCreated = datasetCreatedDates().generateOne
+      date.asInstanceOf[CreatedOrPublished].asJson.hcursor.as[CreatedOrPublished].value shouldBe date
+    }
+
+    "provide decoder if it's a DatePublished" in {
+      val date: DatePublished = datasetPublishedDates().generateOne
+      date.asInstanceOf[CreatedOrPublished].asJson.hcursor.as[CreatedOrPublished].value shouldBe date
+    }
   }
 
   "DateModified.apply(CreatedOrPublished)" should {

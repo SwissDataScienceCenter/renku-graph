@@ -255,11 +255,18 @@ object datasets {
 
   sealed trait CreatedOrPublished extends Any with TinyType {
     def instant: Instant
+    def fold[A](c: DateCreated => A, p: DatePublished => A): A
   }
   object CreatedOrPublished {
+
     implicit val encoder: Encoder[CreatedOrPublished] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson
+    }
+
+    implicit val decoder: Decoder[CreatedOrPublished] = Decoder.instance { cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      cur.as[DateCreated] orElse cur.as[DatePublished]
     }
 
     implicit val show: Show[CreatedOrPublished] =
@@ -271,6 +278,7 @@ object datasets {
 
   final class DateCreated private (val value: Instant) extends AnyVal with CreatedOrPublished with InstantTinyType {
     override def instant: Instant = value
+    def fold[A](c: DateCreated => A, p: DatePublished => A): A = c(this)
   }
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
@@ -285,6 +293,7 @@ object datasets {
       with CreatedOrPublished
       with LocalDateTinyType {
     override def instant: Instant = value.atStartOfDay().toInstant(ZoneOffset.UTC)
+    def fold[A](c: DateCreated => A, p: DatePublished => A): A = p(this)
   }
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
