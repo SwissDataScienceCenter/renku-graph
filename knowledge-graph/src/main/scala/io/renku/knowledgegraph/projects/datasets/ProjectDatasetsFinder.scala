@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
-import cats.MonadThrow
 import cats.effect.kernel.Async
 import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
@@ -35,26 +34,23 @@ private trait ProjectDatasetsFinder[F[_]] {
 
 private object ProjectDatasetsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connectionConfig: ProjectsConnectionConfig)(implicit
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](conCfg: ProjectsConnectionConfig)(implicit
       renkuUrl: RenkuUrl
-  ): F[ProjectDatasetsFinder[F]] =
-    MonadThrow[F].catchNonFatal(
-      new ProjectDatasetsFinderImpl[F](connectionConfig)
-    )
+  ): ProjectDatasetsFinder[F] = new ProjectDatasetsFinderImpl[F](TSClient[F](conCfg))
 }
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    connectionConfig: ProjectsConnectionConfig
+    tsClient: TSClient[F]
 )(implicit renkuUrl: RenkuUrl)
-    extends TSClientImpl(connectionConfig)
-    with ProjectDatasetsFinder[F] {
+    extends ProjectDatasetsFinder[F] {
 
-  import ProjectDatasetsFinderImpl._
+  import ResultsDecoder._
   import eu.timepit.refined.auto._
+  import io.circe.Decoder
   import io.renku.graph.model.Schemas._
 
   def findProjectDatasets(projectPath: Path): F[List[ProjectDataset]] =
-    queryExpecting[List[ProjectDataset]](selectQuery = query(projectPath))
+    tsClient.queryExpecting[List[ProjectDataset]](selectQuery = query(projectPath))
 
   private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
@@ -74,7 +70,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
         |     OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |     FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |     FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
-        |     OPTIONAL { 
+        |     OPTIONAL {
         |       ?imageId schema:position ?imagePosition ;
         |                schema:contentUrl ?imageUrl ;
         |                ^schema:image ?datasetId .
@@ -86,12 +82,6 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
         |ORDER BY ?name
         |""".stripMargin
   )
-}
-
-private object ProjectDatasetsFinderImpl {
-
-  import ResultsDecoder._
-  import io.circe.Decoder
 
   private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = ResultsDecoder[List, ProjectDataset] {
     implicit cur =>

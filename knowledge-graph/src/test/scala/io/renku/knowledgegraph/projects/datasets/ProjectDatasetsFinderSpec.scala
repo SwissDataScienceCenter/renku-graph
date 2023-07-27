@@ -28,7 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder, TSClient}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -174,5 +174,5 @@ class ProjectDatasetsFinderSpec
 
   implicit override def ioLogger:    TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-  private lazy val datasetsFinder = new ProjectDatasetsFinderImpl[IO](projectsDSConnectionInfo)
+  private lazy val datasetsFinder = new ProjectDatasetsFinderImpl[IO](TSClient[IO](projectsDSConnectionInfo))
 }

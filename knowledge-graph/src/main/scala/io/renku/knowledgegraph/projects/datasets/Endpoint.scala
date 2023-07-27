@@ -83,12 +83,10 @@ object Endpoint {
     gitLabUrl                     <- GitLabUrlLoader[F]()
     renkuResourceUrl              <- renku.ApiUrl[F]()
     executionTimeRecorder         <- ExecutionTimeRecorder[F]()
-    projectDatasetFinder          <- ProjectDatasetsFinder(renkuConnectionConfig)
-  } yield new EndpointImpl[F](
-    projectDatasetFinder,
-    renkuResourceUrl,
-    gitLabUrl,
-    executionTimeRecorder
+  } yield new EndpointImpl[F](ProjectDatasetsFinder(renkuConnectionConfig),
+                              renkuResourceUrl,
+                              gitLabUrl,
+                              executionTimeRecorder
   )
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
