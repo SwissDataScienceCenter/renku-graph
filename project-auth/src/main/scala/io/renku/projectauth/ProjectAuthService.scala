@@ -7,6 +7,7 @@ import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.NamedGraph
 import io.renku.jsonld.syntax._
 import io.renku.projectauth.sparql.{ConnectionConfig, DefaultSparqlClient, SparqlClient}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
@@ -21,7 +22,7 @@ trait ProjectAuthService[F[_]] {
 
 object ProjectAuthService {
 
-  def apply[F[_]: Async: Network](
+  def apply[F[_]: Async: Network: Logger](
       connectionConfig: ConnectionConfig,
       timeout:          Duration = 20.minutes
   )(implicit renkuUrl: RenkuUrl): Resource[F, ProjectAuthService[F]] =
@@ -42,7 +43,12 @@ object ProjectAuthService {
 
     override def updateAll: Pipe[F, ProjectAuthData, Nothing] =
       _.chunks
-        .map(chunk => NamedGraph.fromJsonLDsUnsafe(graph, chunk.toList.map(_.asJsonLD)))
+        .map(chunk =>
+          chunk.toNel match { // TODO improve that weird ergonomics for NamedGraph in jsonld4s
+            case Some(nel) => NamedGraph.fromJsonLDsUnsafe(graph, nel.head.asJsonLD, nel.tail.map(_.asJsonLD): _*)
+            case None      => NamedGraph(graph, Seq.empty)
+          }
+        )
         .evalMap(sparqlClient.upload)
         .drain
   }

@@ -3,32 +3,42 @@ package io.renku.projectauth.sparql
 import cats.effect.kernel.Concurrent
 import cats.effect.{Async, Resource}
 import cats.syntax.all._
+import fs2.Stream
 import fs2.io.net.Network
 import io.circe.Json
-import io.renku.projectauth.sparql.DefaultSparqlClient.SparqlRequestError
+import io.renku.projectauth.sparql.DefaultSparqlClient.{ConnectionError, SparqlRequestError}
 import io.renku.jsonld.JsonLD
+import io.renku.projectauth.sparql.ConnectionConfig.RetryConfig
 import org.http4s.{BasicCredentials, EntityDecoder, MediaType, Request, Response, Status}
 import org.http4s.Method.POST
 import org.http4s.implicits._
-import org.http4s.client.Client
+import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.circe.CirceEntityCodec._
+import org.http4s.ember.core.EmberException
 import org.http4s.headers.{Accept, Authorization, `Content-Type`}
+import org.typelevel.log4cats.Logger
 
+import java.io.IOException
+import java.net.{ConnectException, SocketException, UnknownHostException}
+import java.nio.channels.ClosedChannelException
 import scala.concurrent.duration._
 
-final class DefaultSparqlClient[F[_]: Async](client: Client[F], connectionConfig: ConnectionConfig)
+final class DefaultSparqlClient[F[_]: Async: Logger](client: Client[F], config: ConnectionConfig)
     extends SparqlClient[F]
     with Http4sClientDsl[F] {
 
   private[this] val sparqlResultsJson: MediaType = mediaType"application/sparql-results+json"
 
-  override def update(request: SparqlUpdate): F[Unit] = {
+  override def update(request: SparqlUpdate): F[Unit] =
+    config.retry.fold(update0(request))(retryConnectionErrors(update0(request)))
+
+  private def update0(request: SparqlUpdate): F[Unit] = {
     val req =
-      POST(connectionConfig.baseUrl / "update")
+      POST(config.baseUrl / "update")
         .putHeaders(Accept(sparqlResultsJson))
-        .withBasicAuth(connectionConfig.basicAuth)
+        .withBasicAuth(config.basicAuth)
         .withEntity(request)
 
     client.run(req).use { resp =>
@@ -37,11 +47,14 @@ final class DefaultSparqlClient[F[_]: Async](client: Client[F], connectionConfig
     }
   }
 
-  def upload(data: JsonLD): F[Unit] = {
+  override def upload(data: JsonLD): F[Unit] =
+    config.retry.fold(upload0(data))(retryConnectionErrors(upload0(data)))
+
+  private def upload0(data: JsonLD): F[Unit] = {
     val req =
-      POST(connectionConfig.baseUrl / "data")
+      POST(config.baseUrl / "data")
         .putHeaders(Accept(sparqlResultsJson))
-        .withBasicAuth(connectionConfig.basicAuth)
+        .withBasicAuth(config.basicAuth)
         .withEntity(data.toJson)
         .withContentType(`Content-Type`(MediaType.application.`ld+json`))
 
@@ -51,14 +64,50 @@ final class DefaultSparqlClient[F[_]: Async](client: Client[F], connectionConfig
     }
   }
 
-  override def query(request: SparqlQuery): F[Json] = {
+  override def query(request: SparqlQuery): F[Json] =
+    config.retry.fold(query0(request))(retryConnectionErrors(query(request)))
+
+  private def query0(request: SparqlQuery): F[Json] = {
     val req =
-      POST(connectionConfig.baseUrl / "query")
+      POST(config.baseUrl / "query")
         .addHeader(Accept(sparqlResultsJson))
-        .withBasicAuth(connectionConfig.basicAuth)
+        .withBasicAuth(config.basicAuth)
         .withEntity(request)
 
     client.run(req).use(_.as[Json])
+  }
+
+  // TODO this can be moved to some generic utility
+  private def retryConnectionErrors[A](fa: F[A])(cfg: RetryConfig): F[A] = {
+    val waits = Stream.awakeDelay(cfg.interval).void
+
+    val tries =
+      (Stream.eval(fa.attempt) ++
+        Stream
+          .repeatEval(fa.attempt)
+          .zip(waits)
+          .map(_._1)).zipWithIndex.take(cfg.maxRetries)
+
+    val result =
+      tries
+        .flatMap {
+          case (Right(v), _) => Stream.emit(v.some)
+          case (Left(ConnectionError(ex)), currentTry) =>
+            Stream
+              .eval(Logger[F].info(s"Request failed with ${ex.getMessage}, trying again $currentTry/${cfg.maxRetries}"))
+              .as(None)
+
+          case (Left(ex), _) =>
+            Stream.raiseError(ex)
+        }
+        .takeThrough(_.isEmpty)
+        .compile
+        .lastOrError
+
+    result.flatMap {
+      case Some(v) => v.pure[F]
+      case None    => Async[F].raiseError(new Exception(s"Request failed after retrying: $cfg"))
+    }
   }
 
   final implicit class MoreRequestDsl(req: Request[F]) {
@@ -78,7 +127,7 @@ object DefaultSparqlClient {
       EntityDecoder.decodeText(resp).map(str => SparqlRequestError(resp.status, str))
   }
 
-  def apply[F[_]: Async: Network](
+  def apply[F[_]: Async: Network: Logger](
       connectionConfig: ConnectionConfig,
       timeout:          Duration = 20.minutes
   ): Resource[F, SparqlClient[F]] =
@@ -87,4 +136,19 @@ object DefaultSparqlClient {
       .withTimeout(timeout)
       .build
       .map(c => new DefaultSparqlClient[F](c, connectionConfig))
+
+  private object ConnectionError {
+    def unapply(ex: Throwable): Option[Throwable] =
+      ex match {
+        case _: ConnectionFailure | _: ConnectException | _: SocketException | _: UnknownHostException =>
+          Some(ex)
+        case _: IOException
+            if ex.getMessage.toLowerCase
+              .contains("connection reset") || ex.getMessage.toLowerCase.contains("broken pipe") =>
+          Some(ex)
+        case _: EmberException.ReachedEndOfStream => Some(ex)
+        case _: ClosedChannelException            => Some(ex)
+        case _ => None
+      }
+  }
 }

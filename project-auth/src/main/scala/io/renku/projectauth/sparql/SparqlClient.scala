@@ -9,7 +9,7 @@ trait SparqlClient[F[_]] {
   /** The sparql update operation. */
   def update(request: SparqlUpdate): F[Unit]
 
-  /** Upload rdf data  */
+  /** Upload rdf data. Not an official sparql operation, but Jena supports it.  */
   def upload(data: JsonLD): F[Unit]
 
   /** The sparql query operation, returning results as JSON. */

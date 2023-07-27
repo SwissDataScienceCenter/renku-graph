@@ -1,5 +1,6 @@
 package io.renku.projectauth.sparql
 
+import io.renku.triplesstore.client.sparql.Fragment
 import io.renku.triplesstore.{SparqlQuery => SQuery}
 import org.http4s.{EntityEncoder, MediaType}
 import org.http4s.headers.`Content-Type`
@@ -18,6 +19,9 @@ object SparqlQuery {
 
   def apply(q: SQuery): SparqlQuery =
     raw(q.toString)
+
+  def apply(fr: Fragment): SparqlQuery =
+    raw(fr.sparql)
 
   implicit def entityEncoder[F[_]]: EntityEncoder[F, SparqlQuery] =
     EntityEncoder

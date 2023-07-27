@@ -8,12 +8,14 @@ import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.http4s.implicits._
 import org.scalatest.flatspec.AsyncFlatSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import java.time.Instant
 
 class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
-
-  val cc = ConnectionConfig(uri"http://localhost:3030/projects", None)
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  val cc = ConnectionConfig(uri"http://localhost:3030/projects", None, None)
 
   val testQuery = SparqlQuery.raw("""PREFIX schema: <http://schema.org/>
                                     |SELECT * WHERE {

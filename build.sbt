@@ -165,7 +165,8 @@ lazy val projectAuth = project
   .settings(commonSettings)
   .dependsOn(
     renkuModelTinyTypes % "compile->compile; test->test",
-    graphCommons        % "compile->compile; test->test"
+    graphCommons        % "compile->compile; test->test",
+    triplesStoreClient  % "compile->compile; test->test"
   )
   .enablePlugins(AutomateHeaderPlugin)
 
