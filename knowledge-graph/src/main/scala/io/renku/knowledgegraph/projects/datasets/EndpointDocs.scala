@@ -47,7 +47,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     GET(
       "Project Datasets",
       "Finds Project's Datasets",
-      Uri / "projects" / namespace / projectName / "datasets" :? page & perPage,
+      Uri / "projects" / namespace / projectName / "datasets" :? sort & page & perPage,
       Status.Ok -> Response("Datasets found",
                             Contents(MediaType.`application/json`("Sample data", example)),
                             responseHeaders
@@ -80,6 +80,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   )
 
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
+
+  private lazy val sort = Parameter.Query(
+    "sort",
+    Schema.String,
+    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name` and `dateModified`".some,
+    required = false
+  )
 
   private lazy val page = Parameter.Query(
     "page",

@@ -312,6 +312,7 @@ When the `query` parameter is given, the match is done on the following fields:
 **Sorting:**
 * `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
+* `dateModified` - to sort by entity modification date
 * `date` - to sort by entity creation date
 
 **NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
@@ -833,6 +834,7 @@ Finds list of datasets of the project with the given `namespace/name`.
 
 **Sorting:**
 * `name` - to sort by Dataset name - **default when no `query` parameter is given**
+* `dateModified` - to sort by modification date; in case a dataset hasn't been modified yet its creation date is considered.
 
 **Paging:**
 * the `page` query parameter is optional and defaults to `1`.
