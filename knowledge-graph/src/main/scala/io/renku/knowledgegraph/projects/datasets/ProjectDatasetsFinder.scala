@@ -113,7 +113,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
   )(implicit encoder: SparqlEncoder[OrderBy]): Fragment = {
     def mapPropertyName(property: Criteria.Sort.SortProperty) = property match {
       case Criteria.Sort.ByName         => OrderBy.Property("LCASE(?name)")
-      case Criteria.Sort.ByDateModified => OrderBy.Property("xsd:date(?modifiedCreatedOrPublished)")
+      case Criteria.Sort.ByDateModified => OrderBy.Property("?modifiedCreatedOrPublished")
     }
 
     encoder(sorting.toOrderBy(mapPropertyName))
