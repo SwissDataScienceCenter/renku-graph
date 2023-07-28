@@ -37,14 +37,22 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   import io.renku.json.JsonOps._
 
+  def briefJson(dataset:     Dataset[Dataset.Provenance.Modified],
+                originalDs:  Dataset[Dataset.Provenance],
+                projectPath: projects.Path
+  )(implicit
+      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Path)]
+  ): Json = encoder((dataset, Some(originalDs), projectPath))
+
   def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
-      encoder: Encoder[(Dataset[Dataset.Provenance], projects.Path)]
-  ): Json = encoder(dataset -> projectPath)
+      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Path)]
+  ): Json = encoder((dataset, Option.empty, projectPath))
 
   implicit def datasetEncoder[P <: Dataset.Provenance](implicit
       provenanceEncoder: Encoder[P]
-  ): Encoder[(Dataset[P], projects.Path)] = Encoder.instance { case (dataset, projectPath) =>
-    json"""{
+  ): Encoder[(Dataset[P], Option[Dataset[Dataset.Provenance]], projects.Path)] = Encoder.instance {
+    case (dataset, maybeOriginalDs, projectPath) =>
+      json"""{
       "identifier": ${dataset.identification.identifier.value},
       "versions": {
         "initial": ${dataset.provenance.originalIdentifier.value}
@@ -54,19 +62,26 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "slug":   ${dataset.identification.name.value},
       "images": ${dataset.additionalInfo.images -> projectPath}
     }"""
-      .deepMerge(
-        _links(
-          Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
-          Rel("tags") -> Href(
-            renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
+        .deepMerge(
+          _links(
+            Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
+            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
+            Rel("tags") -> Href(
+              renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
+            )
           )
         )
-      )
-      .deepMerge(provenanceEncoder(dataset.provenance))
-      .deepMerge(dataset.provenance.date.asInstanceOf[datasets.CreatedOrPublished].asJson)
-      .deepMerge(encodeMaybeDateModified(dataset.provenance))
-      .deepDropNullValues
+        .deepMerge(provenanceEncoder(dataset.provenance))
+        .deepMerge(encodeMaybeDateModified(dataset.provenance))
+        .deepMerge(
+          maybeOriginalDs
+            .map(_.provenance)
+            .getOrElse(dataset.provenance)
+            .date
+            .asInstanceOf[datasets.CreatedOrPublished]
+            .asJson
+        )
+        .deepDropNullValues
   }
 
   private implicit lazy val createdOrPublishedEncoder: Encoder[datasets.CreatedOrPublished] =
