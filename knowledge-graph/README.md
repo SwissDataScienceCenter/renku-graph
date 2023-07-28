@@ -836,6 +836,10 @@ Finds list of datasets of the project with the given `namespace/name`.
 * `name` - to sort by Dataset name - **default when no `query` parameter is given**
 * `dateModified` - to sort by modification date; in case a dataset hasn't been modified yet its creation date is considered.
 
+**NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
+
+Multiple `sort` parameters are allowed.
+
 **Paging:**
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`; max value is `100`.

@@ -24,10 +24,13 @@ import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets
 import io.renku.graph.model.testentities._
+import io.renku.http.rest.Sorting
+import io.renku.knowledgegraph.projects.datasets.Endpoint.Criteria
+import Criteria.Sort._
+import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.projects.datasets.Endpoint.Criteria
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.CustomAsyncIOSpec
@@ -80,7 +83,7 @@ class ProjectDatasetsFinderSpec
 
     provisionTestProject(project) >>
       datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting {
-        _.results shouldBe List(
+        _.results should contain theSameElementsAs List(
           ProjectDataset(
             dataset1.identification.identifier,
             datasets.OriginalIdentifier(dataset1.identification.identifier),
@@ -101,7 +104,7 @@ class ProjectDatasetsFinderSpec
             modified2.provenance.derivedFrom.asRight,
             modified2.additionalInfo.images
           )
-        ).sortBy(_.title)
+        )
       }
   }
 
@@ -179,6 +182,128 @@ class ProjectDatasetsFinderSpec
       datasetsFinder.findProjectDatasets(Criteria(project.path)).asserting(_.results shouldBe Nil)
   }
 
+  it should "return the results sorted by dateModified if requested" in {
+
+    val (ds1 -> ds1Modification -> ds2 -> ds2Modification, project) = renkuProjectEntities(anyVisibility)
+      .addDatasetAndModification(datasetEntities(provenanceImportedExternal))
+      .addDatasetAndModification(datasetEntities(provenanceInternal))
+      .generateOne
+
+    provisionTestProject(project) >>
+      datasetsFinder
+        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
+        .asserting {
+          _.results shouldBe List(
+            ProjectDataset(
+              ds1Modification.identification.identifier,
+              datasets.OriginalIdentifier(ds1.identification.identifier),
+              ds1Modification.identification.title,
+              ds1Modification.identification.name,
+              ds1.provenance.date,
+              datasets.DateModified(ds1Modification.provenance.date).some,
+              ds1Modification.provenance.derivedFrom.asRight,
+              ds1Modification.additionalInfo.images
+            ),
+            ProjectDataset(
+              ds2Modification.identification.identifier,
+              datasets.OriginalIdentifier(ds2.identification.identifier),
+              ds2Modification.identification.title,
+              ds2Modification.identification.name,
+              ds2.provenance.date,
+              datasets.DateModified(ds2Modification.provenance.date).some,
+              ds2Modification.provenance.derivedFrom.asRight,
+              ds2Modification.additionalInfo.images
+            )
+          ).sortBy(_.maybeDateModified).reverse
+        }
+  }
+
+  it should "return the results sorted by dateModified with a fallback to dateCreated or datePublished for non-modified DS" in {
+
+    val (dsImported -> dsInternal -> dsOrig -> dsOrigModification, project) = renkuProjectEntities(anyVisibility)
+      .addDataset(datasetEntities(provenanceImportedExternal))
+      .addDataset(datasetEntities(provenanceInternal))
+      .addDatasetAndModification(datasetEntities(provenanceInternal))
+      .generateOne
+
+    provisionTestProject(project) >>
+      datasetsFinder
+        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByDateModified, Direction.Desc))))
+        .asserting {
+          _.results shouldBe List(
+            ProjectDataset(
+              dsImported.identification.identifier,
+              datasets.OriginalIdentifier(dsImported.identification.identifier),
+              dsImported.identification.title,
+              dsImported.identification.name,
+              dsImported.provenance.date,
+              maybeDateModified = None,
+              dsImported.provenance.sameAs.asLeft,
+              dsImported.additionalInfo.images
+            ),
+            ProjectDataset(
+              dsInternal.identification.identifier,
+              datasets.OriginalIdentifier(dsInternal.identification.identifier),
+              dsInternal.identification.title,
+              dsInternal.identification.name,
+              dsInternal.provenance.date,
+              maybeDateModified = None,
+              datasets.SameAs(dsInternal.provenance.topmostSameAs.value).asLeft,
+              dsInternal.additionalInfo.images
+            ),
+            ProjectDataset(
+              dsOrigModification.identification.identifier,
+              datasets.OriginalIdentifier(dsOrig.identification.identifier),
+              dsOrigModification.identification.title,
+              dsOrigModification.identification.name,
+              dsOrig.provenance.date,
+              datasets.DateModified(dsOrigModification.provenance.date).some,
+              dsOrigModification.provenance.derivedFrom.asRight,
+              dsOrigModification.additionalInfo.images
+            )
+          ).sortBy(ds => ds.maybeDateModified.map(_.value).getOrElse(ds.createdOrPublished.instant)).reverse
+        }
+  }
+
+  it should "return the results sorted by name by default and if requested" in {
+
+    val (ds1 -> ds2, project) = renkuProjectEntities(anyVisibility)
+      .addDataset(datasetEntities(provenanceImportedExternal))
+      .addDataset(datasetEntities(provenanceInternal))
+      .generateOne
+
+    val expectedResults = List(
+      ProjectDataset(
+        ds1.identification.identifier,
+        datasets.OriginalIdentifier(ds1.identification.identifier),
+        ds1.identification.title,
+        ds1.identification.name,
+        ds1.provenance.date,
+        maybeDateModified = None,
+        ds1.provenance.sameAs.asLeft,
+        ds1.additionalInfo.images
+      ),
+      ProjectDataset(
+        ds2.identification.identifier,
+        datasets.OriginalIdentifier(ds2.identification.identifier),
+        ds2.identification.title,
+        ds2.identification.name,
+        ds2.provenance.date,
+        maybeDateModified = None,
+        datasets.SameAs(ds2.provenance.topmostSameAs.value).asLeft,
+        ds2.additionalInfo.images
+      )
+    ).sortBy(_.title.value.toLowerCase)
+
+    provisionTestProject(project) >>
+      datasetsFinder
+        .findProjectDatasets(Criteria(project.path, Sorting(Criteria.Sort.By(ByName, Direction.Asc))))
+        .asserting(_.results shouldBe expectedResults) >>
+      datasetsFinder
+        .findProjectDatasets(Criteria(project.path))
+        .asserting(_.results shouldBe expectedResults)
+  }
+
   it should "return the requested page" in {
 
     val (dataset1 -> dataset2 -> modified2, project) = renkuProjectEntities(anyVisibility)
@@ -187,30 +312,32 @@ class ProjectDatasetsFinderSpec
       .generateOne
 
     provisionTestProject(project) >>
-      datasetsFinder.findProjectDatasets(Criteria(project.path, PagingRequest(Page(2), PerPage(1)))).asserting {
-        _.results shouldBe List(
-          ProjectDataset(
-            dataset1.identification.identifier,
-            datasets.OriginalIdentifier(dataset1.identification.identifier),
-            dataset1.identification.title,
-            dataset1.identification.name,
-            dataset1.provenance.date,
-            maybeDateModified = None,
-            dataset1.provenance.sameAs.asLeft,
-            dataset1.additionalInfo.images
-          ),
-          ProjectDataset(
-            modified2.identification.identifier,
-            datasets.OriginalIdentifier(dataset2.identification.identifier),
-            modified2.identification.title,
-            modified2.identification.name,
-            dataset2.provenance.date,
-            datasets.DateModified(modified2.provenance.date).some,
-            modified2.provenance.derivedFrom.asRight,
-            modified2.additionalInfo.images
-          )
-        ).sortBy(_.title).slice(1, 2)
-      }
+      datasetsFinder
+        .findProjectDatasets(Criteria(project.path, paging = PagingRequest(Page(2), PerPage(1))))
+        .asserting {
+          _.results shouldBe List(
+            ProjectDataset(
+              dataset1.identification.identifier,
+              datasets.OriginalIdentifier(dataset1.identification.identifier),
+              dataset1.identification.title,
+              dataset1.identification.name,
+              dataset1.provenance.date,
+              maybeDateModified = None,
+              dataset1.provenance.sameAs.asLeft,
+              dataset1.additionalInfo.images
+            ),
+            ProjectDataset(
+              modified2.identification.identifier,
+              datasets.OriginalIdentifier(dataset2.identification.identifier),
+              modified2.identification.title,
+              modified2.identification.name,
+              dataset2.provenance.date,
+              datasets.DateModified(modified2.provenance.date).some,
+              modified2.provenance.derivedFrom.asRight,
+              modified2.additionalInfo.images
+            )
+          ).sortBy(_.title.value.toLowerCase).slice(1, 2)
+        }
   }
 
   implicit override def ioLogger:    TestLogger[IO]              = TestLogger[IO]()

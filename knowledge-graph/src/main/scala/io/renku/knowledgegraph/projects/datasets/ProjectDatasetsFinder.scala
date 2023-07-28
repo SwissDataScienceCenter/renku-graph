@@ -25,10 +25,13 @@ import cats.syntax.all._
 import io.renku.graph.model.datasets.{DateCreated, DateModified, DatePublished, DerivedFrom, Identifier, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import io.renku.triplesstore.client.model.OrderBy
+import io.renku.triplesstore.client.sparql.{Fragment, SparqlEncoder}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectDatasetsFinder[F[_]] {
@@ -63,14 +66,14 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
 
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "ds projects",
-    Prefixes of (renku -> "renku", schema -> "schema", prov -> "prov"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", xsd -> "xsd"),
     sparql"""|SELECT ?identifier ?name ?slug
-             |  ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |  ?modifiedCreatedOrPublished ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
              |  ?topmostSameAs ?maybeDerivedFrom ?originalId
              |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
              |WHERE {
              |   BIND (${projects.ResourceId(criteria.projectPath).asEntityId} AS ?projectId)
-             |   Graph ?projectId {
+             |   GRAPH ?projectId {
              |     ?projectId renku:hasDataset ?datasetId.
              |     ?datasetId a schema:Dataset;
              |               schema:identifier ?identifier;
@@ -92,14 +95,29 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
              |                ^schema:image ?datasetId .
              |       BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
              |     }
+             |
+             |     BIND(IF (BOUND(?maybeDateModified), ?maybeDateModified,
+             |       IF (BOUND(?maybeDateCreated), ?maybeDateCreated, xsd:dateTime(?maybeDatePublished))) AS ?modifiedCreatedOrPublished
+             |     )
              |   }
              |}
              |GROUP BY ?identifier ?name ?slug
-             |  ?maybeDateCreated ?maybeDatePublished ?maybeDateModified
+             |  ?maybeDateCreated ?maybeDatePublished ?maybeDateModified ?modifiedCreatedOrPublished
              |  ?topmostSameAs ?maybeDerivedFrom ?originalId
-             |ORDER BY ASC(?name)
+             |${`ORDER BY`(criteria.sorting)}
              |""".stripMargin
   )
+
+  private def `ORDER BY`(
+      sorting: Sorting[Criteria.Sort.type]
+  )(implicit encoder: SparqlEncoder[OrderBy]): Fragment = {
+    def mapPropertyName(property: Criteria.Sort.SortProperty) = property match {
+      case Criteria.Sort.ByName         => OrderBy.Property("LCASE(?name)")
+      case Criteria.Sort.ByDateModified => OrderBy.Property("xsd:date(?modifiedCreatedOrPublished)")
+    }
+
+    encoder(sorting.toOrderBy(mapPropertyName))
+  }
 
   private implicit val recordDecoder: Decoder[ProjectDataset] = { implicit cur =>
     import io.renku.tinytypes.json.TinyTypeDecoders._

@@ -90,7 +90,7 @@ object Criteria {
     final case object ByDate          extends Property("date") with SortProperty
     final case object ByDateModified  extends Property("dateModified") with SortProperty
 
-    val byNameAsc = Sort.By(ByName, Direction.Asc)
+    val byNameAsc: Sort.By = Sort.By(ByName, Direction.Asc)
 
     val default: Sorting[Sort.type] = Sorting(byNameAsc)
 

@@ -614,6 +614,8 @@ class MicroserviceRoutesSpec
 
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
     import projects.datasets.Endpoint.Criteria
+    import projects.datasets.Endpoint.Criteria.Sort
+    import projects.datasets.Endpoint.Criteria.Sort._
 
     val projectPath = projectPaths.generateOne
     val projectDsUri = projectPath.toNamespaces
@@ -623,15 +625,30 @@ class MicroserviceRoutesSpec
       Table(
         "uri"        -> "criteria",
         projectDsUri -> Criteria(projectPath),
+        sortingDirections
+          .map(dir =>
+            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectPath, sorting = Sorting(Sort.By(ByName, dir)))
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectPath,
+                                                                         sorting = Sorting(Sort.By(ByDateModified, dir))
+            )
+          )
+          .generateOne,
         pages
           .map(page =>
-            projectDsUri +? ("page" -> page.show) -> Criteria(projectPath, PagingRequest.default.copy(page = page))
+            projectDsUri +? ("page" -> page.show) -> Criteria(projectPath,
+                                                              paging = PagingRequest.default.copy(page = page)
+            )
           )
           .generateOne,
         perPages
           .map(perPage =>
             projectDsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
-                                                                     PagingRequest.default.copy(perPage = perPage)
+                                                                     paging =
+                                                                       PagingRequest.default.copy(perPage = perPage)
             )
           )
           .generateOne

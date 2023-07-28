@@ -29,6 +29,8 @@ import io.renku.data.Message
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
 import io.renku.http.rest.Links._
+import io.renku.http.rest.SortBy.Direction
+import io.renku.http.rest.Sorting
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
@@ -84,7 +86,28 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
 
 object Endpoint {
 
-  final case class Criteria(projectPath: projects.Path, paging: PagingRequest = PagingRequest.default)
+  final case class Criteria(projectPath: projects.Path,
+                            sorting:     Sorting[Criteria.Sort.type] = Criteria.Sort.default,
+                            paging:      PagingRequest = PagingRequest.default
+  )
+
+  object Criteria {
+    object Sort extends io.renku.http.rest.SortBy {
+
+      type PropertyType = SortProperty
+
+      sealed trait SortProperty extends Property
+
+      final case object ByName         extends Property("name") with SortProperty
+      final case object ByDateModified extends Property("dateModified") with SortProperty
+
+      val byNameAsc: Sort.By = Sort.By(ByName, Direction.Asc)
+
+      val default: Sorting[Sort.type] = Sorting(byNameAsc)
+
+      override lazy val properties: Set[SortProperty] = Set(ByName, ByDateModified)
+    }
+  }
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     implicit0(renkuUrl: RenkuUrl)        <- RenkuUrlLoader()
