@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.triplesstore.client.http
 
 import cats.MonadThrow
@@ -13,9 +31,6 @@ import scala.concurrent.duration.FiniteDuration
 final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, maxTries: Int) {
   private[this] val logger: Logger[F] = Logger[F]
   private[this] val F = MonadThrow[F]
-
-  def retryConnectionError[A](fa: F[A]): F[A] =
-    retryWhen(ConnectionError.exists)(fa)
 
   def retryWhen[A](filter: Throwable => Boolean)(fa: F[A]): F[A] = {
     val waits = Stream.awakeDelay(interval).void
@@ -47,6 +62,9 @@ final class Retry[F[_]: Logger: Temporal: MonadThrow](interval: FiniteDuration, 
       case Left(errs) => F.raiseError(Retry.RetryExceeded(interval, maxTries, errs))
     }
   }
+
+  def retryConnectionError[A](fa: F[A]): F[A] =
+    retryWhen(ConnectionError.exists)(fa)
 }
 
 object Retry {

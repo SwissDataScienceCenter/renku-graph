@@ -9,6 +9,7 @@ import org.scalatest.matchers.should
 import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import io.renku.triplesstore.client.syntax._
 
 import java.time.Instant
 
@@ -16,29 +17,27 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   val cc = ConnectionConfig(uri"http://localhost:3030/projects", None, None)
 
-  val testQuery = SparqlQuery.raw("""PREFIX schema: <http://schema.org/>
-                                    |SELECT * WHERE {
-                                    |  graph <https://tygtmzjt:8901/EWxEPoLMmg/projects/123> {
-                                    |    ?projId schema:dateModified ?dateModified
-                                    |  }
-                                    |} LIMIT 100""".stripMargin)
+  val testQuery = sparql"""PREFIX schema: <http://schema.org/>
+                          |SELECT * WHERE {
+                          |  graph <https://tygtmzjt:8901/EWxEPoLMmg/projects/123> {
+                          |    ?projId schema:dateModified ?dateModified
+                          |  }
+                          |} LIMIT 100""".stripMargin
 
   it should "run sparql queries" in {
     SparqlClient[IO](cc).use { c =>
       for {
         _ <- c.update(
-               SparqlUpdate.raw(
-                 """PREFIX schema: <http://schema.org/>
-                   |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                   |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                   |INSERT DATA {
-                   |  Graph <https://tygtmzjt:8901/EWxEPoLMmg/projects/123> {
-                   |     <https://tygtmzjt:8901/EWxEPoLMmg/projects/123>
-                   |     schema:dateModified "1988-09-21T17:44:42.325Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
-                   |  }
-                   |}
-                   |""".stripMargin
-               )
+               sparql"""PREFIX schema: <http://schema.org/>
+                       |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                       |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                       |INSERT DATA {
+                       |  Graph <https://tygtmzjt:8901/EWxEPoLMmg/projects/123> {
+                       |     <https://tygtmzjt:8901/EWxEPoLMmg/projects/123>
+                       |     schema:dateModified "1988-09-21T17:44:42.325Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>.
+                       |  }
+                       |}
+                       |""".stripMargin
              )
         r <- c.query(testQuery)
         obj = r.asObject.getOrElse(sys.error(s"Unexpected response: $r"))
