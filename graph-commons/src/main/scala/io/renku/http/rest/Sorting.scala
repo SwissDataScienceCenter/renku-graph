@@ -50,6 +50,9 @@ object Sorting {
   def fromListOrDefault[E <: SortBy](list: List[E#By], default: => Sorting[E]): Sorting[E] =
     fromList(list).getOrElse(default)
 
+  def fromOptionalListOrDefault[E <: SortBy](maybeList: Option[List[E#By]], default: => Sorting[E]): Sorting[E] =
+    fromListOrDefault(maybeList getOrElse Nil, default)
+
   implicit def sortingSemigroup[A <: SortBy]: Semigroup[Sorting[A]] =
     Semigroup.instance(_ ++ _)
 

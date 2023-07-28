@@ -57,7 +57,7 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testProject) =
+    val (dataset1 -> dataset2 -> dataset2Modified, testProject) =
       renkuProjectEntities(visibilityPublic, creatorGen = cliShapedPersons)
         .modify(removeMembers())
         .addDataset(datasetEntities(provenanceInternal(cliShapedPersons)))
@@ -90,7 +90,7 @@ class DatasetsResourcesSpec
       projectDatasetsResponse.status shouldBe Ok
       val foundDatasets = projectDatasetsResponse.jsonBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
-                                                          briefJson(dataset2Modified, project.path)
+                                                          briefJson(dataset2Modified, dataset2, project.path)
       )
 
       When("user then fetches details of the chosen dataset with the link from the response")

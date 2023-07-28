@@ -18,180 +18,120 @@
 
 package io.renku.knowledgegraph.projects.datasets
 
+import Generators.projectDatasetGen
 import cats.effect.IO
 import cats.syntax.all._
-import io.circe.literal._
+import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import io.renku.config.renku
+import io.renku.config.renku.ResourceUrl
 import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{Identifier, Name, OriginalIdentifier, Title}
-import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.{GitLabUrl, RenkuUrl}
+import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.testtools.IOSpec
+import io.renku.testtools.CustomAsyncIOSpec
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.AsyncMockFactory
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
+class EndpointSpec
+    extends AsyncFlatSpec
+    with CustomAsyncIOSpec
+    with AsyncMockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers
+    with BeforeAndAfterEach {
 
-  import ProjectDatasetsFinder._
+  it should "respond with OK and the found datasets" in {
 
-  "getProjectDatasets" should {
+    val criteria = Endpoint.Criteria(projectPath)
 
-    "respond with OK and the found datasets" in new TestCase {
+    val pagingResponse = pagingResponses(projectDatasetGen).generateOne
+    givenProjectFinding(criteria, returning = pagingResponse.pure[IO])
 
-      forAll(nonEmptyList(datasetBasicDetails).map(_.toList)) { datasetsList =>
-        (projectDatasetsFinder
-          .findProjectDatasets(_: Path))
-          .expects(projectPath)
-          .returning(datasetsList.pure[IO])
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+      for {
+        _ <- response.as[List[Json]].asserting(_ shouldBe pagingResponse.results.map(_.asJson))
+        _ = response.status        shouldBe Ok
+        _ = response.contentType   shouldBe Some(`Content-Type`(MediaType.application.json))
+        _ = response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
 
-        val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
-
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-
-        response.as[List[Json]].unsafeRunSync() should contain theSameElementsAs (datasetsList map toJson)
-
-        logger.loggedOnly(
-          Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
-        )
-        logger.reset()
-      }
+        _ =
+          logger.loggedOnly(
+            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+          )
+      } yield ()
     }
 
-    "respond with OK an empty JSON array if no datasets found" in new TestCase {
+  }
 
-      (projectDatasetsFinder
-        .findProjectDatasets(_: Path))
-        .expects(projectPath)
-        .returning(List.empty[ProjectDataset].pure[IO])
+  it should "respond with OK an empty JSON array if no datasets found" in {
 
-      val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
+    val criteria = Endpoint.Criteria(projectPath)
 
-      response.status                         shouldBe Ok
-      response.contentType                    shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[List[Json]].unsafeRunSync() shouldBe List.empty
+    givenProjectFinding(criteria, returning = PagingResponse.empty[ProjectDataset](pagingRequests.generateOne).pure[IO])
 
-      logger.loggedOnly(
-        Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
-      )
-    }
-
-    "respond with INTERNAL_SERVER_ERROR if finding datasets fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (projectDatasetsFinder
-        .findProjectDatasets(_: Path))
-        .expects(projectPath)
-        .returning(exception.raiseError[IO, List[ProjectDataset]])
-
-      val response = endpoint.getProjectDatasets(projectPath).unsafeRunSync()
-
-      response.status      shouldBe InternalServerError
-      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-
-      response.as[Message].unsafeRunSync() shouldBe Message.Error.unsafeApply(s"Finding $projectPath's datasets failed")
-
-      logger.loggedOnly(Error(s"Finding $projectPath's datasets failed", exception))
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+      for {
+        _ <- response.as[List[Json]].asserting(_ shouldBe List.empty)
+        _ = response.status shouldBe Ok
+        _ =
+          logger.loggedOnly(
+            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+          )
+      } yield ()
     }
   }
 
-  private trait TestCase {
-    val projectPath = projectPaths.generateOne
+  it should "respond with INTERNAL_SERVER_ERROR if finding datasets fails" in {
 
-    val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
-    val renkuApiUrl           = renkuApiUrls.generateOne
-    val gitLabUrl             = gitLabUrls.generateOne
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    val criteria = Endpoint.Criteria(projectPath)
 
-    lazy val toJson: ((Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
-      case (id, originalId, title, name, Left(sameAs), images) =>
-        json"""{
-          "identifier": $id,
-          "versions": {
-            "initial": $originalId
-          },
-          "title": $title,
-          "name": $name,
-          "slug": $name,
-          "sameAs": $sameAs,
-          "images": $images,
-          "_links": [{
-            "rel":  "details",
-            "href": ${renkuApiUrl / "datasets" / id}
-          }, {
-            "rel":  "initial-version",
-            "href": ${renkuApiUrl / "datasets" / originalId}
-          }, {
-            "rel":  "tags",
-            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
-          }]
-        }"""
-      case (id, originalId, title, name, Right(derivedFrom), images) =>
-        json"""{
-          "identifier": $id,
-          "versions" : {
-            "initial": $originalId
-          },
-          "title": $title,
-          "name": $name,
-          "slug": $name,
-          "derivedFrom": $derivedFrom,
-          "images": $images,
-          "_links": [{
-            "rel":  "details",
-            "href": ${renkuApiUrl / "datasets" / id}
-          }, {
-            "rel":  "initial-version",
-            "href": ${renkuApiUrl / "datasets" / originalId}
-          }, {
-            "rel":  "tags",
-            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
-          }]
-        }"""
-    }
+    val exception = exceptions.generateOne
+    givenProjectFinding(criteria, returning = exception.raiseError[IO, PagingResponse[ProjectDataset]])
 
-    private implicit lazy val imagesEncoder: Encoder[List[ImageUri]] = Encoder.instance[List[ImageUri]] { images =>
-      Json.arr(images.map {
-        case uri: ImageUri.Relative => json"""{
-            "location": $uri,
-            "_links": [{
-              "rel":  "view",
-              "href": ${s"$gitLabUrl/$projectPath/raw/master/$uri"}
-            }]
-          }"""
-        case uri: ImageUri.Absolute => json"""{
-            "location": $uri,
-            "_links": [{
-              "rel":  "view",
-              "href": $uri
-            }]
-          }"""
-      }: _*)
+    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+      for {
+        _ <- response
+               .as[Message]
+               .asserting(_ shouldBe Message.Error.unsafeApply(s"Finding ${criteria.projectPath}'s datasets failed"))
+        _ = response.status      shouldBe InternalServerError
+        _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+        _ = logger.loggedOnly(Error(s"Finding ${criteria.projectPath}'s datasets failed", exception))
+      } yield ()
     }
   }
 
-  private implicit lazy val datasetBasicDetails: Gen[ProjectDataset] = for {
-    id                      <- datasetIdentifiers
-    originalIdentifier      <- datasetOriginalIdentifiers
-    title                   <- datasetTitles
-    name                    <- datasetNames
-    sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-    images                  <- listOf(imageUris)
-  } yield (id, originalIdentifier, title, name, sameAsEitherDerivedFrom, images)
+  private lazy val request     = Request[IO]()
+  private lazy val projectPath = projectPaths.generateOne
+
+  private implicit lazy val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectPath)
+
+  private lazy val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
+  private implicit lazy val renkuApiUrl:      renku.ApiUrl      = renkuApiUrls.generateOne
+  private implicit lazy val renkuUrl:         RenkuUrl          = renkuUrls.generateOne
+  private implicit lazy val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
+  private implicit lazy val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+  private implicit lazy val logger:           TestLogger[IO]    = TestLogger[IO]()
+  private lazy val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
+  private lazy val endpoint              = new EndpointImpl[IO](projectDatasetsFinder, executionTimeRecorder)
+
+  protected override def beforeEach() = logger.reset()
+
+  private def givenProjectFinding(criteria: Endpoint.Criteria, returning: IO[PagingResponse[ProjectDataset]]) =
+    (projectDatasetsFinder.findProjectDatasets _)
+      .expects(criteria)
+      .returning(returning)
 }
