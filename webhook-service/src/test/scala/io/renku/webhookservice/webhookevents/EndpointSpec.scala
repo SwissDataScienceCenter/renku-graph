@@ -73,7 +73,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
 
       logger.loggedOnly(
         Info(
-          s"Push event for eventId = $commitId, projectId = ${syncRequest.project.id}, projectPath = ${syncRequest.project.path} -> accepted"
+          s"Push event for eventId = $commitId, projectId = ${syncRequest.project.id}, projectSlug = ${syncRequest.project.slug} -> accepted"
         )
       )
     }
@@ -170,7 +170,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with should.Matchers wit
       "after": $commitId,
       "project": {
         "id":                  ${syncRequest.project.id},
-        "path_with_namespace": ${syncRequest.project.path}
+        "path_with_namespace": ${syncRequest.project.slug}
       }
     }"""
 }

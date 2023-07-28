@@ -22,7 +22,7 @@ import io.renku.cli.model.CliProject
 import io.renku.graph.model._
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Slug, Visibility}
 import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 
@@ -39,7 +39,7 @@ sealed trait NonRenkuProject extends Project with Product with Serializable {
 
 object NonRenkuProject {
 
-  final case class WithoutParent(path:             Path,
+  final case class WithoutParent(slug:             Slug,
                                  name:             Name,
                                  maybeDescription: Option[Description],
                                  dateCreated:      DateCreated,
@@ -55,7 +55,7 @@ object NonRenkuProject {
     def fold[A](f1: NonRenkuProject.WithParent => A, f2: NonRenkuProject.WithoutParent => A): A = f2(this)
   }
 
-  final case class WithParent(path:             Path,
+  final case class WithParent(slug:             Slug,
                               name:             Name,
                               maybeDescription: Option[Description],
                               dateCreated:      DateCreated,
@@ -85,7 +85,7 @@ object NonRenkuProject {
     project =>
       entities.NonRenkuProject.WithoutParent(
         projects.ResourceId(project.asEntityId),
-        project.path,
+        project.slug,
         project.name,
         project.maybeDescription,
         project.dateCreated,
@@ -103,7 +103,7 @@ object NonRenkuProject {
     project =>
       entities.NonRenkuProject.WithParent(
         projects.ResourceId(project.asEntityId),
-        project.path,
+        project.slug,
         project.name,
         project.maybeDescription,
         project.dateCreated,

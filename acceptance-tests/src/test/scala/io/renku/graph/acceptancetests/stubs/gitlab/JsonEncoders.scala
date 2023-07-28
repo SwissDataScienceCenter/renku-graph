@@ -141,7 +141,7 @@ trait JsonEncoders {
           "topics"              -> project.entitiesProject.keywords.map(_.value).asJson,
           "name"                -> project.name.value.asJson,
           "star_count"          -> project.starsCount.value.asJson,
-          "path_with_namespace" -> project.path.value.asJson,
+          "path_with_namespace" -> project.slug.value.asJson,
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
           "updated_at"          -> project.entitiesProject.dateModified.value.asJson,
           "creator_id"          -> project.maybeCreator.map(_.gitLabId).asJson,
@@ -149,7 +149,7 @@ trait JsonEncoders {
           "statistics"          -> project.statistics.asJson,
           "forked_from_project" -> (project.entitiesProject match {
             case withParent: Parent =>
-              Json.obj("path_with_namespace" -> withParent.parent.path.value.asJson)
+              Json.obj("path_with_namespace" -> withParent.parent.slug.value.asJson)
             case _ => Json.Null
           })
         )

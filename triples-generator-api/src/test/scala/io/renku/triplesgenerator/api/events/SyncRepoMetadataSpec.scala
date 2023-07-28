@@ -23,7 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should
@@ -43,9 +43,9 @@ class SyncRepoMetadataSpec extends AnyWordSpec with should.Matchers with ScalaCh
       json"""{
         "categoryName": "SYNC_REPO_METADATA",
         "project": {
-          "path": "project/path"
+          "slug": "project/path"
         }
-      }""".hcursor.as[SyncRepoMetadata].value shouldBe SyncRepoMetadata(projects.Path("project/path"))
+      }""".hcursor.as[SyncRepoMetadata].value shouldBe SyncRepoMetadata(projects.Slug("project/path"))
     }
 
     "fail if categoryName does not match" in {
@@ -54,7 +54,7 @@ class SyncRepoMetadataSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val result = json"""{
         "categoryName": $otherCategory,
         "project": {
-          "path": ${projectPaths.generateOne}
+          "slug": ${projectSlugs.generateOne}
         }
       }""".hcursor.as[SyncRepoMetadata]
 

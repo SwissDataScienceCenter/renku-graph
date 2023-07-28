@@ -47,12 +47,12 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
   import membersSynchronizer._
   import tsReadinessChecker._
 
-  protected override type Event = projects.Path
+  protected override type Event = projects.Slug
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.getProjectPath,
-      process = (tsWriteLock: Lock[F, projects.Path]).surround[Unit](synchronizeMembers _),
+      decode = _.event.getProjectSlug,
+      process = (tsWriteLock: Lock[F, projects.Slug]).surround[Unit](synchronizeMembers _),
       precondition = verifyTSReady,
       onRelease = subscriptionMechanism.renewSubscription().some
     )

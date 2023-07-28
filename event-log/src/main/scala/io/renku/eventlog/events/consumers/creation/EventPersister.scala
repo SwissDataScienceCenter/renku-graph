@@ -57,7 +57,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
         result <- insertIfNotDuplicate(event)(session)
                     .flatTap(_ => transaction.commit)
                     .recoverWith { case error => transaction.rollback(sp) >> error.raiseError[F, Result] }
-        _ <- whenA(aNewEventIsCreated(result))(EventStatusGauges[F].awaitingGeneration.increment(event.project.path))
+        _ <- whenA(aNewEventIsCreated(result))(EventStatusGauges[F].awaitingGeneration.increment(event.project.slug))
       } yield result
     }
   }
@@ -176,17 +176,17 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
 
   private def upsertProject(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - upsert project")
-      .command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple](
+      .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](
         sql"""
             INSERT INTO project (project_id, project_path, latest_event_date)
-            VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+            VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
               UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
               WHERE EXCLUDED.latest_event_date > project.latest_event_date
           """.command
       )
-      .arguments(event.project.id *: event.project.path *: event.date *: EmptyTuple)
+      .arguments(event.project.id *: event.project.slug *: event.date *: EmptyTuple)
       .build
       .void
   )

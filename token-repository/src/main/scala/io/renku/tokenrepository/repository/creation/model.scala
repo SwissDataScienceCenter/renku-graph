@@ -50,10 +50,10 @@ private[repository] final case class TokenStoringInfo(project:        Project,
                                                       dates:          TokenDates
 )
 
-private[repository] final case class Project(id: projects.GitLabId, path: projects.Path)
+private[repository] final case class Project(id: projects.GitLabId, slug: projects.Slug)
 
 private[repository] object Project {
   implicit lazy val show: Show[Project] = { case Project(id, path) =>
-    s"projectId = $id, projectPath = $path"
+    s"projectId = $id, projectSlug = $path"
   }
 }

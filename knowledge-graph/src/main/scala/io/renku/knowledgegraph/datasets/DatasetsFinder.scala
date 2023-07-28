@@ -90,7 +90,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
       name = "ds free-text search",
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
       s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date 
-          |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectPath) AS ?projectSamplePath) ?projectsCount         
+          |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectSlug) AS ?projectSamplePath) ?projectsCount
           |  (GROUP_CONCAT(?keyword; separator='|') AS ?keywords)
           |  (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images) 
           |WHERE { 
@@ -146,7 +146,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |                schema:identifier ?identifier;
           |                schema:name ?name;
           |                renku:slug ?slug. 
-          |    ?projectIdSample renku:projectPath ?projectPath.
+          |    ?projectIdSample renku:projectPath ?projectSlug.
           |    OPTIONAL {
           |      ?dsIdSample schema:image ?imageId.
           |      ?imageId schema:position ?imagePosition;
@@ -245,7 +245,7 @@ private object DatasetsFinderImpl {
       maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate  <- cursor.downField("maybeDatePublished").downField("value").as[Option[DatePublished]]
       projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-      exemplarProjectPath <- cursor.downField("projectSamplePath").downField("value").as[projects.Path]
+      exemplarProjectSlug <- cursor.downField("projectSampleSlug").downField("value").as[projects.Slug]
       keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription    <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
@@ -260,7 +260,7 @@ private object DatasetsFinderImpl {
       maybeDescription,
       List.empty[DatasetCreator],
       date,
-      ExemplarProject(projects.ResourceId(exemplarProjectPath), exemplarProjectPath),
+      ExemplarProject(projects.ResourceId(exemplarProjectSlug), exemplarProjectSlug),
       projectsCount,
       keywords,
       images

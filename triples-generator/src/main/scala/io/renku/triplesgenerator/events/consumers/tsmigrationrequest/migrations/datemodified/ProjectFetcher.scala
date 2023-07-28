@@ -31,7 +31,7 @@ import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectFetcher[F[_]] {
-  def fetchProject(path: projects.Path): F[Option[ProjectInfo]]
+  def fetchProject(slug: projects.Slug): F[Option[ProjectInfo]]
 }
 
 private object ProjectFetcher {
@@ -41,20 +41,20 @@ private object ProjectFetcher {
 
 private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends ProjectFetcher[F] {
 
-  override def fetchProject(path: projects.Path): F[Option[ProjectInfo]] = tsClient.queryExpecting[Option[ProjectInfo]](
+  override def fetchProject(slug: projects.Slug): F[Option[ProjectInfo]] = tsClient.queryExpecting[Option[ProjectInfo]](
     SparqlQuery.ofUnsafe(
       show"${AddProjectDateModified.name} - find projects",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      sparql"""|SELECT DISTINCT ?id ?path ?dateCreated
+      sparql"""|SELECT DISTINCT ?id ?slug ?dateCreated
                |WHERE {
-               |  BIND (${path.asObject} AS ?path)
+               |  BIND (${slug.asObject} AS ?path)
                |  GRAPH ?id {
                |    ?id a schema:Project;
-               |        renku:projectPath ?path;
+               |        renku:projectPath ?slug;
                |        schema:dateCreated ?dateCreated.
                |  }
                |}
-               |GROUP BY ?id ?path ?dateCreated
+               |GROUP BY ?id ?slug ?dateCreated
                |LIMIT 1
                |""".stripMargin
     )
@@ -65,7 +65,7 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
       import io.renku.tinytypes.json.TinyTypeDecoders._
       (
         extract[projects.ResourceId]("id"),
-        extract[projects.Path]("path"),
+        extract[projects.Slug]("slug"),
         extract[projects.DateCreated]("dateCreated")
       ).mapN(ProjectInfo)
   }

@@ -27,7 +27,7 @@ import TestEventStatusGauges._
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
@@ -60,7 +60,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created(event1)
 
-        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
         storedEvent(event1.compoundEventId) shouldBe (
           event1.compoundEventId,
@@ -71,7 +71,7 @@ class EventPersisterSpec
           event1.body,
           None
         )
-        storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
+        storedProjects shouldBe List((event1.project.id, event1.project.slug, event1.date))
 
         // storeNewEvent 2 - different event id and different project
         val event2 = newEvents.generateOne
@@ -81,7 +81,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created(event2)
 
-        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
@@ -96,7 +96,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
         findEvents(status = New).head shouldBe (
           event1.compoundEventId, ExecutionDate(now), event1.batchDate
@@ -110,7 +110,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 2d
+        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 2d
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
@@ -125,7 +125,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
         // storing event 2 for the same project but more recent Event Date
         val event2       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
@@ -134,7 +134,7 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 2d
+        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 2d
 
         // storing event 3 for the same project but less recent Event Date
         val event3       = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
@@ -143,13 +143,13 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event3).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event3.project.path).unsafeRunSync() shouldBe 3d
+        gauges.awaitingGeneration.getValue(event3.project.slug).unsafeRunSync() shouldBe 3d
 
         val savedEvent1 +: savedEvent2 +: savedEvent3 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
         savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
         savedEvent3    shouldBe (event3.compoundEventId, ExecutionDate(nowForEvent3))
-        storedProjects shouldBe List((event1.project.id, event1.project.path, event2.date))
+        storedProjects shouldBe List((event1.project.id, event1.project.slug, event2.date))
       }
 
     "update latest_event_date and project_path for a project " +
@@ -160,10 +160,10 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
         // storing event 2 for the same project but with different project_path and more recent Event Date
-        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
                                                 date = EventDate(now.minus(1, HOURS))
         )
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
@@ -171,12 +171,12 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
         savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
-        storedProjects shouldBe List((event1.project.id, event2.project.path, event2.date))
+        storedProjects shouldBe List((event1.project.id, event2.project.slug, event2.date))
       }
 
     "do not update latest_event_date and project_path for a project " +
@@ -187,10 +187,10 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
         // storing event 2 for the same project but with different project_path and less recent Event Date
-        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
                                                 date = EventDate(now.minus(3, HOURS))
         )
         val nowForEvent2 = Instant.now().truncatedTo(MICROS)
@@ -198,12 +198,12 @@ class EventPersisterSpec
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
-        gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
+        gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
 
         val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
         savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
         savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
-        storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
+        storedProjects shouldBe List((event1.project.id, event1.project.slug, event1.date))
       }
 
     "create event with the TRIPLES_STORE status if a newer event has the TRIPLES_STORE status already" in new TestCase {
@@ -242,7 +242,7 @@ class EventPersisterSpec
         skippedEvent.body,
         Some(skippedEvent.message)
       )
-      storedProjects shouldBe List((skippedEvent.project.id, skippedEvent.project.path, skippedEvent.date))
+      storedProjects shouldBe List((skippedEvent.project.id, skippedEvent.project.slug, skippedEvent.date))
 
       // storeNewEvent 2 - different event id and different project
       val skippedEvent2 = skippedEvents.generateOne
@@ -264,7 +264,7 @@ class EventPersisterSpec
 
       persister.storeNewEvent(event1).unsafeRunSync() shouldBe a[Created]
 
-      gauges.awaitingGeneration.getValue(event1.project.path).unsafeRunSync() shouldBe 1d
+      gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
       val save1Event1 +: Nil = findEvents(status = New)
       save1Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
@@ -277,7 +277,7 @@ class EventPersisterSpec
 
       persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
 
-      gauges.awaitingGeneration.getValue(event2.project.path).unsafeRunSync() shouldBe 1d
+      gauges.awaitingGeneration.getValue(event2.project.slug).unsafeRunSync() shouldBe 1d
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event1.compoundEventId, ExecutionDate(now), event1.batchDate)
@@ -294,7 +294,7 @@ class EventPersisterSpec
 
       persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync() shouldBe Existed
 
-      gauges.awaitingGeneration.getValue(event.project.path).unsafeRunSync() shouldBe 1d
+      gauges.awaitingGeneration.getValue(event.project.slug).unsafeRunSync() shouldBe 1d
 
       storedEvent(event.compoundEventId) shouldBe (
         event.compoundEventId,
@@ -351,13 +351,13 @@ class EventPersisterSpec
       }
   }
 
-  private def storedProjects: List[(projects.GitLabId, projects.Path, EventDate)] = execute {
+  private def storedProjects: List[(projects.GitLabId, projects.Slug, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (projects.GitLabId, projects.Path, EventDate)] =
+      val query: Query[Void, (projects.GitLabId, projects.Slug, EventDate)] =
         sql"""SELECT project_id, project_path, latest_event_date
               FROM project"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
-          .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder)
+          .map { case projectId ~ projectSlug ~ eventDate => (projectId, projectSlug, eventDate) }
       session.execute(query)
     }
   }

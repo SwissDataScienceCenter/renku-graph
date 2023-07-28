@@ -50,8 +50,8 @@ private[syncrepometadata] class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      _.event.getProjectPath.map(SyncRepoMetadata(_)),
-      tsWriteLock.contramap[Event](_.path).surround(eventProcessor.process),
+      _.event.getProjectSlug.map(SyncRepoMetadata(_)),
+      tsWriteLock.contramap[Event](_.slug).surround(eventProcessor.process),
       precondition = tsReadinessChecker.verifyTSReady
     )
 }

@@ -30,7 +30,7 @@ import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryT
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TSPathRecordsFinderSpec
+class TSSlugRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
     with EntitiesGenerators
@@ -45,8 +45,8 @@ class TSPathRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
-        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+      recordsFinder(project.slug, maybeAuthUser).unsafeRunSync() shouldBe List(
+        SecurityRecord(project.visibility, project.slug, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
@@ -55,13 +55,13 @@ class TSPathRecordsFinderSpec
 
       upload(to = projectsDataset, project)
 
-      recordsFinder(project.path, maybeAuthUser).unsafeRunSync() shouldBe List(
-        SecurityRecord(project.visibility, project.path, Set.empty)
+      recordsFinder(project.slug, maybeAuthUser).unsafeRunSync() shouldBe List(
+        SecurityRecord(project.visibility, project.slug, Set.empty)
       )
     }
 
-    "nothing if there's no project with the given path" in new TestCase {
-      recordsFinder(projectPaths.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
+    "nothing if there's no project with the given slug" in new TestCase {
+      recordsFinder(projectSlugs.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }
 
@@ -71,6 +71,6 @@ class TSPathRecordsFinderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO].unsafeRunSync()
-    val recordsFinder = new TSPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
+    val recordsFinder = new TSSlugRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

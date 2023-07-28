@@ -115,14 +115,14 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
         case HEAD -> Root / ProjectId(id) =>
           query(findProjectById(id, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
 
-        case GET -> Root / ProjectPath(path) =>
-          query(findProjectByPath(path, maybeAuthedReq)).flatMap(OkOrNotFound(_))
+        case GET -> Root / ProjectSlug(slug) =>
+          query(findProjectByPath(slug, maybeAuthedReq)).flatMap(OkOrNotFound(_))
 
-        case HEAD -> Root / ProjectPath(path) =>
-          query(findProjectByPath(path, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
+        case HEAD -> Root / ProjectSlug(slug) =>
+          query(findProjectByPath(slug, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
 
-        case GET -> Root / ProjectPath(path) / "members" / "all" =>
-          query(findProjectByPath(path, maybeAuthedReq))
+        case GET -> Root / ProjectSlug(slug) / "members" / "all" =>
+          query(findProjectByPath(slug, maybeAuthedReq))
             .map(_.toList.flatMap(_.members.toList))
             .flatMap(Ok(_))
 
@@ -183,8 +183,8 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
           case true  => OptionT.liftF(InternalServerError())
           case false => OptionT.none
         }
-      case GET -> Root / ProjectPath(path) =>
-        OptionT.liftF(query(isProjectBroken(path))).flatMap {
+      case GET -> Root / ProjectSlug(slug) =>
+        OptionT.liftF(query(isProjectBroken(slug))).flatMap {
           case true  => OptionT.liftF(InternalServerError())
           case false => OptionT.none
         }

@@ -105,7 +105,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
       "projectId":         {"value": ${project.resourceId}},
-      "projectPath":       {"value": ${project.path}},
+      "projectPath":       {"value": ${project.slug}},
       "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}},
       "projectDSId":       {"value": ${dataset.identification.identifier}}
@@ -146,7 +146,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "maybeDateModified":  {"value": ${dataset.provenance.date}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
       "projectId":         {"value": ${project.resourceId}},
-      "projectPath":       {"value": ${project.path}},
+      "projectPath":       {"value": ${project.slug}},
       "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}},
       "projectDSId":       {"value": ${dataset.identification.identifier}}

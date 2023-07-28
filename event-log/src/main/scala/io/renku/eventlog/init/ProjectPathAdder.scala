@@ -26,7 +26,7 @@ import io.circe.parser._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -60,45 +60,45 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
   private def addColumn(): Kleisli[F, Session[F], Unit] = {
     for {
       _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
-      projectIdsAndPaths <- findDistinctProjects
-      _                  <- updatePaths(projectIdsAndPaths)
+      projectIdsAndSlugs <- findDistinctProjects
+      _                  <- updateSlugs(projectIdsAndSlugs)
       _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL".command)
       _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)".command)
       _                  <- Kleisli.liftF(Logger[F].info("'project_path' column added"))
     } yield ()
   } recoverWith logging
 
-  private lazy val findDistinctProjects: Kleisli[F, Session[F], List[(GitLabId, Path)]] = {
+  private lazy val findDistinctProjects: Kleisli[F, Session[F], List[(GitLabId, Slug)]] = {
     val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(text)
-    Kleisli(_.execute(query).flatMap(toListOfProjectIdAndPath))
+    Kleisli(_.execute(query).flatMap(toListOfProjectIdAndSlug))
   }
 
-  private def toListOfProjectIdAndPath(bodies: List[String]): F[List[(GitLabId, Path)]] =
-    bodies.map(parseToProjectIdAndPath).sequence
+  private def toListOfProjectIdAndSlug(bodies: List[String]): F[List[(GitLabId, Slug)]] =
+    bodies.map(parseToProjectIdAndSlug).sequence
 
-  private def parseToProjectIdAndPath(body: String): F[(GitLabId, Path)] =
+  private def parseToProjectIdAndSlug(body: String): F[(GitLabId, Slug)] =
     MonadCancelThrow[F].fromEither {
-      parse(body) flatMap (_.as[(GitLabId, Path)])
+      parse(body) flatMap (_.as[(GitLabId, Slug)])
     }
 
-  private implicit lazy val projectIdAndPathDecoder: Decoder[(GitLabId, Path)] = cursor =>
+  private implicit lazy val projectIdAndSlugDecoder: Decoder[(GitLabId, Slug)] = cursor =>
     for {
       id   <- cursor.downField("project").downField("id").as[GitLabId]
-      path <- cursor.downField("project").downField("path").as[Path]
-    } yield id -> path
+      slug <- cursor.downField("project").downField("slug").as[Slug]
+    } yield id -> slug
 
-  private def updatePaths(projectIdsAndPaths: List[(GitLabId, Path)]): Kleisli[F, Session[F], Unit] =
-    projectIdsAndPaths
+  private def updateSlugs(projectIdsAndSlugs: List[(GitLabId, Slug)]): Kleisli[F, Session[F], Unit] =
+    projectIdsAndSlugs
       .map(toSqlUpdate)
       .sequence
       .map(_ => ())
 
-  private lazy val toSqlUpdate: ((GitLabId, Path)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectPath) =>
-    val query: Command[projects.Path *: projects.GitLabId *: EmptyTuple] =
+  private lazy val toSqlUpdate: ((GitLabId, Slug)) => Kleisli[F, Session[F], Unit] = { case (projectId, projectSlug) =>
+    val query: Command[projects.Slug *: projects.GitLabId *: EmptyTuple] =
       sql"""UPDATE event_log
-            SET project_path = $projectPathEncoder
+            SET project_path = $projectSlugEncoder
             WHERE project_id = $projectIdEncoder""".command
-    Kleisli(_.prepare(query).flatMap(_.execute(projectPath *: projectId *: EmptyTuple)).void)
+    Kleisli(_.prepare(query).flatMap(_.execute(projectSlug *: projectId *: EmptyTuple)).void)
   }
 
   private lazy val logging: PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case NonFatal(exception) =>

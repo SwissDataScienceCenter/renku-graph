@@ -34,12 +34,12 @@ import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
-    override val name: Migration.Name,
-    projectsFinder:    ProjectsFinder[F],
-    eventProducer:     projects.Path => EventData,
-    eventSender:       EventSender[F],
-    executionRegister: MigrationExecutionRegister[F],
-    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+                                                                         override val name: Migration.Name,
+                                                                         projectsFinder:    ProjectsFinder[F],
+                                                                         eventProducer:     projects.Slug => EventData,
+                                                                         eventSender:       EventSender[F],
+                                                                         executionRegister: MigrationExecutionRegister[F],
+                                                                         recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](name, executionRegister, recoveryStrategy) {
 
   import projectsFinder._
@@ -51,24 +51,24 @@ private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
       .recoverWith(maybeRecoverableError[F, Unit])
   }
 
-  lazy val toEvents: List[projects.Path] => List[EventData] = _.map(eventProducer)
+  lazy val toEvents: List[projects.Slug] => List[EventData] = _.map(eventProducer)
 
-  lazy val sendEvents: List[EventData] => F[Unit] = _.map { case (path, event, eventCategory) =>
+  lazy val sendEvents: List[EventData] => F[Unit] = _.map { case (slug, event, eventCategory) =>
     eventSender.sendEvent(
       event,
-      EventSender.EventContext(eventCategory, show"$categoryName: $name cannot send event for $path")
+      EventSender.EventContext(eventCategory, show"$categoryName: $name cannot send event for $slug")
     )
   }.sequence.void
 }
 
 private[migrations] object QueryBasedMigration {
 
-  type EventData = (projects.Path, EventRequestContent.NoPayload, CategoryName)
+  type EventData = (projects.Slug, EventRequestContent.NoPayload, CategoryName)
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry](
       name:          Migration.Name,
       query:         SparqlQuery,
-      eventProducer: projects.Path => EventData
+      eventProducer: projects.Slug => EventData
   ): F[QueryBasedMigration[F]] = for {
     projectsFinder    <- ProjectsFinder[F](query)
     eventSender       <- EventSender[F](EventLogUrl)

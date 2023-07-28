@@ -65,7 +65,7 @@ private class MicroserviceRoutes[F[_]: Async](
     docsEndpoint:               docs.Endpoint[F],
     usersProjectsEndpoint:      users.projects.Endpoint[F],
     authMiddleware:             AuthMiddleware[F, MaybeAuthUser],
-    projectPathAuthorizer:      Authorizer[F, model.projects.Path],
+    projectSlugAuthorizer:      Authorizer[F, model.projects.Slug],
     datasetIdAuthorizer:        Authorizer[F, model.datasets.Identifier],
     datasetSameAsAuthorizer:    Authorizer[F, model.datasets.SameAs],
     routesMetrics:              RoutesMetrics[F],
@@ -83,7 +83,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import projectDatasetTagsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
-  import projectPathAuthorizer.{authorize => authorizePath}
+  import projectSlugAuthorizer.{authorize => authorizePath}
   import projectUpdateEndpoint._
   import routesMetrics._
 
@@ -166,9 +166,9 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeUser.withUserOrNotFound { user =>
         path.segments.toList
           .map(_.toString)
-          .toProjectPath
+          .toProjectSlug
           .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
-          .semiflatMap(`DELETE /projects/:path`(_, user))
+          .semiflatMap(`DELETE /projects/:slug`(_, user))
           .merge
       }
 
@@ -179,9 +179,9 @@ private class MicroserviceRoutes[F[_]: Async](
       maybeUser.withUserOrNotFound { user =>
         path.segments.toList
           .map(_.toString)
-          .toProjectPath
+          .toProjectSlug
           .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
-          .semiflatMap(`PUT /projects/:path`(_, authReq.req, user))
+          .semiflatMap(`PUT /projects/:slug`(_, authReq.req, user))
           .merge
       }
   }
@@ -276,10 +276,10 @@ private class MicroserviceRoutes[F[_]: Async](
 
       PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
         .map(paging =>
-          projectPathParts.toProjectPath
+          projectPathParts.toProjectSlug
             .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
             .semiflatMap(path =>
-              `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
+              `GET /projects/:slug/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
             )
             .merge
         )
@@ -295,19 +295,19 @@ private class MicroserviceRoutes[F[_]: Async](
         PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
       ).mapN { (maybeSorts, paging) =>
         val sorting: Sorting[Criteria.Sort.type] = Sorting.fromOptionalListOrDefault(maybeSorts, Sort.default)
-        projectPathParts.toProjectPath
+        projectPathParts.toProjectSlug
           .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
           .semiflatMap(path =>
-            projectDatasetsEndpoint.`GET /projects/:path/datasets`(request, Criteria(path, sorting, paging))
+            projectDatasetsEndpoint.`GET /projects/:slug/datasets`(request, Criteria(path, sorting, paging))
           )
           .merge
       }.fold(toBadRequest, identity)
     case projectPathParts :+ "files" :+ location :+ "lineage" =>
       getLineage(projectPathParts, location, maybeAuthUser)
     case projectPathParts =>
-      projectPathParts.toProjectPath
+      projectPathParts.toProjectSlug
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(`GET /projects/:path`(_, maybeAuthUser))
+        .semiflatMap(`GET /projects/:slug`(_, maybeAuthUser))
         .merge
   }
 
@@ -320,7 +320,7 @@ private class MicroserviceRoutes[F[_]: Async](
         .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
 
-    (projectPathParts.toProjectPath -> toLocation(location))
+    (projectPathParts.toProjectSlug -> toLocation(location))
       .mapN(_ -> _)
       .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
       .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
@@ -328,8 +328,8 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
-    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
-      model.projects.Path
+    lazy val toProjectSlug: EitherT[F, Response[F], model.projects.Slug] = EitherT.fromEither[F] {
+      model.projects.Slug
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
@@ -360,7 +360,7 @@ private object MicroserviceRoutes {
     usersProjectsEndpoint      <- users.projects.Endpoint[F]
     authenticator              <- GitLabAuthenticator[F]
     authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer      <- Authorizer.using(ProjectPathRecordsFinder[F])
+    projectSlugAuthorizer      <- Authorizer.using(ProjectSlugRecordsFinder[F])
     datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[F])
     datasetSameAsAuthorizer    <- Authorizer.using(DatasetSameAsRecordsFinder[F])
     versionRoutes              <- version.Routes[F]
@@ -379,7 +379,7 @@ private object MicroserviceRoutes {
     docsEndpoint,
     usersProjectsEndpoint,
     authMiddleware,
-    projectPathAuthorizer,
+    projectSlugAuthorizer,
     datasetIdAuthorizer,
     datasetSameAsAuthorizer,
     new RoutesMetrics[F],

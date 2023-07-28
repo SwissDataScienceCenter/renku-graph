@@ -23,14 +23,14 @@ import io.circe.literal._
 import io.renku.events.EventRequestContent
 import io.renku.graph.model.projects
 
-private[tsmigrationrequest] object CleanUpEventsProducer extends (projects.Path => QueryBasedMigration.EventData) {
+private[tsmigrationrequest] object CleanUpEventsProducer extends (projects.Slug => QueryBasedMigration.EventData) {
 
-  override def apply(path: projects.Path): QueryBasedMigration.EventData = (
-    path,
+  override def apply(slug: projects.Slug): QueryBasedMigration.EventData = (
+    slug,
     EventRequestContent.NoPayload(json"""{
       "categoryName": "CLEAN_UP_REQUEST",
       "project": {
-        "path": ${path.value}
+        "slug": $slug
       }
     }"""),
     categoryName

@@ -27,7 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.{CompoundEventId, LastSyncedDate}
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -52,13 +52,13 @@ class ProjectRemoverSpec
       "remove category sync times and clean-up events" in new TestCase {
 
         val eventDate             = eventDates.generateOne
-        val (eventId, _, _, _, _) = storeGeneratedEvent(eventStatuses.generateOne, eventDate, projectId, projectPath)
+        val (eventId, _, _, _, _) = storeGeneratedEvent(eventStatuses.generateOne, eventDate, projectId, projectSlug)
         upsertEventDeliveryInfo(CompoundEventId(eventId, projectId))
         upsertCategorySyncTime(projectId,
                                nonEmptyStrings().generateAs(CategoryName),
                                timestampsNotInTheFuture.generateAs(LastSyncedDate)
         )
-        insertCleanUpEvent(projectId, projectPath, OffsetDateTime.now())
+        insertCleanUpEvent(projectId, projectSlug, OffsetDateTime.now())
 
         remover.removeProject(projectId).unsafeRunSync() shouldBe ()
 
@@ -81,7 +81,7 @@ class ProjectRemoverSpec
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()

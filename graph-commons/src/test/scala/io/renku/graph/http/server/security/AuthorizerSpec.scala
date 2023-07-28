@@ -41,43 +41,43 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
     "succeed if found SecurityRecord is for a public project and there's no auth user" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       (securityRecordsFinder.apply _)
         .expects(key, None)
-        .returning(List(SecurityRecord(Visibility.Public, projectPath, Set.empty[GitLabId])).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Public, projectSlug, Set.empty[GitLabId])).pure[Try])
 
       authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](None, key, Set(projectPath))
+        AuthContext[Key](None, key, Set(projectSlug))
       )
     }
 
     "succeed if found SecurityRecord is for a public project and the user has rights to the project" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val authUser    = authUsers.generateOne
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser.some)
         .returning(
-          List(SecurityRecord(Visibility.Public, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
+          List(SecurityRecord(Visibility.Public, projectSlug, personGitLabIds.generateSet() + authUser.id)).pure[Try]
         )
 
       authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser.some, key, Set(projectPath))
+        AuthContext[Key](authUser.some, key, Set(projectSlug))
       )
     }
 
     "succeed if found SecurityRecord is for a public project and the user has no explicit rights to the project" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val authUser    = authUsers.generateSome
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List(SecurityRecord(Visibility.Public, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Public, projectSlug, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser, key, Set(projectPath))
+        AuthContext[Key](authUser, key, Set(projectSlug))
       )
     }
   }
@@ -87,10 +87,10 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
       s"fail if found SecurityRecord is for a $visibility project and there's no auth user" in new TestCase {
 
-        val projectPath = projectPaths.generateOne
+        val projectSlug = projectSlugs.generateOne
         (securityRecordsFinder.apply _)
           .expects(key, None)
-          .returning(List(SecurityRecord(visibility, projectPath, Set.empty[GitLabId])).pure[Try])
+          .returning(List(SecurityRecord(visibility, projectSlug, Set.empty[GitLabId])).pure[Try])
 
         authorizer.authorize(key, maybeAuthUser = None) shouldBe leftT[Try, Unit](AuthorizationFailure)
       }
@@ -99,43 +99,43 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
     Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
       s"succeed if found SecurityRecord is for a $visibility project but the user has rights to the project" in new TestCase {
 
-        val projectPath = projectPaths.generateOne
+        val projectSlug = projectSlugs.generateOne
         val authUser    = authUsers.generateOne
 
         (securityRecordsFinder.apply _)
           .expects(key, authUser.some)
           .returning(
-            List(SecurityRecord(visibility, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
+            List(SecurityRecord(visibility, projectSlug, personGitLabIds.generateSet() + authUser.id)).pure[Try]
           )
 
         authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
-          AuthContext[Key](authUser.some, key, Set(projectPath))
+          AuthContext[Key](authUser.some, key, Set(projectSlug))
         )
       }
     }
 
     "succeed if found SecurityRecord is for an internal project even if the user has no explicit rights for the project" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val authUser    = authUsers.generateSome
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List(SecurityRecord(Visibility.Internal, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Internal, projectSlug, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe rightT[Try, EndpointSecurityException](
-        AuthContext[Key](authUser, key, Set(projectPath))
+        AuthContext[Key](authUser, key, Set(projectSlug))
       )
     }
 
     "fail if found SecurityRecord is for a private project and the user has no explicit rights for the project" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val authUser    = authUsers.generateSome
 
       (securityRecordsFinder.apply _)
         .expects(key, authUser)
-        .returning(List(SecurityRecord(Visibility.Private, projectPath, personGitLabIds.generateSet())).pure[Try])
+        .returning(List(SecurityRecord(Visibility.Private, projectSlug, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser) shouldBe leftT[Try, Unit](AuthorizationFailure)
     }
@@ -155,14 +155,14 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
   "authorize - auth records for projects with mixed visibility" should {
 
     "succeed with public projects only if there's no auth user" in new TestCase {
-      val publicProject = projectPaths.generateOne
+      val publicProject = projectSlugs.generateOne
       (securityRecordsFinder.apply _)
         .expects(key, None)
         .returning(
           List(
             SecurityRecord(Visibility.Public, publicProject, personGitLabIds.generateSet()),
-            SecurityRecord(Visibility.Internal, projectPaths.generateOne, personGitLabIds.generateSet()),
-            SecurityRecord(Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+            SecurityRecord(Visibility.Internal, projectSlugs.generateOne, personGitLabIds.generateSet()),
+            SecurityRecord(Visibility.Private, projectSlugs.generateOne, personGitLabIds.generateSet())
           ).pure[Try]
         )
 
@@ -175,15 +175,15 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val authUser = authUsers.generateOne
 
-      val publicProject   = projectPaths.generateOne
-      val internalProject = projectPaths.generateOne
+      val publicProject   = projectSlugs.generateOne
+      val internalProject = projectSlugs.generateOne
       (securityRecordsFinder.apply _)
         .expects(key, authUser.some)
         .returning(
           List(
             SecurityRecord(Visibility.Public, publicProject, personGitLabIds.generateSet()),
             SecurityRecord(Visibility.Internal, internalProject, personGitLabIds.generateSet()),
-            SecurityRecord(Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+            SecurityRecord(Visibility.Private, projectSlugs.generateOne, personGitLabIds.generateSet())
           ).pure[Try]
         )
 
@@ -196,9 +196,9 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val authUser = authUsers.generateOne
 
-      val publicProject   = projectPaths.generateOne
-      val internalProject = projectPaths.generateOne
-      val privateProject  = projectPaths.generateOne
+      val publicProject   = projectSlugs.generateOne
+      val internalProject = projectSlugs.generateOne
+      val privateProject  = projectSlugs.generateOne
       (securityRecordsFinder.apply _)
         .expects(key, authUser.some)
         .returning(

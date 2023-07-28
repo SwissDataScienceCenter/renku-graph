@@ -60,7 +60,7 @@ class AllEventsToNewUpdaterSpec
 
       projects foreach { project =>
         if (Random.nextBoolean()) addEvent(project)
-        else upsertProject(project.id, project.path, eventDates.generateOne)
+        else upsertProject(project.id, project.slug, eventDates.generateOne)
       }
 
       projects foreach { project =>
@@ -108,7 +108,7 @@ class AllEventsToNewUpdaterSpec
           case EventStatus.AwaitingDeletion                            => zippedEventPayloads.generateOption
           case _                                                       => zippedEventPayloads.generateNone
         },
-        projectPath = project.path
+        projectSlug = project.slug
       )
 
       status match {
@@ -125,13 +125,13 @@ class AllEventsToNewUpdaterSpec
     }
   }
 
-  private lazy val projectObjects: Gen[Project] = (projectIds -> projectPaths).mapN(Project.apply)
+  private lazy val projectObjects: Gen[Project] = (projectIds -> projectSlugs).mapN(Project.apply)
 
   private def toEventJson(project: Project) = json"""{
     "categoryName": "EVENTS_STATUS_CHANGE",
     "project": {
       "id":   ${project.id},
-      "path": ${project.path}
+      "path": ${project.slug}
     },
     "subCategory": "ProjectEventsToNew"
   }"""

@@ -142,28 +142,28 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       eventAndBody match {
         case (event: NewCommitEvent, body) => json"""{
             "categoryName": "CREATION", 
-            "id":        ${event.id.value},
+            "id":        ${event.id},
             "project": {
-              "id":      ${event.project.id.value},
-              "path":    ${event.project.path.value}
+              "id":      ${event.project.id},
+              "slug":    ${event.project.slug}
             },
-            "date":      ${event.committedDate.value},
-            "batchDate": ${event.batchDate.value},
-            "body":      ${body.value},
-            "status":    ${event.status.value}
+            "date":      ${event.committedDate},
+            "batchDate": ${event.batchDate},
+            "body":      $body,
+            "status":    ${event.status}
           }"""
         case (event: SkippedCommitEvent, body) => json"""{
             "categoryName": "CREATION",
-            "id":        ${event.id.value},
+            "id":        ${event.id},
             "project": {
-              "id":      ${event.project.id.value},
-              "path":    ${event.project.path.value}
+              "id":      ${event.project.id},
+              "slug":    ${event.project.slug}
             },
-            "date":      ${event.committedDate.value},
-            "batchDate": ${event.batchDate.value},
-            "body":      ${body.value},
-            "status":    ${event.status.value},
-            "message":   ${event.message.value}
+            "date":      ${event.committedDate},
+            "batchDate": ${event.batchDate},
+            "body":      $body,
+            "status":    ${event.status},
+            "message":   ${event.message}
           }"""
       }
     )

@@ -31,20 +31,20 @@ import ProjectActivated.DateActivated
 
 import java.time.Instant
 
-final case class ProjectActivated(path: projects.Path, dateActivated: DateActivated)
+final case class ProjectActivated(slug: projects.Slug, dateActivated: DateActivated)
 
 object ProjectActivated {
 
-  def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectActivated =
-    ProjectActivated(path, dateActivated = DateActivated(now()))
+  def forProject(slug: projects.Slug, now: () => Instant = () => Instant.now): ProjectActivated =
+    ProjectActivated(slug, dateActivated = DateActivated(now()))
 
   val categoryName: CategoryName = CategoryName("PROJECT_ACTIVATED")
 
-  implicit val encoder: Encoder[ProjectActivated] = Encoder.instance { case ProjectActivated(path, dateActivated) =>
+  implicit val encoder: Encoder[ProjectActivated] = Encoder.instance { case ProjectActivated(slug, dateActivated) =>
     json"""{
       "categoryName": $categoryName,
       "project": {
-        "path": $path
+        "slug": $slug
       },
       "date": $dateActivated
     }"""
@@ -60,13 +60,13 @@ object ProjectActivated {
 
     for {
       _    <- validateCategory
-      path <- cursor.downField("project").downField("path").as[projects.Path]
+      slug <- cursor.downField("project").downField("slug").as[projects.Slug]
       date <- cursor.downField("date").as[DateActivated]
-    } yield ProjectActivated(path, date)
+    } yield ProjectActivated(slug, date)
   }
 
-  implicit val show: Show[ProjectActivated] = Show.show { case ProjectActivated(path, dateActivated) =>
-    show"projectPath = $path, date = $dateActivated"
+  implicit val show: Show[ProjectActivated] = Show.show { case ProjectActivated(slug, dateActivated) =>
+    show"projectSlug = $slug, date = $dateActivated"
   }
 
   final class DateActivated private (val value: Instant) extends AnyVal with InstantTinyType

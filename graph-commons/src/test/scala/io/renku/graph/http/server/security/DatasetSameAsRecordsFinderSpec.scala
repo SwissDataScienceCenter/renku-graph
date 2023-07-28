@@ -40,7 +40,7 @@ class DatasetSameAsRecordsFinderSpec
 
   "apply" should {
 
-    "return SecurityRecord with project visibility, path and all project members" in new TestCase {
+    "return SecurityRecord with project visibility, slug and all project members" in new TestCase {
 
       val (dataset, project) =
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateOne
@@ -49,11 +49,11 @@ class DatasetSameAsRecordsFinderSpec
 
       recordsFinder(model.datasets.SameAs.ofUnsafe(dataset.provenance.topmostSameAs.value), maybeAuthUser)
         .unsafeRunSync() shouldBe List(
-        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+        SecurityRecord(project.visibility, project.slug, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
-    "return SecurityRecord with project visibility, path and no member if project is none" in new TestCase {
+    "return SecurityRecord with project visibility, slug and no member if project is none" in new TestCase {
 
       val (dataset, project) =
         renkuProjectEntities(anyVisibility)
@@ -64,10 +64,10 @@ class DatasetSameAsRecordsFinderSpec
       upload(to = projectsDataset, project)
 
       recordsFinder(model.datasets.SameAs.ofUnsafe(dataset.provenance.topmostSameAs.value), maybeAuthUser)
-        .unsafeRunSync() shouldBe List(SecurityRecord(project.visibility, project.path, Set.empty))
+        .unsafeRunSync() shouldBe List(SecurityRecord(project.visibility, project.slug, Set.empty))
     }
 
-    "return SecurityRecords with projects visibilities, paths and members in case of forks" in new TestCase {
+    "return SecurityRecords with projects visibilities, slugs and members in case of forks" in new TestCase {
 
       val (dataset, (parentProject, project)) =
         renkuProjectEntities(anyVisibility)
@@ -80,12 +80,12 @@ class DatasetSameAsRecordsFinderSpec
 
       recordsFinder(model.datasets.SameAs.ofUnsafe(dataset.provenance.topmostSameAs.value), maybeAuthUser)
         .unsafeRunSync() should contain theSameElementsAs List(
-        SecurityRecord(parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
-        SecurityRecord(project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
+        SecurityRecord(parentProject.visibility, parentProject.slug, parentProject.members.flatMap(_.maybeGitLabId)),
+        SecurityRecord(project.visibility, project.slug, project.members.flatMap(_.maybeGitLabId))
       )
     }
 
-    "nothing if there's no project with the given path" in new TestCase {
+    "nothing if there's no project with the given slug" in new TestCase {
       recordsFinder(datasetSameAs.generateOne, maybeAuthUser).unsafeRunSync() shouldBe Nil
     }
   }

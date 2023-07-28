@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.creation
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
@@ -82,5 +82,5 @@ class TokenDueCheckerSpec
   }
 
   private def insertToken(projectId: projects.GitLabId, expiryDate: ExpiryDate): Unit =
-    insert(projectId, projectPaths.generateOne, encryptedAccessTokens.generateOne, expiryDate)
+    insert(projectId, projectSlugs.generateOne, encryptedAccessTokens.generateOne, expiryDate)
 }

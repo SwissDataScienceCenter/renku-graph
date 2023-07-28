@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class ProjectPathRemoverSpec
+class ProjectSlugRemoverSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
@@ -80,8 +80,8 @@ class ProjectPathRemoverSpec
   private def checkColumnExists: Boolean = sessionResource
     .useK {
       Kleisli { session =>
-        val query: Query[Void, projects.Path] =
-          sql"select project_path from event_log limit 1".query(projectPathDecoder)
+        val query: Query[Void, projects.Slug] =
+          sql"select project_path from event_log limit 1".query(projectSlugDecoder)
         session
           .option(query)
           .map(_ => true)

@@ -63,8 +63,8 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
         sql"""SELECT proj.project_id, proj.project_path
               FROM project proj
               ORDER BY proj.latest_event_date ASC"""
-          .query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
+          .query(projectIdDecoder ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) => ProjectEventsToNew(Project(id, slug)) }
       )
       .arguments(Void)
       .buildCursorResource(f)
@@ -90,7 +90,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       "categoryName": $categoryName,
       "project": {
         "id":   ${event.project.id},
-        "path": ${event.project.path}
+        "slug": ${event.project.slug}
       },
       "subCategory": "ProjectEventsToNew"
     }"""

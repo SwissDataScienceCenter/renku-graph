@@ -35,7 +35,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "createHandlingDefinition.decode" should {
 
-    "decode project id and path" in new TestCase {
+    "decode project id and slug" in new TestCase {
 
       val definition = handler.createHandlingDefinition()
 
@@ -49,7 +49,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     "call commitSyncForcer" in new TestCase {
       val definition = handler.createHandlingDefinition()
       val event      = Generators.commitSyncRequests.generateOne
-      (commitSyncForcer.forceCommitSync _).expects(event.project.id, event.project.path).returning(IO.unit)
+      (commitSyncForcer.forceCommitSync _).expects(event.project.id, event.project.slug).returning(IO.unit)
       definition.process(event).unsafeRunSync() shouldBe ()
     }
   }

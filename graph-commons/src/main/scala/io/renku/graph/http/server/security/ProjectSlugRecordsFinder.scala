@@ -28,20 +28,20 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
-object ProjectPathRecordsFinder {
+object ProjectSlugRecordsFinder {
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient]
-      : F[SecurityRecordFinder[F, projects.Path]] =
-    (TSPathRecordsFinder[F] -> GitLabPathRecordsFinder[F])
+      : F[SecurityRecordFinder[F, projects.Slug]] =
+    (TSSlugRecordsFinder[F] -> GLSlugRecordsFinder[F])
       .mapN(new ProjectPathRecordsFinderImpl[F](_, _))
 }
 
-private class ProjectPathRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSPathRecordsFinder[F],
-                                                             glPathRecordsFinder: GitLabPathRecordsFinder[F]
-) extends SecurityRecordFinder[F, projects.Path] {
+private class ProjectPathRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSSlugRecordsFinder[F],
+                                                             glPathRecordsFinder: GLSlugRecordsFinder[F]
+) extends SecurityRecordFinder[F, projects.Slug] {
 
-  override def apply(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[List[Authorizer.SecurityRecord]] =
-    tsPathRecordsFinder(path, maybeAuthUser) >>= {
-      case Nil      => glPathRecordsFinder(path, maybeAuthUser)
+  override def apply(slug: projects.Slug, maybeAuthUser: Option[AuthUser]): F[List[Authorizer.SecurityRecord]] =
+    tsPathRecordsFinder(slug, maybeAuthUser) >>= {
+      case Nil      => glPathRecordsFinder(slug, maybeAuthUser)
       case nonEmpty => nonEmpty.pure[F]
     }
 }

@@ -25,8 +25,8 @@ package object commitsync {
 
   private[commitsync] val logMessageCommon: CommitSyncEvent => String = {
     case FullCommitSyncEvent(id, project, lastSynced) =>
-      s"$categoryName: id = $id, projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced"
+      s"$categoryName: id = $id, projectId = ${project.id}, projectSlug = ${project.slug}, lastSynced = $lastSynced"
     case MinimalCommitSyncEvent(project) =>
-      s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}"
+      s"$categoryName: projectId = ${project.id}, projectSlug = ${project.slug}"
   }
 }

@@ -18,7 +18,7 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
 
   it should "encode to JSON" in {
     forAll(projectDatasetGen) { datasets =>
-      datasets.asJson(ProjectDataset.encoder(projectPath)) shouldBe toJson(datasets)
+      datasets.asJson(ProjectDataset.encoder(projectSlug)) shouldBe toJson(datasets)
     }
   }
 
@@ -35,7 +35,7 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
         "dateCreated":   ${createdOrPublished.fold(_.asJson, _ => Json.Null)},
         "datePublished": ${createdOrPublished.fold(_ => Json.Null, _.asJson)},
         "sameAs":        $sameAs,
-        "images":        ${images -> projectPath},
+        "images":        ${images -> projectSlug},
         "_links": [{
           "rel":  "details",
           "href": ${renkuApiUrl / "datasets" / id}
@@ -44,7 +44,7 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
           "href": ${renkuApiUrl / "datasets" / originalId}
         }, {
           "rel":  "tags",
-          "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
+          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags"}
         }]
       }""".deepDropNullValues
     case ProjectDataset(id,
@@ -68,7 +68,7 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
         "datePublished": ${createdOrPublished.fold(_ => Json.Null, _.asJson)},
         "dateModified":  $dateModified,
         "derivedFrom":   $derivedFrom,
-        "images":        ${images -> projectPath},
+        "images":        ${images -> projectSlug},
         "_links": [{
           "rel":  "details",
           "href": ${renkuApiUrl / "datasets" / id}
@@ -77,13 +77,13 @@ class ProjectDatasetSpec extends AnyFlatSpec with should.Matchers with ScalaChec
           "href": ${renkuApiUrl / "datasets" / originalId}
         }, {
           "rel":  "tags",
-          "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
+          "href": ${renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags"}
         }]
       }""".deepDropNullValues
     case other => fail(s"Invalid ProjectDataset $other")
   }
 
-  private lazy val projectPath = projectPaths.generateOne
+  private lazy val projectSlug = projectSlugs.generateOne
   private implicit lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
   private implicit lazy val gitLabUrl:   GitLabUrl    = gitLabUrls.generateOne
 }

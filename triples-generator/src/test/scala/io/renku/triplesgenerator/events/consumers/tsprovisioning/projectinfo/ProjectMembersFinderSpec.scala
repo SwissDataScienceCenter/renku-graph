@@ -29,7 +29,7 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -66,9 +66,9 @@ class ProjectMembersFinderSpec
 
     "fetch and merge project users and members" in new TestCase {
       forAll { members: Set[ProjectMemberNoEmail] =>
-        setGitLabClientExpectation(projectPath, returning = (members, None).pure[IO])
+        setGitLabClientExpectation(projectSlug, returning = (members, None).pure[IO])
 
-        finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe members
+        finder.findProjectMembers(projectSlug).value.unsafeRunSync().value shouldBe members
       }
     }
 
@@ -76,17 +76,17 @@ class ProjectMembersFinderSpec
 
       val members = projectMembersNoEmail.generateFixedSizeSet(ofSize = 4)
 
-      setGitLabClientExpectation(projectPath, returning = (Set(members.head), 2.some).pure[IO])
-      setGitLabClientExpectation(projectPath, maybePage = 2.some, returning = (members.tail, None).pure[IO])
+      setGitLabClientExpectation(projectSlug, returning = (Set(members.head), 2.some).pure[IO])
+      setGitLabClientExpectation(projectSlug, maybePage = 2.some, returning = (members.tail, None).pure[IO])
 
-      finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe members
+      finder.findProjectMembers(projectSlug).value.unsafeRunSync().value shouldBe members
     }
 
     "return an empty set even if GL endpoint responds with NOT_FOUND" in new TestCase {
 
-      setGitLabClientExpectation(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
+      setGitLabClientExpectation(projectSlug, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
 
-      finder.findProjectMembers(projectPath).value.unsafeRunSync().value shouldBe Set.empty
+      finder.findProjectMembers(projectSlug).value.unsafeRunSync().value shouldBe Set.empty
     }
 
     val errorMessage = nonEmptyStrings().generateOne
@@ -98,9 +98,9 @@ class ProjectMembersFinderSpec
     ) foreach { case (problemName, error) =>
       s"return a Recoverable Failure for $problemName when fetching project members" in new TestCase {
 
-        setGitLabClientExpectation(projectPath, returning = IO.raiseError(error))
+        setGitLabClientExpectation(projectSlug, returning = IO.raiseError(error))
 
-        finder.findProjectMembers(projectPath).value.unsafeRunSync().left.value shouldBe a[ProcessingRecoverableError]
+        finder.findProjectMembers(projectSlug).value.unsafeRunSync().left.value shouldBe a[ProcessingRecoverableError]
       }
     }
 
@@ -120,13 +120,13 @@ class ProjectMembersFinderSpec
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new ProjectMembersFinderImpl[IO]
 
-    def setGitLabClientExpectation(projectPath: projects.Path,
+    def setGitLabClientExpectation(projectPath: projects.Slug,
                                    maybePage:   Option[Int] = None,
                                    returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
     ) = {
@@ -149,7 +149,7 @@ class ProjectMembersFinderSpec
 
     val mapResponse =
       captureMapping(gitLabClient)(
-        finder.findProjectMembers(projectPath)(maybeAccessToken).value.unsafeRunSync(),
+        finder.findProjectMembers(projectSlug)(maybeAccessToken).value.unsafeRunSync(),
         Gen.const((Set.empty[ProjectMemberNoEmail], Option.empty[Int]))
       )
   }

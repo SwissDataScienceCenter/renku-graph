@@ -24,7 +24,7 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
@@ -32,7 +32,7 @@ import model._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectFinder[F[_]] {
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]]
+  def findProject(slug: Slug, maybeAuthUser: Option[AuthUser]): F[Option[Project]]
 }
 
 private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
@@ -45,16 +45,16 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]] =
-    ((OptionT(findInKG(path, maybeAuthUser)), findInGitLab(path)) parMapN (merge(path, _, _))).value
+  def findProject(slug: Slug, maybeAuthUser: Option[AuthUser]): F[Option[Project]] =
+    ((OptionT(findInKG(slug, maybeAuthUser)), findInGitLab(slug)) parMapN (merge(slug, _, _))).value
 
-  private def findInGitLab(path: Path) =
-    OptionT(findAccessToken(path)) >>= { implicit accessToken => OptionT(findProjectInGitLab(path)) }
+  private def findInGitLab(slug: Slug) =
+    OptionT(findAccessToken(slug)) >>= { implicit accessToken => OptionT(findProjectInGitLab(slug)) }
 
-  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
+  private def merge(slug: Slug, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
     resourceId = kgProject.resourceId,
     id = gitLabProject.id,
-    path = path,
+    slug = slug,
     name = kgProject.name,
     maybeDescription = kgProject.maybeDescription,
     visibility = kgProject.visibility,
@@ -77,10 +77,10 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
 
   private implicit class ParentOps(maybeParent: Option[KGParent]) {
     lazy val toParentProject: Option[ParentProject] =
-      maybeParent.map { case KGParent(resourceId, path, name, created) =>
+      maybeParent.map { case KGParent(resourceId, slug, name, created) =>
         ParentProject(
           resourceId,
-          path,
+          slug,
           name,
           Creation(created.date,
                    created.maybeCreator.map(creator =>

@@ -56,7 +56,7 @@ class TokensPersisterSpec
       }
 
     "update the given token " +
-      "if there's a token for the project path and id" in new TestCase {
+      "if there's a token for the project slug and id" in new TestCase {
 
         persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
@@ -69,7 +69,7 @@ class TokensPersisterSpec
       }
 
     "update the given token and project id" +
-      "if there's a token for the project path but with different project id" in new TestCase {
+      "if there's a token for the project slug but with different project id" in new TestCase {
 
         persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
@@ -85,15 +85,15 @@ class TokensPersisterSpec
         findTokenInfo(newStoringInfo.project.id)   shouldBe newStoringInfo.some
       }
 
-    "update the given token and project path" +
-      "if there's a token for the project id but with different project path" in new TestCase {
+    "update the given token and project slug" +
+      "if there's a token for the project id but with different project slug" in new TestCase {
 
         persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
         val newStoringInfo =
-          tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(path = projectPaths.generateOne),
+          tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(slug = projectSlugs.generateOne),
                                 encryptedToken = encryptedAccessTokens.generateOne
           )
         persister.persistToken(newStoringInfo).unsafeRunSync() shouldBe ()
@@ -102,34 +102,34 @@ class TokensPersisterSpec
       }
   }
 
-  "updatePath" should {
+  "updateSlug" should {
 
-    "replace the Path for the given project Id" in new TestCase {
+    "replace the Slug for the given project Id" in new TestCase {
 
       persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
-      val newPath = projectPaths.generateOne
-      persister.updatePath(Project(tokenStoringInfo.project.id, newPath)).unsafeRunSync() shouldBe ()
+      val newSlug = projectSlugs.generateOne
+      persister.updateSlug(Project(tokenStoringInfo.project.id, newSlug)).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo
-        .copy(project = tokenStoringInfo.project.copy(path = newPath))
+        .copy(project = tokenStoringInfo.project.copy(slug = newSlug))
         .some
     }
 
-    "do nothing if project Path not changed" in new TestCase {
+    "do nothing if project Slug not changed" in new TestCase {
 
       persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
-      persister.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+      persister.updateSlug(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
     }
 
     "do nothing if no project with the given Id" in new TestCase {
 
-      persister.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+      persister.updateSlug(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe None
     }
@@ -150,11 +150,11 @@ class TokensPersisterSpec
       FROM projects_tokens
       WHERE project_id = $projectIdEncoder"""
         .query(
-          projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder ~ createdAtDecoder ~ expiryDateDecoder
+          projectIdDecoder ~ projectSlugDecoder ~ encryptedAccessTokenDecoder ~ createdAtDecoder ~ expiryDateDecoder
         )
         .map {
-          case (id: projects.GitLabId) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
-            TokenStoringInfo(Project(id, path), token, TokenDates(createdAt, expiryDate))
+          case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (token: EncryptedAccessToken) ~ (createdAt: CreatedAt) ~ (expiryDate: ExpiryDate) =>
+            TokenStoringInfo(Project(id, slug), token, TokenDates(createdAt, expiryDate))
         }
       Kleisli(_.prepare(query).flatMap(_.option(projectId)))
     }

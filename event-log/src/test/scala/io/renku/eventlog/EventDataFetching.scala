@@ -85,12 +85,12 @@ trait EventDataFetching {
       }
     }
 
-  protected def findProjects: List[(projects.GitLabId, projects.Path, EventDate)] = execute {
+  protected def findProjects: List[(projects.GitLabId, projects.Slug, EventDate)] = execute {
     Kleisli { session =>
-      val query: Query[Void, (projects.GitLabId, projects.Path, EventDate)] =
+      val query: Query[Void, (projects.GitLabId, projects.Slug, EventDate)] =
         sql"""SELECT * FROM project"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
-          .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder)
+          .map { case projectId ~ projectSlug ~ eventDate => (projectId, projectSlug, eventDate) }
       session.execute(query)
     }
   }

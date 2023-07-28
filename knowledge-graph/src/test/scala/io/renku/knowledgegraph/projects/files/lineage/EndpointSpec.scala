@@ -48,10 +48,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       val lineage = lineages.generateOne
 
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(lineage.some.pure[IO])
 
-      val response      = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
+      val response      = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
       val Right(result) = response.as[Json].unsafeRunSync().as[Lineage]
 
       response.status      shouldBe Ok
@@ -62,25 +62,25 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
     "respond with NotFound if the lineage isn't returned from the finder" in new TestCase {
 
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(Option.empty[Lineage].pure[IO])
 
-      val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
+      val response = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
       response.as[Message].unsafeRunSync() shouldBe
-        Message.Info.unsafeApply(show"No lineage for project: $projectPath file: $location")
+        Message.Info.unsafeApply(show"No lineage for project: $projectSlug file: $location")
     }
 
     "respond with InternalServerError if the lineage is returned from the finder but the encoder fails" in new TestCase {
 
       val exception = exceptions.generateOne
       (lineageFinder.find _)
-        .expects(projectPath, location, maybeUser)
+        .expects(projectSlug, location, maybeUser)
         .returning(exception.raiseError[IO, Option[Lineage]])
 
-      val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
+      val response = endpoint.`GET /lineage`(projectSlug, location, maybeUser).unsafeRunSync()
 
       response.status                      shouldBe InternalServerError
       response.contentType                 shouldBe Some(`Content-Type`(application.json))
@@ -89,7 +89,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
   }
 
   private trait TestCase {
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val location    = nodeLocations.generateOne
     val maybeUser   = authUsers.generateOption
 

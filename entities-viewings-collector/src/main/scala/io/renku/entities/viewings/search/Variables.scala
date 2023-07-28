@@ -46,7 +46,7 @@ object Variables {
     val description       = VarName("description")
     val keywords          = VarName("keywords")
     val images            = VarName("images")
-    val projectPath       = VarName("projectPath")
+    val projectSlug       = VarName("projectSlug")
     val projectVisibility = VarName("projectVisibility")
     lazy val viewedDate   = Variables.viewedDate
 
@@ -61,7 +61,7 @@ object Variables {
       date,
       creatorNames,
       description,
-      projectPath,
+      projectSlug,
       projectVisibility,
       keywords,
       images,
@@ -73,7 +73,7 @@ object Variables {
         matchingScore      <- read[MatchingScore](matchingScore)
         name               <- read[datasets.Name](datasetName)
         sameAs             <- read[datasets.TopmostSameAs](datasetSameAs)
-        path               <- read[projects.Path](projectPath)
+        slug               <- read[projects.Slug](projectSlug)
         visibility         <- read[projects.Visibility](projectVisibility)
         maybeDateCreated   <- read[Option[datasets.DateCreated]](dateCreated)
         maybeDatePublished <- read[Option[datasets.DatePublished]](datePublished)
@@ -98,7 +98,7 @@ object Variables {
         keywords,
         maybeDesc,
         images,
-        path
+        slug
       )
     }
   }
@@ -108,7 +108,7 @@ object Variables {
     val matchingScore   = VarName("matchingScore")
     val entityType      = VarName("entityType")
     val projectName     = VarName("projectName")
-    val projectPath     = VarName("projectPath")
+    val projectSlug     = VarName("projectSlug")
     val visibility      = VarName("visibility")
     val creatorNames    = VarName("creatorNames")
     val dateCreated     = VarName("dateCreated")
@@ -122,7 +122,7 @@ object Variables {
       matchingScore,
       entityType,
       projectName,
-      projectPath,
+      projectSlug,
       visibility,
       creatorNames,
       dateCreated,
@@ -137,7 +137,7 @@ object Variables {
       for {
         matchingScore    <- read[MatchingScore](matchingScore)
         name             <- read[projects.Name](projectName)
-        path             <- read[projects.Path](projectPath)
+        slug             <- read[projects.Slug](projectSlug)
         visibility       <- read[projects.Visibility](visibility)
         dateCreated      <- read[projects.DateCreated](dateCreated)
         dateModified     <- read[projects.DateModified](dateModified)
@@ -148,7 +148,7 @@ object Variables {
         images           <- read[Option[String]](images) >>= toListOfImageUris
       } yield SearchEntity.Project(
         matchingScore,
-        path,
+        slug,
         name,
         visibility,
         dateCreated,

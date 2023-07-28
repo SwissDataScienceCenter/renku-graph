@@ -52,7 +52,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
     findGLProject(event) >>= toProject
 
   private def findGLProject(event: MinProjectInfoEvent)(implicit mat: Option[AccessToken]) =
-    findProjectInfo(event.project.path)
+    findProjectInfo(event.project.slug)
       .semiflatMap {
         case Some(projectInfo) => projectInfo.pure[F]
         case None =>
@@ -73,7 +73,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
   private lazy val convert: GitLabProjectInfo => ValidatedNel[String, Project] = {
     case GitLabProjectInfo(_,
                            name,
-                           path,
+                           slug,
                            dateCreated,
                            dateModified,
                            maybeDescription,
@@ -85,8 +85,8 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithParent.from(
-        ResourceId(path),
-        path,
+        ResourceId(slug),
+        slug,
         name,
         maybeDescription,
         dateCreated,
@@ -96,11 +96,11 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         keywords,
         members.map(toPerson),
         ResourceId(parentPath),
-        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
+        avatarUrl.map(Image.projectImage(ResourceId(slug), _)).toList
       )
     case GitLabProjectInfo(_,
                            name,
-                           path,
+                           slug,
                            dateCreated,
                            dateModified,
                            maybeDescription,
@@ -112,8 +112,8 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithoutParent.from(
-        ResourceId(path),
-        path,
+        ResourceId(slug),
+        slug,
         name,
         maybeDescription,
         dateCreated,
@@ -122,7 +122,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         visibility,
         keywords,
         members.map(toPerson),
-        avatarUrl.map(Image.projectImage(ResourceId(path), _)).toList
+        avatarUrl.map(Image.projectImage(ResourceId(slug), _)).toList
       )
   }
 

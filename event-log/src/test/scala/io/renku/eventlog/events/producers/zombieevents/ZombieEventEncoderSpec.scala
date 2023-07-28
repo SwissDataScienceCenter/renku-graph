@@ -34,12 +34,12 @@ class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
       ZombieEventEncoder.encodeEvent(event) shouldBe
         json"""{
         "categoryName": "ZOMBIE_CHASING",
-        "id":           ${event.eventId.id.value},
+        "id": ${event.eventId.id},
         "project": {
-          "id":         ${event.eventId.projectId.value},
-          "path":       ${event.projectPath.value}
+          "id":   ${event.eventId.projectId},
+          "slug": ${event.projectSlug}
         },
-        "status":       ${event.status.value}
+        "status": ${event.status}
       }"""
     }
   }

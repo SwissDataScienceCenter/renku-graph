@@ -27,7 +27,7 @@ private object SearchInfoExtractor {
     ProjectSearchInfo(
       project.resourceId,
       project.name,
-      project.path,
+      project.slug,
       project.visibility,
       project.dateCreated,
       project.dateModified,

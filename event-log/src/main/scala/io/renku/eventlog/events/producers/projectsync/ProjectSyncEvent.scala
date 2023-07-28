@@ -22,11 +22,11 @@ import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private final case class ProjectSyncEvent(projectId: projects.GitLabId, projectPath: projects.Path)
+private final case class ProjectSyncEvent(projectId: projects.GitLabId, projectSlug: projects.Slug)
 
 private object ProjectSyncEvent {
   implicit lazy val show: Show[ProjectSyncEvent] =
-    Show.show { case ProjectSyncEvent(id, path) => show"projectId = $id, projectPath = $path" }
+    Show.show { case ProjectSyncEvent(id, slug) => show"projectId = $id, projectSlug = $slug" }
 }
 
 private object EventEncoder {
@@ -35,10 +35,10 @@ private object EventEncoder {
   import io.circe.literal._
 
   def encodeEvent(event: ProjectSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
+    "categoryName": $categoryName,
     "project": {
-      "id":   ${event.projectId.value},
-      "path": ${event.projectPath.value}
+      "id":   ${event.projectId},
+      "slug": ${event.projectSlug}
     }
   }"""
 }

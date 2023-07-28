@@ -29,7 +29,7 @@ private object Generators {
   implicit lazy val projectSearchInfoObjects: Gen[ProjectSearchInfo] = for {
     id           <- projectResourceIds
     name         <- projectNames
-    path         <- projectPaths
+    slug         <- projectSlugs
     createdDate  <- projectCreatedDates()
     modifiedDate <- projectModifiedDates(createdDate.value)
     visibility   <- projectVisibilities
@@ -39,7 +39,7 @@ private object Generators {
     images       <- imageUris.toGeneratorOfList(max = 2).map(convertImageUris(id.asEntityId))
   } yield ProjectSearchInfo(id,
                             name,
-                            path,
+                            slug,
                             visibility,
                             createdDate,
                             modifiedDate,

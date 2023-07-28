@@ -53,7 +53,7 @@ private[entities] object CliProjectConverter {
     }
     val dateCreated  = (gitLabInfo.dateCreated :: cliProject.dateCreated :: Nil).min
     val dateModified = (gitLabInfo.dateModified :: cliProject.dateModified :: Nil).max
-    val gitlabImage  = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.path), _))
+    val gitlabImage  = gitLabInfo.avatarUrl.map(Image.projectImage(ResourceId(gitLabInfo.slug), _))
     val all          = (creatorV, allPersonV, datasetV, activityV, planV).mapN(Tuple5.apply)
     all.andThen { case (creator, persons, datasets, activities, plans) =>
       newProject(
@@ -94,12 +94,12 @@ private[entities] object CliProjectConverter {
                          plans:            List[Plan],
                          images:           List[Image]
   )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Project] =
-    (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
+    (maybeAgent, maybeVersion, gitLabInfo.maybeParentSlug) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             agent,
@@ -120,8 +120,8 @@ private[entities] object CliProjectConverter {
       case (Some(agent), Some(version), None) =>
         RenkuProject.WithoutParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             agent,
@@ -141,8 +141,8 @@ private[entities] object CliProjectConverter {
       case (None, None, Some(parentPath)) =>
         NonRenkuProject.WithParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,
@@ -158,8 +158,8 @@ private[entities] object CliProjectConverter {
       case (None, None, None) =>
         NonRenkuProject.WithoutParent
           .from(
-            ResourceId(gitLabInfo.path),
-            gitLabInfo.path,
+            ResourceId(gitLabInfo.slug),
+            gitLabInfo.slug,
             gitLabInfo.name,
             maybeDescription,
             dateCreated,

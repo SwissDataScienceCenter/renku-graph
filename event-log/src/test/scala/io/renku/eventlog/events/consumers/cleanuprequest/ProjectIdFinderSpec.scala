@@ -39,20 +39,20 @@ class ProjectIdFinderSpec
 
   "findProjectId" should {
 
-    "return id of the project with the given path" in new TestCase {
+    "return id of the project with the given slug" in new TestCase {
       val id = projectIds.generateOne
-      upsertProject(id, path, eventDates.generateOne)
+      upsertProject(id, slug, eventDates.generateOne)
 
-      finder.findProjectId(path).unsafeRunSync() shouldBe id.some
+      finder.findProjectId(slug).unsafeRunSync() shouldBe id.some
     }
 
     "return None if project with the given path does not exist" in new TestCase {
-      finder.findProjectId(path).unsafeRunSync() shouldBe None
+      finder.findProjectId(slug).unsafeRunSync() shouldBe None
     }
   }
 
   private trait TestCase {
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()

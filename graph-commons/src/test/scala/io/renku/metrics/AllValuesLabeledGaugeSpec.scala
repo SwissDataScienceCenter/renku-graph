@@ -32,15 +32,15 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Try
 
 class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
-  import io.renku.graph.model.GraphModelGenerators.projectPaths
-  import io.renku.graph.model.projects.Path
+  import io.renku.graph.model.GraphModelGenerators.projectSlugs
+  import io.renku.graph.model.projects.Slug
 
   "set" should {
 
     "associate the given value with a label on the gauge" in new TestCase {
 
       // iteration 1
-      val labelValue1 = projectPaths.generateOne
+      val labelValue1 = projectSlugs.generateOne
       val value1      = nonNegativeDoubles().generateOne.value
 
       gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
@@ -48,7 +48,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
       underlying.collectValuesFor(label.value, labelValue1.value) shouldBe List(value1)
 
       // iteration 2
-      val labelValue2 = projectPaths.generateOne
+      val labelValue2 = projectSlugs.generateOne
       val value2      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue2 -> value2) shouldBe MonadThrow[Try].unit
 
@@ -57,7 +57,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "set negative value if one is set" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val value      = negativeDoubles().generateOne.value
 
       gauge.set(labelValue -> value) shouldBe MonadThrow[Try].unit
@@ -70,7 +70,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "update the value associated with the label - case without a label and positive update" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val update     = nonNegativeDoubles().generateOne.value
       gauge.update(labelValue -> update) shouldBe MonadThrow[Try].unit
 
@@ -79,7 +79,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "update the value associated with the label - case without a label and negative update" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val update     = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> -update) shouldBe MonadThrow[Try].unit
@@ -89,7 +89,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "update the value associated with the label - case with a positive update value" in new TestCase {
 
-      val labelValue   = projectPaths.generateOne
+      val labelValue   = projectSlugs.generateOne
       val initialValue = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
@@ -104,7 +104,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "update the value associated with the label - case with a negative update value so current + update < 0" in new TestCase {
 
-      val labelValue   = projectPaths.generateOne
+      val labelValue   = projectSlugs.generateOne
       val initialValue = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> initialValue) shouldBe MonadThrow[Try].unit
@@ -121,7 +121,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
     "replace all current entries with ones returned from the given reset data fetch function" in new TestCase {
 
       // before re-provisioning
-      val labelValue1 = projectPaths.generateOne
+      val labelValue1 = projectSlugs.generateOne
       val value1      = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
@@ -144,7 +144,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "remove all entries" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val value      = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> value) shouldBe MonadThrow[Try].unit
@@ -161,7 +161,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "increment value for the given label value" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val value      = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> value) shouldBe MonadThrow[Try].unit
@@ -176,7 +176,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "add label value if one is not present yet" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
 
       gauge.increment(labelValue) shouldBe MonadThrow[Try].unit
 
@@ -188,7 +188,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "decrement value for the given label value" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
       val value      = nonNegativeDoubles().generateOne.value
 
       gauge.update(labelValue -> value) shouldBe MonadThrow[Try].unit
@@ -201,7 +201,7 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
 
     "add label value with value -1 if one is not present yet" in new TestCase {
 
-      val labelValue = projectPaths.generateOne
+      val labelValue = projectSlugs.generateOne
 
       gauge.decrement(labelValue) shouldBe MonadThrow[Try].unit
 
@@ -213,16 +213,16 @@ class AllValuesLabeledGaugeSpec extends AnyWordSpec with MockFactory with should
     val label          = nonBlankStrings().generateOne
     val name           = nonBlankStrings().generateOne
     val help           = nonBlankStrings().generateOne
-    val resetDataFetch = mockFunction[Try[Map[Path, Double]]]
+    val resetDataFetch = mockFunction[Try[Map[Slug, Double]]]
 
-    val gauge      = new AllValuesLabeledGauge[Try, Path](name, help, label, resetDataFetch)
+    val gauge      = new AllValuesLabeledGauge[Try, Slug](name, help, label, resetDataFetch)
     val underlying = gauge.wrappedCollector
   }
 
-  private lazy val waitingEventsGen: Gen[Map[Path, Double]] = nonEmptySet {
+  private lazy val waitingEventsGen: Gen[Map[Slug, Double]] = nonEmptySet {
     for {
-      path  <- projectPaths
+      slug  <- projectSlugs
       count <- nonNegativeLongs()
-    } yield path -> count.value.toDouble
+    } yield slug -> count.value.toDouble
   }.map(_.toMap)
 }

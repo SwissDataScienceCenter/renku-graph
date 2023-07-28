@@ -71,7 +71,7 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
 
   private lazy val example = {
     val sameAs      = datasets.SameAs("http://datasets-repo/abcd")
-    val projectPath = projects.Path("group/subgroup/name")
+    val projectSlug = projects.Slug("group/subgroup/name")
     Dataset
       .NonModifiedDataset(
         datasets.ResourceId((renkuUrl / "datasets" / "123444").show),
@@ -89,15 +89,15 @@ private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
         ),
         datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
         List(DatasetPart(datasets.PartLocation("data"))),
-        project = DatasetProject(projects.ResourceId(projectPath),
-                                 projectPath,
+        project = DatasetProject(projects.ResourceId(projectSlug),
+                                 projectSlug,
                                  projects.Name("name"),
                                  Visibility.Public,
                                  datasets.Identifier("123444")
         ),
         usedIn = List(
-          DatasetProject(projects.ResourceId(projectPath),
-                         projectPath,
+          DatasetProject(projects.ResourceId(projectSlug),
+                         projectSlug,
                          projects.Name("name"),
                          Visibility.Public,
                          datasets.Identifier("123444")

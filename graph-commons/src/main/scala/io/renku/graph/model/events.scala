@@ -352,13 +352,13 @@ object events {
   }
 
   object EventInfo {
-    final case class ProjectIds(id: projects.GitLabId, path: projects.Path)
+    final case class ProjectIds(id: projects.GitLabId, slug: projects.Slug)
     object ProjectIds {
       implicit val jsonDecoder: Decoder[ProjectIds] =
         io.circe.generic.semiauto.deriveDecoder[ProjectIds]
 
       implicit val show: Show[ProjectIds] =
-        a => show"${a.id}/${a.path}"
+        a => show"${a.id}/${a.slug}"
     }
 
     implicit val show: Show[EventInfo] =

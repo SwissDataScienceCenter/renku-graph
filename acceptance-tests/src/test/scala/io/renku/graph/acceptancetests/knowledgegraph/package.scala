@@ -48,7 +48,7 @@ package object knowledgegraph {
 
     json"""{
     "identifier":   ${project.id.value},
-    "path":         ${project.path.value},
+    "path":         ${project.slug.value},
     "name":         ${project.name.value},
     "visibility":   ${project.entitiesProject.visibility.value},
     "created":      ${(project.entitiesProject.dateCreated, project.entitiesProject.maybeCreator)},
@@ -58,7 +58,7 @@ package object knowledgegraph {
     "keywords":     ${project.entitiesProject.keywords.map(_.value).toList.sorted},
     "starsCount":   ${project.starsCount.value},
     "permissions":  ${toJson(project.permissions)},
-    "images":       ${project.entitiesProject.images -> project.path},
+    "images":       ${project.entitiesProject.images -> project.slug},
     "statistics": {
       "commitsCount":     ${project.statistics.commitsCount.value},
       "storageSize":      ${project.statistics.storageSize.value},
@@ -70,8 +70,8 @@ package object knowledgegraph {
   }"""
       .deepMerge {
         _links(
-          Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
-          Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
+          Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.slug)),
+          Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.slug / "datasets"))
         )
       }
       .addIfDefined("description" -> project.entitiesProject.maybeDescription)
@@ -91,7 +91,7 @@ package object knowledgegraph {
       case (forksCount, project: testentities.RenkuProject.WithParent) => json"""{
         "forksCount": ${forksCount.value},
         "parent": {
-          "path":    ${project.parent.path.value},
+          "path":    ${project.parent.slug.value},
           "name":    ${project.parent.name.value},
           "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
         }

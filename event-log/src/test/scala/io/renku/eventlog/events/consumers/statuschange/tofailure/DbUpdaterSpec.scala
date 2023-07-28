@@ -65,7 +65,7 @@ class DbUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
         )
 
@@ -124,7 +124,7 @@ class DbUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(TriplesGenerated -> -1, statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 2)
         )
 
@@ -182,7 +182,7 @@ class DbUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB statusChangeEvent)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-          project.path,
+          project.slug,
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1, New -> 1, TriplesGenerated -> -1)
         )
 
@@ -242,7 +242,7 @@ class DbUpdaterSpec
       sessionResource
         .useK((dbUpdater onRollback statusChangeEvent)(deadlockException))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
       )
 
@@ -321,7 +321,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         eventDate,
         eventBodies.generateOne,
-        projectPath = project.path
+        projectSlug = project.slug
       )
       eventId
     }

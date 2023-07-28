@@ -104,7 +104,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
 
   private lazy val example = {
     implicit val renkuUrl: RenkuUrl = RenkuUrl("http://renku")
-    val projectPath = projects.Path("group/subgroup/name")
+    val projectSlug = projects.Slug("group/subgroup/name")
 
     Json.arr(
       DatasetSearchResult(
@@ -119,7 +119,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
           )
         ),
         datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-        ExemplarProject(projects.ResourceId(projectPath), projectPath),
+        ExemplarProject(projects.ResourceId(projectSlug), projectSlug),
         ProjectsCount(1),
         List(datasets.Keyword("key")),
         List(ImageUri("image.png"))

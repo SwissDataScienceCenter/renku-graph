@@ -26,13 +26,13 @@ import io.renku.graph.model.{GitLabUrl, projects}
 trait ImageApiEncoders {
   def gitLabUrl: GitLabUrl
 
-  implicit def imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
+  implicit def imagesEncoder: Encoder[(List[ImageUri], projects.Slug)] =
+    Encoder.instance[(List[ImageUri], projects.Slug)] { case (images, exemplarProjectSlug) =>
       Json.arr(images.map {
         case uri: ImageUri.Relative => json"""{
            "_links": [{
              "rel": "view",
-             "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
+             "href": ${s"$gitLabUrl/$exemplarProjectSlug/raw/master/$uri"}
            }],
            "location": $uri
          }"""

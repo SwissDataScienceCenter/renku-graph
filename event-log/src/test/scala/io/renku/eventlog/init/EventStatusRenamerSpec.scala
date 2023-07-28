@@ -113,7 +113,7 @@ class EventStatusRenamerSpec
   }
 
   private def store(event: Event, withStatus: String): Unit = {
-    upsertProject(event.compoundEventId, event.project.path, event.date)
+    upsertProject(event.compoundEventId, event.project.slug, event.date)
     execute[Unit] {
       Kleisli { session =>
         val query: Command[
@@ -154,8 +154,8 @@ class EventStatusRenamerSpec
   private def toJsonBody(event: Event): String =
     json"""{
     "project": {
-      "id": ${event.project.id.value},
-      "path": ${event.project.path.value}
+      "id":   ${event.project.id},
+      "slug": ${event.project.slug}
      }
   }""".noSpaces
 

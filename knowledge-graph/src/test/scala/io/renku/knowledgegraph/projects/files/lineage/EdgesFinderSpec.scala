@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
@@ -59,7 +59,7 @@ class EdgesFinderSpec
         upload(to = projectsDataset, project)
 
         edgesFinder
-          .findEdges(project.path, maybeUser = None)
+          .findEdges(project.slug, maybeUser = None)
           .unsafeRunSync() shouldBe Map(
           ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
@@ -117,7 +117,7 @@ class EdgesFinderSpec
       upload(to = projectsDataset, project.addActivities(activity1, activity2))
 
       edgesFinder
-        .findEdges(project.path, maybeUser = None)
+        .findEdges(project.slug, maybeUser = None)
         .unsafeRunSync() shouldBe Map(
         ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
           Set(Node.Location(in1.value), Node.Location(in2.value)),
@@ -133,7 +133,7 @@ class EdgesFinderSpec
     "return None if there's no lineage for the project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
         edgesFinder
-          .findEdges(projectPaths.generateOne, maybeUser = None)
+          .findEdges(projectSlugs.generateOne, maybeUser = None)
           .unsafeRunSync() shouldBe empty
       }
 
@@ -145,7 +145,7 @@ class EdgesFinderSpec
           upload(to = projectsDataset, exemplarData.project)
 
           edgesFinder
-            .findEdges(projectPaths.generateOne, authUsers.generateOption)
+            .findEdges(projectSlugs.generateOne, authUsers.generateOption)
             .unsafeRunSync() shouldBe empty
 
           logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
@@ -159,7 +159,7 @@ class EdgesFinderSpec
         upload(to = projectsDataset, exemplarData.project)
 
         edgesFinder
-          .findEdges(projectPaths.generateOne, authUsers.generateSome)
+          .findEdges(projectSlugs.generateOne, authUsers.generateSome)
           .unsafeRunSync() shouldBe empty
 
         logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
@@ -181,7 +181,7 @@ class EdgesFinderSpec
           upload(to = projectsDataset, project)
 
           edgesFinder
-            .findEdges(project.path, Some(authUser))
+            .findEdges(project.slug, Some(authUser))
             .unsafeRunSync() shouldBe Map(
             ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
               Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
@@ -214,7 +214,7 @@ class EdgesFinderSpec
         upload(to = projectsDataset, project)
 
         edgesFinder
-          .findEdges(project.path, Some(authUser))
+          .findEdges(project.slug, Some(authUser))
           .unsafeRunSync() shouldBe Map(
           ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
             Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),

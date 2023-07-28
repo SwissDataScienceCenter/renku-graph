@@ -67,7 +67,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "id": ${eventId.id.value},
               "project": {
                 "id": ${eventId.projectId.value},
-                "path": ${projectPath.value}
+                "path": ${projectSlug.value}
               },
               "subCategory": "ToTriplesGenerated",
               "processingTime": ${processingTime.value}
@@ -82,7 +82,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
         .returning(IO.unit)
 
       updater
-        .toTriplesGenerated(eventId, projectPath, jsonLDPayload, processingTime)
+        .toTriplesGenerated(eventId, projectSlug, jsonLDPayload, processingTime)
         .unsafeRunSync() shouldBe ()
     }
   }
@@ -101,7 +101,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "id": ${eventId.id.value},
               "project": {
                 "id": ${eventId.projectId.value},
-                "path": ${projectPath.value}
+                "path": ${projectSlug.value}
               },
               "subCategory": "ToTriplesStore",
               "processingTime": ${processingTime.value}
@@ -114,7 +114,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
         .returning(IO.unit)
 
       updater
-        .toTriplesStore(eventId, projectPath, processingTime)
+        .toTriplesStore(eventId, projectSlug, processingTime)
         .unsafeRunSync() shouldBe ()
     }
   }
@@ -131,7 +131,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "id":           ${eventId.id.value},
               "project": {
                 "id":   ${eventId.projectId.value},
-                "path": ${projectPath.value}
+                "path": ${projectSlug.value}
               },
               "subCategory": "RollbackToNew"
             }"""
@@ -143,7 +143,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
         )
         .returning(IO.unit)
 
-      updater.rollback(eventId, projectPath, RollbackStatus.New).unsafeRunSync() shouldBe ()
+      updater.rollback(eventId, projectSlug, RollbackStatus.New).unsafeRunSync() shouldBe ()
     }
 
     s"send a ToTriplesGenerated status change event" in new TestCase {
@@ -156,7 +156,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "id":           ${eventId.id},
               "project": {
                 "id":   ${eventId.projectId},
-                "path": $projectPath
+                "path": $projectSlug
               },
               "subCategory": "RollbackToTriplesGenerated"
             }"""
@@ -168,7 +168,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
         )
         .returning(IO.unit)
 
-      updater.rollback(eventId, projectPath, RollbackStatus.TriplesGenerated).unsafeRunSync() shouldBe ()
+      updater.rollback(eventId, projectSlug, RollbackStatus.TriplesGenerated).unsafeRunSync() shouldBe ()
     }
   }
 
@@ -187,11 +187,11 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                   "id":           ${eventId.id},
                   "project": {
                     "id":   ${eventId.projectId},
-                    "path": $projectPath
+                    "path": $projectSlug
                   },
                   "subCategory": "ToFailure",
                   "message":   ${Message.Error.fromStackTrace(exception).show},
-                  "newStatus": $eventStatus 
+                  "newStatus": $eventStatus
                 }"""
               ),
               EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
@@ -200,7 +200,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
             )
             .returning(IO.unit)
 
-          updater.toFailure(eventId, projectPath, eventStatus, exception).unsafeRunSync() shouldBe ()
+          updater.toFailure(eventId, projectSlug, eventStatus, exception).unsafeRunSync() shouldBe ()
         }
     }
   }
@@ -216,7 +216,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "categoryName": "EVENTS_STATUS_CHANGE",
               "project": {
                 "id":   ${eventId.projectId.value},
-                "path": ${projectPath.value}
+                "path": ${projectSlug.value}
               },
               "subCategory": "ProjectEventsToNew"
             }"""
@@ -227,12 +227,12 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
         )
         .returning(IO.unit)
 
-      updater.projectToNew(Project(eventId.projectId, projectPath)).unsafeRunSync() shouldBe ()
+      updater.projectToNew(Project(eventId.projectId, projectSlug)).unsafeRunSync() shouldBe ()
     }
   }
   private trait TestCase {
     val eventId     = compoundEventIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     val categoryName = categoryNames.generateOne
     val eventSender  = mock[EventSender[IO]]

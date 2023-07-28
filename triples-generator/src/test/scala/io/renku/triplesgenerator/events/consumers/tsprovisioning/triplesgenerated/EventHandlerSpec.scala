@@ -59,7 +59,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     "lock while executing" in new TestCase {
       val test = Ref.unsafe[IO, Int](0)
       override val tsWriteLock: TsWriteLock[IO] =
-        Lock.from[IO, projects.Path](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
+        Lock.from[IO, projects.Slug](Kleisli(_ => test.update(_ + 1)))(Kleisli(_ => test.update(_ + 1)))
 
       val event = triplesGeneratedEvents.generateOne
 
@@ -101,7 +101,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     val eventProcessor = mock[EventProcessor[IO]]
 
-    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Path]
+    def tsWriteLock: TsWriteLock[IO] = Lock.none[IO, projects.Slug]
 
     lazy val handler = new EventHandler[IO](
       categoryName,

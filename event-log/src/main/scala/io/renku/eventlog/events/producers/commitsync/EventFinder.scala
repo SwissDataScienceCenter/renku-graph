@@ -100,7 +100,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                 (maybeEventStatus: Option[EventStatus]) ~
                 (project: Project) ~ (maybeLastSyncDate: Option[LastSyncedDate]) ~ (latestEventDate: EventDate) =>
               (FullCommitSyncEvent(CompoundEventId(eventId, project.id),
-                                   project.path,
+                                   project.slug,
                                    maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
                ),
                maybeLastSyncDate,

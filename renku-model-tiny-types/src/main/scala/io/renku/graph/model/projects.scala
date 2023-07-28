@@ -39,8 +39,8 @@ object projects {
       with NonNegativeInt[GitLabId]
       with TinyTypeJsonLDOps[GitLabId]
 
-  final class Path private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
-  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath[Path] with TinyTypeJsonLDOps[Path] {
+  final class Slug private(val value: String) extends AnyVal with RelativePathTinyType with Identifier
+  implicit object Slug extends TinyTypeFactory[Slug](new Slug(_)) with RelativePath[Slug] with TinyTypeJsonLDOps[Slug] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
 
@@ -49,8 +49,8 @@ object projects {
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    implicit class PathOps(path: Path) {
-      private lazy val nameString :: namespacesStringReversed = path.show.split('/').toList.reverse
+    implicit class SlugOps(slug: Slug) {
+      private lazy val nameString :: namespacesStringReversed = slug.show.split('/').toList.reverse
       lazy val toName:       Name            = Name(nameString)
       lazy val toNamespaces: List[Namespace] = namespacesStringReversed.reverseIterator.map(Namespace(_)).toList
       lazy val toNamespace:  Namespace       = toNamespaces.mkString("/")
@@ -71,22 +71,22 @@ object projects {
       with UrlOps[ResourceId]
       with EntityIdJsonLDOps[ResourceId] {
 
-    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
+    private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Slug.regexValidator.drop(1)}"
 
     addConstraint(
       _ matches regexValidator,
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    def apply(projectPath: Path)(implicit renkuUrl: RenkuUrl): ResourceId =
-      ResourceId((renkuUrl / "projects" / projectPath).value)
+    def apply(projectSlug: Slug)(implicit renkuUrl: RenkuUrl): ResourceId =
+      ResourceId((renkuUrl / "projects" / projectSlug).value)
 
     def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 
-    private val pathExtractor = "^.*\\/projects\\/(.*)$".r
-    implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
-      case ResourceId(pathExtractor(path)) => Path.from(path)
-      case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
+    private val slugExtractor = "^.*\\/projects\\/(.*)$".r
+    implicit lazy val projectSlugConverter: TinyTypeConverter[ResourceId, Slug] = {
+      case ResourceId(slugExtractor(path)) => Slug.from(path)
+      case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectSlug"))
     }
   }
 

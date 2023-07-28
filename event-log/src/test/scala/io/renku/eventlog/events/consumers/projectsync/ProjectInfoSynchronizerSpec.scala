@@ -46,11 +46,11 @@ class ProjectInfoSynchronizerSpec
     with should.Matchers {
 
   it should "fetch relevant project info from GitLab and send SYNC_REPO_METADATA " +
-    "if both paths from event and GitLab are the same" in {
+    "if both slugs from event and GitLab are the same" in {
 
       val event = projectSyncEvents.generateOne
 
-      givenGitLabProject(by = event.projectId, returning = event.projectPath.some.asRight.pure[IO])
+      givenGitLabProject(by = event.projectId, returning = event.projectSlug.some.asRight.pure[IO])
 
       givenSendingSyncRepoMetadata(event, returning = ().pure[IO])
 
@@ -58,33 +58,33 @@ class ProjectInfoSynchronizerSpec
     }
 
   it should "fetch relevant project info from GitLab and " +
-    "if GitLab returns a different path " +
+    "if GitLab returns a different slug " +
     "project info in the project table is changed " +
     "and a COMMIT_SYNC_REQUEST event with the updated project info " +
     "and a CLEAN_UP_REQUEST event with the old project info " +
     "are sent" in {
 
       val event   = projectSyncEvents.generateOne
-      val newPath = projectPaths.generateOne
+      val newSlug = projectSlugs.generateOne
 
-      givenGitLabProject(by = event.projectId, returning = newPath.some.asRight.pure[IO])
+      givenGitLabProject(by = event.projectId, returning = newSlug.some.asRight.pure[IO])
 
       givenProjectRemovedFromDB(event.projectId, returning = ().pure[IO])
 
       givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
 
-      givenSending(commitSyncRequestEvent(event.projectId, newPath), returning = ().pure[IO])
+      givenSending(commitSyncRequestEvent(event.projectId, newSlug), returning = ().pure[IO])
 
       synchronizer.syncProjectInfo(event).assertNoException
     }
 
   it should "fetch relevant project info from GitLab and " +
-    "if GitLab returns no path " +
+    "if GitLab returns no slug " +
     "only a CLEAN_UP_REQUEST event with the old project info is sent" in {
 
       val event = projectSyncEvents.generateOne
 
-      givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Path].asRight.pure[IO])
+      givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Slug].asRight.pure[IO])
 
       givenSending(cleanUpRequestEvent(event), returning = ().pure[IO])
 
@@ -107,7 +107,7 @@ class ProjectInfoSynchronizerSpec
 
     val exception = exceptions.generateOne
     givenGitLabProject(by = event.projectId,
-                       returning = exception.raiseError[IO, Either[UnauthorizedException, Option[projects.Path]]]
+                       returning = exception.raiseError[IO, Either[UnauthorizedException, Option[projects.Slug]]]
     )
 
     synchronizer.syncProjectInfo(event).assertThrowsError[Exception](_ shouldBe exception)
@@ -122,7 +122,7 @@ class ProjectInfoSynchronizerSpec
     new ProjectInfoSynchronizerImpl[IO](gitLabProjectFetcher, projectRemover, eventSender, tgClient)
 
   private def givenGitLabProject(by:        projects.GitLabId,
-                                 returning: IO[Either[UnauthorizedException, Option[projects.Path]]]
+                                 returning: IO[Either[UnauthorizedException, Option[projects.Slug]]]
   ) = (gitLabProjectFetcher.fetchGitLabProject _)
     .expects(by)
     .returning(returning)
@@ -142,17 +142,17 @@ class ProjectInfoSynchronizerSpec
       .returning(returning)
 
   private def givenSendingSyncRepoMetadata(event: ProjectSyncEvent, returning: IO[Unit]) =
-    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(event.projectPath)).returning(returning)
+    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(event.projectSlug)).returning(returning)
 
   private def commitSyncRequestEvent(id:   projects.GitLabId,
-                                     path: projects.Path
+                                     slug: projects.Slug
   ): (CategoryName, EventRequestContent.NoPayload) = {
     val category = commitsyncrequest.categoryName
     val payload = json"""{
       "categoryName": ${category.show},
       "project": {
-        "id":   ${id.value},
-        "path": ${path.show}
+        "id":   $id,
+        "slug": $slug
       }
     }"""
     category -> EventRequestContent.NoPayload(payload)
@@ -161,10 +161,10 @@ class ProjectInfoSynchronizerSpec
   private def cleanUpRequestEvent(event: ProjectSyncEvent): (CategoryName, EventRequestContent.NoPayload) = {
     val category = cleanuprequest.categoryName
     val payload = json"""{
-      "categoryName": ${category.show},
+      "categoryName": $category,
       "project": {
-        "id":   ${event.projectId.value},
-        "path": ${event.projectPath.show}
+        "id":   ${event.projectId},
+        "slug": ${event.projectSlug}
       }
     }"""
     category -> EventRequestContent.NoPayload(payload)

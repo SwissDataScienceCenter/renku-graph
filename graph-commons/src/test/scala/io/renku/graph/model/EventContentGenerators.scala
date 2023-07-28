@@ -21,7 +21,7 @@ package io.renku.graph.model
 import io.renku.generators.Generators.{nonEmptyStrings, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventInfo.ProjectIds
 import io.renku.graph.model.events._
 import org.scalacheck.Gen
@@ -35,11 +35,11 @@ object EventContentGenerators {
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
 
   def eventInfos(
-      projectPathGen: Gen[projects.Path] = projectPaths,
+      projectSlugGen: Gen[projects.Slug] = projectSlugs,
       projectIdGen:   Gen[projects.GitLabId] = projectIds
   ): Gen[EventInfo] = for {
     id            <- eventIds
-    projectPath   <- projectPathGen
+    projectSlug   <- projectSlugGen
     projectId     <- projectIdGen
     status        <- eventStatuses
     eventDate     <- eventDates
@@ -48,7 +48,7 @@ object EventContentGenerators {
     processingTimes <-
       statusProcessingTimeObjects(status).toGeneratorOfList().map(_.sortBy(_.status)).map(_.distinctBy(_.status))
   } yield EventInfo(id,
-                    ProjectIds(projectId, projectPath),
+                    ProjectIds(projectId, projectSlug),
                     status,
                     eventDate,
                     executionDate,

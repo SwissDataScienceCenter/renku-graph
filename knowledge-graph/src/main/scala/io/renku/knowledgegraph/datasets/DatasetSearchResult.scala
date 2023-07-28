@@ -48,7 +48,7 @@ final case class DatasetSearchResult(
 
 object DatasetSearchResult {
 
-  final case class ExemplarProject(id: projects.ResourceId, path: projects.Path)
+  final case class ExemplarProject(id: projects.ResourceId, slug: projects.Slug)
 
   implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: config.renku.ApiUrl): Encoder[DatasetSearchResult] =
     Encoder.instance[DatasetSearchResult] {
@@ -95,13 +95,13 @@ object DatasetSearchResult {
   }
 
   private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], ExemplarProject)] =
-    Encoder.instance[(List[ImageUri], ExemplarProject)] { case (imageUris, ExemplarProject(_, projectPath)) =>
+    Encoder.instance[(List[ImageUri], ExemplarProject)] { case (imageUris, ExemplarProject(_, projectSlug)) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
-          "location": $uri  
+          "location": $uri
         }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / projectPath / "raw" / "master" / uri))
+            Link(Rel("view") -> Href(gitLabUrl / projectSlug / "raw" / "master" / uri))
           )
         case uri: ImageUri.Absolute =>
           json"""{

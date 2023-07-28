@@ -116,7 +116,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       stepsRunner.run(List(TransformationStep(step1Name, step1Transformation)),
                       originalProject
-      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $exception", exception)
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.slug} failed: $exception", exception)
         .pure[Try]
     }
 
@@ -160,7 +160,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                       originalProject
-      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $nonRecoverableError",
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.slug} failed: $nonRecoverableError",
                                        nonRecoverableError
       ).pure[Try]
     }
@@ -227,7 +227,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                       project
-      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $failure", failure).pure[Try]
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.slug} failed: $failure", failure).pure[Try]
     }
 
     s"return $RecoverableFailure if executing postDataUploadQueries fails with RecoverableFailure" in new TestCase {
@@ -277,7 +277,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                       project
-      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $nonRecoverableError",
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.slug} failed: $nonRecoverableError",
                                        nonRecoverableError
       ).pure[Try]
     }
@@ -328,7 +328,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                       project
-      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $nonRecoverableError",
+      ) shouldBe NonRecoverableFailure(s"Transformation of ${project.slug} failed: $nonRecoverableError",
                                        nonRecoverableError
       ).pure[Try]
     }

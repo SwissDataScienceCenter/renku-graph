@@ -100,7 +100,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       "categoryName": "GLOBAL_COMMIT_SYNC",
       "project": {
         "id":   ${project.id},
-        "path": ${project.path}
+        "slug": ${project.slug}
       },
       "commits": {
         "count":  ${commits.count},

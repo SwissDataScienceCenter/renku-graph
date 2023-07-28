@@ -25,7 +25,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.events.EventRequestContent
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -33,8 +33,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
-  val fullEvent:    CleanUpRequestEvent = CleanUpRequestEvent.Full(projectIds.generateOne, projectPaths.generateOne)
-  val partialEvent: CleanUpRequestEvent = CleanUpRequestEvent.Partial(projectPaths.generateOne)
+  val fullEvent:    CleanUpRequestEvent = CleanUpRequestEvent.Full(projectIds.generateOne, projectSlugs.generateOne)
+  val partialEvent: CleanUpRequestEvent = CleanUpRequestEvent.Partial(projectSlugs.generateOne)
   val events: List[CleanUpRequestEvent] = List(fullEvent, partialEvent)
 
   "createHandlingDefinition.decode" should {
@@ -75,19 +75,19 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     implicit val eventRequestEncoder: Encoder[CleanUpRequestEvent] =
       Encoder.instance {
-        case CleanUpRequestEvent.Full(id, path) =>
+        case CleanUpRequestEvent.Full(id, slug) =>
           json"""{
               "categoryName": "CLEAN_UP_REQUEST",
               "project": {
-                "id":   ${id.value},
-                "path": ${path.show}
+                "id":   $id,
+                "slug": $slug
               }
             }"""
-        case CleanUpRequestEvent.Partial(path) =>
+        case CleanUpRequestEvent.Partial(slug) =>
           json"""{
               "categoryName": "CLEAN_UP_REQUEST",
               "project": {
-                "path": ${path.show}
+                "slug": $slug
               }
             }"""
       }

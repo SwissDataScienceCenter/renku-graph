@@ -65,11 +65,11 @@ class EventFinderSpec
 
         val project0                 = consumerProjects.generateOne
         val (eventId0, oldEventDate) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
-        addEvent(eventId0, oldEventDate, project0.path)
+        addEvent(eventId0, oldEventDate, project0.slug)
 
         val project1                    = consumerProjects.generateOne
         val (eventId1, latestEventDate) = genCommitIdAndDate(olderThanAWeek = false, project1.id)
-        addEvent(eventId1, latestEventDate, project1.path)
+        addEvent(eventId1, latestEventDate, project1.slug)
 
         givenTheLastSyncedDateIsUpdated(project1)
 
@@ -94,14 +94,14 @@ class EventFinderSpec
         val project0                               = consumerProjects.generateOne
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, project0.id)
-        addEvent(project0Event0Id, project0Event0Date, project0.path)
-        addEvent(project0Event1Id, project0Event1Date, project0.path)
+        addEvent(project0Event0Id, project0Event0Date, project0.slug)
+        addEvent(project0Event1Id, project0Event1Date, project0.slug)
 
         val project1                               = consumerProjects.generateOne
         val (project1Event0Id, project1Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
         val (project1Event1Id, project1Event1Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
-        addEvent(project1Event0Id, project1Event0Date, project1.path)
-        addEvent(project1Event1Id, project1Event1Date, project1.path)
+        addEvent(project1Event0Id, project1Event0Date, project1.slug)
+        addEvent(project1Event1Id, project1Event1Date, project1.slug)
 
         givenTheLastSyncedDateIsUpdated(project0)
 
@@ -123,8 +123,8 @@ class EventFinderSpec
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
-        addEvent(project0Event0Id, project0Event0Date, project0.path)
-        addEvent(project0Event1Id, project0Event1Date, project0.path)
+        addEvent(project0Event0Id, project0Event0Date, project0.slug)
+        addEvent(project0Event1Id, project0Event1Date, project0.slug)
         upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         currentTime.expects().returning(now)
@@ -144,8 +144,8 @@ class EventFinderSpec
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
-        addEvent(project0Event0Id, project0Event0Date, project0.path)
-        addEvent(project0Event1Id, project0Event1Date, project0.path)
+        addEvent(project0Event0Id, project0Event0Date, project0.slug)
+        addEvent(project0Event1Id, project0Event1Date, project0.slug)
         upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         val project1           = consumerProjects.generateOne
@@ -153,7 +153,7 @@ class EventFinderSpec
 
         val project1Event0Id   = genCompoundEventId(projectId = project1.id)
         val project1Event0Date = EventDate(project0Event0Date.value.minus(1, ChronoUnit.DAYS))
-        addEvent(project1Event0Id, project1Event0Date, project1.path)
+        addEvent(project1Event0Id, project1Event0Date, project1.slug)
         upsertCategorySyncTime(project1.id, categoryName, project1LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
@@ -181,9 +181,9 @@ class EventFinderSpec
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
         val (project0Event2Id, project0Event2Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
-        addEvent(project0Event0Id, project0Event0Date, project0.path)
-        addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
-        addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
+        addEvent(project0Event0Id, project0Event0Date, project0.slug)
+        addEvent(project0Event1Id, project0Event1Date, project0.slug, eventStatus = AwaitingDeletion)
+        addEvent(project0Event2Id, project0Event2Date, project0.slug, eventStatus = Deleting)
         upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
@@ -208,9 +208,9 @@ class EventFinderSpec
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
         val (project0Event2Id, project0Event2Date) = genCommitIdAndDate(projectId = project0.id)
-        addEvent(project0Event0Id, project0Event0Date, project0.path, eventStatus = AwaitingDeletion)
-        addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
-        addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
+        addEvent(project0Event0Id, project0Event0Date, project0.slug, eventStatus = AwaitingDeletion)
+        addEvent(project0Event1Id, project0Event1Date, project0.slug, eventStatus = AwaitingDeletion)
+        addEvent(project0Event2Id, project0Event2Date, project0.slug, eventStatus = Deleting)
         upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
@@ -258,7 +258,7 @@ class EventFinderSpec
   private def addEvent(
       eventId:     CompoundEventId,
       eventDate:   EventDate,
-      projectPath: projects.Path,
+      projectSlug: projects.Slug,
       createdDate: CreatedDate = createdDates.generateOne,
       eventStatus: EventStatus =
         Gen.oneOf(EventStatus.all.filterNot(status => status == AwaitingDeletion || status == Deleting)).generateOne
@@ -269,6 +269,6 @@ class EventFinderSpec
     eventDate,
     eventBodies.generateOne,
     createdDate,
-    projectPath = projectPath
+    projectSlug = projectSlug
   )
 }

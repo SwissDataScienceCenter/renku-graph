@@ -89,9 +89,9 @@ class CommitsSynchronizerSpec
         val elOnlyIds = commitIds.generateList()
 
         givenCommitsInGL(event.project.id, untilNow, PageResult(commonIds ::: glOnlyIds, maybeNextPage = None))
-        givenCommitsInEL(event.project.path, untilNow, PageResult(commonIds ::: elOnlyIds, maybeNextPage = None))
+        givenCommitsInEL(event.project.slug, untilNow, PageResult(commonIds ::: elOnlyIds, maybeNextPage = None))
         givenCommitsInGL(event.project.id, sinceNow, PageResult.empty)
-        givenCommitsInEL(event.project.path, sinceNow, PageResult.empty)
+        givenCommitsInEL(event.project.slug, sinceNow, PageResult.empty)
 
         expectEventsToBeCreated(event.project, glOnlyIds)
         expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -116,9 +116,9 @@ class CommitsSynchronizerSpec
           givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
           givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
-          givenCommitsInEL(event.project.path, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
+          givenCommitsInEL(event.project.slug, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
           givenCommitsInGL(event.project.id, sinceNow, PageResult.empty)
-          givenCommitsInEL(event.project.path, sinceNow, PageResult.empty)
+          givenCommitsInEL(event.project.slug, sinceNow, PageResult.empty)
 
           expectEventsToBeCreated(event.project, glOnlyIds)
           expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -152,12 +152,12 @@ class CommitsSynchronizerSpec
         givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
         givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
-        givenCommitsInEL(event.project.path, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
+        givenCommitsInEL(event.project.slug, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
         givenCommitsInGL(event.project.id,
                          sinceNow,
                          (commonIdsSinceArrival ::: glEventsSinceArrival).shuffle.toPages(ofSize = 2): _*
         )
-        givenCommitsInEL(event.project.path,
+        givenCommitsInEL(event.project.slug,
                          sinceNow,
                          (commonIdsSinceArrival ::: elEventsSinceArrival).shuffle.toPages(ofSize = 2): _*
         )
@@ -205,8 +205,8 @@ class CommitsSynchronizerSpec
       givenCommitsInGL(event.project.id, sinceNow)
 
       val elOnlyIds = commitIds.generateList()
-      givenCommitsInEL(event.project.path, untilNow, elOnlyIds.toPages(2): _*)
-      givenCommitsInEL(event.project.path, sinceNow)
+      givenCommitsInEL(event.project.slug, untilNow, elOnlyIds.toPages(2): _*)
+      givenCommitsInEL(event.project.slug, sinceNow)
 
       expectEventsToBeCreated(event.project, Nil)
       expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -286,22 +286,22 @@ class CommitsSynchronizerSpec
         }
     }
 
-    def givenCommitsInEL(projectPath: projects.Path, condition: DateCondition, pageResults: PageResult*) = {
+    def givenCommitsInEL(projectSlug: projects.Slug, condition: DateCondition, pageResults: PageResult*) = {
       val lastPage =
         if (pageResults.isEmpty) Page.first
         else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
 
       if (pageResults.isEmpty) {
         (eventLogCommitFetcher
-          .fetchELCommits(_: projects.Path, _: DateCondition, _: PagingRequest))
-          .expects(projectPath, condition, pageRequest(Page.first))
+          .fetchELCommits(_: projects.Slug, _: DateCondition, _: PagingRequest))
+          .expects(projectSlug, condition, pageRequest(Page.first))
           .returning(PageResult.empty.pure[IO])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (eventLogCommitFetcher
-            .fetchELCommits(_: projects.Path, _: DateCondition, _: PagingRequest))
-            .expects(projectPath, condition, pageRequest(previousPage))
+            .fetchELCommits(_: projects.Slug, _: DateCondition, _: PagingRequest))
+            .expects(projectSlug, condition, pageRequest(previousPage))
             .returning(pageResult.pure[IO])
         }
     }

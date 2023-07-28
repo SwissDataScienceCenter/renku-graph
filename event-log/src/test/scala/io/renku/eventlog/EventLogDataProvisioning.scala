@@ -29,11 +29,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.microservices.MicroserviceBaseUrl
 import skunk._
 import skunk.codec.all.{text, timestamptz, varchar}
@@ -48,7 +48,7 @@ trait EventLogDataProvisioning {
   protected def storeGeneratedEvent(status:      EventStatus,
                                     eventDate:   EventDate,
                                     projectId:   projects.GitLabId,
-                                    projectPath: projects.Path,
+                                    projectSlug: projects.Slug,
                                     message:     Option[EventMessage] = None
   ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) = {
     val eventId = CompoundEventId(eventIds.generateOne, projectId)
@@ -67,7 +67,7 @@ trait EventLogDataProvisioning {
       timestampsNotInTheFuture.generateAs(ExecutionDate),
       eventDate,
       eventBodies.generateOne,
-      projectPath = projectPath,
+      projectSlug = projectSlug,
       maybeMessage = maybeMessage,
       maybeEventPayload = maybePayload
     )
@@ -91,11 +91,11 @@ trait EventLogDataProvisioning {
                            eventBody:         EventBody,
                            createdDate:       CreatedDate = CreatedDate(Instant.now),
                            batchDate:         BatchDate = BatchDate(Instant.now),
-                           projectPath:       Path = projectPaths.generateOne,
+                           projectSlug:       Slug = projectSlugs.generateOne,
                            maybeMessage:      Option[EventMessage] = None,
                            maybeEventPayload: Option[ZippedEventPayload] = None
   ): Unit = {
-    upsertProject(compoundEventId, projectPath, eventDate)
+    upsertProject(compoundEventId, projectSlug, eventDate)
     insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
     upsertEventPayload(compoundEventId, eventStatus, maybeEventPayload)
   }
@@ -147,21 +147,21 @@ trait EventLogDataProvisioning {
     }
   }
 
-  protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
-    upsertProject(compoundEventId.projectId, projectPath, eventDate)
+  protected def upsertProject(compoundEventId: CompoundEventId, projectSlug: Slug, eventDate: EventDate): Unit =
+    upsertProject(compoundEventId.projectId, projectSlug, eventDate)
 
   protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
-    upsertProject(project.id, project.path, eventDate)
+    upsertProject(project.id, project.slug, eventDate)
 
-  protected def upsertProject(projectId: projects.GitLabId, projectPath: Path, eventDate: EventDate): Unit = execute {
+  protected def upsertProject(projectId: projects.GitLabId, projectSlug: Slug, eventDate: EventDate): Unit = execute {
     Kleisli { session =>
-      val query: Command[projects.GitLabId *: projects.Path *: EventDate *: EmptyTuple] =
+      val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
         sql"""INSERT INTO project (project_id, project_path, latest_event_date)
-              VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+              VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
               ON CONFLICT (project_id)
               DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-      session.prepare(query).flatMap(_.execute(projectId *: projectPath *: eventDate *: EmptyTuple)).void
+      session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
     }
   }
 

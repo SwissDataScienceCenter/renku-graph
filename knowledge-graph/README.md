@@ -17,7 +17,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
 | GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
 | GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                                          |
@@ -915,7 +915,7 @@ Response body example:
           "_links":[  
              {  
                 "rel":  "view",
-                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+                "href": "https://renkulab.io/gitlab/project_slug/raw/master/data/mniouUnmal/image.png"
              }
           ]
         },

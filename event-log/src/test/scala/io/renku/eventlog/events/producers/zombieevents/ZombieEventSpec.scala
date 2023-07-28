@@ -22,7 +22,7 @@ import Generators.zombieEventProcessNames
 import cats.implicits.toShow
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, processingStatuses}
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -33,10 +33,10 @@ class ZombieEventSpec extends AnyWordSpec with should.Matchers {
     "print out the id and status" in {
       val event = ZombieEvent(zombieEventProcessNames.generateOne,
                               compoundEventIds.generateOne,
-                              projectPaths.generateOne,
+                              projectSlugs.generateOne,
                               processingStatuses.generateOne
       )
-      event.show shouldBe s"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+      event.show shouldBe s"${event.generatedBy} ${event.eventId}, projectSlug = ${event.projectSlug}, status = ${event.status}"
     }
   }
 }

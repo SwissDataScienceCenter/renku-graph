@@ -44,7 +44,7 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
         "parents": ${commitIds.generateList()},
         "project": {
           "id":   ${project.id},
-          "path": ${project.path}
+          "slug": ${project.slug}
         }
       }""".noSpaces
 

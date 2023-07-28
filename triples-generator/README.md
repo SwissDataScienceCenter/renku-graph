@@ -48,8 +48,8 @@ Accepts an event as multipart requests.
     "f307326be71b17b90db5caaf47bcd44710fe119f"
   ],
   "project": {
-    "id": 123,
-    "path": "namespace/project-name"
+    "id":   123,
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -65,8 +65,8 @@ Accepts an event as multipart requests.
   "categoryName": "TRIPLES_GENERATED",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -87,8 +87,8 @@ Upon arrival, triples-generator will
 {
   "categoryName": "ADD_MIN_PROJECT_INFO",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -109,7 +109,7 @@ Upon arrival, triples-generator will
 {
   "categoryName": "SYNC_REPO_METADATA",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -124,7 +124,7 @@ Upon arrival, triples-generator will
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -139,8 +139,8 @@ Upon arrival, triples-generator will
 {
   "categoryName": "CLEAN_UP",
   "project": {
-    "id": 12,
-    "path": "project/path"
+    "id":   12,
+    "slug": "project/path"
   }
 }
 ```
@@ -175,7 +175,7 @@ Once an event of the type is sent, triples-generator inserts project viewing inf
 {
   "categoryName": "PROJECT_ACTIVATED",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   },
   "date": "2001-09-04T10:48:29.457Z"
 }
@@ -185,7 +185,7 @@ Once an event of the type is sent, triples-generator inserts project viewing inf
 
 Once an event of the type is sent, triples-generator upserts project viewing info in the TS with the data from the payload.
 The upsert happens only if the date from the event is newer than the date from the TS.
-In case there's no project with the given path in the TS, the event is discarded.
+In case there's no project with the given slug in the TS, the event is discarded.
 
 **Multipart Request**
 
@@ -195,7 +195,7 @@ In case there's no project with the given path in the TS, the event is discarded
 {
   "categoryName": "PROJECT_VIEWED",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   },
   "date": "2001-09-04T10:48:29.457Z",
   "user": {
@@ -242,7 +242,7 @@ Once an event of the type is sent, triples-generator removes project viewing inf
 {
   "categoryName": "PROJECT_VIEWING_DELETION",
   "project": {
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```

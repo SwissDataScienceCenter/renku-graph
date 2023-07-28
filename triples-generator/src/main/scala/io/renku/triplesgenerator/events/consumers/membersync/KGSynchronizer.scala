@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.membersync
 import io.renku.graph.model.projects
 
 private trait KGSynchronizer[F[_]] {
-  def syncMembers(path: projects.Path, membersInGL: Set[GitLabProjectMember]): F[SyncSummary]
+  def syncMembers(slug: projects.Slug, membersInGL: Set[GitLabProjectMember]): F[SyncSummary]
 }
 
 private object KGSynchronizerFunctions {

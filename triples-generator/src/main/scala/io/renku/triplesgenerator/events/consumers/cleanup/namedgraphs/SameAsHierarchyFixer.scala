@@ -35,12 +35,12 @@ import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private object SameAsHierarchyFixer {
-  def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
-      connectionConfig: ProjectsConnectionConfig
-  ): F[Unit] = MonadThrow[F].catchNonFatal(new SameAsHierarchyFixer[F](path)(connectionConfig)) >>= (_.run())
+  def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](slug: projects.Slug)(implicit
+                                                                                               connectionConfig: ProjectsConnectionConfig
+  ): F[Unit] = MonadThrow[F].catchNonFatal(new SameAsHierarchyFixer[F](slug)(connectionConfig)) >>= (_.run())
 }
 
-private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
+private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](slug: projects.Slug)(
     connectionConfig: ProjectsConnectionConfig
 ) extends TSClientImpl(connectionConfig) {
 
@@ -102,7 +102,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
         sparql"""|SELECT ?projectId ?datasetId ?topmostSameAs ?sameAs
                  |WHERE {
                  |  GRAPH ?g {
-                 |    ?projectId renku:projectPath ${path.asObject}.
+                 |    ?projectId renku:projectPath ${slug.asObject}.
                  |    ?datasetId ^renku:hasDataset ?projectId;
                  |               a schema:Dataset;
                  |               renku:topmostSameAs ?topmostSameAs.

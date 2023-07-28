@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
@@ -62,11 +62,11 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
     }
     .unsafeRunSync()
 
-  protected def findToken(projectPath: Path): Option[String] = sessionResource
+  protected def findToken(projectSlug: Slug): Option[String] = sessionResource
     .useK {
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
-      Kleisli(_.prepare(query).flatMap(_.option(projectPath.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectSlug.value)))
     }
     .unsafeRunSync()
 

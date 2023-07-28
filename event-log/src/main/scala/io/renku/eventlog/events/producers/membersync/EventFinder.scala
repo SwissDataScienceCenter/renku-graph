@@ -73,9 +73,9 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                 )
               ORDER BY proj.latest_event_date DESC
               LIMIT 1
-      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (maybeDate: Option[LastSyncedDate]) ~ (path: projects.Path) =>
-            (id, maybeDate, MemberSyncEvent(path))
+      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (maybeDate: Option[LastSyncedDate]) ~ (slug: projects.Slug) =>
+            (id, maybeDate, MemberSyncEvent(slug))
           }
       )
       .arguments(

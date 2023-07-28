@@ -36,8 +36,8 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
       actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
       actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
       actualJson.hcursor.downField("project").as[Json] shouldBe Right(json"""{
-                                                                               "id": ${event.id.projectId.value},
-                                                                               "path": ${event.projectPath.value}
+                                                                               "id":   ${event.id.projectId},
+                                                                               "slug": ${event.projectSlug}
                                                                              }""")
     }
   }

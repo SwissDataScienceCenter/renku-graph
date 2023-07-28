@@ -64,9 +64,9 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
                 AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
               LIMIT 1
           """
-          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
-          .map { case eventId ~ projectId ~ path ~ status =>
-            ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectSlugDecoder ~ processingStatusDecoder)
+          .map { case eventId ~ projectId ~ slug ~ status =>
+            ZombieEvent(processName, CompoundEventId(eventId, projectId), slug, status)
           }
       )
       .arguments(ExecutionDate(now()) *: maxDurationForEvent *: EmptyTuple)

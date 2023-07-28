@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventContentGenerators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.http.rest.{SortBy, Sorting}
 import io.renku.http.rest.paging.PagingRequest
@@ -44,9 +44,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
   "findEvents" should {
 
-    "return the List of events of the project the given path or id" in new TestCase {
+    "return the List of events of the project the given slug or id" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -56,7 +56,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -67,16 +67,16 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
         eventStatuses.generateOne,
         eventDates.generateOne,
         projectIds.generateOne,
-        projectPaths.generateOne
+        projectSlugs.generateOne
       )
 
-      val byPathResults = eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None)))
+      val bySlugResults = eventsFinder
+        .findEvents(Criteria(Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None)))
         .unsafeRunSync()
 
-      byPathResults.pagingInfo.total.value   shouldBe infos.size
-      byPathResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
-      byPathResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
+      bySlugResults.pagingInfo.total.value   shouldBe infos.size
+      bySlugResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      bySlugResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
 
       val byIdResults = eventsFinder
         .findEvents(Criteria(Filters.ProjectEvents(projectId, maybeStatus = None, maybeDates = None)))
@@ -87,9 +87,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       byIdResults.results                  shouldBe infos.sortBy(_.eventDate).reverse
     }
 
-    "return the List of events of the project with the given path and the given PagingRequest" in new TestCase {
+    "return the List of events of the project with the given slug and the given PagingRequest" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -99,7 +99,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -110,7 +110,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagingRequest: PagingRequest = PagingRequest(Page(2), PerPage(1))
       val pagedResults = eventsFinder
         .findEvents(
-          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None), paging = pagingRequest)
+          Criteria(Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None), paging = pagingRequest)
         )
         .unsafeRunSync()
 
@@ -119,9 +119,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       pagedResults.results                  shouldBe List(infos.sortBy(_.eventDate).reverse.tail.head)
     }
 
-    "return the List of events of the project with the given path and the given direction" in new TestCase {
+    "return the List of events of the project with the given slug and the given direction" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -131,7 +131,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -142,7 +142,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagingRequest = PagingRequest(Page(1), PerPage(3))
       val pagedResults = eventsFinder
         .findEvents(
-          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
+          Criteria(Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None),
                    Sorting(Sort.By(Sort.EventDate, SortBy.Direction.Asc)),
                    pagingRequest
           )
@@ -156,7 +156,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val ascPagedResults = eventsFinder
         .findEvents(
           Criteria(
-            Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
+            Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None),
             Sorting(Sort.By(Sort.EventDate, SortBy.Direction.Desc)),
             pagingRequest
           )
@@ -168,9 +168,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       ascPagedResults.results                  shouldBe infos.sortBy(_.eventDate).reverse.take(3)
     }
 
-    "return the List of events of the project with the given path and status filter" in new TestCase {
+    "return the List of events of the project with the given slug and status filter" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -180,7 +180,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -190,7 +190,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val eventStatusFilter = Random.shuffle(infos.map(_.status)).head
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, eventStatusFilter.some, maybeDates = None)))
+        .findEvents(Criteria(Filters.ProjectEvents(projectSlug, eventStatusFilter.some, maybeDates = None)))
         .unsafeRunSync()
 
       val expectedResult = infos.filter(_.status == eventStatusFilter)
@@ -199,9 +199,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
     }
 
-    "return the List of events of the project with the given path and since filters" in new TestCase {
+    "return the List of events of the project with the given slug and since filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -211,7 +211,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -223,7 +223,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagedResults = eventsFinder
         .findEvents(
           Criteria(
-            Filters.ProjectEvents(projectPath, maybeStatus = None, Filters.EventsSince(sinceFilter).some)
+            Filters.ProjectEvents(projectSlug, maybeStatus = None, Filters.EventsSince(sinceFilter).some)
           )
         )
         .unsafeRunSync()
@@ -234,9 +234,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
     }
 
-    "return the List of events of the project with the given path and until filters" in new TestCase {
+    "return the List of events of the project with the given slug and until filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectSlug), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -246,7 +246,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -258,7 +258,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagedResults = eventsFinder
         .findEvents(
           Criteria(
-            Filters.ProjectEvents(projectPath, maybeStatus = None, Filters.EventsUntil(untilFilter).some)
+            Filters.ProjectEvents(projectSlug, maybeStatus = None, Filters.EventsUntil(untilFilter).some)
           )
         )
         .unsafeRunSync()
@@ -281,7 +281,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -314,7 +314,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -349,7 +349,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -383,7 +383,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -415,7 +415,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -447,7 +447,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -481,7 +481,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.project.path,
+          projectSlug = info.project.slug,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -500,16 +500,16 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       pagedResults.results                  shouldBe List(List(info1, info2).sortBy(_.eventDate).reverse.last)
     }
 
-    "return an empty List if there's no project with the given path" in new TestCase {
+    "return an empty List if there's no project with the given slug" in new TestCase {
       eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None)))
+        .findEvents(Criteria(Filters.ProjectEvents(projectSlug, maybeStatus = None, maybeDates = None)))
         .unsafeRunSync()
         .results shouldBe Nil
     }
   }
 
   private trait TestCase {
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()

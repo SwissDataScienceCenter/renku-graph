@@ -30,7 +30,7 @@ import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectSlugs}
 import io.renku.graph.model.Schemas
 import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClientError._
@@ -304,6 +304,6 @@ object CommonGraphGenerators {
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {
     maybeAuthUser   <- authUsers.toGeneratorOfOptions
     key             <- keysGen
-    allowedProjects <- projectPaths.toGeneratorOfSet(min = 0)
+    allowedProjects <- projectSlugs.toGeneratorOfSet(min = 0)
   } yield AuthContext(maybeAuthUser, key, allowedProjects)
 }

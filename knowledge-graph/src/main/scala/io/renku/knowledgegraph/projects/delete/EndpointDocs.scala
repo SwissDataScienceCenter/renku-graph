@@ -30,7 +30,7 @@ object EndpointDocs extends docs.EndpointDocs {
   override lazy val path: Path = Path(
     DELETE(
       "Project Delete",
-      "Deletes a Project with the given path",
+      "Deletes a Project with the given slug",
       Uri / "projects" / namespace / projectName,
       Status.Accepted -> Response(
         "Project deleted",

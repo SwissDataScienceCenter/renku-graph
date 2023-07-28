@@ -21,7 +21,7 @@ package io.renku.graph.http.server.security
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -31,7 +31,7 @@ class AuthContextSpec extends AnyWordSpec with should.Matchers {
 
     "return an AuthContext object without auth user" in {
       val key             = nonEmptyStrings().generateOne
-      val allowedProjects = projectPaths.generateSet()
+      val allowedProjects = projectSlugs.generateSet()
 
       AuthContext.forUnknownUser(key, allowedProjects) shouldBe AuthContext(None, key, allowedProjects)
     }

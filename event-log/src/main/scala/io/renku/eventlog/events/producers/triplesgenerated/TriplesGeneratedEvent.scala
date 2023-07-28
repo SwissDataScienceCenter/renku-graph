@@ -24,15 +24,15 @@ import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.graph.model.projects
 
 private final case class TriplesGeneratedEvent(id:          CompoundEventId,
-                                               projectPath: projects.Path,
+                                               projectSlug: projects.Slug,
                                                payload:     ZippedEventPayload
 ) {
-  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
+  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectSlug"
 }
 
 private object TriplesGeneratedEvent {
   implicit lazy val show: Show[TriplesGeneratedEvent] =
-    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}")
+    Show.show(event => show"${event.id}, projectPath = ${event.projectSlug}")
 }
 
 private object TriplesGeneratedEventEncoder {
@@ -45,7 +45,7 @@ private object TriplesGeneratedEventEncoder {
     "id":           ${event.id.id},
     "project": {
       "id":   ${event.id.projectId},
-      "path": ${event.projectPath}
+      "path": ${event.projectSlug}
     }
   }"""
 

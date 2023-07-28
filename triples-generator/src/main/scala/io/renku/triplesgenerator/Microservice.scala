@@ -87,7 +87,7 @@ object Microservice extends IOMicroservice {
     metricsService <- MetricsService[IO](dbSessionPool)
     _ <- metricsService.collectEvery(Duration.fromNanos(config.getDuration("metrics-interval").toNanos)).start
 
-    tsWriteLock = TgLockDB.createLock[IO, projects.Path](dbSessionPool, 0.5.seconds)
+    tsWriteLock = TgLockDB.createLock[IO, projects.Slug](dbSessionPool, 0.5.seconds)
     projectConnConfig              <- ProjectsConnectionConfig[IO](config)
     certificateLoader              <- CertificateLoader[IO]
     gitCertificateInstaller        <- GitCertificateInstaller[IO]

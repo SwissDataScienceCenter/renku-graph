@@ -30,27 +30,27 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class PersistedPathFinderSpec
+class PersistedSlugFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryProjectsTokensDbSpec
     with should.Matchers
     with MockFactory {
 
-  "findPersistedProjectPath" should {
+  "findPersistedProjectSlug" should {
 
-    "return Path for the given project Id" in new TestCase {
+    "return Slug for the given project Id" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      insert(projectId, projectPath, encryptedAccessTokens.generateOne)
+      insert(projectId, projectSlug, encryptedAccessTokens.generateOne)
 
-      (finder findPersistedProjectPath projectId).unsafeRunSync() shouldBe projectPath
+      (finder findPersistedProjectSlug projectId).unsafeRunSync() shouldBe projectSlug
     }
 
-    "fail if there's no Path for the given Id" in new TestCase {
+    "fail if there's no Slug for the given Id" in new TestCase {
       intercept[Exception] {
-        (finder findPersistedProjectPath projectId).unsafeRunSync()
+        (finder findPersistedProjectSlug projectId).unsafeRunSync()
       }
     }
   }
@@ -60,6 +60,6 @@ class PersistedPathFinderSpec
 
     private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val finder = new PersistedPathFinderImpl[IO]
+    val finder = new PersistedSlugFinderImpl[IO]
   }
 }

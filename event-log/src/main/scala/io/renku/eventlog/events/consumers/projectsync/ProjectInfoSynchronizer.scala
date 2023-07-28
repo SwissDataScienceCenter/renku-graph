@@ -52,7 +52,7 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
   import projectRemover._
 
   override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
-    case Right(Some(event.projectPath)) => tgClient.send(SyncRepoMetadata(event.projectPath))
+    case Right(Some(event.`projectSlug`)) => tgClient.send(SyncRepoMetadata(event.projectSlug))
     case Right(Some(newPath)) =>
       removeProject(event.projectId) >>
         send(cleanUpRequest(event)) >>
@@ -65,7 +65,7 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (payload, eventCtx) => sendEvent(payload, eventCtx)
   }
 
-  private def commitSyncRequest(projectId: projects.GitLabId, newPath: projects.Path) = {
+  private def commitSyncRequest(projectId: projects.GitLabId, newPath: projects.Slug) = {
     val category = commitsyncrequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
       "categoryName": ${category.show},
@@ -84,7 +84,7 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
       "categoryName": ${category.show},
       "project": {
         "id":   ${event.projectId.value},
-        "path": ${event.projectPath.show}
+        "path": ${event.projectSlug.show}
       }
     }""")
     val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")

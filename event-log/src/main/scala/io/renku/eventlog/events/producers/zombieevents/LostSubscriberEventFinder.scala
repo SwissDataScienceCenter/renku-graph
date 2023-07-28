@@ -69,9 +69,9 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
         )
         LIMIT 1
         """
-          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
-          .map { case eventId ~ projectId ~ projectPath ~ status =>
-            ZombieEvent(processName, CompoundEventId(eventId, projectId), projectPath, status)
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectSlugDecoder ~ processingStatusDecoder)
+          .map { case eventId ~ projectId ~ projectSlug ~ status =>
+            ZombieEvent(processName, CompoundEventId(eventId, projectId), projectSlug, status)
           }
       )
       .arguments(Void)

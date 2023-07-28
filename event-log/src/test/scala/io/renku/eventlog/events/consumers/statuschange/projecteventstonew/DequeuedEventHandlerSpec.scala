@@ -110,7 +110,7 @@ class DequeuedEventHandlerSpec
 
         sessionResource
           .useK(dbUpdater updateDB ProjectEventsToNew(project))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path, counts)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug, counts)
 
         events.flatMap(findFullEvent) shouldBe events.map { eventId =>
           (eventId.id, EventStatus.New, None, None, Nil)
@@ -146,7 +146,7 @@ class DequeuedEventHandlerSpec
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
                                                                 Map(AwaitingDeletion -> 0, Deleting -> -2)
         )
 
@@ -197,7 +197,7 @@ class DequeuedEventHandlerSpec
 
         sessionResource
           .useK((dbUpdater onRollback ProjectEventsToNew(project))(failure))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.slug,
                                                                 Map(AwaitingDeletion -> 0, Deleting -> -1)
         )
 
@@ -226,7 +226,7 @@ class DequeuedEventHandlerSpec
         case AwaitingDeletion                => zippedEventPayloads.generateOption
         case _                               => zippedEventPayloads.generateNone
       },
-      projectPath = project.path
+      projectSlug = project.slug
     )
 
     status match {

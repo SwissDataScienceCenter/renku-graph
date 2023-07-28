@@ -27,7 +27,7 @@ import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
 
 private trait ProjectIdFinder[F[_]] {
-  def findProjectId(projectPath: projects.Path): F[Option[projects.GitLabId]]
+  def findProjectId(projectSlug: projects.Slug): F[Option[projects.GitLabId]]
 }
 
 private object ProjectIdFinder {
@@ -41,16 +41,16 @@ private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource: Queri
     with TypeSerializers {
   import skunk.implicits._
 
-  override def findProjectId(projectPath: projects.Path): F[Option[projects.GitLabId]] = SessionResource[F].useK {
+  override def findProjectId(projectSlug: projects.Slug): F[Option[projects.GitLabId]] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement
         .named(s"${categoryName.show.toLowerCase} - find project_id")
-        .select[projects.Path, projects.GitLabId](sql"""
+        .select[projects.Slug, projects.GitLabId](sql"""
           SELECT project_id
           FROM project
-          WHERE project_path = $projectPathEncoder 
+          WHERE project_path = $projectSlugEncoder
         """.query(projectIdDecoder))
-        .arguments(projectPath)
+        .arguments(projectSlug)
         .build(_.option)
     }
   }

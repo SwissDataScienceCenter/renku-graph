@@ -38,7 +38,7 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
 
   override def createHandlingDefinition(): EventHandlingDefinition =
     EventHandlingDefinition(
-      decode = _.event.getProjectPath.map(ProjectViewingDeletion.apply),
+      decode = _.event.getProjectSlug.map(ProjectViewingDeletion.apply),
       process
     )
 

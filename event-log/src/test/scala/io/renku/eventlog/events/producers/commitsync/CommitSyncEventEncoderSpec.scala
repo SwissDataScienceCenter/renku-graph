@@ -33,12 +33,12 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
       CommitSyncEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "COMMIT_SYNC",
-        "id":           ${event.id.id.value},
+        "id":           ${event.id.id},
         "project": {
-          "id":         ${event.id.projectId.value},
-          "path":       ${event.projectPath.value}
+          "id":   ${event.id.projectId},
+          "slug": ${event.projectSlug}
         },
-        "lastSynced":   ${event.lastSyncedDate.value}
+        "lastSynced": ${event.lastSyncedDate}
       }"""
     }
 
@@ -48,8 +48,8 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
       CommitSyncEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "COMMIT_SYNC",
         "project": {
-          "id":         ${event.project.id.value},
-          "path":       ${event.project.path.value}
+          "id":   ${event.project.id},
+          "slug": ${event.project.slug}
         }
       }"""
     }

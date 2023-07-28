@@ -72,7 +72,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: S
              |  ?topmostSameAs ?maybeDerivedFrom ?originalId
              |  (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
              |WHERE {
-             |   BIND (${projects.ResourceId(criteria.projectPath).asEntityId} AS ?projectId)
+             |   BIND (${projects.ResourceId(criteria.projectSlug).asEntityId} AS ?projectId)
              |   GRAPH ?projectId {
              |     ?projectId renku:hasDataset ?datasetId.
              |     ?datasetId a schema:Dataset;

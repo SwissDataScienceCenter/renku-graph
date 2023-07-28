@@ -23,14 +23,14 @@ import io.renku.cli.model.CliProject
 import io.renku.graph.model.cli.CliConverters
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.images.ImageUri
-import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, DateModified, Description, ForksCount, Keyword, Name, Slug, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, entities}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDEncoder}
 
 trait Project extends Product with Serializable {
-  val path:             Path
+  val slug:             Slug
   val name:             Name
   val maybeDescription: Option[Description]
   val dateCreated:      DateCreated
@@ -80,7 +80,7 @@ object Project {
     CliConverters.from(_)
 
   implicit def toProjectIdentification(implicit renkuUrl: RenkuUrl): Project => entities.ProjectIdentification =
-    project => entities.ProjectIdentification(projects.ResourceId(project.asEntityId), project.path)
+    project => entities.ProjectIdentification(projects.ResourceId(project.asEntityId), project.slug)
 
   implicit def encoder[P <: Project](implicit
       renkuUrl:     RenkuUrl,
@@ -92,8 +92,8 @@ object Project {
   }
 
   implicit def entityIdEncoder[P <: Project](implicit renkuUrl: RenkuUrl): EntityIdEncoder[P] =
-    EntityIdEncoder.instance(project => toEntityId(project.path))
+    EntityIdEncoder.instance(project => toEntityId(project.slug))
 
-  def toEntityId(projectPath: Path)(implicit renkuUrl: RenkuUrl): EntityId =
-    EntityId.of(renkuUrl / "projects" / projectPath)
+  def toEntityId(projectSlug: Slug)(implicit renkuUrl: RenkuUrl): EntityId =
+    EntityId.of(renkuUrl / "projects" / projectSlug)
 }

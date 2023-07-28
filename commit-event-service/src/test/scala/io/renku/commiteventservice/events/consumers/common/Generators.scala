@@ -23,7 +23,7 @@ import io.renku.commiteventservice.events.consumers.common.CommitEvent.{NewCommi
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.generators.Generators.listOf
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
-import io.renku.graph.model.GraphModelGenerators.{personEmails, personNames, projectIds, projectPaths, projectVisibilities}
+import io.renku.graph.model.GraphModelGenerators.{personEmails, personNames, projectIds, projectSlugs, projectVisibilities}
 import io.renku.graph.model.events.CommitId
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
@@ -38,8 +38,8 @@ private[consumers] object Generators {
   implicit val projectInfos: Gen[ProjectInfo] = for {
     id         <- projectIds
     visibility <- projectVisibilities
-    path       <- projectPaths
-  } yield ProjectInfo(id, visibility, path)
+    slug       <- projectSlugs
+  } yield ProjectInfo(id, visibility, slug)
 
   implicit val commitInfos: Gen[CommitInfo] = for {
     id            <- commitIds

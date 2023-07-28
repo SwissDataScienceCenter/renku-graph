@@ -82,7 +82,7 @@ class EncodersSpec extends AnyWordSpec with should.Matchers {
       searchInfo.asQuads shouldBe Set(
         ProjectsQuad(searchInfo.id, rdf / "type", renku / "DiscoverableProject"),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.nameProperty.id, searchInfo.name.asObject),
-        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.pathProperty.id, searchInfo.path.asObject),
+        ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.pathProperty.id, searchInfo.slug.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.visibilityProperty.id, searchInfo.visibility.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateCreatedProperty.id, searchInfo.dateCreated.asObject),
         ProjectsQuad(searchInfo.id, ProjectSearchInfoOntology.dateModifiedProperty.id, searchInfo.dateModified.asObject)

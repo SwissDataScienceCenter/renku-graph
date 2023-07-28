@@ -32,7 +32,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectFinder[F[_]] {
-  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]]
+  def findProject(projectSlug: projects.Slug)(implicit accessToken: AccessToken): F[Option[GitLabProject]]
 }
 
 private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectFinder[F] {
@@ -44,8 +44,8 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
-    GitLabClient[F].get(uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single-project")(
+  def findProject(projectSlug: projects.Slug)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
+    GitLabClient[F].get(uri"projects" / projectSlug.value withQueryParam ("statistics", "true"), "single-project")(
       mapResponse
     )(accessToken.some)
 

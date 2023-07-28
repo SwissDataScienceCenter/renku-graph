@@ -38,7 +38,7 @@ private class EventProcessorImpl[F[_]: Async: Logger](tsCleaner: namedgraphs.TSC
 
   override def process(project: Project): F[Unit] = {
     Logger[F].info(show"$categoryName: $project accepted") >>
-      tsCleaner.removeTriples(project.path) >>
+      tsCleaner.removeTriples(project.slug) >>
       statusUpdater.projectToNew(project)
   }.recoverWith(logError(project))
 

@@ -46,7 +46,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -79,9 +79,9 @@ class GitLabProjectMembersFinderSpec
 
     "return a set of all project members" in new TestCase {
       forAll { gitLabProjectMembers: Set[GitLabProjectMember] =>
-        setGitLabClientExpectation(path, None, returning = (gitLabProjectMembers, None))
+        setGitLabClientExpectation(slug, None, returning = (gitLabProjectMembers, None))
 
-        finder.findProjectMembers(path).unsafeRunSync() shouldBe gitLabProjectMembers
+        finder.findProjectMembers(slug).unsafeRunSync() shouldBe gitLabProjectMembers
       }
     }
 
@@ -89,10 +89,10 @@ class GitLabProjectMembersFinderSpec
 
       val projectMembers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
 
-      setGitLabClientExpectation(path, None, returning = (Set(projectMembers.head), 2.some))
-      setGitLabClientExpectation(path, 2.some, returning = (projectMembers.tail, None))
+      setGitLabClientExpectation(slug, None, returning = (Set(projectMembers.head), 2.some))
+      setGitLabClientExpectation(slug, 2.some, returning = (projectMembers.tail, None))
 
-      finder.findProjectMembers(path).unsafeRunSync() shouldBe projectMembers
+      finder.findProjectMembers(slug).unsafeRunSync() shouldBe projectMembers
     }
 
     // test map response
@@ -125,11 +125,11 @@ class GitLabProjectMembersFinderSpec
 
         override val mapResponse =
           captureMapping(gitLabClient)(
-            finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+            finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
             Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
           )
 
-        setGitLabClientExpectation(path, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
+        setGitLabClientExpectation(slug, maybePage = None, maybeAccessTokenOverride = None, returning = (members, None))
 
         mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (members, None)
       }
@@ -140,7 +140,7 @@ class GitLabProjectMembersFinderSpec
 
         override val mapResponse =
           captureMapping(gitLabClient)(
-            finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+            finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
             Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
           )
 
@@ -153,14 +153,14 @@ class GitLabProjectMembersFinderSpec
 
   private trait TestCase {
 
-    val path = projectPaths.generateOne
+    val slug = projectSlugs.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new GitLabProjectMembersFinderImpl[IO]
 
-    def setGitLabClientExpectation(projectPath:              projects.Path,
+    def setGitLabClientExpectation(projectPath:              projects.Slug,
                                    maybePage:                Option[Int] = None,
                                    maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
                                    returning:                (Set[GitLabProjectMember], Option[Int])
@@ -185,7 +185,7 @@ class GitLabProjectMembersFinderSpec
 
     val mapResponse =
       captureMapping(gitLabClient)(
-        finder.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+        finder.findProjectMembers(slug)(maybeAccessToken).unsafeRunSync(),
         Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int]))
       )
   }

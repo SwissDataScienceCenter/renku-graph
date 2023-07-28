@@ -70,7 +70,7 @@ private object SearchInfoExtractor {
     ds.additionalInfo.maybeDescription,
     ds.additionalInfo.images,
     NonEmptyList.one(
-      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.path)
+      Link(ds.provenance.topmostSameAs, ds.identification.resourceId, project.resourceId, project.slug)
     )
   )
 }

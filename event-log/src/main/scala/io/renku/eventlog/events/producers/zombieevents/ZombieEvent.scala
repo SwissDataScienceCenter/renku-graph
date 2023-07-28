@@ -30,16 +30,16 @@ private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](ne
 
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
                                eventId:     CompoundEventId,
-                               projectPath: projects.Path,
+                               projectSlug: projects.Slug,
                                status:      ProcessingStatus
 ) {
   override lazy val toString: String =
-    s"$ZombieEvent $generatedBy $eventId, projectPath = $projectPath, status = $status"
+    s"$ZombieEvent $generatedBy $eventId, projectSlug = $projectSlug, status = $status"
 }
 
 private object ZombieEvent {
   implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
-    show"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+    show"${event.generatedBy} ${event.eventId}, projectSlug = ${event.projectSlug}, status = ${event.status}"
   )
 }
 
@@ -53,7 +53,7 @@ private object ZombieEventEncoder {
     "id":           ${event.eventId.id.value},
     "project": {
       "id":         ${event.eventId.projectId.value},
-      "path":       ${event.projectPath.value}
+      "path":       ${event.projectSlug.value}
     },
     "status":       ${event.status.value}
   }"""

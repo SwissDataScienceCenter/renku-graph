@@ -65,7 +65,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   def process(event: TriplesGeneratedEvent): F[Unit] = {
     for {
       _                                   <- Logger[F].info(s"${logMessageCommon(event)} accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollback(event)
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.slug) recoverWith rollback(event)
       results                             <- measureExecutionTime(transformAndUpload(event))
       _                                   <- updateEventLog(results)
       _                                   <- logSummary(event)(results)
@@ -126,7 +126,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     case (elapsedTime, Uploaded(event)) =>
       statusUpdater
         .toTriplesStore(event.compoundEventId,
-                        event.project.path,
+                        event.project.slug,
                         EventProcessingTime(Duration ofMillis elapsedTime.value)
         )
         .recoverWith(logEventLogUpdateError(event, "done"))
@@ -134,7 +134,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       statusUpdater
         .toFailure(
           event.compoundEventId,
-          event.project.path,
+          event.project.slug,
           EventStatus.TransformationRecoverableFailure,
           cause,
           executionDelay = cause match {
@@ -145,7 +145,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
     case (_, NonRecoverableError(event, cause)) =>
       statusUpdater
-        .toFailure(event.compoundEventId, event.project.path, EventStatus.TransformationNonRecoverableFailure, cause)
+        .toFailure(event.compoundEventId, event.project.slug, EventStatus.TransformationNonRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
   }
 
@@ -168,7 +168,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def rollback(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Option[AccessToken]]] = {
     case exception =>
-      statusUpdater.rollback(event.compoundEventId, event.project.path, RollbackStatus.TriplesGenerated) >>
+      statusUpdater.rollback(event.compoundEventId, event.project.slug, RollbackStatus.TriplesGenerated) >>
         new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 

@@ -97,9 +97,9 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
         FROM projects_tokens
         WHERE expiry_date IS NULL
         LIMIT 1"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) =>
-            Project(id, path) -> token
+          .query(projectIdDecoder ~ projectSlugDecoder ~ encryptedAccessTokenDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (token: EncryptedAccessToken) =>
+            Project(id, slug) -> token
           }
       )
       .arguments(Void)

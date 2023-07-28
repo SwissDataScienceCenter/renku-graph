@@ -43,13 +43,13 @@ private trait TokensCreator[F[_]] {
 }
 
 private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:   ProjectPathFinder[F],
+    projectSlugFinder:   ProjectSlugFinder[F],
     accessTokenCrypto:   AccessTokenCrypto[F],
     tokenValidator:      TokenValidator[F],
     tokenDueChecker:     TokenDueChecker[F],
     newTokensCreator:    NewTokensCreator[F],
     tokensPersister:     TokensPersister[F],
-    persistedPathFinder: PersistedPathFinder[F],
+    persistedPathFinder: PersistedSlugFinder[F],
     tokenRemover:        TokenRemover[F],
     tokenFinder:         PersistedTokensFinder[F],
     tokensRevoker:       TokensRevoker[F],
@@ -94,12 +94,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
   ): Option[AccessToken] => F[Option[AccessToken]] = {
     case None => Option.empty[AccessToken].pure[F]
     case Some(token) =>
-      projectPathFinder
-        .findProjectPath(projectId, token)
+      projectSlugFinder
+        .findProjectSlug(projectId, token)
         .semiflatMap(actualPath =>
-          findPersistedProjectPath(projectId).flatMap {
+          findPersistedProjectSlug(projectId).flatMap {
             case `actualPath` => ().pure[F]
-            case _            => updatePath(Project(projectId, actualPath))
+            case _            => updateSlug(Project(projectId, actualPath))
           }
         )
         .cataF(
@@ -123,7 +123,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     }
 
   private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
-    projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
+    projectSlugFinder.findProjectSlug(projectId, userToken).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
     createProjectAccessToken(project.id, userToken).map(project -> _)
@@ -184,7 +184,7 @@ private object TokensCreator {
   private val maxRetries: Int Refined NonNegative = 3
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[TokensCreator[F]] = for {
-    pathFinder                <- ProjectPathFinder[F]
+    slugFinder                <- ProjectSlugFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F]
@@ -192,13 +192,13 @@ private object TokensCreator {
     tokenRemover              <- TokenRemover[F]
     tokensRevoker             <- TokensRevoker[F]
   } yield new TokensCreatorImpl[F](
-    pathFinder,
+    slugFinder,
     accessTokenCrypto,
     tokenValidator,
     tokenDueChecker,
     projectAccessTokenCreator,
     TokensPersister[F],
-    PersistedPathFinder[F],
+    PersistedSlugFinder[F],
     tokenRemover,
     PersistedTokensFinder[F],
     tokensRevoker,

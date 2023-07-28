@@ -68,8 +68,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
                   AND e.status = '#${TriplesStore.value}'
               )
               LIMIT 1
-      """.query(projectIdDecoder ~ projectPathDecoder)
-          .map { case (id: projects.GitLabId) ~ (path: projects.Path) => MinProjectInfoEvent(id, path) }
+      """.query(projectIdDecoder ~ projectSlugDecoder)
+          .map { case (id: projects.GitLabId) ~ (slug: projects.Slug) => MinProjectInfoEvent(id, slug) }
       )
       .arguments(Void)
       .build(_.option)

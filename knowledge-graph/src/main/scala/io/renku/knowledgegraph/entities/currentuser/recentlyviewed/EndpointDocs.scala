@@ -76,7 +76,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
   private lazy val example = Json.arr(
     Project(
       MatchingScore(1),
-      projects.Path("group/subgroup/name"),
+      projects.Slug("group/subgroup/name"),
       projects.Name("name"),
       projects.Visibility.Public,
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
@@ -97,7 +97,7 @@ final class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku
       List(datasets.Keyword("key")),
       datasets.Description("Some project").some,
       List(ImageUri("image.png")),
-      projects.Path("group/subgroup/name")
+      projects.Slug("group/subgroup/name")
     ).asJson
   )
 }

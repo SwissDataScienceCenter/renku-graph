@@ -47,11 +47,11 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](projectIdFinder: Proj
       enqueue(event)
 
   private def enqueue(event: CleanUpRequestEvent) = event match {
-    case CleanUpRequestEvent.Full(id, path) => queue.offer(id, path)
-    case CleanUpRequestEvent.Partial(path) =>
-      findProjectId(path) >>= {
-        case Some(id) => queue.offer(id, path)
-        case None     => Logger[F].warn(show"Cannot find projectId for $path")
+    case CleanUpRequestEvent.Full(id, slug) => queue.offer(id, slug)
+    case CleanUpRequestEvent.Partial(slug) =>
+      findProjectId(slug) >>= {
+        case Some(id) => queue.offer(id, slug)
+        case None     => Logger[F].warn(show"Cannot find projectId for $slug")
       }
   }
 }

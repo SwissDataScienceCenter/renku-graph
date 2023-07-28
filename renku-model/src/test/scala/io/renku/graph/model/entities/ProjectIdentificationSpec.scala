@@ -33,17 +33,17 @@ class ProjectIdentificationSpec extends AnyWordSpec with should.Matchers {
 
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      ProjectIdentification(project) shouldBe ProjectIdentification(project.resourceId, project.path)
+      ProjectIdentification(project) shouldBe ProjectIdentification(project.resourceId, project.slug)
     }
   }
 
   "show" should {
 
-    "return String containing info about id and path" in {
+    "return String containing info about id and slug" in {
 
       val identification = projectIdentifications.generateOne
 
-      identification.show shouldBe show"projectId = ${identification.resourceId}, projectPath = ${identification.path}"
+      identification.show shouldBe show"projectId = ${identification.resourceId}, projectSlug = ${identification.slug}"
     }
   }
 }

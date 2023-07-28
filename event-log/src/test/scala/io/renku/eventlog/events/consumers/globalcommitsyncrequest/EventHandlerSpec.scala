@@ -77,12 +77,12 @@ class EventHandlerSpec
   }
 
   private implicit lazy val eventEncoder: Encoder[Project] =
-    Encoder.instance[Project] { case Project(id, path) =>
+    Encoder.instance[Project] { case Project(id, slug) =>
       json"""{
         "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
         "project": {
-          "id":   ${id.value},
-          "path": ${path.value}
+          "id":   $id,
+          "slug": $slug
         }
       }"""
     }

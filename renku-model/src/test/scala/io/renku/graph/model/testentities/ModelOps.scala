@@ -109,7 +109,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
         creatorGen = creatorsGen
       ).map(child =>
         RenkuProject.WithParent(
-          child.path,
+          child.slug,
           child.name,
           child.maybeDescription,
           parentProject.agent,
@@ -233,7 +233,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                               creatorGen = creatorGen
       ).map(child =>
         NonRenkuProject.WithParent(
-          child.path,
+          child.slug,
           child.name,
           child.maybeDescription,
           child.dateCreated,

@@ -34,7 +34,7 @@ object GitLab {
     "user_email":    ${personEmails.generateOne.value},
     "project": {
       "id":                  ${project.id.value},
-      "path_with_namespace": ${project.path.value}
+      "path_with_namespace": ${project.slug.value}
     }
   }"""
 }

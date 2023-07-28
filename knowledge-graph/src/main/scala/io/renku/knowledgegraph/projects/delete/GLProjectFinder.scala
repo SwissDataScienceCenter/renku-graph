@@ -25,7 +25,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
 private trait GLProjectFinder[F[_]] {
-  def findProject(path: projects.Path)(implicit at: AccessToken): F[Option[Project]]
+  def findProject(slug: projects.Slug)(implicit at: AccessToken): F[Option[Project]]
 }
 
 private object GLProjectFinder {
@@ -42,8 +42,8 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFi
   import org.http4s.circe._
   import org.http4s.implicits._
 
-  override def findProject(path: projects.Path)(implicit at: AccessToken): F[Option[Project]] =
-    GitLabClient[F].get(uri"projects" / path, "single-project")(mapResponse)(at.some)
+  override def findProject(slug: projects.Slug)(implicit at: AccessToken): F[Option[Project]] =
+    GitLabClient[F].get(uri"projects" / slug, "single-project")(mapResponse)(at.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[Project]]] = {
     case (Ok, _, response) => response.as[Project].map(Option.apply)
@@ -52,7 +52,7 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient] extends GLProjectFi
 
   private implicit lazy val decoder: Decoder[Project] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
-    (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Path])
+    (cursor.downField("id").as[projects.GitLabId], cursor.downField("path_with_namespace").as[projects.Slug])
       .mapN(Project(_, _))
   }
 

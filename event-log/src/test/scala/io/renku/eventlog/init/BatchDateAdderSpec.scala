@@ -120,14 +120,14 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[
-        EventId *: projects.GitLabId *: projects.Path *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
+        EventId *: projects.GitLabId *: projects.Slug *: EventStatus *: CreatedDate *: ExecutionDate *: EventDate *: String *: EmptyTuple
       ] =
         sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
               values (
                 $eventIdEncoder, 
                 $projectIdEncoder, 
-                $projectPathEncoder, 
+                $projectSlugEncoder,
                 $eventStatusEncoder, 
                 $createdDateEncoder,
                 $executionDateEncoder, 
@@ -141,7 +141,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
           _.execute(
             event.id *:
               event.project.id *:
-              event.project.path *:
+              event.project.slug *:
               eventStatuses.generateOne *:
               createdDate *:
               executionDates.generateOne *:
@@ -158,7 +158,7 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     json"""{
     "project": {
       "id":   ${event.project.id.value},
-      "path": ${event.project.path.value}
+      "slug": ${event.project.slug.value}
      }
   }""".noSpaces
 

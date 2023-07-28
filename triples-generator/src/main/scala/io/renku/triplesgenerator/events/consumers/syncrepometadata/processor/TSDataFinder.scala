@@ -34,7 +34,7 @@ import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait TSDataFinder[F[_]] {
-  def fetchTSData(path: projects.Path): F[Option[DataExtract.TS]]
+  def fetchTSData(slug: projects.Slug): F[Option[DataExtract.TS]]
 }
 
 private object TSDataFinder {
@@ -47,19 +47,19 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
   import ResultsDecoder._
   import io.circe.Decoder
 
-  override def fetchTSData(path: projects.Path): F[Option[DataExtract.TS]] =
+  override def fetchTSData(slug: projects.Slug): F[Option[DataExtract.TS]] =
     tsClient.queryExpecting[Option[DataExtract.TS]] {
       SparqlQuery.ofUnsafe(
         show"$categoryName: find data",
         Prefixes of (renku -> "renku", schema -> "schema"),
-        sparql"""|SELECT ?id ?path ?name ?visibility ?dateModified ?maybeDesc
+        sparql"""|SELECT ?id ?slug ?name ?visibility ?dateModified ?maybeDesc
                  |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                  |  (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
                  |WHERE {
-                 |  BIND (${path.asObject} AS ?path)
+                 |  BIND (${slug.asObject} AS ?slug)
                  |  GRAPH ?id {
                  |    ?id a schema:Project;
-                 |        renku:projectPath ?path;
+                 |        renku:projectPath ?slug;
                  |        schema:name ?name;
                  |        renku:projectVisibility ?visibility;
                  |        schema:dateModified ?dateModified.
@@ -73,13 +73,13 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
                  |    }
                  |  }
                  |}
-                 |GROUP BY ?id ?path ?name ?visibility ?dateModified ?maybeDesc
+                 |GROUP BY ?id ?slug ?name ?visibility ?dateModified ?maybeDesc
                  |LIMIT 1
                  |""".stripMargin
       )
-    }(decoder(path))
+    }(decoder(slug))
 
-  private def decoder(path: projects.Path): Decoder[Option[DataExtract.TS]] =
+  private def decoder(slug: projects.Slug): Decoder[Option[DataExtract.TS]] =
     ResultsDecoder[Option, DataExtract.TS] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -97,13 +97,13 @@ private class TSDataFinderImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extends 
 
       for {
         id           <- extract[projects.ResourceId]("id")
-        path         <- extract[projects.Path]("path")
+        slug         <- extract[projects.Slug]("slug")
         name         <- extract[projects.Name]("name")
         visibility   <- extract[projects.Visibility]("visibility")
         dateModified <- extract[projects.DateModified]("dateModified")
         maybeDesc    <- extract[Option[projects.Description]]("maybeDesc")
         keywords     <- extract[Option[String]]("keywords") >>= toSetOfKeywords
         images       <- extract[Option[String]]("images") >>= toListOfImageUris
-      } yield DataExtract.TS(id, path, name, visibility, dateModified.some, maybeDesc, keywords, images)
-    }(toOption(show"Multiple projects or values for '$path'"))
+      } yield DataExtract.TS(id, slug, name, visibility, dateModified.some, maybeDesc, keywords, images)
+    }(toOption(show"Multiple projects or values for '$slug'"))
 }

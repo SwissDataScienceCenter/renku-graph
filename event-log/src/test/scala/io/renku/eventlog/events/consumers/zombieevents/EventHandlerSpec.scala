@@ -74,8 +74,8 @@ class EventHandlerSpec
         case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 1d
-      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe -1d
+      incGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 1d
+      decGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe -1d
     }
 
     "call to zombieStatusCleaner and don't update gauges on NotUpdated result" in new TestCase {
@@ -90,8 +90,8 @@ class EventHandlerSpec
         case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
-      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
+      incGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 0d
+      decGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 0d
     }
   }
 
@@ -112,7 +112,7 @@ class EventHandlerSpec
 
     val events: Gen[ZombieEvent] = for {
       eventId     <- compoundEventIds
-      projectPath <- projectPaths
+      projectPath <- projectSlugs
       status      <- processingStatuses
     } yield ZombieEvent(eventId, projectPath, status)
 
@@ -122,7 +122,7 @@ class EventHandlerSpec
         "id": ${event.eventId.id.value},
         "project": {
           "id":   ${event.eventId.projectId.value},
-          "path": ${event.projectPath.value}
+          "path": ${event.projectSlug.value}
        },
         "status": ${event.status.value}
       }"""

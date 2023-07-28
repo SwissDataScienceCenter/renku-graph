@@ -29,8 +29,8 @@ private sealed trait DBUpdateResults {
 
 private object DBUpdateResults {
 
-  final case class ForProjects(statusCounts: Set[(projects.Path, Map[EventStatus, Int])]) extends DBUpdateResults {
-    def apply(project: projects.Path): Map[EventStatus, Int] =
+  final case class ForProjects(statusCounts: Set[(projects.Slug, Map[EventStatus, Int])]) extends DBUpdateResults {
+    def apply(project: projects.Slug): Map[EventStatus, Int] =
       statusCounts.find(_._1 == project).map(_._2).getOrElse(Map.empty)
   }
 
@@ -38,9 +38,8 @@ private object DBUpdateResults {
 
     lazy val empty: ForProjects = ForProjects(Set.empty)
 
-    def apply(projectPath: projects.Path, statusCount: Map[EventStatus, Int]): ForProjects = ForProjects(
-      Set(projectPath -> statusCount)
-    )
+    def apply(projectSlug: projects.Slug, statusCount: Map[EventStatus, Int]): ForProjects =
+      ForProjects(Set(projectSlug -> statusCount))
   }
 
   final case object ForAllProjects extends DBUpdateResults
@@ -50,7 +49,7 @@ private object DBUpdateResults {
       ForProjects(
         (x.statusCounts.toSeq ++ y.statusCounts.toSeq)
           .groupBy(_._1)
-          .map { case (path, pathAndCounts) => path -> pathAndCounts.map(_._2).combineAll }
+          .map { case (slug, slugAndCounts) => slug -> slugAndCounts.map(_._2).combineAll }
           .toSet
       )
 

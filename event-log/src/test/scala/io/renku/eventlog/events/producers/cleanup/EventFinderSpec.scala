@@ -70,13 +70,13 @@ private class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingDeletion.getValue(project1.slug).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project1.slug).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
 
-        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe 0d
-        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 0d
+        gauges.awaitingDeletion.getValue(project2.slug).unsafeRunSync() shouldBe 0d
+        gauges.underDeletion.getValue(project2.slug).unsafeRunSync()    shouldBe 0d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -96,13 +96,13 @@ private class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe 0d
-        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 0d
+        gauges.awaitingDeletion.getValue(project1.slug).unsafeRunSync() shouldBe 0d
+        gauges.underDeletion.getValue(project1.slug).unsafeRunSync()    shouldBe 0d
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
 
-        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingDeletion.getValue(project2.slug).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project2.slug).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -128,13 +128,13 @@ private class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project1).some
 
-        gauges.awaitingDeletion.getValue(project1.path).unsafeRunSync() shouldBe -2d
-        gauges.underDeletion.getValue(project1.path).unsafeRunSync()    shouldBe 2d
+        gauges.awaitingDeletion.getValue(project1.slug).unsafeRunSync() shouldBe -2d
+        gauges.underDeletion.getValue(project1.slug).unsafeRunSync()    shouldBe 2d
 
         finder.popEvent().unsafeRunSync() shouldBe CleanUpEvent(project2).some
 
-        gauges.awaitingDeletion.getValue(project2.path).unsafeRunSync() shouldBe -1d
-        gauges.underDeletion.getValue(project2.path).unsafeRunSync()    shouldBe 1d
+        gauges.awaitingDeletion.getValue(project2.slug).unsafeRunSync() shouldBe -1d
+        gauges.underDeletion.getValue(project2.slug).unsafeRunSync()    shouldBe 1d
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -167,7 +167,7 @@ private class EventFinderSpec
                executionDate,
                eventDates.generateOne,
                eventBodies.generateOne,
-               projectPath = project.path
+               projectSlug = project.slug
     )
     eventId
   }

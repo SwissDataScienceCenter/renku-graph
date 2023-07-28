@@ -103,8 +103,8 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExe
                 )
               LIMIT 1
               """
-          .query(compoundEventIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
-          .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
+          .query(compoundEventIdDecoder ~ projectSlugDecoder ~ processingStatusDecoder)
+          .map { case id ~ slug ~ status => ZombieEvent(processName, id, slug, status) }
       )
       .arguments(
         projectId *: status *: zombieMessage *:
