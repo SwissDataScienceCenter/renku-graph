@@ -160,7 +160,7 @@ class GitLabProjectMembersFinderSpec
     implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
     val finder = new GitLabProjectMembersFinderImpl[IO]
 
-    def setGitLabClientExpectation(projectPath:              projects.Slug,
+    def setGitLabClientExpectation(projectSlug:              projects.Slug,
                                    maybePage:                Option[Int] = None,
                                    maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
                                    returning:                (Set[GitLabProjectMember], Option[Int])
@@ -168,7 +168,7 @@ class GitLabProjectMembersFinderSpec
       val endpointName: String Refined NonEmpty = "project-members"
 
       val uri = {
-        val uri = uri"projects" / projectPath / "members" / "all"
+        val uri = uri"projects" / projectSlug / "members" / "all"
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri

@@ -38,7 +38,7 @@ class ProjectSlugBinderSpec extends AnyWordSpec with should.Matchers {
       result shouldBe projectSlug
     }
 
-    "return None if string value cannot be converted to a ProjectPath" in {
+    "return None if string value cannot be converted to a project.Slug" in {
       ProjectSlug.unapply(blankStrings().generateOne) shouldBe None
     }
   }

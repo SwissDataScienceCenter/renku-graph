@@ -32,10 +32,10 @@ object ProjectSlugRecordsFinder {
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder: GitLabClient]
       : F[SecurityRecordFinder[F, projects.Slug]] =
     (TSSlugRecordsFinder[F] -> GLSlugRecordsFinder[F])
-      .mapN(new ProjectPathRecordsFinderImpl[F](_, _))
+      .mapN(new ProjectSlugRecordsFinderImpl[F](_, _))
 }
 
-private class ProjectPathRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSSlugRecordsFinder[F],
+private class ProjectSlugRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSSlugRecordsFinder[F],
                                                              glPathRecordsFinder: GLSlugRecordsFinder[F]
 ) extends SecurityRecordFinder[F, projects.Slug] {
 

@@ -158,8 +158,8 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
          LIMIT 1
          """
           .query(compoundEventIdDecoder ~ projectSlugDecoder ~ zippedPayloadDecoder)
-          .map { case eventId ~ projectPath ~ eventPayload =>
-            TriplesGeneratedEvent(eventId, projectPath, eventPayload)
+          .map { case eventId ~ projectSlug ~ eventPayload =>
+            TriplesGeneratedEvent(eventId, projectSlug, eventPayload)
           }
       )
       .arguments(idAndSlug.slug *: idAndSlug.id *: executionDate *: executionDate *: EmptyTuple)

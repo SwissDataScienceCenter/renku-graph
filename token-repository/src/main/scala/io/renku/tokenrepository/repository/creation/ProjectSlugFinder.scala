@@ -49,7 +49,7 @@ private class ProjectSlugFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
     case (Unauthorized | Forbidden | NotFound, _, _) => Option.empty[projects.Slug].pure[F]
   }
 
-  private implicit lazy val projectPathDecoder: EntityDecoder[F, projects.Slug] = {
+  private implicit lazy val projectSlugDecoder: EntityDecoder[F, projects.Slug] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
     lazy val decoder: Decoder[projects.Slug] = _.downField("path_with_namespace").as[projects.Slug]
     jsonOf[F, projects.Slug](Sync[F], decoder)

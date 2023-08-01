@@ -107,9 +107,9 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     val events: Gen[ZombieEvent] = for {
       eventId     <- compoundEventIds
-      projectPath <- projectSlugs
+      projectSlug <- projectSlugs
       status      <- processingStatuses
-    } yield ZombieEvent(eventId, projectPath, status)
+    } yield ZombieEvent(eventId, projectSlug, status)
 
     implicit val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
       json"""{

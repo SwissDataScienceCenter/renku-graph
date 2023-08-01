@@ -78,9 +78,9 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       givenTokenRemoval(projectId, userAccessToken, returning = ().pure[IO])
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
+      val tokenInfo = givenSuccessfulTokenCreation(projectSlug)
       givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
@@ -98,11 +98,11 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
 
         givenTokenValidation(of = projectAccessToken, returning = true.pure[IO])
 
-        val newProjectPath = projectSlugs.generateOne
-        givenSlugFinder(projectId, projectAccessToken, OptionT.some[IO](newProjectPath))
+        val newProjectSlug = projectSlugs.generateOne
+        givenSlugFinder(projectId, projectAccessToken, OptionT.some[IO](newProjectSlug))
         givenStoredSlugFinder(projectId, returning = projectSlugs.generateOne.pure[IO])
 
-        givenSlugUpdate(Project(projectId, newProjectPath), returning = ().pure[IO])
+        givenSlugUpdate(Project(projectId, newProjectSlug), returning = ().pure[IO])
 
         givenTokenDueCheck(projectId, returning = false.pure[IO])
 
@@ -124,9 +124,9 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       givenTokenDueCheck(projectId, returning = true.pure[IO])
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
+      val tokenInfo = givenSuccessfulTokenCreation(projectSlug)
       givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
@@ -137,9 +137,9 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
-      val tokenInfo = givenSuccessfulTokenCreation(projectPath)
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
+      val tokenInfo = givenSuccessfulTokenCreation(projectSlug)
       givenSuccessfulTokensRevoking(projectId, tokenInfo, userAccessToken)
 
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
@@ -175,8 +175,8 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       givenTokenDueCheck(projectId, returning = true.pure[IO])
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
-      val newProjectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(newProjectPath))
+      val newProjectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(newProjectSlug))
 
       givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.none)
 
@@ -189,8 +189,8 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
 
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
       givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
@@ -198,7 +198,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[IO])
 
-      givenTokenStoring(Project(projectId, projectPath),
+      givenTokenStoring(Project(projectId, projectSlug),
                         newTokenEncrypted,
                         tokenCreationInfo.dates,
                         returning = ().pure[IO]
@@ -222,8 +222,8 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
 
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
       givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
@@ -231,7 +231,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[IO])
 
-      givenTokenStoring(Project(projectId, projectPath),
+      givenTokenStoring(Project(projectId, projectSlug),
                         newTokenEncrypted,
                         tokenCreationInfo.dates,
                         returning = ().pure[IO]
@@ -265,8 +265,8 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
 
       givenTokenValidation(userAccessToken, returning = true.pure[IO])
 
-      val projectPath = projectSlugs.generateOne
-      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
+      val projectSlug = projectSlugs.generateOne
+      givenSlugFinder(projectId, userAccessToken, returning = OptionT.some(projectSlug))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
       givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
@@ -274,7 +274,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[IO])
 
-      givenTokenStoring(Project(projectId, projectPath),
+      givenTokenStoring(Project(projectId, projectSlug),
                         newTokenEncrypted,
                         tokenCreationInfo.dates,
                         returning = ().pure[IO]
@@ -298,7 +298,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
 
     implicit val logger:    TestLogger[IO]          = TestLogger[IO]()
     private val maxRetries: Int Refined NonNegative = 2
-    private val projectPathFinder   = mock[ProjectSlugFinder[IO]]
+    private val projectSlugFinder   = mock[ProjectSlugFinder[IO]]
     private val accessTokenCrypto   = mock[AccessTokenCrypto[IO]]
     private val tokenValidator      = mock[TokenValidator[IO]]
     private val tokenDueChecker     = mock[TokenDueChecker[IO]]
@@ -309,7 +309,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
     private val tokensFinder        = mock[PersistedTokensFinder[IO]]
     private val tokensRevoker       = mock[TokensRevoker[IO]]
     val tokensCreator = new TokensCreatorImpl[IO](
-      projectPathFinder,
+      projectSlugFinder,
       accessTokenCrypto,
       tokenValidator,
       tokenDueChecker,
@@ -356,7 +356,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
         .returning(returning)
 
     def givenSlugFinder(projectId: projects.GitLabId, accessToken: AccessToken, returning: OptionT[IO, projects.Slug]) =
-      (projectPathFinder.findProjectSlug _)
+      (projectSlugFinder.findProjectSlug _)
         .expects(projectId, accessToken)
         .returning(returning)
 

@@ -66,7 +66,7 @@ object DbInitializer {
     ProjectPathAdder[F],
     BatchDateAdder[F],
     ProjectTableCreator[F],
-    ProjectSlugRemover[F],
+    ProjectPathRemover[F],
     EventLogTableRenamer[F],
     EventStatusRenamer[F],
     EventPayloadTableCreator[F],

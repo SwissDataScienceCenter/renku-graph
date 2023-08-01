@@ -73,14 +73,14 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
   }
 
   private def errorHttpResponse(
-      projectPath: projects.Slug
+      projectSlug: projects.Slug
   ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = Message.Error.unsafeApply(s"Finding $projectPath's datasets failed")
+    val errorMessage = Message.Error.unsafeApply(s"Finding $projectSlug's datasets failed")
     Logger[F].error(exception)(errorMessage.show) >> InternalServerError(errorMessage)
   }
 
-  private def finishedSuccessfully(projectPath: projects.Slug): PartialFunction[Response[F], String] = {
-    case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
+  private def finishedSuccessfully(projectSlug: projects.Slug): PartialFunction[Response[F], String] = {
+    case response if response.status == Ok => s"Finding '$projectSlug' datasets finished"
   }
 }
 

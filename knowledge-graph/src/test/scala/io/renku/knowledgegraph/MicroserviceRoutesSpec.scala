@@ -505,18 +505,18 @@ class MicroserviceRoutesSpec
     s"return $Ok for valid path parameters" in new TestCase {
 
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-      val projectPath   = projectSlugs.generateOne
+      val projectSlug   = projectSlugs.generateOne
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
         )
 
-      val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
       (projectDetailsEndpoint
         .`GET /projects/:slug`(_: model.projects.Slug, _: Option[AuthUser])(_: Request[IO]))
-        .expects(projectPath, maybeAuthUser.option, request)
+        .expects(projectSlug, maybeAuthUser.option, request)
         .returning(Response[IO](Ok).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -547,14 +547,14 @@ class MicroserviceRoutesSpec
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
 
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-      val projectPath   = projectSlugs.generateOne
+      val projectSlug   = projectSlugs.generateOne
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Slug]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser).call(
-        Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+        Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
       )
 
       response.status        shouldBe NotFound
@@ -565,20 +565,20 @@ class MicroserviceRoutesSpec
 
   "PUT /knowledge-graph/projects/:namespace/../:name" should {
 
-    val projectPath = projectSlugs.generateOne
-    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+    val projectSlug = projectSlugs.generateOne
+    val request     = Request[IO](PUT, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
 
     s"return $Accepted for valid path parameters, user and payload" in new TestCase {
 
       val authUser = MaybeAuthUser(authUsers.generateOne)
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, authUser.option)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectPath, Set(projectPath))))
+        .expects(projectSlug, authUser.option)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(authUser.option, projectSlug, Set(projectSlug))))
 
       (projectUpdateEndpoint
         .`PUT /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
-        .expects(projectPath, request, authUser.option.get)
+        .expects(projectSlug, request, authUser.option.get)
         .returning(Response[IO](Accepted).pure[IO])
 
       routes(authUser).call(request).status shouldBe Accepted
@@ -601,7 +601,7 @@ class MicroserviceRoutesSpec
       val authUser = MaybeAuthUser(authUsers.generateOne)
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, authUser.option)
+        .expects(projectSlug, authUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Slug]](AuthorizationFailure))
 
       val response = routes(authUser).call(request)
@@ -617,36 +617,36 @@ class MicroserviceRoutesSpec
     import projects.datasets.Endpoint.Criteria.Sort
     import projects.datasets.Endpoint.Criteria.Sort._
 
-    val projectPath = projectSlugs.generateOne
-    val projectDsUri = projectPath.toNamespaces
-      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectPath.toName.show / "datasets"
+    val projectSlug = projectSlugs.generateOne
+    val projectDsUri = projectSlug.toNamespaces
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectSlug.toName.show / "datasets"
 
     forAll {
       Table(
         "uri"        -> "criteria",
-        projectDsUri -> Criteria(projectPath),
+        projectDsUri -> Criteria(projectSlug),
         sortingDirections
           .map(dir =>
-            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectPath, sorting = Sorting(Sort.By(ByName, dir)))
+            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectSlug, sorting = Sorting(Sort.By(ByName, dir)))
           )
           .generateOne,
         sortingDirections
           .map(dir =>
-            projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectPath,
+            projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectSlug,
                                                                          sorting = Sorting(Sort.By(ByDateModified, dir))
             )
           )
           .generateOne,
         pages
           .map(page =>
-            projectDsUri +? ("page" -> page.show) -> Criteria(projectPath,
+            projectDsUri +? ("page" -> page.show) -> Criteria(projectSlug,
                                                               paging = PagingRequest.default.copy(page = page)
             )
           )
           .generateOne,
         perPages
           .map(perPage =>
-            projectDsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+            projectDsUri +? ("per_page" -> perPage.show) -> Criteria(projectSlug,
                                                                      paging =
                                                                        PagingRequest.default.copy(perPage = perPage)
             )
@@ -707,19 +707,19 @@ class MicroserviceRoutesSpec
   "GET /knowledge-graph/projects/:namespace/../:name/datasets/:dsName/tags" should {
     import projects.datasets.tags.Endpoint._
 
-    val projectPath = projectSlugs.generateOne
+    val projectSlug = projectSlugs.generateOne
     val datasetName = datasetNames.generateOne
-    val projectDsTagsUri = projectPath.toNamespaces
+    val projectDsTagsUri = projectSlug.toNamespaces
       .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) /
-      projectPath.toName.show / "datasets" / datasetName.show / "tags"
+      projectSlug.toName.show / "datasets" / datasetName.show / "tags"
 
     forAll {
       Table(
         "uri"            -> "criteria",
-        projectDsTagsUri -> Criteria(projectPath, datasetName),
+        projectDsTagsUri -> Criteria(projectSlug, datasetName),
         pages
           .map(page =>
-            projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectPath,
+            projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectSlug,
                                                                   datasetName,
                                                                   PagingRequest.default.copy(page = page)
             )
@@ -727,7 +727,7 @@ class MicroserviceRoutesSpec
           .generateOne,
         perPages
           .map(perPage =>
-            projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+            projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectSlug,
                                                                          datasetName,
                                                                          PagingRequest.default.copy(perPage = perPage)
             )
@@ -739,8 +739,8 @@ class MicroserviceRoutesSpec
         val request = Request[IO](GET, uri)
 
         (projectSlugAuthorizer.authorize _)
-          .expects(projectPath, None)
-          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectPath, Set(projectPath))))
+          .expects(projectSlug, None)
+          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectSlug, Set(projectSlug))))
 
         val responseBody = jsons.generateOne
         (projectDatasetTagsEndpoint
@@ -773,15 +773,15 @@ class MicroserviceRoutesSpec
       val request       = Request[IO](GET, projectDsTagsUri)
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
         )
 
       val responseBody = jsons.generateOne
       (projectDatasetTagsEndpoint
         .`GET /projects/:slug/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
-        .expects(Criteria(projectPath, datasetName, maybeUser = maybeAuthUser.option), request)
+        .expects(Criteria(projectSlug, datasetName, maybeUser = maybeAuthUser.option), request)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok
@@ -793,26 +793,26 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
-    def lineageUri(projectPath: model.projects.Slug, location: Location) =
-      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
+    def lineageUri(projectSlug: model.projects.Slug, location: Location) =
+      Uri.unsafeFromString(s"knowledge-graph/projects/${projectSlug.show}/files/${urlEncode(location.show)}/lineage")
 
     s"return $Ok when the lineage is found" in new TestCase {
-      val projectPath   = projectSlugs.generateOne
+      val projectSlug   = projectSlugs.generateOne
       val location      = nodeLocations.generateOne
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-      val uri           = lineageUri(projectPath, location)
+      val uri           = lineageUri(projectSlug, location)
       val request       = Request[IO](GET, uri)
 
       val responseBody = jsons.generateOne
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
         )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser.option)
+        .expects(projectSlug, location, maybeAuthUser.option)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       val response = routes(maybeAuthUser).call(request)
@@ -823,19 +823,19 @@ class MicroserviceRoutesSpec
     }
 
     s"return $NotFound for a lineage which isn't found" in new TestCase {
-      val projectPath   = projectSlugs.generateOne
+      val projectSlug   = projectSlugs.generateOne
       val location      = nodeLocations.generateOne
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-      val uri           = lineageUri(projectPath, location)
+      val uri           = lineageUri(projectSlug, location)
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
         )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser.option)
+        .expects(projectSlug, location, maybeAuthUser.option)
         .returning(Response[IO](NotFound).pure[IO])
 
       val response = routes(maybeAuthUser).call(Request[IO](GET, uri))
@@ -845,21 +845,21 @@ class MicroserviceRoutesSpec
 
     "authenticate user from the request if given" in new TestCase {
 
-      val projectPath   = projectSlugs.generateOne
+      val projectSlug   = projectSlugs.generateOne
       val location      = nodeLocations.generateOne
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
-      val request       = Request[IO](GET, lineageUri(projectPath, location))
+      val request       = Request[IO](GET, lineageUri(projectSlug, location))
 
       val responseBody = jsons.generateOne
 
       (projectSlugAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(projectSlug, maybeAuthUser.option)
         .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
+          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectSlug, Set(projectSlug)))
         )
 
       (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser.option)
+        .expects(projectSlug, location, maybeAuthUser.option)
         .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
 
       routes(maybeAuthUser).call(request).status shouldBe Ok

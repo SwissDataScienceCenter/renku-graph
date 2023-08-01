@@ -77,7 +77,7 @@ object StatusChangeEvent {
       RedoProjectTransformation(ProjectSlug(path))
 
     implicit lazy val show: Show[RedoProjectTransformation] = Show.show { event =>
-      show"${event.subCategoryName} projectPath = ${event.project.slug}, status = ${EventStatus.TriplesGenerated}"
+      show"${event.subCategoryName} projectSlug = ${event.project.slug}, status = ${EventStatus.TriplesGenerated}"
     }
 
     implicit val jsonDecoder: Decoder[RedoProjectTransformation] = specificDecoder[RedoProjectTransformation]

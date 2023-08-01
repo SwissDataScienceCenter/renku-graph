@@ -27,13 +27,13 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectSlugRemover[F[_]] extends DbMigrator[F]
+private trait ProjectPathRemover[F[_]] extends DbMigrator[F]
 
-private object ProjectSlugRemover {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectSlugRemover[F] = new ProjectPathRemoverImpl[F]
+private object ProjectPathRemover {
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectPathRemover[F] = new ProjectPathRemoverImpl[F]
 }
 
-private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends ProjectSlugRemover[F] {
+private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends ProjectPathRemover[F] {
   import MigratorTools._
 
   override def run: F[Unit] = SessionResource[F].useK {

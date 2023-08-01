@@ -78,17 +78,17 @@ private class MicroserviceRoutes[F[_]: Sync](
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ GET  -> Root / "events" :? `project-id`(validatedProjectId) +&
-      `project-slug`(validatedProjectPath) +&
+      `project-slug`(validatedProjectSlug) +&
       status(status) +&
       since(since) +&
       until(until) +&
       page(page) +&
       perPage(perPage) +&
       sort(sortBy) =>
-      respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectPath, status, since, until, page, perPage, sortBy, request))
+      respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectSlug, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
-    case           GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
+    case           GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectSlug) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectSlug))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case           GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)

@@ -61,7 +61,7 @@ class ProjectSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with
 
     private val tsPathRecordsFinder = mock[TSSlugRecordsFinder[Try]]
     private val glPathRecordsFinder = mock[GLSlugRecordsFinder[Try]]
-    val recordsFinder               = new ProjectPathRecordsFinderImpl[Try](tsPathRecordsFinder, glPathRecordsFinder)
+    val recordsFinder               = new ProjectSlugRecordsFinderImpl[Try](tsPathRecordsFinder, glPathRecordsFinder)
 
     def givenTSSlugRecordsFinder(returning: Try[List[SecurityRecord]]) =
       (tsPathRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)

@@ -271,12 +271,12 @@ private class MicroserviceRoutes[F[_]: Async](
       path:          Path,
       maybeAuthUser: Option[AuthUser]
   )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
-    case projectPathParts :+ "datasets" :+ datasets.DatasetName(dsName) :+ "tags" =>
+    case projectSlugParts :+ "datasets" :+ datasets.DatasetName(dsName) :+ "tags" =>
       import projects.datasets.tags.Endpoint._
 
       PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
         .map(paging =>
-          projectPathParts.toProjectSlug
+          projectSlugParts.toProjectSlug
             .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
             .semiflatMap(path =>
               `GET /projects/:slug/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
@@ -285,7 +285,7 @@ private class MicroserviceRoutes[F[_]: Async](
         )
         .fold(toBadRequest, identity)
 
-    case projectPathParts :+ "datasets" =>
+    case projectSlugParts :+ "datasets" =>
       import projects.datasets.Endpoint.Criteria
       import Criteria.Sort
       import Criteria.Sort.sort
@@ -295,23 +295,23 @@ private class MicroserviceRoutes[F[_]: Async](
         PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
       ).mapN { (maybeSorts, paging) =>
         val sorting: Sorting[Criteria.Sort.type] = Sorting.fromOptionalListOrDefault(maybeSorts, Sort.default)
-        projectPathParts.toProjectSlug
+        projectSlugParts.toProjectSlug
           .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
           .semiflatMap(path =>
             projectDatasetsEndpoint.`GET /projects/:slug/datasets`(request, Criteria(path, sorting, paging))
           )
           .merge
       }.fold(toBadRequest, identity)
-    case projectPathParts :+ "files" :+ location :+ "lineage" =>
-      getLineage(projectPathParts, location, maybeAuthUser)
-    case projectPathParts =>
-      projectPathParts.toProjectSlug
+    case projectSlugParts :+ "files" :+ location :+ "lineage" =>
+      getLineage(projectSlugParts, location, maybeAuthUser)
+    case projectSlugParts =>
+      projectSlugParts.toProjectSlug
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(`GET /projects/:slug`(_, maybeAuthUser))
         .merge
   }
 
-  private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
+  private def getLineage(projectSlugParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
     import projects.files.lineage.model.Node.Location
 
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
@@ -320,10 +320,10 @@ private class MicroserviceRoutes[F[_]: Async](
         .leftMap(_ => Response[F](Status.NotFound).withEntity(Message.Info("Resource not found")))
     }
 
-    (projectPathParts.toProjectSlug -> toLocation(location))
+    (projectSlugParts.toProjectSlug -> toLocation(location))
       .mapN(_ -> _)
-      .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
-      .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
+      .flatTap { case (projectSlug, _) => authorizePath(projectSlug, maybeAuthUser).leftMap(_.toHttpResponse) }
+      .semiflatMap { case (projectSlug, location) => `GET /lineage`(projectSlug, location, maybeAuthUser) }
       .merge
   }
 

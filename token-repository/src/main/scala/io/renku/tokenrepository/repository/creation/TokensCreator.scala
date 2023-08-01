@@ -117,12 +117,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     tokenValidator.checkValid(projectId, userToken) >>= {
       case false => ().pure[F]
       case true =>
-        (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
+        (findProjectSlug(projectId, userToken) >>= createNewToken(userToken))
           .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
           .getOrElse(())
     }
 
-  private def findProjectPath(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
+  private def findProjectSlug(projectId: projects.GitLabId, userToken: AccessToken): OptionT[F, Project] =
     projectSlugFinder.findProjectSlug(projectId, userToken).map(Project(projectId, _))
 
   private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =

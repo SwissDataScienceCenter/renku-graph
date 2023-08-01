@@ -110,11 +110,11 @@ class ProvisionProjectsGraphSpec
       val projectSlug2 = projectSlugs.generateOne
       val projectSlug3 = projectSlugs.generateOne
 
-      val projectPathsPage = List(projectSlug1, projectSlug2, projectSlug3)
+      val projectSlugsPage = List(projectSlug1, projectSlug2, projectSlug3)
 
-      givenProjectsPagesReturned(List(projectPathsPage) :+ List.empty[projects.Slug])
+      givenProjectsPagesReturned(List(projectSlugsPage) :+ List.empty[projects.Slug])
 
-      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectPathsPage.size)
+      givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectSlugsPage.size)
 
       List(projectSlug1, projectSlug3) foreach { path =>
         val project = anyProjectEntities

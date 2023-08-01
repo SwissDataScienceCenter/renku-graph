@@ -226,7 +226,5 @@ class ProjectResourceIdSpec
     }
   }
 
-  private lazy val pathGenerator = for {
-    projectPath <- projectSlugs
-  } yield s"projects/$projectPath"
+  private lazy val pathGenerator = projectSlugs.map(slug => s"projects/$slug")
 }

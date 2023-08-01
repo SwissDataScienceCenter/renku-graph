@@ -54,8 +54,8 @@ object Endpoint {
     renkuApiUrl                   <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
 
-  def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Slug, name: datasets.Name): Href =
-    Href(renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags")
+  def href(renkuApiUrl: renku.ApiUrl, projectSlug: graph.model.projects.Slug, name: datasets.Name): Href =
+    Href(renkuApiUrl / "projects" / projectSlug / "datasets" / name / "tags")
 }
 
 private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],

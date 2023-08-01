@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class ProjectSlugRemoverSpec
+class ProjectPathRemoverSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
