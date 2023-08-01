@@ -29,7 +29,7 @@ object GitLab {
 
   def pushEvent(project: Project, commitId: CommitId): Json = json"""{
     "after":         $commitId,
-    "user_id":       ${positiveInts().generateOne},
+    "user_id":       ${positiveInts().generateOne.value},
     "user_username": ${nonEmptyStrings().generateOne},
     "user_email":    ${personEmails.generateOne},
     "project": {
