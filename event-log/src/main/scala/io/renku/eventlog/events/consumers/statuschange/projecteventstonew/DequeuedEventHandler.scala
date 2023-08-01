@@ -237,18 +237,22 @@ object DequeuedEventHandler {
 
     private def cleanUpProjectIfGone(project: Project): Option[EventDate] => Kleisli[F, Session[F], Unit] = {
       case Some(_) => Kleisli.pure(())
-      case None    => projectCleaner.cleanUp(project) recoverWith logError(project)
+      case None    => projectCleaner.cleanUp(project) onError logError(project)
     }
 
     private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
       case NonFatal(error) =>
-        Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}"))
+        Kleisli.liftF(Logger[F].error(error)(s"$categoryName: project clean up failed: ${project.show}; will retry"))
     }
 
-    override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = { case SqlState.DeadlockDetected(_) =>
-      Kleisli.liftF[F, Session[F], Unit](
-        Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
-      ) >> updateDB(event)
+    override def onRollback(event: ProjectEventsToNew): RollbackOp[F] = {
+      case SqlState.DeadlockDetected(_)    => logAndRetry(event, "Deadlock")
+      case SqlState.ForeignKeyViolation(_) => logAndRetry(event, "ForeignKeyViolation")
     }
+
+    private def logAndRetry(event: ProjectEventsToNew, message: String) =
+      Kleisli.liftF[F, Session[F], Unit](
+        Logger[F].info(show"$categoryName: $message happened while processing $event; retrying")
+      ) >> updateDB(event)
   }
 }

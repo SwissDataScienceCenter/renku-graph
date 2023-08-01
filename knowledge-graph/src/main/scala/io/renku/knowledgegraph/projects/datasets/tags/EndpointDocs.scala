@@ -43,7 +43,7 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
     GET(
       "Project Dataset Tags",
       "Returns tags of the Dataset with the given name on the project with given path",
-      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags",
+      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags" :? page & perPage,
       Status.Ok -> Response("Found tags",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -72,6 +72,19 @@ private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends doc
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
   private lazy val dsName = Parameter.Path("dsName", Schema.String, "Dataset name".some)
+
+  private lazy val page = Parameter.Query(
+    "page",
+    Schema.Integer,
+    "the page query parameter is optional and defaults to 1.".some,
+    required = false
+  )
+  private lazy val perPage = Parameter.Query(
+    "per_page",
+    Schema.Integer,
+    "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+    required = false
+  )
 
   private lazy val responseHeaders = Map(
     "Total"       -> Header("The total number of projects".some, Schema.Integer),

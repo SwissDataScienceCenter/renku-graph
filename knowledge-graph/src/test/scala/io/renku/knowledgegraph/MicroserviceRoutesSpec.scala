@@ -613,24 +613,69 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
+    import projects.datasets.Endpoint.Criteria
+    import projects.datasets.Endpoint.Criteria.Sort
+    import projects.datasets.Endpoint.Criteria.Sort._
 
-    s"return $Ok for valid path parameters" in new TestCase {
-      val projectPath   = projectPaths.generateOne
-      val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
+    val projectPath = projectPaths.generateOne
+    val projectDsUri = projectPath.toNamespaces
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) / projectPath.toName.show / "datasets"
 
-      (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
-        .returning(
-          rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser.option, projectPath, Set(projectPath)))
-        )
+    forAll {
+      Table(
+        "uri"        -> "criteria",
+        projectDsUri -> Criteria(projectPath),
+        sortingDirections
+          .map(dir =>
+            projectDsUri +? ("sort" -> s"name:$dir") -> Criteria(projectPath, sorting = Sorting(Sort.By(ByName, dir)))
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            projectDsUri +? ("sort" -> s"dateModified:$dir") -> Criteria(projectPath,
+                                                                         sorting = Sorting(Sort.By(ByDateModified, dir))
+            )
+          )
+          .generateOne,
+        pages
+          .map(page =>
+            projectDsUri +? ("page" -> page.show) -> Criteria(projectPath,
+                                                              paging = PagingRequest.default.copy(page = page)
+            )
+          )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            projectDsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+                                                                     paging =
+                                                                       PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
+      )
+    } { (uri, criteria) =>
+      s"read the parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
 
-      (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+        val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
-      routes(maybeAuthUser)
-        .call(Request(GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets")))
-        .status shouldBe Ok
+        (projectPathAuthorizer.authorize _)
+          .expects(criteria.projectPath, maybeAuthUser.option)
+          .returning(
+            rightT[IO, EndpointSecurityException](
+              AuthContext(maybeAuthUser.option, criteria.projectPath, Set(criteria.projectPath))
+            )
+          )
 
-      routesMetrics.clearRegistry()
+        val request = Request[IO](GET, uri)
+
+        (projectDatasetsEndpoint.`GET /projects/:path/datasets` _)
+          .expects(request, criteria)
+          .returning(Response[IO](Ok).pure[IO])
+
+        routes(maybeAuthUser).call(request).status shouldBe Ok
+
+        routesMetrics.clearRegistry()
+      }
     }
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
@@ -642,17 +687,16 @@ class MicroserviceRoutesSpec
     }
 
     s"return $NotFound when auth user has no rights for the project" in new TestCase {
-      val projectPath   = projectPaths.generateOne
+
+      val criteria      = projects.datasets.Endpoint.Criteria(projectPaths.generateOne)
       val maybeAuthUser = MaybeAuthUser(authUsers.generateOption)
 
       (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser.option)
+        .expects(criteria.projectPath, maybeAuthUser.option)
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser)
-        .call(
-          Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
-        )
+        .call(Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${criteria.projectPath}/datasets")))
 
       response.status        shouldBe NotFound
       response.contentType   shouldBe Some(`Content-Type`(application.json))

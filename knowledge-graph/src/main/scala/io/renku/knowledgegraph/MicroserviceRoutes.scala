@@ -81,7 +81,6 @@ private class MicroserviceRoutes[F[_]: Async](
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetTagsEndpoint._
-  import projectDatasetsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
@@ -287,10 +286,22 @@ private class MicroserviceRoutes[F[_]: Async](
         .fold(toBadRequest, identity)
 
     case projectPathParts :+ "datasets" =>
-      projectPathParts.toProjectPath
-        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(getProjectDatasets)
-        .merge
+      import projects.datasets.Endpoint.Criteria
+      import Criteria.Sort
+      import Criteria.Sort.sort
+
+      (
+        sort.find(request.uri.query).sequence,
+        PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
+      ).mapN { (maybeSorts, paging) =>
+        val sorting: Sorting[Criteria.Sort.type] = Sorting.fromOptionalListOrDefault(maybeSorts, Sort.default)
+        projectPathParts.toProjectPath
+          .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+          .semiflatMap(path =>
+            projectDatasetsEndpoint.`GET /projects/:path/datasets`(request, Criteria(path, sorting, paging))
+          )
+          .merge
+      }.fold(toBadRequest, identity)
     case projectPathParts :+ "files" :+ location :+ "lineage" =>
       getLineage(projectPathParts, location, maybeAuthUser)
     case projectPathParts =>

@@ -312,6 +312,7 @@ When the `query` parameter is given, the match is done on the following fields:
 **Sorting:**
 * `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
+* `dateModified` - to sort by entity modification date
 * `date` - to sort by entity creation date
 
 **NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
@@ -831,14 +832,39 @@ The endpoint requires an authorization token to be passed. Supported headers are
 
 Finds list of datasets of the project with the given `namespace/name`.
 
+**Sorting:**
+* `name` - to sort by Dataset name - **default when no `query` parameter is given**
+* `dateModified` - to sort by modification date; in case a dataset hasn't been modified yet its creation date is considered.
+
+**NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
+
+Multiple `sort` parameters are allowed.
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                             |
-|------------------------------|---------------------------------------------------------------------------------------------------------|
-| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
+| Status                      | Description                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                    | If there are datasets for the project or `[]` if nothing is found                                       |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                                     |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                               |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 
@@ -849,11 +875,13 @@ Response body example:
       "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title":       "rmDaYfpehl",
-      "name":        "mniouUnmal",
-      "slug":        "mniouUnmal",
-      "sameAs":      "http://host/url1",
-      "derivedFrom": "http://host/url1",
+      "title":         "rmDaYfpehl",
+      "name":          "mniouUnmal",
+      "slug":          "mniouUnmal",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "sameAs":        "http://host/url1",
       "images": [],
       "_links": [  
         {  
@@ -875,10 +903,12 @@ Response body example:
       "versions": {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name":        "a",
-      "slug":        "a",
-      "sameAs":      "http://host/url2",   // optional property when no "derivedFrom" exists
-      "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
+      "name":          "a",
+      "slug":          "a",
+      "datePublished": "1990-07-16",              // optional, if not exists dateCreated is present
+      "dateCreated":   "1990-07-16T21:51:12.949Z, // optional, if not exists datePublished is present
+      "dateModified":  "1990-07-16T21:51:12.949Z, // only if derivedFrom exists
+      "derivedFrom":   "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
           "location": "image.png",
@@ -921,14 +951,31 @@ Response body example:
 
 Finds list of tags existing on the Dataset with the given `dsName` on the project with the given `namespace/name`.
 
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
 **Response**
 
-| Status                       | Description                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------|
-| OK (200)                     | If tags are found or `[]` if nothing is found                                                 |
-| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                  |
-| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access it |
-| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                     |
+| Status                      | Description                                                                                   |
+|-----------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                    | If tags are found or `[]` if nothing is found                                                 |
+| BAD_REQUEST (400)           | In case of invalid query parameters                                                           |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)             | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500) | Otherwise                                                                                     |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
 Response body example:
 
