@@ -59,7 +59,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
   private val applicative = Applicative[F]
   import applicative._
 
-  override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = {
+  override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] =
     for {
       _       <- removeCleanUpEvents(project)
       _       <- removeProjectSubscriptionSyncTimes(project)
@@ -68,7 +68,6 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
       _       <- liftF(whenA(removed)(removeWebhookAndToken(project)))
       _       <- liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
     } yield ()
-  } recoverWith logWarnAndRetry(project)
 
   private def sendProjectViewingDeletion(project: Project) =
     tgClient
@@ -121,12 +120,5 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
         case Completion.Delete(1) => true
         case _                    => false
       }
-  }
-
-  private def logWarnAndRetry(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
-    case SqlState.ForeignKeyViolation(ex) =>
-      Kleisli.liftF[F, Session[F], Unit](
-        Logger[F].warn(ex)(show"$categoryName: $project removal failed - retrying")
-      ) >> cleanUp(project)
   }
 }

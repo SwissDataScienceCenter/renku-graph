@@ -26,6 +26,7 @@ import io.renku.entities.search.Criteria.{Filters, Sort}
 import io.renku.entities.search.EntityConverters._
 import io.renku.entities.search.Generators._
 import io.renku.entities.search.diff.SearchDiffInstances
+import io.renku.entities.search.model.Entity
 import io.renku.entities.searchgraphs.SearchInfoDatasets
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
@@ -133,8 +134,19 @@ class EntitiesFinderSpec
             .map(_.resultsWithSkippedMatchingScore)
       }
 
+      // expected date ordering is to use dateModified when available
       implicit val entityOrdering: Ordering[model.Entity] =
-        Ordering.by(e => s"${e.date}, ${e.name}".toLowerCase)
+        Ordering.by {
+          case d: Entity.Dataset =>
+            val date = d.dateModified.getOrElse(d.date).toString
+            s"$date, ${d.name}"
+          case p: Entity.Project =>
+            val date = p.dateModified.toString
+            s"$date, ${p.name}"
+          case e =>
+            val date = e.date.toString
+            s"$date, ${e.name}"
+        }
 
       val expected = allEntitiesFrom(project).filter(_.name.value.contains("hello")).sorted
 

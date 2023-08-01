@@ -114,7 +114,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val sort = Parameter.Query(
     "sort",
     Schema.String,
-    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name` and `date`".some,
+    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name`, `dateModified` and `date`".some,
     required = false
   )
   private lazy val page = Parameter.Query(

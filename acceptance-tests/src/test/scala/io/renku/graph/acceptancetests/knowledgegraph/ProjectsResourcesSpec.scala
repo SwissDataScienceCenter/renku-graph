@@ -44,7 +44,7 @@ class ProjectsResourcesSpec
   private val user        = authUsers.generateOne
   private val accessToken = user.accessToken
 
-  private val (parentProject, project) = {
+  private val parentProject -> project = {
     val creatorGitLabId = personGitLabIds.generateOne
     val creatorEmail    = personEmails.generateOne
     val creator         = cliShapedPersons.generateOne.copy(maybeEmail = creatorEmail.some)
