@@ -35,13 +35,13 @@ object ProjectSlugRecordsFinder {
       .mapN(new ProjectSlugRecordsFinderImpl[F](_, _))
 }
 
-private class ProjectSlugRecordsFinderImpl[F[_]: MonadThrow](tsPathRecordsFinder: TSSlugRecordsFinder[F],
-                                                             glPathRecordsFinder: GLSlugRecordsFinder[F]
+private class ProjectSlugRecordsFinderImpl[F[_]: MonadThrow](tsSlugRecordsFinder: TSSlugRecordsFinder[F],
+                                                             glSlugRecordsFinder: GLSlugRecordsFinder[F]
 ) extends SecurityRecordFinder[F, projects.Slug] {
 
   override def apply(slug: projects.Slug, maybeAuthUser: Option[AuthUser]): F[List[Authorizer.SecurityRecord]] =
-    tsPathRecordsFinder(slug, maybeAuthUser) >>= {
-      case Nil      => glPathRecordsFinder(slug, maybeAuthUser)
+    tsSlugRecordsFinder(slug, maybeAuthUser) >>= {
+      case Nil      => glSlugRecordsFinder(slug, maybeAuthUser)
       case nonEmpty => nonEmpty.pure[F]
     }
 }

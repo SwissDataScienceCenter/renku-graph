@@ -81,7 +81,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
                            keywords,
                            members,
                            visibility,
-                           Some(parentPath),
+                           Some(parentSlug),
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithParent.from(
@@ -95,7 +95,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
         visibility,
         keywords,
         members.map(toPerson),
-        ResourceId(parentPath),
+        ResourceId(parentSlug),
         avatarUrl.map(Image.projectImage(ResourceId(slug), _)).toList
       )
     case GitLabProjectInfo(_,

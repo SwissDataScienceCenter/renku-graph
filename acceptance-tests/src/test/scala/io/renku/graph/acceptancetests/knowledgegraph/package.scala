@@ -89,35 +89,35 @@ package object knowledgegraph {
   private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.RenkuProject)] =
     Encoder.instance {
       case (forksCount, project: testentities.RenkuProject.WithParent) => json"""{
-        "forksCount": ${forksCount.value},
+        "forksCount": $forksCount,
         "parent": {
-          "path":    ${project.parent.slug.value},
-          "name":    ${project.parent.name.value},
+          "path":    ${project.parent.slug},
+          "name":    ${project.parent.name},
           "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
         }
       }"""
       case (forksCount, _) => json"""{
-        "forksCount": ${forksCount.value}
+        "forksCount": ${forksCount}
       }"""
     }
 
   private implicit lazy val createdEncoder: Encoder[(DateCreated, Option[Person])] = Encoder.instance {
     case (dateCreated, Some(creator)) => json"""{
-      "dateCreated": ${dateCreated.value},
+      "dateCreated": $dateCreated,
       "creator":     $creator
     }"""
     case (dateCreated, _) => json"""{
-      "dateCreated": ${dateCreated.value}
+      "dateCreated": $dateCreated
     }"""
   }
 
   private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance {
     case Person(name, Some(email), _, _, maybeAffiliation) => json"""{
-      "name":  ${name.value},
-      "email": ${email.value}
+      "name":  $name,
+      "email": $email
     }""" addIfDefined ("affiliation" -> maybeAffiliation)
     case Person(name, _, _, _, maybeAffiliation) => json"""{
-      "name": ${name.value}
+      "name": $name
     }""" addIfDefined ("affiliation" -> maybeAffiliation)
   }
 

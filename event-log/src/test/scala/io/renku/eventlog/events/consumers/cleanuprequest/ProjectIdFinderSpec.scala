@@ -46,7 +46,7 @@ class ProjectIdFinderSpec
       finder.findProjectId(slug).unsafeRunSync() shouldBe id.some
     }
 
-    "return None if project with the given path does not exist" in new TestCase {
+    "return None if project with the given slug does not exist" in new TestCase {
       finder.findProjectId(slug).unsafeRunSync() shouldBe None
     }
   }

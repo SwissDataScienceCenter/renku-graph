@@ -133,11 +133,11 @@ trait GitLabStateQueries {
   def findProjectBySlug(slug: projects.Slug): StateQuery[Option[Project]] =
     _.projects.find(_.slug == slug)
 
-  def findProjectByPath(path: projects.Slug, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
+  def findProjectBySlug(slug: projects.Slug, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
     maybeAuthedReq match {
-      case Some(AuthedProject(id, _))  => findProject(id, path)
-      case Some(AuthedUser(userId, _)) => findProject(path, userId.some)
-      case None                        => findProject(path, None)
+      case Some(AuthedProject(id, _))  => findProject(id, slug)
+      case Some(AuthedUser(userId, _)) => findProject(slug, userId.some)
+      case None                        => findProject(slug, None)
     }
 
   def findWebhooks(projectId: projects.GitLabId): StateQuery[List[Webhook]] =
@@ -146,9 +146,9 @@ trait GitLabStateQueries {
   def isProjectBroken(id: projects.GitLabId): StateQuery[Boolean] =
     _.brokenProjects.contains(id)
 
-  def isProjectBroken(path: projects.Slug): StateQuery[Boolean] =
+  def isProjectBroken(slug: projects.Slug): StateQuery[Boolean] =
     for {
-      project <- findProjectBySlug(path)
+      project <- findProjectBySlug(slug)
       broken  <- project.traverse(p => isProjectBroken(p.id))
     } yield broken.getOrElse(false)
 

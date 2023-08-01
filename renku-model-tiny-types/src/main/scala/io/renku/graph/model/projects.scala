@@ -85,7 +85,7 @@ object projects {
 
     private val slugExtractor = "^.*\\/projects\\/(.*)$".r
     implicit lazy val projectSlugConverter: TinyTypeConverter[ResourceId, Slug] = {
-      case ResourceId(slugExtractor(path)) => Slug.from(path)
+      case ResourceId(slugExtractor(slug)) => Slug.from(slug)
       case illegalValue => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectSlug"))
     }
   }

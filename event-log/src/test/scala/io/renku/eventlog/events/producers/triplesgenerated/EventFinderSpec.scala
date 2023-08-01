@@ -83,9 +83,9 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
         )
 
-        val TriplesGeneratedEvent(actualEventId, actualPath, actualPayload) = finder.popEvent().unsafeRunSync().value
+        val TriplesGeneratedEvent(actualEventId, actualSlug, actualPayload) = finder.popEvent().unsafeRunSync().value
         actualEventId     shouldBe event1Id
-        actualPath        shouldBe projectSlug
+        actualSlug        shouldBe projectSlug
         actualPayload.value should contain theSameElementsAs eventPayload1.value
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
@@ -129,14 +129,14 @@ private class EventFinderSpec
         returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
       )
 
-      val TriplesGeneratedEvent(actualEventId, actualPath, actualPayload) = finder.popEvent().unsafeRunSync().value
+      val TriplesGeneratedEvent(actualEventId, actualSlug, actualPayload) = finder.popEvent().unsafeRunSync().value
       if (actualEventId == event1Id) {
         actualEventId     shouldBe event1Id
-        actualPath        shouldBe projectSlug
+        actualSlug        shouldBe projectSlug
         actualPayload.value should contain theSameElementsAs event1Payload.value
       } else {
         actualEventId     shouldBe event2Id
-        actualPath        shouldBe projectSlug
+        actualSlug        shouldBe projectSlug
         actualPayload.value should contain theSameElementsAs event2Payload.value
       }
 
@@ -154,15 +154,15 @@ private class EventFinderSpec
         returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
       )
 
-      val TriplesGeneratedEvent(nextActualEventId, nextActualPath, nextActualPayload) =
+      val TriplesGeneratedEvent(nextActualEventId, nextActualSlug, nextActualPayload) =
         finder.popEvent().unsafeRunSync().value
       if (nextActualEventId == event1Id) {
         nextActualEventId     shouldBe event1Id
-        nextActualPath        shouldBe projectSlug
+        nextActualSlug        shouldBe projectSlug
         nextActualPayload.value should contain theSameElementsAs event1Payload.value
       } else {
         nextActualEventId     shouldBe event2Id
-        nextActualPath        shouldBe projectSlug
+        nextActualSlug        shouldBe projectSlug
         nextActualPayload.value should contain theSameElementsAs event2Payload.value
       }
 
@@ -202,11 +202,11 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
         )
 
-        val TriplesGeneratedEvent(actualEvent1Id, actualEvent1Path, actualEvent1Payload) =
+        val TriplesGeneratedEvent(actualEvent1Id, actualEvent1Slug, actualEvent1Payload) =
           finder.popEvent().unsafeRunSync().value
 
         actualEvent1Id          shouldBe event1Id
-        actualEvent1Path        shouldBe projectSlug
+        actualEvent1Slug        shouldBe projectSlug
         actualEvent1Payload.value should contain theSameElementsAs eventPayload1.value
 
         gauges.awaitingTransformation.getValue(projectSlug).unsafeRunSync() shouldBe -1d
@@ -227,11 +227,11 @@ private class EventFinderSpec
           returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
         )
 
-        val TriplesGeneratedEvent(actualEvent2Id, actualEvent2Path, actualEvent2Payload) =
+        val TriplesGeneratedEvent(actualEvent2Id, actualEvent2Slug, actualEvent2Payload) =
           finder.popEvent().unsafeRunSync().value
 
         actualEvent2Id          shouldBe event2Id
-        actualEvent2Path        shouldBe projectSlug
+        actualEvent2Slug        shouldBe projectSlug
         actualEvent2Payload.value should contain theSameElementsAs eventPayload2.value
 
         gauges.awaitingTransformation.getValue(projectSlug).unsafeRunSync() shouldBe -2d
@@ -270,11 +270,11 @@ private class EventFinderSpec
         returns = List(ProjectIds(projectId, projectSlug) -> MaxPriority)
       )
 
-      val TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload) =
+      val TriplesGeneratedEvent(actualEventId, actualEventSlug, actualEventPayload) =
         finder.popEvent().unsafeRunSync().value
 
       actualEventId          shouldBe event2Id
-      actualEventPath        shouldBe projectSlug
+      actualEventSlug        shouldBe projectSlug
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
 
       gauges.awaitingTransformation.getValue(projectSlug).unsafeRunSync() shouldBe -1d
@@ -316,10 +316,10 @@ private class EventFinderSpec
         returns = List(ProjectIds(event2ProjectId, event2ProjectSlug) -> MaxPriority)
       )
 
-      val TriplesGeneratedEvent(actualEventId, actualEventPath, actualEventPayload) =
+      val TriplesGeneratedEvent(actualEventId, actualEventSlug, actualEventPayload) =
         finder.popEvent().unsafeRunSync().value
       actualEventId          shouldBe event2Id
-      actualEventPath        shouldBe event2ProjectSlug
+      actualEventSlug        shouldBe event2ProjectSlug
       actualEventPayload.value should contain theSameElementsAs eventPayload2.value
 
       findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))

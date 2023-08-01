@@ -73,8 +73,8 @@ object StatusChangeEvent {
   final case class RedoProjectTransformation(project: ProjectSlug) extends StatusChangeEvent
   object RedoProjectTransformation {
 
-    def apply(path: projects.Slug): RedoProjectTransformation =
-      RedoProjectTransformation(ProjectSlug(path))
+    def apply(slug: projects.Slug): RedoProjectTransformation =
+      RedoProjectTransformation(ProjectSlug(slug))
 
     implicit lazy val show: Show[RedoProjectTransformation] = Show.show { event =>
       show"${event.subCategoryName} projectSlug = ${event.project.slug}, status = ${EventStatus.TriplesGenerated}"

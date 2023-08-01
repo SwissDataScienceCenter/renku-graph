@@ -162,7 +162,7 @@ class EventPersisterSpec
 
         gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
-        // storing event 2 for the same project but with different project_path and more recent Event Date
+        // storing event 2 for the same project but with different slug and more recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
                                                 date = EventDate(now.minus(1, HOURS))
         )
@@ -189,7 +189,7 @@ class EventPersisterSpec
 
         gauges.awaitingGeneration.getValue(event1.project.slug).unsafeRunSync() shouldBe 1d
 
-        // storing event 2 for the same project but with different project_path and less recent Event Date
+        // storing event 2 for the same project but with different slug and less recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project.copy(slug = projectSlugs.generateOne),
                                                 date = EventDate(now.minus(3, HOURS))
         )

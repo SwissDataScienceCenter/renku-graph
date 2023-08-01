@@ -339,7 +339,7 @@ sequenceDiagram
     activate EventLog
       EventLog ->> TokenRepository: fetches access token
       EventLog ->> GitLab: calls the Project Details
-      loop if there project path is NOT the same in EventLog and GitLab
+      loop if the project slug is NOT the same in EventLog and GitLab
         EventLog ->> CommitEventService: sends COMMIT_SYNC for the new slug
         EventLog ->> TriplesGenerator: sends CLEAN_UP_REQUEST for the old slug
       end

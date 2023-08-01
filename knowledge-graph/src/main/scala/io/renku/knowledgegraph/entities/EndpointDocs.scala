@@ -96,7 +96,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val namespace = Parameter.Query(
     "namespace",
     Schema.String,
-    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. 'group/subgroup'".some,
+    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has to be used, e.g. 'group/subgroup'".some,
     required = false
   )
   private lazy val since = Parameter.Query(

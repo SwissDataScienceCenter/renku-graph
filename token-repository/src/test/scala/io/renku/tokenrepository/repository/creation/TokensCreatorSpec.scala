@@ -86,9 +86,9 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       tokensCreator.create(projectId, userAccessToken).unsafeRunSync() shouldBe ()
     }
 
-    "leave the stored Access Token untouched but update the path if " +
+    "leave the stored Access Token untouched but update the slug if " +
       "the token is valid, it's not due for refresh " +
-      "but the path has changed" in new TestCase {
+      "but the slug has changed" in new TestCase {
 
         val encryptedToken = encryptedAccessTokens.generateOne
         givenStoredTokenFinder(projectId, returning = OptionT.some[IO](encryptedToken))
@@ -304,7 +304,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
     private val tokenDueChecker     = mock[TokenDueChecker[IO]]
     private val newTokensCreator    = mock[NewTokensCreator[IO]]
     private val tokensPersister     = mock[TokensPersister[IO]]
-    private val persistedPathFinder = mock[PersistedSlugFinder[IO]]
+    private val persistedSlugFinder = mock[PersistedSlugFinder[IO]]
     private val tokenRemover        = mock[TokenRemover[IO]]
     private val tokensFinder        = mock[PersistedTokensFinder[IO]]
     private val tokensRevoker       = mock[TokensRevoker[IO]]
@@ -315,7 +315,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
       tokenDueChecker,
       newTokensCreator,
       tokensPersister,
-      persistedPathFinder,
+      persistedSlugFinder,
       tokenRemover,
       tokensFinder,
       tokensRevoker,
@@ -351,7 +351,7 @@ class TokensCreatorSpec extends AnyWordSpec with IOSpec with MockFactory with sh
         .returning(returning)
 
     def givenStoredSlugFinder(projectId: projects.GitLabId, returning: IO[projects.Slug]) =
-      (persistedPathFinder.findPersistedProjectSlug _)
+      (persistedSlugFinder.findPersistedProjectSlug _)
         .expects(projectId)
         .returning(returning)
 

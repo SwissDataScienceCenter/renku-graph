@@ -101,10 +101,10 @@ class ZombieEventDetectionSpec
   private def insertProjectToDB(project: data.Project, eventDate: EventDate): Int = EventLog.execute { session =>
     val query: Command[GitLabId *: Slug *: EventDate *: EmptyTuple] =
       sql"""INSERT INTO project (project_id, project_path, latest_event_date)
-          VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
-          ON CONFLICT (project_id)
-          DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-          """.command
+            VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
+            ON CONFLICT (project_id)
+            DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+            """.command
     session
       .prepare(query)
       .flatMap(_.execute(project.id *: project.slug *: eventDate *: EmptyTuple))

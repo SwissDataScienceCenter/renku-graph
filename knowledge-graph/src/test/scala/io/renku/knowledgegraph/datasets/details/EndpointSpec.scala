@@ -254,8 +254,8 @@ class EndpointSpec
       usedInJsons should have size dataset.usedIn.size
       usedInJsons foreach { json =>
         (json.hcursor.downField("path").as[projects.Slug], json._links)
-          .mapN { case (path, links) =>
-            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
+          .mapN { case (slug, links) =>
+            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / slug))
           }
           .getOrElse(fail("No 'slug' or 'project-details' links on the 'usedIn' elements"))
       }

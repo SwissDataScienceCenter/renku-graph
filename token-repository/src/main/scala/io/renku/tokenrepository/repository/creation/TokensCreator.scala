@@ -49,7 +49,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     tokenDueChecker:     TokenDueChecker[F],
     newTokensCreator:    NewTokensCreator[F],
     tokensPersister:     TokensPersister[F],
-    persistedPathFinder: PersistedSlugFinder[F],
+    persistedSlugFinder: PersistedSlugFinder[F],
     tokenRemover:        TokenRemover[F],
     tokenFinder:         PersistedTokensFinder[F],
     tokensRevoker:       TokensRevoker[F],
@@ -57,7 +57,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
 ) extends TokensCreator[F] {
 
   import newTokensCreator._
-  import persistedPathFinder._
+  import persistedSlugFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
@@ -68,7 +68,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       .flatMapF(
         decrypt >=>
           removeWhenInvalid(projectId, userToken) >=>
-          replacePathIfChangedOrRemove(projectId, userToken) >=>
+          replaceSlugIfChangedOrRemove(projectId, userToken) >=>
           checkIfDue(projectId)
       )
       .void
@@ -88,7 +88,7 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
       }
   }
 
-  private def replacePathIfChangedOrRemove(
+  private def replaceSlugIfChangedOrRemove(
       projectId: projects.GitLabId,
       userToken: AccessToken
   ): Option[AccessToken] => F[Option[AccessToken]] = {
@@ -96,10 +96,10 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case Some(token) =>
       projectSlugFinder
         .findProjectSlug(projectId, token)
-        .semiflatMap(actualPath =>
+        .semiflatMap(actualSlug =>
           findPersistedProjectSlug(projectId).flatMap {
-            case `actualPath` => ().pure[F]
-            case _            => updateSlug(Project(projectId, actualPath))
+            case `actualSlug` => ().pure[F]
+            case _            => updateSlug(Project(projectId, actualSlug))
           }
         )
         .cataF(

@@ -116,13 +116,13 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
           query(findProjectById(id, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
 
         case GET -> Root / ProjectSlug(slug) =>
-          query(findProjectByPath(slug, maybeAuthedReq)).flatMap(OkOrNotFound(_))
+          query(findProjectBySlug(slug, maybeAuthedReq)).flatMap(OkOrNotFound(_))
 
         case HEAD -> Root / ProjectSlug(slug) =>
-          query(findProjectByPath(slug, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
+          query(findProjectBySlug(slug, maybeAuthedReq)).flatMap(EmptyOkOrNotFound(_))
 
         case GET -> Root / ProjectSlug(slug) / "members" / "all" =>
-          query(findProjectByPath(slug, maybeAuthedReq))
+          query(findProjectBySlug(slug, maybeAuthedReq))
             .map(_.toList.flatMap(_.members.toList))
             .flatMap(Ok(_))
 

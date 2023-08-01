@@ -67,7 +67,7 @@ Response body example:
     "id":      "df654c3b1bd105a29d658f78f6380a842feac878",
     "project":         {
       "id":   1234,
-      "path": "namespace2/project-name"
+      "slug": "namespace2/project-name"
     },
     "status":  "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure",
@@ -145,7 +145,7 @@ In the case of a *NEW* event
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   123,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "date":      "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
@@ -407,7 +407,7 @@ Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILUR
 
 Enqueues a `CLEAN_UP` event for the project with the given `id` and `slug`. The `CLEAN_UP` event performs re-provisioning process for a project in the Triples Store.
 
-**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `slug`. If there's no project with the given `path`, no `CLEAN_UP` event will be created. 
+**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `slug`. If there's no project with the given `slug`, no `CLEAN_UP` event will be created. 
 
 **Multipart Request**
 

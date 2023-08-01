@@ -138,7 +138,7 @@ class EntityBuilderSpec
                            keywords,
                            members,
                            visibility,
-                           Some(parentPath),
+                           Some(parentSlug),
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithParent(
@@ -152,7 +152,7 @@ class EntityBuilderSpec
         visibility,
         keywords,
         members.map(toPerson),
-        ResourceId(parentPath),
+        ResourceId(parentSlug),
         convertImageUris(ResourceId(slug).asEntityId)(avatarUrl.toList)
       )
     case GitLabProjectInfo(_,

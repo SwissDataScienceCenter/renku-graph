@@ -83,7 +83,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import projectDatasetTagsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
-  import projectSlugAuthorizer.{authorize => authorizePath}
+  import projectSlugAuthorizer.{authorize => authorizeSlug}
   import projectUpdateEndpoint._
   import routesMetrics._
 
@@ -167,7 +167,7 @@ private class MicroserviceRoutes[F[_]: Async](
         path.segments.toList
           .map(_.toString)
           .toProjectSlug
-          .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
+          .flatTap(authorizeSlug(_, user.some).leftMap(_.toHttpResponse))
           .semiflatMap(`DELETE /projects/:slug`(_, user))
           .merge
       }
@@ -180,7 +180,7 @@ private class MicroserviceRoutes[F[_]: Async](
         path.segments.toList
           .map(_.toString)
           .toProjectSlug
-          .flatTap(authorizePath(_, user.some).leftMap(_.toHttpResponse))
+          .flatTap(authorizeSlug(_, user.some).leftMap(_.toHttpResponse))
           .semiflatMap(`PUT /projects/:slug`(_, authReq.req, user))
           .merge
       }
@@ -277,9 +277,9 @@ private class MicroserviceRoutes[F[_]: Async](
       PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
         .map(paging =>
           projectSlugParts.toProjectSlug
-            .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-            .semiflatMap(path =>
-              `GET /projects/:slug/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
+            .flatTap(authorizeSlug(_, maybeAuthUser).leftMap(_.toHttpResponse))
+            .semiflatMap(slug =>
+              `GET /projects/:slug/datasets/:name/tags`(Criteria(slug, dsName, paging, maybeAuthUser))
             )
             .merge
         )
@@ -296,9 +296,9 @@ private class MicroserviceRoutes[F[_]: Async](
       ).mapN { (maybeSorts, paging) =>
         val sorting: Sorting[Criteria.Sort.type] = Sorting.fromOptionalListOrDefault(maybeSorts, Sort.default)
         projectSlugParts.toProjectSlug
-          .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-          .semiflatMap(path =>
-            projectDatasetsEndpoint.`GET /projects/:slug/datasets`(request, Criteria(path, sorting, paging))
+          .flatTap(authorizeSlug(_, maybeAuthUser).leftMap(_.toHttpResponse))
+          .semiflatMap(slug =>
+            projectDatasetsEndpoint.`GET /projects/:slug/datasets`(request, Criteria(slug, sorting, paging))
           )
           .merge
       }.fold(toBadRequest, identity)
@@ -306,7 +306,7 @@ private class MicroserviceRoutes[F[_]: Async](
       getLineage(projectSlugParts, location, maybeAuthUser)
     case projectSlugParts =>
       projectSlugParts.toProjectSlug
-        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .flatTap(authorizeSlug(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(`GET /projects/:slug`(_, maybeAuthUser))
         .merge
   }
@@ -322,7 +322,7 @@ private class MicroserviceRoutes[F[_]: Async](
 
     (projectSlugParts.toProjectSlug -> toLocation(location))
       .mapN(_ -> _)
-      .flatTap { case (projectSlug, _) => authorizePath(projectSlug, maybeAuthUser).leftMap(_.toHttpResponse) }
+      .flatTap { case (projectSlug, _) => authorizeSlug(projectSlug, maybeAuthUser).leftMap(_.toHttpResponse) }
       .semiflatMap { case (projectSlug, location) => `GET /lineage`(projectSlug, location, maybeAuthUser) }
       .merge
   }

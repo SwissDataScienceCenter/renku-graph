@@ -48,7 +48,7 @@ class ProjectSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with
       givenTSSlugRecordsFinder(returning = Nil.pure[Try])
 
       val securityRecords = securityRecordsGen.generateList(min = 1)
-      givenGLPathRecordsFinder(returning = securityRecords.pure[Try])
+      givenGLSlugRecordsFinder(returning = securityRecords.pure[Try])
 
       recordsFinder(projectSlug, maybeAuthUser).success.value shouldBe securityRecords
     }
@@ -59,15 +59,15 @@ class ProjectSlugRecordsFinderSpec extends AnyWordSpec with should.Matchers with
     val projectSlug   = projectSlugs.generateOne
     val maybeAuthUser = authUsers.generateOption
 
-    private val tsPathRecordsFinder = mock[TSSlugRecordsFinder[Try]]
-    private val glPathRecordsFinder = mock[GLSlugRecordsFinder[Try]]
-    val recordsFinder               = new ProjectSlugRecordsFinderImpl[Try](tsPathRecordsFinder, glPathRecordsFinder)
+    private val tsSlugRecordsFinder = mock[TSSlugRecordsFinder[Try]]
+    private val glSlugRecordsFinder = mock[GLSlugRecordsFinder[Try]]
+    val recordsFinder               = new ProjectSlugRecordsFinderImpl[Try](tsSlugRecordsFinder, glSlugRecordsFinder)
 
     def givenTSSlugRecordsFinder(returning: Try[List[SecurityRecord]]) =
-      (tsPathRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
+      (tsSlugRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
 
-    def givenGLPathRecordsFinder(returning: Try[List[SecurityRecord]]) =
-      (glPathRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
+    def givenGLSlugRecordsFinder(returning: Try[List[SecurityRecord]]) =
+      (glSlugRecordsFinder.apply _).expects(projectSlug, maybeAuthUser).returning(returning)
 
     val securityRecordsGen: Gen[SecurityRecord] =
       (projectVisibilities, personGitLabIds.toGeneratorOfSet(min = 0))

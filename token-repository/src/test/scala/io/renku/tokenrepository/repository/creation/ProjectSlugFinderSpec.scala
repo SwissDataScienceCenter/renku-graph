@@ -73,7 +73,7 @@ class ProjectSlugFinderSpec
       }
     }
 
-    "map OK response body to project path" in new TestCase {
+    "map OK response body to project slug" in new TestCase {
       mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(projectJson))
         .unsafeRunSync() shouldBe projectSlug.some
     }
@@ -110,8 +110,8 @@ class ProjectSlugFinderSpec
     val slugFinder = new ProjectSlugFinderImpl[IO]
 
     lazy val projectJson = json"""{
-      "id": ${projectId.value},
-      "path_with_namespace": ${projectSlug.value}
+      "id":                  $projectId,
+      "path_with_namespace": $projectSlug
     }"""
 
     lazy val mapResponse = captureMapping(gitLabClient)(

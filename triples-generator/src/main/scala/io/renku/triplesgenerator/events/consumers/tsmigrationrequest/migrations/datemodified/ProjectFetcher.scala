@@ -47,7 +47,7 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
       Prefixes of (renku -> "renku", schema -> "schema"),
       sparql"""|SELECT DISTINCT ?id ?slug ?dateCreated
                |WHERE {
-               |  BIND (${slug.asObject} AS ?path)
+               |  BIND (${slug.asObject} AS ?slug)
                |  GRAPH ?id {
                |    ?id a schema:Project;
                |        renku:projectPath ?slug;

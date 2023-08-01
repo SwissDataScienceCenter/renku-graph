@@ -226,7 +226,7 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
                                               FROM event evt
                                               WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                                             )
-              """.query(projectSlugDecoder ~ int8).map { case path ~ count => (path, count) })
+              """.query(projectSlugDecoder ~ int8).map { case slug ~ count => (slug, count) })
       .arguments(Void)
       .build(_.toList)
 

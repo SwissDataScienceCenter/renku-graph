@@ -95,7 +95,7 @@ private[entities] object CliProjectConverter {
                          images:           List[Image]
   )(implicit renkuUrl: RenkuUrl): ValidatedNel[String, Project] =
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentSlug) match {
-      case (Some(agent), Some(version), Some(parentPath)) =>
+      case (Some(agent), Some(version), Some(parentSlug)) =>
         RenkuProject.WithParent
           .from(
             ResourceId(gitLabInfo.slug),
@@ -113,7 +113,7 @@ private[entities] object CliProjectConverter {
             activities,
             datasets,
             plans,
-            parentResourceId = ResourceId(parentPath),
+            parentResourceId = ResourceId(parentSlug),
             images
           )
           .widen[Project]
@@ -138,7 +138,7 @@ private[entities] object CliProjectConverter {
             images
           )
           .widen[Project]
-      case (None, None, Some(parentPath)) =>
+      case (None, None, Some(parentSlug)) =>
         NonRenkuProject.WithParent
           .from(
             ResourceId(gitLabInfo.slug),
@@ -151,7 +151,7 @@ private[entities] object CliProjectConverter {
             gitLabInfo.visibility,
             keywords,
             members(allJsonLdPersons)(gitLabInfo),
-            parentResourceId = ResourceId(parentPath),
+            parentResourceId = ResourceId(parentSlug),
             images
           )
           .widen[Project]

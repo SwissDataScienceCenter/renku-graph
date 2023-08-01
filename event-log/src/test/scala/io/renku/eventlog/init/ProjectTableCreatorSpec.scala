@@ -78,12 +78,12 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
         logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
 
-        val project2Path =
+        val project2Slug =
           if ((project2EventDate1 compareTo project2EventDate2) < 0) project2Slug2
           else project2Slug1
         fetchProjectData should contain theSameElementsAs List(
           (project1Id, project1Slug, Set(project1EventDate1, project1EventDate2).max),
-          (project2Id, project2Path, Set(project2EventDate1, project2EventDate2).max),
+          (project2Id, project2Slug, Set(project2EventDate1, project2EventDate2).max),
           (project3Id, project3Slug, project3EventDate)
         )
       }

@@ -53,10 +53,10 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
 
   override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
     case Right(Some(event.`projectSlug`)) => tgClient.send(SyncRepoMetadata(event.projectSlug))
-    case Right(Some(newPath)) =>
+    case Right(Some(newSlug)) =>
       removeProject(event.projectId) >>
         send(cleanUpRequest(event)) >>
-        send(commitSyncRequest(event.projectId, newPath))
+        send(commitSyncRequest(event.projectId, newSlug))
     case Right(None)     => send(cleanUpRequest(event))
     case Left(exception) => Logger[F].info(show"$categoryName: $event failed: $exception")
   }

@@ -116,14 +116,14 @@ class ProvisionProjectsGraphSpec
 
       givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = projectSlugsPage.size)
 
-      List(projectSlug1, projectSlug3) foreach { path =>
+      List(projectSlug1, projectSlug3) foreach { slug =>
         val project = anyProjectEntities
-          .map(_.fold(_.copy(slug = path), _.copy(slug = path), _.copy(slug = path), _.copy(slug = path)))
+          .map(_.fold(_.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug), _.copy(slug = slug)))
           .generateOne
           .to[entities.Project]
-        givenProjectDataFetching(path, returning = project.some.pure[IO])
+        givenProjectDataFetching(slug, returning = project.some.pure[IO])
         givenProjectsGraphProvisioning(project, returning = ().pure[IO])
-        verifyProjectNotedDone(path)
+        verifyProjectNotedDone(slug)
       }
 
       givenProjectDataFetching(projectSlug2, returning = None.pure[IO])
