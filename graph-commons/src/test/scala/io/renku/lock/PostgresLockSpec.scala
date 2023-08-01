@@ -205,7 +205,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           f1           <- Async[IO].start(makeExclusiveLock(s2, 4.millis).run("1").allocated)
           // use a longer interval so that there is no attempt to insert another record
           f2 <- Async[IO].start(makeExclusiveLock(s3, 1.second).run("1").allocated)
-          _  <- IO.sleep(50.millis)
+          _  <- IO.sleep(100.millis)
 
           // there must be two records waiting for the same lock
           stats <- PostgresLockStats.getStats(s1)

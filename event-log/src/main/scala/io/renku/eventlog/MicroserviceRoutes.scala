@@ -86,20 +86,21 @@ private class MicroserviceRoutes[F[_]: Sync](
       perPage(perPage) +&
       sort(sortBy) =>
       respond503IfMigrating(maybeFindEvents(validatedProjectId, validatedProjectSlug, status, since, until, page, perPage, sortBy, request))
-    case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
-    case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
-    case           GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectSlug) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectSlug))
-    case           GET  -> Root / "ping"                                              => Ok("pong")
-    case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
-    case           GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
-    case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
+    case req @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(req))
+    case       GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case       GET  -> Root / "events" / EventId(eventId) / ProjectSlug(projectSlug) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectSlug))
+    case       GET  -> Root / "ping"                                              => Ok("pong")
+    case       GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
+    case       GET  -> Root / "status"                                            => respond503IfMigrating(`GET /status`)
+    case req @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(req))
   }.withMetrics.map(_  <+> versionRoutes())
   // format: on
 
-  def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] = isMigrating.get.flatMap {
-    case true  => ServiceUnavailable()
-    case false => otherwise
-  }
+  private def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] =
+    isMigrating.get >>= {
+      case true  => ServiceUnavailable()
+      case false => otherwise
+    }
 
   private object ProjectIdParameter {
     private implicit val queryParameterDecoder: QueryParamDecoder[projects.GitLabId] =
