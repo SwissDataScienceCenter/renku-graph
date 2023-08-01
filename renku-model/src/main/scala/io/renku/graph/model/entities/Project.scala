@@ -620,6 +620,7 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
           renku / "projectPath"       -> project.slug.asJsonLD,
           renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
@@ -650,6 +651,7 @@ object Project {
           project.resourceId.asEntityId,
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
+          renku / "slug"              -> project.slug.asJsonLD,
           renku / "projectPath"       -> project.slug.asJsonLD,
           renku / "projectNamespace"  -> project.slug.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
@@ -679,6 +681,7 @@ object Project {
     val image:   Property = schema / "image"
 
     val nameProperty:         DataProperty.Def = DataProperty(schema / "name", xsd / "string")
+    val slugProperty:         DataProperty.Def = DataProperty(renku / "slug", xsd / "string")
     val pathProperty:         DataProperty.Def = DataProperty(renku / "projectPath", xsd / "string")
     val descriptionProperty:  DataProperty.Def = DataProperty(schema / "description", xsd / "string")
     val dateCreatedProperty:  DataProperty.Def = DataProperty(schema / "dateCreated", xsd / "dateTime")
@@ -704,6 +707,7 @@ object Project {
           ObjectProperty(image, Image.Ontology.typeDef)
         ),
         DataProperties(
+          slugProperty,
           nameProperty,
           pathProperty,
           DataProperty(renku / "projectNamespace", xsd / "string"),

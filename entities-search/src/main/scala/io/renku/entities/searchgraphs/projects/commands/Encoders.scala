@@ -71,6 +71,7 @@ private object Encoders {
     Set(
       searchInfoQuad(rdf / "type", ProjectSearchInfoOntology.typeDef.clazz.id).some,
       searchInfoQuad(ProjectSearchInfoOntology.nameProperty.id, info.name.asObject).some,
+      searchInfoQuad(ProjectSearchInfoOntology.slugProperty.id, info.slug.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.pathProperty.id, info.slug.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.visibilityProperty.id, info.visibility.asObject).some,
       searchInfoQuad(ProjectSearchInfoOntology.dateCreatedProperty.id, info.dateCreated.asObject).some,
