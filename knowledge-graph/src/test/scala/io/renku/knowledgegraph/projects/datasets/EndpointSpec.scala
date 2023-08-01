@@ -56,12 +56,12 @@ class EndpointSpec
 
   it should "respond with OK and the found datasets" in {
 
-    val criteria = Endpoint.Criteria(projectPath)
+    val criteria = Endpoint.Criteria(projectSlug)
 
     val pagingResponse = pagingResponses(projectDatasetGen).generateOne
     givenProjectFinding(criteria, returning = pagingResponse.pure[IO])
 
-    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+    endpoint.`GET /projects/:slug/datasets`(request, criteria) >>= { response =>
       for {
         _ <- response.as[List[Json]].asserting(_ shouldBe pagingResponse.results.map(_.asJson))
         _ = response.status        shouldBe Ok
@@ -70,7 +70,7 @@ class EndpointSpec
 
         _ =
           logger.loggedOnly(
-            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+            Warn(s"Finding '${criteria.projectSlug}' datasets finished${executionTimeRecorder.executionTimeInfo}")
           )
       } yield ()
     }
@@ -79,17 +79,17 @@ class EndpointSpec
 
   it should "respond with OK an empty JSON array if no datasets found" in {
 
-    val criteria = Endpoint.Criteria(projectPath)
+    val criteria = Endpoint.Criteria(projectSlug)
 
     givenProjectFinding(criteria, returning = PagingResponse.empty[ProjectDataset](pagingRequests.generateOne).pure[IO])
 
-    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+    endpoint.`GET /projects/:slug/datasets`(request, criteria) >>= { response =>
       for {
         _ <- response.as[List[Json]].asserting(_ shouldBe List.empty)
         _ = response.status shouldBe Ok
         _ =
           logger.loggedOnly(
-            Warn(s"Finding '${criteria.projectPath}' datasets finished${executionTimeRecorder.executionTimeInfo}")
+            Warn(s"Finding '${criteria.projectSlug}' datasets finished${executionTimeRecorder.executionTimeInfo}")
           )
       } yield ()
     }
@@ -97,27 +97,27 @@ class EndpointSpec
 
   it should "respond with INTERNAL_SERVER_ERROR if finding datasets fails" in {
 
-    val criteria = Endpoint.Criteria(projectPath)
+    val criteria = Endpoint.Criteria(projectSlug)
 
     val exception = exceptions.generateOne
     givenProjectFinding(criteria, returning = exception.raiseError[IO, PagingResponse[ProjectDataset]])
 
-    endpoint.`GET /projects/:path/datasets`(request, criteria) >>= { response =>
+    endpoint.`GET /projects/:slug/datasets`(request, criteria) >>= { response =>
       for {
         _ <- response
                .as[Message]
-               .asserting(_ shouldBe Message.Error.unsafeApply(s"Finding ${criteria.projectPath}'s datasets failed"))
+               .asserting(_ shouldBe Message.Error.unsafeApply(s"Finding ${criteria.projectSlug}'s datasets failed"))
         _ = response.status      shouldBe InternalServerError
         _ = response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-        _ = logger.loggedOnly(Error(s"Finding ${criteria.projectPath}'s datasets failed", exception))
+        _ = logger.loggedOnly(Error(s"Finding ${criteria.projectSlug}'s datasets failed", exception))
       } yield ()
     }
   }
 
   private lazy val request     = Request[IO]()
-  private lazy val projectPath = projectPaths.generateOne
+  private lazy val projectSlug = projectSlugs.generateOne
 
-  private implicit lazy val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectPath)
+  private implicit lazy val encoder: Encoder[ProjectDataset] = ProjectDataset.encoder(projectSlug)
 
   private lazy val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
   private implicit lazy val renkuApiUrl:      renku.ApiUrl      = renkuApiUrls.generateOne

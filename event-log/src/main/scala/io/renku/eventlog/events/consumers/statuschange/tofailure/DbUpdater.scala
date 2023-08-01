@@ -92,7 +92,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
         .flatMapResult {
           case Completion.Update(1) =>
             DBUpdateResults
-              .ForProjects(event.project.path, Map(event.currentStatus -> -1, event.newStatus -> 1))
+              .ForProjects(event.project.slug, Map(event.currentStatus -> -1, event.newStatus -> 1))
               .pure[F]
           case Completion.Update(0) =>
             DBUpdateResults.ForProjects.empty.pure[F]
@@ -150,7 +150,7 @@ private[statuschange] class DbUpdater[F[_]: Async: Logger: QueriesExecutionTimes
         .build(_.toList)
         .mapResult { ids =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
+            .ForProjects(event.project.slug, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
         }
     }
 }

@@ -74,8 +74,8 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               ) candidate
               ORDER BY candidate.last_synced ASC
               LIMIT 1
-      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
-          .map { case id ~ maybeDate ~ path => (id, maybeDate, ProjectSyncEvent(id, path)) }
+      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectSlugDecoder)
+          .map { case id ~ maybeDate ~ slug => (id, maybeDate, ProjectSyncEvent(id, slug)) }
       )
       .arguments(LastSyncedDate(now()))
       .build(_.option)

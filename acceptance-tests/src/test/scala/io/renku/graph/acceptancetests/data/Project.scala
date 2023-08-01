@@ -26,7 +26,7 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data.Project._
 import io.renku.graph.model.entities.Project.ProjectMember
-import io.renku.graph.model.projects.{GitLabId, Name, Path}
+import io.renku.graph.model.projects.{GitLabId, Name, Slug}
 import io.renku.graph.model.testentities
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -42,7 +42,7 @@ final case class Project(entitiesProject: testentities.RenkuProject,
                          permissions:     Permissions,
                          statistics:      Statistics
 ) {
-  val path: Path = entitiesProject.path
+  val slug: Slug = entitiesProject.slug
   val name: Name = entitiesProject.name
 }
 

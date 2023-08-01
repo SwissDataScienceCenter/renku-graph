@@ -26,7 +26,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToPath
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
@@ -47,24 +47,24 @@ class MembersSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val maybeAccessToken = accessTokens.generateOption
       (accessTokenFinder
-        .findAccessToken(_: projects.Path)(_: projects.Path => String))
-        .expects(projectPath, projectPathToPath)
+        .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
+        .expects(projectSlug, projectSlugToPath)
         .returning(maybeAccessToken.pure[IO])
 
       (gitLabProjectMembersFinder
-        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
+        .expects(projectSlug, maybeAccessToken)
         .returning(membersInGitLab.pure[IO])
 
       val syncSummary = syncSummaries.generateOne
       (kgSynchronizer.syncMembers _)
-        .expects(projectPath, membersInGitLab)
+        .expects(projectSlug, membersInGitLab)
         .returning(syncSummary.pure[IO])
 
-      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
+      synchronizer.synchronizeMembers(projectSlug).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Info(show"$categoryName: $projectPath accepted"),
+        Info(show"$categoryName: $projectSlug accepted"),
         infoMessage(syncSummary)
       )
     }
@@ -73,25 +73,25 @@ class MembersSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val maybeAccessToken = accessTokens.generateOption
       (accessTokenFinder
-        .findAccessToken(_: projects.Path)(_: projects.Path => String))
-        .expects(projectPath, projectPathToPath)
+        .findAccessToken(_: projects.Slug)(_: projects.Slug => String))
+        .expects(projectSlug, projectSlugToPath)
         .returning(maybeAccessToken.pure[IO])
 
       val exception = exceptions.generateOne
       (gitLabProjectMembersFinder
-        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
+        .findProjectMembers(_: projects.Slug)(_: Option[AccessToken]))
+        .expects(projectSlug, maybeAccessToken)
         .returning(exception.raiseError[IO, Set[GitLabProjectMember]])
 
-      synchronizer.synchronizeMembers(projectPath).unsafeRunSync() shouldBe ()
+      synchronizer.synchronizeMembers(projectSlug).unsafeRunSync() shouldBe ()
 
-      logger.logged(Error(s"$categoryName: Members synchronized for project $projectPath failed", exception))
+      logger.logged(Error(s"$categoryName: Members synchronized for project $projectSlug failed", exception))
     }
   }
 
   private trait TestCase {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
 
     implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
     implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
@@ -102,7 +102,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with IOSpec with MockFactory w
       new MembersSynchronizerImpl[IO](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
 
     def infoMessage(syncSummary: SyncSummary) = Info(
-      s"$categoryName: members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
+      s"$categoryName: members for project: $projectSlug synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
         s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
     )
   }

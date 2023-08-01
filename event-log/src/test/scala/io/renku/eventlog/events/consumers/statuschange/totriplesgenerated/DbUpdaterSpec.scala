@@ -70,7 +70,7 @@ class DbUpdaterSpec
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         statusesToUpdate
           .map(_ -> -1)
           .toMap +
@@ -129,7 +129,7 @@ class DbUpdaterSpec
       sessionResource
         .useK(dbUpdater updateDB statusChangeEvent)
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         statusCount = Map(GeneratingTriples -> -1, TriplesGenerated -> 1)
       )
 
@@ -214,7 +214,7 @@ class DbUpdaterSpec
     def addEvent(status:    EventStatus,
                  eventDate: EventDate
     ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) =
-      storeGeneratedEvent(status, eventDate, project.id, project.path)
+      storeGeneratedEvent(status, eventDate, project.id, project.slug)
 
     def findFullEvent(eventId: CompoundEventId) = {
       val maybeEvent     = findEvent(eventId)

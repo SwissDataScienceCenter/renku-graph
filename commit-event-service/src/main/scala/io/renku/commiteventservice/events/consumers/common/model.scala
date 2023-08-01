@@ -22,13 +22,13 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{New, Skipped}
 import io.renku.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.persons.Email
-import io.renku.graph.model.projects.{GitLabId, Path, Visibility}
+import io.renku.graph.model.projects.{GitLabId, Slug, Visibility}
 import io.renku.graph.model.{persons, projects}
 
 private[consumers] final case class ProjectInfo(
     id:         GitLabId,
     visibility: Visibility,
-    path:       Path
+    slug:       Slug
 )
 
 private[consumers] final case class Commit(id: CommitId, project: Project)

@@ -83,7 +83,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
       .flatMapResult {
         case Completion.Update(1) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(TransformingTriples -> -1, TriplesStore -> 1))
+            .ForProjects(event.project.slug, Map(TransformingTriples -> -1, TriplesStore -> 1))
             .pure[F]
         case Completion.Update(0) => Monoid[DBUpdateResults.ForProjects].empty.pure[F]
         case completion =>
@@ -158,7 +158,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
             .mapResult { oldStatuses =>
               val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
               val incrementedStatuses = TriplesStore -> oldStatuses.size
-              DBUpdateResults.ForProjects(event.project.path, decrementedStatuses + incrementedStatuses)
+              DBUpdateResults.ForProjects(event.project.slug, decrementedStatuses + incrementedStatuses)
             }
         }
     }

@@ -26,7 +26,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.projects
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import org.scalatest.EitherValues
 
 class ProjectViewingDeletionSpec extends AnyWordSpec with should.Matchers with EitherValues {
@@ -44,10 +44,10 @@ class ProjectViewingDeletionSpec extends AnyWordSpec with should.Matchers with E
       json"""{
         "categoryName": "PROJECT_VIEWING_DELETION",
         "project": {
-          "path": "project/path"
+          "slug": "project/path"
         }
       }""".hcursor.as[ProjectViewingDeletion].value shouldBe
-        ProjectViewingDeletion(projects.Path("project/path"))
+        ProjectViewingDeletion(projects.Slug("project/path"))
     }
 
     "fail if categoryName does not match" in {
@@ -56,7 +56,7 @@ class ProjectViewingDeletionSpec extends AnyWordSpec with should.Matchers with E
       val result = json"""{
         "categoryName": $otherCategory,
         "project": {
-          "path": ${projectPaths.generateOne}
+          "slug": ${projectSlugs.generateOne}
         }
       }""".hcursor.as[ProjectViewingDeletion]
 

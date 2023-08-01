@@ -74,33 +74,33 @@ private class MigrationToV10[F[_]: Async: Logger](
         .evalMap(_ => nextProjectsPage())
         .takeThrough(_.nonEmpty)
         .flatMap(in => Stream.emits(in))
-        .evalMap(path => findProgressInfo.map(path -> _))
-        .evalTap { case (path, info) => logInfo(show"processing project '$path'; waiting for free resources", info) }
+        .evalMap(slug => findProgressInfo.map(slug -> _))
+        .evalTap { case (slug, info) => logInfo(show"processing project '$slug'; waiting for free resources", info) }
         .evalTap(_ => envReadyToTakeEvent)
-        .evalTap { case (path, info) => logInfo(show"sending $cleanUpEventCategory event for '$path'", info) }
+        .evalTap { case (slug, info) => logInfo(show"sending $cleanUpEventCategory event for '$slug'", info) }
         .evalTap(sendCleanUpEvent)
-        .evalTap { case (path, _) => noteDone(path) }
-        .evalTap { case (path, info) => logInfo(show"event sent for '$path'", info) }
+        .evalTap { case (slug, _) => noteDone(slug) }
+        .evalTap { case (slug, info) => logInfo(show"event sent for '$slug'", info) }
         .compile
         .drain
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError[F, Unit])
   }
 
-  private lazy val sendCleanUpEvent: ((projects.Path, String)) => F[Unit] = { case (path, _) =>
-    val (payload, ctx) = toCleanUpEvent(path)
+  private lazy val sendCleanUpEvent: ((projects.Slug, String)) => F[Unit] = { case (slug, _) =>
+    val (payload, ctx) = toCleanUpEvent(slug)
     sendEvent(payload, ctx)
   }
 
-  private def toCleanUpEvent(path: projects.Path): (EventRequestContent.NoPayload, EventSender.EventContext) =
+  private def toCleanUpEvent(slug: projects.Slug): (EventRequestContent.NoPayload, EventSender.EventContext) =
     EventRequestContent.NoPayload {
       json"""{
         "categoryName": $cleanUpEventCategory,
         "project": {
-          "path": $path
+          "slug": $slug
         }
       }"""
-    } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $path")
+    } -> EventSender.EventContext(cleanUpEventCategory, show"$categoryName: $name cannot send event for $slug")
 
   private def logInfo(message: String, progressInfo: String): F[Unit] =
     Logger[F].info(show"${MigrationToV10.name} - $progressInfo - $message")

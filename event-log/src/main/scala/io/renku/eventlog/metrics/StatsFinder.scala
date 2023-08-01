@@ -32,7 +32,7 @@ import io.renku.eventlog.events.producers._
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventDate, EventStatus, LastSyncedDate}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -45,7 +45,7 @@ trait StatsFinder[F[_]] {
 
   def statuses(): F[Map[EventStatus, Long]]
 
-  def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Path, Long]]
+  def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Slug, Long]]
 }
 
 class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
@@ -198,9 +198,9 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
 
   override def countEvents(statuses:   Set[EventStatus],
                            maybeLimit: Option[Int Refined Positive] = None
-  ): F[Map[Path, Long]] =
+  ): F[Map[Slug, Long]] =
     NonEmptyList.fromList(statuses.toList) match {
-      case None => Map.empty[Path, Long].pure[F]
+      case None => Map.empty[Slug, Long].pure[F]
       case Some(statusesList) =>
         SessionResource[F].useK {
           measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
@@ -217,7 +217,7 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
 
   private def prepareQuery(statuses: NonEmptyList[EventStatus]) =
     SqlStatement(name = "projects events count")
-      .select[Void, Path ~ Long](sql"""SELECT
+      .select[Void, Slug ~ Long](sql"""SELECT
                                       project_path,
                                       (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (#${statuses.toSql})) AS count
                                       FROM project prj
@@ -226,13 +226,13 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
                                               FROM event evt
                                               WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                                             )
-              """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) })
+              """.query(projectSlugDecoder ~ int8).map { case slug ~ count => (slug, count) })
       .arguments(Void)
       .build(_.toList)
 
   private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) =
     SqlStatement(name = "projects events count limit")
-      .select[Int, (Path, Long)](
+      .select[Int, (Slug, Long)](
         sql"""
       SELECT
         project_path,
@@ -247,8 +247,8 @@ class StatsFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
             )
       LIMIT $int4;
       """
-          .query(projectPathDecoder ~ int8)
-          .map { case projectPath ~ count => (projectPath, count) }
+          .query(projectSlugDecoder ~ int8)
+          .map { case projectSlug ~ count => (projectSlug, count) }
       )
       .arguments(limit)
       .build(_.toList)

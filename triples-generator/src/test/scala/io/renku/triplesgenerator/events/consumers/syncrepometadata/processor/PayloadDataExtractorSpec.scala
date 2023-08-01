@@ -51,9 +51,9 @@ class PayloadDataExtractorSpec
       val ioPayload        = eventPayloads[IO](cliProjectJsonLD.toJson.noSpaces).map(_.generateOne)
 
       (ioPayload >>=
-        (extractor.extractPayloadData(testProject.path, _)))
+        (extractor.extractPayloadData(testProject.slug, _)))
         .asserting(
-          _.value shouldBe DataExtract.Payload(testProject.path,
+          _.value shouldBe DataExtract.Payload(testProject.slug,
                                                testProject.name,
                                                testProject.maybeDescription,
                                                testProject.keywords,
@@ -73,7 +73,7 @@ class PayloadDataExtractorSpec
         .map(ba => ByteVector(ba.toVector))
         .generateAs(EventPayload.apply)
 
-    extractor.extractPayloadData(projectPaths.generateOne, zippedPayload).asserting(_ shouldBe None) >>
+    extractor.extractPayloadData(projectSlugs.generateOne, zippedPayload).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("Unzipping"))
   }
 
@@ -83,7 +83,7 @@ class PayloadDataExtractorSpec
 
     val ioPayload = eventPayloads[IO](contentGen = nonEmptyStrings()).map(_.generateOne)
 
-    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
+    (ioPayload >>= (extractor.extractPayloadData(projectSlugs.generateOne, _))).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Error).pure[IO].asserting(_.head.show should include("ParsingFailure"))
   }
 
@@ -93,7 +93,7 @@ class PayloadDataExtractorSpec
 
     val ioPayload = eventPayloads[IO].map(_.generateOne)
 
-    (ioPayload >>= (extractor.extractPayloadData(projectPaths.generateOne, _))).asserting(_ shouldBe None) >>
+    (ioPayload >>= (extractor.extractPayloadData(projectSlugs.generateOne, _))).asserting(_ shouldBe None) >>
       logger.getMessages(TestLogger.Level.Warn).pure[IO].asserting(_.head.show should include("DecodingFailure"))
   }
 

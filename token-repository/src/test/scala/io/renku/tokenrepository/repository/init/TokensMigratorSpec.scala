@@ -30,7 +30,7 @@ import deletion.PersistedTokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.ProjectAccessToken
@@ -82,7 +82,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val (projectTokenEncrypted, creationInfo) =
         givenSuccessfulTokenReplacement(oldTokenProject, oldTokenEncrypted)
 
-      val oldTokenProject1   = Project(projectIds.generateOne, projectPaths.generateOne)
+      val oldTokenProject1   = Project(projectIds.generateOne, projectSlugs.generateOne)
       val oldTokenEncrypted1 = encryptedAccessTokens.generateOne
       insertNonMigrated(oldTokenProject1, oldTokenEncrypted1)
       val (projectTokenEncrypted1, creationInfo1) =
@@ -221,10 +221,10 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
   private trait TestCase {
 
-    val validTokenProject   = Project(projectIds.generateOne, projectPaths.generateOne)
+    val validTokenProject   = Project(projectIds.generateOne, projectSlugs.generateOne)
     val validTokenEncrypted = encryptedAccessTokens.generateOne
 
-    val oldTokenProject   = Project(projectIds.generateOne, projectPaths.generateOne)
+    val oldTokenProject   = Project(projectIds.generateOne, projectSlugs.generateOne)
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -255,13 +255,13 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def insertNonMigrated(project: Project, encryptedToken: EncryptedAccessToken) = execute[Unit] {
       Kleisli[IO, Session[IO], Unit] { session =>
-        val command: Command[projects.GitLabId *: projects.Path *: EncryptedAccessToken *: EmptyTuple] =
+        val command: Command[projects.GitLabId *: projects.Slug *: EncryptedAccessToken *: EmptyTuple] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)""".command
+          VALUES ($projectIdEncoder, $projectSlugEncoder, $encryptedAccessTokenEncoder)""".command
         session
           .prepare(command)
-          .flatMap(_.execute(project.id *: project.path *: encryptedToken *: EmptyTuple))
+          .flatMap(_.execute(project.id *: project.slug *: encryptedToken *: EmptyTuple))
           .void
       }
     }

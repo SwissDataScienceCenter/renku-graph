@@ -27,20 +27,20 @@ class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
   "FullCommitSyncEvent.toString" should {
 
-    "print out the event id, project id and path along with the last sync date" in {
+    "print out the event id, project id and slug along with the last sync date" in {
       val event = fullCommitSyncEvents.generateOne
       event.toString shouldBe s"id = ${event.id}, " +
         s"projectId = ${event.project.id}, " +
-        s"projectPath = ${event.project.path}, " +
+        s"projectSlug = ${event.project.slug}, " +
         s"lastSynced = ${event.lastSynced}"
     }
   }
 
   "MinimalCommitSyncEvent.toString" should {
 
-    "print out the event id, project id and path along with the last sync date" in {
+    "print out the event id, project id and slug along with the last sync date" in {
       val event = minimalCommitSyncEvents.generateOne
-      event.toString shouldBe s"projectId = ${event.project.id}, projectPath = ${event.project.path}"
+      event.toString shouldBe s"projectId = ${event.project.id}, projectSlug = ${event.project.slug}"
     }
   }
 }

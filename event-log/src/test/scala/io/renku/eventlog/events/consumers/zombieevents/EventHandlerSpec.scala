@@ -22,7 +22,7 @@ package zombieevents
 import cats.effect.IO
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
+import io.circe.{DecodingFailure, Encoder, Json}
 import io.renku.eventlog.metrics.TestEventStatusGauges._
 import io.renku.eventlog.metrics.{EventStatusGauges, TestEventStatusGauges}
 import io.renku.events.EventRequestContent
@@ -35,33 +35,28 @@ import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventHandlerSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with Eventually
-    with IntegrationPatience {
+class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with EitherValues {
 
   "createHandlingDefinition.decode" should {
     s"decode a valid event successfully" in new TestCase {
       val definition = handler.createHandlingDefinition()
       val eventData  = events.generateOne
-      definition.decode(EventRequestContent(eventData.asJson)) shouldBe Right(eventData)
+      definition.decode(EventRequestContent(eventData.asJson)).value shouldBe eventData
     }
 
     "fail on invalid event data" in new TestCase {
       val definition = handler.createHandlingDefinition()
       val eventData  = Json.obj("invalid" -> true.asJson)
-      definition.decode(EventRequestContent(eventData)).isLeft shouldBe true
+      definition.decode(EventRequestContent(eventData)).left.value shouldBe a[DecodingFailure]
     }
   }
 
   "createHandlingDefinition.process" should {
+
     "call to zombieStatusCleaner and update gauges on Updated result" in new TestCase {
       val definition = handler.createHandlingDefinition()
       (zombieStatusCleaner.cleanZombieStatus _).expects(*).returning(IO.pure(Updated))
@@ -74,8 +69,8 @@ class EventHandlerSpec
         case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 1d
-      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe -1d
+      incGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 1d
+      decGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe -1d
     }
 
     "call to zombieStatusCleaner and don't update gauges on NotUpdated result" in new TestCase {
@@ -90,8 +85,8 @@ class EventHandlerSpec
         case EventStatus.Deleting            => gauges.awaitingDeletion       -> gauges.underDeletion
       }
 
-      incGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
-      decGauge.getValue(event.projectPath).unsafeRunSync() shouldBe 0d
+      incGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 0d
+      decGauge.getValue(event.projectSlug).unsafeRunSync() shouldBe 0d
     }
   }
 
@@ -112,19 +107,19 @@ class EventHandlerSpec
 
     val events: Gen[ZombieEvent] = for {
       eventId     <- compoundEventIds
-      projectPath <- projectPaths
+      projectSlug <- projectSlugs
       status      <- processingStatuses
-    } yield ZombieEvent(eventId, projectPath, status)
+    } yield ZombieEvent(eventId, projectSlug, status)
 
     implicit val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
       json"""{
         "categoryName": "ZOMBIE_CHASING",
-        "id": ${event.eventId.id.value},
+        "id": ${event.eventId.id},
         "project": {
-          "id":   ${event.eventId.projectId.value},
-          "path": ${event.projectPath.value}
-       },
-        "status": ${event.status.value}
+          "id":   ${event.eventId.projectId},
+          "slug": ${event.projectSlug}
+        },
+        "status": ${event.status}
       }"""
     }
   }

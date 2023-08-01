@@ -20,26 +20,26 @@ package io.renku.graph.http.server
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathBinderSpec extends AnyWordSpec with should.Matchers {
+class ProjectSlugBinderSpec extends AnyWordSpec with should.Matchers {
 
   import binders._
 
   "unapply" should {
 
-    "convert valid project path as string to a ProjectPath" in {
-      val projectPath = projectPaths.generateOne
+    "convert valid project slug as string to a ProjectSlug" in {
+      val projectSlug = projectSlugs.generateOne
 
-      val Some(result) = ProjectPath.unapply(projectPath.value)
+      val Some(result) = ProjectSlug.unapply(projectSlug.value)
 
-      result shouldBe projectPath
+      result shouldBe projectSlug
     }
 
-    "return None if string value cannot be converted to a ProjectPath" in {
-      ProjectPath.unapply(blankStrings().generateOne) shouldBe None
+    "return None if string value cannot be converted to a project.Slug" in {
+      ProjectSlug.unapply(blankStrings().generateOne) shouldBe None
     }
   }
 }

@@ -7,7 +7,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                        | Description                                                                |
 |--------|---------------------------------------------|----------------------------------------------------------------------------|
 | GET    | ```/events```                               | Returns info about events                                                  |
-| GET    | ```/events/:event-id/:project-path```       | Returns info about event with the given `id` and `project-path`            |
+| GET    | ```/events/:event-id/:project-slug```       | Returns info about event with the given `id` and `project-slug`            |
 | GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
 | POST   | ```/events```                               | Sends an event for processing                                              |
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
@@ -26,7 +26,7 @@ Returns information about the selected events.
 | Query Parameter | Mandatory | Default        | Description                                                                       |
 |-----------------|-----------|----------------|-----------------------------------------------------------------------------------|
 | project-id      | No        | -              | Project id                                                                        |
-| project-path    | No        | -              | Url-encoded non-blank project path                                                |
+| project-slug    | No        | -              | Url-encoded non-blank project path                                                |
 | status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                            |
 | since           | No        | -              | To find events after or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
 | until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
@@ -36,7 +36,7 @@ Returns information about the selected events.
 
 NOTES:
 
-* at least `project-id`, `project-path` or `status` query parameter has to be given.
+* at least `project-id`, `project-slug` or `status` query parameter has to be given.
 * the returned events are sorted by the `event_date`.
 
 **Response**
@@ -67,7 +67,7 @@ Response body example:
     "id":      "df654c3b1bd105a29d658f78f6380a842feac878",
     "project":         {
       "id":   1234,
-      "path": "namespace2/project-name"
+      "slug": "namespace2/project-name"
     },
     "status":  "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure",
@@ -108,7 +108,7 @@ Response body example:
 }
 ```
 
-### GET /events/:event-id/:project-path/payload`
+### GET /events/:event-id/:project-slug/payload`
 
 Finds event's payload.
 
@@ -145,7 +145,7 @@ In the case of a *NEW* event
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   123,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "date":      "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
@@ -162,7 +162,7 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   123,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "date":      "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
@@ -193,7 +193,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -211,7 +211,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "message":   "<failure message>",
   "newStatus": <failure status>
@@ -231,7 +231,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -247,7 +247,7 @@ payload needed for processing.
   "categoryName": "EVENTS_STATUS_CHANGE",
   "subCategory":  "RedoProjectTransformation",
   "project": {
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -265,7 +265,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -283,7 +283,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "processingTime": "PT2.023S"
 }
@@ -304,7 +304,7 @@ payload needed for processing.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "processingTime": "PT2.023S"
 }
@@ -322,7 +322,7 @@ payload needed for processing.
   "subCategory": "ProjectEventsToNew",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -339,7 +339,7 @@ payload needed for processing.
   "subCategory":  "RollbackToAwaitingDeletion",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -371,7 +371,7 @@ Changes the status of a zombie event.
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
 }
@@ -405,9 +405,9 @@ Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILUR
 
 - **CLEAN_UP_REQUEST**
 
-Enqueues a `CLEAN_UP` event for the project with the given `id` and `path`. The `CLEAN_UP` event performs re-provisioning process for a project in the Triples Store.
+Enqueues a `CLEAN_UP` event for the project with the given `id` and `slug`. The `CLEAN_UP` event performs re-provisioning process for a project in the Triples Store.
 
-**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `path`. If there's no project with the given `path`, no `CLEAN_UP` event will be created. 
+**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `slug`. If there's no project with the given `slug`, no `CLEAN_UP` event will be created. 
 
 **Multipart Request**
 
@@ -418,7 +418,7 @@ Enqueues a `CLEAN_UP` event for the project with the given `id` and `path`. The 
   "categoryName": "CLEAN_UP_REQUEST",
   "project": {
     "id":   123  // optional,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -436,7 +436,7 @@ Forces issuing a commit sync event for the given project
   "categoryName": "COMMIT_SYNC_REQUEST",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -454,7 +454,7 @@ Forces issuing a GLOBAL_COMMIT_SYNC event for the given project.
   "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -472,7 +472,7 @@ Checks if the data stored for the project in EL matches the data in GitLab. If n
   "categoryName": "PROJECT_SYNC",
   "project": {
     "id":   12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -615,7 +615,7 @@ All events are sent as multipart requests
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -651,7 +651,7 @@ All events are sent as multipart requests
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -680,7 +680,7 @@ All events are sent as multipart requests
   "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id":   12,
-    "path": "project/path"
+    "slug": "project/path"
   },
   "lastSynced": "2001-09-04T11:00:00.000Z"
 }
@@ -693,7 +693,7 @@ or
   "categoryName": "COMMIT_SYNC",
   "project": {
     "id":   12,
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -721,7 +721,7 @@ or
   "categoryName": "GLOBAL_COMMIT_SYNC",
   "project": {
     "id":   12,
-    "path": "project/path"
+    "slug": "project/path"
   },
   "commits": {
     "count":  100,
@@ -755,7 +755,7 @@ Events of the type are issued for all the projects with the frequency of 1 per 2
   "categoryName": "PROJECT_SYNC",
   "project": {
     "id":   12,
-    "path": "project/path"
+    "slug": "project/path"
   }
 }
 ```
@@ -785,7 +785,7 @@ Events of the type are issued for all the projects that have no events in the `T
   "categoryName": "ADD_MIN_PROJECT_INFO",
   "project": {
     "id":   1,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   }
 }
 ```
@@ -814,7 +814,7 @@ Events of the type are issued for all the projects that have no events in the `T
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 12,
-    "path": "namespace/project-name"
+    "slug": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
 }

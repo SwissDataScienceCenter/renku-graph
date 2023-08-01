@@ -62,7 +62,7 @@ object ProjectQuery extends (Criteria => Option[SparqlQuery]) {
                |    Graph ?projectId {
                |      ?projectId a schema:Project;
                |               schema:name ${v.projectName};
-               |               renku:projectPath ${v.projectPath};
+               |               renku:projectPath ${v.projectSlug};
                |               renku:projectVisibility ${v.visibility};
                |               schema:dateModified ${v.dateModified};
                |               schema:dateCreated ${v.dateCreated}.

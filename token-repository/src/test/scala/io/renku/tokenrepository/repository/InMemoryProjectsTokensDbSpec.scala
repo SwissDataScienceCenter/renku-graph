@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.db.DbSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.init.DbMigrations
@@ -52,7 +52,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
   }
 
   protected def insert(projectId:      GitLabId,
-                       projectPath:    Path,
+                       projectSlug:    Slug,
                        encryptedToken: EncryptedAccessToken,
                        expiryDate:     ExpiryDate = localDates(min = LocalDate.now().plusDays(1)).generateAs(ExpiryDate)
   ): Unit = execute {
@@ -66,7 +66,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
         .flatMap(
           _.execute(
             projectId.value *:
-              projectPath.value *:
+              projectSlug.value *:
               encryptedToken.value *:
               OffsetDateTime.now() *:
               expiryDate.value *:
@@ -100,11 +100,11 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     case c                    => fail(s"deletion problem: $c")
   }
 
-  protected def findToken(projectPath: Path): Option[String] = sessionResource
+  protected def findToken(projectSlug: Slug): Option[String] = sessionResource
     .useK {
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
-      Kleisli(_.prepare(query).flatMap(_.option(projectPath.value)))
+      Kleisli(_.prepare(query).flatMap(_.option(projectSlug.value)))
     }
     .unsafeRunSync()
 

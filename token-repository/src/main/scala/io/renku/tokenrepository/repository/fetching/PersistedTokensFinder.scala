@@ -22,7 +22,7 @@ import cats.data.OptionT
 import cats.effect._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.graph.model.projects.{GitLabId, Path}
+import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
@@ -31,7 +31,7 @@ import skunk.implicits._
 
 private[repository] trait PersistedTokensFinder[F[_]] {
   def findStoredToken(projectId:   GitLabId): OptionT[F, EncryptedAccessToken]
-  def findStoredToken(projectPath: Path):     OptionT[F, EncryptedAccessToken]
+  def findStoredToken(projectSlug: Slug):     OptionT[F, EncryptedAccessToken]
 }
 
 private[repository] object PersistedTokensFinder {
@@ -55,13 +55,13 @@ private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource:
       .build(_.option)
   }
 
-  override def findStoredToken(projectPath: Path): OptionT[F, EncryptedAccessToken] = run {
-    SqlStatement(name = "find token - path")
-      .select[Path, EncryptedAccessToken](
-        sql"select token from projects_tokens where project_path = $projectPathEncoder"
+  override def findStoredToken(projectSlug: Slug): OptionT[F, EncryptedAccessToken] = run {
+    SqlStatement(name = "find token - slug")
+      .select[Slug, EncryptedAccessToken](
+        sql"select token from projects_tokens where project_path = $projectSlugEncoder"
           .query(encryptedAccessTokenDecoder)
       )
-      .arguments(projectPath)
+      .arguments(projectSlug)
       .build(_.option)
   }
 

@@ -48,7 +48,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
           "id":           ${event.id.id},
           "project": {
             "id":   ${event.id.projectId},
-            "path": ${event.projectPath}
+            "slug": ${event.projectSlug}
           },
           "subCategory": "RollbackToNew"
         }"""
@@ -68,7 +68,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "id":           ${event.id.id},
         "project": {
           "id":   ${event.id.projectId},
-          "path": ${event.projectPath}
+          "slug": ${event.projectSlug}
         },
         "subCategory": "ToFailure",
         "message" : ${EventMessage(exception)},

@@ -27,7 +27,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.{persons, projects}
-import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds, projectPaths, projectViewedDates}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{personEmails, personGitLabIds, projectSlugs, projectViewedDates}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -49,10 +49,10 @@ class ProjectViewedEventSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val path = projectPaths.generateOne
+      val slug = projectSlugs.generateOne
 
-      ProjectViewedEvent.forProject(path, now) shouldBe
-        ProjectViewedEvent(path, currentTime, maybeUserId = None)
+      ProjectViewedEvent.forProject(slug, now) shouldBe
+        ProjectViewedEvent(slug, currentTime, maybeUserId = None)
     }
   }
 
@@ -64,11 +64,11 @@ class ProjectViewedEventSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val path     = projectPaths.generateOne
+      val slug     = projectSlugs.generateOne
       val userGLId = personGitLabIds.generateSome
 
-      ProjectViewedEvent.forProjectAndUserId(path, userGLId, now) shouldBe
-        ProjectViewedEvent(path, currentTime, userGLId.map(UserId(_)))
+      ProjectViewedEvent.forProjectAndUserId(slug, userGLId, now) shouldBe
+        ProjectViewedEvent(slug, currentTime, userGLId.map(UserId(_)))
     }
   }
 
@@ -80,11 +80,11 @@ class ProjectViewedEventSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val path      = projectPaths.generateOne
+      val slug      = projectSlugs.generateOne
       val userEmail = personEmails.generateOne
 
-      ProjectViewedEvent.forProjectAndUserEmail(path, userEmail, now) shouldBe
-        ProjectViewedEvent(path, currentTime, UserId(userEmail).some)
+      ProjectViewedEvent.forProjectAndUserEmail(slug, userEmail, now) shouldBe
+        ProjectViewedEvent(slug, currentTime, UserId(userEmail).some)
     }
   }
 
@@ -100,14 +100,14 @@ class ProjectViewedEventSpec
       json"""{
         "categoryName": "PROJECT_VIEWED",
         "project": {
-          "path": "project/path"
+          "slug": "project/path"
         },
         "date": "1988-11-04T00:00:00.000Z",
         "user": {
           "id": 123
         }
       }""".hcursor.as[ProjectViewedEvent].value shouldBe ProjectViewedEvent(
-        projects.Path("project/path"),
+        projects.Slug("project/path"),
         projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
         maybeUserId = Some(UserId(persons.GitLabId(123)))
       )
@@ -117,14 +117,14 @@ class ProjectViewedEventSpec
       json"""{
         "categoryName": "PROJECT_VIEWED",
         "project": {
-          "path": "project/path"
+          "slug": "project/path"
         },
         "date": "1988-11-04T00:00:00.000Z",
         "user": {
           "email": "a@a.com"
         }
       }""".hcursor.as[ProjectViewedEvent].value shouldBe ProjectViewedEvent(
-        projects.Path("project/path"),
+        projects.Slug("project/path"),
         projects.DateViewed(Instant.parse("1988-11-04T00:00:00.000Z")),
         maybeUserId = Some(UserId(persons.Email("a@a.com")))
       )
@@ -136,7 +136,7 @@ class ProjectViewedEventSpec
       val result = json"""{
         "categoryName": $otherCategory,
         "project": {
-          "path": ${projectPaths.generateOne}
+          "slug": ${projectSlugs.generateOne}
         },
         "date": ${projectViewedDates().generateOne}
       }""".hcursor.as[ProjectViewedEvent]
@@ -147,12 +147,12 @@ class ProjectViewedEventSpec
 
   "show" should {
 
-    "return String info with path and the date" in {
+    "return String info with slug and the date" in {
 
       val event = projectViewedEvents.generateOne
 
       val userShow = event.maybeUserId.map(u => show", user = $u").getOrElse("")
-      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateViewed}$userShow"
+      event.show shouldBe show"projectSlug = ${event.slug}, date = ${event.dateViewed}$userShow"
     }
   }
 }

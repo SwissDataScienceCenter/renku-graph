@@ -84,13 +84,13 @@ class DatasetsResourcesSpec
       `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
-      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
+      val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.slug}/datasets"
 
       Then("he should get OK response with project's datasets")
       projectDatasetsResponse.status shouldBe Ok
       val foundDatasets = projectDatasetsResponse.jsonBody.as[List[Json]].value
-      foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.path),
-                                                          briefJson(dataset2Modified, dataset2, project.path)
+      foundDatasets should contain theSameElementsAs List(briefJson(dataset1, project.slug),
+                                                          briefJson(dataset2Modified, dataset2, project.slug)
       )
 
       When("user then fetches details of the chosen dataset with the link from the response")
@@ -202,7 +202,7 @@ class DatasetsResourcesSpec
       When("there's an authenticated user who is not a member of the project")
       And("he fetches project's details")
       val response =
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${privateProject.path}/datasets", user.accessToken)
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${privateProject.slug}/datasets", user.accessToken)
 
       Then("he should get NOT_FOUND response")
       response.status shouldBe NotFound
@@ -278,15 +278,15 @@ class DatasetsResourcesSpec
       val foundDatasets = dsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should {
         contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasets),
-          searchResultJson(dataset2, 1, project2.path, foundDatasets),
-          searchResultJson(dataset3, 1, project3.path, foundDatasets),
-          searchResultJson(dataset4, 2, project4.path, foundDatasets)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
+          searchResultJson(dataset4, 2, project4.slug, foundDatasets)
         ) or contain theSameElementsAs List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasets),
-          searchResultJson(dataset2, 1, project2.path, foundDatasets),
-          searchResultJson(dataset3, 1, project3.path, foundDatasets),
-          searchResultJson(dataset4, 2, project4Fork.path, foundDatasets)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasets),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasets),
+          searchResultJson(dataset4, 2, project4Fork.slug, foundDatasets)
         )
       }
 
@@ -298,21 +298,21 @@ class DatasetsResourcesSpec
       searchSortedByName.status shouldBe Ok
 
       val foundDatasetsSortedByName = searchSortedByName.jsonBody.as[List[Json]].value
-      val datasetsSortedByNameProj4Path = List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
+      val datasetsSortedByNameProj4Slug = List(
+        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4.slug, foundDatasetsSortedByName)
       ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
-      val datasetsSortedByNameProj4ForkPath = List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
-        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
-        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
-        searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsSortedByName)
+      val datasetsSortedByNameProj4ForkSlug = List(
+        searchResultJson(dataset1, 1, project1.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.slug, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsSortedByName)
       ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
       foundDatasetsSortedByName should {
-        be(datasetsSortedByNameProj4Path) or be(datasetsSortedByNameProj4ForkPath)
+        be(datasetsSortedByNameProj4Slug) or be(datasetsSortedByNameProj4ForkSlug)
       }
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
@@ -322,8 +322,8 @@ class DatasetsResourcesSpec
       Then("he should get OK response with the dataset from the requested page")
       val foundDatasetsPage = searchForPage.jsonBody.as[List[Json]].value
       foundDatasetsPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1))
+        contain theSameElementsAs List(datasetsSortedByNameProj4Slug(1)) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug(1))
       }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
@@ -333,18 +333,18 @@ class DatasetsResourcesSpec
       val foundDatasetsWithoutPhrase = searchWithoutPhrase.jsonBody.as[List[Json]].value
       foundDatasetsWithoutPhrase should {
         contain allElementsOf List(
-          searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
-          searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+          searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset4, 2, project4.slug, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
         ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
           contain allElementsOf List(
-            searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsWithoutPhrase),
-            searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+            searchResultJson(dataset1, 1, project1.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset2, 1, project2.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset3, 1, project3.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset4, 2, project4Fork.slug, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset5WithoutText, 1, project5.slug, foundDatasetsWithoutPhrase)
           ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       }
 
@@ -355,8 +355,8 @@ class DatasetsResourcesSpec
       Then("he should get OK response with the datasets from the first page")
       val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
       foundFirstPage should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path.head) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath.head)
+        contain theSameElementsAs List(datasetsSortedByNameProj4Slug.head) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkSlug.head)
       }
 
       When("user uses 'details' link of one of the found datasets")
@@ -427,8 +427,8 @@ class DatasetsResourcesSpec
 
       val foundDatasets = datasetsSearchResponse.jsonBody.as[List[Json]].value
       foundDatasets should contain theSameElementsAs List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasets),
-        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)
+        searchResultJson(dataset1, 1, project1.slug, foundDatasets),
+        searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.slug, foundDatasets)
       )
     }
 

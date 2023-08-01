@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.membersync
 
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -29,12 +29,12 @@ class MemberSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
   "encodeEvent" should {
 
     "serialize MemberSyncEvent to Json" in {
-      val event = MemberSyncEvent(projectPaths.generateOne)
+      val event = MemberSyncEvent(projectSlugs.generateOne)
 
       MemberSyncEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "MEMBER_SYNC",
         "project": {
-          "path":       ${event.projectPath.value}
+          "slug": ${event.projectSlug}
         }
       }"""
     }

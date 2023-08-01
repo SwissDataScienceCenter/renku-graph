@@ -104,7 +104,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
   )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] =
     (
       fetch(maybeNextGLPage, fetchGitLabCommits(event.project.id, dateCondition, _)),
-      fetch(maybeNextELPage, fetchELCommits(event.project.path, dateCondition, _))
+      fetch(maybeNextELPage, fetchELCommits(event.project.slug, dateCondition, _))
     ).parMapN { case (glCommitsPage, elCommitsPage) =>
       addNextPage(dateCondition, update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
     }.flatten

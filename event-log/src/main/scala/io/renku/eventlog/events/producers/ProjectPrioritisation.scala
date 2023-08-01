@@ -69,8 +69,8 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
   private lazy val findPrioritiesBasedOnLatestEventDate
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {
     case Nil => Nil
-    case ProjectInfo(projectId, projectPath, _, currentOccupancy) :: Nil =>
-      List((ProjectIds(projectId, projectPath), MaxPriority, currentOccupancy))
+    case ProjectInfo(projectId, projectSlug, _, currentOccupancy) :: Nil =>
+      List((ProjectIds(projectId, projectSlug), MaxPriority, currentOccupancy))
     case projects =>
       val ProjectInfo(_, _, latestEventDate, _) = projects.head
       val ProjectInfo(_, _, oldestEventDate, _) = projects.last
@@ -83,8 +83,8 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
             BigDecimal(oldestEventDate.distance(from = eventDate).toDouble) / maxDistance
           )
       }
-      projects.map { case ProjectInfo(projectId, projectPath, eventDate, currentOccupancy) =>
-        (ProjectIds(projectId, projectPath), findPriority(eventDate), currentOccupancy)
+      projects.map { case ProjectInfo(projectId, projectSlug, eventDate, currentOccupancy) =>
+        (ProjectIds(projectId, projectSlug), findPriority(eventDate), currentOccupancy)
       }
   }
 
@@ -127,7 +127,7 @@ private class ProjectPrioritisationImpl[F[_]: DefaultSubscribers] extends Projec
   }
 
   private lazy val alignItemType: ((ProjectIds, BigDecimal)) => (ProjectIds, Priority) = {
-    case (projectIdAndPath, priority) => projectIdAndPath -> Priority.safeApply(priority)
+    case (projectIdAndSlug, priority) => projectIdAndSlug -> Priority.safeApply(priority)
   }
 
   private lazy val toPriority: ((ProjectIds, Priority, Int Refined NonNegative)) => BigDecimal = {
@@ -149,7 +149,7 @@ private object ProjectPrioritisation {
     MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F])
 
   final case class ProjectInfo(id:               projects.GitLabId,
-                               path:             projects.Path,
+                               slug:             projects.Slug,
                                latestEventDate:  EventDate,
                                currentOccupancy: Int Refined NonNegative
   )

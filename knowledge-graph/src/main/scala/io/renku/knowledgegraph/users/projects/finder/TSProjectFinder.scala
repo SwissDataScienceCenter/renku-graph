@@ -54,7 +54,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "user projects by id",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT ?name ?path ?visibility ?dateCreated ?maybeCreatorName 
+    s"""|SELECT ?name ?slug ?visibility ?dateCreated ?maybeCreatorName
         |       (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |       ?maybeDescription 
         |WHERE {
@@ -66,7 +66,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  GRAPH ?projectId {
         |    ?projectId schema:member ?memberId;
         |               a schema:Project;
-        |               renku:projectPath ?path;
+        |               renku:projectPath ?slug;
         |               schema:name ?name;
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?dateCreated.
@@ -81,7 +81,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |    }
         |  }
         |}
-        |GROUP BY ?projectId ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |GROUP BY ?projectId ?name ?slug ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
         |""".stripMargin
   )
 
@@ -130,13 +130,13 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     ResultsDecoder[List, Project.Activated] { implicit cur =>
       for {
         name         <- extract[Name]("name")
-        path         <- extract[Path]("path")
+        slug         <- extract[Slug]("slug")
         visibility   <- extract[Visibility]("visibility")
         dateCreated  <- extract[DateCreated]("dateCreated")
         maybeCreator <- extract[Option[persons.Name]]("maybeCreatorName")
         keywords     <- extract[Option[String]]("keywords").flatMap(toSetOfKeywords)
         maybeDesc    <- extract[Option[Description]]("maybeDescription")
-      } yield Project.Activated(name, path, visibility, dateCreated, maybeCreator, keywords.toList.sorted, maybeDesc)
+      } yield Project.Activated(name, slug, visibility, dateCreated, maybeCreator, keywords.toList.sorted, maybeDesc)
     }
   }
 }

@@ -33,7 +33,7 @@ import io.renku.triplesstore.client.syntax._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectFetcher[F[_]] {
-  def fetchProject(path: projects.Path): F[Option[Project]]
+  def fetchProject(slug: projects.Slug): F[Option[Project]]
 }
 
 private object ProjectFetcher {
@@ -43,19 +43,19 @@ private object ProjectFetcher {
 
 private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends ProjectFetcher[F] {
 
-  override def fetchProject(path: projects.Path): F[Option[Project]] = tsClient.queryExpecting[Option[Project]](
+  override def fetchProject(slug: projects.Slug): F[Option[Project]] = tsClient.queryExpecting[Option[Project]](
     SparqlQuery.ofUnsafe(
       show"${ProvisionProjectsGraph.name} - find projects",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      sparql"""|SELECT DISTINCT ?id ?path ?name ?maybeDesc ?dateCreated ?dateModified
+      sparql"""|SELECT DISTINCT ?id ?slug ?name ?maybeDesc ?dateCreated ?dateModified
                |  ?maybeCreatorId ?maybeCreatorName ?visibility
                |  (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
                |  (GROUP_CONCAT(DISTINCT ?encodedImageUrl; separator=',') AS ?images)
                |WHERE {
-               |  BIND (${path.asObject} AS ?path)
+               |  BIND (${slug.asObject} AS ?slug)
                |  GRAPH ?id {
                |    ?id a schema:Project;
-               |        renku:projectPath ?path;
+               |        renku:projectPath ?slug;
                |        schema:name ?name;
                |        schema:dateCreated ?dateCreated;
                |        renku:projectVisibility ?visibility.
@@ -80,7 +80,7 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
                |    }
                |  }
                |}
-               |GROUP BY ?id ?path ?name ?maybeDesc ?dateCreated ?dateModified ?maybeCreatorId ?maybeCreatorName ?visibility
+               |GROUP BY ?id ?slug ?name ?maybeDesc ?dateCreated ?dateModified ?maybeCreatorId ?maybeCreatorName ?visibility
                |LIMIT 1
                |""".stripMargin
     )
@@ -102,7 +102,7 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
 
     for {
       id               <- extract[projects.ResourceId]("id")
-      path             <- extract[projects.Path]("path")
+      slug             <- extract[projects.Slug]("slug")
       name             <- extract[projects.Name]("name")
       maybeDesc        <- extract[Option[projects.Description]]("maybeDesc")
       dateCreated      <- extract[projects.DateCreated]("dateCreated")
@@ -114,7 +114,7 @@ private class ProjectFetcherImpl[F[_]: Async](tsClient: TSClient[F]) extends Pro
       images           <- extract[Option[String]]("images") >>= toListOfImages(id)
     } yield NonRenkuProject.WithoutParent(
       id,
-      path,
+      slug,
       name,
       maybeDesc,
       dateCreated,

@@ -20,4 +20,4 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import io.renku.graph.model.projects
 
-private final case class ProjectInfo(id: projects.ResourceId, path: projects.Path, dateCreated: projects.DateCreated)
+private final case class ProjectInfo(id: projects.ResourceId, slug: projects.Slug, dateCreated: projects.DateCreated)

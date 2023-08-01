@@ -41,9 +41,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
     )
 
   private lazy val startForceCommitSync: Event => F[Unit] = {
-    case CommitSyncRequest(project @ Project(projectId, projectPath)) =>
+    case CommitSyncRequest(project @ Project(projectId, projectSlug)) =>
       Logger[F].info(show"$categoryName: $project accepted") >>
-        commitSyncForcer.forceCommitSync(projectId, projectPath)
+        commitSyncForcer.forceCommitSync(projectId, projectSlug)
   }
 }
 

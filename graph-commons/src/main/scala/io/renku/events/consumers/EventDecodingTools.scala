@@ -41,14 +41,14 @@ trait EventDecodingTools {
 
     lazy val getEventId: Either[DecodingFailure, CompoundEventId] = json.as[CompoundEventId]
 
-    lazy val getProjectPath: Either[DecodingFailure, projects.Path] =
-      json.hcursor.downField("project").downField("path").as[projects.Path]
+    lazy val getProjectSlug: Either[DecodingFailure, projects.Slug] =
+      json.hcursor.downField("project").downField("slug").as[projects.Slug]
 
     private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
       for {
         projectId   <- cursor.downField("project").downField("id").as[projects.GitLabId]
-        projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      } yield Project(projectId, projectPath)
+        projectSlug <- cursor.downField("project").downField("slug").as[projects.Slug]
+      } yield Project(projectId, projectSlug)
     }
 
     private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>

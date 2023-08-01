@@ -27,7 +27,7 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import GraphModelGenerators.projectPaths
+import GraphModelGenerators.projectSlugs
 import cats.MonadThrow
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings, positiveInts}
 import io.renku.interpreters.TestLogger
@@ -76,12 +76,12 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
 
         givenBacklogCreated()
 
-        val allProjects = projectPaths.generateList(min = pageSize, max = pageSize * 2)
+        val allProjects = projectSlugs.generateList(min = pageSize, max = pageSize * 2)
 
         val projectsPages = allProjects
           .sliding(pageSize, pageSize)
           .toList
-        givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Path])
+        givenProjectsPagesReturned(projectsPages :+ List.empty[projects.Slug])
 
         givenProgressInfoFinding(returning = nonEmptyStrings().generateOne.pure[IO], times = allProjects.size)
 
@@ -102,7 +102,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         val exception = exceptions.generateOne
         (() => projectsFinder.nextProjectsPage())
           .expects()
-          .returning(exception.raiseError[IO, List[projects.Path]])
+          .returning(exception.raiseError[IO, List[projects.Slug]])
 
         migration.migrate().value.unsafeRunSync().left.value shouldBe recoverableError
       }
@@ -154,7 +154,7 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         .expects()
         .returning(().pure[IO])
 
-    def givenProjectsPagesReturned(pages: List[List[projects.Path]]): Unit =
+    def givenProjectsPagesReturned(pages: List[List[projects.Slug]]): Unit =
       pages foreach { page =>
         (projectsFinder.nextProjectsPage _)
           .expects()
@@ -173,30 +173,30 @@ class MigrationToV10Spec extends AnyWordSpec with should.Matchers with IOSpec wi
         .returning(().pure[IO])
         .atLeastOnce()
 
-    def toCleanUpRequestEvent(projectPath: projects.Path) = projectPath -> EventRequestContent.NoPayload {
+    def toCleanUpRequestEvent(projectSlug: projects.Slug) = projectSlug -> EventRequestContent.NoPayload {
       json"""{
         "categoryName": $eventCategoryName,
         "project": {
-          "path": $projectPath
+          "slug": $projectSlug
         }
       }"""
     }
 
-    lazy val verifyEventWasSent: ((projects.Path, EventRequestContent.NoPayload)) => Unit = { case (path, event) =>
+    lazy val verifyEventWasSent: ((projects.Slug, EventRequestContent.NoPayload)) => Unit = { case (slug, event) =>
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(event,
                  EventSender.EventContext(eventCategoryName,
-                                          show"$categoryName: ${migration.name} cannot send event for $path"
+                                          show"$categoryName: ${migration.name} cannot send event for $slug"
                  )
         )
         .returning(().pure[IO])
       ()
     }
 
-    def verifyProjectNotedDone(path: projects.Path) =
+    def verifyProjectNotedDone(slug: projects.Slug) =
       (projectDonePersister.noteDone _)
-        .expects(path)
+        .expects(slug)
         .returning(().pure[IO])
 
     def verifyMigrationExecutionRegistered =

@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
 import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes}
-import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.RenkuTinyTypeGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model.events.EventInfo.ProjectIds
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventId, EventInfo, EventStatus, StatusProcessingTime}
@@ -51,103 +51,103 @@ class LatestPayloadFinderSpec
   it should "fetch id of the latest project event in status TRIPLES_STORE " +
     "and then fetch this event payload" in {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val eventId     = eventIds.generateOne
-      givenEventFinding(projectPath, returning = eventId.some.pure[Try])
+      givenEventFinding(projectSlug, returning = eventId.some.pure[Try])
 
       val maybePayload = Gen.option(EventPayload(ByteVector.fromValidHex("cafebabe"))).generateOne
-      givenPayloadFinding(eventId, projectPath, returning = maybePayload.pure[Try])
+      givenPayloadFinding(eventId, projectSlug, returning = maybePayload.pure[Try])
 
-      finder.fetchLatestPayload(projectPath).success.value shouldBe maybePayload
+      finder.fetchLatestPayload(projectSlug).success.value shouldBe maybePayload
     }
 
   it should "return None if fetching id of the latest project event in status TRIPLES_STORE returns no results" in {
 
-    val projectPath = projectPaths.generateOne
-    givenEventFinding(projectPath, returning = Option.empty.pure[Try])
+    val projectSlug = projectSlugs.generateOne
+    givenEventFinding(projectSlug, returning = Option.empty.pure[Try])
 
-    finder.fetchLatestPayload(projectPath).success.value shouldBe None
+    finder.fetchLatestPayload(projectSlug).success.value shouldBe None
   }
 
   it should "fail if finding eventId fails" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val exception   = exceptions.generateOne
-    givenEventFindingResponding(projectPath, exception.raiseError[Try, Nothing])
+    givenEventFindingResponding(projectSlug, exception.raiseError[Try, Nothing])
 
-    finder.fetchLatestPayload(projectPath).failure.exception shouldBe exception
+    finder.fetchLatestPayload(projectSlug).failure.exception shouldBe exception
   }
 
   it should "fail if finding eventId returns a failure" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val exception   = nonEmptyStrings().generateOne
-    givenEventFindingResponding(projectPath, Result.failure(exception).pure[Try])
+    givenEventFindingResponding(projectSlug, Result.failure(exception).pure[Try])
 
-    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
+    finder.fetchLatestPayload(projectSlug).failure.exception.getMessage shouldBe exception
   }
 
   it should "fail if finding eventId returns unavailable" in {
 
-    val projectPath = projectPaths.generateOne
-    givenEventFindingResponding(projectPath, Result.unavailable.pure[Try])
+    val projectSlug = projectSlugs.generateOne
+    givenEventFindingResponding(projectSlug, Result.unavailable.pure[Try])
 
-    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
+    finder.fetchLatestPayload(projectSlug).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
 
   it should "fail if finding payload fails" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectSlug, returning = eventId.some.pure[Try])
 
     val exception = exceptions.generateOne
-    givenPayloadFinding(eventId, projectPath, returning = exception.raiseError[Try, Nothing])
+    givenPayloadFinding(eventId, projectSlug, returning = exception.raiseError[Try, Nothing])
 
-    finder.fetchLatestPayload(projectPath).failure.exception shouldBe exception
+    finder.fetchLatestPayload(projectSlug).failure.exception shouldBe exception
   }
 
   it should "fail if finding payload returns a failure" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectSlug, returning = eventId.some.pure[Try])
 
     val exception = nonEmptyStrings().generateOne
-    givenPayloadFindingResponding(eventId, projectPath, Result.failure(exception).pure[Try])
+    givenPayloadFindingResponding(eventId, projectSlug, Result.failure(exception).pure[Try])
 
-    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe exception
+    finder.fetchLatestPayload(projectSlug).failure.exception.getMessage shouldBe exception
   }
 
   it should "fail if finding payload returns unavailable" in {
 
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val eventId     = eventIds.generateOne
-    givenEventFinding(projectPath, returning = eventId.some.pure[Try])
+    givenEventFinding(projectSlug, returning = eventId.some.pure[Try])
 
-    givenPayloadFindingResponding(eventId, projectPath, Result.unavailable.pure[Try])
+    givenPayloadFindingResponding(eventId, projectSlug, Result.unavailable.pure[Try])
 
-    finder.fetchLatestPayload(projectPath).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
+    finder.fetchLatestPayload(projectSlug).failure.exception.getMessage shouldBe Result.Unavailable.getMessage
   }
 
   private lazy val elClient = mock[EventLogClient[Try]]
   private lazy val finder   = new LatestPayloadFinderImpl[Try](elClient)
 
-  private def givenEventFinding(path: projects.Path, returning: Try[Option[EventId]]) =
-    givenEventFindingResponding(path, toEventsFindingResult(path, returning))
+  private def givenEventFinding(slug: projects.Slug, returning: Try[Option[EventId]]) =
+    givenEventFindingResponding(slug, toEventsFindingResult(slug, returning))
 
-  private def givenEventFindingResponding(path: projects.Path, response: Try[Result[List[EventInfo]]]) =
+  private def givenEventFindingResponding(slug: projects.Slug, response: Try[Result[List[EventInfo]]]) =
     (elClient.getEvents _)
       .expects(
         SearchCriteria
-          .forProject(path)
+          .forProject(slug)
           .withStatus(TriplesStore)
           .withPerPage(PerPage(1))
           .sortBy(SearchCriteria.Sort.EventDateDesc)
       )
       .returning(response)
 
-  private def toEventsFindingResult(path: projects.Path, returning: Try[Option[EventId]]) =
+  private def toEventsFindingResult(slug: projects.Slug, returning: Try[Option[EventId]]) =
     returning match {
       case Success(Some(eventId)) =>
         val status = EventStatus.TriplesStore
@@ -156,7 +156,7 @@ class LatestPayloadFinderSpec
             List(
               EventInfo(
                 eventId,
-                ProjectIds(projectIds.generateOne, path),
+                ProjectIds(projectIds.generateOne, slug),
                 status,
                 eventDates.generateOne,
                 executionDates.generateOne,
@@ -170,20 +170,20 @@ class LatestPayloadFinderSpec
       case Failure(exception) => exception.raiseError[Try, Result[List[EventInfo]]]
     }
 
-  private def givenPayloadFinding(eventId: EventId, path: projects.Path, returning: Try[Option[EventPayload]]) = {
+  private def givenPayloadFinding(eventId: EventId, slug: projects.Slug, returning: Try[Option[EventPayload]]) = {
 
     val result = returning match {
       case Success(maybePayload) => Result.Success(maybePayload).pure[Try]
       case Failure(exception)    => exception.raiseError[Try, Result[Option[EventPayload]]]
     }
 
-    givenPayloadFindingResponding(eventId, path, result)
+    givenPayloadFindingResponding(eventId, slug, result)
   }
 
   private def givenPayloadFindingResponding(eventId:  EventId,
-                                            path:     projects.Path,
+                                            slug:     projects.Slug,
                                             response: Try[Result[Option[EventPayload]]]
   ) = (elClient.getEventPayload _)
-    .expects(eventId, path)
+    .expects(eventId, slug)
     .returning(response)
 }

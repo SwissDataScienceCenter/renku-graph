@@ -21,15 +21,15 @@ package io.renku.eventlog.events.producers.zombieevents
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, processingStatuses}
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 
 private object Generators {
   lazy val zombieEvents = for {
     eventId     <- compoundEventIds
-    projectPath <- projectPaths
+    projectSlug <- projectSlugs
     eventStatus <- processingStatuses
     processName <- zombieEventProcessNames
-  } yield ZombieEvent(processName, eventId, projectPath, eventStatus)
+  } yield ZombieEvent(processName, eventId, projectSlug, eventStatus)
 
   lazy val zombieEventProcessNames = nonEmptyStrings().toGeneratorOf(ZombieEventProcess)
 }

@@ -45,11 +45,11 @@ class ProjectFetcherSpec
     upload(to = projectsDataset, project)
 
     fetcher
-      .fetchProject(project.path)
+      .fetchProject(project.slug)
       .asserting(
         _.value shouldBe entities.NonRenkuProject.WithoutParent(
           project.resourceId,
-          project.path,
+          project.slug,
           project.name,
           project.maybeDescription,
           project.dateCreated,
@@ -64,7 +64,7 @@ class ProjectFetcherSpec
   }
 
   it should "return no project if one does not exists" in {
-    fetcher.fetchProject(projectPaths.generateOne).asserting(_ shouldBe None)
+    fetcher.fetchProject(projectSlugs.generateOne).asserting(_ shouldBe None)
   }
 
   private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()

@@ -39,19 +39,19 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   def briefJson(dataset:     Dataset[Dataset.Provenance.Modified],
                 originalDs:  Dataset[Dataset.Provenance],
-                projectPath: projects.Path
+                projectSlug: projects.Slug
   )(implicit
-      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Path)]
-  ): Json = encoder((dataset, Some(originalDs), projectPath))
+      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Slug)]
+  ): Json = encoder((dataset, Some(originalDs), projectSlug))
 
-  def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
-      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Path)]
-  ): Json = encoder((dataset, Option.empty, projectPath))
+  def briefJson(dataset: Dataset[Dataset.Provenance], projectSlug: projects.Slug)(implicit
+      encoder: Encoder[(Dataset[Dataset.Provenance], Option[Dataset[Dataset.Provenance]], projects.Slug)]
+  ): Json = encoder((dataset, Option.empty, projectSlug))
 
   implicit def datasetEncoder[P <: Dataset.Provenance](implicit
       provenanceEncoder: Encoder[P]
-  ): Encoder[(Dataset[P], Option[Dataset[Dataset.Provenance]], projects.Path)] = Encoder.instance {
-    case (dataset, maybeOriginalDs, projectPath) =>
+  ): Encoder[(Dataset[P], Option[Dataset[Dataset.Provenance]], projects.Slug)] = Encoder.instance {
+    case (dataset, maybeOriginalDs, projectSlug) =>
       json"""{
       "identifier": ${dataset.identification.identifier.value},
       "versions": {
@@ -60,14 +60,14 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "title":  ${dataset.identification.title.value},
       "name":   ${dataset.identification.name.value},
       "slug":   ${dataset.identification.name.value},
-      "images": ${dataset.additionalInfo.images -> projectPath}
+      "images": ${dataset.additionalInfo.images -> projectSlug}
     }"""
         .deepMerge(
           _links(
             Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
             Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
             Rel("tags") -> Href(
-              renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
+              renkuApiUrl / "projects" / projectSlug / "datasets" / dataset.identification.name / "tags"
             )
           )
         )
@@ -106,7 +106,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
 
   def searchResultJson[P <: Dataset.Provenance](dataset:       Dataset[P],
                                                 projectsCount: Int,
-                                                projectPath:   projects.Path,
+                                                projectSlug:   projects.Slug,
                                                 actualResults: List[Json]
   ): Json = {
     val actualIdentifier = actualResults
@@ -124,7 +124,7 @@ trait DatasetsApiEncoders extends ImageApiEncoders {
       "date":          ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
       "keywords":      ${dataset.additionalInfo.keywords.sorted.map(_.value)},
-      "images":        ${dataset.additionalInfo.images -> projectPath}
+      "images":        ${dataset.additionalInfo.images -> projectSlug}
     }"""
       .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
       .deepMerge {

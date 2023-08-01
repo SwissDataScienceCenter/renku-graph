@@ -58,7 +58,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       `data in the Triples Store`(project, commitId, accessToken)
 
-      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
 
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
 
@@ -83,7 +83,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
       eventually {
         val updatedProjectDetailsResponse =
-          knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
+          knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.slug}", accessToken)
         projectDetailsResponseIsValid(updatedProjectDetailsResponse, newSchemaVersion)
       }(PatienceConfig(timeout = Span(20, Minutes), interval = Span(10, Seconds)),
         Retrying.retryingNatureOfT,

@@ -77,7 +77,7 @@ class ProjectDatasetTagsResourceSpec
 
       When("the user fetches the tags with GET knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags")
       val response = knowledgeGraphClient.GET(
-        s"knowledge-graph/projects/${project.path}/datasets/${dataset.identification.name}/tags",
+        s"knowledge-graph/projects/${project.slug}/datasets/${dataset.identification.name}/tags",
         accessToken
       )
 

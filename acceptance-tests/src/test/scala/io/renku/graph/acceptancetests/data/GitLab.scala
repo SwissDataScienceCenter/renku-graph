@@ -28,13 +28,13 @@ import io.renku.graph.model.events.CommitId
 object GitLab {
 
   def pushEvent(project: Project, commitId: CommitId): Json = json"""{
-    "after":         ${commitId.value},
-    "user_id":       ${positiveInts().generateOne.value}, 
+    "after":         $commitId,
+    "user_id":       ${positiveInts().generateOne.value},
     "user_username": ${nonEmptyStrings().generateOne},
-    "user_email":    ${personEmails.generateOne.value},
+    "user_email":    ${personEmails.generateOne},
     "project": {
-      "id":                  ${project.id.value},
-      "path_with_namespace": ${project.path.value}
+      "id":                  ${project.id},
+      "path_with_namespace": ${project.slug}
     }
   }"""
 }

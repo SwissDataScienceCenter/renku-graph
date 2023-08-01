@@ -22,11 +22,11 @@ import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private case class MinProjectInfoEvent(projectId: projects.GitLabId, projectPath: projects.Path)
+private case class MinProjectInfoEvent(projectId: projects.GitLabId, projectSlug: projects.Slug)
 
 private object MinProjectInfoEvent {
-  implicit val show: Show[MinProjectInfoEvent] = Show.show { case MinProjectInfoEvent(id, path) =>
-    show"projectId = $id, projectPath = $path"
+  implicit val show: Show[MinProjectInfoEvent] = Show.show { case MinProjectInfoEvent(id, slug) =>
+    show"projectId = $id, projectSlug = $slug"
   }
 }
 
@@ -36,10 +36,10 @@ private object EventEncoder {
   import io.circe.literal._
 
   def encodeEvent(event: MinProjectInfoEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
+    "categoryName": $categoryName,
     "project": {
-      "id":   ${event.projectId.value},
-      "path": ${event.projectPath.value}
+      "id":   ${event.projectId},
+      "slug": ${event.projectSlug}
     }
   }"""
 }

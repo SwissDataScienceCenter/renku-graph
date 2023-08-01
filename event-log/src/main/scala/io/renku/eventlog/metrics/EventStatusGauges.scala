@@ -30,7 +30,7 @@ trait EventStatusGauges[F[_]] {
   def underTransformation:    UnderTransformationGauge[F]
   def awaitingDeletion:       AwaitingDeletionGauge[F]
   def underDeletion:          UnderDeletionGauge[F]
-  def asList:                 List[LabeledGauge[F, projects.Path]]
+  def asList:                 List[LabeledGauge[F, projects.Slug]]
 }
 
 private class EventStatusGaugesImpl[F[_]](
@@ -41,7 +41,7 @@ private class EventStatusGaugesImpl[F[_]](
     override val awaitingDeletion:       AwaitingDeletionGauge[F],
     override val underDeletion:          UnderDeletionGauge[F]
 ) extends EventStatusGauges[F] {
-  override def asList: List[LabeledGauge[F, projects.Path]] = List(
+  override def asList: List[LabeledGauge[F, projects.Slug]] = List(
     awaitingGeneration,
     underGeneration,
     awaitingTransformation,

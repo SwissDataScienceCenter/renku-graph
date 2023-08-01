@@ -36,7 +36,7 @@ import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `PUT /projects/:path`(path: projects.Path, request: Request[F], authUser: AuthUser): F[Response[F]]
+  def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]]
 }
 
 object Endpoint {
@@ -49,13 +49,13 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
-  override def `PUT /projects/:path`(path: projects.Path, request: Request[F], authUser: AuthUser): F[Response[F]] =
+  override def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
     decodePayload(request)
-      .flatMap(updateGL(path, authUser))
-      .semiflatMap(_ => tgClient.send(SyncRepoMetadata(path)))
+      .flatMap(updateGL(slug, authUser))
+      .semiflatMap(_ => tgClient.send(SyncRepoMetadata(slug)))
       .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
       .merge
-      .handleErrorWith(serverError(path)(_))
+      .handleErrorWith(serverError(slug)(_))
 
   private lazy val decodePayload: Request[F] => EitherT[F, Response[F], NewValues] = req =>
     EitherT {
@@ -72,11 +72,11 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
   private def badRequest(message: Json): Response[F] =
     Response[F](BadRequest).withEntity(Message.Error.fromJsonUnsafe(message))
 
-  private def updateGL(path: projects.Path, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
-    glProjectUpdater.updateProject(path, newValues, authUser.accessToken).leftMap(badRequest)
+  private def updateGL(slug: projects.Slug, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
+    glProjectUpdater.updateProject(slug, newValues, authUser.accessToken).leftMap(badRequest)
 
-  private def serverError(path: projects.Path): Throwable => F[Response[F]] =
+  private def serverError(slug: projects.Slug): Throwable => F[Response[F]] =
     Logger[F]
-      .error(_)(show"Updating project $path failed")
+      .error(_)(show"Updating project $slug failed")
       .as(Response[F](InternalServerError).withEntity(Message.Error("Update failed")))
 }

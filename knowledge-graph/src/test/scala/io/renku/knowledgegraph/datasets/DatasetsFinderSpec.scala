@@ -937,7 +937,7 @@ class DatasetsFinderSpec
       dataset.additionalInfo.maybeDescription,
       dataset.provenance.creators.map(_.to[DatasetCreator]).toList.sortBy(_.name),
       dataset.provenance.date,
-      ExemplarProject(project.resourceId, project.path),
+      ExemplarProject(project.resourceId, project.slug),
       ProjectsCount(projectsCount),
       dataset.additionalInfo.keywords.sorted,
       dataset.additionalInfo.images
@@ -963,9 +963,9 @@ class DatasetsFinderSpec
         dataset.provenance.creators.map(_.to[DatasetCreator]).toList,
         dataset.provenance.date,
         matchProjectFrom
-          .find(_.path == matchingResult.exemplarProject.path)
-          .map(project => ExemplarProject(project.resourceId, project.path))
-          .getOrElse(fail("Cannot find matching exemplar project path in the results")),
+          .find(_.slug == matchingResult.exemplarProject.slug)
+          .map(project => ExemplarProject(project.resourceId, project.slug))
+          .getOrElse(fail("Cannot find matching exemplar project slug in the results")),
         ProjectsCount(projectsCount),
         dataset.additionalInfo.keywords.sorted,
         dataset.additionalInfo.images

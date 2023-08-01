@@ -38,7 +38,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "remove the triples linked to the project and notify the EL when the process is done" in new TestCase {
 
-      (tsCleaner.removeTriples _).expects(project.path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(project.slug).returns(().pure[IO])
 
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
 
@@ -50,7 +50,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "do not fail but log an error if the removal of the triples fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (tsCleaner.removeTriples _).expects(project.path).returns(exception.raiseError[IO, Unit])
+      (tsCleaner.removeTriples _).expects(project.slug).returns(exception.raiseError[IO, Unit])
 
       (eventProcessor process project).unsafeRunSync() shouldBe ()
 
@@ -59,7 +59,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not fail but log an error if the notification of the EL fails" in new TestCase {
 
-      (tsCleaner.removeTriples _).expects(project.path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(project.slug).returns(().pure[IO])
 
       val exception = exceptions.generateOne
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])

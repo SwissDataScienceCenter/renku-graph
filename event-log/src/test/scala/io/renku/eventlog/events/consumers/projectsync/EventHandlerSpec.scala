@@ -90,17 +90,17 @@ class EventHandlerSpec
   }
 
   private implicit lazy val eventEncoder: Encoder[ProjectSyncEvent] = Encoder.instance[ProjectSyncEvent] {
-    case ProjectSyncEvent(id, path) => json"""{
+    case ProjectSyncEvent(id, slug) => json"""{
       "categoryName": "PROJECT_SYNC",
       "project": {
-        "id":   ${id.value},
-        "path": ${path.value}
+        "id":   $id,
+        "slug": $slug
       }
     }"""
   }
 
   private lazy val projectSyncEvents = for {
     id   <- projectIds
-    path <- projectPaths
-  } yield ProjectSyncEvent(id, path)
+    slug <- projectSlugs
+  } yield ProjectSyncEvent(id, slug)
 }

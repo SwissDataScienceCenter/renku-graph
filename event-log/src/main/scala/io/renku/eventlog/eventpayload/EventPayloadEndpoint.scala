@@ -24,7 +24,7 @@ import io.renku.data.Message
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
-import io.renku.graph.model.projects.{Path => ProjectPath}
+import io.renku.graph.model.projects.{Slug => ProjectSlug}
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 
 trait EventPayloadEndpoint[F[_]] {
 
-  def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Response[F]]
+  def getEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Response[F]]
 }
 
 object EventPayloadEndpoint {
@@ -43,12 +43,12 @@ object EventPayloadEndpoint {
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =
     new EventPayloadEndpoint[F] with Http4sDsl[F] {
-      def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Response[F]] =
-        payloadFinder.findEventPayload(eventId, projectPath).flatMap {
+      def getEventPayload(eventId: EventId, projectSlug: ProjectSlug): F[Response[F]] =
+        payloadFinder.findEventPayload(eventId, projectSlug).flatMap {
           case Some(data) =>
             for {
               resp <- Ok(data.data)
-              name = s"${eventId.value}-${projectPath.value.replace('/', '_')}.gz"
+              name = s"${eventId.value}-${projectSlug.value.replace('/', '_')}.gz"
               r = resp.withHeaders(
                     `Content-Length`(data.length),
                     `Content-Type`(MediaType.application.gzip),
@@ -56,7 +56,7 @@ object EventPayloadEndpoint {
                   )
             } yield r
           case None =>
-            NotFound(Message.Info.unsafeApply(show"Event/Project $eventId/$projectPath not found"))
+            NotFound(Message.Info.unsafeApply(show"Event/Project $eventId/$projectSlug not found"))
         }
     }
 }

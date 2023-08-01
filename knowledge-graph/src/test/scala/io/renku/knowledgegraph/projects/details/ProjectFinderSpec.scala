@@ -27,11 +27,11 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectSlugToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
@@ -47,14 +47,14 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       val maybeAuthUser = authUsers.generateSome
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser, returning = kgProject.some.pure[IO])
 
-      val accessToken = givenAccessToken(existsFor = kgProject.path)
+      val accessToken = givenAccessToken(existsFor = kgProject.slug)
 
       val gitLabProject = gitLabProjects.generateOne
-      givenGLProjectFinder(kgProject.path, accessToken, returning = gitLabProject.some.pure[IO])
+      givenGLProjectFinder(kgProject.slug, accessToken, returning = gitLabProject.some.pure[IO])
 
-      projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync() shouldBe Some(
+      projectFinder.findProject(kgProject.slug, maybeAuthUser).unsafeRunSync() shouldBe Some(
         projectFrom(kgProject, gitLabProject)
       )
     }
@@ -62,87 +62,87 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     "merge the project metadata found in the KG and in GitLab - case when no AuthUser given" in new TestCase {
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser = None, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser = None, returning = kgProject.some.pure[IO])
 
-      val accessToken = givenAccessToken(existsFor = kgProject.path)
+      val accessToken = givenAccessToken(existsFor = kgProject.slug)
 
       val gitLabProject = gitLabProjects.generateOne
-      givenGLProjectFinder(kgProject.path, accessToken, returning = gitLabProject.some.pure[IO])
+      givenGLProjectFinder(kgProject.slug, accessToken, returning = gitLabProject.some.pure[IO])
 
-      projectFinder.findProject(kgProject.path, maybeAuthUser = None).unsafeRunSync() shouldBe Some(
+      projectFinder.findProject(kgProject.slug, maybeAuthUser = None).unsafeRunSync() shouldBe Some(
         projectFrom(kgProject, gitLabProject)
       )
     }
 
-    "return None if there's no project for the path in the KG" in new TestCase {
+    "return None if there's no project for the slug in the KG" in new TestCase {
       val maybeAuthUser = authUsers.generateSome
 
-      val projectPath = projectPaths.generateOne
-      givenKgProjectFinder(projectPath, maybeAuthUser, returning = None.pure[IO])
+      val projectSlug = projectSlugs.generateOne
+      givenKgProjectFinder(projectSlug, maybeAuthUser, returning = None.pure[IO])
 
-      val accessToken = givenAccessToken(existsFor = projectPath)
+      val accessToken = givenAccessToken(existsFor = projectSlug)
 
       val gitLabProject = gitLabProjects.generateOne
-      givenGLProjectFinder(projectPath, accessToken, returning = gitLabProject.some.pure[IO])
+      givenGLProjectFinder(projectSlug, accessToken, returning = gitLabProject.some.pure[IO])
 
-      projectFinder.findProject(projectPath, maybeAuthUser).unsafeRunSync() shouldBe None
+      projectFinder.findProject(projectSlug, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
-    "return None if there's no project for the path in GitLab" in new TestCase {
+    "return None if there's no project for the slug in GitLab" in new TestCase {
       val maybeAuthUser = authUsers.generateSome
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser, returning = kgProject.some.pure[IO])
 
-      val accessToken = givenAccessToken(existsFor = kgProject.path)
+      val accessToken = givenAccessToken(existsFor = kgProject.slug)
 
-      givenGLProjectFinder(kgProject.path, accessToken, returning = None.pure[IO])
+      givenGLProjectFinder(kgProject.slug, accessToken, returning = None.pure[IO])
 
-      projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync() shouldBe None
+      projectFinder.findProject(kgProject.slug, maybeAuthUser).unsafeRunSync() shouldBe None
     }
 
-    "return None if no access token can be found for the given project path" in new TestCase {
+    "return None if no access token can be found for the given project slug" in new TestCase {
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser = None, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser = None, returning = kgProject.some.pure[IO])
 
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(kgProject.path, projectPathToPath)
+        .findAccessToken(_: Slug)(_: Slug => String))
+        .expects(kgProject.slug, projectSlugToPath)
         .returning(Option.empty[AccessToken].pure[IO])
 
-      projectFinder.findProject(kgProject.path, maybeAuthUser = None).unsafeRunSync() shouldBe None
+      projectFinder.findProject(kgProject.slug, maybeAuthUser = None).unsafeRunSync() shouldBe None
     }
 
     "fail if finding project in the KG failed" in new TestCase {
       val maybeAuthUser = authUsers.generateSome
-      val projectPath   = projectPaths.generateOne
+      val projectSlug   = projectSlugs.generateOne
 
       val exception = exceptions.generateOne
-      givenKgProjectFinder(projectPath, maybeAuthUser, returning = exception.raiseError[IO, Option[KGProject]])
+      givenKgProjectFinder(projectSlug, maybeAuthUser, returning = exception.raiseError[IO, Option[KGProject]])
 
-      val accessToken = givenAccessToken(existsFor = projectPath)
+      val accessToken = givenAccessToken(existsFor = projectSlug)
 
-      givenGLProjectFinder(projectPath, accessToken, returning = None.pure[IO]).noMoreThanOnce()
+      givenGLProjectFinder(projectSlug, accessToken, returning = None.pure[IO]).noMoreThanOnce()
 
       intercept[Exception] {
-        projectFinder.findProject(projectPath, maybeAuthUser).unsafeRunSync()
+        projectFinder.findProject(projectSlug, maybeAuthUser).unsafeRunSync()
       } shouldBe exception
     }
 
     "fail if finding access token failed" in new TestCase {
 
       val kgProject = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser = None, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser = None, returning = kgProject.some.pure[IO])
 
       val exception = exceptions.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(kgProject.path, projectPathToPath)
+        .findAccessToken(_: Slug)(_: Slug => String))
+        .expects(kgProject.slug, projectSlugToPath)
         .returning(exception.raiseError[IO, Option[AccessToken]])
 
       intercept[Exception] {
-        projectFinder.findProject(kgProject.path, maybeAuthUser = None).unsafeRunSync()
+        projectFinder.findProject(kgProject.slug, maybeAuthUser = None).unsafeRunSync()
       } shouldBe exception
     }
 
@@ -150,15 +150,15 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val maybeAuthUser = authUsers.generateSome
       val kgProject     = anyProjectEntities.generateOne.to(kgProjectConverter)
-      givenKgProjectFinder(kgProject.path, maybeAuthUser, returning = kgProject.some.pure[IO])
+      givenKgProjectFinder(kgProject.slug, maybeAuthUser, returning = kgProject.some.pure[IO])
 
-      val accessToken = givenAccessToken(existsFor = kgProject.path)
+      val accessToken = givenAccessToken(existsFor = kgProject.slug)
 
       val exception = exceptions.generateOne
-      givenGLProjectFinder(kgProject.path, accessToken, returning = exception.raiseError[IO, Option[GitLabProject]])
+      givenGLProjectFinder(kgProject.slug, accessToken, returning = exception.raiseError[IO, Option[GitLabProject]])
 
       intercept[Exception] {
-        projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync()
+        projectFinder.findProject(kgProject.slug, maybeAuthUser).unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -169,23 +169,23 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
     val projectFinder       = new ProjectFinderImpl[IO](kgProjectFinder, gitLabProjectFinder)
 
-    def givenKgProjectFinder(path: Path, maybeAuthUser: Option[AuthUser], returning: IO[Option[KGProject]]) =
+    def givenKgProjectFinder(slug: Slug, maybeAuthUser: Option[AuthUser], returning: IO[Option[KGProject]]) =
       (kgProjectFinder
-        .findProject(_: Path, _: Option[AuthUser]))
-        .expects(path, maybeAuthUser)
+        .findProject(_: Slug, _: Option[AuthUser]))
+        .expects(slug, maybeAuthUser)
         .returning(returning)
 
-    def givenGLProjectFinder(path: Path, accessToken: AccessToken, returning: IO[Option[GitLabProject]]) =
+    def givenGLProjectFinder(slug: Slug, accessToken: AccessToken, returning: IO[Option[GitLabProject]]) =
       (gitLabProjectFinder
-        .findProject(_: Path)(_: AccessToken))
-        .expects(path, accessToken)
+        .findProject(_: Slug)(_: AccessToken))
+        .expects(slug, accessToken)
         .returning(returning)
 
-    def givenAccessToken(existsFor: Path): AccessToken = {
+    def givenAccessToken(existsFor: Slug): AccessToken = {
       val accessToken = accessTokens.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Path)(_: Path => String))
-        .expects(existsFor, projectPathToPath)
+        .findAccessToken(_: Slug)(_: Slug => String))
+        .expects(existsFor, projectSlugToPath)
         .returning(Some(accessToken).pure[IO])
       accessToken
     }
@@ -195,7 +195,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
     model.Project(
       resourceId = kgProject.resourceId,
       id = gitLabProject.id,
-      path = kgProject.path,
+      slug = kgProject.slug,
       name = kgProject.name,
       maybeDescription = kgProject.maybeDescription,
       visibility = kgProject.visibility,
@@ -210,7 +210,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
         kgProject.maybeParent.map { parent =>
           model.ParentProject(
             parent.resourceId,
-            parent.path,
+            parent.slug,
             parent.name,
             model.Creation(
               parent.created.date,

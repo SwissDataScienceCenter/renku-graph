@@ -64,7 +64,7 @@ private class EventUploaderImpl[F[_]: MonadThrow](
 
   private def persistProjectViewedEvent(dsInfo: DSInfo, event: DatasetViewedEvent) =
     projectViewedEventPersister.persist(
-      ProjectViewedEvent(dsInfo.projectPath,
+      ProjectViewedEvent(dsInfo.projectSlug,
                          projects.DateViewed(event.dateViewed.value),
                          event.maybeUserId.map(UserId(_))
       )

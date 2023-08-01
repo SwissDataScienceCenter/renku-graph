@@ -54,12 +54,12 @@ private class DatasetSameAsRecordsFinderImpl[F[_]: MonadThrow](tsClient: TSClien
   private def query(sameAs: datasets.SameAs) = SparqlQuery.of(
     name = "authorise - dataset sameAs",
     Prefixes of (renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?projectId ?path ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator='$rowsSeparator') AS ?memberGitLabIds)
+    s"""|SELECT DISTINCT ?projectId ?slug ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator='$rowsSeparator') AS ?memberGitLabIds)
         |WHERE {
         |  GRAPH ?projectId {
         |    ?projectId a schema:Project;
         |               renku:hasDataset/renku:topmostSameAs ${EntityId.of(sameAs.value).sparql};
-        |               renku:projectPath ?path;
+        |               renku:projectPath ?slug;
         |               renku:projectVisibility ?visibility.
         |    OPTIONAL {
         |      ?projectId schema:member ?memberId.
@@ -71,7 +71,7 @@ private class DatasetSameAsRecordsFinderImpl[F[_]: MonadThrow](tsClient: TSClien
         |    }
         |  }
         |}
-        |GROUP BY ?projectId ?path ?visibility
+        |GROUP BY ?projectId ?slug ?visibility
         |""".stripMargin
   )
 
@@ -89,8 +89,8 @@ private class DatasetSameAsRecordsFinderImpl[F[_]: MonadThrow](tsClient: TSClien
 
       for {
         visibility <- extract[projects.Visibility]("visibility")
-        path       <- extract[projects.Path]("path")
+        slug       <- extract[projects.Slug]("slug")
         userIds    <- extract[Option[String]]("memberGitLabIds") >>= toSetOfGitLabIds
-      } yield SecurityRecord(visibility, path, userIds)
+      } yield SecurityRecord(visibility, slug, userIds)
   }
 }

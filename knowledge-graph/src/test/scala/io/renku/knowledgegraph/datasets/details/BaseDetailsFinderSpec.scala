@@ -105,7 +105,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
       "projectId":         {"value": ${project.resourceId}},
-      "projectPath":       {"value": ${project.path}},
+      "projectSlug":       {"value": ${project.slug}},
       "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}},
       "projectDSId":       {"value": ${dataset.identification.identifier}}
@@ -143,10 +143,10 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "description":       {"value": $description},
       "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
       "maybeDerivedFrom":  {"value": ${dataset.provenance.derivedFrom}},
-      "maybeDateModified":  {"value": ${dataset.provenance.date}},
+      "maybeDateModified": {"value": ${dataset.provenance.date}},
       "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
       "projectId":         {"value": ${project.resourceId}},
-      "projectPath":       {"value": ${project.path}},
+      "projectSlug":       {"value": ${project.slug}},
       "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}},
       "projectDSId":       {"value": ${dataset.identification.identifier}}

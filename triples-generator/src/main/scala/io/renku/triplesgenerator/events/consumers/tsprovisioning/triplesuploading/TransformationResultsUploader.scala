@@ -65,7 +65,7 @@ private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader
       .mapN(_ :: _.toList)
       .flatMap(_.map(_.flatten).sequence)
       .fold(
-        error => NonRecoverableFailure(s"Encoding '${project.path}' failed", error).raiseError[F, List[NamedGraph]],
+        error => NonRecoverableFailure(s"Encoding '${project.slug}' failed", error).raiseError[F, List[NamedGraph]],
         _.pure[F]
       )
   }

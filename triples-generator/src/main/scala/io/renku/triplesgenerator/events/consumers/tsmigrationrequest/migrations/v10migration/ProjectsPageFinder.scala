@@ -32,7 +32,7 @@ import org.typelevel.log4cats.Logger
 import tooling.RecordsFinder
 
 private trait ProjectsPageFinder[F[_]] {
-  def nextProjectsPage(): F[List[projects.Path]]
+  def nextProjectsPage(): F[List[projects.Slug]]
 }
 
 private object ProjectsPageFinder {
@@ -55,22 +55,22 @@ private class ProjectsPageFinderImpl[F[_]: Monad](recordsFinder: RecordsFinder[F
 
   private val pageSize: Int = 50
 
-  override def nextProjectsPage(): F[List[projects.Path]] =
-    findRecords[projects.Path](query)
+  override def nextProjectsPage(): F[List[projects.Slug]] =
+    findRecords[projects.Slug](query)
 
   private lazy val query = SparqlQuery.ofUnsafe(
     show"${MigrationToV10.name} - find projects",
     Prefixes of renku -> "renku",
-    s"""|SELECT DISTINCT ?path
+    s"""|SELECT DISTINCT ?slug
         |WHERE {
-        |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?path
+        |  ${MigrationToV10.name.asEntityId.asSparql.sparql} renku:toBeMigrated ?slug
         |}
-        |ORDER BY ?path
+        |ORDER BY ?slug
         |LIMIT $pageSize
         |""".stripMargin
   )
 
-  private implicit lazy val decoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
-    implicit cur => extract[projects.Path]("path")
+  private implicit lazy val decoder: Decoder[List[projects.Slug]] = ResultsDecoder[List, projects.Slug] {
+    implicit cur => extract[projects.Slug]("slug")
   }
 }

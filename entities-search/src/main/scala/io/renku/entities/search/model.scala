@@ -44,7 +44,7 @@ object model {
 
     final case class Project(
         matchingScore:    MatchingScore,
-        path:             projects.Path,
+        slug:             projects.Slug,
         name:             projects.Name,
         visibility:       projects.Visibility,
         date:             projects.DateCreated,
@@ -69,7 +69,7 @@ object model {
         keywords:            List[datasets.Keyword],
         maybeDescription:    Option[datasets.Description],
         images:              List[ImageUri],
-        exemplarProjectPath: projects.Path
+        exemplarProjectSlug: projects.Slug
     ) extends Entity {
       override type Name = datasets.Name
       override type Date = datasets.CreatedOrPublished

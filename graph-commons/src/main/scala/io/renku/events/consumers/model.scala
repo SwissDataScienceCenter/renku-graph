@@ -24,11 +24,11 @@ import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
 
-final case class Project(id: projects.GitLabId, path: projects.Path)
+final case class Project(id: projects.GitLabId, slug: projects.Slug)
 
 object Project {
-  implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
-    s"projectId = $id, projectPath = $path"
+  implicit lazy val show: Show[Project] = Show.show { case Project(id, slug) =>
+    s"projectId = $id, projectSlug = $slug"
   }
 
   implicit val jsonDecoder: Decoder[Project] = deriveDecoder[Project]

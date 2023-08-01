@@ -26,7 +26,7 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
-import io.renku.graph.model.projects.{Path, ResourceId}
+import io.renku.graph.model.projects.{Slug, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.ResultsDecoder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -34,7 +34,7 @@ import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectMembersFinder[F[_]] {
-  def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]]
+  def findProjectMembers(slug: projects.Slug): F[Set[KGProjectMember]]
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -46,8 +46,8 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]] =
-    queryExpecting[Set[KGProjectMember]](selectQuery = query(path))
+  def findProjectMembers(slug: projects.Slug): F[Set[KGProjectMember]] =
+    queryExpecting[Set[KGProjectMember]](selectQuery = query(slug))
 
   private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = ResultsDecoder[Set, KGProjectMember] {
     implicit cursor =>
@@ -56,10 +56,10 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         .mapN(KGProjectMember)
   }
 
-  private def query(path: Path) = {
-    val projectId = ResourceId(path)
+  private def query(slug: Slug) = {
+    val projectId = ResourceId(slug)
     SparqlQuery.of(
-      name = "members by project path",
+      name = "members by project slug",
       Prefixes of schema -> "schema",
       s"""|SELECT DISTINCT ?memberId ?gitLabId
           |FROM <${GraphClass.Persons.id}> 

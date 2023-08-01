@@ -55,12 +55,12 @@ private[statuschange] class DbUpdater[F[_]: MonadCancelThrow: QueriesExecutionTi
       .flatMapResult {
         case Completion.Update(count) =>
           DBUpdateResults
-            .ForProjects(event.project.path, Map(Deleting -> -count, AwaitingDeletion -> count))
+            .ForProjects(event.project.slug, Map(Deleting -> -count, AwaitingDeletion -> count))
             .pure[F]
             .widen[DBUpdateResults]
         case _ =>
           new Exception(
-            s"Could not update $Deleting events for project ${event.project.path} to status $AwaitingDeletion"
+            s"Could not update $Deleting events for project ${event.project.slug} to status $AwaitingDeletion"
           ).raiseError[F, DBUpdateResults]
       }
   }

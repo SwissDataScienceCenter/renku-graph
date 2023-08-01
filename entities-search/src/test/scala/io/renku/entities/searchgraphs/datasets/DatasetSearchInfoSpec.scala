@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.entities.searchgraphs.datasets.Generators._
 import io.renku.entities.searchgraphs.datasets.Link.{ImportedDataset, OriginalDataset, show}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.{datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectPaths, projectResourceIds}
+import io.renku.graph.model.GraphModelGenerators.{datasetExternalSameAs, datasetResourceIds, datasetTopmostSameAs, projectSlugs, projectResourceIds}
 import io.renku.graph.model.datasets
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
@@ -100,19 +100,19 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val datasetId     = datasetResourceIds.generateOne
       val topmostSameAs = datasets.TopmostSameAs(datasetId.asEntityId)
       val projectId     = projectResourceIds.generateOne
-      val projectPath   = projectPaths.generateOne
+      val projectSlug   = projectSlugs.generateOne
 
-      val link = Link(topmostSameAs, datasetId, projectId, projectPath)
+      val link = Link(topmostSameAs, datasetId, projectId, projectSlug)
 
       link            shouldBe a[OriginalDataset]
-      link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
+      link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectSlug)
     }
 
     "return OriginalDataset if linkId starts with datasetId" in {
       val datasetId   = datasetResourceIds.generateOne
       val projectId   = projectResourceIds.generateOne
-      val projectPath = projectPaths.generateOne
-      val linkId      = links.ResourceId.from(datasets.TopmostSameAs(datasetId.asEntityId), projectPath)
+      val projectSlug = projectSlugs.generateOne
+      val linkId      = links.ResourceId.from(datasets.TopmostSameAs(datasetId.asEntityId), projectSlug)
 
       val link = Link(linkId, datasetId, projectId)
 
@@ -126,19 +126,19 @@ class LinkSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
       val datasetId     = datasetResourceIds.generateOne
       val topmostSameAs = datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_))
       val projectId     = projectResourceIds.generateOne
-      val projectPath   = projectPaths.generateOne
+      val projectSlug   = projectSlugs.generateOne
 
-      val link = Link(topmostSameAs, datasetId, projectId, projectPath)
+      val link = Link(topmostSameAs, datasetId, projectId, projectSlug)
 
       link            shouldBe a[ImportedDataset]
-      link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectPath)
+      link.resourceId shouldBe links.ResourceId.from(topmostSameAs, projectSlug)
     }
 
     "return ImportedDataset if linkId does not starts with datasetId" in {
       val datasetId   = datasetResourceIds.generateOne
       val projectId   = projectResourceIds.generateOne
-      val projectPath = projectPaths.generateOne
-      val linkId      = links.ResourceId.from(datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_)), projectPath)
+      val projectSlug = projectSlugs.generateOne
+      val linkId      = links.ResourceId.from(datasetExternalSameAs.generateAs(datasets.TopmostSameAs(_)), projectSlug)
 
       val link = Link(linkId, datasetId, projectId)
 

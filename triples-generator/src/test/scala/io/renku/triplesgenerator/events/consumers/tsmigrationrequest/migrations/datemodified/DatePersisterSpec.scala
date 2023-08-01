@@ -60,7 +60,7 @@ class DatePersisterSpec
       findProjectDateModified(project.resourceId).asserting(_ shouldBe None) >>
       findProjectsDateModified(project.resourceId).asserting(_ shouldBe None) >>
       persister
-        .persistDateModified(ProjectInfo(project.resourceId, project.path, project.dateCreated))
+        .persistDateModified(ProjectInfo(project.resourceId, project.slug, project.dateCreated))
         .assertNoException >>
       findProjectDateModified(project.resourceId).asserting(_.value shouldBe expectedDate) >>
       findProjectsDateModified(project.resourceId).asserting(_.value shouldBe expectedDate) >>
@@ -75,7 +75,7 @@ class DatePersisterSpec
       findProjectDateModified(project.resourceId).asserting(_.value shouldBe project.dateModified) >>
       findProjectsDateModified(project.resourceId).asserting(_.value shouldBe project.dateModified) >>
       persister
-        .persistDateModified(ProjectInfo(project.resourceId, project.path, project.dateCreated))
+        .persistDateModified(ProjectInfo(project.resourceId, project.slug, project.dateCreated))
         .assertNoException >>
       findProjectDateModified(project.resourceId).asserting(_.value shouldBe project.dateModified) >>
       findProjectsDateModified(project.resourceId).asserting(_.value shouldBe project.dateModified) >>

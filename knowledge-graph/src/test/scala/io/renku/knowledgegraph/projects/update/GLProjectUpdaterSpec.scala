@@ -30,7 +30,7 @@ import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -56,25 +56,25 @@ class GLProjectUpdaterSpec
 
   it should s"call GL's PUT gl/projects/:slug and return unit on success" in {
 
-    val path        = projectPaths.generateOne
+    val slug        = projectSlugs.generateOne
     val newValues   = newValuesGen.generateOne
     val accessToken = accessTokens.generateOne
 
-    givenEditProjectAPICall(path, newValues, accessToken, returning = ().asRight.pure[IO])
+    givenEditProjectAPICall(slug, newValues, accessToken, returning = ().asRight.pure[IO])
 
-    finder.updateProject(path, newValues, accessToken).value.asserting(_.value shouldBe ())
+    finder.updateProject(slug, newValues, accessToken).value.asserting(_.value shouldBe ())
   }
 
   it should s"call GL's PUT gl/projects/:slug and return GL message if returned" in {
 
-    val path        = projectPaths.generateOne
+    val slug        = projectSlugs.generateOne
     val newValues   = newValuesGen.generateOne
     val accessToken = accessTokens.generateOne
 
     val error = jsons.generateOne
-    givenEditProjectAPICall(path, newValues, accessToken, returning = error.asLeft.pure[IO])
+    givenEditProjectAPICall(slug, newValues, accessToken, returning = error.asLeft.pure[IO])
 
-    finder.updateProject(path, newValues, accessToken).value.asserting(_.left.value shouldBe error)
+    finder.updateProject(slug, newValues, accessToken).value.asserting(_.left.value shouldBe error)
   }
 
   it should "succeed if PUT gl/projects/:slug returns 200 OK" in {
@@ -100,7 +100,7 @@ class GLProjectUpdaterSpec
   private implicit val glClient: GitLabClient[IO] = mock[GitLabClient[IO]]
   private lazy val finder = new GLProjectUpdaterImpl[IO]
 
-  private def givenEditProjectAPICall(path:        projects.Path,
+  private def givenEditProjectAPICall(slug:        projects.Slug,
                                       newValues:   NewValues,
                                       accessToken: AccessToken,
                                       returning:   IO[Either[Json, Unit]]
@@ -110,7 +110,7 @@ class GLProjectUpdaterSpec
       .put(_: Uri, _: String Refined NonEmpty, _: UrlForm)(_: ResponseMappingF[IO, Either[Json, Unit]])(
         _: Option[AccessToken]
       ))
-      .expects(uri"projects" / path,
+      .expects(uri"projects" / slug,
                endpointName,
                UrlForm("visibility" -> newValues.visibility.value),
                *,
@@ -122,7 +122,7 @@ class GLProjectUpdaterSpec
   private lazy val mapResponse: ResponseMappingF[IO, Either[Json, Unit]] =
     captureMapping(glClient)(
       finder
-        .updateProject(projectPaths.generateOne, newValuesGen.generateOne, accessTokens.generateOne)
+        .updateProject(projectSlugs.generateOne, newValuesGen.generateOne, accessTokens.generateOne)
         .value
         .unsafeRunSync(),
       ().asRight[Json],

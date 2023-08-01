@@ -34,7 +34,7 @@ trait ProjectEntitiesGenerators {
   self: EntitiesGenerators with RenkuProjectEntitiesGenerators with NonRenkuProjectEntitiesGenerators =>
 
   lazy val projectIdentifications: Gen[ProjectIdentification] =
-    (projectResourceIds -> projectPaths).mapN(ProjectIdentification(_, _))
+    (projectResourceIds -> projectSlugs).mapN(ProjectIdentification(_, _))
 
   lazy val anyProjectEntities: Gen[Project] = projectEntities(anyVisibility)
 

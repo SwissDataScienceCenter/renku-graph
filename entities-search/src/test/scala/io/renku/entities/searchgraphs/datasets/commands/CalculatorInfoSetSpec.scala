@@ -107,7 +107,7 @@ class CalculatorInfoSetSpec extends AnyWordSpec with should.Matchers with ScalaC
 
   "show" should {
 
-    "return String containing project id and path along with model and TS search info" in {
+    "return String containing project id and slug along with model and TS search info" in {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeModelInfo = datasetSearchInfoObjects(withLinkTo = project.resourceId).generateSome
 

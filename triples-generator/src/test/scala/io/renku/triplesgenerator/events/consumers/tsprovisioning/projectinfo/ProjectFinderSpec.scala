@@ -29,10 +29,10 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.Slug
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -48,6 +48,7 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -56,20 +57,21 @@ class ProjectFinderSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
+    with EitherValues
     with MockFactory
     with ScalaCheckPropertyChecks
     with GitLabClientTools[IO] {
 
   "findProject" should {
 
-    "fetch info about the project with the given path from GitLab" in new TestCase {
+    "fetch info about the project with the given slug from GitLab" in new TestCase {
       forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some, members = Set.empty)
 
-        setGitLabClientExpectationProjects(projectInfo.path, (projectInfo, creator.gitLabId.some).some.pure[IO])
+        setGitLabClientExpectationProjects(projectInfo.slug, (projectInfo, creator.gitLabId.some).some.pure[IO])
         setGitLabClientExpectationUsers(creator.gitLabId, creator.some.pure[IO])
 
-        finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+        finder.findProject(projectInfo.slug).value.unsafeRunSync() shouldBe
           projectInfo.copy(members = Set.empty, maybeCreator = creator.some).some.asRight
       }
     }
@@ -78,10 +80,10 @@ class ProjectFinderSpec
       forAll { (projectInfoRaw: GitLabProjectInfo, creator: ProjectMemberNoEmail) =>
         val projectInfo = projectInfoRaw.copy(maybeCreator = creator.some, members = Set.empty)
 
-        setGitLabClientExpectationProjects(projectInfo.path, (projectInfo, creator.gitLabId.some).some.pure[IO])
+        setGitLabClientExpectationProjects(projectInfo.slug, (projectInfo, creator.gitLabId.some).some.pure[IO])
         setGitLabClientExpectationUsers(creator.gitLabId, None.pure[IO])
 
-        finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+        finder.findProject(projectInfo.slug).value.unsafeRunSync() shouldBe
           projectInfo.copy(maybeCreator = None, members = Set.empty).some.asRight
       }
     }
@@ -102,11 +104,11 @@ class ProjectFinderSpec
       )
     ) { case (problemName, error, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName when fetching project info" in new TestCase {
-        val path = projectPaths.generateOne
+        val slug = projectSlugs.generateOne
 
-        setGitLabClientExpectationProjects(path, IO.raiseError(error))
+        setGitLabClientExpectationProjects(slug, IO.raiseError(error))
 
-        val Left(failure) = finder.findProject(path).value.unsafeRunSync()
+        val Left(failure) = finder.findProject(slug).value.unsafeRunSync()
         failureTypeAssertion(failure)
       }
 
@@ -114,9 +116,9 @@ class ProjectFinderSpec
         val creator     = projectMembersNoEmail.generateOne
         val projectInfo = gitLabProjectInfos.generateOne.copy(maybeCreator = creator.some)
 
-        setGitLabClientExpectationProjects(projectInfo.path, IO.raiseError(error))
+        setGitLabClientExpectationProjects(projectInfo.slug, IO.raiseError(error))
 
-        val Left(failure) = finder.findProject(projectInfo.path).value.unsafeRunSync()
+        val failure = finder.findProject(projectInfo.slug).value.unsafeRunSync().left.value
         failureTypeAssertion(failure)
       }
     }
@@ -148,7 +150,7 @@ class ProjectFinderSpec
       }
     }
 
-    "return no info when there's no project with the given path" in new TestCase {
+    "return no info when there's no project with the given slug" in new TestCase {
       mapTo(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe None
     }
   }
@@ -165,7 +167,7 @@ class ProjectFinderSpec
     def setGitLabClientExpectationUsers(id: persons.GitLabId, returning: IO[Option[ProjectMember]]) =
       setGitLabClientExpectation("single-user", id.show, returning)
 
-    def setGitLabClientExpectationProjects(id: projects.Path, returning: IO[Option[ProjectAndCreators]]) =
+    def setGitLabClientExpectationProjects(id: projects.Slug, returning: IO[Option[ProjectAndCreators]]) =
       setGitLabClientExpectation("single-project", id.show, returning)
 
     private def setGitLabClientExpectation[ResultType](endpointName: String Refined NonEmpty,
@@ -183,19 +185,19 @@ class ProjectFinderSpec
 
     val mapTo: ResponseMappingF[IO, Option[(GitLabProjectInfo, Option[persons.GitLabId])]] =
       captureMapping(gitLabClient)(
-        finder.findProject(projectPaths.generateOne)(maybeAccessToken).value.unsafeRunSync(),
+        finder.findProject(projectSlugs.generateOne)(maybeAccessToken).value.unsafeRunSync(),
         Gen.const((gitLabProjectInfos.generateOne, Option.empty[persons.GitLabId]).some)
       )
   }
 
   private implicit lazy val projectInfoEncoder: Encoder[GitLabProjectInfo] = Encoder.instance { project =>
-    val parentPathEncoder: Encoder[Path] = Encoder.instance(path => json"""{
-      "path_with_namespace": $path
+    val parenSlugEncoder: Encoder[Slug] = Encoder.instance(slug => json"""{
+      "path_with_namespace": $slug
     }""")
 
     json"""{
       "id":                  ${project.id},
-      "path_with_namespace": ${project.path},
+      "path_with_namespace": ${project.slug},
       "name":                ${project.name},
       "created_at":          ${project.dateCreated},
       "created_at":          ${project.dateCreated},
@@ -203,7 +205,7 @@ class ProjectFinderSpec
       "visibility":          ${project.visibility},
       "topics":              ${project.keywords.map(_.value) + blankStrings().generateOne}
     }"""
-      .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
+      .addIfDefined("forked_from_project" -> project.maybeParentSlug)(parenSlugEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))
       .addIfDefined("description" -> project.maybeDescription.map(_.value))
       .addIfDefined("avatar_url" -> project.avatarUrl)

@@ -112,10 +112,10 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
         ORDER BY p.latest_event_date DESC
         LIMIT $int4
         """
-          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+          .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder ~ int8)
           .map {
-            case (id: projects.GitLabId) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
-              ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+            case (id: projects.GitLabId) ~ (slug: projects.Slug) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+              ProjectInfo(id, slug, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
           }
       )
       .arguments(ExecutionDate(now()) *: ExecutionDate(now()) *: projectsFetchingLimit.value *: EmptyTuple)
@@ -132,15 +132,15 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
       .build[Id](_.unique)
   }
 
-  private def findNewestEvent(idAndPath: ProjectIds) = measureExecutionTime {
+  private def findNewestEvent(idAndSlug: ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find oldest")
-      .select[projects.Path *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
+      .select[projects.Slug *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
               TriplesGeneratedEvent
       ](
         sql"""
-         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload
+         SELECT evt.event_id, evt.project_id, $projectSlugEncoder AS project_path, evt_payload.payload
          FROM (
            SELECT evt_int.project_id, max(event_date) AS max_event_date
            FROM event evt_int
@@ -150,19 +150,19 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
              AND execution_date < $executionDateEncoder
            GROUP BY evt_int.project_id
          ) newest_event_date
-         JOIN event evt ON newest_event_date.project_id = evt.project_id 
+         JOIN event evt ON newest_event_date.project_id = evt.project_id
            AND newest_event_date.max_event_date = evt.event_date
            AND #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)}
            AND execution_date < $executionDateEncoder
          JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
          LIMIT 1
          """
-          .query(compoundEventIdDecoder ~ projectPathDecoder ~ zippedPayloadDecoder)
-          .map { case eventId ~ projectPath ~ eventPayload =>
-            TriplesGeneratedEvent(eventId, projectPath, eventPayload)
+          .query(compoundEventIdDecoder ~ projectSlugDecoder ~ zippedPayloadDecoder)
+          .map { case eventId ~ projectSlug ~ eventPayload =>
+            TriplesGeneratedEvent(eventId, projectSlug, eventPayload)
           }
       )
-      .arguments(idAndPath.path *: idAndPath.id *: executionDate *: executionDate *: EmptyTuple)
+      .arguments(idAndSlug.slug *: idAndSlug.id *: executionDate *: executionDate *: EmptyTuple)
       .build(_.option)
   }
 
@@ -171,13 +171,13 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
 
   private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None
-    case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
+    case (projectIdAndSlug, _) +: Nil => Some(projectIdAndSlug)
     case many                         => pickRandomlyFrom(prioritiesList(from = many))
   }
 
   private def prioritiesList(from: List[(ProjectIds, Priority)]): List[ProjectIds] =
-    from.foldLeft(List.empty[ProjectIds]) { case (acc, (projectIdAndPath, priority)) =>
-      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
+    from.foldLeft(List.empty[ProjectIds]) { case (acc, (projectIdAndSlug, priority)) =>
+      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndSlug)
     }
 
   private lazy val markAsTransformingTriples
@@ -217,9 +217,9 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
 
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[TriplesGeneratedEvent]) =
     (maybeBody, maybeProject)
-      .mapN { case (_, ProjectIds(_, projectPath)) =>
-        (EventStatusGauges[F].awaitingTransformation decrement projectPath) >>
-          (EventStatusGauges[F].underTransformation increment projectPath)
+      .mapN { case (_, ProjectIds(_, projectSlug)) =>
+        (EventStatusGauges[F].awaitingTransformation decrement projectSlug) >>
+          (EventStatusGauges[F].underTransformation increment projectSlug)
       }
       .getOrElse(().pure[F])
 }

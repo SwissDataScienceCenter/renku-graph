@@ -56,7 +56,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             ds.additionalInfo.maybeDescription,
             ds.additionalInfo.images,
             NonEmptyList.one(
-              Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.path)
+              Link(ds.provenance.topmostSameAs, ds.resourceId, project.resourceId, project.slug)
             )
           )
         }
@@ -88,7 +88,7 @@ class SearchInfoExtractorSpec extends AnyWordSpec with should.Matchers {
             Link(lastModification.provenance.topmostSameAs,
                  lastModification.resourceId,
                  project.resourceId,
-                 project.path
+                 project.slug
             )
           )
         )

@@ -29,7 +29,7 @@ import io.renku.http.rest.paging.model.PerPage
 import org.typelevel.log4cats.Logger
 
 private trait LatestPayloadFinder[F[_]] {
-  def fetchLatestPayload(path: projects.Path): F[Option[EventPayload]]
+  def fetchLatestPayload(slug: projects.Slug): F[Option[EventPayload]]
 }
 
 private object LatestPayloadFinder {
@@ -39,17 +39,17 @@ private object LatestPayloadFinder {
 
 private class LatestPayloadFinderImpl[F[_]: MonadThrow](elClient: EventLogClient[F]) extends LatestPayloadFinder[F] {
 
-  override def fetchLatestPayload(path: projects.Path): F[Option[EventPayload]] =
-    findMostRecentSuccessfulEventId(path) >>= {
+  override def fetchLatestPayload(slug: projects.Slug): F[Option[EventPayload]] =
+    findMostRecentSuccessfulEventId(slug) >>= {
       case None          => Option.empty[EventPayload].pure[F]
-      case Some(eventId) => findEventPayload(eventId, path)
+      case Some(eventId) => findEventPayload(eventId, slug)
     }
 
-  private def findMostRecentSuccessfulEventId(path: projects.Path) =
+  private def findMostRecentSuccessfulEventId(slug: projects.Slug) =
     elClient
       .getEvents(
         SearchCriteria
-          .forProject(path)
+          .forProject(slug)
           .withStatus(EventStatus.TriplesStore)
           .withPerPage(PerPage(1))
           .sortBy(SearchCriteria.Sort.EventDateDesc)
@@ -58,9 +58,9 @@ private class LatestPayloadFinderImpl[F[_]: MonadThrow](elClient: EventLogClient
       .map(_.headOption)
       .map(_.map(_.eventId))
 
-  private def findEventPayload(eventId: events.EventId, path: projects.Path) =
+  private def findEventPayload(eventId: events.EventId, slug: projects.Slug) =
     elClient
-      .getEventPayload(eventId, path)
+      .getEventPayload(eventId, slug)
       .flatMap(raiseErrorWhenException[Option[EventPayload]])
 
   private def raiseErrorWhenException[O](result: EventLogClient.Result[O]) =

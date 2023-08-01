@@ -74,7 +74,7 @@ class EntityBuilderSpec
         .generateOne
 
       val glProject = gitLabProjectInfo(testProject)
-      givenFindProjectInfo(testProject.path)
+      givenFindProjectInfo(testProject.slug)
         .returning(rightT[Try, ProcessingRecoverableError](glProject.some))
 
       val modelProject = testProject.to[entities.Project]
@@ -83,7 +83,7 @@ class EntityBuilderSpec
       val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
-            project = consumers.Project(projectIds.generateOne, testProject.path),
+            project = consumers.Project(projectIds.generateOne, testProject.slug),
             payload = cliProject.asJsonLD(CliProject.flatJsonLDEncoder)
           )
         )
@@ -99,7 +99,7 @@ class EntityBuilderSpec
         .generateOne
 
       val glProject = gitLabProjectInfo(testProject)
-      givenFindProjectInfo(testProject.path)
+      givenFindProjectInfo(testProject.slug)
         .returning(rightT[Try, ProcessingRecoverableError](glProject.some))
 
       val modelProject = testProject.to[entities.Project]
@@ -108,7 +108,7 @@ class EntityBuilderSpec
       val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
-            project = consumers.Project(projectIds.generateOne, testProject.path),
+            project = consumers.Project(projectIds.generateOne, testProject.slug),
             payload = payloadJsonLD(cliProject)
           )
         )
@@ -119,12 +119,12 @@ class EntityBuilderSpec
 
     "fail if there's no project info found for the project" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
-      givenFindProjectInfo(projectPath)
+      givenFindProjectInfo(projectSlug)
         .returning(rightT[Try, ProcessingRecoverableError](Option.empty[GitLabProjectInfo]))
 
-      val eventProject = consumers.Project(projectIds.generateOne, projectPath)
+      val eventProject = consumers.Project(projectIds.generateOne, projectSlug)
       val results = entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
@@ -140,16 +140,16 @@ class EntityBuilderSpec
 
     "fail if fetching the project info fails" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
 
       val exception = exceptions.generateOne
-      givenFindProjectInfo(projectPath)
+      givenFindProjectInfo(projectSlug)
         .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]))
 
       entityBuilder
         .buildEntity(
           triplesGeneratedEvents.generateOne.copy(
-            project = consumers.Project(projectIds.generateOne, projectPath),
+            project = consumers.Project(projectIds.generateOne, projectSlug),
             payload = JsonLD.arr()
           )
         )
@@ -163,9 +163,9 @@ class EntityBuilderSpec
         .withDatasets(datasetEntities(provenanceNonModified(creatorsGen = cliShapedPersons)))
         .generateOne
 
-      val eventProject = consumers.Project(projectIds.generateOne, testProject.path)
+      val eventProject = consumers.Project(projectIds.generateOne, testProject.slug)
 
-      givenFindProjectInfo(testProject.path)
+      givenFindProjectInfo(testProject.slug)
         .returning(rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(testProject).some))
 
       val results = entityBuilder
@@ -186,10 +186,10 @@ class EntityBuilderSpec
       val project      = projectEntities(anyVisibility, creatorGen = cliShapedPersons).map(removeMembers()).generateOne
       val otherProject = projectEntities(anyVisibility, creatorGen = cliShapedPersons).map(removeMembers()).generateOne
 
-      givenFindProjectInfo(project.path)
+      givenFindProjectInfo(project.slug)
         .returning(rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
+      val eventProject = consumers.Project(projectIds.generateOne, project.slug)
 
       val results = entityBuilder
         .buildEntity(
@@ -209,7 +209,7 @@ class EntityBuilderSpec
       val project      = projectEntities(anyVisibility, creatorGen = cliShapedPersons).map(removeMembers()).generateOne
       val eventProject = consumerProjects.generateOne
 
-      givenFindProjectInfo(eventProject.path)
+      givenFindProjectInfo(eventProject.slug)
         .returning(rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
       val results = entityBuilder.buildEntity {
@@ -220,17 +220,17 @@ class EntityBuilderSpec
       }.value
 
       results.failure.exception shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
-      results.failure.exception.getMessage shouldBe show"Event for project $eventProject contains payload for project ${project.path}"
+      results.failure.exception.getMessage shouldBe show"Event for project $eventProject contains payload for project ${project.slug}"
     }
 
     "successfully deserialize JsonLD to the model " +
-      "if project from the payload has the same path in case insensitive way as the project in the event" in new TestCase {
+      "if project from the payload has the same slug in case insensitive way as the project in the event" in new TestCase {
 
         val project = projectEntities(anyVisibility, creatorGen = cliShapedPersons).map(removeMembers()).generateOne
-        val eventProject = consumers.Project(projectIds.generateOne, projects.Path(project.path.value.toUpperCase()))
+        val eventProject = consumers.Project(projectIds.generateOne, projects.Slug(project.slug.value.toUpperCase()))
 
         val glProject = gitLabProjectInfo(project)
-        givenFindProjectInfo(eventProject.path)
+        givenFindProjectInfo(eventProject.slug)
           .returning(rightT[Try, ProcessingRecoverableError](glProject.some))
 
         val modelProject = project.to[entities.Project]
@@ -248,10 +248,10 @@ class EntityBuilderSpec
 
       val project = renkuProjectEntities(anyVisibility, creatorGen = cliShapedPersons).map(removeMembers()).generateOne
 
-      givenFindProjectInfo(project.path)
+      givenFindProjectInfo(project.slug)
         .returning(rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
 
-      val eventProject = consumers.Project(projectIds.generateOne, project.path)
+      val eventProject = consumers.Project(projectIds.generateOne, project.slug)
 
       val brokenDs = datasetEntities(provenanceInternal(cliShapedPersons))
         .withDateBefore(projects.DateCreated(project.dateCreated.value.minusSeconds(1)))
@@ -282,7 +282,7 @@ class EntityBuilderSpec
     def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
       projectIds.generateOne,
       project.name,
-      project.path,
+      project.slug,
       project.dateCreated,
       project.dateModified,
       project.maybeDescription,
@@ -290,8 +290,8 @@ class EntityBuilderSpec
       project.keywords,
       projectMembers.generateSet(),
       project.visibility,
-      maybeParentPath = project match {
-        case p: Project with Parent => p.parent.path.some
+      maybeParentSlug = project match {
+        case p: Project with Parent => p.parent.slug.some
         case _ => None
       },
       project.images.headOption
@@ -308,11 +308,11 @@ class EntityBuilderSpec
       }
     }
 
-    def givenFindProjectInfo(projectPath: projects.Path) = new {
+    def givenFindProjectInfo(projectSlug: projects.Slug) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
         (projectInfoFinder
-          .findProjectInfo(_: projects.Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .findProjectInfo(_: projects.Slug)(_: Option[AccessToken]))
+          .expects(projectSlug, maybeAccessToken)
           .returning(result)
     }
   }

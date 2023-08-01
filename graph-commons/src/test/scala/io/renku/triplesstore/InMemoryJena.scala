@@ -271,10 +271,10 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   registerDataset(connectionInfoFactory, configFile)
 
   import io.renku.generators.Generators.Implicits._
-  import io.renku.graph.model.GraphModelGenerators.projectPaths
-  import io.renku.graph.model.projects.Path
+  import io.renku.graph.model.GraphModelGenerators.projectSlugs
+  import io.renku.graph.model.projects.Slug
 
-  private lazy val defaultProjectForGraph: Path = projectPaths.generateOne
+  private lazy val defaultProjectForGraph: Slug = projectSlugs.generateOne
 
   def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
     io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)

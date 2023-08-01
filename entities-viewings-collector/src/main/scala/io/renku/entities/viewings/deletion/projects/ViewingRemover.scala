@@ -49,11 +49,11 @@ private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
   import tsClient._
 
   override def removeViewing(event: ProjectViewingDeletion): F[Unit] =
-    deleteFromPersonViewings(event.path) >>
-      deleteFromProjectViewedTimes(event.path) >>
+    deleteFromPersonViewings(event.slug) >>
+      deleteFromProjectViewedTimes(event.slug) >>
       deleteOrphanPersonViewings()
 
-  private def deleteFromProjectViewedTimes(path: projects.Path): F[Unit] = updateWithNoResult(
+  private def deleteFromProjectViewedTimes(slug: projects.Slug): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: delete project viewings",
       Prefixes of renku -> "renku",
@@ -61,14 +61,14 @@ private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
                |WHERE {
                |  GRAPH ${GraphClass.ProjectViewedTimes.id} {
                |    ?id ?p ?o
-               |    FILTER (STRENDS(STR(?id), ${path.asObject}))
+               |    FILTER (STRENDS(STR(?id), ${slug.asObject}))
                |  }
                |}
                |""".stripMargin
     )
   )
 
-  private def deleteFromPersonViewings(path: projects.Path): F[Unit] = updateWithNoResult(
+  private def deleteFromPersonViewings(slug: projects.Slug): F[Unit] = updateWithNoResult(
     SparqlQuery.ofUnsafe(
       show"${categoryName.show.toLowerCase}: delete person viewings",
       Prefixes of renku -> "renku",
@@ -83,7 +83,7 @@ private class ViewingRemoverImpl[F[_]: MonadThrow](tsClient: TSClient[F]) extend
                |    ?userId renku:viewedProject ?viewingId.
                |    ?viewingId renku:project ?projectId.
                |    ?viewingId ?p ?o.
-               |    FILTER (STRENDS(STR(?projectId), ${path.asObject}))
+               |    FILTER (STRENDS(STR(?projectId), ${slug.asObject}))
                |  }
                |}
                |""".stripMargin

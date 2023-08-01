@@ -57,28 +57,28 @@ class FailedEventsRestorerSpec
         val eventToChange = storeGeneratedEvent(GenerationNonRecoverableFailure,
                                                 eventDate,
                                                 projectId,
-                                                projectPath,
+                                                projectSlug,
                                                 EventMessage(sentenceContaining(failure).generateOne).some
         )._1
         val olderMatchingEvent = storeGeneratedEvent(
           GenerationNonRecoverableFailure,
           timestamps(max = eventDate.value).generateAs(EventDate),
           projectId,
-          projectPath,
+          projectSlug,
           EventMessage(sentenceContaining(failure).generateOne).some
         )._1
         val newerMatchingEvent = storeGeneratedEvent(
           GenerationNonRecoverableFailure,
           timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
           projectId,
-          projectPath,
+          projectSlug,
           EventMessage(sentenceContaining(failure).generateOne).some
         )._1
         val olderNotMatchingEvent = storeGeneratedEvent(
           TriplesStore,
           timestamps(max = eventDate.value).generateAs(EventDate),
           projectId,
-          projectPath
+          projectSlug
         )._1
 
         restorer.run.unsafeRunSync() shouldBe ()
@@ -97,21 +97,21 @@ class FailedEventsRestorerSpec
         val matchingEvent = storeGeneratedEvent(GenerationNonRecoverableFailure,
                                                 eventDate,
                                                 projectId,
-                                                projectPath,
+                                                projectSlug,
                                                 EventMessage(sentenceContaining(failure).generateOne).some
         )._1
         val olderMatchingEvent = storeGeneratedEvent(
           GenerationNonRecoverableFailure,
           timestamps(max = eventDate.value).generateAs(EventDate),
           projectId,
-          projectPath,
+          projectSlug,
           EventMessage(sentenceContaining(failure).generateOne).some
         )._1
         val newerInDiscardingStatusEvent = storeGeneratedEvent(
           TriplesStore,
           timestampsNotInTheFuture(butYoungerThan = eventDate.value).generateAs(EventDate),
           projectId,
-          projectPath
+          projectSlug
         )._1
 
         restorer.run.unsafeRunSync() shouldBe ()
@@ -126,7 +126,7 @@ class FailedEventsRestorerSpec
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectSlug = projectSlugs.generateOne
     val failure: NonBlank = Refined.unsafeApply(s"%${sentenceContaining("%").generateOne}%")
 
     def compoundId(eventId: EventId) = CompoundEventId(eventId, projectId)

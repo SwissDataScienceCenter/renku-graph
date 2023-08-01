@@ -58,7 +58,7 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
 
   private def findValidProjectInfo(event: TriplesGeneratedEvent)(implicit
       maybeAccessToken: Option[AccessToken]
-  ) = projectInfoFinder.findProjectInfo(event.project.path) semiflatMap {
+  ) = projectInfoFinder.findProjectInfo(event.project.slug) semiflatMap {
     case Some(projectInfo) => projectInfo.pure[F]
     case None =>
       ProcessingNonRecoverableError
@@ -80,10 +80,10 @@ private class EntityBuilderImpl[F[_]: MonadThrow](
                          )
                          .raiseError[F, Project]
                    }
-        _ <- whenA(event.project.path.value.toLowerCase() != project.path.value.toLowerCase())(
+        _ <- whenA(event.project.slug.value.toLowerCase() != project.slug.value.toLowerCase())(
                ProcessingNonRecoverableError
                  .MalformedRepository(
-                   show"Event for project ${event.project} contains payload for project ${project.path}"
+                   show"Event for project ${event.project} contains payload for project ${project.slug}"
                  )
                  .raiseError[F, Unit]
              )

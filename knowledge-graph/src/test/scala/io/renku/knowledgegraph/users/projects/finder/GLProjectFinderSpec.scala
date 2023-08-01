@@ -157,7 +157,7 @@ class GLProjectFinderSpec
       "description":         ${project.maybeDesc.map(_.asJson).getOrElse(Json.Null)},
       "topics":              ${project.keywords},
       "name":                ${project.name},
-      "path_with_namespace": ${project.path},
+      "path_with_namespace": ${project.slug},
       "created_at":          ${project.dateCreated},
       "creator_id":          ${project.maybeCreatorId.map(_.asJson).getOrElse(Json.Null)}
     }"""

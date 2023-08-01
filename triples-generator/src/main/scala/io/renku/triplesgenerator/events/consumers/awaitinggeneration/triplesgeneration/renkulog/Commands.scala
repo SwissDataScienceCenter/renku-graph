@@ -49,17 +49,17 @@ private object Commands {
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
   trait GitLabRepoUrlFinder[F[_]] {
-    def findRepositoryUrl(projectPath: projects.Path)(implicit maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
+    def findRepositoryUrl(projectSlug: projects.Slug)(implicit maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
   }
 
   class GitLabRepoUrlFinderImpl[F[_]: MonadThrow](gitLabUrl: GitLabUrl) extends GitLabRepoUrlFinder[F] {
 
     import java.net.URL
 
-    override def findRepositoryUrl(projectPath: projects.Path)(implicit
+    override def findRepositoryUrl(projectSlug: projects.Slug)(implicit
         maybeAccessToken: Option[AccessToken]
     ): F[ServiceUrl] =
-      merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
+      merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectSlug)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
       case None                              => ""
@@ -68,13 +68,13 @@ private object Commands {
       case Some(PersonalAccessToken(token))  => s"gitlab-ci-token:$token@"
     }
 
-    private def merge(gitLabUrl: GitLabUrl, urlTokenPart: String, projectPath: projects.Path): F[ServiceUrl] =
+    private def merge(gitLabUrl: GitLabUrl, urlTokenPart: String, projectSlug: projects.Slug): F[ServiceUrl] =
       MonadThrow[F].fromEither {
         ServiceUrl.from {
           val url              = gitLabUrl.value
           val protocol         = new URL(url).getProtocol
           val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
-          s"$serviceWithToken/$projectPath.git"
+          s"$serviceWithToken/$projectSlug.git"
         }
       }
   }

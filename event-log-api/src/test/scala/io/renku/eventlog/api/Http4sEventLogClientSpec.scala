@@ -29,7 +29,7 @@ import io.circe.literal._
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.jsons
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectSlugs}
 import io.renku.graph.model._
 import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.http.client.UrlEncoder
@@ -78,19 +78,19 @@ class Http4sEventLogClientSpec
       result.toEither.fold(throw _, identity) shouldBe events
     }
 
-    "apply search criteria in the query - case with project path query param" in {
+    "apply search criteria in the query - case with project slug query param" in {
       val events      = EventContentGenerators.eventInfos().toGeneratorOfNonEmptyList().generateOne.toList
-      val projectPath = projectPaths.generateOne
+      val projectSlug = projectSlugs.generateOne
       val sinceDate   = EventContentGenerators.eventDates.generateOne.value.truncatedTo(ChronoUnit.SECONDS)
 
       stubFor {
         get(
-          s"/events?since=${param(sinceDate.toString)}&project-path=${projectPath.show}&page=1&per_page=35&sort=eventDate%3AASC"
+          s"/events?since=${param(sinceDate.toString)}&project-slug=${projectSlug.show}&page=1&per_page=35&sort=eventDate%3AASC"
         ).willReturn(ok(events))
       }
 
       val criteria = SearchCriteria
-        .forProject(projectPath)
+        .forProject(projectSlug)
         .withSince(EventDate(sinceDate))
         .withPerPage(35)
         .sortBy(SearchCriteria.Sort.EventDateAsc)
@@ -149,19 +149,19 @@ class Http4sEventLogClientSpec
 
   "getEventPayload" should {
     val eventId     = EventsGenerators.eventIds.generateOne
-    val projectPath = GraphModelGenerators.projectPaths.generateOne
+    val projectSlug = GraphModelGenerators.projectSlugs.generateOne
     val gzippedBody = ByteVector.fromValidHex("cafebabe")
 
     "return bytes" in {
       stubFor {
-        get(s"/events/${param(eventId.value)}/${param(projectPath.value)}/payload")
+        get(s"/events/${param(eventId.value)}/${param(projectSlug.value)}/payload")
           .willReturn(
             aResponse()
               .withHeader("Content-Type", "application/gzip")
               .withBody(gzippedBody.toArray)
           )
       }
-      val result = client.getEventPayload(eventId, projectPath).unsafeRunSync()
+      val result = client.getEventPayload(eventId, projectSlug).unsafeRunSync()
       result match {
         case Result.Success(Some(r)) => r.data shouldBe gzippedBody
         case _                       => fail(s"unexpected result: $result")
@@ -170,10 +170,10 @@ class Http4sEventLogClientSpec
 
     "return not found" in {
       stubFor {
-        get(s"/events/${param(eventId.value)}/${param(projectPath.value)}/payload")
+        get(s"/events/${param(eventId.value)}/${param(projectSlug.value)}/payload")
           .willReturn(notFound())
       }
-      val result = client.getEventPayload(eventId, projectPath).unsafeRunSync()
+      val result = client.getEventPayload(eventId, projectSlug).unsafeRunSync()
       result match {
         case Result.Success(None) => ()
         case _                    => fail(s"unexpected result: $result")
@@ -243,7 +243,7 @@ object Http4sEventLogClientSpec {
     }
 
     implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
-      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+      json"""{ "id": ${ids.id}, "slug": ${ids.slug} }"""
 
     implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
       json"""{

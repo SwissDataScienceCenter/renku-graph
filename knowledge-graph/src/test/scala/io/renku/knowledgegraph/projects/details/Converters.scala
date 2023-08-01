@@ -29,7 +29,7 @@ private trait Converters {
   lazy val kgProjectConverter: Project => KGProject = project =>
     KGProject(
       resourceId = project.resourceId,
-      path = project.path,
+      slug = project.slug,
       name = project.name,
       created = ProjectCreation(
         project.dateCreated,
@@ -48,7 +48,7 @@ private trait Converters {
   private lazy val kgParentConverter: Project => KGParent = parent =>
     KGParent(
       parent.resourceId,
-      parent.path,
+      parent.slug,
       parent.name,
       ProjectCreation(
         parent.dateCreated,

@@ -29,33 +29,33 @@ import io.renku.json.JsonOps._
 
 import java.time.Instant
 
-final case class ProjectViewedEvent(path: projects.Path, dateViewed: projects.DateViewed, maybeUserId: Option[UserId])
+final case class ProjectViewedEvent(slug: projects.Slug, dateViewed: projects.DateViewed, maybeUserId: Option[UserId])
 
 object ProjectViewedEvent {
 
-  def forProject(path: projects.Path, now: () => Instant = () => Instant.now): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), maybeUserId = None)
+  def forProject(slug: projects.Slug, now: () => Instant = () => Instant.now): ProjectViewedEvent =
+    ProjectViewedEvent(slug, dateViewed = projects.DateViewed(now()), maybeUserId = None)
 
-  def forProjectAndUserId(path:   projects.Path,
+  def forProjectAndUserId(slug:   projects.Slug,
                           userId: Option[persons.GitLabId],
                           now:    () => Instant = () => Instant.now
   ): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), userId.map(UserId(_)))
+    ProjectViewedEvent(slug, dateViewed = projects.DateViewed(now()), userId.map(UserId(_)))
 
-  def forProjectAndUserEmail(path:      projects.Path,
+  def forProjectAndUserEmail(slug:      projects.Slug,
                              userEmail: persons.Email,
                              now:       () => Instant = () => Instant.now
   ): ProjectViewedEvent =
-    ProjectViewedEvent(path, dateViewed = projects.DateViewed(now()), Some(UserId(userEmail)))
+    ProjectViewedEvent(slug, dateViewed = projects.DateViewed(now()), Some(UserId(userEmail)))
 
   val categoryName: CategoryName = CategoryName("PROJECT_VIEWED")
 
   implicit val encoder: Encoder[ProjectViewedEvent] = Encoder.instance {
-    case ProjectViewedEvent(path, dateViewed, maybeUserId) =>
+    case ProjectViewedEvent(slug, dateViewed, maybeUserId) =>
       json"""{
         "categoryName": $categoryName,
         "project": {
-          "path": $path
+          "slug": $slug
         },
         "date": $dateViewed
       }""" addIfDefined "user" -> maybeUserId
@@ -71,16 +71,16 @@ object ProjectViewedEvent {
 
     for {
       _           <- validateCategory
-      path        <- cursor.downField("project").downField("path").as[projects.Path]
+      slug        <- cursor.downField("project").downField("slug").as[projects.Slug]
       date        <- cursor.downField("date").as[projects.DateViewed]
       maybeUserId <- cursor.downField("user").as[Option[UserId]]
-    } yield ProjectViewedEvent(path, date, maybeUserId)
+    } yield ProjectViewedEvent(slug, date, maybeUserId)
   }
 
   implicit val show: Show[ProjectViewedEvent] = Show.show {
-    case ProjectViewedEvent(path, dateViewed, None) =>
-      show"projectPath = $path, date = $dateViewed"
-    case ProjectViewedEvent(path, dateViewed, Some(userId)) =>
-      show"projectPath = $path, date = $dateViewed, user = $userId"
+    case ProjectViewedEvent(slug, dateViewed, None) =>
+      show"projectSlug = $slug, date = $dateViewed"
+    case ProjectViewedEvent(slug, dateViewed, Some(userId)) =>
+      show"projectSlug = $slug, date = $dateViewed, user = $userId"
   }
 }

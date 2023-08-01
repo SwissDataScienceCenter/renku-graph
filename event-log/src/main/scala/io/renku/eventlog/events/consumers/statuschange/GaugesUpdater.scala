@@ -38,18 +38,18 @@ private class GaugesUpdaterImpl[F[_]: Applicative: EventStatusGauges] extends Ga
 
     case DBUpdateResults.ForProjects(projectsAndCounts) =>
       projectsAndCounts
-        .map { case (path, changedStatusCounts) =>
+        .map { case (slug, changedStatusCounts) =>
           def sum(of: EventStatus*): Double = changedStatusCounts.view.filterKeys(of.contains).values.sum
 
           List(
-            EventStatusGauges[F].awaitingGeneration.update(path -> sum(New, GenerationRecoverableFailure)),
-            EventStatusGauges[F].underGeneration.update(path    -> sum(GeneratingTriples)),
+            EventStatusGauges[F].awaitingGeneration.update(slug -> sum(New, GenerationRecoverableFailure)),
+            EventStatusGauges[F].underGeneration.update(slug    -> sum(GeneratingTriples)),
             EventStatusGauges[F].awaitingTransformation.update(
-              path -> sum(TriplesGenerated, TransformationRecoverableFailure)
+              slug -> sum(TriplesGenerated, TransformationRecoverableFailure)
             ),
-            EventStatusGauges[F].underTransformation.update(path -> sum(TransformingTriples)),
-            EventStatusGauges[F].awaitingDeletion.update(path    -> sum(AwaitingDeletion)),
-            EventStatusGauges[F].underDeletion.update(path       -> sum(Deleting))
+            EventStatusGauges[F].underTransformation.update(slug -> sum(TransformingTriples)),
+            EventStatusGauges[F].awaitingDeletion.update(slug    -> sum(AwaitingDeletion)),
+            EventStatusGauges[F].underDeletion.update(slug       -> sum(Deleting))
           ).sequence
         }
         .toList

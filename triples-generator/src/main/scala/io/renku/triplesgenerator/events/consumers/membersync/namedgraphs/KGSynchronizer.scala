@@ -44,13 +44,13 @@ private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMem
 ) extends KGSynchronizer[F] {
   import KGSynchronizerFunctions._
 
-  override def syncMembers(path: projects.Path, membersInGL: Set[GitLabProjectMember]): F[SyncSummary] = for {
-    membersInKG <- kgMembersFinder.findProjectMembers(path)
+  override def syncMembers(slug: projects.Slug, membersInGL: Set[GitLabProjectMember]): F[SyncSummary] = for {
+    membersInKG <- kgMembersFinder.findProjectMembers(slug)
     membersToAdd = findMembersToAdd(membersInGL, membersInKG)
     membersToAddWithIds <- kgPersonFinder.findPersonIds(membersToAdd)
-    insertionUpdates = updatesCreator.insertion(path, membersToAddWithIds)
+    insertionUpdates = updatesCreator.insertion(slug, membersToAddWithIds)
     membersToRemove  = findMembersToRemove(membersInGL, membersInKG)
-    removalUpdates   = updatesCreator.removal(path, membersToRemove)
+    removalUpdates   = updatesCreator.removal(slug, membersToRemove)
     _ <- (insertionUpdates ::: removalUpdates).map(tsClient.updateWithNoResult).sequence
   } yield SyncSummary(membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
 }

@@ -33,7 +33,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   private val matchingScoreVar    = VarName("matchingScore")
   private val nameVar             = VarName("name")
-  private val pathVar             = VarName("path")
+  private val slugVar             = VarName("slug")
   private val visibilityVar       = VarName("visibility")
   private val dateVar             = VarName("date")
   private val dateModifiedVar     = VarName("dateModified")
@@ -56,7 +56,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       entityTypeVar,
       matchingScoreVar,
       nameVar,
-      pathVar,
+      slugVar,
       visibilityVar,
       dateVar,
       dateModifiedVar,
@@ -69,7 +69,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
   override def query(criteria: Criteria): Option[String] = (criteria.filters whenRequesting entityType) {
     import criteria._
     sparql"""|{
-             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar
+             |  SELECT $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar
              |    (MIN($someDateCreatedVar) AS $maybeDateCreatedVar)
              |    (MAX($someDateModifiedVar) AS $dateModifiedVar)
              |    (MAX($someDateModifiedVar) AS $dateVar)
@@ -86,7 +86,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |    GRAPH ${GraphClass.Projects.id} {
              |      $projectIdVar a renku:DiscoverableProject;
              |                    schema:name $nameVar;
-             |                    renku:projectPath $pathVar;
+             |                    renku:projectPath $slugVar;
              |                    schema:dateModified $someDateModifiedVar;
              |                    schema:dateCreated $someDateCreatedVar.
              |
@@ -105,7 +105,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
              |      $imagesPart
              |    }
              |  }
-             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $pathVar $visibilityVar $maybeDescriptionVar
+             |  GROUP BY $entityTypeVar $matchingScoreVar $nameVar $slugVar $visibilityVar $maybeDescriptionVar
              |}
              |""".stripMargin.sparql
   }
@@ -206,7 +206,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
     for {
       matchingScore    <- read[MatchingScore](matchingScoreVar)
-      path             <- read[projects.Path](pathVar)
+      slug             <- read[projects.Slug](slugVar)
       name             <- read[projects.Name](nameVar)
       visibility       <- read[projects.Visibility](visibilityVar)
       dateCreated      <- read[projects.DateCreated](maybeDateCreatedVar)
@@ -217,7 +217,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
       keywords <-
         read[Option[String]](keywordsVar) >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
     } yield Entity.Project(matchingScore,
-                           path,
+                           slug,
                            name,
                            visibility,
                            dateCreated,

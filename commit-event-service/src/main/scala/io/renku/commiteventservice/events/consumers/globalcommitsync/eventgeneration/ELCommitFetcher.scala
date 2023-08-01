@@ -41,7 +41,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ELCommitFetcher[F[_]] {
-  def fetchELCommits(projectPath:   projects.Path,
+  def fetchELCommits(projectSlug:   projects.Slug,
                      dateCondition: DateCondition,
                      pageRequest:   PagingRequest
   ): F[PageResult]
@@ -65,18 +65,18 @@ private class ELCommitFetcherImpl[F[_]: Async: Logger](
     )
     with ELCommitFetcher[F] {
 
-  override def fetchELCommits(projectPath:   projects.Path,
+  override def fetchELCommits(projectSlug:   projects.Slug,
                               dateCondition: DateCondition,
                               pageRequest:   PagingRequest
   ): F[PageResult] = for {
-    uri        <- createUrl(projectPath, dateCondition, pageRequest)
+    uri        <- createUrl(projectSlug, dateCondition, pageRequest)
     pageResult <- send(request(GET, uri))(mapResponse)
   } yield pageResult
 
-  private def createUrl(projectPath: projects.Path, dateCondition: DateCondition, pageRequest: PagingRequest) =
+  private def createUrl(projectSlug: projects.Slug, dateCondition: DateCondition, pageRequest: PagingRequest) =
     validateUri(s"$eventLogUrl/events").map(
       _.withQueryParams(
-        Map("project-path" -> projectPath.show,
+        Map("project-slug" -> projectSlug.show,
             "page"         -> pageRequest.page.show,
             "per_page"     -> pageRequest.perPage.show
         ) + dateCondition.asQueryParameter

@@ -32,7 +32,7 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait MembersSynchronizer[F[_]] {
-  def synchronizeMembers(path: projects.Path): F[Unit]
+  def synchronizeMembers(slug: projects.Slug): F[Unit]
 }
 
 private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
@@ -45,24 +45,24 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
   import accessTokenFinder._
   import executionTimeRecorder._
 
-  override def synchronizeMembers(path: projects.Path): F[Unit] = {
+  override def synchronizeMembers(slug: projects.Slug): F[Unit] = {
     for {
-      _                                   <- Logger[F].info(show"$categoryName: $path accepted")
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(path)
-      membersInGL                         <- glMembersFinder.findProjectMembers(path)
-      _                                   <- syncMembers(path, kgSynchronizer.syncMembers(_, membersInGL))
+      _                                   <- Logger[F].info(show"$categoryName: $slug accepted")
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(slug)
+      membersInGL                         <- glMembersFinder.findProjectMembers(slug)
+      _                                   <- syncMembers(slug, kgSynchronizer.syncMembers(_, membersInGL))
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $path failed")
+    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $slug failed")
   }
 
-  private def syncMembers(path: projects.Path, sync: projects.Path => F[SyncSummary]) =
-    measureExecutionTime(sync(path)) >>= logSummary(path)
+  private def syncMembers(slug: projects.Slug, sync: projects.Slug => F[SyncSummary]) =
+    measureExecutionTime(sync(slug)) >>= logSummary(slug)
 
-  private def logSummary(path: projects.Path): ((ElapsedTime, SyncSummary)) => F[Unit] = {
+  private def logSummary(slug: projects.Slug): ((ElapsedTime, SyncSummary)) => F[Unit] = {
     case (elapsedTime, SyncSummary(membersAdded, membersRemoved)) =>
       Logger[F].info(
-        s"$categoryName: members for project: $path synchronized in ${elapsedTime}ms: " +
+        s"$categoryName: members for project: $slug synchronized in ${elapsedTime}ms: " +
           s"$membersAdded member(s) added, $membersRemoved member(s) removed"
       )
   }

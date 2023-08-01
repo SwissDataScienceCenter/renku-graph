@@ -40,9 +40,9 @@ private class EventHandler[F[_]: MonadCancelThrow: Logger](
       process = startForceCommitSync
     )
 
-  private def startForceCommitSync: Event => F[Unit] = { case project @ Project(projectId, projectPath) =>
+  private def startForceCommitSync: Event => F[Unit] = { case project @ Project(projectId, projectSlug) =>
     Logger[F].info(show"$categoryName: $project accepted") >>
-      globalCommitSyncForcer.moveGlobalCommitSync(projectId, projectPath)
+      globalCommitSyncForcer.moveGlobalCommitSync(projectId, projectSlug)
   }
 }
 

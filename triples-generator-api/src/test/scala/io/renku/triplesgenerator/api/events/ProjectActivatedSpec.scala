@@ -27,7 +27,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.Generators.{nonEmptyStrings, timestampsNotInTheFuture}
 import io.renku.graph.model.projects
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -49,9 +49,9 @@ class ProjectActivatedSpec
       val now         = mockFunction[Instant]
       now.expects().returning(currentTime)
 
-      val path = projectPaths.generateOne
+      val slug = projectSlugs.generateOne
 
-      ProjectActivated.forProject(path, now) shouldBe ProjectActivated(path, currentTime)
+      ProjectActivated.forProject(slug, now) shouldBe ProjectActivated(slug, currentTime)
     }
   }
 
@@ -68,11 +68,11 @@ class ProjectActivatedSpec
       json"""{
         "categoryName": "PROJECT_ACTIVATED",
         "project": {
-          "path": "project/path"
+          "slug": "project/path"
         },
         "date": "1988-11-04T00:00:00.000Z"
       }""".hcursor.as[ProjectActivated].value shouldBe ProjectActivated(
-        projects.Path("project/path"),
+        projects.Slug("project/path"),
         ProjectActivated.DateActivated(Instant.parse("1988-11-04T00:00:00.000Z"))
       )
     }
@@ -83,7 +83,7 @@ class ProjectActivatedSpec
       val result = json"""{
         "categoryName": $otherCategory,
         "project": {
-          "path": ${projectPaths.generateOne}
+          "slug": ${projectSlugs.generateOne}
         },
         "date": ${timestampsNotInTheFuture.generateAs(ProjectActivated.DateActivated)}
       }""".hcursor.as[ProjectActivated]
@@ -94,11 +94,11 @@ class ProjectActivatedSpec
 
   "show" should {
 
-    "return String info with path and the date" in {
+    "return String info with slug and the date" in {
 
       val event = projectActivatedEvents.generateOne
 
-      event.show shouldBe show"projectPath = ${event.path}, date = ${event.dateActivated}"
+      event.show shouldBe show"projectSlug = ${event.slug}, date = ${event.dateActivated}"
     }
   }
 }

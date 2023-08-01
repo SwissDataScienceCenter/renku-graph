@@ -8,7 +8,7 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 |--------|----------------------------|-----------------------------------------------------------------------------------------|
 | GET    | ```/metrics```             | Serves Prometheus metrics                                                               |
 | GET    | ```/ping```                | To check if service is healthy                                                          |
-| GET    | ```/projects/:id/tokens``` | Fetches an access token for the project id or path                                      |
+| GET    | ```/projects/:id/tokens``` | Fetches an access token for the project id or slug                                      |
 | POST   | ```/projects/:id/tokens``` | Generates and stores a new Project Access Token for the given project if does not exist |
 | DELETE | ```/projects/:id/tokens``` | Deletes the token and project id association                                            |
 | GET    | ```/version```             | Returns info about service version                                                      |
@@ -37,9 +37,9 @@ Verifies service health.
 
 #### GET /projects/:id/tokens
 
-Fetches an access token for a project id or path.
+Fetches an access token for a project id or slug.
 
-**NOTICE**: if project path used, it has to be URL encoded.
+**NOTICE**: if project slug used, it has to be URL encoded.
 
 **Response**
 

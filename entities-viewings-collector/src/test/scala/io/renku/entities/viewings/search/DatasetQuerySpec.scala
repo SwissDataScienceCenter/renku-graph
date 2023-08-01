@@ -47,9 +47,9 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
     upload(projectsDataset, person)
     provisionTestProjects(project1, project2).unsafeRunSync()
 
-    storeProjectViewed(userId, Instant.now().minus(1, ChronoUnit.DAYS), project1.path)
+    storeProjectViewed(userId, Instant.now().minus(1, ChronoUnit.DAYS), project1.slug)
     storeDatasetViewed(userId, Instant.now().minus(2, ChronoUnit.DAYS), dataset1.identification.identifier)
-    storeProjectViewed(userId, Instant.now().minus(3, ChronoUnit.DAYS), project2.path)
+    storeProjectViewed(userId, Instant.now().minus(3, ChronoUnit.DAYS), project2.slug)
     storeDatasetViewed(userId, Instant.now().minus(4, ChronoUnit.DAYS), dataset2.identification.identifier)
 
     val query = DatasetQuery.makeQuery(Criteria(Set.empty, AuthUser(userId, token), 5))
@@ -89,7 +89,7 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
         maybeDescription = dataset.additionalInfo.maybeDescription,
         images = dataset.additionalInfo.images.map(_.uri),
         creators = dataset.provenance.creators.toList.map(_.name),
-        exemplarProjectPath = project.path
+        exemplarProjectSlug = project.slug
       )
   }
 
@@ -129,7 +129,7 @@ class DatasetQuerySpec extends SearchTestBase with OptionValues {
         maybeDescription = dataset1.additionalInfo.maybeDescription,
         images = dataset1.additionalInfo.images.map(_.uri),
         creators = dataset1.provenance.creators.toList.map(_.name),
-        exemplarProjectPath = project1.path
+        exemplarProjectSlug = project1.slug
       )
   }
 }

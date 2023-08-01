@@ -22,7 +22,7 @@ import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.compoundEventIds
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import io.renku.graph.model.events.LastSyncedDate
 import org.scalacheck.Gen
 
@@ -30,9 +30,9 @@ private object Generators {
 
   val fullCommitSyncEvents: Gen[FullCommitSyncEvent] = for {
     id         <- compoundEventIds
-    path       <- projectPaths
+    slug       <- projectSlugs
     lastSynced <- timestampsNotInTheFuture toGeneratorOf LastSyncedDate
-  } yield FullCommitSyncEvent(id, path, lastSynced)
+  } yield FullCommitSyncEvent(id, slug, lastSynced)
 
   val minimalCommitSyncEvents: Gen[MinimalCommitSyncEvent] = for {
     project <- consumerProjects

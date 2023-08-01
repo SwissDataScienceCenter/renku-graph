@@ -62,7 +62,7 @@ trait PersonViewedProjectSpecTools {
   )
 
   protected def toCollectorProject(project: entities.Project) =
-    collector.persons.Project(project.resourceId, project.path)
+    collector.persons.Project(project.resourceId, project.slug)
 
   protected def insertOtherDate(projectId: projects.ResourceId, dateViewed: projects.DateViewed) =
     runUpdate(

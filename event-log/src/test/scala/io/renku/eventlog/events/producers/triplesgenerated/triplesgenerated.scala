@@ -19,14 +19,14 @@
 package io.renku.eventlog.events.producers
 
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.projectSlugs
 import org.scalacheck.Gen
 
 package object triplesgenerated {
 
   private[triplesgenerated] lazy val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
     eventId     <- compoundEventIds
-    projectPath <- projectPaths
+    projectSlug <- projectSlugs
     payload     <- zippedEventPayloads
-  } yield TriplesGeneratedEvent(eventId, projectPath, payload)
+  } yield TriplesGeneratedEvent(eventId, projectSlug, payload)
 }

@@ -39,7 +39,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
   "findProjects" should {
 
-    "combine results from both TS and GL favouring TS projects when having the same path" in new TestCase {
+    "combine results from both TS and GL favouring TS projects when having the same slug" in new TestCase {
 
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.All))
       val commonProject = notActivatedProjects.generateOne
@@ -206,7 +206,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     lazy val toActivated: model.Project.Activated = model.Project.Activated(
       project.name,
-      project.path,
+      project.slug,
       project.visibility,
       project.dateCreated,
       project.maybeCreator,

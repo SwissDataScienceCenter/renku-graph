@@ -33,7 +33,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 private[cleanup] trait TSCleaner[F[_]] {
-  def removeTriples(projectPath: projects.Path): F[Unit]
+  def removeTriples(projectSlug: projects.Slug): F[Unit]
 }
 
 private[cleanup] object TSCleaner {
@@ -70,11 +70,11 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import searchGraphsCleaner._
   private implicit val tsConnection: ProjectsConnectionConfig = connectionConfig
 
-  override def removeTriples(projectPath: projects.Path): F[Unit] =
-    findProjectId(projectPath) >>= {
+  override def removeTriples(projectSlug: projects.Slug): F[Unit] =
+    findProjectId(projectSlug) >>= {
       case Some(project) =>
-        relinkSameAsHierarchy(project.path) >>
-          relinkProjectHierarchy(project.path) >>
+        relinkSameAsHierarchy(project.slug) >>
+          relinkProjectHierarchy(project.slug) >>
           removeProjectGraph(project) >>
           cleanSearchGraphs(project)
       case None => ().pure[F]

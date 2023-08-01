@@ -27,14 +27,14 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 
 trait ImagesEncoder {
 
-  implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+  implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Slug)] =
+    Encoder.instance[(List[ImageUri], projects.Slug)] { case (imageUris, exemplarProjectSlug) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
            "location": $uri
          }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectSlug / "raw" / "master" / uri))
           )
         case uri: ImageUri.Absolute =>
           json"""{

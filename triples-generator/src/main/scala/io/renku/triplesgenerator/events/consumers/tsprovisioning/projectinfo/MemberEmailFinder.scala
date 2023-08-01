@@ -108,10 +108,10 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
 
   private def matchEmailOnSingleCommit(event: PushEvent, project: Project, eventsToCheck: List[PushEvent])(implicit
       maybeAccessToken: Option[AccessToken]
-  ) = findCommitAuthor(project.path, event.commitId) >>= {
+  ) = findCommitAuthor(project.slug, event.commitId) >>= {
     case Some((event.authorName, email)) => rightT[F, ProcessingRecoverableError](email.some)
     case _ => matchEmailFromCommits(eventsToCheck, project, rightT[F, ProcessingRecoverableError](none))
   }
 }
 
-private final case class Project(id: projects.GitLabId, path: projects.Path)
+private final case class Project(id: projects.GitLabId, slug: projects.Slug)

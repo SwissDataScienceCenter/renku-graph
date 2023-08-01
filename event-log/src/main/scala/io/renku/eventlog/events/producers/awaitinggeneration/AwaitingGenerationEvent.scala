@@ -23,11 +23,11 @@ import cats.syntax.all._
 import io.renku.graph.model.events.{CompoundEventId, EventBody}
 import io.renku.graph.model.projects
 
-private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
+private final case class AwaitingGenerationEvent(id: CompoundEventId, projectSlug: projects.Slug, body: EventBody)
 
 private object AwaitingGenerationEvent {
   implicit lazy val show: Show[AwaitingGenerationEvent] = Show.show { event =>
-    show"${event.id}, projectPath = ${event.projectPath}"
+    show"${event.id}, projectSlug = ${event.projectSlug}"
   }
 }
 

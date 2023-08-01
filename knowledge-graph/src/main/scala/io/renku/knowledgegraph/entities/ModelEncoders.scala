@@ -36,14 +36,14 @@ object ModelEncoders extends ModelEncoders
 
 trait ModelEncoders {
 
-  implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+  implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Slug)] =
+    Encoder.instance[(List[ImageUri], projects.Slug)] { case (imageUris, exemplarProjectSlug) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
           "location": $uri
         }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectSlug / "raw" / "master" / uri))
           )
         case uri: ImageUri.Absolute =>
           json"""{
@@ -58,21 +58,21 @@ trait ModelEncoders {
         "type":          ${Criteria.Filters.EntityType.Project.value},
         "matchingScore": ${project.matchingScore},
         "name":          ${project.name},
-        "path":          ${project.path},
-        "namespace":     ${project.path.toNamespaces.mkString("/")},
-        "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
+        "path":          ${project.slug},
+        "namespace":     ${project.slug.toNamespaces.mkString("/")},
+        "namespaces":    ${toDetailedInfo(project.slug.toNamespaces)},
         "visibility":    ${project.visibility},
         "date":          ${project.date},
         "dateCreated":   ${project.date},
         "dateModified":  ${project.dateModified},
         "keywords":      ${project.keywords},
-        "images":        ${(project.images -> project.path).asJson}
+        "images":        ${(project.images -> project.slug).asJson}
       }"""
         .addIfDefined("creator" -> project.maybeCreator)
         .addIfDefined("description" -> project.maybeDescription)
         .deepMerge(
           _links(
-            Link(Rel("details") -> knowledgegraph.projects.details.Endpoint.href(renkuApiUrl, project.path))
+            Link(Rel("details") -> knowledgegraph.projects.details.Endpoint.href(renkuApiUrl, project.slug))
           )
         )
     }
@@ -106,7 +106,7 @@ trait ModelEncoders {
         "date":          ${ds.date},
         "creators":      ${ds.creators},
         "keywords":      ${ds.keywords},
-        "images":        ${(ds.images -> ds.exemplarProjectPath).asJson}
+        "images":        ${(ds.images -> ds.exemplarProjectSlug).asJson}
       }"""
         .addIfDefined("description" -> ds.maybeDescription)
         .addIfDefined("dateModified" -> ds.dateModified)

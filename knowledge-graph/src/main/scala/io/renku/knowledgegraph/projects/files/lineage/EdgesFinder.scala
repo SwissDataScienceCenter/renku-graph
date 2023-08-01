@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{Slug, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.http.server.security.model.AuthUser
@@ -36,7 +36,7 @@ import model._
 import org.typelevel.log4cats.Logger
 
 private trait EdgesFinder[F[_]] {
-  def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap]
+  def findEdges(projectSlug: Slug, maybeUser: Option[AuthUser]): F[EdgeMap]
 }
 
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -47,8 +47,8 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])
 
-  override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap] =
-    queryEdges(query = query(projectPath, maybeUser)) map toNodesLocations
+  override def findEdges(projectSlug: Slug, maybeUser: Option[AuthUser]): F[EdgeMap] =
+    queryEdges(query = query(projectSlug, maybeUser)) map toNodesLocations
 
   private def queryEdges(query: SparqlQuery): F[Set[EdgeData]] = {
     val pageSize = 2000
@@ -67,14 +67,14 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     fetchPaginatedResult(Set.empty[EdgeData], query, offset = 0)
   }
 
-  private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(
+  private def query(slug: Slug, maybeUser: Option[AuthUser]) = SparqlQuery.of(
     name = "lineage - edges",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
-        |   BIND (${ResourceId(path)(renkuUrl).showAs[RdfResource]} AS ?projectId)
+        |   BIND (${ResourceId(slug)(renkuUrl).showAs[RdfResource]} AS ?projectId)
         |   GRAPH ?projectId {
-        |     ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
+        |     ${projectMemberFilterQuery(ResourceId(slug)(renkuUrl).showAs[RdfResource])(maybeUser)}
         |     ?activity a prov:Activity;
         |               ^renku:hasActivity ?projectId;
         |               prov:startedAtTime ?date;

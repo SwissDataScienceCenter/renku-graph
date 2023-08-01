@@ -26,12 +26,12 @@ import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder,
 import org.typelevel.log4cats.Logger
 
 private object ProjectHierarchyFixer {
-  def relinkProjectHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
+  def relinkProjectHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](slug: projects.Slug)(implicit
       connectionConfig: ProjectsConnectionConfig
-  ): F[Unit] = MonadThrow[F].catchNonFatal(new ProjectHierarchyFixer[F](path)(connectionConfig)) >>= (_.run())
+  ): F[Unit] = MonadThrow[F].catchNonFatal(new ProjectHierarchyFixer[F](slug)(connectionConfig)) >>= (_.run())
 }
 
-private class ProjectHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](projectPath: projects.Path)(
+private class ProjectHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](projectSlug: projects.Slug)(
     connectionConfig: ProjectsConnectionConfig
 ) extends TSClientImpl(connectionConfig) {
 
@@ -50,7 +50,7 @@ private class ProjectHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder
         INSERT { GRAPH ?childId { ?childId prov:wasDerivedFrom ?parentId } }
         WHERE {
           GRAPH ?projectGraphId {
-            ?projectId renku:projectPath ${projectPath.asObject.asSparql.sparql}
+            ?projectId renku:projectPath ${projectSlug.asObject.asSparql.sparql}
           }
           OPTIONAL { GRAPH ?projectId { ?projectId prov:wasDerivedFrom ?parentId } }
           GRAPH ?childGraphId {

@@ -55,7 +55,7 @@ class DbUpdaterSpec
       sessionResource
         .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, project))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
-        project.path,
+        project.slug,
         Map(eventOldStatus -> -1, AwaitingDeletion -> 1)
       )
 
@@ -95,7 +95,7 @@ class DbUpdaterSpec
         timestampsNotInTheFuture.generateAs(ExecutionDate),
         timestampsNotInTheFuture.generateAs(EventDate),
         eventBodies.generateOne,
-        projectPath = project.path
+        projectSlug = project.slug
       )
       eventId.id
     }

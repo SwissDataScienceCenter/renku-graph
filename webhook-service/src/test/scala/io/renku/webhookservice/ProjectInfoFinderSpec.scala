@@ -103,7 +103,7 @@ class ProjectInfoFinderSpec
 
     lazy val projectJson: String = json"""{
       "id":                  $projectId,
-      "path_with_namespace": ${project.path}
+      "path_with_namespace": ${project.slug}
     }""".noSpaces
 
     lazy val mapResponse = captureMapping(gitLabClient)(

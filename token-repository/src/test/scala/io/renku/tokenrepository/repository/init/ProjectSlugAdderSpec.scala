@@ -26,7 +26,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathAdderSpec
+class ProjectSlugAdderSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec

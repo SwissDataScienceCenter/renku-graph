@@ -36,9 +36,9 @@ import tooling.{AcceptanceSpec, ApplicationServices}
 
 class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
-  Feature("GET /events?project-path=<path> to return info about all the project events") {
+  Feature("GET /events?project-slug=<slug> to return info about all the project events") {
 
-    Scenario("As a user I would like to see all events from the project with the given path") {
+    Scenario("As a user I would like to see all events from the project with the given slug") {
 
       val commits = commitIds.generateNonEmptyList(max = 6)
       val user    = authUsers.generateOne
@@ -50,7 +50,7 @@ class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TS
         .generateOne
 
       Given("there are no events for the given project in EL")
-      val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
+      val noEventsResponse = eventLogClient.GET(s"events?project-slug=${urlEncode(project.slug.show)}")
       noEventsResponse.status                  shouldBe Ok
       noEventsResponse.jsonBody.as[List[Json]] shouldBe Nil.asRight
 
@@ -64,7 +64,7 @@ class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TS
 
       eventually {
         Then("the user can see the events on the endpoint")
-        val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
+        val eventsResponse = eventLogClient.GET(s"events?project-slug=${urlEncode(project.slug.show)}")
         eventsResponse.status shouldBe Ok
         val Right(events) = eventsResponse.jsonBody.as[List[EventInfo]]
         events.size               shouldBe commits.size

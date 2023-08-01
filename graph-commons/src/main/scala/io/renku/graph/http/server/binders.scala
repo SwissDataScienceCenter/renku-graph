@@ -30,9 +30,9 @@ object binders {
     }.toOption
   }
 
-  object ProjectPath {
-    def unapply(value: String): Option[projects.Path] =
-      projects.Path.from(value).toOption
+  object ProjectSlug {
+    def unapply(value: String): Option[projects.Slug] =
+      projects.Slug.from(value).toOption
   }
 
   object EventId {

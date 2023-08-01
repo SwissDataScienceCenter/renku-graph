@@ -61,7 +61,7 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   override def process(event: SyncRepoMetadata): F[Unit] =
     Logger[F].info(show"$categoryName: $event accepted") >>
-      (fetchTSData(event.path), fetchGLData(event.path), fetchLatestPayload(event.path) >>= extractPayloadData(event))
+      (fetchTSData(event.slug), fetchGLData(event.slug), fetchLatestPayload(event.slug) >>= extractPayloadData(event))
         .parFlatMapN {
           case (Some(tsData), Some(glData), maybePayloadData) =>
             calculateUpdateCommands(tsData, glData, maybePayloadData) >>= executeUpdates
@@ -72,7 +72,7 @@ private class EventProcessorImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def extractPayloadData(event: SyncRepoMetadata): Option[EventPayload] => F[Option[DataExtract.Payload]] = {
     case None          => Option.empty[DataExtract.Payload].pure[F]
-    case Some(payload) => payloadDataExtractor.extractPayloadData(event.path, payload)
+    case Some(payload) => payloadDataExtractor.extractPayloadData(event.slug, payload)
   }
 
   private def executeUpdates: List[UpdateCommand] => F[Unit] =

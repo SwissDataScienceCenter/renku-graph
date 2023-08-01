@@ -30,7 +30,7 @@ import io.renku.data.Message
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.RenkuTinyTypeGenerators.projectPaths
+import io.renku.graph.model.RenkuTinyTypeGenerators.projectSlugs
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
@@ -50,13 +50,13 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     "and return 202 Accepted" in {
 
       val authUser  = authUsers.generateOne
-      val path      = projectPaths.generateOne
+      val slug      = projectSlugs.generateOne
       val newValues = newValuesGen.generateOne
 
-      givenUpdatingProjectInGL(path, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
-      givenSyncRepoMetadataSending(path, returning = ().pure[IO])
+      givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
+      givenSyncRepoMetadataSending(slug, returning = ().pure[IO])
 
-      endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+      endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
           response.as[Json].asserting(_ shouldBe Message.Info("Project update accepted").asJson)
       }
@@ -65,9 +65,9 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   it should "return 400 BadRequest if payload is malformed" in {
 
     val authUser = authUsers.generateOne
-    val path     = projectPaths.generateOne
+    val slug     = projectSlugs.generateOne
 
-    endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
+    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(Json.obj()), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Invalid payload"))
     }
@@ -76,13 +76,13 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   it should "return 400 BadRequest if GL returns 400" in {
 
     val authUser  = authUsers.generateOne
-    val path      = projectPaths.generateOne
+    val slug      = projectSlugs.generateOne
     val newValues = newValuesGen.generateOne
 
     val error = jsons.generateOne
-    givenUpdatingProjectInGL(path, newValues, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
+    givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.left(error.pure[IO]))
 
-    endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.BadRequest) >>
         response.as[Message].asserting(_ shouldBe Message.Error.fromJsonUnsafe(error))
     }
@@ -91,17 +91,17 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   it should "return 500 InternalServerError if updating GL failed" in {
 
     val authUser  = authUsers.generateOne
-    val path      = projectPaths.generateOne
+    val slug      = projectSlugs.generateOne
     val newValues = newValuesGen.generateOne
 
     val exception = exceptions.generateOne
-    givenUpdatingProjectInGL(path,
+    givenUpdatingProjectInGL(slug,
                              newValues,
                              authUser.accessToken,
                              returning = EitherT(exception.raiseError[IO, Either[Json, Unit]])
     )
 
-    endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
@@ -110,14 +110,14 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   it should "return 500 InternalServerError if sending event failed" in {
 
     val authUser  = authUsers.generateOne
-    val path      = projectPaths.generateOne
+    val slug      = projectSlugs.generateOne
     val newValues = newValuesGen.generateOne
 
-    givenUpdatingProjectInGL(path, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
+    givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
     val exception = exceptions.generateOne
-    givenSyncRepoMetadataSending(path, returning = exception.raiseError[IO, Nothing])
+    givenSyncRepoMetadataSending(slug, returning = exception.raiseError[IO, Nothing])
 
-    endpoint.`PUT /projects/:path`(path, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
+    endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
       response.pure[IO].asserting(_.status shouldBe Status.InternalServerError) >>
         response.as[Message].asserting(_ shouldBe Message.Error("Update failed"))
     }
@@ -128,16 +128,16 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
   private val tgClient         = mock[triplesgenerator.api.events.Client[IO]]
   private lazy val endpoint    = new EndpointImpl[IO](glProjectUpdater, tgClient)
 
-  private def givenUpdatingProjectInGL(path:      projects.Path,
+  private def givenUpdatingProjectInGL(slug:      projects.Slug,
                                        newValues: NewValues,
                                        at:        AccessToken,
                                        returning: EitherT[IO, Json, Unit]
   ) = (glProjectUpdater.updateProject _)
-    .expects(path, newValues, at)
+    .expects(slug, newValues, at)
     .returning(returning)
 
-  private def givenSyncRepoMetadataSending(path: projects.Path, returning: IO[Unit]) =
-    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(path)).returning(returning)
+  private def givenSyncRepoMetadataSending(slug: projects.Slug, returning: IO[Unit]) =
+    (tgClient.send(_: SyncRepoMetadata)).expects(SyncRepoMetadata(slug)).returning(returning)
 
   private implicit lazy val payloadEncoder: Encoder[NewValues] = Encoder.instance { case NewValues(visibility) =>
     json"""{"visibility":  $visibility}"""

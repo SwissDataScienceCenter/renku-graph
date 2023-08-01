@@ -27,7 +27,7 @@ import io.renku.triplesstore.ResultsDecoder._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectIdFinder[F[_]] {
-  def findProjectId(path: projects.Path): F[Option[ProjectIdentification]]
+  def findProjectId(slug: projects.Slug): F[Option[ProjectIdentification]]
 }
 
 private object ProjectIdFinder {
@@ -48,11 +48,11 @@ private class ProjectIdFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.triplesstore.SparqlQuery.Prefixes
   import io.renku.triplesstore.client.syntax._
 
-  override def findProjectId(path: projects.Path): F[Option[ProjectIdentification]] =
-    queryExpecting[Option[projects.ResourceId]](query(path))(encoder)
-      .map(_.map(ProjectIdentification(_, path)))
+  override def findProjectId(slug: projects.Slug): F[Option[ProjectIdentification]] =
+    queryExpecting[Option[projects.ResourceId]](query(slug))(encoder)
+      .map(_.map(ProjectIdentification(_, slug)))
 
-  private def query(path: projects.Path) =
+  private def query(slug: projects.Slug) =
     SparqlQuery.of(
       name = "find projectId",
       Prefixes of renku -> "renku",
@@ -60,7 +60,7 @@ private class ProjectIdFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       SELECT ?projectId
       WHERE {
         GRAPH ?projectId {
-          ?projectId renku:projectPath ${path.asObject.asSparql.sparql}
+          ?projectId renku:projectPath ${slug.asObject.asSparql.sparql}
         }
       }
      """

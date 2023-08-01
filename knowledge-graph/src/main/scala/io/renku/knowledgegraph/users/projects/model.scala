@@ -32,7 +32,7 @@ private object model {
 
   sealed trait Project extends Product with Serializable {
     val name:         projects.Name
-    val path:         projects.Path
+    val slug:         projects.Slug
     val visibility:   projects.Visibility
     val dateCreated:  projects.DateCreated
     val maybeCreator: Option[persons.Name]
@@ -44,7 +44,7 @@ private object model {
 
     final case class Activated(
         name:         projects.Name,
-        path:         projects.Path,
+        slug:         projects.Slug,
         visibility:   projects.Visibility,
         dateCreated:  projects.DateCreated,
         maybeCreator: Option[persons.Name],
@@ -56,7 +56,7 @@ private object model {
       implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[Activated] =
         Encoder.instance[Activated] { project =>
           json"""{
-            "path":        ${project.path},
+            "path":        ${project.slug},
             "name":        ${project.name},
             "visibility":  ${project.visibility},
             "date":        ${project.dateCreated},
@@ -66,7 +66,7 @@ private object model {
             .addIfDefined("description" -> project.maybeDesc)
             .deepMerge(
               _links(
-                Link(Rel("details") -> Endpoint.href(renkuApiUrl, project.path))
+                Link(Rel("details") -> Endpoint.href(renkuApiUrl, project.slug))
               )
             )
         }
@@ -75,7 +75,7 @@ private object model {
     final case class NotActivated(
         id:             projects.GitLabId,
         name:           projects.Name,
-        path:           projects.Path,
+        slug:           projects.Slug,
         visibility:     projects.Visibility,
         dateCreated:    projects.DateCreated,
         maybeCreatorId: Option[persons.GitLabId],
@@ -89,7 +89,7 @@ private object model {
         Encoder.instance[NotActivated] { project =>
           json"""{
             "id":          ${project.id},
-            "path":        ${project.path},
+            "path":        ${project.slug},
             "name":        ${project.name},
             "visibility":  ${project.visibility},
             "date":        ${project.dateCreated},

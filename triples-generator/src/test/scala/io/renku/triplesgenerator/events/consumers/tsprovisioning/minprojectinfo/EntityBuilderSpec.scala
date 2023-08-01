@@ -58,11 +58,11 @@ class EntityBuilderSpec
 
       val projectInfo = gitLabProjectInfos.generateOne
 
-      givenFindProjectInfo(projectInfo.path)
+      givenFindProjectInfo(projectInfo.slug)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectInfo.some))
 
       entityBuilder
-        .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.path)))
+        .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.slug)))
         .value
         .success
         .value shouldBe projectInfo.to[entities.Project].asRight
@@ -72,7 +72,7 @@ class EntityBuilderSpec
 
       val event = minProjectInfoEvents.generateOne
 
-      givenFindProjectInfo(event.project.path)
+      givenFindProjectInfo(event.project.slug)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](Option.empty[GitLabProjectInfo]))
 
       val error = entityBuilder.buildEntity(event).value.failure.exception
@@ -86,7 +86,7 @@ class EntityBuilderSpec
       val event = minProjectInfoEvents.generateOne
 
       val exception = exceptions.generateOne
-      givenFindProjectInfo(event.project.path)
+      givenFindProjectInfo(event.project.slug)
         .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Option[GitLabProjectInfo]]]))
 
       entityBuilder.buildEntity(event).value.failure.exception shouldBe exception
@@ -98,11 +98,11 @@ class EntityBuilderSpec
         val gl = gitLabProjectInfos.generateOne
         gl.copy(dateModified = timestamps(max = gl.dateCreated.value.minusSeconds(1)).generateAs(projects.DateModified))
       }
-      givenFindProjectInfo(projectInfo.path)
+      givenFindProjectInfo(projectInfo.slug)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectInfo.some))
 
       entityBuilder
-        .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.path)))
+        .buildEntity(MinProjectInfoEvent(consumers.Project(projectInfo.id, projectInfo.slug)))
         .value
         .failure
         .exception shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
@@ -114,11 +114,11 @@ class EntityBuilderSpec
     private val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val entityBuilder             = new EntityBuilderImpl[Try](projectInfoFinder)
 
-    def givenFindProjectInfo(projectPath: projects.Path) = new {
+    def givenFindProjectInfo(projectSlug: projects.Slug) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =
         (projectInfoFinder
-          .findProjectInfo(_: projects.Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .findProjectInfo(_: projects.Slug)(_: Option[AccessToken]))
+          .expects(projectSlug, maybeAccessToken)
           .returning(result)
     }
   }
@@ -130,7 +130,7 @@ class EntityBuilderSpec
   private implicit val toEntitiesProject: GitLabProjectInfo => entities.Project = {
     case GitLabProjectInfo(_,
                            name,
-                           path,
+                           slug,
                            dateCreated,
                            dateModified,
                            maybeDescription,
@@ -138,12 +138,12 @@ class EntityBuilderSpec
                            keywords,
                            members,
                            visibility,
-                           Some(parentPath),
+                           Some(parentSlug),
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithParent(
-        ResourceId(path),
-        path,
+        ResourceId(slug),
+        slug,
         name,
         maybeDescription,
         dateCreated,
@@ -152,12 +152,12 @@ class EntityBuilderSpec
         visibility,
         keywords,
         members.map(toPerson),
-        ResourceId(parentPath),
-        convertImageUris(ResourceId(path).asEntityId)(avatarUrl.toList)
+        ResourceId(parentSlug),
+        convertImageUris(ResourceId(slug).asEntityId)(avatarUrl.toList)
       )
     case GitLabProjectInfo(_,
                            name,
-                           path,
+                           slug,
                            dateCreated,
                            dateModified,
                            maybeDescription,
@@ -169,8 +169,8 @@ class EntityBuilderSpec
                            avatarUrl
         ) =>
       entities.NonRenkuProject.WithoutParent(
-        ResourceId(path),
-        path,
+        ResourceId(slug),
+        slug,
         name,
         maybeDescription,
         dateCreated,
@@ -179,7 +179,7 @@ class EntityBuilderSpec
         visibility,
         keywords,
         members.map(toPerson),
-        convertImageUris(ResourceId(path).asEntityId)(avatarUrl.toList)
+        convertImageUris(ResourceId(slug).asEntityId)(avatarUrl.toList)
       )
   }
 

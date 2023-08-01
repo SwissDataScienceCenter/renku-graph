@@ -73,8 +73,8 @@ trait RenkuProjectEntitiesGenerators {
       datasetFactories:      List[DatasetGenFactory[Dataset.Provenance]] = Nil,
       forksCountGen:         Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
-    path             <- projectPaths
-    name             <- Gen.const(path.toName)
+    slug             <- projectSlugs
+    name             <- Gen.const(slug.toName)
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     agent            <- cliVersions
     dateCreated      <- projectDateCreatedGen
@@ -89,7 +89,7 @@ trait RenkuProjectEntitiesGenerators {
     datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
     images           <- imageUris.toGeneratorOfList()
   } yield RenkuProject.WithoutParent(
-    path,
+    slug,
     name,
     maybeDescription,
     agent,
@@ -121,7 +121,7 @@ trait RenkuProjectEntitiesGenerators {
   implicit lazy val gitLabProjectInfos: Gen[GitLabProjectInfo] = for {
     id               <- projectIds
     name             <- projectNames
-    path             <- projectPaths
+    slug             <- projectSlugs
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     dateModified     <- projectModifiedDates(dateCreated.value)
@@ -129,11 +129,11 @@ trait RenkuProjectEntitiesGenerators {
     keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
     members          <- projectMembers.toGeneratorOfList(min = 1).map(_.toSet)
     visibility       <- projectVisibilities
-    maybeParentPath  <- projectPaths.toGeneratorOfOptions
+    maybeParentSlug  <- projectSlugs.toGeneratorOfOptions
     avatarUri        <- imageUris.toGeneratorOfOptions
   } yield GitLabProjectInfo(id,
                             name,
-                            path,
+                            slug,
                             dateCreated,
                             dateModified,
                             maybeDescription,
@@ -141,7 +141,7 @@ trait RenkuProjectEntitiesGenerators {
                             keywords,
                             members,
                             visibility,
-                            maybeParentPath,
+                            maybeParentSlug,
                             avatarUri
   )
 

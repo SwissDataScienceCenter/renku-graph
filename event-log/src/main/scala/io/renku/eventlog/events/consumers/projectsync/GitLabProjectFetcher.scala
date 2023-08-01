@@ -31,7 +31,7 @@ import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthor
 import org.http4s.{EntityDecoder, Request, Response, Status}
 
 private trait GitLabProjectFetcher[F[_]] {
-  def fetchGitLabProject(projectId: projects.GitLabId): F[Either[UnauthorizedException, Option[projects.Path]]]
+  def fetchGitLabProject(projectId: projects.GitLabId): F[Either[UnauthorizedException, Option[projects.Slug]]]
 }
 
 private object GitLabProjectFetcher {
@@ -47,30 +47,30 @@ private class GitLabProjectFetcherImpl[F[_]: Async: GitLabClient: AccessTokenFin
 
   override def fetchGitLabProject(
       projectId: projects.GitLabId
-  ): F[Either[UnauthorizedException, Option[projects.Path]]] =
+  ): F[Either[UnauthorizedException, Option[projects.Slug]]] =
     findAccessToken(projectId) >>= { implicit accessToken =>
-      GitLabClient[F].get[Either[UnauthorizedException, Option[projects.Path]]](uri"projects" / projectId.show,
+      GitLabClient[F].get[Either[UnauthorizedException, Option[projects.Slug]]](uri"projects" / projectId.show,
                                                                                 "single-project"
       )(mapping)
     }
 
   private lazy val mapping
-      : PartialFunction[(Status, Request[F], Response[F]), F[Either[UnauthorizedException, Option[projects.Path]]]] = {
-    case (Ok, _, response) => response.as[Option[projects.Path]].map(_.asRight)
+      : PartialFunction[(Status, Request[F], Response[F]), F[Either[UnauthorizedException, Option[projects.Slug]]]] = {
+    case (Ok, _, response) => response.as[Option[projects.Slug]].map(_.asRight)
     case (NotFound | InternalServerError, _, _) =>
-      Option.empty[projects.Path].asRight[UnauthorizedException].pure[F]
+      Option.empty[projects.Slug].asRight[UnauthorizedException].pure[F]
     case (Unauthorized | Forbidden, _, _) =>
-      UnauthorizedException.asLeft[Option[projects.Path]].pure[F]
+      UnauthorizedException.asLeft[Option[projects.Slug]].pure[F]
   }
 
-  private implicit val entityDecoder: EntityDecoder[F, Option[projects.Path]] = {
+  private implicit val entityDecoder: EntityDecoder[F, Option[projects.Slug]] = {
     import org.http4s.circe.jsonOf
 
-    implicit val decoder: Decoder[Option[projects.Path]] = {
+    implicit val decoder: Decoder[Option[projects.Slug]] = {
       import io.circe.Decoder.decodeOption
       import io.renku.tinytypes.json.TinyTypeDecoders.relativePathDecoder
-      _.downField("path_with_namespace").as(decodeOption(relativePathDecoder(projects.Path)))
+      _.downField("path_with_namespace").as(decodeOption(relativePathDecoder(projects.Slug)))
     }
-    jsonOf[F, Option[projects.Path]]
+    jsonOf[F, Option[projects.Slug]]
   }
 }

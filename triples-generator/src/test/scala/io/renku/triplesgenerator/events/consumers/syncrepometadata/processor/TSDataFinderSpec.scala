@@ -47,12 +47,12 @@ class TSDataFinderSpec
       upload(to = projectsDataset, project)
 
       finder
-        .fetchTSData(project.path)
+        .fetchTSData(project.slug)
         .asserting(
           _.value shouldBe DataExtract
             .TS(
               project.resourceId,
-              project.path,
+              project.slug,
               project.name,
               project.visibility,
               project.dateModified.some,
@@ -64,9 +64,9 @@ class TSDataFinderSpec
     }
   }
 
-  it should "return None if there's no project with the given path" in {
+  it should "return None if there's no project with the given slug" in {
     finder
-      .fetchTSData(projectPaths.generateOne)
+      .fetchTSData(projectSlugs.generateOne)
       .asserting(_ shouldBe None)
   }
 
