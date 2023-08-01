@@ -184,7 +184,7 @@ class PostgresLockSpec extends AsyncWordSpec with AsyncIOSpec with should.Matche
           _            <- resetLockTable(s1)
           (_, release) <- makeExclusiveLock(s1, 1.second).run("1").allocated
           fiber        <- Async[IO].start(makeExclusiveLock(s2).run("1").allocated)
-          _            <- IO.sleep(50.millis)
+          _            <- IO.sleep(100.millis)
           stats        <- PostgresLockStats.getStats(s1)
           _            <- release
           _            <- fiber.join
