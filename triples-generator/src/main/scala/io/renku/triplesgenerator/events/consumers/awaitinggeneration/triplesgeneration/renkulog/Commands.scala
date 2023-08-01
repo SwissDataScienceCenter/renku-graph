@@ -57,7 +57,7 @@ private object Commands {
     import java.net.URL
 
     override def findRepositoryUrl(projectSlug: projects.Slug)(implicit
-                                                               maybeAccessToken: Option[AccessToken]
+        maybeAccessToken: Option[AccessToken]
     ): F[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectSlug)
 

@@ -34,12 +34,12 @@ import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
-                                                                         override val name: Migration.Name,
-                                                                         projectsFinder:    ProjectsFinder[F],
-                                                                         eventProducer:     projects.Slug => EventData,
-                                                                         eventSender:       EventSender[F],
-                                                                         executionRegister: MigrationExecutionRegister[F],
-                                                                         recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    override val name: Migration.Name,
+    projectsFinder:    ProjectsFinder[F],
+    eventProducer:     projects.Slug => EventData,
+    eventSender:       EventSender[F],
+    executionRegister: MigrationExecutionRegister[F],
+    recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends RegisteredMigration[F](name, executionRegister, recoveryStrategy) {
 
   import projectsFinder._

@@ -39,7 +39,7 @@ object projects {
       with NonNegativeInt[GitLabId]
       with TinyTypeJsonLDOps[GitLabId]
 
-  final class Slug private(val value: String) extends AnyVal with RelativePathTinyType with Identifier
+  final class Slug private (val value: String) extends AnyVal with RelativePathTinyType with Identifier
   implicit object Slug extends TinyTypeFactory[Slug](new Slug(_)) with RelativePath[Slug] with TinyTypeJsonLDOps[Slug] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"

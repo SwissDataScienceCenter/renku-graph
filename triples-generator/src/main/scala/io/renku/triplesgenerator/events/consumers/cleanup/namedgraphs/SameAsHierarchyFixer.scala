@@ -36,7 +36,7 @@ import org.typelevel.log4cats.Logger
 
 private object SameAsHierarchyFixer {
   def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](slug: projects.Slug)(implicit
-                                                                                               connectionConfig: ProjectsConnectionConfig
+      connectionConfig: ProjectsConnectionConfig
   ): F[Unit] = MonadThrow[F].catchNonFatal(new SameAsHierarchyFixer[F](slug)(connectionConfig)) >>= (_.run())
 }
 

@@ -78,7 +78,7 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
   private implicit val apiUrl: renku.ApiUrl = renkuApiUrl
 
   override def `GET /projects/:slug/datasets/:name/tags`(criteria: Criteria)(implicit
-                                                                             request: Request[F]
+      request: Request[F]
   ): F[Response[F]] = tagsFinder.findTags(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Tag]): Response[F] = {
