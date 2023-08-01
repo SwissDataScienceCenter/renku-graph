@@ -35,9 +35,9 @@ private object MemberSyncEventEncoder {
   import io.circe.literal._
 
   def encodeEvent(event: MemberSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
+    "categoryName": $categoryName,
     "project": {
-      "path":       ${event.projectSlug.value}
+      "slug": ${event.projectSlug}
     }
   }"""
 }

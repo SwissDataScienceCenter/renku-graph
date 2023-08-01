@@ -64,13 +64,13 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
           EventRequestContent.WithPayload[ByteArrayTinyType with ZippedContent](
             event = json"""{
               "categoryName": "EVENTS_STATUS_CHANGE",
-              "id": ${eventId.id.value},
+              "id": ${eventId.id},
               "project": {
-                "id": ${eventId.projectId.value},
-                "path": ${projectSlug.value}
+                "id":   ${eventId.projectId},
+                "slug": $projectSlug
               },
-              "subCategory": "ToTriplesGenerated",
-              "processingTime": ${processingTime.value}
+              "subCategory":    "ToTriplesGenerated",
+              "processingTime": $processingTime
             }""",
             payload = zippedPayload
           ),
@@ -98,13 +98,13 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
           EventRequestContent.NoPayload(
             json"""{
               "categoryName": "EVENTS_STATUS_CHANGE",
-              "id": ${eventId.id.value},
+              "id": ${eventId.id},
               "project": {
-                "id": ${eventId.projectId.value},
-                "path": ${projectSlug.value}
+                "id":   ${eventId.projectId},
+                "slug": $projectSlug
               },
-              "subCategory": "ToTriplesStore",
-              "processingTime": ${processingTime.value}
+              "subCategory":    "ToTriplesStore",
+              "processingTime": $processingTime
             }"""
           ),
           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
@@ -128,10 +128,10 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
           EventRequestContent.NoPayload(
             json"""{
               "categoryName": "EVENTS_STATUS_CHANGE",
-              "id":           ${eventId.id.value},
+              "id":           ${eventId.id},
               "project": {
-                "id":   ${eventId.projectId.value},
-                "path": ${projectSlug.value}
+                "id":   ${eventId.projectId},
+                "slug": $projectSlug
               },
               "subCategory": "RollbackToNew"
             }"""
@@ -156,7 +156,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
               "id":           ${eventId.id},
               "project": {
                 "id":   ${eventId.projectId},
-                "path": $projectSlug
+                "slug": $projectSlug
               },
               "subCategory": "RollbackToTriplesGenerated"
             }"""
@@ -187,7 +187,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
                   "id":           ${eventId.id},
                   "project": {
                     "id":   ${eventId.projectId},
-                    "path": $projectSlug
+                    "slug": $projectSlug
                   },
                   "subCategory": "ToFailure",
                   "message":   ${Message.Error.fromStackTrace(exception).show},
@@ -215,8 +215,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory wi
             json"""{
               "categoryName": "EVENTS_STATUS_CHANGE",
               "project": {
-                "id":   ${eventId.projectId.value},
-                "path": ${projectSlug.value}
+                "id":   ${eventId.projectId},
+                "slug": $projectSlug
               },
               "subCategory": "ProjectEventsToNew"
             }"""

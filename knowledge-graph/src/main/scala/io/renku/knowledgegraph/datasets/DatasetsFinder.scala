@@ -90,7 +90,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
       name = "ds free-text search",
       Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
       s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date 
-          |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectSlug) AS ?projectSamplePath) ?projectsCount
+          |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectSlug) AS ?projectSampleSlug) ?projectsCount
           |  (GROUP_CONCAT(?keyword; separator='|') AS ?keywords)
           |  (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images) 
           |WHERE { 

@@ -49,12 +49,12 @@ private object ZombieEventEncoder {
   import io.circe.literal.JsonStringContext
 
   def encodeEvent(event: ZombieEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "id":           ${event.eventId.id.value},
+    "categoryName": $categoryName,
+    "id":           ${event.eventId.id},
     "project": {
-      "id":         ${event.eventId.projectId.value},
-      "path":       ${event.projectSlug.value}
+      "id":   ${event.eventId.projectId},
+      "slug": ${event.projectSlug}
     },
-    "status":       ${event.status.value}
+    "status": ${event.status}
   }"""
 }

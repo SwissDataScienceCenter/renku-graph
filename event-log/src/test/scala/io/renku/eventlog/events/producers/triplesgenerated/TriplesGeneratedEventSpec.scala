@@ -27,7 +27,7 @@ class TriplesGeneratedEventSpec extends AnyWordSpec with should.Matchers {
 
   "show" should {
 
-    "print out the id and projectSlug" in {
+    "print out the event id id and project slug" in {
       val event = triplesGeneratedEvents.generateOne
       event.show shouldBe s"${event.id}, projectSlug = ${event.projectSlug}"
     }

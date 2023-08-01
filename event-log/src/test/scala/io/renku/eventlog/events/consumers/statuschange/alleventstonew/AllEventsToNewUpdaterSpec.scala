@@ -131,7 +131,7 @@ class AllEventsToNewUpdaterSpec
     "categoryName": "EVENTS_STATUS_CHANGE",
     "project": {
       "id":   ${project.id},
-      "path": ${project.slug}
+      "slug": ${project.slug}
     },
     "subCategory": "ProjectEventsToNew"
   }"""

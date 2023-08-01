@@ -240,7 +240,7 @@ class EndpointSpec
 
     def verifyProject(cursor: HCursor) = {
       val mainProject = cursor.downField("project").as[Json].value
-      (mainProject.hcursor.downField("slug").as[Slug], mainProject._links)
+      (mainProject.hcursor.downField("path").as[projects.Slug], mainProject._links)
         .mapN { case (slug, links) =>
           links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / slug))
         }
@@ -253,7 +253,7 @@ class EndpointSpec
 
       usedInJsons should have size dataset.usedIn.size
       usedInJsons foreach { json =>
-        (json.hcursor.downField("slug").as[Slug], json._links)
+        (json.hcursor.downField("path").as[projects.Slug], json._links)
           .mapN { case (path, links) =>
             links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
           }
@@ -372,7 +372,7 @@ class EndpointSpec
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      slug         <- cursor.downField("slug").as[projects.Slug]
+      slug         <- cursor.downField("path").as[projects.Slug]
       name         <- cursor.downField("name").as[projects.Name]
       visibility   <- cursor.downField("visibility").as[projects.Visibility]
       dsIdentifier <- cursor.downField("dataset").downField("identifier").as[datasets.Identifier]

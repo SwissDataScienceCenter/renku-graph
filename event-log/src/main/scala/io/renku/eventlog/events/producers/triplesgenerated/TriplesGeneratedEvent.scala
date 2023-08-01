@@ -27,12 +27,12 @@ private final case class TriplesGeneratedEvent(id:          CompoundEventId,
                                                projectSlug: projects.Slug,
                                                payload:     ZippedEventPayload
 ) {
-  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectSlug"
+  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectSlug = $projectSlug"
 }
 
 private object TriplesGeneratedEvent {
   implicit lazy val show: Show[TriplesGeneratedEvent] =
-    Show.show(event => show"${event.id}, projectPath = ${event.projectSlug}")
+    Show.show(event => show"${event.id}, projectSlug = ${event.projectSlug}")
 }
 
 private object TriplesGeneratedEventEncoder {
@@ -45,7 +45,7 @@ private object TriplesGeneratedEventEncoder {
     "id":           ${event.id.id},
     "project": {
       "id":   ${event.id.projectId},
-      "path": ${event.projectSlug}
+      "slug": ${event.projectSlug}
     }
   }"""
 

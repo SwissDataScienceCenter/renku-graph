@@ -179,7 +179,7 @@ object ModelEncoderSpec {
       description:   Option[projects.Description],
       creator:       Option[persons.Name],
       matchingScore: MatchingScore,
-      slug:          projects.Slug,
+      path:          projects.Slug,
       name:          projects.Name,
       namespace:     projects.Namespace,
       namespaces:    List[Ns],

@@ -21,27 +21,23 @@ package io.renku.eventlog.events.producers.zombieevents
 import Generators.zombieEvents
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
+class ZombieEventEncoderSpec extends AnyFlatSpec with should.Matchers {
 
-  "encodeEvent" should {
+  it should "serialize ZombieEvent to Json" in {
+    val event = zombieEvents.generateOne
 
-    "serialize ZombieEvent to Json" in {
-      val event = zombieEvents.generateOne
-
-      ZombieEventEncoder.encodeEvent(event) shouldBe
-        json"""{
+    ZombieEventEncoder.encodeEvent(event) shouldBe
+      json"""{
         "categoryName": "ZOMBIE_CHASING",
-        "id": ${event.eventId.id},
+        "id":           ${event.eventId.id},
         "project": {
           "id":   ${event.eventId.projectId},
           "slug": ${event.projectSlug}
         },
         "status": ${event.status}
       }"""
-    }
   }
-
 }

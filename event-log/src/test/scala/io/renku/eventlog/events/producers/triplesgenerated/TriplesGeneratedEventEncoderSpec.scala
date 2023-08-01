@@ -20,11 +20,13 @@ package io.renku.eventlog.events.producers.triplesgenerated
 
 import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
+import org.scalatest.EitherValues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers {
+class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
 
   "encoderParts" should {
 
@@ -33,12 +35,12 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
 
       val actualJson = TriplesGeneratedEventEncoder.encodeEvent(event)
 
-      actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
-      actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
-      actualJson.hcursor.downField("project").as[Json] shouldBe Right(json"""{
-                                                                               "id":   ${event.id.projectId},
-                                                                               "slug": ${event.projectSlug}
-                                                                             }""")
+      actualJson.hcursor.downField("categoryName").as[String].value shouldBe "TRIPLES_GENERATED"
+      actualJson.hcursor.downField("id").as[String].value           shouldBe event.id.id.value
+      actualJson.hcursor.downField("project").as[Json].value shouldBe Json.obj(
+        "id"   -> event.id.projectId.asJson,
+        "slug" -> event.projectSlug.asJson
+      )
     }
   }
 

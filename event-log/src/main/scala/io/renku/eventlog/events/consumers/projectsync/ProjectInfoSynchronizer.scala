@@ -65,13 +65,13 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (payload, eventCtx) => sendEvent(payload, eventCtx)
   }
 
-  private def commitSyncRequest(projectId: projects.GitLabId, newPath: projects.Slug) = {
+  private def commitSyncRequest(projectId: projects.GitLabId, newSlug: projects.Slug) = {
     val category = commitsyncrequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
-      "categoryName": ${category.show},
+      "categoryName": $category,
       "project": {
-        "id":   ${projectId.value},
-        "path": ${newPath.value}
+        "id":   $projectId,
+        "slug": $newSlug
       }
     }""")
     val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")
@@ -81,10 +81,10 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
   private def cleanUpRequest(event: ProjectSyncEvent) = {
     val category = cleanuprequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
-      "categoryName": ${category.show},
+      "categoryName": $category,
       "project": {
-        "id":   ${event.projectId.value},
-        "path": ${event.projectSlug.show}
+        "id":   ${event.projectId},
+        "slug": ${event.projectSlug}
       }
     }""")
     val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")

@@ -887,5 +887,5 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
   }
 
   private def commonLogMessage(event: CommitEvent): String =
-    s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.slug}"
+    s"$categoryName: ${event.compoundEventId}, projectSlug = ${event.project.slug}"
 }

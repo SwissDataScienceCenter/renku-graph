@@ -54,7 +54,7 @@ class ProjectInfoSynchronizerSpec
 
       givenSendingSyncRepoMetadata(event, returning = ().pure[IO])
 
-      synchronizer.syncProjectInfo(event).unsafeRunSync() shouldBe ()
+      synchronizer.syncProjectInfo(event).assertNoException
     }
 
   it should "fetch relevant project info from GitLab and " +
