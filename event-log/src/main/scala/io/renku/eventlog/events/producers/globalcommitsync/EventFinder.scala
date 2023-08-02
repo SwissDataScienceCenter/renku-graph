@@ -71,7 +71,7 @@ private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTime
       .select[CategoryName *: LastSyncedDate *: EmptyTuple, (Project, Option[LastSyncedDate])](
         sql"""SELECT
                 proj.project_id,
-                proj.project_path,
+                proj.project_slug,
                 sync_time.last_synced
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time

@@ -178,11 +178,11 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Querie
     SqlStatement(name = "new - upsert project")
       .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](
         sql"""
-            INSERT INTO project (project_id, project_path, latest_event_date)
+            INSERT INTO project (project_id, project_slug, latest_event_date)
             VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
-              UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
+              UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_slug = EXCLUDED.project_slug
               WHERE EXCLUDED.latest_event_date > project.latest_event_date
           """.command
       )

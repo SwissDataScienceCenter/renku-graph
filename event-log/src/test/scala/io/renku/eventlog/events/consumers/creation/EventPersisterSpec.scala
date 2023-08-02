@@ -152,7 +152,7 @@ class EventPersisterSpec
         storedProjects shouldBe List((event1.project.id, event1.project.slug, event2.date))
       }
 
-    "update latest_event_date and project_path for a project " +
+    "update latest_event_date and project_slug for a project " +
       "only if there's an event with more recent Event Date added" in new TestCase {
 
         // storing event 1
@@ -179,7 +179,7 @@ class EventPersisterSpec
         storedProjects shouldBe List((event1.project.id, event2.project.slug, event2.date))
       }
 
-    "do not update latest_event_date and project_path for a project " +
+    "do not update latest_event_date and project_slug for a project " +
       "only if there's an event with less recent Event Date added" in new TestCase {
 
         // storing event 1
@@ -354,7 +354,7 @@ class EventPersisterSpec
   private def storedProjects: List[(projects.GitLabId, projects.Slug, EventDate)] = execute {
     Kleisli { session =>
       val query: Query[Void, (projects.GitLabId, projects.Slug, EventDate)] =
-        sql"""SELECT project_id, project_path, latest_event_date
+        sql"""SELECT project_id, project_slug, latest_event_date
               FROM project"""
           .query(projectIdDecoder ~ projectSlugDecoder ~ eventDateDecoder)
           .map { case projectId ~ projectSlug ~ eventDate => (projectId, projectSlug, eventDate) }

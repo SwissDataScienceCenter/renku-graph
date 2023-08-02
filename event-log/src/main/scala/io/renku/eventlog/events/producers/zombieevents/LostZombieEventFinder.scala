@@ -55,11 +55,11 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: Que
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lze - find event")
       .select[ExecutionDate *: EventProcessingTime *: EmptyTuple, ZombieEvent](
-        sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
+        sql"""SELECT evt.event_id, evt.project_id, proj.project_slug, evt.status
               FROM event evt
               JOIN project proj ON evt.project_id = proj.project_id
               WHERE 
-                evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
+                evt.status IN (#${ProcessingStatus.all.map(s => s"'${s.value}'").mkString(", ")})
                 AND evt.message = '#$zombieMessage'
                 AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
               LIMIT 1

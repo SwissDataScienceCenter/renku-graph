@@ -54,7 +54,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event")
       .select[Void, MinProjectInfoEvent](
-        sql"""SELECT p.project_id, p.project_path
+        sql"""SELECT p.project_id, p.project_slug
               FROM project p
               WHERE NOT EXISTS (
                 SELECT project_id 

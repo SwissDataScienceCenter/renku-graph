@@ -60,7 +60,7 @@ private[statuschange] class DbUpdater[F[_]: Async: QueriesExecutionTimes](
     SqlStatement
       .named("all_to_new - find projects")
       .select[Void, ProjectEventsToNew](
-        sql"""SELECT proj.project_id, proj.project_path
+        sql"""SELECT proj.project_id, proj.project_slug
               FROM project proj
               ORDER BY proj.latest_event_date ASC"""
           .query(projectIdDecoder ~ projectSlugDecoder)

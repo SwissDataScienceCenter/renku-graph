@@ -66,7 +66,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
         FROM (
           SELECT e.event_id, e.project_id
           FROM event e
-          JOIN project p ON e.project_id = p.project_id AND p.project_path = $projectSlugEncoder
+          JOIN project p ON e.project_id = p.project_id AND p.project_slug = $projectSlugEncoder
           WHERE e.status = '#${TriplesStore.value}'
           ORDER BY event_date DESC
           LIMIT 1
@@ -119,7 +119,7 @@ private class DequeuedEventHandlerImpl[F[_]: Async: QueriesExecutionTimes](
                 AND project_id = (
                   SELECT project_id
                   FROM project
-                  WHERE project_path = $projectSlugEncoder
+                  WHERE project_slug = $projectSlugEncoder
                 )
                """.command
       )

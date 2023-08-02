@@ -83,7 +83,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
       .select[ExecutionDate *: ExecutionDate *: Int *: EmptyTuple, ProjectInfo](
         sql"""
-          SELECT p.project_id, p.project_path, p.latest_event_date,
+          SELECT p.project_id, p.project_slug, p.latest_event_date,
 	        (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
           FROM (
             SELECT DISTINCT project_id, MAX(event_date) AS max_event_date
@@ -140,7 +140,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: QueriesExe
       .select[projects.Slug *: projects.GitLabId *: ExecutionDate *: ExecutionDate *: EmptyTuple,
               AwaitingGenerationEvent
       ](sql"""
-        SELECT evt.event_id, evt.project_id, $projectSlugEncoder AS project_path, evt.event_body
+        SELECT evt.event_id, evt.project_id, $projectSlugEncoder AS project_slug, evt.event_body
         FROM (
           SELECT project_id, max(event_date) AS max_event_date
           FROM event

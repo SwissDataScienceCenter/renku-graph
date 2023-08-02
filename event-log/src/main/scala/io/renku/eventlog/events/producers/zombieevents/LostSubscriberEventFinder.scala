@@ -55,7 +55,7 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource:
       .named(s"${categoryName.value.toLowerCase} - lse - find events")
       .select[Void, ZombieEvent](
         sql"""
-        SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
+        SELECT DISTINCT evt.event_id, evt.project_id, proj.project_slug, evt.status
         FROM event_delivery delivery
         JOIN event evt ON evt.event_id = delivery.event_id
           AND evt.project_id = delivery.project_id

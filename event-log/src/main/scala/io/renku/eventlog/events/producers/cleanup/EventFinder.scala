@@ -72,7 +72,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event in queue")
       .select[Void, Project](sql"""
-        SELECT queue.project_id, queue.project_path
+        SELECT queue.project_id, queue.project_slug
         FROM clean_up_events_queue queue
         ORDER BY queue.date ASC
         LIMIT 1
@@ -85,7 +85,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event")
       .select[ExecutionDate, Project](sql"""
-        SELECT evt.project_id, prj.project_path
+        SELECT evt.project_id, prj.project_slug
         FROM event evt
         JOIN  project prj ON prj.project_id = evt.project_id 
         WHERE evt.status = '#${AwaitingDeletion.value}'
@@ -104,7 +104,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: Qu
           .named(s"${categoryName.show.toLowerCase} - delete clean-up event")
           .command[projects.Slug](sql"""
             DELETE FROM clean_up_events_queue
-            WHERE project_path = $projectSlugEncoder
+            WHERE project_slug = $projectSlugEncoder
             """.command)
           .arguments(projectSlug)
           .build

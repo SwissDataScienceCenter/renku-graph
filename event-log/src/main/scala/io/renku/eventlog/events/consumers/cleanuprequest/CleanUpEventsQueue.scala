@@ -54,7 +54,7 @@ private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource: QueriesExecut
     measureExecutionTime {
       SqlStatement[F](name = "clean_up_events_queue - offer")
         .command[OffsetDateTime *: projects.GitLabId *: projects.Slug *: EmptyTuple](
-          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
+          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_slug)
                 VALUES ($timestamptz, $projectIdEncoder, $projectSlugEncoder)
                 ON CONFLICT DO NOTHING
           """.command

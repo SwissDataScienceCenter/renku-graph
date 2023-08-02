@@ -102,7 +102,7 @@ object DequeuedEventHandler {
             FROM event e
             JOIN project p ON e.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectSlugEncoder
+              AND p.project_slug = $projectSlugEncoder
             WHERE #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
             FOR UPDATE
           ) old_evt
@@ -125,7 +125,7 @@ object DequeuedEventHandler {
             FROM status_processing_time t
             JOIN project p ON t.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectSlugEncoder
+              AND p.project_slug = $projectSlugEncoder
           )""".command)
         .arguments(project.id *: project.slug *: EmptyTuple)
         .build
@@ -141,7 +141,7 @@ object DequeuedEventHandler {
             FROM event_payload ep
             JOIN project p ON ep.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectSlugEncoder
+              AND p.project_slug = $projectSlugEncoder
           )""".command)
         .arguments(project.id *: project.slug *: EmptyTuple)
         .build
@@ -158,7 +158,7 @@ object DequeuedEventHandler {
             FROM event e
             JOIN project p ON e.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectSlugEncoder
+              AND p.project_slug = $projectSlugEncoder
           )
           """.command)
         .arguments(status *: project.id *: project.slug *: EmptyTuple)
@@ -179,7 +179,7 @@ object DequeuedEventHandler {
               FROM event e
               JOIN project p ON e.project_id = p.project_id
                 AND p.project_id = $projectIdEncoder
-                AND p.project_path = $projectSlugEncoder
+                AND p.project_slug = $projectSlugEncoder
               WHERE e.status = '#${GeneratingTriples.value}'
             )""".command)
         .arguments(project.id *: project.id *: project.slug *: EmptyTuple)
@@ -197,7 +197,7 @@ object DequeuedEventHandler {
             FROM subscription_category_sync_time st
             JOIN project p ON st.project_id = p.project_id
               AND p.project_id = $projectIdEncoder
-              AND p.project_path = $projectSlugEncoder
+              AND p.project_slug = $projectSlugEncoder
           )
           """.command)
         .arguments(project.id *: project.slug *: EmptyTuple)
@@ -212,7 +212,7 @@ object DequeuedEventHandler {
           FROM event e
           JOIN project p ON e.project_id = p.project_id
             AND p.project_id = $projectIdEncoder
-            AND p.project_path = $projectSlugEncoder
+            AND p.project_slug = $projectSlugEncoder
           ORDER BY event_date DESC
           LIMIT 1""".query(eventDateDecoder))
         .arguments(project.id *: project.slug *: EmptyTuple)

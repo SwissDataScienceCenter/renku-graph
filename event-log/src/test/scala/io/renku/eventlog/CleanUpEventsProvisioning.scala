@@ -40,7 +40,7 @@ trait CleanUpEventsProvisioning {
     execute {
       Kleisli { session =>
         val query: Command[OffsetDateTime *: projects.GitLabId *: projects.Slug *: EmptyTuple] = sql"""
-          INSERT INTO clean_up_events_queue (date, project_id, project_path)
+          INSERT INTO clean_up_events_queue (date, project_id, project_slug)
           VALUES ($timestamptz, $projectIdEncoder, $projectSlugEncoder)""".command
         session
           .prepare(query)
@@ -52,7 +52,7 @@ trait CleanUpEventsProvisioning {
   protected def findCleanUpEvents: List[(projects.GitLabId, projects.Slug)] = execute {
     Kleisli { session =>
       val query: Query[Void, projects.GitLabId ~ projects.Slug] = sql"""
-        SELECT project_id, project_path
+        SELECT project_id, project_slug
         FROM clean_up_events_queue
         ORDER BY date DESC"""
         .query(projectIdDecoder ~ projectSlugDecoder)
