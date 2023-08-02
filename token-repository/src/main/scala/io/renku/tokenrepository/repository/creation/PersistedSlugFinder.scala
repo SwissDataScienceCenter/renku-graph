@@ -50,7 +50,7 @@ private class PersistedSlugFinderImpl[F[_]: MonadCancelThrow: SessionResource: Q
     SqlStatement
       .named("find slug for token")
       .select[projects.GitLabId, projects.Slug](
-        sql"""SELECT project_path
+        sql"""SELECT project_slug
               FROM projects_tokens
               WHERE project_id = $projectIdEncoder"""
           .query(projectSlugDecoder)

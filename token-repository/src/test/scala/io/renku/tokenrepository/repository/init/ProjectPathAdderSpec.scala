@@ -26,7 +26,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectSlugAdderSpec
+class ProjectPathAdderSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
@@ -60,8 +60,6 @@ class ProjectSlugAdderSpec
   }
 
   private trait TestCase {
-    logger.reset()
-
     val projectPathAdder = new ProjectPathAdder[IO]
   }
 }

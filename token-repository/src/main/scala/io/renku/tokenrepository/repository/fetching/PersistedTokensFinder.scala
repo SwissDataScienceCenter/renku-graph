@@ -58,7 +58,7 @@ private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource:
   override def findStoredToken(projectSlug: Slug): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement(name = "find token - slug")
       .select[Slug, EncryptedAccessToken](
-        sql"select token from projects_tokens where project_path = $projectSlugEncoder"
+        sql"select token from projects_tokens where project_slug = $projectSlugEncoder"
           .query(encryptedAccessTokenDecoder)
       )
       .arguments(projectSlug)

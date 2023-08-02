@@ -58,7 +58,7 @@ private class ProjectPathAdder[F[_]: Spawn: Logger: SessionResource]
   }
 
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)("'project_path' column adding failure")
-    exception.raiseError[F, Unit]
+    Logger[F].error(exception)("'project_path' column adding failure") >>
+      exception.raiseError[F, Unit]
   }
 }
