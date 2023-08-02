@@ -40,26 +40,27 @@ class ProjectPathToSlugSpec
     case _ => true
   }
 
-  it should "rename the 'project_path' column to 'project_slug'" in {
+  it should "rename the 'project_path' column to 'project_slug' " +
+    "as well as rename the 'idx_project_path' index" in {
 
-    verifyColumnExists("projects_tokens", "project_path") shouldBe true
-    verifyColumnExists("projects_tokens", "project_slug") shouldBe false
+      verifyColumnExists("projects_tokens", "project_path") shouldBe true
+      verifyColumnExists("projects_tokens", "project_slug") shouldBe false
 
-    projectPathToSlug.run.unsafeRunSync()
+      projectPathToSlug.run.unsafeRunSync()
 
-    logger.loggedOnly(Info("column 'project_path' renamed to 'project_slug'"))
-    logger.reset()
+      logger.loggedOnly(Info("column 'project_path' renamed to 'project_slug'"))
+      logger.reset()
 
-    verifyColumnExists("projects_tokens", "project_path") shouldBe false
-    verifyColumnExists("projects_tokens", "project_slug") shouldBe true
+      verifyColumnExists("projects_tokens", "project_path") shouldBe false
+      verifyColumnExists("projects_tokens", "project_slug") shouldBe true
 
-    projectPathToSlug.run.unsafeRunSync()
+      projectPathToSlug.run.unsafeRunSync()
 
-    logger.loggedOnly(Info("'project_slug' column existed"))
+      logger.loggedOnly(Info("'project_slug' column existed"))
 
-    verifyIndexExists("projects_tokens", "idx_project_path") shouldBe false
-    verifyIndexExists("projects_tokens", "idx_project_slug") shouldBe true
-  }
+      verifyIndexExists("projects_tokens", "idx_project_path") shouldBe false
+      verifyIndexExists("projects_tokens", "idx_project_slug") shouldBe true
+    }
 
   private lazy val projectPathToSlug = new ProjectPathToSlug[IO]
 }

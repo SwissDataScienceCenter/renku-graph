@@ -171,7 +171,8 @@ object DbInitializer {
       currentStatus = TransformationNonRecoverableFailure,
       destinationStatus = TriplesGenerated,
       discardingStatuses = TriplesStore :: Nil
-    )
+    ),
+    ProjectPathToSlug[F]
   )
 
   def apply[F[_]: Temporal: Logger: SessionResource](isMigrating: Ref[F, Boolean]): F[DbInitializer[F]] =
