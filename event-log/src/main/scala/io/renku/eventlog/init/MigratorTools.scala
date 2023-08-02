@@ -51,6 +51,26 @@ private object MigratorTools {
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
+  def checkIndexExists[F[_]: MonadCancelThrow](index: String): Kleisli[F, Session[F], Boolean] = {
+    val query: Query[Void, Boolean] = sql"""
+      SELECT EXISTS (
+        SELECT *
+        FROM pg_indexes
+        WHERE indexname = '#$index'
+      )""".query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
+
+  def checkIndexExists[F[_]: MonadCancelThrow](table: String, index: String): Kleisli[F, Session[F], Boolean] = {
+    val query: Query[Void, Boolean] = sql"""
+      SELECT EXISTS (
+        SELECT *
+        FROM pg_indexes
+        WHERE tablename = '#$table' AND indexname = '#$index'
+      )""".query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
+
   def execute[F[_]: MonadCancelThrow](sql: Command[Void]): Kleisli[F, Session[F], Unit] =
     Kleisli(_.execute(sql).void)
 }

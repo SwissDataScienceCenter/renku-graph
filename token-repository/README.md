@@ -133,7 +133,7 @@ token-repository uses relational database as an internal storage. The DB has the
 | column       | type        | constraints |
 |--------------|-------------|-------------|
 | project_id   | INT4        | PK NOT NULL |
-| project_path | VARCHAR     | NOT NULL    |
+| project_slug | VARCHAR     | NOT NULL    |
 | token        | VARCHAR     | NOT NULL    |
 | created_at   | TIMESTAMPTZ | NOT NULL    |
 | expiry_date  | DATE        | NOT NULL    |

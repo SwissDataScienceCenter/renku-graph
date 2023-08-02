@@ -48,7 +48,7 @@ private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource: Queri
         .select[projects.Slug, projects.GitLabId](sql"""
           SELECT project_id
           FROM project
-          WHERE project_path = $projectSlugEncoder
+          WHERE project_slug = $projectSlugEncoder
         """.query(projectIdDecoder))
         .arguments(projectSlug)
         .build(_.option)

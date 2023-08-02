@@ -77,7 +77,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
               LIMIT 1
             ) event_status,
             proj.project_id,
-            proj.project_path,
+            proj.project_slug,
             sync_time.last_synced,
             proj.latest_event_date
           FROM project proj

@@ -76,10 +76,9 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - insert project")
       .command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple](sql"""
-        INSERT INTO project (project_id, project_path, latest_event_date)
+        INSERT INTO project (project_id, project_slug, latest_event_date)
         VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
-        ON CONFLICT (project_id)
-        DO NOTHING
+        ON CONFLICT (project_id) DO NOTHING
         """.command)
       .arguments(projectId *: projectSlug *: EventDate(Instant.EPOCH) *: EmptyTuple)
       .build

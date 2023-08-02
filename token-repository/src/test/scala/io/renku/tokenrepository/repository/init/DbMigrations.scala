@@ -31,7 +31,7 @@ trait DbMigrations {
   self: InMemoryProjectsTokensDb with IOSpec with MockFactory =>
 
   implicit lazy val logger:             TestLogger[IO]            = TestLogger[IO]()
-  private implicit lazy val glClient:   GitLabClient[IO]          = mock[GitLabClient[IO]]
+  implicit lazy val glClient:           GitLabClient[IO]          = mock[GitLabClient[IO]]
   private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
   implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
 

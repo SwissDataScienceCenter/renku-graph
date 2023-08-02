@@ -87,7 +87,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
     SqlStatement(name = "project_to_new - clean_up_events_queue removal")
       .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
         DELETE FROM clean_up_events_queue 
-        WHERE project_id = $projectIdEncoder AND project_path = $projectSlugEncoder""".command)
+        WHERE project_id = $projectIdEncoder AND project_slug = $projectSlugEncoder""".command)
       .arguments(project.id *: project.slug *: EmptyTuple)
       .build
       .void
@@ -102,7 +102,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
           FROM subscription_category_sync_time st
           JOIN project p ON st.project_id = p.project_id 
             AND p.project_id = $projectIdEncoder
-            AND p.project_path = $projectSlugEncoder
+            AND p.project_slug = $projectSlugEncoder
         )""".command)
       .arguments(project.id *: project.slug *: EmptyTuple)
       .build
@@ -113,7 +113,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger: QueriesExecu
     SqlStatement(name = "project_to_new - remove project")
       .command[projects.GitLabId *: projects.Slug *: EmptyTuple](sql"""
         DELETE FROM project 
-        WHERE project_id = $projectIdEncoder AND project_path = $projectSlugEncoder""".command)
+        WHERE project_id = $projectIdEncoder AND project_slug = $projectSlugEncoder""".command)
       .arguments(project.id *: project.slug *: EmptyTuple)
       .build
       .mapResult {

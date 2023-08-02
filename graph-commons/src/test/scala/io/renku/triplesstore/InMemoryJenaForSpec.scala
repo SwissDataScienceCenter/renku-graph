@@ -35,8 +35,6 @@ trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with Bef
   def clearDatasetsBefore: Boolean = true
 
   before {
-    if (clearDatasetsBefore) {
-      clearAllDatasets()
-    }
+    if (clearDatasetsBefore) clearAllDatasets()
   }
 }

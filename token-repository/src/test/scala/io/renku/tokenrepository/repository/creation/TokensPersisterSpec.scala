@@ -146,7 +146,7 @@ class TokensPersisterSpec
   private def findTokenInfo(projectId: projects.GitLabId): Option[TokenStoringInfo] = sessionResource
     .useK {
       val query: Query[projects.GitLabId, TokenStoringInfo] = sql"""
-      SELECT project_id, project_path, token, created_at, expiry_date
+      SELECT project_id, project_slug, token, created_at, expiry_date
       FROM projects_tokens
       WHERE project_id = $projectIdEncoder"""
         .query(

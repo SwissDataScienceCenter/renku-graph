@@ -37,10 +37,8 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
 ) extends DbInitializer[F] {
 
   override def run: F[Unit] = {
-    for {
-      _ <- migrators.map(_.run).sequence
-      _ <- Logger[F].info("Projects Tokens database initialization success")
-    } yield ()
+    migrators.map(_.run).sequence >>
+      Logger[F].info("Projects Tokens database initialization success")
   } recoverWith logAndRetry
 
   private def logAndRetry: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
@@ -61,7 +59,8 @@ object DbInitializer {
       DuplicateProjectsRemover[F].pure[F],
       ExpiryAndCreatedDatesAdder[F].pure[F],
       TokensMigrator[F],
-      ExpiryAndCreatedDatesNotNull[F].pure[F]
+      ExpiryAndCreatedDatesNotNull[F].pure[F],
+      ProjectPathToSlug[F].pure[F]
     ).sequence
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[DbInitializer[F]] =

@@ -56,11 +56,10 @@ object EventPayloadFinder {
           .build(_.option)
 
       def selectPayload: Query[EventId *: ProjectSlug *: EmptyTuple, PayloadData] =
-        sql"""
-              SELECT ep.payload
+        sql"""SELECT ep.payload
               FROM event_payload ep
               INNER JOIN project p USING (project_id)
-              WHERE ep.event_id = $eventIdEncoder AND p.project_path = $projectSlugEncoder
+              WHERE ep.event_id = $eventIdEncoder AND p.project_slug = $projectSlugEncoder
              """
           .query(byteVectorDecoder)
           .map(PayloadData)

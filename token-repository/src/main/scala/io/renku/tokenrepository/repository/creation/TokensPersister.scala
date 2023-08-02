@@ -28,7 +28,6 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{GitLabId, Slug}
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import org.typelevel.twiddles.syntax._
 import skunk._
 import skunk.data.Completion
 import skunk.data.Completion.Delete
@@ -64,7 +63,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
       .named("associate token - delete")
       .command[GitLabId *: Slug *: EmptyTuple](sql"""
         DELETE FROM projects_tokens 
-        WHERE project_id = $projectIdEncoder OR project_path = $projectSlugEncoder
+        WHERE project_id = $projectIdEncoder OR project_slug = $projectSlugEncoder
       """.command)
       .arguments(project.id, project.slug)
       .build
@@ -81,7 +80,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
     SqlStatement
       .named("associate token - insert")
       .command[GitLabId *: Slug *: EncryptedAccessToken *: CreatedAt *: ExpiryDate *: EmptyTuple](sql"""
-        INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
+        INSERT INTO projects_tokens (project_id, project_slug, token, created_at, expiry_date)
         VALUES ($projectIdEncoder, $projectSlugEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
       """.command)
       .arguments(
@@ -101,7 +100,7 @@ private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: Queri
       .named("associate token - update slug")
       .command[Slug *: GitLabId *: EmptyTuple](sql"""
         UPDATE projects_tokens
-        SET project_path = $projectSlugEncoder
+        SET project_slug = $projectSlugEncoder
         WHERE project_id = $projectIdEncoder
     """.command)
       .arguments(project.slug -> project.id)

@@ -228,30 +228,33 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val tokenCrypto     = mock[AccessTokenCrypto[IO]]
-    private val tokenValidator  = mock[TokenValidator[IO]]
-    private val tokenRemover    = PersistedTokenRemover[IO]
-    private val tokensCreator   = mock[NewTokensCreator[IO]]
-    private val tokensPersister = TokensPersister[IO]
-    val migration = new TokensMigrator[IO](tokenCrypto,
-                                           tokenValidator,
-                                           tokenRemover,
-                                           tokensCreator,
-                                           tokensPersister,
-                                           retryInterval = 500 millis
-    )
+    private val tokenCrypto    = mock[AccessTokenCrypto[IO]]
+    private val tokenValidator = mock[TokenValidator[IO]]
+    private val tokenRemover   = PersistedTokenRemover[IO]
+    private val tokensCreator  = mock[NewTokensCreator[IO]]
+    val migration =
+      new TokensMigrator[IO](tokenCrypto, tokenValidator, tokenRemover, tokensCreator, retryInterval = 500 millis)
 
     val logPrefix = "token migration:"
 
     def insert(project: Project, encryptedToken: EncryptedAccessToken) =
-      tokensPersister
-        .persistToken(
-          TokenStoringInfo(project,
-                           encryptedToken,
-                           TokenDates(timestampsNotInTheFuture.generateAs(CreatedAt), localDates.generateAs(ExpiryDate))
-          )
-        )
-        .unsafeRunSync()
+      execute[Unit] {
+        Kleisli[IO, Session[IO], Unit] { session =>
+          val command: Command[
+            projects.GitLabId *: projects.Slug *: EncryptedAccessToken *: CreatedAt *: ExpiryDate *: EmptyTuple
+          ] = sql""" INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
+                     VALUES ($projectIdEncoder, $projectSlugEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)""".command
+          session
+            .prepare(command)
+            .flatMap(
+              _.execute(
+                project.id *: project.slug *: encryptedToken *:
+                  timestampsNotInTheFuture.generateAs(CreatedAt) *: localDates.generateAs(ExpiryDate) *: EmptyTuple
+              )
+            )
+            .void
+        }
+      }
 
     def insertNonMigrated(project: Project, encryptedToken: EncryptedAccessToken) = execute[Unit] {
       Kleisli[IO, Session[IO], Unit] { session =>

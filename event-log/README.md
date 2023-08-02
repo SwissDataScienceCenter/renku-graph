@@ -898,7 +898,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project                                   |
 |-------------------------------------------|
 | project_id        INT4        PK NOT NULL |
-| project_path      VARCHAR        NOT NULL |
+| project_slug      VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMPTZ    NOT NULL |
 
 | event_payload                     |
@@ -945,7 +945,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | id           SERIAL      PK NOT NULL |
 | date         TIMESTAMPTZ    NOT NULL |
 | project_id   INT4           NOT NULL |
-| project_path VARCHAR        NOT NULL |
+| project_slug VARCHAR        NOT NULL |
 
 | ts_migration                                |
 |---------------------------------------------|

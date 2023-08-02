@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import org.typelevel.twiddles.syntax._
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._

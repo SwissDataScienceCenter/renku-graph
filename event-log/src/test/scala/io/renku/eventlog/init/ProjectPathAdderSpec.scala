@@ -39,7 +39,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-class ProjectSlugAdderSpec
+class ProjectPathAdderSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec

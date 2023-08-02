@@ -147,23 +147,26 @@ trait EventLogDataProvisioning {
     }
   }
 
-  protected def upsertProject(compoundEventId: CompoundEventId, projectSlug: Slug, eventDate: EventDate): Unit =
-    upsertProject(compoundEventId.projectId, projectSlug, eventDate)
+  protected def upsertProject(compoundEventId: CompoundEventId,
+                              projectSlug:     projects.Slug,
+                              eventDate:       EventDate
+  ): Unit = upsertProject(compoundEventId.projectId, projectSlug, eventDate)
 
   protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
     upsertProject(project.id, project.slug, eventDate)
 
-  protected def upsertProject(projectId: projects.GitLabId, projectSlug: Slug, eventDate: EventDate): Unit = execute {
-    Kleisli { session =>
-      val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
-        sql"""INSERT INTO project (project_id, project_path, latest_event_date)
+  protected def upsertProject(projectId: projects.GitLabId, projectSlug: projects.Slug, eventDate: EventDate): Unit =
+    execute {
+      Kleisli { session =>
+        val query: Command[projects.GitLabId *: projects.Slug *: EventDate *: EmptyTuple] =
+          sql"""INSERT INTO project (project_id, project_slug, latest_event_date)
               VALUES ($projectIdEncoder, $projectSlugEncoder, $eventDateEncoder)
               ON CONFLICT (project_id)
               DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-      session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
+        session.prepare(query).flatMap(_.execute(projectId *: projectSlug *: eventDate *: EmptyTuple)).void
+      }
     }
-  }
 
   protected def upsertEventPayload(compoundEventId: CompoundEventId,
                                    eventStatus:     EventStatus,

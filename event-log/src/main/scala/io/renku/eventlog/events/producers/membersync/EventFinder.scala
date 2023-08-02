@@ -60,7 +60,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesEx
         CategoryName *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EventDate *: LastSyncedDate *: EmptyTuple,
         (projects.GitLabId, Option[LastSyncedDate], MemberSyncEvent)
       ](
-        sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
+        sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_slug
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder

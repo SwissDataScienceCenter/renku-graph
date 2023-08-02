@@ -58,7 +58,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
   ): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Int *: String *: String *: OffsetDateTime *: LocalDate *: EmptyTuple] =
-        sql"""insert into projects_tokens (project_id, project_path, token, created_at, expiry_date)
+        sql"""insert into projects_tokens (project_id, project_slug, token, created_at, expiry_date)
               values ($int4, $varchar, $varchar, $timestamptz, $date)
          """.command
       session
@@ -102,7 +102,7 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
 
   protected def findToken(projectSlug: Slug): Option[String] = sessionResource
     .useK {
-      val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
+      val query: Query[String, String] = sql"select token from projects_tokens where project_slug = $varchar"
         .query(varchar)
       Kleisli(_.prepare(query).flatMap(_.option(projectSlug.value)))
     }
