@@ -16,7 +16,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
 | PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `slug`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
 | GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
@@ -102,7 +102,7 @@ Response body example:
           "_links":[  
              {  
                 "rel":  "view",
-                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+                "href": "https://renkulab.io/gitlab/project_slug/raw/master/data/mniouUnmal/image.png"
              }
           ]
         }
@@ -230,6 +230,7 @@ Response body example:
       "identifier": "22222222-2222-2222-2222-222222222222"
     },
     "path":       "namespace1/project1-name",
+    "slug":       "namespace1/project1-name",
     "name":       "project1 name",
     "visibility": "public"
   },
@@ -245,6 +246,7 @@ Response body example:
         "identifier": "33333333333"
       },
       "path":       "namespace1/project1-name",
+      "slug":       "namespace1/project1-name",
       "name":       "project1 name",
       "visibility": "public"
     },
@@ -259,6 +261,7 @@ Response body example:
         "identifier": "4444444444"
       },
       "path":       "namespace2/project2-name",
+      "slug":       "namespace2/project2-name",
       "name":       "project2 name",
       "visibility": "public"
     }

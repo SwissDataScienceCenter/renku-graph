@@ -173,6 +173,7 @@ private object Dataset {
     Encoder.instance[DatasetProject] { project =>
       json"""{
         "path":       ${project.slug},
+        "slug":       ${project.slug},
         "name":       ${project.name},
         "visibility": ${project.visibility},
         "dataset": {

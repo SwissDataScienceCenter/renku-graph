@@ -372,7 +372,9 @@ class EndpointSpec
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      slug         <- cursor.downField("path").as[projects.Slug]
+      path         <- cursor.downField("path").as[projects.Slug]
+      slug         <- cursor.downField("slug").as[projects.Slug]
+      _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
       name         <- cursor.downField("name").as[projects.Name]
       visibility   <- cursor.downField("visibility").as[projects.Visibility]
       dsIdentifier <- cursor.downField("dataset").downField("identifier").as[datasets.Identifier]
