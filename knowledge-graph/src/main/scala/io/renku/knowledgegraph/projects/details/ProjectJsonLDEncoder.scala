@@ -38,6 +38,7 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
       entities.Project.entityTypes,
       schema / "identifier"       -> project.id.asJsonLD,
       renku / "projectPath"       -> project.slug.asJsonLD,
+      renku / "slug"              -> project.slug.asJsonLD,
       schema / "name"             -> project.name.asJsonLD,
       schema / "description"      -> project.maybeDescription.asJsonLD,
       renku / "projectVisibility" -> project.visibility.asJsonLD,

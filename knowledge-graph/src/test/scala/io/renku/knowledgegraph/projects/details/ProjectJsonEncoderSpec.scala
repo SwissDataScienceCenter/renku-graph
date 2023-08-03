@@ -71,7 +71,9 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
   private def decoder(project: Project): Decoder[Project] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[GitLabId]
-      slug             <- cursor.downField("path").as[Slug]
+      path             <- cursor.downField("path").as[Slug]
+      slug             <- cursor.downField("slug").as[Slug]
+      _                <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
       name             <- cursor.downField("name").as[Name]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       visibility       <- cursor.downField("visibility").as[Visibility]
@@ -126,7 +128,9 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   private def parentDecoder(maybeParent: Option[ParentProject]): Decoder[ParentProject] = cursor =>
     for {
-      slug    <- cursor.downField("path").as[Slug]
+      path    <- cursor.downField("path").as[Slug]
+      slug    <- cursor.downField("slug").as[Slug]
+      _       <- Either.cond(path == slug, (), DecodingFailure("parent path != slug", Nil))
       name    <- cursor.downField("name").as[Name]
       parent  <- maybeParent.toRight(DecodingFailure(show"'$slug' parent project expected but found None", Nil))
       created <- cursor.downField("created").as(creationDecoder(parent.created))

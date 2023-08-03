@@ -48,6 +48,7 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
     json"""{
       "identifier":   ${project.id},
       "path":         ${project.slug},
+      "slug":         ${project.slug},
       "name":         ${project.name},
       "visibility":   ${project.visibility},
       "created":      ${project.created},
@@ -91,6 +92,7 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
       "path":    ${parent.slug},
+      "slug":    ${parent.slug},
       "name":    ${parent.name},
       "created": ${parent.created}
     }"""

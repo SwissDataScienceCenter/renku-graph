@@ -47,27 +47,28 @@ package object knowledgegraph {
     ).max
 
     json"""{
-    "identifier":   ${project.id.value},
-    "path":         ${project.slug.value},
-    "name":         ${project.name.value},
-    "visibility":   ${project.entitiesProject.visibility.value},
-    "created":      ${(project.entitiesProject.dateCreated, project.entitiesProject.maybeCreator)},
-    "dateModified": ${modified.value},
-    "urls":         ${project.urls.toJson},
-    "forking":      ${project.entitiesProject.forksCount -> project.entitiesProject},
-    "keywords":     ${project.entitiesProject.keywords.map(_.value).toList.sorted},
-    "starsCount":   ${project.starsCount.value},
-    "permissions":  ${toJson(project.permissions)},
-    "images":       ${project.entitiesProject.images -> project.slug},
-    "statistics": {
-      "commitsCount":     ${project.statistics.commitsCount.value},
-      "storageSize":      ${project.statistics.storageSize.value},
-      "repositorySize":   ${project.statistics.repositorySize.value},
-      "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
-      "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
-    },
-    "version": ${project.entitiesProject.version.value}
-  }"""
+      "identifier":   ${project.id.value},
+      "slug":         ${project.slug.value},
+      "path":         ${project.slug.value},
+      "name":         ${project.name.value},
+      "visibility":   ${project.entitiesProject.visibility.value},
+      "created":      ${(project.entitiesProject.dateCreated, project.entitiesProject.maybeCreator)},
+      "dateModified": ${modified.value},
+      "urls":         ${project.urls.toJson},
+      "forking":      ${project.entitiesProject.forksCount -> project.entitiesProject},
+      "keywords":     ${project.entitiesProject.keywords.map(_.value).toList.sorted},
+      "starsCount":   ${project.starsCount.value},
+      "permissions":  ${toJson(project.permissions)},
+      "images":       ${project.entitiesProject.images -> project.slug},
+      "statistics": {
+        "commitsCount":     ${project.statistics.commitsCount.value},
+        "storageSize":      ${project.statistics.storageSize.value},
+        "repositorySize":   ${project.statistics.repositorySize.value},
+        "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
+        "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
+      },
+      "version": ${project.entitiesProject.version.value}
+    }"""
       .deepMerge {
         _links(
           Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.slug)),
@@ -92,6 +93,7 @@ package object knowledgegraph {
         "forksCount": $forksCount,
         "parent": {
           "path":    ${project.parent.slug},
+          "slug":    ${project.parent.slug},
           "name":    ${project.parent.name},
           "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
         }

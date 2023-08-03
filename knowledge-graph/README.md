@@ -664,6 +664,7 @@ Response body example for `Accept: application/json`:
 {
   "identifier":  123,
   "path":        "namespace/project-name", 
+  "slug":        "namespace/project-name", 
   "name":        "Some project name",
   "description": "This is a longer text describing the project", // optional
   "visibility":  "public|private|internal",
@@ -686,6 +687,7 @@ Response body example for `Accept: application/json`:
     "forksCount": 1,
     "parent": { // optional
       "path":       "namespace/parent-project",
+      "slug":       "namespace/parent-project",
       "name":       "Parent project name",
       "created": {
         "dateCreated": "2001-09-04T10:48:29.457Z",
@@ -749,6 +751,9 @@ Response body example for `Accept: application/ld+json`:
     "http://schema.org/Project"
   ],
   "https://swissdatasciencecenter.github.io/renku-ontology#projectPath": {
+    "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  },
+  "https://swissdatasciencecenter.github.io/renku-ontology#slug": {
     "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
   },
   "http://schema.org/description": {
