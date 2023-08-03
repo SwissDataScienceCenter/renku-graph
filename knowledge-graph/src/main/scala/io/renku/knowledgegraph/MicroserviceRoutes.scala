@@ -57,6 +57,7 @@ private class MicroserviceRoutes[F[_]: Async](
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDeleteEndpoint:      projects.delete.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
+    projectCreateEndpoint:      projects.create.Endpoint[F],
     projectUpdateEndpoint:      projects.update.Endpoint[F],
     projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
@@ -80,6 +81,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
+  import projectCreateEndpoint._
   import projectDatasetTagsEndpoint._
   import projectDeleteEndpoint._
   import projectDetailsEndpoint._
@@ -174,6 +176,15 @@ private class MicroserviceRoutes[F[_]: Async](
 
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       routeToProjectsEndpoints(path, maybeUser.option)(authReq.req)
+
+    case authReq @ POST -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      maybeUser.withUserOrNotFound { user =>
+        path.segments.toList
+          .map(_.toString)
+          .toProjectSlug
+          .semiflatMap(`POST /projects/:slug`(_, authReq.req, user))
+          .merge
+      }
 
     case authReq @ PUT -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       maybeUser.withUserOrNotFound { user =>
@@ -352,6 +363,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint           <- ontology.Endpoint[F]
     projectDeleteEndpoint      <- projects.delete.Endpoint[F]
     projectDetailsEndpoint     <- projects.details.Endpoint[F]
+    projectCreateEndpoint      <- projects.create.Endpoint[F]
     projectUpdateEndpoint      <- projects.update.Endpoint[F]
     projectDatasetsEndpoint    <- projects.datasets.Endpoint[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[F]
@@ -371,6 +383,7 @@ private object MicroserviceRoutes {
     ontologyEndpoint,
     projectDeleteEndpoint,
     projectDetailsEndpoint,
+    projectCreateEndpoint,
     projectUpdateEndpoint,
     projectDatasetsEndpoint,
     projectDatasetTagsEndpoint,

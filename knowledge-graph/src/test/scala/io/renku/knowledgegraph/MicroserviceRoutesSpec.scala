@@ -47,7 +47,7 @@ import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.details.RequestedDataset
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
-import org.http4s.Method.{DELETE, GET, PUT}
+import org.http4s.Method.{DELETE, GET, PUT, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -563,6 +563,36 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "POST /knowledge-graph/projects/:namespace/../:name" should {
+
+    val projectSlug = projectSlugs.generateOne
+    val request     = Request[IO](POST, Uri.unsafeFromString(s"knowledge-graph/projects/$projectSlug"))
+
+    s"return $Accepted for valid path parameters, user and payload" in new TestCase {
+
+      val authUser = MaybeAuthUser(authUsers.generateOne)
+
+      (projectCreateEndpoint
+        .`POST /projects/:slug`(_: model.projects.Slug, _: Request[IO], _: AuthUser))
+        .expects(projectSlug, request, authUser.option.get)
+        .returning(Response[IO](Accepted).pure[IO])
+
+      routes(authUser).call(request).status shouldBe Accepted
+
+      routesMetrics.clearRegistry()
+    }
+
+    s"return $Unauthorized when authentication fails" in new TestCase {
+      routes(givenAuthAsUnauthorized)
+        .call(request)
+        .status shouldBe Unauthorized
+    }
+
+    s"return $NotFound when no auth header" in new TestCase {
+      routes(maybeAuthUser = MaybeAuthUser.noUser).call(request).status shouldBe NotFound
+    }
+  }
+
   "PUT /knowledge-graph/projects/:namespace/../:name" should {
 
     val projectSlug = projectSlugs.generateOne
@@ -1000,6 +1030,7 @@ class MicroserviceRoutesSpec
     val ontologyEndpoint                = mock[ontology.Endpoint[IO]]
     val projectDeleteEndpoint           = mock[projects.delete.Endpoint[IO]]
     val projectDetailsEndpoint          = mock[projects.details.Endpoint[IO]]
+    val projectCreateEndpoint           = mock[projects.create.Endpoint[IO]]
     val projectUpdateEndpoint           = mock[projects.update.Endpoint[IO]]
     val projectDatasetsEndpoint         = mock[projects.datasets.Endpoint[IO]]
     val projectDatasetTagsEndpoint      = mock[projects.datasets.tags.Endpoint[IO]]
@@ -1025,6 +1056,7 @@ class MicroserviceRoutesSpec
         ontologyEndpoint,
         projectDeleteEndpoint,
         projectDetailsEndpoint,
+        projectCreateEndpoint,
         projectUpdateEndpoint,
         projectDatasetsEndpoint,
         projectDatasetTagsEndpoint,

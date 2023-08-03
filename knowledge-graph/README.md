@@ -15,6 +15,7 @@ The following routes may be slightly different when accessed via the main Renku 
 | GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
 | DELETE | ```/knowledge-graph/projects/:namespace/:name```                         | Deletes the project with the given `namespace/name` from knowledge-graph and GitLab  |
 | GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
+| POST   | ```/knowledge-graph/projects/:namespace/:name```                         | Creates a project from the given payload in GitLab and the Knowledge Graph           |
 | PUT    | ```/knowledge-graph/projects/:namespace/:name```                         | Updates selected properties of the project with the given `namespace/name`           |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `slug`                                |
 | GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `slug` |
@@ -810,6 +811,37 @@ Response body example for `Accept: application/ld+json`:
   ]
 }
 ```
+
+#### POST /knowledge-graph/projects/:namespace/:name
+
+API to create a new project from the given payload in both the Triples Store and GitLab
+
+The endpoint requires an authorization token to be passed. Supported headers are:
+
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+
+**Request**
+
+```json
+{
+  "name":        "project name",
+  "namespace":   "group",
+  "description": "project description",
+  "visibility":  "public|internal|private",
+  "images":      ["image.png", "http://image.com/image.png"],
+  "templateId":  "id1cb2f6f12ae50c46"
+}
+```
+
+**Response**
+
+| Status                      | Description                                                                                |
+|-----------------------------|--------------------------------------------------------------------------------------------|
+| ACCEPTED (202)              | If the creation process was successfully scheduled                                         |
+| BAD_REQUEST (400)           | If the given payload is empty or malformed or a project with the given slug already exists |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated                                               |
+| INTERNAL_SERVER_ERROR (500) | Otherwise                                                                                  |
 
 #### PUT /knowledge-graph/projects/:namespace/:name
 
