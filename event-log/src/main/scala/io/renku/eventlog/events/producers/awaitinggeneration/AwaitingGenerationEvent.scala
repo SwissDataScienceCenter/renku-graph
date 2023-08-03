@@ -37,10 +37,10 @@ private object AwaitingGenerationEventEncoder {
   import io.circe.literal.JsonStringContext
 
   def encodeEvent(event: AwaitingGenerationEvent): Json = json"""{
-    "categoryName": ${SubscriptionCategory.categoryName.value},
-    "id":           ${event.id.id.value},
+    "categoryName": ${SubscriptionCategory.categoryName},
+    "id":           ${event.id.id},
     "project": {
-      "id":         ${event.id.projectId.value}
+      "id": ${event.id.projectId}
     }
   }"""
 

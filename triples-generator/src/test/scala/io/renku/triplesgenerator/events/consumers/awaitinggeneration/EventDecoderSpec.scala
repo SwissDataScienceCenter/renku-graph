@@ -27,19 +27,17 @@ import io.renku.generators.Generators.jsons
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventId
 import org.scalatest.EitherValues
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
-class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValues {
+class EventDecoderSpec extends AnyFlatSpec with should.Matchers with EitherValues {
 
-  "decode" should {
+  it should "produce a CommitEvent if the Json string can be successfully deserialized - case with project.slug" in {
 
-    "produce a CommitEvent if the Json string can be successfully deserialized" in {
-
-      val commitId = commitIds.generateOne
-      val project  = consumerProjects.generateOne
-      lazy val eventBody: String =
-        json"""{
+    val commitId = commitIds.generateOne
+    val project  = consumerProjects.generateOne
+    lazy val eventBody: String =
+      json"""{
         "id": $commitId,
         "parents": ${commitIds.generateList()},
         "project": {
@@ -48,26 +46,44 @@ class EventDecoderSpec extends AnyWordSpec with should.Matchers with EitherValue
         }
       }""".noSpaces
 
-      EventDecoder
-        .decode(EventRequestContent.WithPayload(jsons.generateOne, eventBody))
-        .value shouldBe CommitEvent(EventId(commitId.value), project, commitId)
-    }
+    EventDecoder
+      .decode(EventRequestContent.WithPayload(jsons.generateOne, eventBody))
+      .value shouldBe CommitEvent(EventId(commitId.value), project, commitId)
+  }
 
-    "fail if parsing fails" in {
+  it should "produce a CommitEvent if the Json string can be successfully deserialized - case with project.path" in {
 
-      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{"))
+    val commitId = commitIds.generateOne
+    val project  = consumerProjects.generateOne
+    lazy val eventBody: String =
+      json"""{
+        "id": $commitId,
+        "parents": ${commitIds.generateList()},
+        "project": {
+          "id":   ${project.id},
+          "path": ${project.slug}
+        }
+      }""".noSpaces
 
-      result.left.value                                         shouldBe a[ParsingFailure]
-      result.left.value.getMessage                              shouldBe "CommitEvent cannot be decoded: '{'"
-      result.left.value.asInstanceOf[ParsingFailure].underlying shouldBe a[ParsingFailure]
-    }
+    EventDecoder
+      .decode(EventRequestContent.WithPayload(jsons.generateOne, eventBody))
+      .value shouldBe CommitEvent(EventId(commitId.value), project, commitId)
+  }
 
-    "fail if decoding fails" in {
+  it should "fail if parsing fails" in {
 
-      val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{}"))
+    val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{"))
 
-      result.left.value                                       shouldBe a[DecodingFailure]
-      result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be decoded: '{}'"
-    }
+    result.left.value                                         shouldBe a[ParsingFailure]
+    result.left.value.getMessage                              shouldBe "CommitEvent cannot be decoded: '{'"
+    result.left.value.asInstanceOf[ParsingFailure].underlying shouldBe a[ParsingFailure]
+  }
+
+  it should "fail if decoding fails" in {
+
+    val result = EventDecoder.decode(EventRequestContent.WithPayload(jsons.generateOne, "{}"))
+
+    result.left.value                                       shouldBe a[DecodingFailure]
+    result.left.value.asInstanceOf[DecodingFailure].message shouldBe "CommitEvent cannot be decoded: '{}'"
   }
 }

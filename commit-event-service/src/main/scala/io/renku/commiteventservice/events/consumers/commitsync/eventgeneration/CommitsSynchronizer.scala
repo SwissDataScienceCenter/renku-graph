@@ -224,7 +224,8 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Acce
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder] = for {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[CommitsSynchronizerImpl[F]] = for {
     latestCommitFinder  <- LatestCommitFinder[F]
     eventDetailsFinder  <- EventDetailsFinder[F]
     commitInfoFinder    <- CommitInfoFinder[F]
