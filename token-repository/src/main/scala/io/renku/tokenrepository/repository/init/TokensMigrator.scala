@@ -58,6 +58,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
 
   private val logPrefix = "token migration:"
 
+  import MigrationTools._
   import fs2.Stream
   import io.renku.db.SqlStatement
   import skunk.Void
@@ -66,7 +67,14 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger: QueriesExecut
   import tokenValidator._
   import tokensCreator._
 
-  override def run: F[Unit] =
+  override def run: F[Unit] = SessionResource[F].useK {
+    checkColumnExists("projects_tokens", "project_slug").flatMapF {
+      case true  => ().pure[F]
+      case false => migrateTokens
+    }
+  }
+
+  private def migrateTokens =
     Stream
       .repeatEval(findTokenWithoutDates)
       .unNoneTerminate

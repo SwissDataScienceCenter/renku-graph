@@ -40,9 +40,13 @@ private class ProjectPathAdder[F[_]: Spawn: Logger: SessionResource]
   import MigrationTools._
 
   def run: F[Unit] = SessionResource[F].useK {
-    checkColumnExists("projects_tokens", "project_path") >>= {
-      case true  => Kleisli.liftF(Logger[F].info("'project_path' column existed"))
-      case false => addColumn()
+    checkColumnExists("projects_tokens", "project_slug") >>= {
+      case true => Kleisli.liftF(Logger[F].info("no need to create 'project_path' as 'project_slug' exists already"))
+      case false =>
+        checkColumnExists("projects_tokens", "project_path") >>= {
+          case true  => Kleisli.liftF(Logger[F].info("'project_path' column existed"))
+          case false => addColumn()
+        }
     }
   }
 

@@ -23,11 +23,11 @@ import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectPathAdderSpec
-    extends AnyWordSpec
+    extends AnyFlatSpec
     with IOSpec
     with DbInitSpec
     with Eventually
@@ -40,26 +40,22 @@ class ProjectPathAdderSpec
     case _ => true
   }
 
-  "run" should {
+  it should "add the 'project_path' column if neither 'project_path' nor 'project_slug' exist" in {
 
-    "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
+    verifyColumnExists("projects_tokens", "project_path") shouldBe false
 
-      verifyColumnExists("projects_tokens", "project_path") shouldBe false
+    projectPathAdder.run.unsafeRunSync() shouldBe ()
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
+    verifyColumnExists("projects_tokens", "project_path") shouldBe true
+    logger.loggedOnly(Info("'project_path' column added"))
+    logger.reset()
 
-      logger.loggedOnly(Info("'project_path' column added"))
-      logger.reset()
+    projectPathAdder.run.unsafeRunSync() shouldBe ()
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ()
+    logger.loggedOnly(Info("'project_path' column existed"))
 
-      logger.loggedOnly(Info("'project_path' column existed"))
-
-      verifyIndexExists("projects_tokens", "idx_project_path")
-    }
+    verifyIndexExists("projects_tokens", "idx_project_path")
   }
 
-  private trait TestCase {
-    val projectPathAdder = new ProjectPathAdder[IO]
-  }
+  private lazy val projectPathAdder = new ProjectPathAdder[IO]
 }
