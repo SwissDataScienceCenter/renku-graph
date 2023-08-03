@@ -56,11 +56,12 @@ private object model {
       implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[Activated] =
         Encoder.instance[Activated] { project =>
           json"""{
-            "path":        ${project.slug},
-            "name":        ${project.name},
-            "visibility":  ${project.visibility},
-            "date":        ${project.dateCreated},
-            "keywords":    ${project.keywords.sorted.map(_.value)}
+            "path":       ${project.slug},
+            "slug":       ${project.slug},
+            "name":       ${project.name},
+            "visibility": ${project.visibility},
+            "date":       ${project.dateCreated},
+            "keywords":   ${project.keywords.sorted.map(_.value)}
           }"""
             .addIfDefined("creator" -> project.maybeCreator)
             .addIfDefined("description" -> project.maybeDesc)
@@ -88,12 +89,13 @@ private object model {
       implicit def encoder(implicit renkuUrl: RenkuUrl): Encoder[NotActivated] =
         Encoder.instance[NotActivated] { project =>
           json"""{
-            "id":          ${project.id},
-            "path":        ${project.slug},
-            "name":        ${project.name},
-            "visibility":  ${project.visibility},
-            "date":        ${project.dateCreated},
-            "keywords":    ${project.keywords.sorted.map(_.value)}
+            "id":         ${project.id},
+            "slug":       ${project.slug},
+            "path":       ${project.slug},
+            "name":       ${project.name},
+            "visibility": ${project.visibility},
+            "date":       ${project.dateCreated},
+            "keywords":   ${project.keywords.sorted.map(_.value)}
           }"""
             .addIfDefined("creator" -> project.maybeCreator)
             .addIfDefined("description" -> project.maybeDesc)

@@ -75,6 +75,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
       project.maybeCreator,
       project.matchingScore,
       project.slug,
+      project.slug,
       project.name,
       project.slug.toNamespace,
       makeNamespaces(project.slug),
@@ -91,7 +92,7 @@ class ModelEncoderSpec extends AnyFlatSpec with should.Matchers with DiffInstanc
   it should "encode datasets with topmost-sameas" in {
     val dataset = Entity.Dataset(
       MatchingScore(0.65f),
-      datasets.TopmostSameAs(s"${renkuApiUrl}/datasets/123"),
+      datasets.TopmostSameAs(s"$renkuApiUrl/datasets/123"),
       datasets.Name("my-dataset"),
       Visibility.Public,
       datasets.DateCreated(Instant.parse("2013-03-31T13:03:45Z")),
@@ -180,6 +181,7 @@ object ModelEncoderSpec {
       creator:       Option[persons.Name],
       matchingScore: MatchingScore,
       path:          projects.Slug,
+      slug:          projects.Slug,
       name:          projects.Name,
       namespace:     projects.Namespace,
       namespaces:    List[Ns],
