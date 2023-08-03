@@ -36,20 +36,13 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
   import MigratorTools._
   import cats.syntax.all._
   import skunk._
-  import skunk.codec.all._
   import skunk.implicits._
 
   override def run: F[Unit] = SessionResource[F].useK {
-    checkTableExists >>= {
+    checkTableExists("ts_migration") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'ts_migration' table exists")
       case false => createTable()
     }
-  }
-
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'ts_migration')".query(bool)
-    Kleisli(_.unique(query) recover { case _ => false })
   }
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {

@@ -50,9 +50,13 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
   override def run: F[Unit] = SessionResource[F].useK {
     whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project_path' column adding skipped"),
-      otherwise = checkColumnExists("event_log", "project_path") >>= {
-        case true  => Kleisli.liftF(Logger[F] info "'project_path' column exists")
-        case false => addColumn()
+      otherwise = checkColumnExists("projects_tokens", "project_slug") >>= {
+        case true => Kleisli.liftF(Logger[F].info("no need to create 'project_path' as 'project_slug' already exists"))
+        case false =>
+          checkColumnExists("event_log", "project_path") >>= {
+            case true  => Kleisli.liftF(Logger[F] info "'project_path' column exists")
+            case false => addColumn()
+          }
       }
     )
   }
