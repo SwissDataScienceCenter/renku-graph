@@ -118,7 +118,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     cursor._links >>= {
       case links if links.get(Links.Rel("details")).isDefined =>
         for {
-          slug         <- cursor.downField("path").as[projects.Slug]
+          path         <- cursor.downField("path").as[projects.Slug]
+          slug         <- cursor.downField("slug").as[projects.Slug]
+          _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]
@@ -137,7 +139,9 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       case links if links.get(Links.Rel("activation")).isDefined =>
         for {
           id           <- cursor.downField("id").as[projects.GitLabId]
+          path         <- cursor.downField("path").as[projects.Slug]
           slug         <- cursor.downField("path").as[projects.Slug]
+          _            <- Either.cond(path == slug, (), DecodingFailure("path != slug", Nil))
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]

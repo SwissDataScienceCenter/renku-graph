@@ -1101,6 +1101,7 @@ Response body example:
 [
   {
     "name":        "name",
+    "slug":        "group/subgroup/name",
     "path":        "group/subgroup/name",
     "visibility":  "public",
     "date":        "2012-11-15T10:00:00.000Z",
@@ -1120,6 +1121,7 @@ Response body example:
   {
     "id":          123,
     "name":        "name",
+    "slug":        "group/subgroup/name",
     "path":        "group/subgroup/name",
     "visibility":  "public",
     "date":        "2012-11-15T10:00:00.000Z",
