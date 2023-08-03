@@ -362,6 +362,7 @@ Response body example:
     "type":          "project",
     "matchingScore": 1.0055376,
     "name":          "name",
+    "slug":          "group/subgroup/name",
     "path":          "group/subgroup/name",
     "namespace":     "group/subgroup",
     "namespaces": [
@@ -491,6 +492,7 @@ Response body example:
     "creator":       "Jan Kowalski",
     "matchingScore": 1,
     "name":          "name",
+    "slug":          "group/subgroup/name",
     "path":          "group/subgroup/name",
     "namespace":     "group/subgroup",
     "namespaces": [

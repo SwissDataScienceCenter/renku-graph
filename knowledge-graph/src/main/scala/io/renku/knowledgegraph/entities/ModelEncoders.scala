@@ -58,6 +58,7 @@ trait ModelEncoders {
         "type":          ${Criteria.Filters.EntityType.Project.value},
         "matchingScore": ${project.matchingScore},
         "name":          ${project.name},
+        "slug":          ${project.slug},
         "path":          ${project.slug},
         "namespace":     ${project.slug.toNamespaces.mkString("/")},
         "namespaces":    ${toDetailedInfo(project.slug.toNamespaces)},
