@@ -4,18 +4,18 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                                        | Description                                                                |
-|--------|---------------------------------------------|----------------------------------------------------------------------------|
-| GET    | ```/events```                               | Returns info about events                                                  |
-| GET    | ```/events/:event-id/:project-slug```       | Returns info about event with the given `id` and `project-slug`            |
-| GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
-| POST   | ```/events```                               | Sends an event for processing                                              |
-| GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
-| GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
-| GET    | ```/ping```                                 | Verifies service health                                                    |
-| GET    | ```/status```                               | Returns info about the state of the service                                |
-| POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
-| GET    | ```/version```                              | Returns info about service version                                         |
+| Method | Path                                          | Description                                                                  |
+|--------|-----------------------------------------------|------------------------------------------------------------------------------|
+| GET    | ```/events```                                 | Returns info about events                                                    |
+| GET    | ```/events/:event-id/:project-id```           | Returns info about event with the given `id` and `project-id`                |
+| GET    | ```/events/:event-id/:project-slug/payload``` | Returns payload associated with the event having the `id` and `project-slug` |
+| POST   | ```/events```                                 | Sends an event for processing                                                |
+| GET    | ```/metrics```                                | Returns Prometheus metrics of the service                                    |
+| GET    | ```/migration-status```                       | Returns whether or not DB is currently migrating                             |
+| GET    | ```/ping```                                   | Verifies service health                                                      |
+| GET    | ```/status```                                 | Returns info about the state of the service                                  |
+| POST   | ```/subscriptions```                          | Adds a subscription for events                                               |
+| GET    | ```/version```                                | Returns info about service version                                           |
 
 All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is under migration.
 
