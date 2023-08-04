@@ -29,7 +29,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.events.SyncRepoMetadata
+import io.renku.triplesgenerator.api.ProjectUpdates
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -41,19 +41,18 @@ trait Endpoint[F[_]] {
 
 object Endpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    triplesgenerator.api.events.Client[F].map(new EndpointImpl(GLProjectUpdater[F], _))
+    triplesgenerator.api.Client[F].map(new EndpointImpl(GLProjectUpdater[F], _))
 }
 
 private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdater[F],
-                                                tgClient: triplesgenerator.api.events.Client[F]
+                                                tgClient: triplesgenerator.api.Client[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
   override def `PUT /projects/:slug`(slug: projects.Slug, request: Request[F], authUser: AuthUser): F[Response[F]] =
     decodePayload(request)
-      .flatMap(updateGL(slug, authUser))
-      .semiflatMap(_ => tgClient.send(SyncRepoMetadata(slug)))
-      .as(Response[F](Accepted).withEntity(Message.Info("Project update accepted")))
+      .flatTap(updateGL(slug, authUser))
+      .flatMap(updateTG(slug))
       .merge
       .handleErrorWith(serverError(slug)(_))
 
@@ -74,6 +73,16 @@ private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdat
 
   private def updateGL(slug: projects.Slug, authUser: AuthUser)(newValues: NewValues): EitherT[F, Response[F], Unit] =
     glProjectUpdater.updateProject(slug, newValues, authUser.accessToken).leftMap(badRequest)
+
+  private def updateTG(slug: projects.Slug)(newValues: NewValues): EitherT[F, Response[F], Response[F]] =
+    EitherT {
+      tgClient
+        .updateProject(slug, ProjectUpdates.empty.copy(newVisibility = newValues.visibility.some))
+        .map(_.toEither)
+    }.biSemiflatMap(
+      serverError(slug),
+      _ => Response[F](Accepted).withEntity(Message.Info("Project update accepted")).pure[F]
+    )
 
   private def serverError(slug: projects.Slug): Throwable => F[Response[F]] =
     Logger[F]
