@@ -4,12 +4,13 @@ This microservice deals with all Triples Store administrative and provisioning e
 
 ## API
 
-| Method | Path             | Description                        |
-|--------|------------------|------------------------------------|
-| POST   | ```/events```    | To send an event for processing    |
-| GET    | ```/metrics```   | Serves Prometheus metrics          |
-| GET    | ```/ping```      | To check if service is healthy     |
-| GET    | ```/version```   | Returns info about service version |
+| Method | Path                  | Description                          |
+|--------|-----------------------|--------------------------------------|
+| POST   | ```/events```         | To send an event for processing      |
+| GET    | ```/metrics```        | Serves Prometheus metrics            |
+| GET    | ```/ping```           | To check if service is healthy       |
+| PUT    | ```/projects/:slug``` | API to update project data in the TS |
+| GET    | ```/version```        | Returns info about service version   |
 
 #### POST /events
 
@@ -277,6 +278,56 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### PUT /knowledge-graph/projects/:slug
+
+API to update project data in the Triples Store.
+
+Each of the properties can be either set or be null (skipping the property means it's set to null). 
+In the case the value is null or specified, the value won't be changed in the TS.
+In case it's set (even to an empty array) this value will be used in the update.
+Blank descriptions are considered as Nones.
+In case no properties are set, no data will be changed in the TS. 
+
+**Request**
+
+* case when there are updates for all properties
+
+```json
+{
+  "description": {
+    "newValue": "project description"
+  },
+  "images": {
+    "newValue": ["image.png", "http://image.com/image.png"]
+  },
+  "keywords":{
+    "newValue": ["id1cb2f6f12ae50c46"]
+  },
+  "visibility": {
+    "newValue": "public|internal|private"
+  }
+}
+```
+
+* case when there's an update only for `description` that clears it up
+
+```json
+{
+  "description": {
+    "newValue": null
+  }
+}
+```
+
+**Response**
+
+| Status                      | Description                           |
+|-----------------------------|---------------------------------------|
+| OK (200)                    | When project is updated successfully  |
+| BAD_REQUEST (400)           | When the given payload is malformed   |
+| NOT_FOUND (404)             | When project does not exist in the TS |
+| INTERNAL SERVER ERROR (500) | In case of failures                   |
 
 #### GET /version
 
