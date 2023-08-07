@@ -283,10 +283,16 @@ Verifies service health.
 
 API to update project data in the Triples Store.
 
-Each of the properties can be either set or be null (skipping the property means it's set to null). 
-In the case the value is null or specified, the value won't be changed in the TS.
-In case it's set (even to an empty array) this value will be used in the update.
-Blank descriptions are considered as Nones.
+Each of the properties can be either set to a new value or omitted in case there's no new value.
+
+The properties that can be updated are:
+* description - possible values are: 
+  * `null` for removing the current description
+  * any non-blank String value 
+* images - an array of either relative or absolute links to the images; an empty array removes all the images 
+* keywords - an array of String values; an empty array removes all the keywords
+* visibility - possible values are: `public`, `internal`, `private`
+
 In case no properties are set, no data will be changed in the TS. 
 
 **Request**
@@ -295,28 +301,26 @@ In case no properties are set, no data will be changed in the TS.
 
 ```json
 {
-  "description": {
-    "newValue": "project description"
-  },
-  "images": {
-    "newValue": ["image.png", "http://image.com/image.png"]
-  },
-  "keywords":{
-    "newValue": ["id1cb2f6f12ae50c46"]
-  },
-  "visibility": {
-    "newValue": "public|internal|private"
-  }
+  "description": "a new project description",
+  "images":      ["image.png", "http://image.com/image.png"],
+  "keywords":    ["some keyword"],
+  "visibility":  "public|internal|private"
 }
 ```
 
-* case when there's an update only for `description` that clears it up
+* case when there's an update only for the `description` that removes it
 
 ```json
 {
-  "description": {
-    "newValue": null
-  }
+  "description": null
+}
+```
+
+* case with the `description` set to a blank String means the same as `"description": null`
+
+```json
+{
+  "description": ""
 }
 ```
 

@@ -18,10 +18,10 @@
 
 package io.renku.triplesgenerator.api
 
+import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
-import cats.syntax.all._
-import io.circe.{Decoder, Encoder, Json}
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.renku.graph.model.images.ImageUri
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -39,35 +39,27 @@ object ProjectUpdates {
 
   implicit val encoder: Encoder[ProjectUpdates] = Encoder.instance {
     case ProjectUpdates(newDescription, newImages, newKeywords, newVisibility) =>
-      def newOptionValue[T](option: Option[Option[T]])(implicit enc: Encoder[T]) =
-        option.map {
-          case Some(v) => Json.obj("newValue" -> v.asJson)
-          case None    => Json.obj("newValue" -> Json.Null)
-        }
-      def newValue[T](option: Option[T])(implicit enc: Encoder[T]) =
-        option.map(v => Json.obj("newValue" -> v.asJson))
-
-      json"""{
-        "description": ${newOptionValue(newDescription)},
-        "images":      ${newValue(newImages)},
-        "keywords":    ${newValue(newKeywords)},
-        "visibility":  ${newValue(newVisibility)}
-      }""" dropNullValues
+      Json.obj(
+        List(
+          newDescription.map(v => "description" -> v.fold(Json.Null)(_.asJson)),
+          newImages.map(v => "images" -> v.asJson),
+          newKeywords.map(v => "keywords" -> v.asJson),
+          newVisibility.map(v => "visibility" -> v.asJson)
+        ).flatten: _*
+      )
   }
 
   implicit val decoder: Decoder[ProjectUpdates] = Decoder.instance { cur =>
     for {
-      newDesc <-
-        cur
-          .downField("description")
-          .as[Option[Json]]
-          .flatMap(_.map(_.hcursor.downField("newValue").as[Option[projects.Description]]).sequence)
-      newImages <-
-        cur.downField("images").downField("newValue").as[Option[List[ImageUri]]]
-      newKeywords <-
-        cur.downField("keywords").downField("newValue").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
-      newVisibility <-
-        cur.downField("visibility").downField("newValue").as[Option[projects.Visibility]]
+      newDesc <- cur
+                   .downField("description")
+                   .success
+                   .fold(Option.empty[Option[projects.Description]].asRight[DecodingFailure]) {
+                     _.as[Option[projects.Description]].map(_.some)
+                   }
+      newImages     <- cur.downField("images").as[Option[List[ImageUri]]]
+      newKeywords   <- cur.downField("keywords").as[Option[List[projects.Keyword]]].map(_.map(_.toSet))
+      newVisibility <- cur.downField("visibility").as[Option[projects.Visibility]]
     } yield ProjectUpdates(newDesc, newImages, newKeywords, newVisibility)
   }
 }
