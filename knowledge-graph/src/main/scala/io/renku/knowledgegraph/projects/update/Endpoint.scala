@@ -28,8 +28,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.ProjectUpdates
+import io.renku.triplesgenerator.api.{ProjectUpdates, TriplesGeneratorClient}
 import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -41,11 +40,11 @@ trait Endpoint[F[_]] {
 
 object Endpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry: GitLabClient]: F[Endpoint[F]] =
-    triplesgenerator.api.Client[F].map(new EndpointImpl(GLProjectUpdater[F], _))
+    TriplesGeneratorClient[F].map(new EndpointImpl(GLProjectUpdater[F], _))
 }
 
 private class EndpointImpl[F[_]: Async: Logger](glProjectUpdater: GLProjectUpdater[F],
-                                                tgClient: triplesgenerator.api.Client[F]
+                                                tgClient: TriplesGeneratorClient[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 

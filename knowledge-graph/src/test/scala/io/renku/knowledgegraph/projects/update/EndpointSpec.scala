@@ -36,8 +36,7 @@ import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.CustomAsyncIOSpec
-import io.renku.triplesgenerator
-import io.renku.triplesgenerator.api.ProjectUpdates
+import io.renku.triplesgenerator.api.{ProjectUpdates, TriplesGeneratorClient}
 import org.http4s.{Request, Status}
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -54,7 +53,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
       val newValues = newValuesGen.generateOne
 
       givenUpdatingProjectInGL(slug, newValues, authUser.accessToken, returning = EitherT.pure[IO, Json](()))
-      givenSyncRepoMetadataSending(slug, newValues, returning = triplesgenerator.api.Client.Result.success(()).pure[IO])
+      givenSyncRepoMetadataSending(slug, newValues, returning = TriplesGeneratorClient.Result.success(()).pure[IO])
 
       endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
         response.pure[IO].asserting(_.status shouldBe Status.Accepted) >>
@@ -117,7 +116,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
     val exception = exceptions.generateOne
     givenSyncRepoMetadataSending(slug,
                                  newValues,
-                                 returning = triplesgenerator.api.Client.Result.failure(exception.getMessage).pure[IO]
+                                 returning = TriplesGeneratorClient.Result.failure(exception.getMessage).pure[IO]
     )
 
     endpoint.`PUT /projects/:slug`(slug, Request[IO]().withEntity(newValues.asJson), authUser) >>= { response =>
@@ -128,7 +127,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
   private implicit val logger: TestLogger[IO] = TestLogger[IO]()
   private val glProjectUpdater = mock[GLProjectUpdater[IO]]
-  private val tgClient         = mock[triplesgenerator.api.Client[IO]]
+  private val tgClient         = mock[TriplesGeneratorClient[IO]]
   private lazy val endpoint    = new EndpointImpl[IO](glProjectUpdater, tgClient)
 
   private def givenUpdatingProjectInGL(slug:      projects.Slug,
@@ -141,7 +140,7 @@ class EndpointSpec extends AsyncFlatSpec with CustomAsyncIOSpec with should.Matc
 
   private def givenSyncRepoMetadataSending(slug:      projects.Slug,
                                            newValues: NewValues,
-                                           returning: IO[triplesgenerator.api.Client.Result[Unit]]
+                                           returning: IO[TriplesGeneratorClient.Result[Unit]]
   ) = (tgClient.updateProject _)
     .expects(slug, ProjectUpdates.empty.copy(newVisibility = newValues.visibility.some))
     .returning(returning)

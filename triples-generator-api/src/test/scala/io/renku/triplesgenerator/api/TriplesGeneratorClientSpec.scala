@@ -34,10 +34,10 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AsyncWordSpec
 import org.typelevel.log4cats.Logger
 
-class ClientSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with ExternalServiceStubbing {
+class TriplesGeneratorClientSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matchers with ExternalServiceStubbing {
 
   private implicit val logger: Logger[IO] = TestLogger()
-  private lazy val client = new ClientImpl[IO](Uri.unsafeFromString(externalServiceBaseUrl))
+  private lazy val client = new TriplesGeneratorClientImpl[IO](Uri.unsafeFromString(externalServiceBaseUrl))
 
   "updateProject" should {
 
@@ -52,7 +52,7 @@ class ClientSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matche
           .willReturn(ok())
       }
 
-      client.updateProject(slug, updates).asserting(_ shouldBe Client.Result.success(()))
+      client.updateProject(slug, updates).asserting(_ shouldBe TriplesGeneratorClient.Result.success(()))
     }
 
     "failed if sending project update to the TG's Project Update API returned other status" in {
@@ -67,7 +67,7 @@ class ClientSpec extends AsyncWordSpec with CustomAsyncIOSpec with should.Matche
 
       client
         .updateProject(slug, updates)
-        .asserting(_ shouldBe Client.Result.failure("Project for update does not exist"))
+        .asserting(_ shouldBe TriplesGeneratorClient.Result.failure("Project for update does not exist"))
     }
   }
 }

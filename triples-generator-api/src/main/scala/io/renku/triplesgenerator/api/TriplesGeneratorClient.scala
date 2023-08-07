@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.api
 
+import TriplesGeneratorClient.Result
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.control.Throttler
@@ -25,21 +26,20 @@ import io.renku.graph.config.TriplesGeneratorUrl
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.api.Client.Result
 import org.http4s.Uri
 import org.http4s.client.dsl.Http4sClientDsl
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
-trait Client[F[_]] {
+trait TriplesGeneratorClient[F[_]] {
   def updateProject(slug: projects.Slug, updates: ProjectUpdates): F[Result[Unit]]
 }
 
-object Client {
+object TriplesGeneratorClient {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[Client[F]] =
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[TriplesGeneratorClient[F]] =
     TriplesGeneratorUrl[F]()
-      .map(tgUrl => new ClientImpl[F](Uri.unsafeFromString(tgUrl.value)))
+      .map(tgUrl => new TriplesGeneratorClientImpl[F](Uri.unsafeFromString(tgUrl.value)))
 
   sealed trait Result[+A] {
     def toEither: Either[Throwable, A]
@@ -60,9 +60,9 @@ object Client {
   }
 }
 
-private class ClientImpl[F[_]: Async: Logger](tgUri: Uri)
+private class TriplesGeneratorClientImpl[F[_]: Async: Logger](tgUri: Uri)
     extends RestClient[F, Nothing](Throttler.noThrottling)
-    with Client[F]
+    with TriplesGeneratorClient[F]
     with Http4sDsl[F]
     with Http4sClientDsl[F] {
 
