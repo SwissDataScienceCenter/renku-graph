@@ -1,3 +1,21 @@
+/*
+ * Copyright 2023 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.triplesstore.client.http
 
 import cats.effect._
@@ -6,16 +24,16 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder, Schema}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should
-import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 import io.renku.triplesstore.client.syntax._
+import io.renku.triplesstore.client.util.JenaContainerSpec
 
 import java.time.Instant
 
-class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matchers {
+class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with JenaContainerSpec with should.Matchers {
   implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
-  val cc = ConnectionConfig(uri"http://localhost:3030/projects", None, None)
+  val dataset = "projects"
 
   val testQuery = sparql"""PREFIX schema: <http://schema.org/>
                           |SELECT * WHERE {
@@ -25,7 +43,7 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
                           |} LIMIT 100""".stripMargin
 
   it should "run sparql queries" in {
-    SparqlClient[IO](cc).use { c =>
+    withDataset(dataset).use { c =>
       for {
         _ <- c.update(
                sparql"""PREFIX schema: <http://schema.org/>
@@ -43,16 +61,20 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
         obj = r.asObject.getOrElse(sys.error(s"Unexpected response: $r"))
         _   = obj("head").get.isObject    shouldBe true
         _   = obj("results").get.isObject shouldBe true
-        _ <- IO.println(r)
-        x <- c.queryDecode[Data](testQuery)
-        _ <- IO.println(x)
+        decoded <- c.queryDecode[Data](testQuery)
+        _ = decoded shouldBe List(
+              Data(
+                "https://tygtmzjt:8901/EWxEPoLMmg/projects/123",
+                Instant.parse("1988-09-21T17:44:42.325Z")
+              )
+            )
       } yield ()
     }
   }
 
   it should "upload jsonld" in {
-    SparqlClient[IO](cc).use { c =>
-      val data = Data("http://localhost/project/123", Instant.now())
+    val data = Data("http://localhost/project/123", Instant.now())
+    withDataset(dataset).use { c =>
       for {
         _ <- c.upload(data.asJsonLD)
         r <- c.queryDecode[Data](SparqlQuery.raw("""PREFIX schema: <http://schema.org/>
@@ -64,7 +86,6 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
                                                    |}
                                                    |""".stripMargin))
         _ = r.contains(data) shouldBe true
-        _ <- IO.println(r)
       } yield ()
     }
   }
@@ -89,5 +110,4 @@ class SparqlClientSpec extends AsyncFlatSpec with AsyncIOSpec with should.Matche
         )
       }
   }
-
 }

@@ -16,19 +16,21 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "triples-store-client"
+package io.renku.triplesstore.client.util
 
-libraryDependencies ++=
-  Dependencies.jsonld4s ++
-    Dependencies.luceneQueryParser ++
-    Dependencies.rdf4jQueryParserSparql ++
-    Dependencies.http4sClient ++
-    Dependencies.http4sCirce
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 
-libraryDependencies ++=
-  (Dependencies.scalacheck ++
-    Dependencies.scalatest ++
-    Dependencies.catsEffectScalaTest ++
-    Dependencies.testContainersScalaTest ++
-    Dependencies.scalatestScalaCheck).map(_ % Test)
+sealed trait JenaRunMode
+
+object JenaRunMode {
+
+  /** A docker container is started creating a port mapping using the given port. */
+  final case class FixedPortContainer(port: Int Refined Positive) extends JenaRunMode
+
+  /** A docker container is started using a random port mapping. */
+  case object GenericContainer extends JenaRunMode
+
+  /** No container is started, it is assumed that Jena is running and accepts connections at the given port */
+  final case class Local(port: Int Refined Positive) extends JenaRunMode
+}

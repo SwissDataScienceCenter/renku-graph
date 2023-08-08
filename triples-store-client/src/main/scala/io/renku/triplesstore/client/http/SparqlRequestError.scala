@@ -16,21 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.triplesstore
+package io.renku.triplesstore.client.http
 
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import cats.effect.Concurrent
+import cats.syntax.all._
+import org.http4s.{EntityDecoder, Response, Status}
 
-sealed trait JenaRunMode
+final case class SparqlRequestError(status: Status, body: String)
+    extends RuntimeException(s"Request failed with status=$status: $body") {
+  override def fillInStackTrace(): Throwable = this
+}
 
-object JenaRunMode {
-
-  /** A docker container is started creating a port mapping using the given port. */
-  final case class FixedPortContainer(port: Int Refined Positive) extends JenaRunMode
-
-  /** A docker container is started using a random port mapping. */
-  case object GenericContainer extends JenaRunMode
-
-  /** No container is started, it is assumed that Jena is running and accepts connections at the given port */
-  final case class Local(port: Int Refined Positive) extends JenaRunMode
+object SparqlRequestError {
+  def apply[F[_]: Concurrent](resp: Response[F]): F[SparqlRequestError] =
+    EntityDecoder.decodeText(resp).map(str => SparqlRequestError(resp.status, str))
 }

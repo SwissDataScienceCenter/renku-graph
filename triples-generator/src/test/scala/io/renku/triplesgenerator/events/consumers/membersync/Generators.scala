@@ -23,6 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, personResourceIds}
 import io.renku.graph.model.RenkuUrl
+import io.renku.projectauth.Role
 import org.scalacheck.Gen
 
 private object Generators {
@@ -30,7 +31,7 @@ private object Generators {
   implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
     id   <- personGitLabIds
     name <- personNames
-  } yield GitLabProjectMember(id, name)
+  } yield GitLabProjectMember(id, name, Role.toGitLabAccessLevel(Role.Owner))
 
   implicit def kgProjectMembers(implicit renkuUrl: RenkuUrl): Gen[KGProjectMember] = for {
     memberId <- personResourceIds

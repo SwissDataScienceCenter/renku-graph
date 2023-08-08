@@ -16,19 +16,15 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "triples-store-client"
+package io.renku.triplesstore.client.http
 
-libraryDependencies ++=
-  Dependencies.jsonld4s ++
-    Dependencies.luceneQueryParser ++
-    Dependencies.rdf4jQueryParserSparql ++
-    Dependencies.http4sClient ++
-    Dependencies.http4sCirce
+import org.http4s.{BasicCredentials, Request}
+import org.http4s.headers.Authorization
 
-libraryDependencies ++=
-  (Dependencies.scalacheck ++
-    Dependencies.scalatest ++
-    Dependencies.catsEffectScalaTest ++
-    Dependencies.testContainersScalaTest ++
-    Dependencies.scalatestScalaCheck).map(_ % Test)
+trait MoreClientDsl[F[_]] {
+
+  final implicit class MoreRequestDsl(req: Request[F]) {
+    def withBasicAuth(cred: Option[BasicCredentials]): Request[F] =
+      cred.map(c => req.putHeaders(Authorization(c))).getOrElse(req)
+  }
+}

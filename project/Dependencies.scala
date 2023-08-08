@@ -132,10 +132,14 @@ object Dependencies {
     "org.typelevel" %% "log4cats-core" % V.log4cats
   )
 
-  val testContainersPostgres = Seq(
-    "com.dimafeng" %% "testcontainers-scala-scalatest"  % V.testContainersScala,
-    "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+  val testContainersScalaTest = Seq(
+    "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersScala
   )
+  val testContainersPostgres =
+    testContainersScalaTest ++
+      Seq(
+        "com.dimafeng" %% "testcontainers-scala-postgresql" % V.testContainersScala
+      )
 
   val wiremock = Seq(
     "com.github.tomakehurst" % "wiremock-jre8" % V.wiremock

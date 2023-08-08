@@ -65,6 +65,13 @@ object Role {
       case _            => Reader
     }
 
+  def toGitLabAccessLevel(role: Role): Int =
+    role match {
+      case Role.Owner      => 50
+      case Role.Maintainer => 40
+      case Role.Reader     => 20
+    }
+
   implicit val ordering: Ordering[Role] =
     Ordering.by(r => -all.toList.indexOf(r))
 

@@ -18,14 +18,14 @@
 
 package io.renku.projectauth
 
-import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.projects.{Slug, ResourceId, Visibility}
 import io.renku.graph.model.{RenkuUrl, Schemas}
 import io.renku.jsonld.JsonLD.JsonLDArray
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
 final case class ProjectAuthData(
-    path:       Path,
+    path:       Slug,
     members:    Set[ProjectMember],
     visibility: Visibility
 )
